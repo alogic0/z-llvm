@@ -463,35 +463,38 @@ Passes covered:
 Goal: implement late scalar rewrites that LLVM uses before machine code only
 after call, target, and DataLayout facts are available.
 
-- [ ] Add algorithm contracts for lower-expect, div-rem-pairs, tailcallelim,
+- [x] Add algorithm contracts for lower-expect, div-rem-pairs, tailcallelim,
       libcalls-shrinkwrap, and TargetLibraryInfo-backed transforms.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp`,
       `llvm/lib/Transforms/Scalar/DivRemPairs.cpp`,
       `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp`,
       `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp`, and
       `llvm/include/llvm/Analysis/TargetLibraryInfo.h`.
-- [ ] Add TargetLibraryInfo-style inventory for Zig targets.
-- [ ] Implement conservative `lower-expect` support if `llvm.expect` enters IR.
-- [ ] Implement `div-rem-pairs` only after target cost/operation lowering
-      policies exist.
-- [ ] Keep `float2int` as an explicit placeholder until floating-point IR and
+- [x] Add TargetLibraryInfo-style inventory for Zig targets.
+- [x] Keep `lower-expect` as an explicit placeholder until `llvm.expect` enters
+      IR.
+- [x] Keep `div-rem-pairs` as an explicit placeholder until target
+      cost/operation lowering policies exist.
+- [x] Keep `float2int` as an explicit placeholder until floating-point IR and
       target legality are represented.
-- [ ] Implement `tailcallelim` only after call lowering and ABI constraints are
-      represented.
-- [ ] Implement `libcalls-shrinkwrap` only with target-library facts.
-- [ ] Add `inject-tli-mappings` only when vector library mappings matter.
-- [ ] Keep transformations target-aware and mode-aware.
+- [x] Keep `tailcallelim` as an explicit placeholder until call lowering and ABI
+      constraints are represented.
+- [x] Keep `libcalls-shrinkwrap` as an explicit placeholder backed by the new
+      TargetLibraryInfo foundation.
+- [x] Add `inject-tli-mappings` as an explicit placeholder until vector library
+      mappings matter.
+- [x] Keep transformations target-aware and mode-aware.
 
 Passes covered:
 
-- [ ] `lower-expect`
-- [ ] `div-rem-pairs`
-- [ ] `float2int` placeholder
-- [ ] `tailcallelim`
-- [ ] `libcalls-shrinkwrap`
-- [ ] `inject-tli-mappings`
-- [ ] `rel-lookup-table-converter` placeholder
+- [x] `lower-expect`
+- [x] `div-rem-pairs`
+- [x] `float2int` placeholder
+- [x] `tailcallelim`
+- [x] `libcalls-shrinkwrap`
+- [x] `inject-tli-mappings`
+- [x] `rel-lookup-table-converter` placeholder
 
 ## Epic 12: Instrumentation, Sanitizers, Debug/Profile Metadata
 

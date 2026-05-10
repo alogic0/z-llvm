@@ -332,6 +332,12 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "jump-threading")) return placeholder.make("jump-threading", .scalar, "llvm/lib/Transforms/Scalar/JumpThreading.cpp");
     if (std.mem.eql(u8, name, "correlated-propagation")) return placeholder.make("correlated-propagation", .scalar, "llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp");
     if (std.mem.eql(u8, name, "tailcallelim")) return placeholder.make("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp");
+    if (std.mem.eql(u8, name, "lower-expect")) return placeholder.make("lower-expect", .codegen_prep, "llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp");
+    if (std.mem.eql(u8, name, "div-rem-pairs")) return placeholder.make("div-rem-pairs", .codegen_prep, "llvm/lib/Transforms/Scalar/DivRemPairs.cpp");
+    if (std.mem.eql(u8, name, "float2int")) return placeholder.make("float2int", .codegen_prep, "llvm/lib/Transforms/Scalar/Float2Int.cpp");
+    if (std.mem.eql(u8, name, "libcalls-shrinkwrap")) return placeholder.make("libcalls-shrinkwrap", .codegen_prep, "llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp");
+    if (std.mem.eql(u8, name, "inject-tli-mappings")) return placeholder.make("inject-tli-mappings", .codegen_prep, "llvm/lib/Transforms/Utils/InjectTLIMappings.cpp");
+    if (std.mem.eql(u8, name, "rel-lookup-table-converter")) return placeholder.make("rel-lookup-table-converter", .codegen_prep, "llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp");
     if (std.mem.eql(u8, name, "memcpyopt")) return placeholder.make("memcpyopt", .memory, "llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp");
     if (std.mem.eql(u8, name, "mldst-motion")) return placeholder.make("mldst-motion", .memory, "llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp");
     if (std.mem.eql(u8, name, "infer-alignment")) return placeholder.make("infer-alignment", .memory, "llvm/lib/Transforms/Scalar/InferAlignment.cpp");

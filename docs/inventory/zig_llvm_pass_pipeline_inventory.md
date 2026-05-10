@@ -190,9 +190,9 @@ Status meanings:
 | `constraint-elimination` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |
 | `speculative-execution` | scalar/code motion | P3 | placeholder | `llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp` |
 | `tailcallelim` | call/CFG | P2 | placeholder | `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp` |
-| `div-rem-pairs` | scalar/codegen prep | P2 | missing | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
-| `float2int` | scalar | P3 | defer | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |
-| `lower-expect` | canonicalization / profiling metadata | P2 | missing | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
+| `div-rem-pairs` | scalar/codegen prep | P2 | placeholder | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
+| `float2int` | scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |
+| `lower-expect` | canonicalization / profiling metadata | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
 | `lower-constant-intrinsics` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp` |
 | `drop-unnecessary-assumes` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp` |
 | `infer-alignment` | memory / target facts | P2 | placeholder | `llvm/lib/Transforms/Scalar/InferAlignment.cpp` |
@@ -223,8 +223,8 @@ Status meanings:
 | `require<profile-summary>` | analysis plumbing | P3 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `require<should-not-run-function-passes>` | pipeline guard | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `openmp-opt`, `openmp-opt-cgscc` | OpenMP IPO | P3 | defer | `llvm/lib/Transforms/IPO/OpenMPOpt.cpp` |
-| `libcalls-shrinkwrap` | library-call optimization | P3 | missing | `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp` |
-| `inject-tli-mappings` | TLI/vector library metadata | P3 | missing | `llvm/lib/Transforms/Utils/InjectTLIMappings.cpp` |
+| `libcalls-shrinkwrap` | library-call optimization | P3 | placeholder | `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp` |
+| `inject-tli-mappings` | TLI/vector library metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/InjectTLIMappings.cpp` |
 | `loop-vectorize` | vectorization | P3 | defer | `llvm/lib/Transforms/Vectorize/LoopVectorize.cpp` |
 | `slp-vectorizer` | vectorization | P3 | defer | `llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp` |
 | `vector-combine` | vector canonicalization | P3 | defer | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
@@ -243,7 +243,7 @@ Status meanings:
 | `memprof-remove-attributes` | MemProf cleanup | P3 | defer | `llvm/lib/Transforms/Instrumentation/MemProfUse.cpp` |
 | `canonicalize-aliases` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
 | `name-anon-globals` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp` |
-| `rel-lookup-table-converter` | codegen/linker prep | P3 | defer | `llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp` |
+| `rel-lookup-table-converter` | codegen/linker prep | P3 | placeholder | `llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp` |
 | `transform-warning` | diagnostics | P3 | defer | `llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp` |
 
 ## Immediate Replacement Order

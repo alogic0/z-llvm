@@ -15,6 +15,7 @@ const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
+const target_library_info = @import("analysis/target_library_info.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
@@ -160,7 +161,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,constmerge,elim-avail-extern,recompute-globalsaa,globals-aa,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,lower-expect,div-rem-pairs,float2int,libcalls-shrinkwrap,inject-tli-mappings,rel-lookup-table-converter,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,constmerge,elim-avail-extern,recompute-globalsaa,globals-aa,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -355,6 +356,18 @@ test "target triple parser accepts compact wasm32 wasi spelling" {
     try std.testing.expect(triple.isWasi());
     try std.testing.expectEqualStrings("unknown", triple.vendor);
     try std.testing.expectEqual(target.SupportedTarget.wasm32_wasi, triple.supportedTarget().?);
+}
+
+test "target library info exposes conservative per-target libcalls" {
+    const linux = target_library_info.Info.init(try target.Triple.parse("x86_64-unknown-linux-gnu"));
+    try std.testing.expect(linux.has(.memcpy));
+    try std.testing.expect(linux.has(.sqrt));
+    try std.testing.expect(linux.hasName("memset"));
+    try std.testing.expect(!linux.hasName("unknown_libcall"));
+
+    const wasi = target_library_info.Info.init(try target.Triple.parse("wasm32-wasi"));
+    try std.testing.expect(wasi.has(.memcpy));
+    try std.testing.expect(!wasi.has(.sqrt));
 }
 
 test "target ABI classifies scalar function signatures" {
