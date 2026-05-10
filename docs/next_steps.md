@@ -6,7 +6,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 ### Cycle 6: Select and Unreachable Control Flow
 
-- [ ] Add `unreachable` terminator parsing, printing, verification, CFG handling, and upstream LLVM mapping.
+- [x] Add `unreachable` terminator parsing, printing, verification, CFG handling, and upstream LLVM mapping.
 - [ ] Add `select` instruction parsing, printing, verification, def-use tracking, and upstream LLVM mapping.
 - [ ] Extend `instcombine` to fold simple `select` forms: constant condition and identical arms.
 - [ ] Extend value replacement paths across `select` so `instcombine`, `simplifycfg`, and `mem2reg` keep select operands current.
@@ -107,3 +107,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - Memory IR now parses, prints, and verifies a first opaque-pointer `getelementptr` form.
 - Alias analysis now traces simple `getelementptr` values back to stack-slot roots and distinguishes zero-offset must-alias from conservative same-root may-alias.
 - `opt-22` comparison fixtures now cover escaped stack-slot rejection, stored stack-slot pointer rejection, and GEP-backed memory that remains unpromoted.
+- Control-flow IR now supports the `unreachable` terminator, documented in [ir_control_flow.md](ir_control_flow.md).

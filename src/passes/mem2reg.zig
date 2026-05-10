@@ -96,6 +96,7 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
         if (block.terminator) |terminator| switch (terminator) {
             .ret => |ret| if (isNamed(ret.value, slot)) return false,
             .br => {},
+            .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
         };
     }
@@ -329,6 +330,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
         if (block.terminator) |terminator| switch (terminator) {
             .ret => |ret| if (isNamed(ret.value, slot)) return false,
             .br => {},
+            .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
         };
     }
@@ -420,6 +422,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
         if (block.terminator) |*terminator| switch (terminator.*) {
             .ret => |*ret| ret.value = replaceOperand(ret.value, name, replacement),
             .br => {},
+            .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
         };
     }

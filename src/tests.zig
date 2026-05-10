@@ -181,6 +181,21 @@ test "parser normalizes multiple functions and branch terminators" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes unreachable terminator" {
+    const input =
+        \\define i32 @trap() {
+        \\entry:
+        \\  unreachable
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "parser normalizes icmp instructions" {
     const input =
         \\define i1 @cmp(i32 %a) {

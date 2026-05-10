@@ -28,6 +28,7 @@ pub const Graph = struct {
             const terminator = block.terminator orelse continue;
             switch (terminator) {
                 .ret => {},
+                .@"unreachable" => {},
                 .br => |br| try graph.addEdge(function, block_index, br.target),
                 .condbr => |condbr| {
                     try graph.addEdge(function, block_index, condbr.then_target);

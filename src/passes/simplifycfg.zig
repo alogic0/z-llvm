@@ -36,7 +36,9 @@ fn simplifyTerminators(function: *ir.Function) bool {
                     changed = true;
                 }
             },
-            .ret, .br => {},
+            .ret => {},
+            .br => {},
+            .@"unreachable" => {},
         }
     }
     return changed;
@@ -53,7 +55,9 @@ fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function
         for (function.blocks.items, 0..) |*block, block_index| {
             const br = switch (block.terminator orelse continue) {
                 .br => |br| br,
-                .ret, .condbr => continue,
+                .ret => continue,
+                .condbr => continue,
+                .@"unreachable" => continue,
             };
             const target_index = function.blockIndex(br.target) orelse continue;
             if (target_index == block_index) continue;
@@ -215,6 +219,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
         if (block.terminator) |*terminator| switch (terminator.*) {
             .ret => |*ret| ret.value = replaceOperand(ret.value, name, replacement),
             .br => {},
+            .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
         };
     }

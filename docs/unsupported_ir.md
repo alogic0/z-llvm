@@ -19,6 +19,7 @@ getelementptr instructions
 ret
 br label %target
 br i1 <value>, label %then, label %else
+unreachable
 integer constants
 undef constants
 named SSA values
@@ -50,7 +51,6 @@ division/remainder
 bitwise operations
 shifts
 switch
-unreachable
 landingpad/cleanupret/catchret
 atomicrmw/cmpxchg/fence
 inline asm
@@ -124,7 +124,13 @@ Def-use subset:
 
 Memory IR subset:
   opaque ptr type
-  alloca/load/store parsing, printing, and verification
+  alloca/load/store/getelementptr parsing, printing, and verification
+
+Control-flow IR subset:
+  ret
+  br
+  conditional br
+  unreachable
 
 Value subset:
   named SSA values

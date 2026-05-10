@@ -241,6 +241,7 @@ pub const Terminator = union(enum) {
         then_target: []const u8,
         else_target: []const u8,
     },
+    @"unreachable",
 };
 
 pub const BasicBlock = struct {
@@ -365,6 +366,12 @@ pub const Module = struct {
             if (std.mem.startsWith(u8, line, "br ")) {
                 if (block.terminator != null) return error.MultipleTerminators;
                 block.terminator = try parseBr(line);
+                continue;
+            }
+
+            if (std.mem.eql(u8, line, "unreachable")) {
+                if (block.terminator != null) return error.MultipleTerminators;
+                block.terminator = .{ .@"unreachable" = {} };
                 continue;
             }
 
@@ -495,6 +502,7 @@ pub const Module = struct {
                         try condbr.cond.format(writer);
                         try writer.print(", label %{s}, label %{s}\n", .{ condbr.then_target, condbr.else_target });
                     },
+                    .@"unreachable" => try writer.writeAll("  unreachable\n"),
                 };
             }
 
@@ -575,6 +583,7 @@ pub const Module = struct {
                         try verifyBlockTarget(function, condbr.then_target);
                         try verifyBlockTarget(function, condbr.else_target);
                     },
+                    .@"unreachable" => {},
                 }
             }
         }

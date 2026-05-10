@@ -91,6 +91,7 @@ pub const UseCounts = struct {
         switch (terminator) {
             .ret => |ret| try uses.addValue(ret.value),
             .br => {},
+            .@"unreachable" => {},
             .condbr => |condbr| try uses.addValue(condbr.cond),
         }
     }
