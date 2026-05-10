@@ -110,7 +110,7 @@ Suggested slice boundary:
 
 ## 4. AIR-Like Input Bridge
 
-- [ ] Define a tiny AIR-like test input format or helper builder inside `src/tools/` or tests, not a full Zig frontend.
+- [x] Define a tiny AIR-like test input format or helper builder inside `src/tools/` or tests, not a full Zig frontend.
 - [ ] Lower scalar integer arithmetic into the project IR: add/sub/mul/bitwise/shift/casts.
 - [ ] Lower control flow into the project IR: blocks, conditional branch, return, unreachable.
 - [ ] Lower stack memory into the project IR: alloca/load/store/GEP for scalar stack slots.
@@ -120,7 +120,7 @@ Suggested slice boundary:
 
 Suggested slice boundary:
 
-- [ ] Define the bridge input as a test/build helper format with a stable
+- [x] Define the bridge input as a test/build helper format with a stable
       printer, so failures can be reduced without invoking the whole Zig
       compiler every time.
 - [ ] Add bridge output before optimization and after the named optimizer

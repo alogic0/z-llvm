@@ -92,6 +92,7 @@ module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
 ABI classification beyond void, scalar integer, and pointer signatures
+AIR-like lowering beyond one-entry-block scalar binary functions
 ```
 
 ## Current Parser Errors
@@ -184,6 +185,7 @@ Module IR subset:
   raw global suffix attributes
   initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
   scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
+  AIR-like helper lowering for one-entry-block scalar binary functions
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc
@@ -240,6 +242,8 @@ semantic global variable use in optimizations
 visibility and attributes with semantic effects
 calling convention ABI semantics
 aggregate, floating-point, vector, varargs, byval, sret, register, and stack ABI classification
+full AIR parser and full Zig AIR semantics
+AIR-like control flow, stack memory, loops, calls, casts, comparisons, aggregates, comptime, errors, async, and debug info
 function declarations
 attribute groups
 module metadata

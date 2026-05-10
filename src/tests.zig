@@ -1,4 +1,5 @@
 const std = @import("std");
+const air_bridge = @import("air_bridge.zig");
 const alias = @import("analysis/alias.zig");
 const cfg = @import("analysis/cfg.zig");
 const codegen = @import("codegen.zig");
@@ -199,6 +200,58 @@ test "target ABI classifies scalar function signatures" {
 
         try std.testing.expectError(error.UnsupportedAbiType, target.abi.classifyParam(triple, layout, .void));
     }
+}
+
+test "AIR-like bridge lowers scalar binary function" {
+    const params = [_]air_bridge.Param{
+        .{ .name = "a", .ty = .{ .int = 32 } },
+        .{ .name = "b", .ty = .{ .int = 32 } },
+    };
+    const binaries = [_]air_bridge.Binary{
+        .{
+            .result = "sum",
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "a" },
+            .rhs = .{ .named = "b" },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "add",
+            .ret_ty = .{ .int = 32 },
+            .params = &params,
+            .binaries = &binaries,
+            .ret = .{ .named = "sum" },
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .source_filename = "air-like",
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .target_datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\source_filename = "air-like"
+        \\target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @add(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
 test "parser preserves module target records and void return" {
