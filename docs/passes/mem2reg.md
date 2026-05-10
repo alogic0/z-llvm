@@ -30,6 +30,7 @@ one multi-block stack slot per pass invocation
 multiple independent stack slots promoted until no promotable alloca remains
 alloca discovery restricted to the function entry block
 only direct load/store users of the alloca pointer are promotable
+volatile and atomic load/store users are rejected as memory barriers
 loads before the first store keep the slot unpromoted
 uninitialized promoted loads are replaced with undef
 dominance-frontier phi placement for join blocks
@@ -48,6 +49,8 @@ alloca result used by arithmetic, icmp, phi, or another non-memory instruction
 alloca result stored as a value into memory
 alloca result used by any memory instruction other than direct load/store of that exact pointer
 alloca outside the function entry block
+volatile load/store through the alloca
+atomic load/store through the alloca
 alloca forms with array counts, alignment, address spaces, or non-parsed type syntax
 ```
 
@@ -57,6 +60,7 @@ Upstream mapping:
 This reproduces LLVM mem2reg's same-block scalar replacement and the first dominance-frontier phi-placement plus rename-walk shape.
 LLVM's `Mem2Reg.cpp` pass wrapper finds promotable allocas by scanning only `Function::getEntryBlock`; this project follows that entry-block discovery rule.
 The promotability filter maps to LLVM's `isAllocaPromotable`: this subset accepts only direct non-volatile load/store users and rejects escapes conservatively.
+LLVM rejects volatile load/store users. LLVM permits atomic load/store users on local allocas, but this project currently rejects atomic users too because the shared memory-effect model treats atomic instructions as barriers until a more precise local-alloca exception is implemented.
 LLVM's PromoteMemToReg promotes many allocas per run and supports precise debug-info assignment tracking, lifetime intrinsics, unreachable uses, and poison/undef details for uninitialized loads.
 This subset models the basic uninitialized-load result as `undef`, but does not yet implement LLVM's full poison/undef semantics.
 ```
@@ -74,10 +78,12 @@ opt-22 equivalent:
   mem2reg_escape
   mem2reg_store_slot
   mem2reg_non_entry_alloca
+  mem2reg_volatile_load
+  mem2reg_volatile_store
   gep_memory
 
 local-only conservative:
-  none currently
+  atomic alloca users are rejected by unit tests, while LLVM mem2reg can promote atomic local alloca accesses
 
 unit-test only:
   single-block promotion behavior

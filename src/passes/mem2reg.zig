@@ -67,11 +67,13 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
 
             switch (instruction.kind) {
                 .load => |load| {
-                    if (isNamed(load.ptr, slot)) continue;
+                    if (!isNamed(load.ptr, slot)) continue;
+                    if (load.attrs.isBarrier()) return false;
                 },
                 .store => |store| {
                     if (isNamed(store.value, slot)) return false;
-                    if (isNamed(store.ptr, slot)) continue;
+                    if (!isNamed(store.ptr, slot)) continue;
+                    if (store.attrs.isBarrier()) return false;
                 },
                 .binary => |binary| {
                     if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
@@ -311,11 +313,13 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             switch (instruction.kind) {
                 .load => |load| {
                     if (!isNamed(load.ptr, slot)) continue;
+                    if (load.attrs.isBarrier()) return false;
                     if (block_index != slot_block_index) return false;
                 },
                 .store => |store| {
                     if (isNamed(store.value, slot)) return false;
                     if (!isNamed(store.ptr, slot)) continue;
+                    if (store.attrs.isBarrier()) return false;
                     if (block_index != slot_block_index) return false;
                 },
                 .binary => |binary| {

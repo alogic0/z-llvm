@@ -118,7 +118,7 @@ DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, and empty-block threading subsets
 EarlyCSE: same-block repeated pure-expression elimination subset
-Mem2Reg: entry-block alloca discovery plus single-block, multi-block, undef, and multi-slot stack promotion subsets
+Mem2Reg: entry-block alloca discovery plus single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets
 SROA: zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset

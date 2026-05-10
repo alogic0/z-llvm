@@ -2098,6 +2098,64 @@ test "mem2reg ignores non-entry allocas" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "mem2reg rejects volatile alloca users" {
+    const input =
+        \\define i32 @volatile_alloca(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store volatile i32 %a, ptr %slot, align 4
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "mem2reg rejects atomic alloca users as local barriers" {
+    const input =
+        \\define i32 @atomic_alloca(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store atomic i32 %a, ptr %slot, release, align 4
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

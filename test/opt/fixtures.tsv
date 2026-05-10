@@ -29,5 +29,7 @@ mem2reg_unreachable	simplifycfg,mem2reg	simplifycfg,mem2reg	test/opt/inputs/mem2
 mem2reg_escape	mem2reg	mem2reg	test/opt/inputs/mem2reg_escape.ll	test/opt/expected/z_llvm/mem2reg_escape.ll	escaped stack slot is not promotable
 mem2reg_store_slot	mem2reg	mem2reg	test/opt/inputs/mem2reg_store_slot.ll	test/opt/expected/z_llvm/mem2reg_store_slot.ll	stored stack-slot pointer is not promotable
 mem2reg_non_entry_alloca	mem2reg	mem2reg	test/opt/inputs/mem2reg_non_entry_alloca.ll	test/opt/expected/z_llvm/mem2reg_non_entry_alloca.ll	non-entry allocas are outside LLVM mem2reg discovery
+mem2reg_volatile_load	mem2reg	mem2reg	test/opt/inputs/mem2reg_volatile_load.ll	test/opt/expected/z_llvm/mem2reg_volatile_load.ll	volatile alloca load is not promotable
+mem2reg_volatile_store	mem2reg	mem2reg	test/opt/inputs/mem2reg_volatile_store.ll	test/opt/expected/z_llvm/mem2reg_volatile_store.ll	volatile alloca store is not promotable
 gep_memory	mem2reg	mem2reg	test/opt/inputs/gep_memory.ll	test/opt/expected/z_llvm/gep_memory.ll	GEP user keeps stack slot unpromoted
 sroa_zero_gep	sroa	sroa	test/opt/inputs/sroa_zero_gep.ll	test/opt/expected/z_llvm/sroa_zero_gep.ll	zero-offset GEP alloca forwarding enables promotion

@@ -11,4 +11,14 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle.
+### Cycle 38: Mem2Reg Memory Attribute Barriers
+
+Source epic: none; source-level alignment correction from upstream LLVM review.
+Epic sections: n/a
+
+- [x] Reject volatile and atomic load/store users in `mem2reg` promotability.
+- [x] Add `opt-22` comparison fixtures for volatile load/store alloca users.
+- [x] Add local coverage for atomic alloca barriers.
+- [x] Update `docs/passes/mem2reg.md` and `docs/testing.md` with the memory-attribute boundary.
+- [x] Run `zig fmt`, `zig build test`, and `bash scripts/compare_opt.sh`.
+- [ ] Clear `docs/next_steps.md` after committing the implementation.
