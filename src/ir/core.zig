@@ -54,11 +54,23 @@ pub const BinaryOp = enum {
     add,
     sub,
     mul,
+    @"and",
+    @"or",
+    xor,
+    shl,
+    lshr,
+    ashr,
 
     pub fn parse(text: []const u8) ?BinaryOp {
         if (std.mem.eql(u8, text, "add")) return .add;
         if (std.mem.eql(u8, text, "sub")) return .sub;
         if (std.mem.eql(u8, text, "mul")) return .mul;
+        if (std.mem.eql(u8, text, "and")) return .@"and";
+        if (std.mem.eql(u8, text, "or")) return .@"or";
+        if (std.mem.eql(u8, text, "xor")) return .xor;
+        if (std.mem.eql(u8, text, "shl")) return .shl;
+        if (std.mem.eql(u8, text, "lshr")) return .lshr;
+        if (std.mem.eql(u8, text, "ashr")) return .ashr;
         return null;
     }
 

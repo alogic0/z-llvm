@@ -55,13 +55,7 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
 
 fn foldBinary(binary: ir.BinaryInst) ?ir.Value {
     if (binary.lhs == .int and binary.rhs == .int) {
-        const lhs = binary.lhs.int;
-        const rhs = binary.rhs.int;
-        return .{ .int = switch (binary.op) {
-            .add => lhs + rhs,
-            .sub => lhs - rhs,
-            .mul => lhs * rhs,
-        } };
+        if (foldBinaryConstants(binary)) |replacement| return replacement;
     }
 
     return switch (binary.op) {
@@ -77,6 +71,57 @@ fn foldBinary(binary: ir.BinaryInst) ?ir.Value {
         else if (isOne(binary.lhs))
             binary.rhs
         else if (isZero(binary.rhs) or isZero(binary.lhs))
+            .{ .int = 0 }
+        else
+            null,
+        .@"and" => if (isZero(binary.rhs) or isZero(binary.lhs))
+            .{ .int = 0 }
+        else if (isAllOnes(binary.rhs))
+            binary.lhs
+        else if (isAllOnes(binary.lhs))
+            binary.rhs
+        else if (binary.lhs.eql(binary.rhs))
+            binary.lhs
+        else
+            null,
+        .@"or" => if (isZero(binary.rhs))
+            binary.lhs
+        else if (isZero(binary.lhs))
+            binary.rhs
+        else if (binary.lhs.eql(binary.rhs))
+            binary.lhs
+        else
+            null,
+        .xor => if (isZero(binary.rhs))
+            binary.lhs
+        else if (isZero(binary.lhs))
+            binary.rhs
+        else if (binary.lhs.eql(binary.rhs))
+            .{ .int = 0 }
+        else
+            null,
+        .shl, .lshr, .ashr => if (isZero(binary.rhs))
+            binary.lhs
+        else if (isZero(binary.lhs))
+            .{ .int = 0 }
+        else
+            null,
+    };
+}
+
+fn foldBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
+    const lhs = binary.lhs.int;
+    const rhs = binary.rhs.int;
+    return switch (binary.op) {
+        .add => .{ .int = lhs + rhs },
+        .sub => .{ .int = lhs - rhs },
+        .mul => .{ .int = lhs * rhs },
+        .@"and" => .{ .int = lhs & rhs },
+        .@"or" => .{ .int = lhs | rhs },
+        .xor => .{ .int = lhs ^ rhs },
+        .shl, .lshr, .ashr => if (rhs == 0)
+            .{ .int = lhs }
+        else if (lhs == 0)
             .{ .int = 0 }
         else
             null,
@@ -113,4 +158,8 @@ fn isZero(value: ir.Value) bool {
 
 fn isOne(value: ir.Value) bool {
     return value == .int and value.int == 1;
+}
+
+fn isAllOnes(value: ir.Value) bool {
+    return value == .int and value.int == -1;
 }

@@ -14,6 +14,12 @@ InstructionCombiningPass
 InstCombinerImpl::visitAdd
 InstCombinerImpl::visitSub
 InstCombinerImpl::visitMul
+InstCombinerImpl::visitAnd
+InstCombinerImpl::visitOr
+InstCombinerImpl::visitXor
+InstCombinerImpl::visitShl
+InstCombinerImpl::visitLShr
+InstCombinerImpl::visitAShr
 InstCombinerImpl::visitICmpInst
 InstCombinerImpl::visitSelectInst
 ```
@@ -31,6 +37,18 @@ x * 1 -> x
 x * 0 -> 0
 0 * x -> 0
 integer constant folding for add/sub/mul
+integer constant folding for and/or/xor
+x & 0 -> 0
+x & -1 -> x
+x & x -> x
+x | 0 -> x
+x | x -> x
+x ^ 0 -> x
+x ^ x -> 0
+x << 0 -> x
+x >> 0 -> x for logical and arithmetic shift
+0 << x -> 0
+0 >> x -> 0 for logical and arithmetic shift
 icmp eq/ne constant folding
 icmp eq/ne same-operand folding
 select constant-condition folding
@@ -62,6 +80,7 @@ Known gaps:
 no flags such as nsw/nuw/exact
 no poison/undef/freeze handling
 no vectors
+no width-aware constant folding for non-zero shifts
 no icmp predicates other than eq/ne
 no casts
 no canonical reassociation
