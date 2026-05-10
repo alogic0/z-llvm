@@ -39,10 +39,21 @@ load results are replaced with the current SSA value
 promoted alloca/load/store instructions are removed from printed IR
 ```
 
+Rejected stack slots:
+
+```text
+alloca result returned or used by a terminator
+alloca result used by arithmetic, icmp, phi, or another non-memory instruction
+alloca result stored as a value into memory
+alloca result used by any memory instruction other than direct load/store of that exact pointer
+alloca forms with array counts, alignment, address spaces, or non-parsed type syntax
+```
+
 Upstream mapping:
 
 ```text
 This reproduces LLVM mem2reg's same-block scalar replacement and the first dominance-frontier phi-placement plus rename-walk shape.
+The promotability filter maps to LLVM's `isAllocaPromotable`: this subset accepts only direct non-volatile load/store users and rejects escapes conservatively.
 LLVM's PromoteMemToReg promotes many allocas per run and supports precise debug-info assignment tracking, lifetime intrinsics, unreachable uses, and poison/undef details for uninitialized loads.
 This subset models the basic uninitialized-load result as `undef`, but does not yet implement LLVM's full poison/undef semantics.
 ```
