@@ -4,7 +4,17 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+### Cycle 14: Scalar IR Expansion
+
+Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+- [ ] Add integer cast IR support for `trunc`, `zext`, and `sext`: parsing, printing, verification, def-use, normalization, and unsupported-form errors, with upstream LLVM mapping.
+- [ ] Add integer division and remainder IR support for `udiv`, `sdiv`, `urem`, and `srem`, with conservative verifier checks and no unsafe folding, with upstream LLVM mapping.
+- [ ] Parse and preserve selected instruction flags where needed for round-tripping, starting with `nsw`, `nuw`, and `exact`, without using them for transforms until documented safe.
+- [ ] Decide whether `freeze` is needed for this slice; either implement parse/print/verify or document why it remains out of scope for current comparison fixtures.
+- [ ] Update `unsupported_ir.md`, `ir_values.md`, scalar pass docs, and the inventory current-coverage section for the new scalar surface and remaining poison/flag gaps.
+- [ ] Add `opt-22` equivalent fixtures and local tests for accepted scalar IR round-tripping and conservative no-fold behavior.
+- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
 
 ## Completed Cycles
 
