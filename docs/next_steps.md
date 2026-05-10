@@ -5,7 +5,7 @@
 - [x] Implement `simplifycfg` for trivial branch and unreachable-block cleanup.
 - [x] Add `opt` comparison fixtures for `instcombine`, `dce`, and `simplifycfg`.
 - [x] Add def-use maintenance instead of recomputing usage ad hoc.
-- [ ] Document unsupported LLVM IR constructs and parser errors.
+- [x] Document unsupported LLVM IR constructs and parser errors.
 
 ## Reproduced LLVM Algorithms
 
@@ -23,3 +23,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `simplifycfg` now folds constant conditional branches and removes blocks unreachable from function entry.
 - `opt` comparison fixtures now exist for `instcombine`, `dce`, and `simplifycfg`; `opt` was not available in this environment, so the committed verification covers the `z_llvm` side of each fixture.
 - DCE now uses a shared def-use use-count analysis and decrements operand uses as instructions are removed.
+- Unsupported LLVM IR constructs and current parser errors are tracked in [unsupported_ir.md](unsupported_ir.md).
