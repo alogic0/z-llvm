@@ -59,6 +59,7 @@ initial target matrix recognition for x86_64-linux-gnu, x86_64-linux-musl, aarch
 target datalayout preservation and pointer/integer alignment queries
 scalar ABI classification for void, integer, and pointer signatures
 AIR-like scalar builder lowering for tiny binary and cast functions
+AIR-like control-flow builder lowering for conditional branches, returns, and unreachable
 source_filename preservation
 scalar global and constant global preservation
 function linkage and raw function-header attribute preservation
@@ -109,7 +110,7 @@ LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing, initial target matrix recognition, minimal DataLayout query subset, and scalar ABI classification
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
-AIR-like bridge: tiny scalar binary and cast function lowering into project IR
+AIR-like bridge: tiny scalar binary/cast and control-flow function lowering into project IR
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 

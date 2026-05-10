@@ -22,6 +22,9 @@ FuncGen.airBitOr
 FuncGen.airBitXor
 FuncGen.airIntCast
 FuncGen.airRet
+FuncGen.airBr
+FuncGen.airCondBr
+FuncGen.airUnreach
 FuncGen.airRetLoad
 FuncGen.resolveInst
 IRBuilderBase::CreateAdd
@@ -34,10 +37,11 @@ Implemented subset:
 test/helper builder, not a text input language
 module source_filename, target triple, and datalayout preservation
 one-entry-block functions
+explicit basic blocks
 scalar integer parameters
 scalar integer binary operations
 scalar integer casts: trunc, zext, sext
-return of a scalar SSA value or constant
+return, branch, conditional branch, and unreachable terminators
 ```
 
 Upstream mapping:
@@ -60,6 +64,7 @@ local-only conservative:
 unit-test only:
   scalar add function with two i32 parameters and an SSA return
   scalar sub/and/shl arithmetic with zext return
+  conditional branch to return and unreachable blocks
   target triple and datalayout preservation on lowered modules
 ```
 
@@ -68,7 +73,6 @@ Known gaps:
 ```text
 no AIR text parser
 no full Zig AIR semantics
-no control-flow builder beyond a single entry block
 no stack memory lowering
 no loops
 no calls

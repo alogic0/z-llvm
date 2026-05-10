@@ -22,12 +22,37 @@ pub const Cast = struct {
     to_ty: ir.Type,
 };
 
+pub const Terminator = union(enum) {
+    ret: struct {
+        ty: ir.Type,
+        value: ?ir.Value = null,
+    },
+    br: struct {
+        target: []const u8,
+    },
+    condbr: struct {
+        cond_ty: ir.Type,
+        cond: ir.Value,
+        then_target: []const u8,
+        else_target: []const u8,
+    },
+    @"unreachable",
+};
+
+pub const Block = struct {
+    name: []const u8,
+    binaries: []const Binary = &.{},
+    casts: []const Cast = &.{},
+    terminator: Terminator,
+};
+
 pub const Function = struct {
     name: []const u8,
     ret_ty: ir.Type,
     params: []const Param,
-    binaries: []const Binary,
+    binaries: []const Binary = &.{},
     casts: []const Cast = &.{},
+    blocks: []const Block = &.{},
     ret: ?ir.Value = null,
 };
 
@@ -69,11 +94,33 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
         });
     }
 
-    var entry = ir.BasicBlock.init("entry");
-    errdefer entry.deinit(allocator);
+    if (spec.blocks.len != 0) {
+        for (spec.blocks) |block| {
+            try function.blocks.append(allocator, try lowerBlock(allocator, block));
+        }
+        return function;
+    }
+
+    const entry_spec: Block = .{
+        .name = "entry",
+        .binaries = spec.binaries,
+        .casts = spec.casts,
+        .terminator = .{ .ret = .{
+            .ty = spec.ret_ty,
+            .value = spec.ret,
+        } },
+    };
+    try function.blocks.append(allocator, try lowerBlock(allocator, entry_spec));
+
+    return function;
+}
+
+fn lowerBlock(allocator: std.mem.Allocator, spec: Block) !ir.BasicBlock {
+    var block = ir.BasicBlock.init(spec.name);
+    errdefer block.deinit(allocator);
 
     for (spec.binaries) |binary| {
-        try entry.instructions.append(allocator, .{
+        try block.instructions.append(allocator, .{
             .result = binary.result,
             .kind = .{ .binary = .{
                 .op = binary.op,
@@ -84,7 +131,7 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
         });
     }
     for (spec.casts) |cast| {
-        try entry.instructions.append(allocator, .{
+        try block.instructions.append(allocator, .{
             .result = cast.result,
             .kind = .{ .cast = .{
                 .op = cast.op,
@@ -95,11 +142,20 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
         });
     }
 
-    entry.terminator = .{ .ret = .{
-        .ty = spec.ret_ty,
-        .value = spec.ret,
-    } };
-    try function.blocks.append(allocator, entry);
+    block.terminator = switch (spec.terminator) {
+        .ret => |ret| .{ .ret = .{
+            .ty = ret.ty,
+            .value = ret.value,
+        } },
+        .br => |br| .{ .br = .{ .target = br.target } },
+        .condbr => |condbr| .{ .condbr = .{
+            .cond_ty = condbr.cond_ty,
+            .cond = condbr.cond,
+            .then_target = condbr.then_target,
+            .else_target = condbr.else_target,
+        } },
+        .@"unreachable" => .{ .@"unreachable" = {} },
+    };
 
-    return function;
+    return block;
 }

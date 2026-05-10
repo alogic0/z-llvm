@@ -329,6 +329,81 @@ test "AIR-like bridge lowers scalar arithmetic and casts" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "AIR-like bridge lowers explicit control flow blocks" {
+    const params = [_]air_bridge.Param{
+        .{ .name = "cond", .ty = .{ .int = 1 } },
+        .{ .name = "a", .ty = .{ .int = 32 } },
+        .{ .name = "b", .ty = .{ .int = 32 } },
+    };
+    const then_binaries = [_]air_bridge.Binary{
+        .{
+            .result = "sum",
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "a" },
+            .rhs = .{ .named = "b" },
+        },
+    };
+    const blocks = [_]air_bridge.Block{
+        .{
+            .name = "entry",
+            .terminator = .{ .condbr = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = "cond" },
+                .then_target = "then",
+                .else_target = "trap",
+            } },
+        },
+        .{
+            .name = "then",
+            .binaries = &then_binaries,
+            .terminator = .{ .ret = .{
+                .ty = .{ .int = 32 },
+                .value = .{ .named = "sum" },
+            } },
+        },
+        .{
+            .name = "trap",
+            .terminator = .@"unreachable",
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "branch",
+            .ret_ty = .{ .int = 32 },
+            .params = &params,
+            .blocks = &blocks,
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %trap
+        \\then:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\trap:
+        \\  unreachable
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"
