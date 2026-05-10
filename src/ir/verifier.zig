@@ -1,0 +1,102 @@
+const std = @import("std");
+const core = @import("core.zig");
+
+pub fn verify(module: core.Module) !void {
+    for (module.functions.items) |function| {
+        var defs = std.StringHashMap(core.Type).init(module.allocator);
+        defer defs.deinit();
+
+        for (function.params.items) |param| try defs.put(param.name, param.ty);
+
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                const result = instruction.result orelse continue;
+                if (defs.contains(result)) return error.DuplicateDefinition;
+                const result_ty = instruction.resultType() orelse return error.InstructionWithoutResultType;
+                try defs.put(result, result_ty);
+            }
+        }
+
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                switch (instruction.kind) {
+                    .binary => |binary| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyValue(defs, binary.ty, binary.lhs);
+                        try verifyValue(defs, binary.ty, binary.rhs);
+                    },
+                    .icmp => |icmp| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyValue(defs, icmp.operand_ty, icmp.lhs);
+                        try verifyValue(defs, icmp.operand_ty, icmp.rhs);
+                    },
+                    .select => |select| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        if (!select.cond_ty.eql(.{ .int = 1 })) return error.SelectConditionTypeMismatch;
+                        try verifyValue(defs, select.cond_ty, select.cond);
+                        try verifyValue(defs, select.ty, select.true_value);
+                        try verifyValue(defs, select.ty, select.false_value);
+                    },
+                    .phi => |phi| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        if (phi.incoming.items.len == 0) return error.EmptyPhi;
+                        for (phi.incoming.items) |incoming| {
+                            try verifyValue(defs, phi.ty, incoming.value);
+                            try verifyBlockTarget(function, incoming.block);
+                        }
+                    },
+                    .alloca => {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                    },
+                    .load => |load| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyValue(defs, .ptr, load.ptr);
+                    },
+                    .store => |store| {
+                        if (instruction.result != null) return error.StoreHasResult;
+                        try verifyValue(defs, store.ty, store.value);
+                        try verifyValue(defs, .ptr, store.ptr);
+                    },
+                    .gep => |gep| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyValue(defs, .ptr, gep.ptr);
+                        if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
+                        for (gep.indices.items) |index| {
+                            try verifyValue(defs, index.ty, index.value);
+                        }
+                    },
+                }
+            }
+
+            const terminator = block.terminator orelse return error.BlockWithoutTerminator;
+            switch (terminator) {
+                .ret => |ret| {
+                    if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+                    try verifyValue(defs, ret.ty, ret.value);
+                },
+                .br => |br| try verifyBlockTarget(function, br.target),
+                .condbr => |condbr| {
+                    if (!condbr.cond_ty.eql(.{ .int = 1 })) return error.BranchConditionTypeMismatch;
+                    try verifyValue(defs, condbr.cond_ty, condbr.cond);
+                    try verifyBlockTarget(function, condbr.then_target);
+                    try verifyBlockTarget(function, condbr.else_target);
+                },
+                .@"unreachable" => {},
+            }
+        }
+    }
+}
+
+fn verifyValue(defs: std.StringHashMap(core.Type), ty: core.Type, value: core.Value) !void {
+    switch (value) {
+        .int, .undef => {},
+        .named => |name| {
+            const def_ty = defs.get(name) orelse return error.UnknownValue;
+            if (!def_ty.eql(ty)) return error.TypeMismatch;
+        },
+    }
+}
+
+fn verifyBlockTarget(function: core.Function, target: []const u8) !void {
+    if (function.blockIndex(target) == null) return error.UnknownBlock;
+}

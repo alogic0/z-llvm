@@ -4,15 +4,17 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle is currently open.
+
+## Completed Cycles
+
 ### Cycle 10: Documentation Freshness and IR Module Split
 
 - [x] Update `unsupported_ir.md` so supported instructions, predicates, terminators, and next unsupported areas match the current IR implementation.
 - [x] Update `testing.md` and `inventory/zig_llvm_api_inventory.md` so current fixtures and phase-zero optimizer coverage include the Cycle 6-9 work.
 - [x] Confirm scratch documentation state and keep `docs/tmp` out of tracked project documentation unless it is classified deliberately.
-- [ ] Split `src/ir/core.zig` into core data structures plus parser, printer, and verifier modules while preserving the public `ir.Module` API.
-- [ ] Verify the split and docs refresh with `zig build test` and `bash scripts/compare_opt.sh`.
-
-## Completed Cycles
+- [x] Split `src/ir/core.zig` into core data structures plus parser, printer, and verifier modules while preserving the public `ir.Module` API.
+- [x] Verify the split and docs refresh with `zig build test` and `bash scripts/compare_opt.sh`.
 
 ### Cycle 9: Scalar and Loop Optimizer Refinement
 
@@ -156,3 +158,6 @@ Track each reproduced LLVM algorithm here as it lands:
 - SimplifyCFG now threads phi-free empty branch blocks and re-runs terminator simplification to collapse same-target branches.
 - LoopInfo now reports a unique unconditional preheader and loop exit blocks for natural loops.
 - LICM now hoists pure loop-invariant binary, `icmp`, and `select` instructions to an existing preheader.
+- `docs/unsupported_ir.md`, `docs/testing.md`, and `docs/inventory/zig_llvm_api_inventory.md` now reflect the Cycle 6-9 optimizer and IR coverage.
+- `docs/tmp` is currently empty, so no scratch documentation needed classification or removal.
+- `src/ir/core.zig` now keeps core IR data structures and delegates parser, printer, and verifier behavior to dedicated IR modules without changing the public `ir.Module` API.
