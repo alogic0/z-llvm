@@ -212,6 +212,22 @@ test "parser normalizes icmp instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes select instructions" {
+    const input =
+        \\define i32 @choose(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  %v = select i1 %cond, i32 %a, i32 %b
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "instcombine folds constant icmp" {
     const input =
         \\define i1 @cmp() {

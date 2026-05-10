@@ -92,7 +92,7 @@ fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_nam
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
                 },
-                .binary, .icmp, .alloca, .load, .store, .gep => {},
+                .binary, .icmp, .select, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -150,7 +150,7 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
                         changed = true;
                     }
                 },
-                .binary, .icmp, .alloca, .load, .store, .gep => {},
+                .binary, .icmp, .select, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -164,7 +164,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .icmp, .alloca, .load, .store, .gep => null,
+                .binary, .icmp, .select, .alloca, .load, .store, .gep => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -198,6 +198,11 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .select => |*select| {
+                    select.cond = replaceOperand(select.cond, name, replacement);
+                    select.true_value = replaceOperand(select.true_value, name, replacement);
+                    select.false_value = replaceOperand(select.false_value, name, replacement);
                 },
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);

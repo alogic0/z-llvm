@@ -81,6 +81,11 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
                 },
+                .select => |select| {
+                    if (isNamed(select.cond, slot) or
+                        isNamed(select.true_value, slot) or
+                        isNamed(select.false_value, slot)) return false;
+                },
                 .phi => |phi| for (phi.incoming.items) |incoming| {
                     if (isNamed(incoming.value, slot)) return false;
                 },
@@ -168,7 +173,7 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .store => |store| if (isNamed(store.ptr, slot)) return true,
-            .binary, .icmp, .phi, .alloca, .load, .gep => {},
+            .binary, .icmp, .select, .phi, .alloca, .load, .gep => {},
         }
     }
     return false;
@@ -256,7 +261,7 @@ fn renameSlot(
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .icmp, .phi, .alloca, .gep => {},
+                .binary, .icmp, .select, .phi, .alloca, .gep => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -286,7 +291,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
                 });
                 return;
             },
-            .binary, .icmp, .alloca, .load, .store, .gep => return,
+            .binary, .icmp, .select, .alloca, .load, .store, .gep => return,
         }
     }
 }
@@ -314,6 +319,11 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                 },
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
+                },
+                .select => |select| {
+                    if (isNamed(select.cond, slot) or
+                        isNamed(select.true_value, slot) or
+                        isNamed(select.false_value, slot)) return false;
                 },
                 .phi => |phi| for (phi.incoming.items) |incoming| {
                     if (isNamed(incoming.value, slot)) return false;
@@ -345,7 +355,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .load => |load| {
                 if (isNamed(load.ptr, slot) and !has_current_value) return false;
             },
-            .binary, .icmp, .phi, .alloca, .gep => {},
+            .binary, .icmp, .select, .phi, .alloca, .gep => {},
         }
     }
     return true;
@@ -382,7 +392,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .icmp, .phi, .alloca, .gep => {},
+                .binary, .icmp, .select, .phi, .alloca, .gep => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -401,6 +411,11 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .select => |*select| {
+                    select.cond = replaceOperand(select.cond, name, replacement);
+                    select.true_value = replaceOperand(select.true_value, name, replacement);
+                    select.false_value = replaceOperand(select.false_value, name, replacement);
                 },
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);

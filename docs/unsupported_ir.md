@@ -11,6 +11,7 @@ ptr parameters
 named basic blocks
 add/sub/mul integer instructions
 icmp eq/ne integer instructions
+select instructions
 phi instructions
 alloca instructions
 load instructions
@@ -44,7 +45,6 @@ token/metadata types
 icmp predicates except eq/ne
 fcmp
 phi token/blockaddress values
-select
 call/invoke/callbr
 cast instructions
 division/remainder
@@ -136,6 +136,10 @@ Value subset:
   named SSA values
   integer constants
   undef constants
+
+Select subset:
+  scalar i1 condition
+  matching scalar result arms
 ```
 
 ## Next Unsupported Areas To Remove

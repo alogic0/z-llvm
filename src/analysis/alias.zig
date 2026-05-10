@@ -41,7 +41,7 @@ fn pointerObject(function: ir.Function, value: ir.Value) ?PointerObject {
                     base.zero_offset = base.zero_offset and hasOnlyZeroIndices(gep);
                     return base;
                 },
-                .binary, .icmp, .phi, .load, .store => return null,
+                .binary, .icmp, .select, .phi, .load, .store => return null,
             }
         }
     }

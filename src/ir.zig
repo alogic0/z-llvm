@@ -101,6 +101,14 @@ pub const IcmpInst = struct {
     rhs: Value,
 };
 
+pub const SelectInst = struct {
+    cond_ty: Type,
+    cond: Value,
+    ty: Type,
+    true_value: Value,
+    false_value: Value,
+};
+
 pub const PhiIncoming = struct {
     value: Value,
     block: []const u8,
@@ -150,6 +158,7 @@ pub const Instruction = struct {
     kind: union(enum) {
         binary: BinaryInst,
         icmp: IcmpInst,
+        select: SelectInst,
         phi: PhiInst,
         alloca: AllocaInst,
         load: LoadInst,
@@ -175,6 +184,7 @@ pub const Instruction = struct {
         return switch (instruction.kind) {
             .binary => |binary| binary.ty,
             .icmp => .{ .int = 1 },
+            .select => |select| select.ty,
             .phi => |phi| phi.ty,
             .alloca => .ptr,
             .load => |load| load.ty,
@@ -192,6 +202,11 @@ pub const Instruction = struct {
             .icmp => |*icmp| {
                 icmp.lhs = resolveValue(aliases, icmp.lhs);
                 icmp.rhs = resolveValue(aliases, icmp.rhs);
+            },
+            .select => |*select| {
+                select.cond = resolveValue(aliases, select.cond);
+                select.true_value = resolveValue(aliases, select.true_value);
+                select.false_value = resolveValue(aliases, select.false_value);
             },
             .phi => |*phi| for (phi.incoming.items) |*incoming| {
                 incoming.value = resolveValue(aliases, incoming.value);
@@ -213,7 +228,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .icmp, .alloca, .load, .store => {},
+            .binary, .icmp, .select, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
         }
@@ -438,6 +453,21 @@ pub const Module = struct {
                             try icmp.rhs.format(writer);
                             try writer.writeByte('\n');
                         },
+                        .select => |select| {
+                            try writer.writeAll("select ");
+                            try select.cond_ty.format(writer);
+                            try writer.writeByte(' ');
+                            try select.cond.format(writer);
+                            try writer.writeAll(", ");
+                            try select.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try select.true_value.format(writer);
+                            try writer.writeAll(", ");
+                            try select.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try select.false_value.format(writer);
+                            try writer.writeByte('\n');
+                        },
                         .phi => |phi| {
                             try writer.writeAll("phi ");
                             try phi.ty.format(writer);
@@ -538,6 +568,13 @@ pub const Module = struct {
                             if (instruction.result == null) return error.InstructionNeedsResult;
                             try verifyValue(defs, icmp.operand_ty, icmp.lhs);
                             try verifyValue(defs, icmp.operand_ty, icmp.rhs);
+                        },
+                        .select => |select| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
+                            if (!select.cond_ty.eql(.{ .int = 1 })) return error.SelectConditionTypeMismatch;
+                            try verifyValue(defs, select.cond_ty, select.cond);
+                            try verifyValue(defs, select.ty, select.true_value);
+                            try verifyValue(defs, select.ty, select.false_value);
                         },
                         .phi => |phi| {
                             if (instruction.result == null) return error.InstructionNeedsResult;
@@ -669,6 +706,27 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction
                 .operand_ty = operand_ty,
                 .lhs = lhs,
                 .rhs = rhs,
+            } },
+        };
+    }
+
+    if (std.mem.eql(u8, op_text, "select")) {
+        const cond_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const cond = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const true_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        const false_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        if (!ty.eql(false_ty)) return error.TypeMismatch;
+        const false_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .select = .{
+                .cond_ty = cond_ty,
+                .cond = cond,
+                .ty = ty,
+                .true_value = true_value,
+                .false_value = false_value,
             } },
         };
     }

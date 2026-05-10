@@ -45,6 +45,11 @@ pub const UseCounts = struct {
                 try uses.addValue(icmp.lhs);
                 try uses.addValue(icmp.rhs);
             },
+            .select => |select| {
+                try uses.addValue(select.cond);
+                try uses.addValue(select.true_value);
+                try uses.addValue(select.false_value);
+            },
             .phi => |phi| for (phi.incoming.items) |incoming| {
                 try uses.addValue(incoming.value);
             },
@@ -70,6 +75,11 @@ pub const UseCounts = struct {
             .icmp => |icmp| {
                 uses.removeValue(icmp.lhs);
                 uses.removeValue(icmp.rhs);
+            },
+            .select => |select| {
+                uses.removeValue(select.cond);
+                uses.removeValue(select.true_value);
+                uses.removeValue(select.false_value);
             },
             .phi => |phi| for (phi.incoming.items) |incoming| {
                 uses.removeValue(incoming.value);
