@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle is currently open.
+
+## Completed Cycles
+
 ### Cycle 11: Loop Optimization Foundation 2
 
 - [x] Make `LoopInfo` APIs explicit for loop `header`, `latch`, `preheader`, `exitingBlocks`, `exitBlocks`, and `contains`, with upstream LLVM mapping to `Loop`/`LoopInfo` query APIs.
@@ -13,8 +17,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add an LICM SSA-validity fixture framed around preserving dominance of all uses after hoisting.
 - [x] Compare accepted and rejected LICM behavior against `opt-22`.
 - [x] Document the distinction needed by later loop passes: an exiting block is inside the loop with a successor outside the loop, while an exit block is outside the loop and receives control from the loop.
-
-## Completed Cycles
 
 ### Cycle 10: Documentation Freshness and IR Module Split
 
@@ -169,3 +171,9 @@ Track each reproduced LLVM algorithm here as it lands:
 - `docs/unsupported_ir.md`, `docs/testing.md`, and `docs/inventory/zig_llvm_api_inventory.md` now reflect the Cycle 6-9 optimizer and IR coverage.
 - `docs/tmp` is currently empty, so no scratch documentation needed classification or removal.
 - `src/ir/core.zig` now keeps core IR data structures and delegates parser, printer, and verifier behavior to dedicated IR modules without changing the public `ir.Module` API.
+- LoopInfo now exposes explicit header, latch, preheader, exiting-block, exit-block, and contains queries with upstream `Loop` query mapping.
+- LoopInfo docs now define preheader, header, latch, exiting block, exit block, and dedicated exit terminology.
+- LICM now skips multi-latch loop headers until the LoopInfo model represents them as one canonical loop.
+- LICM legality docs now make the scalar-only boundary explicit: binary, `icmp`, and `select` can hoist; memory, calls, atomics, volatile operations, and unknown effects cannot.
+- LICM fixtures now cover variant-operand rejection and dominance-preserving scalar-chain hoisting against `opt-22`.
+- Local LICM tests now cover no-preheader, side-effecting store, memory-load, and multi-latch rejection cases that LLVM's fuller pipeline can transform through preheader creation, sinking, or MemorySSA promotion.
