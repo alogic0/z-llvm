@@ -1,5 +1,18 @@
 # Next Steps
 
+## Active Cycle
+
+- [ ] Add `icmp` instruction parsing, printing, verification, and tests.
+- [ ] Add `phi` instruction parsing, printing, verification, and tests.
+- [ ] Extend `simplifycfg` to update/remove trivial phi inputs.
+- [ ] Add an explicit CFG analysis helper for predecessors and successors.
+- [ ] Add dominator tree analysis for reachable blocks.
+- [ ] Implement an `early-cse` subset for repeated pure expressions.
+
+## Completed Cycles
+
+### Cycle 1: Initial IR and Scalar Cleanup
+
 - [x] Add LLVM IR normalization and golden-output comparison.
 - [x] Expand the parser to support multiple functions and basic branches.
 - [x] Implement `simplifycfg` for trivial branch and unreachable-block cleanup.
