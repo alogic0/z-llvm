@@ -17,6 +17,7 @@ LoadInst
 StoreInst
 GetElementPtrInst
 GEPOperator
+MemoryLocation
 Instruction::mayReadOrWriteMemory
 Instruction::isAtomic
 Instruction::isVolatile
@@ -50,6 +51,7 @@ Upstream mapping:
 This reproduces the basic IR shape and verifier checks needed before memory optimization passes can run, plus a first opaque-pointer GEP form for pointer-derived memory operands.
 LLVM's memory instructions carry much more state: alignment, volatile and atomic ordering, address spaces, metadata, attributes, and target datalayout-sensitive rules.
 This subset preserves align and volatile spelling on load/store and recognizes narrow atomic load/store spelling only as a conservative memory barrier.
+The analysis layer computes simple byte offsets for scalar integer GEPs when the index is constant and the element type has a byte size.
 It deliberately rejects unsupported atomic operations such as cmpxchg and atomicrmw instead of modeling LLVM's full atomic ordering rules.
 ```
 
@@ -60,7 +62,7 @@ no typed pointer or address-space modeling
 no semantic use of alignment for optimization
 no full volatile or atomic memory model
 no cmpxchg, atomicrmw, fence, syncscope, or atomic ordering semantics
-no datalayout-aware getelementptr offset computation
+no datalayout-aware getelementptr offset computation beyond scalar integer element sizes
 no lifetime intrinsics
 no datalayout checks
 ```

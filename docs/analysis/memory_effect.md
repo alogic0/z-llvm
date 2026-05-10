@@ -75,7 +75,8 @@ Known gaps:
 ```text
 no call, intrinsic, fence, cmpxchg, or atomicrmw classification
 no target-library or readonly/readnone call handling
-no MemoryLocation size or metadata model
+MemoryLocation size and offset model is limited to scalar stack-slot accesses
+no MemoryLocation metadata model
 no MemorySSA integration
 no alias-aware instruction reordering
 no distinction between acquire/release/monotonic/etc ordering semantics

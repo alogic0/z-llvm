@@ -66,7 +66,7 @@ replacement needs.
 The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset.
-- CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot alias/mod-ref scaffolding, and pass-manager instrumentation.
+- CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
 - Named `scalar-foundation` and `memory-foundation` pipeline aliases, plus `opt-22` comparison fixtures for the implemented middle-end subset and unit tests for analysis-only behavior.

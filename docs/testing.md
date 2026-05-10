@@ -97,5 +97,5 @@ Current memory legality examples:
 ```text
 opt-22 equivalent: scalar LICM/GVN/DCE behavior beside volatile memory, volatile load preservation
 local-only conservative: aligned load not hoisted, atomic/store barriers preserved
-unit-test only: unknown pointer aliasing remains may-alias/ref
+unit-test only: MemoryLocation offset/size queries, known disjoint stack offsets, unknown pointer aliasing remains may-alias/ref
 ```
