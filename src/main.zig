@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("ir.zig");
 const pass_manager = @import("pass_manager.zig");
+const adce = @import("passes/adce.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
@@ -12,7 +13,7 @@ const sroa = @import("passes/sroa.zig");
 const usage =
     \\usage: z_llvm [--passes=list] [--trace] <input.ll>
     \\
-    \\Supported passes: instcombine,dce,early-cse,gvn,simplifycfg,mem2reg,sroa
+    \\Supported passes: instcombine,dce,adce,early-cse,gvn,simplifycfg,mem2reg,sroa
     \\
 ;
 
@@ -87,6 +88,8 @@ fn addPasses(pm: *pass_manager.ModulePassManager, pass_list: []const u8) !void {
             try pm.add(instcombine.pass);
         } else if (std.mem.eql(u8, name, "dce")) {
             try pm.add(dce.pass);
+        } else if (std.mem.eql(u8, name, "adce")) {
+            try pm.add(adce.pass);
         } else if (std.mem.eql(u8, name, "early-cse")) {
             try pm.add(early_cse.pass);
         } else if (std.mem.eql(u8, name, "gvn")) {

@@ -17,7 +17,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add an SROA foundation slice for zero-offset alloca forwarding, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Extend `instcombine` and IR parsing for simple bitwise and shift identities, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Add a GVN-style cross-block expression elimination slice using dominator information, with upstream LLVM mapping and `opt-22` fixtures.
-- [ ] Add an ADCE foundation pass for aggressively removing unused side-effect-free instruction chains, with upstream LLVM mapping and `opt-22` fixtures.
+- [x] Add an ADCE foundation pass for aggressively removing unused side-effect-free instruction chains, with upstream LLVM mapping and `opt-22` fixtures.
 - [ ] Add LoopInfo-style natural loop analysis over dominator backedges, with upstream LLVM mapping and unit tests.
 
 ## Completed Cycles
