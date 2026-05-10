@@ -20,6 +20,77 @@ PromoteMem2Reg::QueuePhiNode
 PromoteMem2Reg::RenamePass
 ```
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/lib/Transforms/Utils/Mem2Reg.cpp
+  llvm-project-22/llvm/lib/Transforms/Utils/PromoteMemoryToRegister.cpp
+  llvm-project-22/llvm/include/llvm/Transforms/Utils/PromoteMemToReg.h
+
+LLVM entry points/classes:
+  PromotePass::run
+  isAllocaPromotable
+  PromoteMemToReg
+  PromoteMem2Reg::QueuePhiNode
+  PromoteMem2Reg::RenamePass
+
+Required analyses:
+  Dominator tree
+  Dominance frontier
+  CFG predecessor/successor graph
+
+Required IR invariants:
+  Entry-block alloca discovery
+  Verified direct load/store uses
+  Verified phi and SSA dominance
+
+Core LLVM algorithm data structures:
+  Entry-block alloca worklist
+  Promotability checks
+  Dominance-frontier phi placement
+  Rename stacks/current-value state
+
+Local target status:
+  LLVM-shaped algorithm subset
+
+Implemented subset:
+  Entry-block scalar allocas
+  Direct non-volatile non-atomic loads/stores
+  Single-block and multi-block promotion
+  Multi-slot promotion by repeated local promotion
+  Undef replacement for promoted uninitialized loads
+
+Intentional divergences:
+  Atomic local alloca users are rejected conservatively.
+  Debug-info salvage, lifetime intrinsics, and batched alloca promotion are not
+  implemented yet.
+
+Analysis preservation/invalidation:
+  mem2reg mutates IR and invalidates analyses under the local pass-manager
+  policy. The pass manager verifies after execution.
+
+Fixture coverage:
+  mem2reg
+  mem2reg_undef
+  mem2reg_if
+  mem2reg_loop
+  mem2reg_two_slots
+  mem2reg_unreachable
+  mem2reg_escape
+  mem2reg_store_slot
+  mem2reg_non_entry_alloca
+  mem2reg_volatile_load
+  mem2reg_volatile_store
+  gep_memory
+
+opt-22 comparison command:
+  bash scripts/compare_opt.sh
+
+Local-only fixture command:
+  zig build test
+```
+
 This pass promotes simple stack slots to SSA values.
 
 Implemented subset:

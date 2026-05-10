@@ -198,30 +198,30 @@ Passes covered:
 Goal: cover the stack-to-SSA transformations Zig depends on before memory-heavy
 optimizations.
 
-- [ ] Add algorithm contracts for mem2reg and SROA before broadening either
+- [x] Add algorithm contracts for mem2reg and SROA before broadening either
       implementation.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Utils/Mem2Reg.cpp`,
       `llvm/lib/Transforms/Utils/PromoteMemoryToRegister.cpp`, and
       `llvm/lib/Transforms/Scalar/SROA.cpp`.
-- [ ] Expand mem2reg for all Zig-emitted scalar alloca patterns that are safe
+- [x] Expand mem2reg for all Zig-emitted scalar alloca patterns that are safe
       under the current IR model.
-- [ ] Keep LLVM's entry-block alloca discovery rule.
-- [ ] Preserve volatile rejection and document the local atomic policy.
-- [ ] Expand SROA from zero-offset GEP forwarding to known-offset scalar slices
+- [x] Keep LLVM's entry-block alloca discovery rule.
+- [x] Preserve volatile rejection and document the local atomic policy.
+- [x] Expand SROA from zero-offset GEP forwarding to known-offset scalar slices
       only when DataLayout can prove size/offset facts.
-- [ ] Add lifetime intrinsic placeholders or explicit unsupported handling.
-- [ ] Add fixtures for multiple slots, nested simple GEPs, known disjoint
+- [x] Add lifetime intrinsic placeholders or explicit unsupported handling.
+- [x] Add fixtures for multiple slots, nested simple GEPs, known disjoint
       stack offsets, and rejected aggregate/vector/unknown-layout cases.
-- [ ] Add debug-info salvage placeholders but keep debug metadata out of scope
+- [x] Add debug-info salvage placeholders but keep debug metadata out of scope
       until the debug-info epic.
 
 Passes covered:
 
-- [ ] `mem2reg`
-- [ ] `sroa`
-- [ ] stack-relevant parts of `instcombine`
-- [ ] stack-relevant parts of `simplifycfg`
+- [x] `mem2reg`
+- [x] `sroa`
+- [x] stack-relevant parts of `instcombine`
+- [x] stack-relevant parts of `simplifycfg`
 
 ## Epic 5: Alias, Memory Effects, And DSE Foundation
 

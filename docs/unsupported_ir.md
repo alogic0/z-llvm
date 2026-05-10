@@ -267,6 +267,11 @@ InstSimplify subset:
   freeze-constant folding
   shared scalar expression equivalence for GVN and EarlyCSE
 
+SROA subset:
+  zero-offset GEP alloca forwarding
+  nested zero-offset GEP alloca forwarding
+  non-zero aggregate/vector slice rewriting remains unsupported
+
 Select subset:
   scalar i1 condition
   matching scalar result arms

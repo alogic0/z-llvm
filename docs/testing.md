@@ -39,6 +39,7 @@ opt-22 -passes=adce test/opt/inputs/adce_chain.ll -S -o /tmp/llvm_adce.ll
 opt-22 -passes=gvn test/opt/inputs/gvn_dominating_expr.ll -S -o /tmp/llvm_gvn.ll
 opt-22 -passes='loop-mssa(licm)' test/opt/inputs/licm_invariant.ll -S -o /tmp/llvm_licm.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_zero_gep.ll -S -o /tmp/llvm_sroa.ll
+opt-22 -passes=sroa test/opt/inputs/sroa_nested_zero_gep.ll -S -o /tmp/llvm_sroa_nested.ll
 opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_scalar_simplify.ll -S -o /tmp/llvm_scalar_simplify.ll
 opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_safe_scalar.ll -S -o /tmp/llvm_safe_scalar.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
@@ -150,7 +151,7 @@ ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, empty-block threading, and matching return-block merge subsets
 EarlyCSE: same-block repeated pure-expression elimination subset
 Mem2Reg: entry-block alloca discovery plus single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets
-SROA: zero-offset GEP alloca forwarding subset
+SROA: zero-offset and nested-zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures

@@ -42,16 +42,25 @@ fn forwardZeroOffsetGeps(function: *ir.Function) !bool {
 
 fn allocaBase(function: ir.Function, gep: ir.GepInst) ?[]const u8 {
     if (!allIndicesAreZero(gep)) return null;
-    const base_name = switch (gep.ptr) {
+    return zeroOffsetAllocaBase(function, gep.ptr);
+}
+
+fn zeroOffsetAllocaBase(function: ir.Function, ptr: ir.Value) ?[]const u8 {
+    const base_name = switch (ptr) {
         .named => |name| name,
         .int, .undef => return null,
     };
 
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
-            if (instruction.removed or instruction.kind != .alloca) continue;
+            if (instruction.removed) continue;
             const result = instruction.result orelse continue;
-            if (std.mem.eql(u8, result, base_name)) return base_name;
+            if (!std.mem.eql(u8, result, base_name)) continue;
+            return switch (instruction.kind) {
+                .alloca => base_name,
+                .gep => |gep| if (allIndicesAreZero(gep)) zeroOffsetAllocaBase(function, gep.ptr) else null,
+                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => null,
+            };
         }
     }
     return null;
