@@ -79,6 +79,41 @@ test "constant folding rewrites return value" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "dce updates use counts while removing instruction chains" {
+    const input =
+        \\define i32 @chain(i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 1
+        \\  %y = mul i32 %x, 2
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @chain(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "normalization preserves canonical LLVM-compatible fixture output" {
     const input = @embedFile("testdata/instcombine.ll");
     const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);

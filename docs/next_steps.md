@@ -4,7 +4,7 @@
 - [x] Expand the parser to support multiple functions and basic branches.
 - [x] Implement `simplifycfg` for trivial branch and unreachable-block cleanup.
 - [x] Add `opt` comparison fixtures for `instcombine`, `dce`, and `simplifycfg`.
-- [ ] Add def-use maintenance instead of recomputing usage ad hoc.
+- [x] Add def-use maintenance instead of recomputing usage ad hoc.
 - [ ] Document unsupported LLVM IR constructs and parser errors.
 
 ## Reproduced LLVM Algorithms
@@ -14,6 +14,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - `instcombine` subset: documented in [passes/instcombine.md](passes/instcombine.md).
 - `dce` subset: documented in [passes/dce.md](passes/dce.md).
 - `simplifycfg` subset: documented in [passes/simplifycfg.md](passes/simplifycfg.md).
+- def-use use-count subset: documented in [analysis/def_use.md](analysis/def_use.md).
 
 ## Completed Step Notes
 
@@ -21,3 +22,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - Parser support for multiple functions plus `br` and conditional `br` is infrastructure for reproducing LLVM's `simplifycfg` algorithm.
 - `simplifycfg` now folds constant conditional branches and removes blocks unreachable from function entry.
 - `opt` comparison fixtures now exist for `instcombine`, `dce`, and `simplifycfg`; `opt` was not available in this environment, so the committed verification covers the `z_llvm` side of each fixture.
+- DCE now uses a shared def-use use-count analysis and decrements operand uses as instructions are removed.
