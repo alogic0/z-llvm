@@ -12,7 +12,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Extend dominator analysis with immediate dominator or dominance-frontier support needed by LLVM `PromoteMemToReg` phi placement, with upstream mapping.
 - [x] Implement multi-block `mem2reg` phi insertion for one promotable stack slot using CFG predecessors and dominance-frontier placement.
 - [x] Implement the `mem2reg` rename pass over the dominator tree for promoted stack-slot values, including phi incoming updates.
-- [ ] Add LLVM `opt-22` comparison fixtures for multi-block `mem2reg` cases: if/else merge, loop-carried value, and unreachable predecessor cleanup.
+- [x] Add LLVM `opt-22` comparison fixtures for multi-block `mem2reg` cases: if/else merge, loop-carried value, and unreachable predecessor cleanup.
 
 ## Completed Cycles
 
@@ -81,3 +81,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `test/opt/fixtures.tsv` now records each comparison fixture's `z_llvm` pass, LLVM pass, expected output, and normalization notes.
 - Dominator analysis now exposes immediate dominators and dominance-frontier sets for mem2reg phi placement.
 - `mem2reg` now promotes one multi-block stack slot with dominance-frontier phi insertion and a dominator-tree rename walk.
+- `opt-22` comparison fixtures now cover multi-block `mem2reg` if/else, loop-carried, and unreachable-predecessor cases.

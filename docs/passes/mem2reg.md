@@ -81,7 +81,7 @@ Known gaps:
 
 ```text
 only one multi-block alloca is promoted per pass invocation
-generated phi names use the destination block name
+generated phi names follow the first LLVM-compatible stack-slot form: %slot.0, %slot.1, ...
 no alloca arrays
 no lifetime intrinsics
 no debug-info salvage

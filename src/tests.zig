@@ -448,8 +448,8 @@ test "mem2reg promotes if-else stack slot with phi" {
         \\right:
         \\  br label %merge
         \\merge:
-        \\  %merge = phi i32 [ %a, %left ], [ %b, %right ]
-        \\  ret i32 %merge
+        \\  %slot.0 = phi i32 [ %a, %left ], [ %b, %right ]
+        \\  ret i32 %slot.0
         \\}
         \\
     ;
@@ -496,14 +496,14 @@ test "mem2reg promotes loop-carried stack slot" {
         \\entry:
         \\  br label %loop
         \\loop:
-        \\  %loop = phi i32 [ %a, %entry ], [ %next, %body ]
-        \\  %more = icmp ne i32 %loop, 0
+        \\  %slot.0 = phi i32 [ %a, %entry ], [ %next, %body ]
+        \\  %more = icmp ne i32 %slot.0, 0
         \\  br i1 %more, label %body, label %exit
         \\body:
-        \\  %next = sub i32 %loop, 1
+        \\  %next = sub i32 %slot.0, 1
         \\  br label %loop
         \\exit:
-        \\  ret i32 %loop
+        \\  ret i32 %slot.0
         \\}
         \\
     ;

@@ -266,12 +266,14 @@ pub const Function = struct {
 pub const Module = struct {
     allocator: std.mem.Allocator,
     source: []u8,
+    owned_strings: std.ArrayList([]u8),
     functions: std.ArrayList(Function),
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) !Module {
         var module: Module = .{
             .allocator = allocator,
             .source = try allocator.dupe(u8, text),
+            .owned_strings = .empty,
             .functions = .empty,
         };
         errdefer module.deinit();
@@ -350,7 +352,15 @@ pub const Module = struct {
     pub fn deinit(module: *Module) void {
         for (module.functions.items) |*function| function.deinit(module.allocator);
         module.functions.deinit(module.allocator);
+        for (module.owned_strings.items) |owned| module.allocator.free(owned);
+        module.owned_strings.deinit(module.allocator);
         module.allocator.free(module.source);
+    }
+
+    pub fn ownString(module: *Module, value: []u8) ![]const u8 {
+        errdefer module.allocator.free(value);
+        try module.owned_strings.append(module.allocator, value);
+        return value;
     }
 
     pub fn print(module: Module, writer: anytype) !void {

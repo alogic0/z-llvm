@@ -9,15 +9,16 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
-    for (module.functions.items) |*function| {
-        changed = try promoteFunction(context.allocator, function) or changed;
+    for (module.functions.items, 0..) |_, function_index| {
+        changed = try promoteFunction(module, function_index) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
 
-fn promoteFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+fn promoteFunction(module: *ir.Module, function_index: usize) !bool {
+    const function = &module.functions.items[function_index];
     var changed = false;
     var block_index: usize = 0;
     while (block_index < function.blocks.items.len) : (block_index += 1) {
@@ -43,7 +44,7 @@ fn promoteFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
             const slot = instruction.result orelse continue;
             if (!isPromotableStackSlot(function.*, slot)) continue;
 
-            try promoteMultiBlockSlot(allocator, function, block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
+            try promoteMultiBlockSlot(module, function_index, block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
             return true;
         }
     }
@@ -88,13 +89,15 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
 }
 
 fn promoteMultiBlockSlot(
-    allocator: std.mem.Allocator,
-    function: *ir.Function,
+    module: *ir.Module,
+    function_index: usize,
     alloca_block_index: usize,
     alloca_instruction_index: usize,
     slot: []const u8,
     ty: ir.Type,
 ) !void {
+    const allocator = module.allocator;
+    const function = &module.functions.items[function_index];
     var dom = try dominator.Dominators.build(allocator, function.*);
     defer dom.deinit();
 
@@ -105,6 +108,10 @@ fn promoteMultiBlockSlot(
     const has_phi = try allocator.alloc(bool, block_count);
     defer allocator.free(has_phi);
     @memset(has_phi, false);
+
+    const phi_names = try allocator.alloc(?[]const u8, block_count);
+    defer allocator.free(phi_names);
+    @memset(phi_names, null);
 
     const defines = try allocator.alloc(bool, block_count);
     defer allocator.free(defines);
@@ -123,8 +130,10 @@ fn promoteMultiBlockSlot(
     while (worklist.pop()) |def_block| {
         for (frontiers.frontier(def_block)) |frontier_block| {
             if (has_phi[frontier_block]) continue;
-            try insertSlotPhi(allocator, function, frontier_block, ty);
+            const phi_name = try newPhiName(module, slot, countPhis(phi_names));
+            try insertSlotPhi(allocator, function, frontier_block, ty, phi_name);
             has_phi[frontier_block] = true;
+            phi_names[frontier_block] = phi_name;
             if (!defines[frontier_block]) try worklist.append(allocator, frontier_block);
         }
     }
@@ -136,7 +145,7 @@ fn promoteMultiBlockSlot(
     defer deinitChildren(allocator, &children);
 
     function.blocks.items[alloca_block_index].instructions.items[alloca_instruction_index].removed = true;
-    try renameSlot(allocator, function, graph, children.items, has_phi, slot, 0, null);
+    try renameSlot(allocator, function, graph, children.items, phi_names, slot, 0, null);
 }
 
 fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
@@ -150,12 +159,24 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
     return false;
 }
 
-fn insertSlotPhi(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, ty: ir.Type) !void {
+fn newPhiName(module: *ir.Module, slot: []const u8, index: usize) ![]const u8 {
+    return module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.{}", .{ slot, index }));
+}
+
+fn countPhis(phi_names: []const ?[]const u8) usize {
+    var count: usize = 0;
+    for (phi_names) |name| {
+        if (name != null) count += 1;
+    }
+    return count;
+}
+
+fn insertSlotPhi(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, ty: ir.Type, phi_name: []const u8) !void {
     var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
     errdefer incoming.deinit(allocator);
 
     try function.blocks.items[block_index].instructions.insert(allocator, 0, .{
-        .result = function.blocks.items[block_index].name,
+        .result = phi_name,
         .kind = .{ .phi = .{
             .ty = ty,
             .incoming = incoming,
@@ -185,13 +206,13 @@ fn renameSlot(
     function: *ir.Function,
     graph: cfg.Graph,
     children: []const std.ArrayList(usize),
-    has_phi: []const bool,
+    phi_names: []const ?[]const u8,
     slot: []const u8,
     block_index: usize,
     incoming_value: ?ir.Value,
 ) !void {
     var current_value = incoming_value;
-    if (has_phi[block_index]) current_value = .{ .named = function.blocks.items[block_index].name };
+    if (phi_names[block_index]) |phi_name| current_value = .{ .named = phi_name };
 
     var instruction_index: usize = 0;
     while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
@@ -228,13 +249,14 @@ fn renameSlot(
 
     if (current_value) |value| {
         for (graph.successors(block_index)) |successor| {
-            if (!has_phi[successor]) continue;
+            const phi_name = phi_names[successor] orelse continue;
             try addPhiIncoming(allocator, function, successor, value, function.blocks.items[block_index].name);
+            _ = phi_name;
         }
     }
 
     for (children[block_index].items) |child| {
-        try renameSlot(allocator, function, graph, children, has_phi, slot, child, current_value);
+        try renameSlot(allocator, function, graph, children, phi_names, slot, child, current_value);
     }
 }
 
@@ -243,7 +265,6 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .phi => |*phi| {
-                if (!std.mem.eql(u8, instruction.result orelse return, function.blocks.items[block_index].name)) continue;
                 try phi.incoming.append(allocator, .{
                     .value = value,
                     .block = predecessor,
