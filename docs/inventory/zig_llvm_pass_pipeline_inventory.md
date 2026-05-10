@@ -222,29 +222,29 @@ Status meanings:
 | `invalidate<aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `require<profile-summary>` | analysis plumbing | P3 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `require<should-not-run-function-passes>` | pipeline guard | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
-| `openmp-opt`, `openmp-opt-cgscc` | OpenMP IPO | P3 | defer | `llvm/lib/Transforms/IPO/OpenMPOpt.cpp` |
+| `openmp-opt`, `openmp-opt-cgscc` | OpenMP IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/OpenMPOpt.cpp` |
 | `libcalls-shrinkwrap` | library-call optimization | P3 | placeholder | `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp` |
 | `inject-tli-mappings` | TLI/vector library metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/InjectTLIMappings.cpp` |
-| `loop-vectorize` | vectorization | P3 | defer | `llvm/lib/Transforms/Vectorize/LoopVectorize.cpp` |
-| `slp-vectorizer` | vectorization | P3 | defer | `llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp` |
-| `vector-combine` | vector canonicalization | P3 | defer | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
-| `chr` | control-height reduction | P3 | defer | `llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp` |
-| `cg-profile` | profile metadata | P3 | defer | `llvm/lib/Transforms/Instrumentation/CGProfile.cpp` |
+| `loop-vectorize` | vectorization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/LoopVectorize.cpp` |
+| `slp-vectorizer` | vectorization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp` |
+| `vector-combine` | vector canonicalization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
+| `chr` | control-height reduction | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp` |
+| `cg-profile` | profile metadata | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/CGProfile.cpp` |
 | `ee-instrument` | instrumentation | P3 | placeholder | `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp` |
 | `add-discriminators` | debug/profile metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/AddDiscriminators.cpp` |
 | `sancov` / `SanitizerCoveragePass` | sanitizer instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp` |
 | `module-tsan`, `tsan` | sanitizer instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp` |
-| `coro-early` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroEarly.cpp` |
-| `coro-split` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroSplit.cpp` |
-| `coro-elide` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroElide.cpp` |
-| `coro-cleanup` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroCleanup.cpp` |
-| `coro-annotation-elide` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp` |
+| `coro-early` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroEarly.cpp` |
+| `coro-split` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroSplit.cpp` |
+| `coro-elide` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroElide.cpp` |
+| `coro-cleanup` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroCleanup.cpp` |
+| `coro-annotation-elide` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp` |
 | `alloc-token` | allocation instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/AllocToken.cpp` |
-| `memprof-remove-attributes` | MemProf cleanup | P3 | defer | `llvm/lib/Transforms/Instrumentation/MemProfUse.cpp` |
+| `memprof-remove-attributes` | MemProf cleanup | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/MemProfUse.cpp` |
 | `canonicalize-aliases` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
 | `name-anon-globals` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp` |
 | `rel-lookup-table-converter` | codegen/linker prep | P3 | placeholder | `llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp` |
-| `transform-warning` | diagnostics | P3 | defer | `llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp` |
+| `transform-warning` | diagnostics | P3 | placeholder | `llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp` |
 
 ## Immediate Replacement Order
 

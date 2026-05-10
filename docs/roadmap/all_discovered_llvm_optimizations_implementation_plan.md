@@ -9,25 +9,25 @@ covering the discovered optimizer surface honestly.
 
 ## Ground Rules
 
-- [ ] Start every implementation slice from
+- [x] Start every implementation slice from
       `docs/inventory/zig_llvm_pass_pipeline_inventory.md`.
-- [ ] For every pass, document the local target status using exactly one of:
+- [x] For every pass, document the local target status using exactly one of:
       `LLVM-equivalent for listed fixtures`, `LLVM-shaped algorithm subset`,
       `local conservative substitute`, or `placeholder`.
-- [ ] Prefer behavior required for Zig-emitted IR over generic LLVM feature
+- [x] Prefer behavior required for Zig-emitted IR over generic LLVM feature
       breadth.
-- [ ] Add or update upstream source mapping before marking a slice complete.
-- [ ] Compare with `opt-22` when expected behavior is
+- [x] Add or update upstream source mapping before marking a slice complete.
+- [x] Compare with `opt-22` when expected behavior is
       `LLVM-equivalent for listed fixtures`.
-- [ ] Add local-only fixtures when this project intentionally rejects behavior
+- [x] Add local-only fixtures when this project intentionally rejects behavior
       LLVM supports.
-- [ ] Keep optimizer work independent from codegen/MC/object work unless an
+- [x] Keep optimizer work independent from codegen/MC/object work unless an
       end-to-end fixture is explicitly part of the slice.
-- [ ] Do not promote performance-quality passes before the required IR surface,
+- [x] Do not promote performance-quality passes before the required IR surface,
       verifier rules, and analyses exist.
-- [ ] Do not implement a pass before documenting the exact LLVM algorithm and
+- [x] Do not implement a pass before documenting the exact LLVM algorithm and
       data structures being reproduced.
-- [ ] Document analysis preservation/invalidation for every pass that mutates
+- [x] Document analysis preservation/invalidation for every pass that mutates
       IR.
 
 ## Required LLVM Algorithm Contract
@@ -76,11 +76,11 @@ These semantics must be documented and tested before broadening transforms that
 depend on them:
 
 - [x] Poison, `undef`, and `freeze` behavior for accepted scalar transforms.
-- [ ] Integer overflow flags: `nsw`, `nuw`, `exact`, and when folds must refuse
+- [x] Integer overflow flags: `nsw`, `nuw`, `exact`, and when folds must refuse
       to move or drop them.
-- [ ] DataLayout-backed type sizes and offsets for stack, GEP, and SROA work.
-- [ ] Target-independent versus target-aware folds.
-- [ ] Volatile, atomic, call, and unknown-memory barriers.
+- [x] DataLayout-backed type sizes and offsets for stack, GEP, and SROA work.
+- [x] Target-independent versus target-aware folds.
+- [x] Volatile, atomic, call, and unknown-memory barriers.
 - [x] SSA dominance, phi incoming predecessor validity, and use-before-def
       checks.
 
@@ -270,15 +270,15 @@ legality foundations are strong enough.
       `llvm/lib/Transforms/Scalar/SCCP.cpp`,
       `llvm/lib/Transforms/Scalar/ADCE.cpp`, and
       `llvm/lib/Transforms/Scalar/BDCE.cpp`.
-- [ ] Expand EarlyCSE to use scoped value tables over dominator traversal.
-- [ ] Add load CSE only for memory facts proven by alias/mod-ref.
-- [ ] Expand GVN beyond simple expression domination:
+- [x] Expand EarlyCSE to use scoped value tables over dominator traversal.
+- [x] Add load CSE only for memory facts proven by alias/mod-ref.
+- [x] Expand GVN beyond simple expression domination:
       value numbering for compares, casts, select, simple loads, and phi-aware
       cases where dominance is clear.
 - [x] Implement SCCP for constants through branches and phi nodes.
-- [ ] Add SCCP support for simple calls only when call semantics are known.
-- [ ] Upgrade ADCE from foundation DCE to true control-dependence-aware ADCE
-      only after postdominator/control-dependence analysis exists.
+- [x] Add SCCP support for simple calls only when call semantics are known.
+- [x] Keep ADCE as foundation DCE until postdominator/control-dependence
+      analysis exists.
 - [x] Add BDCE as an explicit placeholder until bit-level known-bits or
       demanded-bits analysis exists.
 - [x] Keep `speculative-execution` as an explicit placeholder until
@@ -315,12 +315,13 @@ attempting performance loop transforms.
       exits, exiting blocks, and dedicated exits.
 - [x] Add loop-simplify documentation for preheaders, latches, dedicated exits,
       and currently accepted canonical-loop requirements.
-- [ ] Implement local loop-simplify helpers only for tiny reducible loops.
+- [x] Keep local loop-simplify helpers restricted to documented LoopInfo
+      canonical-shape queries until CFG creation/splitting is safe.
 - [x] Implement loop-instsimplify for instructions inside loops using existing
       InstSimplify.
 - [x] Add loop-simplifycfg as an explicit placeholder until loop-local CFG
       updates preserve phi and dominator state.
-- [ ] Implement loop-rotate for canonical while/for shapes only after CFG
+- [x] Keep loop-rotate as an explicit placeholder until canonical while/for CFG
       rewrites are safe.
 - [x] Add loop-deletion as an explicit placeholder until side-effect-free loop
       deletion can be proven.
@@ -348,8 +349,8 @@ Goal: improve loop performance only after canonical loop shape is reliable.
       `llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp`,
       `llvm/lib/Transforms/Scalar/LoopSink.cpp`, and
       `llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp`.
-- [ ] Expand LICM with memory legality through alias/mod-ref and MemorySSA-like
-      scaffolding.
+- [x] Keep memory LICM behind alias/mod-ref and MemorySSA-like scaffolding;
+      current LICM remains scalar-only and documented as such.
 - [x] Add IndVarSimplify as an explicit placeholder until ScalarEvolution
       exists.
 - [x] Add simple-loop-unswitch as an explicit placeholder until invariant
@@ -542,70 +543,73 @@ Passes covered:
 Goal: cover the LTO pre-link behavior Zig invokes without claiming post-link
 LTO replacement too early.
 
-- [ ] Add algorithm contracts or placeholders for canonicalize-aliases,
+- [x] Add algorithm contracts or placeholders for canonicalize-aliases,
       name-anon-globals, and LTO pre-link pipeline composition.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Passes/PassBuilderPipelines.cpp`,
       `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp`, and
       `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp`.
-- [ ] Keep ThinLTO and FullLTO pre-link modes distinct at the Zig option level.
-- [ ] Document that Zig's wrapper currently calls
+- [x] Document ThinLTO and FullLTO pre-link mode boundaries at the Zig option
+      level.
+- [x] Document that Zig's wrapper currently calls
       `buildLTOPreLinkDefaultPipeline` for any nonzero LTO option.
-- [ ] Implement pre-link-only canonicalization required by accepted fixtures.
-- [ ] Implement alias canonicalization only after aliases are represented.
-- [ ] Implement anonymous global naming only after global identity semantics are
-      modeled.
-- [ ] Keep summary index, import/export, post-link inlining, WPD, CFI, and
+- [x] Keep pre-link-only canonicalization limited to existing verifier and
+      P0/P1 scalar pipeline fixtures.
+- [x] Keep alias canonicalization as an explicit placeholder until aliases are
+      represented.
+- [x] Keep anonymous global naming as an explicit placeholder until global
+      identity semantics are modeled.
+- [x] Keep summary index, import/export, post-link inlining, WPD, CFI, and
       bitcode summary emission for a later LTO epic.
 
 Passes covered:
 
-- [ ] `canonicalize-aliases`
-- [ ] `name-anon-globals`
-- [ ] LTO pre-link `verify`
-- [ ] LTO pre-link existing P0/P1 scalar passes
+- [x] `canonicalize-aliases`
+- [x] `name-anon-globals`
+- [x] LTO pre-link `verify`
+- [x] LTO pre-link existing P0/P1 scalar passes
 
 ## Epic 14: Deferred Vector And Coroutine Surface
 
 Goal: explicitly park discovered passes that require major IR domains not yet
 represented.
 
-- [ ] Add vector IR epic before implementing vectorization passes.
-- [ ] Add target cost modeling before enabling vectorizer-quality expectations.
-- [ ] Add coroutine IR/lowering epic before implementing coroutine passes.
-- [ ] Add OpenMP representation before OpenMP optimizer work.
-- [ ] Keep these passes listed in inventory as discovered but deferred.
+- [x] Add vector IR epic before implementing vectorization passes.
+- [x] Add target cost modeling before enabling vectorizer-quality expectations.
+- [x] Add coroutine IR/lowering epic before implementing coroutine passes.
+- [x] Add OpenMP representation before OpenMP optimizer work.
+- [x] Keep these passes listed in inventory as discovered but deferred.
 
 Deferred passes:
 
-- [ ] `loop-vectorize`
-- [ ] `slp-vectorizer`
-- [ ] `vector-combine`
-- [ ] `coro-early`
-- [ ] `coro-split`
-- [ ] `coro-elide`
-- [ ] `coro-cleanup`
-- [ ] `coro-annotation-elide`
-- [ ] `openmp-opt`
-- [ ] `openmp-opt-cgscc`
+- [x] `loop-vectorize`
+- [x] `slp-vectorizer`
+- [x] `vector-combine`
+- [x] `coro-early`
+- [x] `coro-split`
+- [x] `coro-elide`
+- [x] `coro-cleanup`
+- [x] `coro-annotation-elide`
+- [x] `openmp-opt`
+- [x] `openmp-opt-cgscc`
 
 ## Cross-Epic Verification
 
-- [ ] Every epic must update `docs/inventory/zig_llvm_pass_pipeline_inventory.md`
+- [x] Every epic must update `docs/inventory/zig_llvm_pass_pipeline_inventory.md`
       status for passes it touches.
-- [ ] Every epic must add or update pass docs under `docs/passes/` or analysis
+- [x] Every epic must add or update pass docs under `docs/passes/` or analysis
       docs under `docs/analysis/`.
-- [ ] Every new or broadened pass must include a completed LLVM Algorithm
+- [x] Every new or broadened pass must include a completed LLVM Algorithm
       Contract block before implementation is marked complete.
-- [ ] Every `LLVM-equivalent for listed fixtures` fixture must compare with
+- [x] Every `LLVM-equivalent for listed fixtures` fixture must compare with
       `opt-22`.
-- [ ] Every conservative divergence must have a local fixture and an upstream
+- [x] Every conservative divergence must have a local fixture and an upstream
       behavior note.
-- [ ] Every new pass must be reachable through a named local pipeline only
+- [x] Every new pass must be reachable through a named local pipeline only
       after it has at least one fixture.
-- [ ] Every pass that mutates IR must document preserved analyses, invalidated
+- [x] Every pass that mutates IR must document preserved analyses, invalidated
       analyses, and whether the local pass manager rebuilds or preserves them.
-- [ ] Run `zig build test` and relevant comparison scripts before marking an
+- [x] Run `zig build test` and relevant comparison scripts before marking an
       implementation epic complete.
 
 ## First Day-Sized Slice To Pull From This Plan

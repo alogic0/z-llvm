@@ -1,4 +1,5 @@
 const std = @import("std");
+const alias = @import("../analysis/alias.zig");
 const dominator = @import("../analysis/dominator.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
@@ -67,7 +68,7 @@ fn findDominatingEquivalent(
             if (candidate.removed or !isCandidate(candidate)) continue;
             if (candidate_block_index == block_index and candidate_index >= instruction_index) continue;
             if (candidate_block_index != block_index and !dom.dominates(candidate_block_index, block_index)) continue;
-            if (!inst_simplify.sameExpression(candidate, instruction)) continue;
+            if (!sameGvnExpression(function, candidate, instruction)) continue;
             return .{ .named = candidate.result orelse return null };
         }
     }
@@ -75,11 +76,31 @@ fn findDominatingEquivalent(
 }
 
 fn isCandidate(instruction: ir.Instruction) bool {
-    if (memory_effect.classify(instruction) != .none) return false;
+    const effect = memory_effect.classify(instruction);
+    if (effect != .none and effect != .readonly_load) return false;
     return switch (instruction.kind) {
-        .binary, .cast, .icmp, .select => true,
-        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
+        .binary, .cast, .icmp, .select, .phi, .load => true,
+        .freeze, .alloca, .store, .gep, .call => false,
     };
+}
+
+fn sameGvnExpression(function: ir.Function, candidate: ir.Instruction, instruction: ir.Instruction) bool {
+    if (!inst_simplify.sameExpression(candidate, instruction)) return false;
+    if (instruction.kind != .load) return true;
+    return !hasFunctionClobber(function, instruction.kind.load.ptr);
+}
+
+fn hasFunctionClobber(function: ir.Function, ptr: ir.Value) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (alias.modRef(function, instruction, ptr)) {
+                .mod, .mod_ref, .unknown => return true,
+                .no_mod_ref, .ref => {},
+            }
+        }
+    }
+    return false;
 }
 
 fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value) void {

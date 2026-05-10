@@ -14,12 +14,12 @@ pub const pass: pass_manager.ModulePass = .{
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        changed = try propagateFunction(module.allocator, function) or changed;
+        changed = try propagateFunction(module.allocator, module.*, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
 
-fn propagateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+fn propagateFunction(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
     var aliases = std.StringHashMap(ir.Value).init(allocator);
     defer aliases.deinit();
 
@@ -32,6 +32,11 @@ fn propagateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
                 if (instruction.removed) continue;
                 instruction.mapOperands(aliases);
                 if (simplifyPhi(instruction.*)) |replacement| {
+                    local_changed = try replaceInstruction(&aliases, instruction, replacement) or local_changed;
+                    changed = true;
+                    continue;
+                }
+                if (simplifyCall(module, instruction.*)) |replacement| {
                     local_changed = try replaceInstruction(&aliases, instruction, replacement) or local_changed;
                     changed = true;
                     continue;
@@ -51,6 +56,30 @@ fn propagateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
         }
     }
     return changed;
+}
+
+fn simplifyCall(module: ir.Module, instruction: ir.Instruction) ?ir.Value {
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return null,
+    };
+    if (call.ret_ty == .void) return null;
+    const callee = findFunction(module, call.callee) orelse return null;
+    if (!callee.ret_ty.eql(call.ret_ty)) return null;
+    if (callee.blocks.items.len != 1) return null;
+    const block = callee.blocks.items[0];
+    if (block.instructions.items.len != 0) return null;
+    return switch (block.terminator orelse return null) {
+        .ret => |ret| ret.value,
+        .br, .condbr, .@"unreachable" => null,
+    };
+}
+
+fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
+    for (module.functions.items) |function| {
+        if (std.mem.eql(u8, function.name, name)) return function;
+    }
+    return null;
 }
 
 fn replaceInstruction(aliases: *std.StringHashMap(ir.Value), instruction: *ir.Instruction, replacement: ir.Value) !bool {

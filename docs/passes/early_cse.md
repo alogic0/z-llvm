@@ -48,19 +48,23 @@ Local target status:
 Implemented subset:
 
 ```text
-same-basic-block common subexpression elimination
-pure add/sub/mul expression matching
+scoped dominator-tree traversal with an available-expression stack
+same-basic-block and dominating-block common subexpression elimination
+pure binary expression matching
 pure integer cast expression matching
-pure icmp eq/ne expression matching
-later uses in the same block are rewritten to the earlier value
+pure icmp expression matching
+safe load CSE only when alias/mod-ref proves no clobber in the supported local region
+later dominated uses are rewritten to the earlier value
 scalar expression equivalence shared with the InstSimplify helper
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces only the available-value lookup idea from EarlyCSE.
-LLVM's implementation walks with dominator/tree scoped tables and also handles memory, loads, calls, and target/library knowledge.
+This reproduces LLVM EarlyCSE's scoped available-value shape over a dominator
+tree, but with a much smaller expression and memory model.
+LLVM also handles richer memory, calls, assumptions, target/library knowledge,
+and poison-sensitive cases.
 ```
 
 Fixture coverage:
@@ -74,6 +78,8 @@ local-only conservative:
 
 unit-test only:
   same-block repeated pure expression elimination
+  dominating-block expression elimination
+  conservative load CSE with alias/mod-ref proof
 ```
 
 Example:
@@ -92,12 +98,9 @@ after early-cse:
 Known gaps:
 
 ```text
-no dominator-tree walk yet
-no memory value numbering
-no load CSE
+no full MemorySSA-backed load CSE
 no freeze CSE because undef/poison semantics need more modeling first
 no commutative operand canonicalization
-no control-flow-aware replacement
 no target-library knowledge
 no debug-info salvage
 ```

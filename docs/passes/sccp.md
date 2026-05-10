@@ -47,6 +47,7 @@ Implemented subset:
 function-local scalar constant propagation using the InstSimplify helper
 phi simplification when all incoming values are the same integer or undef
 conditional branch condition replacement when the condition folds to a constant
+direct call folding when the callee is a known local function that always returns the same constant
 ```
 
 Intentional divergences:
@@ -56,7 +57,7 @@ no full lattice yet
 no executable-edge pruning yet
 no overdefined tracking yet
 no interprocedural propagation yet
-no call semantics yet
+no general call semantics yet
 IPSCCP is an explicit placeholder until call graph support exists
 ```
 
@@ -71,6 +72,7 @@ local-only conservative:
 
 unit-test only:
   pipeline inclusion and pass dispatch
+  direct call to a constant-return function
 ```
 
 Comparison command:

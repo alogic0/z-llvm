@@ -55,8 +55,26 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_select.false_value.eql(b_select.false_value),
             .binary, .cast, .freeze, .icmp, .phi, .alloca, .load, .store, .gep, .call => false,
         },
-        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
+        .phi => |a_phi| switch (b.kind) {
+            .phi => |b_phi| samePhi(a_phi, b_phi),
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => false,
+        },
+        .load => |a_load| switch (b.kind) {
+            .load => |b_load| a_load.ty.eql(b_load.ty) and a_load.ptr.eql(b_load.ptr) and
+                !a_load.attrs.isBarrier() and !b_load.attrs.isBarrier(),
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => false,
+        },
+        .freeze, .alloca, .store, .gep, .call => false,
     };
+}
+
+fn samePhi(a: ir.PhiInst, b: ir.PhiInst) bool {
+    if (!a.ty.eql(b.ty) or a.incoming.items.len != b.incoming.items.len) return false;
+    for (a.incoming.items, b.incoming.items) |a_incoming, b_incoming| {
+        if (!a_incoming.value.eql(b_incoming.value)) return false;
+        if (!@import("std").mem.eql(u8, a_incoming.block, b_incoming.block)) return false;
+    }
+    return true;
 }
 
 fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {

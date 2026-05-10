@@ -58,9 +58,10 @@ Local target status:
 Implemented subset:
 
 ```text
-per-function scan for pure binary, integer cast, icmp, and select expressions
-shared memory-effect API rejects memory-reading, memory-writing, volatile/atomic, and unknown instructions from value numbering
+per-function scan for pure binary, integer cast, icmp, select, phi, and simple load expressions
+shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
 equivalence by opcode, flags where present, type, and operands
+simple load equivalence only when alias/mod-ref sees no clobber
 dominator check for cross-block availability
 same-block availability by instruction order
 replacement of dominated redundant expression uses
@@ -82,7 +83,8 @@ local-only conservative:
   none currently
 
 unit-test only:
-  none currently
+  phi-aware redundancy
+  simple load redundancy with no clobber
 ```
 
 The volatile operation in `gvn_scalar_with_memory` is not value-numbered; it
@@ -92,8 +94,8 @@ Known gaps:
 
 ```text
 no load PRE or MemorySSA
-no memory value numbering
-no phi translation
+no MemorySSA-backed memory value numbering
+no phi translation beyond exact phi expression matching
 no congruence-class iteration
 no expression hashing
 no critical-edge or partial redundancy handling

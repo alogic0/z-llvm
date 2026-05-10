@@ -20,8 +20,10 @@ const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
+const gvn = @import("passes/gvn.zig");
 const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
+const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 
 test "named pipelines expand to stable pass sequences" {
@@ -161,7 +163,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,lower-expect,div-rem-pairs,float2int,libcalls-shrinkwrap,inject-tli-mappings,rel-lookup-table-converter,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,constmerge,elim-avail-extern,recompute-globalsaa,globals-aa,annotation2metadata,sancov,module-tsan,tsan,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,lower-expect,div-rem-pairs,float2int,libcalls-shrinkwrap,inject-tli-mappings,rel-lookup-table-converter,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,constmerge,elim-avail-extern,recompute-globalsaa,globals-aa,annotation2metadata,sancov,module-tsan,tsan,memprof-remove-attributes,cg-profile,chr,transform-warning,loop-vectorize,slp-vectorizer,vector-combine,coro-early,coro-split,coro-elide,coro-cleanup,coro-annotation-elide,openmp-opt,openmp-opt-cgscc,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -3601,6 +3603,155 @@ test "early-cse removes repeated pure expressions in a block" {
         \\  %x = add i32 %a, 1
         \\  %z = mul i32 %x, 2
         \\  ret i32 %z
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "early-cse removes dominating pure and safe load expressions" {
+    const input =
+        \\define i32 @cse_dom_load(i1 %cond, ptr %p, i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 1
+        \\  %l0 = load i32, ptr %p
+        \\  br i1 %cond, label %then, label %exit
+        \\then:
+        \\  %y = add i32 %a, 1
+        \\  %l1 = load i32, ptr %p
+        \\  %z = add i32 %y, %l1
+        \\  ret i32 %z
+        \\exit:
+        \\  ret i32 %l0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(early_cse.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @cse_dom_load(i1 %cond, ptr %p, i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 1
+        \\  %l0 = load i32, ptr %p
+        \\  br i1 %cond, label %then, label %exit
+        \\then:
+        \\  %z = add i32 %x, %l0
+        \\  ret i32 %z
+        \\exit:
+        \\  ret i32 %l0
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "gvn removes equivalent phi nodes and safe loads" {
+    const input =
+        \\define i32 @gvn_phi_load(i1 %cond, ptr %p, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %p0 = phi i32 [ %a, %left ], [ %b, %right ]
+        \\  %p1 = phi i32 [ %a, %left ], [ %b, %right ]
+        \\  %l0 = load i32, ptr %p
+        \\  %l1 = load i32, ptr %p
+        \\  %x = add i32 %p1, %l1
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(gvn.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @gvn_phi_load(i1 %cond, ptr %p, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %p0 = phi i32 [ %a, %left ], [ %b, %right ]
+        \\  %l0 = load i32, ptr %p
+        \\  %x = add i32 %p0, %l0
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "sccp folds direct calls to constant-return functions" {
+    const input =
+        \\define internal i32 @constant() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  %x = call i32 @constant()
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(sccp.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define internal i32 @constant() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  ret i32 7
         \\}
         \\
     ;
