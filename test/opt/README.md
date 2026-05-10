@@ -8,7 +8,21 @@ Fixture metadata lives in:
 test/opt/fixtures.tsv
 ```
 
-Each row records the fixture id, `z_llvm` pass name, LLVM `opt` pass name, input path, expected `z_llvm` output path, and known normalization notes.
+Each row records:
+
+```text
+id
+z_llvm pass or pipeline
+LLVM opt pass or pipeline
+input path
+expected z_llvm output path
+fixture kind: opt-equivalent, local-conservative, or parse-preserve-only
+inventory pass names covered by the fixture
+known normalization notes
+```
+
+The `inventory pass names` field ties every optimizer fixture back to
+`docs/inventory/zig_llvm_pass_pipeline_inventory.md`.
 
 Run `z_llvm`:
 
@@ -70,4 +84,6 @@ Run a custom metadata file:
 bash scripts/compare_opt.sh test/opt/fixtures.tsv
 ```
 
-The fixtures are intentionally limited to the reproduced subset of each LLVM algorithm. LLVM may preserve extra module flags, attributes, or formatting when run on richer input; compare normalized behavior rather than raw text.
+The fixtures are intentionally limited to the reproduced subset of each LLVM
+algorithm. LLVM may preserve extra module flags, attributes, or formatting when
+run on richer input; compare normalized behavior rather than raw text.

@@ -124,7 +124,7 @@ pipelines without silently accepting invalid inputs.
 - [x] Keep unsupported passes as explicit pipeline placeholders with targeted
       diagnostics or documented no-op behavior.
 - [x] Add pass-limit/trace output that can show the expanded local pipeline.
-- [ ] Add fixture metadata tying every optimizer fixture to the inventory pass
+- [x] Add fixture metadata tying every optimizer fixture to the inventory pass
       it covers.
 
 Passes covered:

@@ -24,10 +24,13 @@ LLVM `opt` comparison fixtures live under:
 ```text
 test/opt/inputs/
 test/opt/expected/z_llvm/
+test/opt/fixtures.tsv
 ```
 
 Use these to compare each reproduced pass with the matching LLVM pass when `opt` is installed.
 The current development environment uses versioned LLVM 22 commands; see [environment.md](environment.md).
+`test/opt/fixtures.tsv` records fixture kind and the inventory pass names each
+fixture covers.
 
 ```bash
 opt-22 -passes=instcombine test/opt/inputs/instcombine.ll -S -o /tmp/llvm_instcombine.ll

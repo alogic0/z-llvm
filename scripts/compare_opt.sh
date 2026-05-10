@@ -6,7 +6,7 @@ metadata="${1:-test/opt/fixtures.tsv}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-while IFS=$'\t' read -r id z_pass llvm_pass input_path expected_path notes; do
+while IFS=$'\t' read -r id z_pass llvm_pass input_path expected_path fixture_kind inventory_passes notes; do
   if [[ -z "${id:-}" || "$id" == \#* ]]; then
     continue
   fi
@@ -26,5 +26,5 @@ while IFS=$'\t' read -r id z_pass llvm_pass input_path expected_path notes; do
 
   diff -u "$expected_norm" "$z_norm"
   diff -u "$llvm_norm" "$z_norm"
-  printf 'ok %s (%s)\n' "$id" "$notes"
+  printf 'ok %s [%s: %s] (%s)\n' "$id" "$fixture_kind" "$inventory_passes" "$notes"
 done < "$metadata"
