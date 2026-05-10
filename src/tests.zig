@@ -549,6 +549,42 @@ test "dominator analysis answers dominance queries" {
     try std.testing.expect(!dom.dominates(2, 3));
 }
 
+test "dominator analysis reports immediate dominators and frontiers" {
+    const input =
+        \\define i32 @frontier(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var dom = try dominator.Dominators.build(std.testing.allocator, function);
+    defer dom.deinit();
+
+    try std.testing.expectEqual(@as(?usize, null), dom.immediateDominator(0));
+    try std.testing.expectEqual(@as(?usize, 0), dom.immediateDominator(1));
+    try std.testing.expectEqual(@as(?usize, 0), dom.immediateDominator(2));
+    try std.testing.expectEqual(@as(?usize, 0), dom.immediateDominator(3));
+
+    var frontiers = try dominator.DominanceFrontiers.build(std.testing.allocator, function, dom);
+    defer frontiers.deinit();
+
+    try std.testing.expectEqualSlices(usize, &.{}, frontiers.frontier(0));
+    try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(1));
+    try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(2));
+    try std.testing.expectEqualSlices(usize, &.{}, frontiers.frontier(3));
+}
+
 test "early-cse removes repeated pure expressions in a block" {
     const input =
         \\define i32 @cse(i32 %a) {

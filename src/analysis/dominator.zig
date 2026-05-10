@@ -77,6 +77,18 @@ pub const Dominators = struct {
         return dom.bits[dom.index(dominator, block)];
     }
 
+    pub fn immediateDominator(dom: Dominators, block: usize) ?usize {
+        if (block == 0 or block >= dom.block_count) return null;
+        var best: ?usize = null;
+        for (0..dom.block_count) |candidate| {
+            if (candidate == block or !dom.dominates(candidate, block)) continue;
+            if (best == null or dom.dominates(best.?, candidate)) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
     fn set(dom: *Dominators, dominator: usize, block: usize, value: bool) void {
         dom.bits[dom.index(dominator, block)] = value;
     }
@@ -85,3 +97,53 @@ pub const Dominators = struct {
         return block * dom.block_count + dominator;
     }
 };
+
+pub const DominanceFrontiers = struct {
+    allocator: std.mem.Allocator,
+    sets: std.ArrayList(std.ArrayList(usize)),
+
+    pub fn build(allocator: std.mem.Allocator, function: ir.Function, dom: Dominators) !DominanceFrontiers {
+        var graph = try cfg.Graph.build(allocator, function);
+        defer graph.deinit();
+
+        var frontiers: DominanceFrontiers = .{
+            .allocator = allocator,
+            .sets = .empty,
+        };
+        errdefer frontiers.deinit();
+
+        try frontiers.sets.appendNTimes(allocator, .empty, function.blocks.items.len);
+
+        for (function.blocks.items, 0..) |_, block_index| {
+            const predecessors = graph.predecessors(block_index);
+            if (predecessors.len < 2) continue;
+
+            const stop = dom.immediateDominator(block_index) orelse continue;
+            for (predecessors) |predecessor| {
+                var runner = predecessor;
+                while (runner != stop) {
+                    try appendUnique(allocator, &frontiers.sets.items[runner], block_index);
+                    runner = dom.immediateDominator(runner) orelse break;
+                }
+            }
+        }
+
+        return frontiers;
+    }
+
+    pub fn deinit(frontiers: *DominanceFrontiers) void {
+        for (frontiers.sets.items) |*set| set.deinit(frontiers.allocator);
+        frontiers.sets.deinit(frontiers.allocator);
+    }
+
+    pub fn frontier(frontiers: DominanceFrontiers, block_index: usize) []const usize {
+        return frontiers.sets.items[block_index].items;
+    }
+};
+
+fn appendUnique(allocator: std.mem.Allocator, list: *std.ArrayList(usize), value: usize) !void {
+    for (list.items) |existing| {
+        if (existing == value) return;
+    }
+    try list.append(allocator, value);
+}
