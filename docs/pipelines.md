@@ -58,6 +58,8 @@ Implemented subset:
   Named pass registry
   Named development pipelines
   Zig mode pipeline descriptors for Debug/O0, Release/O3, Release/Oz, and LTO
+  Textual nesting placeholders for module(...), function(...), loop(...), and
+  cgscc(...)
   Explicit no-op placeholders for discovered passes whose algorithms are not
   implemented yet
 
@@ -66,7 +68,9 @@ Intentional divergences:
   modes, not complete textual reproductions of LLVM's printed pipeline.
   Placeholder passes are documented no-ops so the pipeline surface is explicit
   before each algorithm lands.
-  No nested module/function/loop/CGSCC pass managers exist yet.
+  Textual nesting placeholders flatten accepted inner passes into the module
+  pass manager.
+  No real nested module/function/loop/CGSCC pass managers exist yet.
 
 Analysis preservation/invalidation:
   Pipeline expansion preserves no analysis state.
@@ -76,6 +80,8 @@ Analysis preservation/invalidation:
 Fixture coverage:
   Unit tests check development pipeline expansion.
   Unit tests check Debug/O0 and Release/O3 mode pipeline expansion.
+  Unit tests check nested pipeline placeholder flattening and malformed group
+  rejection.
   Unit tests check placeholder no-op execution.
 
 opt-22 comparison command:
@@ -158,6 +164,7 @@ zig build run -- --passes=scalar-foundation test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
 zig build run -- --pipeline=release-o3 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=debug-o0 test/opt/inputs/instcombine.ll
+zig build run -- --passes='module(verify,function(instcombine,dce))' test/opt/inputs/instcombine.ll
 ```
 
 Implemented subset:
@@ -169,6 +176,7 @@ pipeline aliases can be mixed with explicit pass names
 unit tests check the scalar-foundation pass order
 inventory placeholders are executable documented no-ops
 unit tests check debug-o0 and release-o3 expansion
+textual nested pipeline placeholders are flattened for now
 ```
 
 Upstream mapping:
@@ -181,7 +189,7 @@ LLVM's PassBuilder handles optimization levels, analysis managers, extension poi
 Known conservative differences:
 
 ```text
-no nested module/function/loop/CGSCC pass managers
+no real nested module/function/loop/CGSCC pass managers
 no target-machine pipeline hooks
 no extension points
 no analysis preservation scheduling

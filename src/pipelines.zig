@@ -202,17 +202,53 @@ pub fn find(name: []const u8) ?Pipeline {
     return null;
 }
 
-pub fn addPasses(pm: *pass_manager.ModulePassManager, pass_list: []const u8) !void {
-    var names = std.mem.splitScalar(u8, pass_list, ',');
-    while (names.next()) |raw_name| {
-        const name = std.mem.trim(u8, raw_name, " \t");
-        if (name.len == 0) continue;
-        if (find(name)) |pipeline| {
-            for (pipeline.passes) |pass_name| try addPass(pm, pass_name);
-        } else {
-            try addPass(pm, name);
+pub fn addPasses(pm: *pass_manager.ModulePassManager, pass_list: []const u8) anyerror!void {
+    var start: usize = 0;
+    var depth: usize = 0;
+    for (pass_list, 0..) |byte, index| {
+        switch (byte) {
+            '(' => depth += 1,
+            ')' => {
+                if (depth == 0) return error.InvalidPassPipeline;
+                depth -= 1;
+            },
+            ',' => if (depth == 0) {
+                try addPassExpression(pm, pass_list[start..index]);
+                start = index + 1;
+            },
+            else => {},
         }
     }
+    if (depth != 0) return error.InvalidPassPipeline;
+    try addPassExpression(pm, pass_list[start..]);
+}
+
+fn addPassExpression(pm: *pass_manager.ModulePassManager, raw_expression: []const u8) anyerror!void {
+    const expression = std.mem.trim(u8, raw_expression, " \t");
+    if (expression.len == 0) return;
+
+    if (find(expression)) |pipeline| {
+        for (pipeline.passes) |pass_name| try addPass(pm, pass_name);
+    } else if (nestedPipelineBody(expression)) |body| {
+        try addPasses(pm, body);
+    } else {
+        try addPass(pm, expression);
+    }
+}
+
+fn nestedPipelineBody(expression: []const u8) ?[]const u8 {
+    const prefixes = [_][]const u8{
+        "module(",
+        "function(",
+        "loop(",
+        "cgscc(",
+    };
+    for (prefixes) |prefix| {
+        if (!std.mem.startsWith(u8, expression, prefix)) continue;
+        if (!std.mem.endsWith(u8, expression, ")")) return null;
+        return expression[prefix.len .. expression.len - 1];
+    }
+    return null;
 }
 
 fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {

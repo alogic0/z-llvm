@@ -143,6 +143,32 @@ test "inventory placeholders run as documented no-op passes" {
     try std.testing.expectEqualStrings(input, printed.writer.buffered());
 }
 
+test "nested pipeline placeholders flatten accepted inner passes" {
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+
+    try pipelines.addPasses(&pm, "module(verify,function(instcombine,dce)),loop(licm),cgscc(always-inline)");
+
+    const expected = [_][]const u8{
+        "verify",
+        "instcombine",
+        "dce",
+        "licm",
+        "always-inline",
+    };
+    try std.testing.expectEqual(expected.len, pm.passes.items.len);
+    for (expected, pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
+}
+
+test "nested pipeline placeholders reject unbalanced groups" {
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+
+    try std.testing.expectError(error.InvalidPassPipeline, pipelines.addPasses(&pm, "function(instcombine,dce"));
+}
+
 test "pass manager pass limit and timing output are deterministic without an io clock" {
     const input =
         \\define i32 @limit(i32 %a) {

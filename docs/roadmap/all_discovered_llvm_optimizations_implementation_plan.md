@@ -131,7 +131,7 @@ Passes covered:
 
 - [x] `verify`
 - [x] analysis plumbing: `require<...>`, `invalidate<...>` placeholders
-- [ ] pass-manager nesting placeholders for module/function/loop/CGSCC groups
+- [x] pass-manager nesting placeholders for module/function/loop/CGSCC groups
 
 ## Epic 2: P0 Scalar Canonicalization Foundation
 

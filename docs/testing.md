@@ -98,6 +98,7 @@ zig build run -- --pipeline=release-o3 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=release-oz test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=lto-prelink-o3 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=lto-prelink-oz test/opt/inputs/instcombine.ll
+zig build run -- --passes='module(verify,function(instcombine,dce))' test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --trace test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
@@ -139,6 +140,7 @@ LLVM algorithms covered so far:
 ```text
 Verifier: accepted-IR subset for terminators, call signatures, memory attributes, SSA dominance, use-before-def, and phi predecessor validation
 PassBuilder pipeline surface: named pass registry, Zig mode pipeline descriptors, and no-op placeholders for not-yet-implemented inventory passes
+PassBuilder nesting surface: textual module/function/loop/CGSCC group placeholders flattened to module pass execution
 InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset

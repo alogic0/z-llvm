@@ -39,6 +39,7 @@ optional per-pass timing comments
 optional pass execution limit
 module verification after each executed pass
 explicit placeholder passes that return unchanged
+textual nesting placeholders are flattened before execution
 ```
 
 CLI:
@@ -82,7 +83,7 @@ Known gaps:
 ```text
 no analysis manager
 no preserved-analysis reporting
-no nested pass managers
+no real nested pass managers
 no before/after pass instrumentation callbacks
 no pass skip callbacks beyond the simple pass limit
 no machine-readable timing output
