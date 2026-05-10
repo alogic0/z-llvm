@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+## Completed Cycles
+
 ### Cycle 14: Scalar IR Expansion
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
@@ -15,8 +19,6 @@ Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer
 - [x] Update `unsupported_ir.md`, `ir_values.md`, scalar pass docs, and the inventory current-coverage section for the new scalar surface and remaining poison/flag gaps.
 - [x] Add `opt-22` equivalent fixtures and local tests for accepted scalar IR round-tripping and conservative no-fold behavior.
 - [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
-
-## Completed Cycles
 
 ### Cycle 13: Pipeline and Pass Infrastructure
 
@@ -178,6 +180,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - memory IR subset: documented in [ir_memory.md](ir_memory.md).
 - named pipeline aliases: documented in [pipelines.md](pipelines.md).
 - pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](pass_manager.md).
+- scalar IR casts, div/rem spelling, flags, and freeze: documented in [ir_scalar.md](ir_scalar.md).
 
 ## Completed Step Notes
 
