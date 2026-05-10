@@ -2,6 +2,7 @@ const std = @import("std");
 const alias = @import("analysis/alias.zig");
 const cfg = @import("analysis/cfg.zig");
 const dominator = @import("analysis/dominator.zig");
+const loop_info = @import("analysis/loop_info.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
@@ -968,6 +969,39 @@ test "dominator analysis reports immediate dominators and frontiers" {
     try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(1));
     try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(2));
     try std.testing.expectEqualSlices(usize, &.{}, frontiers.frontier(3));
+}
+
+test "loop info finds a natural loop from a dominator backedge" {
+    const input =
+        \\define i32 @loop(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  br i1 %cond, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
+    defer loops.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), loops.loops.items.len);
+    const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expectEqual(@as(usize, 1), natural_loop.header);
+    try std.testing.expectEqual(@as(usize, 3), natural_loop.latch);
+    try std.testing.expectEqualSlices(usize, &.{ 1, 2, 3 }, natural_loop.blocks.items);
+    try std.testing.expect(natural_loop.contains(2));
+    try std.testing.expect(!natural_loop.contains(4));
 }
 
 test "early-cse removes repeated pure expressions in a block" {

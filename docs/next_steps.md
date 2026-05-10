@@ -18,7 +18,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Extend `instcombine` and IR parsing for simple bitwise and shift identities, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Add a GVN-style cross-block expression elimination slice using dominator information, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Add an ADCE foundation pass for aggressively removing unused side-effect-free instruction chains, with upstream LLVM mapping and `opt-22` fixtures.
-- [ ] Add LoopInfo-style natural loop analysis over dominator backedges, with upstream LLVM mapping and unit tests.
+- [x] Add LoopInfo-style natural loop analysis over dominator backedges, with upstream LLVM mapping and unit tests.
 
 ## Completed Cycles
 
@@ -87,8 +87,12 @@ Track each reproduced LLVM algorithm here as it lands:
 - CFG successor/predecessor subset: documented in [analysis/cfg.md](analysis/cfg.md).
 - alias analysis stack-slot subset: documented in [analysis/alias.md](analysis/alias.md).
 - dominator analysis subset: documented in [analysis/dominator.md](analysis/dominator.md).
+- LoopInfo natural-loop subset: documented in [analysis/loop_info.md](analysis/loop_info.md).
 - `early-cse` subset: documented in [passes/early_cse.md](passes/early_cse.md).
 - `mem2reg` single-block subset: documented in [passes/mem2reg.md](passes/mem2reg.md).
+- SROA zero-offset alloca forwarding subset: documented in [passes/sroa.md](passes/sroa.md).
+- GVN dominating-expression subset: documented in [passes/gvn.md](passes/gvn.md).
+- ADCE dead-chain subset: documented in [passes/adce.md](passes/adce.md).
 - memory IR subset: documented in [ir_memory.md](ir_memory.md).
 
 ## Completed Step Notes
