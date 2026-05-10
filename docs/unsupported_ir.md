@@ -95,6 +95,7 @@ ABI classification beyond void, scalar integer, and pointer signatures
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
+target-aware pipeline integration beyond CLI target/datalayout record injection
 ```
 
 ## Current Parser Errors
@@ -189,6 +190,7 @@ Module IR subset:
   scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
   AIR-like pre/post optimization driver using named pipelines
+  zig-scalar-foundation pipeline alias and CLI target/datalayout record injection
   normalized Zig-emitted scalar function signature fixture
   function linkage on definitions
   function visibility on definitions

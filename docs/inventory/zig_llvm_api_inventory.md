@@ -67,6 +67,7 @@ The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, scalar globals, function linkage/visibility, calling convention preservation, raw function and parameter attribute preservation, and void returns.
 - AIR-like helper bridge for lowering tiny scalar binary/cast arithmetic, control-flow, stack-memory, and canonical-loop function specs into project IR, plus a pre/post named-pipeline driver.
+- `zig-scalar-foundation` pipeline alias and CLI target/datalayout injection for target-aware scalar IR tests.
 - Zig-emitted LLVM IR fixture harness for normalized tiny scalar module records and function signatures.
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.

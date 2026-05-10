@@ -87,6 +87,7 @@ zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
 zig build run -- --passes=scalar-foundation --trace test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=zig-scalar-foundation --target=x86_64-unknown-linux-gnu --datalayout=e-m:e-p:64:64-i64:64 test/opt/inputs/instcombine.ll
 ```
 
 Assembly bootstrap command:
@@ -116,6 +117,7 @@ Target/DataLayout: target triple parsing, initial target matrix recognition, min
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
 AIR-like bridge: tiny scalar binary/cast, control-flow, stack-memory, and canonical-loop function lowering into project IR
 AIR-like bridge driver: pre/post pipeline output for `memory-foundation`
+Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout record injection
 Zig-emitted IR harness: normalized tiny scalar module records and function signatures
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```

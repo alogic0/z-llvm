@@ -40,6 +40,26 @@ test "named pipelines expand to stable pass sequences" {
     }
 }
 
+test "zig scalar foundation pipeline aliases scalar foundation passes" {
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+
+    try pipelines.addPasses(&pm, "zig-scalar-foundation");
+
+    const expected = [_][]const u8{
+        "simplifycfg",
+        "instcombine",
+        "early-cse",
+        "gvn",
+        "dce",
+        "adce",
+    };
+    try std.testing.expectEqual(expected.len, pm.passes.items.len);
+    for (expected, pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
+}
+
 test "pass manager pass limit and timing output are deterministic without an io clock" {
     const input =
         \\define i32 @limit(i32 %a) {

@@ -6,10 +6,10 @@ const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm] [--target=triple] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa
-    \\Supported pipelines: scalar-foundation,memory-foundation
+    \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation
     \\
 ;
 
@@ -32,6 +32,7 @@ pub fn main(init: std.process.Init) !void {
     var pass_limit: ?usize = null;
     var emit: Emit = .ir;
     var target_triple: ?[]const u8 = null;
+    var target_datalayout: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
@@ -58,6 +59,8 @@ pub fn main(init: std.process.Init) !void {
             }
         } else if (std.mem.startsWith(u8, arg, "--target=")) {
             target_triple = arg["--target=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--datalayout=")) {
+            target_datalayout = arg["--datalayout=".len..];
         } else if (std.mem.startsWith(u8, arg, "--pipeline=")) {
             pass_list = arg["--pipeline=".len..];
         } else if (std.mem.startsWith(u8, arg, "--passes=")) {
@@ -86,6 +89,8 @@ pub fn main(init: std.process.Init) !void {
 
     var module = try ir.Module.parse(allocator, input);
     defer module.deinit();
+    if (module.target_triple == null) module.target_triple = target_triple;
+    if (module.target_datalayout == null) module.target_datalayout = target_datalayout;
     try module.verify();
 
     var stdout_buffer: [4096]u8 = undefined;

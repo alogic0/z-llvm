@@ -49,6 +49,13 @@ pub const all = [_]Pipeline{
         .intended_level = "phase-zero stack-memory cleanup foundation",
         .notes = "direct stack-slot and zero-offset GEP subset only; no MemorySSA or general memory motion",
     },
+    .{
+        .name = "zig-scalar-foundation",
+        .passes = &scalar_foundation_passes,
+        .llvm_analogue = "Zig AIR-like scalar cleanup over target-aware project IR",
+        .intended_level = "target-aware AIR-like scalar optimization foundation",
+        .notes = "currently reuses scalar-foundation passes after target/module records are available",
+    },
 };
 
 pub fn find(name: []const u8) ?Pipeline {

@@ -11,4 +11,14 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle. Pull the next bounded slice from one epic before implementing.
+### Cycle 32: Zig Scalar Foundation Pipeline Integration
+
+Source epic: [Target DataLayout and AIR-to-IR Bridge Epic](roadmap/target_datalayout_air_bridge_epic.md)
+Epic sections: 6, 7, 8
+
+- [x] Add a named `zig-scalar-foundation` pipeline alias that reuses the current scalar optimizer foundation.
+- [x] Add CLI support for filling missing target triple and datalayout records before verification.
+- [x] Keep the old LLVM IR input optimizer path intact.
+- [x] Add tests for the new pipeline alias and update command documentation.
+- [x] Update testing docs, inventory, unsupported IR notes, and target bridge epic progress.
+- [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh`.
