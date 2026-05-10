@@ -4,7 +4,13 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-No active cycle is currently open. Add the next optimization-focused cycle here before implementation starts.
+### Cycle 10: Documentation Freshness and IR Module Split
+
+- [ ] Update `unsupported_ir.md` so supported instructions, predicates, terminators, and next unsupported areas match the current IR implementation.
+- [ ] Update `testing.md` and `inventory/zig_llvm_api_inventory.md` so current fixtures and phase-zero optimizer coverage include the Cycle 6-9 work.
+- [ ] Confirm scratch documentation state and keep `docs/tmp` out of tracked project documentation unless it is classified deliberately.
+- [ ] Split `src/ir/core.zig` into core data structures plus parser, printer, and verifier modules while preserving the public `ir.Module` API.
+- [ ] Verify the split and docs refresh with `zig build test` and `bash scripts/compare_opt.sh`.
 
 ## Completed Cycles
 
