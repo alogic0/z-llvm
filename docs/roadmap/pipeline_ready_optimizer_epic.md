@@ -5,6 +5,22 @@ optimization pipeline over a richer IR subset. This is intentionally larger
 than one development cycle. Pull one bounded slice from this roadmap into
 `docs/next_steps.md` at a time.
 
+## Relationship To Other Epics
+
+Roadmap order:
+
+```text
+Pipeline-Ready Optimizer Epic
+  -> Target DataLayout and AIR-to-IR Bridge Epic
+  -> MC/Object Bootstrap Epic
+```
+
+- This epic is the current optimizer foundation.
+- Next epic: [Target DataLayout and AIR-to-IR Bridge Epic](target_datalayout_air_bridge_epic.md).
+- Later codegen epic: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
+- Do not use this optimizer epic to absorb target/DataLayout, AIR lowering, or
+  MC/object-emission work; those belong in the later epics.
+
 ## 1. Pipeline and Pass Infrastructure
 
 - Add named pipeline aliases to the CLI, starting with `scalar-foundation` and `memory-foundation`, while keeping explicit comma-separated pass lists supported.
