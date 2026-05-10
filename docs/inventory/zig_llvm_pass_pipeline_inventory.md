@@ -156,7 +156,7 @@ Status meanings:
 
 | LLVM pass | Category | Priority | Local status | Upstream owner |
 | --- | --- | --- | --- | --- |
-| `verify` / `VerifierPass` | mandatory | P0 | partial verifier | `llvm/lib/IR/Verifier.cpp` |
+| `verify` / `VerifierPass` | mandatory | P0 | foundation: SSA dominance and phi predecessor checks for accepted IR | `llvm/lib/IR/Verifier.cpp` |
 | `always-inline` | mandatory IPO | P0 | missing | `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` |
 | `mem2reg` | canonicalization | P0 | foundation | `llvm/lib/Transforms/Utils/Mem2Reg.cpp` |
 | `sroa` | canonicalization / memory | P0 | foundation | `llvm/lib/Transforms/Scalar/SROA.cpp` |

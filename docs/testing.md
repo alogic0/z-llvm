@@ -73,6 +73,7 @@ function visibility and raw parameter attribute preservation
 calling convention preservation for ccc/fastcc/coldcc-compatible header parsing
 function declaration and direct call round-tripping
 direct call verifier mismatch and unsupported-call diagnostics
+verifier dominance, use-before-def, exact phi predecessor, and phi ordering diagnostics
 void function and ret void round-tripping
 explicit unsupported global diagnostics
 ```
@@ -127,6 +128,7 @@ arguments, and unsupported call live pressure.
 LLVM algorithms covered so far:
 
 ```text
+Verifier: accepted-IR subset for terminators, call signatures, memory attributes, SSA dominance, use-before-def, and phi predecessor validation
 InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset

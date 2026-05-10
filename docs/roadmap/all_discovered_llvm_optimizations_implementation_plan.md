@@ -596,15 +596,15 @@ Deferred passes:
 
 ## First Day-Sized Slice To Pull From This Plan
 
-- [ ] Create a `Verifier Foundation Epic` in `docs/roadmap/`.
-- [ ] Pull only verifier expansion and fixture metadata:
+- [x] Create a `Verifier Foundation Epic` in `docs/roadmap/`.
+- [x] Pull only verifier expansion and fixture metadata:
       dominance checks, phi predecessor/incoming validity, use-before-def
       rejection, terminator shape validation, and call/reference validation for
       the currently accepted IR.
-- [ ] Add the `verify` inventory row as the explicit justification.
-- [ ] Add the LLVM Algorithm Contract for `VerifierPass` and local verifier
+- [x] Add the `verify` inventory row as the explicit justification.
+- [x] Add the LLVM Algorithm Contract for `VerifierPass` and local verifier
       behavior before implementation.
-- [ ] Add accepted and rejected verifier fixtures with `opt-22` comparison where
+- [x] Add accepted and rejected verifier fixtures with `opt-22` comparison where
       LLVM accepts the same IR surface.
-- [ ] Keep InstCombine, SimplifyCFG, mem2reg, SROA, DSE, SCCP, loop rotation,
+- [x] Keep InstCombine, SimplifyCFG, mem2reg, SROA, DSE, SCCP, loop rotation,
       inlining, globals, vectorization, and LTO out of the first slice.

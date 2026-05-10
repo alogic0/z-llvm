@@ -14,10 +14,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         changed = simplifyTerminators(function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTerminators(function) or changed;
+        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
         changed = try removeUnreachableBlocks(module.allocator, function) or changed;
         changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
+        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
         changed = simplifyTrivialPhis(function) or changed;
         changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
+        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
@@ -202,6 +205,44 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
         }
     }
     return changed;
+}
+
+fn prunePhiIncomingToPredecessors(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
+    var changed = false;
+    for (function.blocks.items, 0..) |*block, block_index| {
+        const predecessors = graph.predecessors(block_index);
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .phi => |*phi| {
+                    var index = phi.incoming.items.len;
+                    while (index > 0) {
+                        index -= 1;
+                        const incoming_block_index = function.blockIndex(phi.incoming.items[index].block) orelse {
+                            _ = phi.incoming.orderedRemove(index);
+                            changed = true;
+                            continue;
+                        };
+                        if (containsIndex(predecessors, incoming_block_index)) continue;
+                        _ = phi.incoming.orderedRemove(index);
+                        changed = true;
+                    }
+                },
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
+            }
+        }
+    }
+    return changed;
+}
+
+fn containsIndex(values: []const usize, needle: usize) bool {
+    for (values) |value| {
+        if (value == needle) return true;
+    }
+    return false;
 }
 
 fn simplifyTrivialPhis(function: *ir.Function) bool {

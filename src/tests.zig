@@ -1040,6 +1040,119 @@ test "verifier accepts matching declaration and definition" {
     try module.verify();
 }
 
+test "verifier rejects use before definition in the same block" {
+    const input =
+        \\define i32 @bad(i32 %a) {
+        \\entry:
+        \\  %y = add i32 %x, 1
+        \\  %x = add i32 %a, 1
+        \\  ret i32 %y
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.ValueDoesNotDominateUse, module.verify());
+}
+
+test "verifier rejects value that does not dominate a merge use" {
+    const input =
+        \\define i32 @bad(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  %x = add i32 %a, 1
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.ValueDoesNotDominateUse, module.verify());
+}
+
+test "verifier rejects phi incoming blocks that are not exact predecessors" {
+    const wrong_predecessor =
+        \\define i32 @bad(i32 %a) {
+        \\entry:
+        \\  br label %merge
+        \\unused:
+        \\  ret i32 %a
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ], [ %a, %unused ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var wrong_module = try ir.Module.parse(std.testing.allocator, wrong_predecessor);
+    defer wrong_module.deinit();
+    try std.testing.expectError(error.PhiIncomingNotPredecessor, wrong_module.verify());
+
+    const missing_predecessor =
+        \\define i32 @bad(i32 %a) {
+        \\entry:
+        \\  br label %merge
+        \\other:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var missing_module = try ir.Module.parse(std.testing.allocator, missing_predecessor);
+    defer missing_module.deinit();
+    try std.testing.expectError(error.MissingPhiIncoming, missing_module.verify());
+
+    const duplicate_predecessor =
+        \\define i32 @bad(i32 %a) {
+        \\entry:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ], [ %a, %entry ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var duplicate_module = try ir.Module.parse(std.testing.allocator, duplicate_predecessor);
+    defer duplicate_module.deinit();
+    try std.testing.expectError(error.DuplicatePhiIncoming, duplicate_module.verify());
+}
+
+test "verifier rejects phi after non-phi instructions" {
+    const input =
+        \\define i32 @bad(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %x = add i32 %a, 1
+        \\  %v = phi i32 [ %a, %left ], [ %x, %right ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.PhiAfterNonPhi, module.verify());
+}
+
 test "parser rejects unsupported indirect and control-flow calls" {
     const indirect =
         \\define i32 @caller(ptr %fn, i32 %a) {
@@ -1987,7 +2100,13 @@ test "parser normalizes undef values" {
     const input =
         \\define i32 @undef_value(i1 %cond, i32 %a) {
         \\entry:
-        \\  %v = phi i32 [ undef, %entry ], [ %a, %entry ]
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ undef, %left ], [ %a, %right ]
         \\  ret i32 %v
         \\}
         \\

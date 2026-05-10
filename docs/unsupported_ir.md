@@ -152,11 +152,28 @@ UnsupportedCallTerminator
 UnsupportedVarArgs
 UnsupportedAttributeGroup
 UnsupportedModuleMetadata
+ValueDoesNotDominateUse
+PhiIncomingNotPredecessor
+DuplicatePhiIncoming
+MissingPhiIncoming
+PhiAfterNonPhi
 ```
 
 ## Reproduced LLVM Functionality So Far
 
 ```text
+Verifier subset:
+  block terminator presence
+  branch target existence
+  direct call declaration/function reference and signature checks
+  load/store attribute validation for the accepted memory spelling
+  named SSA type checks
+  named SSA dominance checks
+  same-block use-before-def rejection
+  phi incoming predecessor exactness
+  phi incoming value checks on predecessor edges
+  phi-before-non-phi ordering
+
 InstCombine subset:
   identity arithmetic and integer constant folding for add/sub/mul
   bitwise and shift identity folding
