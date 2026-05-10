@@ -51,6 +51,8 @@ x >> 0 -> x for logical and arithmetic shift
 0 >> x -> 0 for logical and arithmetic shift
 icmp eq/ne constant folding
 icmp eq/ne same-operand folding
+icmp signed and unsigned relational constant folding
+icmp signed and unsigned relational same-operand folding
 select constant-condition folding
 select identical-arm folding
 ```
@@ -81,7 +83,7 @@ no flags such as nsw/nuw/exact
 no poison/undef/freeze handling
 no vectors
 no width-aware constant folding for non-zero shifts
-no icmp predicates other than eq/ne
+unsigned constant folding is limited to integer widths below 128 bits
 no casts
 no canonical reassociation
 no target-specific combines

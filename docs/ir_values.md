@@ -18,6 +18,7 @@ UndefValue
 UndefValue::get
 PoisonValue
 AsmWriter support for undef
+AsmWriter support for i1 true/false constants
 ```
 
 Implemented subset:
@@ -25,6 +26,7 @@ Implemented subset:
 ```text
 named SSA values: %name
 integer constants
+i1 boolean constants parsed as integer 1/0 for normalization
 undef constants
 ```
 

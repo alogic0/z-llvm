@@ -82,10 +82,26 @@ pub const BinaryOp = enum {
 pub const IcmpPredicate = enum {
     eq,
     ne,
+    sgt,
+    sge,
+    slt,
+    sle,
+    ugt,
+    uge,
+    ult,
+    ule,
 
     pub fn parse(text: []const u8) ?IcmpPredicate {
         if (std.mem.eql(u8, text, "eq")) return .eq;
         if (std.mem.eql(u8, text, "ne")) return .ne;
+        if (std.mem.eql(u8, text, "sgt")) return .sgt;
+        if (std.mem.eql(u8, text, "sge")) return .sge;
+        if (std.mem.eql(u8, text, "slt")) return .slt;
+        if (std.mem.eql(u8, text, "sle")) return .sle;
+        if (std.mem.eql(u8, text, "ugt")) return .ugt;
+        if (std.mem.eql(u8, text, "uge")) return .uge;
+        if (std.mem.eql(u8, text, "ult")) return .ult;
+        if (std.mem.eql(u8, text, "ule")) return .ule;
         return null;
     }
 
@@ -931,6 +947,8 @@ fn parseType(text: []const u8) !Type {
 fn parseValue(text: []const u8) !Value {
     if (text.len == 0) return error.InvalidValue;
     if (std.mem.eql(u8, text, "undef")) return .undef;
+    if (std.mem.eql(u8, text, "true")) return .{ .int = 1 };
+    if (std.mem.eql(u8, text, "false")) return .{ .int = 0 };
     if (text[0] == '%') {
         if (text.len == 1) return error.InvalidValueName;
         return .{ .named = text[1..] };

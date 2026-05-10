@@ -130,20 +130,55 @@ fn foldBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
 
 fn foldIcmp(icmp: ir.IcmpInst) ?ir.Value {
     if (icmp.lhs == .int and icmp.rhs == .int) {
-        return .{ .int = switch (icmp.predicate) {
-            .eq => @intFromBool(icmp.lhs.int == icmp.rhs.int),
-            .ne => @intFromBool(icmp.lhs.int != icmp.rhs.int),
-        } };
+        return foldIcmpConstants(icmp);
     }
 
     if (icmp.lhs.eql(icmp.rhs)) {
         return .{ .int = switch (icmp.predicate) {
             .eq => 1,
             .ne => 0,
+            .sgt, .slt, .ugt, .ult => 0,
+            .sge, .sle, .uge, .ule => 1,
         } };
     }
 
     return null;
+}
+
+fn foldIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
+    const lhs = icmp.lhs.int;
+    const rhs = icmp.rhs.int;
+    const result = switch (icmp.predicate) {
+        .eq => lhs == rhs,
+        .ne => lhs != rhs,
+        .sgt => lhs > rhs,
+        .sge => lhs >= rhs,
+        .slt => lhs < rhs,
+        .sle => lhs <= rhs,
+        .ugt, .uge, .ult, .ule => blk: {
+            const lhs_unsigned = unsignedInt(lhs, icmp.operand_ty) orelse return null;
+            const rhs_unsigned = unsignedInt(rhs, icmp.operand_ty) orelse return null;
+            break :blk switch (icmp.predicate) {
+                .ugt => lhs_unsigned > rhs_unsigned,
+                .uge => lhs_unsigned >= rhs_unsigned,
+                .ult => lhs_unsigned < rhs_unsigned,
+                .ule => lhs_unsigned <= rhs_unsigned,
+                .eq, .ne, .sgt, .sge, .slt, .sle => unreachable,
+            };
+        },
+    };
+    return .{ .int = @intFromBool(result) };
+}
+
+fn unsignedInt(value: i128, ty: ir.Type) ?u128 {
+    const bits = switch (ty) {
+        .int => |bits| bits,
+        .ptr => return null,
+    };
+    if (bits >= 128) return null;
+    if (value >= 0) return @intCast(value);
+    const modulus: i128 = @as(i128, 1) << @intCast(bits);
+    return @intCast(modulus + value);
 }
 
 fn foldSelect(select: ir.SelectInst) ?ir.Value {

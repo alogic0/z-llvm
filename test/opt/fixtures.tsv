@@ -1,6 +1,7 @@
 # id	z_pass	llvm_pass	input	expected_z_llvm	notes
 instcombine	instcombine	instcombine	test/opt/inputs/instcombine.ll	test/opt/expected/z_llvm/instcombine.ll	generic LLVM headers only
 instcombine_bitwise	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_bitwise.ll	test/opt/expected/z_llvm/instcombine_bitwise.ll	bitwise and shift identity folding
+instcombine_icmp_rel	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_icmp_rel.ll	test/opt/expected/z_llvm/instcombine_icmp_rel.ll	relational icmp constant and same-operand folding
 select_fold	instcombine,dce	instcombine,dce	test/opt/inputs/select_fold.ll	test/opt/expected/z_llvm/select_fold.ll	select constant and identical-arm folding
 dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	generic LLVM headers only
 adce_chain	adce	adce	test/opt/inputs/adce_chain.ll	test/opt/expected/z_llvm/adce_chain.ll	unused side-effect-free instruction chain removed
