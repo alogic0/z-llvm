@@ -11,4 +11,13 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle.
+### Cycle 21: Calling Convention Preservation
+
+Source epic: [Target DataLayout and AIR-to-IR Bridge Epic](roadmap/target_datalayout_air_bridge_epic.md)
+Epic sections: 3, 7, 8
+
+- [ ] Parse and print basic calling conventions emitted by small LLVM IR examples, with upstream LLVM mapping.
+- [ ] Preserve calling convention metadata without ABI lowering semantics yet.
+- [ ] Add round-trip tests for calling convention preservation.
+- [ ] Update `docs/ir_module.md`, `docs/unsupported_ir.md`, `docs/testing.md`, inventory coverage, and target bridge epic progress.
+- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh`.
