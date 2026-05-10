@@ -51,6 +51,16 @@ Use a different `opt` binary:
 OPT_BIN=opt bash scripts/compare_opt.sh
 ```
 
+Named pipeline and pass-manager debugging commands:
+
+```bash
+zig build run -- --passes=scalar-foundation test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
+zig build run -- --passes=scalar-foundation --trace test/opt/inputs/instcombine.ll
+zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.ll
+zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
+```
+
 LLVM algorithms covered so far:
 
 ```text

@@ -8,13 +8,13 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
 
-- [ ] Add named pipeline aliases to the CLI, starting with `scalar-foundation` and `memory-foundation`, while keeping explicit comma-separated pass lists supported.
-- [ ] Document each named pipeline's pass order, LLVM upstream analogue, intended optimization level, and known conservative differences.
-- [ ] Add pass timing instrumentation behind a CLI flag, with stable output suitable for local debugging.
-- [ ] Add an opt-bisect-style pass limit option that stops after N pass executions and documents the mapping to LLVM's opt-bisect concept.
-- [ ] Add a minimal analysis invalidation contract to the pass manager docs, even if the implementation still rebuilds analyses conservatively.
-- [ ] Add trace fixtures or tests proving named pipelines run the expected pass sequence.
-- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
+- [x] Add named pipeline aliases to the CLI, starting with `scalar-foundation` and `memory-foundation`, while keeping explicit comma-separated pass lists supported.
+- [x] Document each named pipeline's pass order, LLVM upstream analogue, intended optimization level, and known conservative differences.
+- [x] Add pass timing instrumentation behind a CLI flag, with stable output suitable for local debugging.
+- [x] Add an opt-bisect-style pass limit option that stops after N pass executions and documents the mapping to LLVM's opt-bisect concept.
+- [x] Add a minimal analysis invalidation contract to the pass manager docs, even if the implementation still rebuilds analyses conservatively.
+- [x] Add trace fixtures or tests proving named pipelines run the expected pass sequence.
+- [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
 
 ## Completed Cycles
 

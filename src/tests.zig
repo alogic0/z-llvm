@@ -7,12 +7,66 @@ const memory_effect = @import("analysis/memory_effect.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
+const pipelines = @import("pipelines.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
 const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
+
+test "named pipelines expand to stable pass sequences" {
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+
+    try pipelines.addPasses(&pm, "scalar-foundation");
+
+    const expected = [_][]const u8{
+        "simplifycfg",
+        "instcombine",
+        "early-cse",
+        "gvn",
+        "dce",
+        "adce",
+    };
+    try std.testing.expectEqual(expected.len, pm.passes.items.len);
+    for (expected, pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
+}
+
+test "pass manager pass limit and timing output are deterministic without an io clock" {
+    const input =
+        \\define i32 @limit(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(.{ .name = "first", .run = noopPass });
+    try pm.add(.{ .name = "second", .run = noopPass });
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.runWithOptions(&module, &context, &output.writer, .{
+        .timing = true,
+        .pass_limit = 1,
+    });
+
+    try std.testing.expectEqualStrings("; time first: 0 ns\n", output.writer.buffered());
+}
+
+fn noopPass(_: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+    return .unchanged;
+}
 
 test "instcombine and dce remove identity arithmetic" {
     const input =

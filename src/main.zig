@@ -1,20 +1,13 @@
 const std = @import("std");
 const ir = @import("ir.zig");
 const pass_manager = @import("pass_manager.zig");
-const adce = @import("passes/adce.zig");
-const instcombine = @import("passes/instcombine.zig");
-const dce = @import("passes/dce.zig");
-const early_cse = @import("passes/early_cse.zig");
-const gvn = @import("passes/gvn.zig");
-const licm = @import("passes/licm.zig");
-const mem2reg = @import("passes/mem2reg.zig");
-const simplifycfg = @import("passes/simplifycfg.zig");
-const sroa = @import("passes/sroa.zig");
+const pipelines = @import("pipelines.zig");
 
 const usage =
-    \\usage: z_llvm [--passes=list] [--trace] <input.ll>
+    \\usage: z_llvm [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa
+    \\Supported pipelines: scalar-foundation,memory-foundation
     \\
 ;
 
@@ -28,6 +21,8 @@ pub fn main(init: std.process.Init) !void {
 
     var pass_list: []const u8 = "instcombine,dce";
     var trace = false;
+    var timing = false;
+    var pass_limit: ?usize = null;
     var input_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
@@ -39,6 +34,12 @@ pub fn main(init: std.process.Init) !void {
             return;
         } else if (std.mem.eql(u8, arg, "--trace")) {
             trace = true;
+        } else if (std.mem.eql(u8, arg, "--time")) {
+            timing = true;
+        } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
+            pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--pipeline=")) {
+            pass_list = arg["--pipeline=".len..];
         } else if (std.mem.startsWith(u8, arg, "--passes=")) {
             pass_list = arg["--passes=".len..];
         } else if (input_path == null) {
@@ -69,42 +70,17 @@ pub fn main(init: std.process.Init) !void {
 
     var pm = pass_manager.ModulePassManager.init(allocator);
     defer pm.deinit();
-    try addPasses(&pm, pass_list);
+    try pipelines.addPasses(&pm, pass_list);
 
-    var context: pass_manager.Context = .{ .allocator = allocator };
+    var context: pass_manager.Context = .{ .allocator = allocator, .io = io };
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
-    _ = try pm.run(&module, &context, stdout, trace);
+    _ = try pm.runWithOptions(&module, &context, stdout, .{
+        .trace = trace,
+        .timing = timing,
+        .pass_limit = pass_limit,
+    });
     if (!trace) try module.print(stdout);
     try stdout.flush();
-}
-
-fn addPasses(pm: *pass_manager.ModulePassManager, pass_list: []const u8) !void {
-    var names = std.mem.splitScalar(u8, pass_list, ',');
-    while (names.next()) |raw_name| {
-        const name = std.mem.trim(u8, raw_name, " \t");
-        if (name.len == 0) continue;
-        if (std.mem.eql(u8, name, "instcombine")) {
-            try pm.add(instcombine.pass);
-        } else if (std.mem.eql(u8, name, "dce")) {
-            try pm.add(dce.pass);
-        } else if (std.mem.eql(u8, name, "adce")) {
-            try pm.add(adce.pass);
-        } else if (std.mem.eql(u8, name, "early-cse")) {
-            try pm.add(early_cse.pass);
-        } else if (std.mem.eql(u8, name, "gvn")) {
-            try pm.add(gvn.pass);
-        } else if (std.mem.eql(u8, name, "licm")) {
-            try pm.add(licm.pass);
-        } else if (std.mem.eql(u8, name, "simplifycfg")) {
-            try pm.add(simplifycfg.pass);
-        } else if (std.mem.eql(u8, name, "mem2reg")) {
-            try pm.add(mem2reg.pass);
-        } else if (std.mem.eql(u8, name, "sroa")) {
-            try pm.add(sroa.pass);
-        } else {
-            return error.UnknownPass;
-        }
-    }
 }

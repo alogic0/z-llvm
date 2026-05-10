@@ -21,7 +21,7 @@ actually uses today. Paths are relative to `prog`.
 | `MemoryBuffer.createMemoryBufferWithMemoryRange` | `LLVMCreateMemoryBufferWithMemoryRange` | bitcode input | `src/bitcode/` | missing |
 | `Context.create`, `Context.dispose` | `LLVMContextCreate`, `LLVMContextDispose` | IR context/lifetime | `src/ir/` | missing |
 | `Context.parseBitcodeInContext2` | `LLVMParseBitcodeInContext2` | bitcode input | `src/bitcode/` | missing |
-| `Context.setOptBisectLimit` | `ZigLLVMSetOptBisectLimit` | pass instrumentation | `src/pass_manager.zig`, future `src/pipeline.zig` | missing |
+| `Context.setOptBisectLimit` | `ZigLLVMSetOptBisectLimit` | pass instrumentation | `src/pass_manager.zig`, `src/pipelines.zig` | pass-limit foundation |
 | `Context.enableBrokenDebugInfoCheck`, `Context.getBrokenDebugInfo` | Zig LLVM debug-info wrappers | debug validation | `src/debug/` | missing |
 | `Context.intType` | `LLVMIntTypeInContext` | LLVM type construction | `src/ir/` | partial integer IR only |
 | `Module.dispose` | `LLVMDisposeModule` | module lifetime | `src/ir/` | partial text IR module only |
@@ -66,10 +66,10 @@ replacement needs.
 The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset.
-- CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, and stack-slot alias/mod-ref scaffolding.
+- CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `select`, `unreachable`, bitwise operations, shifts, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
-- `opt-22` comparison fixtures for the implemented middle-end subset plus unit tests for analysis-only behavior.
+- Named `scalar-foundation` and `memory-foundation` pipeline aliases, plus `opt-22` comparison fixtures for the implemented middle-end subset and unit tests for analysis-only behavior.
 
 This is useful groundwork, but it does not yet cover the largest Zig LLVM
 dependencies: AIR lowering, target lowering, ABI rules, instruction selection,
