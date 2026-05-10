@@ -157,10 +157,12 @@ GVN subset:
 LoopInfo subset:
   natural-loop discovery from dominator backedges
   unique preheader query
+  loop exiting block query
   loop exit block query
 
 LICM subset:
   pure loop-invariant instruction hoisting to an existing preheader
+  no memory LICM, store sinking, preheader creation, or MemorySSA promotion yet
 ```
 
 ## Next Unsupported Areas To Remove

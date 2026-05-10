@@ -62,8 +62,8 @@ EarlyCSE: same-block repeated pure-expression elimination subset
 Mem2Reg: single-block, multi-block, undef, and multi-slot stack promotion subsets
 SROA: zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset
-LoopInfo: natural-loop, preheader, and exit-block analysis subset
-LICM: pure loop-invariant instruction hoisting subset
+LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
+LICM: pure scalar loop-invariant instruction hoisting subset, including variant-operand rejection and SSA dominance preservation fixtures
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

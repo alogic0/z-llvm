@@ -30,6 +30,7 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
 
     var changed = false;
     for (loops.loops.items) |natural_loop| {
+        if (!hasUniqueLoopHeader(loops, natural_loop.header)) continue;
         const preheader = natural_loop.preheader(function.*, graph) orelse continue;
         var local_changed = true;
         while (local_changed) {
@@ -54,6 +55,16 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
         }
     }
     return changed;
+}
+
+fn hasUniqueLoopHeader(loops: loop_info.LoopInfo, header: usize) bool {
+    var count: usize = 0;
+    for (loops.loops.items) |natural_loop| {
+        if (natural_loop.header != header) continue;
+        count += 1;
+        if (count > 1) return false;
+    }
+    return count == 1;
 }
 
 fn collectDefinitionBlocks(def_blocks: *std.StringHashMap(usize), function: ir.Function) !void {

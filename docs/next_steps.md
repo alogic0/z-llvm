@@ -8,10 +8,10 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 - [x] Make `LoopInfo` APIs explicit for loop `header`, `latch`, `preheader`, `exitingBlocks`, `exitBlocks`, and `contains`, with upstream LLVM mapping to `Loop`/`LoopInfo` query APIs.
 - [x] Document canonical loop shape: preheader, header, latch, exiting blocks, exit blocks, dedicated exits, and the canonical forms this project currently requires.
-- [ ] Harden LICM legality so the implemented pass only hoists pure scalar `binary`, `icmp`, and `select` instructions, while documenting that loads, stores, calls, atomics, volatile operations, and unknown memory are not hoistable yet.
-- [ ] Add negative LICM fixtures for no preheader, variant operands, side-effecting store, memory load, and unsupported noncanonical loop shapes such as multi-latch loops if still unsupported.
-- [ ] Add an LICM SSA-validity fixture framed around preserving dominance of all uses after hoisting.
-- [ ] Compare accepted and rejected LICM behavior against `opt-22`.
+- [x] Harden LICM legality so the implemented pass only hoists pure scalar `binary`, `icmp`, and `select` instructions, while documenting that loads, stores, calls, atomics, volatile operations, and unknown memory are not hoistable yet.
+- [x] Add negative LICM fixtures for no preheader, variant operands, side-effecting store, memory load, and unsupported noncanonical loop shapes such as multi-latch loops if still unsupported.
+- [x] Add an LICM SSA-validity fixture framed around preserving dominance of all uses after hoisting.
+- [x] Compare accepted and rejected LICM behavior against `opt-22`.
 - [x] Document the distinction needed by later loop passes: an exiting block is inside the loop with a successor outside the loop, while an exit block is outside the loop and receives control from the loop.
 
 ## Completed Cycles

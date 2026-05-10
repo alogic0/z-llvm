@@ -9,6 +9,7 @@ const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
+const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 
@@ -1015,6 +1016,150 @@ test "loop info finds a natural loop from a dominator backedge" {
     var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
     defer exits.deinit(std.testing.allocator);
     try std.testing.expectEqualSlices(usize, &.{4}, exits.items);
+}
+
+test "licm leaves loops without an existing preheader unchanged" {
+    const input =
+        \\define i32 @licm_no_preheader(i32 %a) {
+        \\entry:
+        \\  br i1 1, label %header, label %exit
+        \\header:
+        \\  %x = icmp sgt i32 %a, 0
+        \\  br i1 %x, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "licm leaves side-effecting stores in the loop" {
+    const input =
+        \\define i32 @licm_store_reject(i32 %a) {
+        \\entry:
+        \\  %p = alloca i32
+        \\  br label %header
+        \\header:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %latch ]
+        \\  store i32 %i, ptr %p
+        \\  br i1 1, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  %next = add i32 %i, 1
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "licm leaves memory loads in the loop" {
+    const input =
+        \\define i32 @licm_load_reject(i32 %a) {
+        \\entry:
+        \\  %p = alloca i32
+        \\  store i32 %a, ptr %p
+        \\  br label %header
+        \\header:
+        \\  %v = load i32, ptr %p
+        \\  store i32 %v, ptr %p
+        \\  br i1 1, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "licm skips multi-latch loops until canonical loop support exists" {
+    const input =
+        \\define i32 @licm_multi_latch(i32 %a) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  %x = icmp sgt i32 %a, 0
+        \\  br i1 %x, label %left, label %right
+        \\left:
+        \\  br label %latch_left
+        \\latch_left:
+        \\  br label %header
+        \\right:
+        \\  br label %latch_right
+        \\latch_right:
+        \\  br label %header
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "early-cse removes repeated pure expressions in a block" {
