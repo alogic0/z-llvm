@@ -4,7 +4,17 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+### Cycle 16: Memory Location and Alias Precision
+
+Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+- [ ] Introduce a `MemoryLocation` representation for pointer value plus optional known size and offset, with upstream LLVM mapping.
+- [ ] Extend GEP analysis to compute simple constant byte/element offsets where the current type model makes that unambiguous.
+- [ ] Extend alias analysis from stack-slot roots to non-overlapping known-offset stack locations where sizes are known; otherwise keep `may_alias`.
+- [ ] Keep address spaces, target `DataLayout`, globals, calls, captures, and partial aliasing explicitly out of scope in docs and tests.
+- [ ] Add unit tests for alias and mod/ref queries: same slot, distinct slot, zero-offset GEP, known disjoint offset, unknown offset, volatile/atomic barrier.
+- [ ] Update `docs/analysis/alias.md`, `docs/analysis/memory_effect.md`, `docs/ir_memory.md`, `testing.md`, and inventory coverage for the MemoryLocation slice.
+- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
 
 ## Completed Cycles
 
