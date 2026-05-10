@@ -2,6 +2,8 @@ Zig and LLVM have a complex, "it's complicated" relationship. While Zig was orig
 
 Here is the breakdown of how the Zig compiler interacts with LLVM.
 
+For hands-on notes about tracing `AIR -> LLVM IR -> optimized LLVM IR -> assembly/object code`, see [LLVM_workflow.md](LLVM_workflow.md).
+
 ---
 
 ## Concrete places in the Zig source
@@ -29,6 +31,14 @@ The current Zig checkout at `/home/oleg/prog/ziglang` shows LLVM as an optional 
     *   `codegen.zig:43-56` maps `.stage2_llvm` to `codegen/llvm.zig` and maps the self-hosted backends to their own Zig files.
 
 In short: Zig parses and semantically analyzes Zig code itself, lowers functions into AIR, and then either sends that code through LLVM (`src/codegen/llvm.zig`) or through a self-hosted backend (`src/codegen/x86_64`, `src/codegen/aarch64`, `src/codegen/riscv64`, `src/codegen/wasm`, etc.).
+
+Short glossary for those names:
+
+*   **ZIR (Zig IR):** A source-level intermediate representation produced from parsed Zig code. It still tracks Zig syntax and comptime structure.
+*   **Sema:** The semantic analysis phase. It resolves types, comptime execution, declarations, generics, and errors.
+*   **AIR (Analyzed IR):** The typed, semantically checked IR produced after Sema. Codegen backends consume AIR for function bodies.
+*   **MIR (Machine IR):** A backend-specific, lower-level representation used by Zig's native machine-code backends before emitting bytes.
+*   **LLVM IR / bitcode:** LLVM's own intermediate representation. The LLVM backend lowers Zig's analyzed code into this form so libLLVM can optimize and emit target machine code.
 
 ---
 
