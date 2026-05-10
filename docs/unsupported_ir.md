@@ -104,6 +104,7 @@ target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
 ABI classification beyond void, scalar integer, pointer, and whole-function scalar signatures
 call codegen beyond i32 direct calls with register arguments, external PLT32 relocations, and one deterministic spill
+stack-frame codegen beyond one fixed i32 alloca/store/load/return slot
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization

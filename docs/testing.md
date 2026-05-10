@@ -118,8 +118,9 @@ objdump -dr /tmp/z_llvm_add_args.o
 The assembly/object path currently has unit-test coverage plus tiny CLI smoke
 inputs. It covers x86_64 SysV i32 leaf functions, simple conditional returns,
 tiny direct-call assembly functions, one deterministic i32 call spill, minimal
-instruction encoding, ELF64 relocatable metadata, direct-call PLT32 relocation
-records, and explicit diagnostics for unsupported control flow.
+fixed stack-slot load/store lowering, instruction encoding, ELF64 relocatable
+metadata, direct-call PLT32 relocation records, and explicit diagnostics for
+unsupported control flow.
 
 LLVM algorithms covered so far:
 
@@ -143,7 +144,7 @@ Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout re
 Target diagnostics: invalid datalayout and unsupported `--emit=asm` target messages
 Zig-emitted IR harness: normalized tiny scalar module records and function signatures
 Zig fixture pair: project-lowered and optimized outputs compared structurally with normalized Zig-emitted signatures
-MC/CodeGen: tiny x86_64 Machine IR, assembly printer, direct-call assembly/object lowering, instruction encoder, and ELF64 relocatable object bootstrap
+MC/CodeGen: tiny x86_64 Machine IR, assembly printer, direct-call assembly/object lowering, one fixed stack-slot lowering, instruction encoder, and ELF64 relocatable object bootstrap
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

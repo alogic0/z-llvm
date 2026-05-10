@@ -15,6 +15,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
             .spill_arg_rsp => |reg| try writer.print("\tmovl {s}, (%rsp)\n", .{reg.name32()}),
             .reload_arg_rsp => |reg| try writer.print("\tmovl (%rsp), {s}\n", .{reg.name32()}),
+            .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),

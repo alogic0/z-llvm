@@ -33,6 +33,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
             .spill_arg_rsp => |reg| try encodeRegToRspSlot(&bytes, allocator, 0x89, reg),
             .reload_arg_rsp => |reg| try encodeRspSlotToReg(&bytes, allocator, 0x8b, reg),
+            .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
             .direct_call => {
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
@@ -63,6 +64,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp, .reload_arg_rsp => |reg| if (reg.rexR()) 4 else 3,
+        .reload_rsp_eax => 3,
         .direct_call => 5,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .je => 6,

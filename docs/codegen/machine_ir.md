@@ -33,6 +33,7 @@ return add/sub/and/or/xor i32 of register-passed parameters
 direct call symbol pseudo-instruction for assembly printing
 minimal %rsp adjustment around calls
 one deterministic i32 argument spill/reload across one direct call
+one fixed i32 stack slot loaded/stored through %rsp
 simple three-block conditional return with an i1 register-passed condition
 void leaf return
 machine labels and conditional branch to a local label
@@ -65,6 +66,7 @@ unit-test only:
   conditional_return lowering
   direct call assembly lowering
   one-live-argument call spill lowering
+  stack_slot frame lowering
   x86_64 instruction encoding
   ELF relocatable metadata
   unsupported control-flow diagnostic
@@ -76,6 +78,7 @@ Known gaps:
 no object relocation encoding for calls yet
 no stack-passed parameters
 no general spills beyond one i32 argument across one direct call
+no general frame indexes beyond one fixed %rsp-relative i32 slot
 no general register allocation
 no instruction scheduling
 no memory operations

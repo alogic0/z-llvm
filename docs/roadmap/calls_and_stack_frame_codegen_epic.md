@@ -33,7 +33,8 @@ Current status:
   support is in place. Direct-call x86_64 assembly lowering is in place for tiny
   i32 register-argument fixtures, including the minimal stack-alignment
   adjustment, one deterministic i32 spill, and external PLT32 call relocations.
-  General stack frames are still open.
+  One fixed i32 stack slot is also supported. General stack frames are still
+  open.
 - Target/object pair is fixed to `x86_64-linux-elf` with SysV ABI.
 - The previous epic already supports register-only scalar i32 leaf functions,
   simple conditional returns, assembly text, instruction bytes, and ELF64
@@ -186,13 +187,13 @@ Suggested slice boundary:
 
 ## 6. Stack Frame Foundation
 
-- [ ] Add a frame model:
+- [x] Add a frame model:
       fixed local slots, spill slots, frame size, stack alignment, and whether a
       frame pointer is used.
-- [ ] Choose the first frame policy:
+- [x] Choose the first frame policy:
       no frame pointer, no red zone, fixed `%rsp`-relative offsets, and introduce
       `%rbp` only in a later slice if fixtures require it.
-- [ ] Emit prologue and epilogue only for functions that need a frame.
+- [x] Emit prologue and epilogue only for functions that need a frame.
 - [x] Preserve SysV stack alignment before every `callq`:
       for call-capable functions without a full frame, subtract/add 8 around the
       call or create the minimal fixed frame needed to make `%rsp % 16 == 0`
@@ -200,28 +201,28 @@ Suggested slice boundary:
 - [ ] Add frame verifier checks:
       aligned frame size, non-overlapping slots, valid stack offsets, and no
       frame references without a frame.
-- [ ] Document unsupported frame features:
+- [x] Document unsupported frame features:
       dynamic alloca, stack realignment, unwind metadata, shrink wrapping, stack
       probes, stack canaries, split stacks.
 
 Suggested slice boundary:
 
-- [ ] Implement a frame only for one fixed local slot or one deterministic spill,
+- [x] Implement a frame only for one fixed local slot or one deterministic spill,
       not for arbitrary alloca lowering.
 
 ## 7. Stack Slot Loads and Stores
 
 - [ ] Add frame-index Machine IR operands.
-- [ ] Add x86_64 stack-relative addressing for `%rsp` or `%rbp` based on the
+- [x] Add x86_64 stack-relative addressing for `%rsp` or `%rbp` based on the
       selected frame policy.
-- [ ] Encode and print loads/stores for the integer widths required by fixtures.
-- [ ] Lower simple scalar stack loads/stores selected for this epic.
-- [ ] Reject volatile/atomic stack memory, unknown address spaces, unsupported
+- [x] Encode and print loads/stores for the integer widths required by fixtures.
+- [x] Lower simple scalar stack loads/stores selected for this epic.
+- [x] Reject volatile/atomic stack memory, unknown address spaces, unsupported
       widths, and pointer arithmetic outside the selected frame-index pattern.
 
 Suggested slice boundary:
 
-- [ ] Add stack slot assembly/encoding before integrating it with call spills.
+- [x] Add stack slot assembly/encoding before integrating it with call spills.
 
 ## 8. Deterministic Spills Across Calls
 
@@ -262,7 +263,7 @@ Suggested slice boundary:
 ## 11. Documentation and Inventory Updates
 
 - [ ] Add `docs/codegen/calls.md`.
-- [ ] Add `docs/codegen/stack_frame.md`.
+- [x] Add `docs/codegen/stack_frame.md`.
 - [x] Extend `docs/codegen/abi_x86_64_sysv.md` with call, stack alignment, and
       caller/callee-saved register rules.
 - [x] Extend `docs/mc/instruction_encoding.md` for `callq` and stack-relative

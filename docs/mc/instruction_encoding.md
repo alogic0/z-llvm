@@ -27,6 +27,7 @@ near je rel32 to a local Machine IR label
 retq
 subq/addq 8-byte %rsp adjustment
 movl r32, (%rsp) and movl (%rsp), r32 for one deterministic spill slot
+movl (%rsp), %eax for one fixed local stack slot
 callq rel32 placeholder bytes for ELF relocation
 ```
 
