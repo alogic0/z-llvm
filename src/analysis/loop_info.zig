@@ -18,6 +18,38 @@ pub const NaturalLoop = struct {
         }
         return false;
     }
+
+    pub fn preheader(loop: NaturalLoop, function: ir.Function, graph: cfg.Graph) ?usize {
+        var candidate: ?usize = null;
+        for (graph.predecessors(loop.header)) |predecessor| {
+            if (loop.contains(predecessor)) continue;
+            if (candidate != null) return null;
+            candidate = predecessor;
+        }
+        const preheader_index = candidate orelse return null;
+        const terminator = function.blocks.items[preheader_index].terminator orelse return null;
+        switch (terminator) {
+            .br => |br| {
+                const target = function.blockIndex(br.target) orelse return null;
+                return if (target == loop.header) preheader_index else null;
+            },
+            .ret, .condbr, .@"unreachable" => return null,
+        }
+    }
+
+    pub fn exitBlocks(loop: NaturalLoop, allocator: std.mem.Allocator, graph: cfg.Graph) !std.ArrayList(usize) {
+        var exits: std.ArrayList(usize) = .empty;
+        errdefer exits.deinit(allocator);
+
+        for (loop.blocks.items) |block_index| {
+            for (graph.successors(block_index)) |successor| {
+                if (loop.contains(successor)) continue;
+                try appendUnique(allocator, &exits, successor);
+            }
+        }
+        sortBlocks(exits.items);
+        return exits;
+    }
 };
 
 pub const LoopInfo = struct {

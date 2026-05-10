@@ -994,6 +994,8 @@ test "loop info finds a natural loop from a dominator backedge" {
 
     var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
     defer loops.deinit();
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), loops.loops.items.len);
     const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
@@ -1002,6 +1004,11 @@ test "loop info finds a natural loop from a dominator backedge" {
     try std.testing.expectEqualSlices(usize, &.{ 1, 2, 3 }, natural_loop.blocks.items);
     try std.testing.expect(natural_loop.contains(2));
     try std.testing.expect(!natural_loop.contains(4));
+    try std.testing.expectEqual(@as(?usize, 0), natural_loop.preheader(function, graph));
+
+    var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
+    defer exits.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{4}, exits.items);
 }
 
 test "early-cse removes repeated pure expressions in a block" {
