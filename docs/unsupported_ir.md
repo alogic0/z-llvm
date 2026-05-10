@@ -10,7 +10,9 @@ integer parameters
 ptr parameters
 named basic blocks
 add/sub/mul integer instructions
-icmp eq/ne integer instructions
+and/or/xor integer instructions
+shl/lshr/ashr integer instructions
+icmp eq/ne/sgt/sge/slt/sle/ugt/uge/ult/ule integer instructions
 select instructions
 phi instructions
 alloca instructions
@@ -22,6 +24,7 @@ br label %target
 br i1 <value>, label %then, label %else
 unreachable
 integer constants
+i1 true/false constants, normalized to 1/0 internally
 undef constants
 named SSA values
 ```
@@ -42,14 +45,11 @@ token/metadata types
 ## Unsupported Instructions
 
 ```text
-icmp predicates except eq/ne
 fcmp
 phi token/blockaddress values
 call/invoke/callbr
 cast instructions
 division/remainder
-bitwise operations
-shifts
 switch
 landingpad/cleanupret/catchret
 atomicrmw/cmpxchg/fence
@@ -110,14 +110,21 @@ InvalidLabel
 ```text
 InstCombine subset:
   identity arithmetic and integer constant folding for add/sub/mul
+  bitwise and shift identity folding
+  relational icmp constant and same-operand folding
+  commutative binary constant canonicalization
 
 DCE subset:
-  unused pure add/sub/mul removal using def-use counts
+  unused pure instruction removal using def-use counts
+
+ADCE subset:
+  unused side-effect-free instruction chain removal
 
 SimplifyCFG subset:
   constant conditional branch folding
   same-target conditional branch folding
   unreachable block removal
+  phi-free empty branch block threading
 
 Def-use subset:
   per-function use counts for named SSA values, including load/store operands
@@ -140,6 +147,20 @@ Value subset:
 Select subset:
   scalar i1 condition
   matching scalar result arms
+
+SROA subset:
+  zero-offset GEP alloca forwarding before stack promotion
+
+GVN subset:
+  dominating repeated pure-expression elimination
+
+LoopInfo subset:
+  natural-loop discovery from dominator backedges
+  unique preheader query
+  loop exit block query
+
+LICM subset:
+  pure loop-invariant instruction hoisting to an existing preheader
 ```
 
 ## Next Unsupported Areas To Remove
@@ -147,11 +168,11 @@ Select subset:
 The next useful parser expansions are:
 
 ```text
-icmp predicates beyond eq/ne
-unreachable terminator
 call
+cast instructions
+division/remainder
 instruction flags such as nsw/nuw
 target triple and datalayout records
 ```
 
-These unlock better comparisons with LLVM `opt` and the next algorithms: `early-cse`, `mem2reg`, dominator tree construction, and LICM.
+These unlock better comparisons with LLVM `opt` and the next algorithms: richer InstCombine folds, SROA slice splitting, memory-aware LICM, and ABI-aware lowering.

@@ -66,9 +66,10 @@ replacement needs.
 The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset.
-- CFG, def-use, dominators, dominance frontiers, and stack-slot alias scaffolding.
-- `instcombine`, `dce`, `simplifycfg`, `early-cse`, and `mem2reg` subsets.
-- `opt-22` comparison fixtures for the implemented middle-end subset.
+- CFG, def-use, dominators, dominance frontiers, LoopInfo, and stack-slot alias scaffolding.
+- `instcombine`, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
+- IR support for `select`, `unreachable`, bitwise operations, shifts, relational integer `icmp`, `undef`, and simple `getelementptr`.
+- `opt-22` comparison fixtures for the implemented middle-end subset plus unit tests for analysis-only behavior.
 
 This is useful groundwork, but it does not yet cover the largest Zig LLVM
 dependencies: AIR lowering, target lowering, ABI rules, instruction selection,
