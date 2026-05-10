@@ -45,6 +45,9 @@ pub const UseCounts = struct {
                 try uses.addValue(icmp.lhs);
                 try uses.addValue(icmp.rhs);
             },
+            .phi => |phi| for (phi.incoming.items) |incoming| {
+                try uses.addValue(incoming.value);
+            },
         }
     }
 
@@ -57,6 +60,9 @@ pub const UseCounts = struct {
             .icmp => |icmp| {
                 uses.removeValue(icmp.lhs);
                 uses.removeValue(icmp.rhs);
+            },
+            .phi => |phi| for (phi.incoming.items) |incoming| {
+                uses.removeValue(incoming.value);
             },
         }
     }

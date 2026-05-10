@@ -3,7 +3,7 @@
 ## Active Cycle
 
 - [x] Add `icmp` instruction parsing, printing, verification, and tests.
-- [ ] Add `phi` instruction parsing, printing, verification, and tests.
+- [x] Add `phi` instruction parsing, printing, verification, and tests.
 - [ ] Extend `simplifycfg` to update/remove trivial phi inputs.
 - [ ] Add an explicit CFG analysis helper for predecessors and successors.
 - [ ] Add dominator tree analysis for reachable blocks.
@@ -38,3 +38,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - DCE now uses a shared def-use use-count analysis and decrements operand uses as instructions are removed.
 - Unsupported LLVM IR constructs and current parser errors are tracked in [unsupported_ir.md](unsupported_ir.md).
 - `icmp eq/ne` parsing, printing, verification, and constant folding are now supported.
+- `phi` parsing, printing, verification, and def-use tracking are now supported for the current integer/value subset.

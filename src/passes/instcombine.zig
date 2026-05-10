@@ -46,6 +46,7 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .binary => |binary| foldBinary(binary),
         .icmp => |icmp| foldIcmp(icmp),
+        .phi => null,
     };
 }
 

@@ -227,6 +227,28 @@ test "instcombine folds constant icmp" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "parser normalizes phi instructions" {
+    const input =
+        \\define i32 @select(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  br label %merge
+        \\else:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %then ], [ %b, %else ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

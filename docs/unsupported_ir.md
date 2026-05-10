@@ -10,6 +10,7 @@ integer parameters
 named basic blocks
 add/sub/mul integer instructions
 icmp eq/ne integer instructions
+phi instructions
 ret
 br label %target
 br i1 <value>, label %then, label %else
@@ -37,7 +38,7 @@ token/metadata types
 ```text
 icmp predicates except eq/ne
 fcmp
-phi
+phi token/blockaddress values
 select
 alloca
 load/store

@@ -94,11 +94,26 @@ pub const IcmpInst = struct {
     rhs: Value,
 };
 
+pub const PhiIncoming = struct {
+    value: Value,
+    block: []const u8,
+};
+
+pub const PhiInst = struct {
+    ty: Type,
+    incoming: std.ArrayList(PhiIncoming),
+
+    pub fn deinit(phi: *PhiInst, allocator: std.mem.Allocator) void {
+        phi.incoming.deinit(allocator);
+    }
+};
+
 pub const Instruction = struct {
     result: []const u8,
     kind: union(enum) {
         binary: BinaryInst,
         icmp: IcmpInst,
+        phi: PhiInst,
     },
     removed: bool = false,
     replacement: ?Value = null,
@@ -111,6 +126,7 @@ pub const Instruction = struct {
         return switch (instruction.kind) {
             .binary => |binary| binary.ty,
             .icmp => .{ .int = 1 },
+            .phi => |phi| phi.ty,
         };
     }
 
@@ -124,6 +140,16 @@ pub const Instruction = struct {
                 icmp.lhs = resolveValue(aliases, icmp.lhs);
                 icmp.rhs = resolveValue(aliases, icmp.rhs);
             },
+            .phi => |*phi| for (phi.incoming.items) |*incoming| {
+                incoming.value = resolveValue(aliases, incoming.value);
+            },
+        }
+    }
+
+    pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
+        switch (instruction.kind) {
+            .binary, .icmp => {},
+            .phi => |*phi| phi.deinit(allocator),
         }
     }
 };
@@ -164,6 +190,7 @@ pub const BasicBlock = struct {
     }
 
     pub fn deinit(block: *BasicBlock, allocator: std.mem.Allocator) void {
+        for (block.instructions.items) |*instruction| instruction.deinit(allocator);
         block.instructions.deinit(allocator);
     }
 };
@@ -273,7 +300,7 @@ pub const Module = struct {
                 continue;
             }
 
-            try block.instructions.append(allocator, try parseInstruction(line));
+            try block.instructions.append(allocator, try parseInstruction(allocator, line));
         }
 
         if (current_function != null) return error.UnclosedFunction;
@@ -324,6 +351,18 @@ pub const Module = struct {
                             try icmp.rhs.format(writer);
                             try writer.writeByte('\n');
                         },
+                        .phi => |phi| {
+                            try writer.writeAll("phi ");
+                            try phi.ty.format(writer);
+                            try writer.writeByte(' ');
+                            for (phi.incoming.items, 0..) |incoming, index| {
+                                if (index != 0) try writer.writeAll(", ");
+                                try writer.writeAll("[ ");
+                                try incoming.value.format(writer);
+                                try writer.print(", %{s} ]", .{incoming.block});
+                            }
+                            try writer.writeByte('\n');
+                        },
                     }
                 }
                 if (block.terminator) |terminator| switch (terminator) {
@@ -358,6 +397,13 @@ pub const Module = struct {
 
             for (function.blocks.items) |block| {
                 for (block.instructions.items) |instruction| {
+                    if (defs.contains(instruction.result)) return error.DuplicateDefinition;
+                    try defs.put(instruction.result, instruction.resultType());
+                }
+            }
+
+            for (function.blocks.items) |block| {
+                for (block.instructions.items) |instruction| {
                     switch (instruction.kind) {
                         .binary => |binary| {
                             try verifyValue(defs, binary.ty, binary.lhs);
@@ -367,9 +413,14 @@ pub const Module = struct {
                             try verifyValue(defs, icmp.operand_ty, icmp.lhs);
                             try verifyValue(defs, icmp.operand_ty, icmp.rhs);
                         },
+                        .phi => |phi| {
+                            if (phi.incoming.items.len == 0) return error.EmptyPhi;
+                            for (phi.incoming.items) |incoming| {
+                                try verifyValue(defs, phi.ty, incoming.value);
+                                try verifyBlockTarget(function, incoming.block);
+                            }
+                        },
                     }
-                    if (defs.contains(instruction.result)) return error.DuplicateDefinition;
-                    try defs.put(instruction.result, instruction.resultType());
                 }
 
                 const terminator = block.terminator orelse return error.BlockWithoutTerminator;
@@ -439,12 +490,19 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !Function
     return function;
 }
 
-fn parseInstruction(line: []const u8) !Instruction {
+fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction {
     const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidInstruction;
     const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, result_text, "%")) return error.InvalidValueName;
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    if (std.mem.startsWith(u8, rhs_text, "phi ")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .phi = try parsePhi(allocator, rhs_text) },
+        };
+    }
+
     var parts = std.mem.tokenizeAny(u8, rhs_text, " \t,");
     const op_text = parts.next() orelse return error.InvalidInstruction;
 
@@ -480,6 +538,41 @@ fn parseInstruction(line: []const u8) !Instruction {
             .rhs = rhs,
         } },
     };
+}
+
+fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !PhiInst {
+    var rest = std.mem.trim(u8, text["phi ".len..], " \t");
+    const ty_end = std.mem.indexOfAny(u8, rest, " \t") orelse return error.InvalidPhi;
+    const ty = try parseType(rest[0..ty_end]);
+    rest = std.mem.trim(u8, rest[ty_end..], " \t");
+
+    var phi: PhiInst = .{
+        .ty = ty,
+        .incoming = .empty,
+    };
+    errdefer phi.deinit(allocator);
+
+    while (rest.len > 0) {
+        if (rest[0] != '[') return error.InvalidPhi;
+        const close = std.mem.indexOfScalar(u8, rest, ']') orelse return error.InvalidPhi;
+        const incoming_text = std.mem.trim(u8, rest[1..close], " \t");
+        const comma = std.mem.indexOfScalar(u8, incoming_text, ',') orelse return error.InvalidPhi;
+        const value_text = std.mem.trim(u8, incoming_text[0..comma], " \t");
+        const block_text = std.mem.trim(u8, incoming_text[comma + 1 ..], " \t");
+
+        try phi.incoming.append(allocator, .{
+            .value = try parseValue(value_text),
+            .block = try parseLabel(block_text),
+        });
+
+        rest = std.mem.trim(u8, rest[close + 1 ..], " \t");
+        if (rest.len == 0) break;
+        if (rest[0] != ',') return error.InvalidPhi;
+        rest = std.mem.trim(u8, rest[1..], " \t");
+    }
+
+    if (phi.incoming.items.len == 0) return error.EmptyPhi;
+    return phi;
 }
 
 fn parseRet(line: []const u8) !Terminator {
