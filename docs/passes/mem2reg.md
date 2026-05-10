@@ -28,6 +28,7 @@ Implemented subset:
 single-basic-block alloca promotion
 one multi-block stack slot per pass invocation
 multiple independent stack slots promoted until no promotable alloca remains
+alloca discovery restricted to the function entry block
 only direct load/store users of the alloca pointer are promotable
 loads before the first store keep the slot unpromoted
 uninitialized promoted loads are replaced with undef
@@ -46,6 +47,7 @@ alloca result returned or used by a terminator
 alloca result used by arithmetic, icmp, phi, or another non-memory instruction
 alloca result stored as a value into memory
 alloca result used by any memory instruction other than direct load/store of that exact pointer
+alloca outside the function entry block
 alloca forms with array counts, alignment, address spaces, or non-parsed type syntax
 ```
 
@@ -53,6 +55,7 @@ Upstream mapping:
 
 ```text
 This reproduces LLVM mem2reg's same-block scalar replacement and the first dominance-frontier phi-placement plus rename-walk shape.
+LLVM's `Mem2Reg.cpp` pass wrapper finds promotable allocas by scanning only `Function::getEntryBlock`; this project follows that entry-block discovery rule.
 The promotability filter maps to LLVM's `isAllocaPromotable`: this subset accepts only direct non-volatile load/store users and rejects escapes conservatively.
 LLVM's PromoteMemToReg promotes many allocas per run and supports precise debug-info assignment tracking, lifetime intrinsics, unreachable uses, and poison/undef details for uninitialized loads.
 This subset models the basic uninitialized-load result as `undef`, but does not yet implement LLVM's full poison/undef semantics.
@@ -70,6 +73,7 @@ opt-22 equivalent:
   mem2reg_unreachable
   mem2reg_escape
   mem2reg_store_slot
+  mem2reg_non_entry_alloca
   gep_memory
 
 local-only conservative:
@@ -118,6 +122,7 @@ Known gaps:
 ```text
 multi-block allocas are currently promoted one at a time in a loop rather than batched like LLVM
 generated phi names follow the first LLVM-compatible stack-slot form: %slot.0, %slot.1, ...
+no dynamic or non-entry alloca promotion
 no alloca arrays
 no lifetime intrinsics
 no debug-info salvage

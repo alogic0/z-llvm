@@ -27,34 +27,32 @@ fn promoteFunction(module: *ir.Module, function_index: usize) !bool {
 
 fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
     const function = &module.functions.items[function_index];
-    var changed = false;
-    var block_index: usize = 0;
-    while (block_index < function.blocks.items.len) : (block_index += 1) {
-        var instruction_index: usize = 0;
-        while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
-            const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
-            if (instruction.removed or instruction.kind != .alloca) continue;
-            const slot = instruction.result orelse continue;
-            if (!isPromotableSingleBlockSlot(function.*, block_index, slot)) continue;
+    if (function.blocks.items.len == 0) return false;
 
-            promoteSingleBlockSlot(function, block_index, slot);
-            changed = true;
-        }
+    const entry_block_index: usize = 0;
+    const entry_block = &function.blocks.items[entry_block_index];
+    var changed = false;
+    var instruction_index: usize = 0;
+    while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
+        const instruction = entry_block.instructions.items[instruction_index];
+        if (instruction.removed or instruction.kind != .alloca) continue;
+        const slot = instruction.result orelse continue;
+        if (!isPromotableSingleBlockSlot(function.*, entry_block_index, slot)) continue;
+
+        promoteSingleBlockSlot(function, entry_block_index, slot);
+        changed = true;
     }
     if (changed) return true;
 
-    block_index = 0;
-    while (block_index < function.blocks.items.len) : (block_index += 1) {
-        var instruction_index: usize = 0;
-        while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
-            const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
-            if (instruction.removed or instruction.kind != .alloca) continue;
-            const slot = instruction.result orelse continue;
-            if (!isPromotableStackSlot(function.*, slot)) continue;
+    instruction_index = 0;
+    while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
+        const instruction = entry_block.instructions.items[instruction_index];
+        if (instruction.removed or instruction.kind != .alloca) continue;
+        const slot = instruction.result orelse continue;
+        if (!isPromotableStackSlot(function.*, slot)) continue;
 
-            try promoteMultiBlockSlot(module, function_index, block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
-            return true;
-        }
+        try promoteMultiBlockSlot(module, function_index, entry_block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
+        return true;
     }
     return changed;
 }

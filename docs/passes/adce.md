@@ -1,4 +1,4 @@
-# ADCE
+# ADCE Foundation
 
 LLVM references:
 
@@ -22,7 +22,7 @@ LLVM ADCE assumes instructions are dead until proven live, marks side effects,
 terminators, required control dependence, and operand chains as live, then
 removes everything else.
 
-Implemented subset:
+Implemented foundation subset:
 
 ```text
 start from current def-use counts
@@ -35,6 +35,10 @@ preserve stores, volatile/atomic memory barriers, unknown memory effects, and te
 This overlaps with the current DCE subset, but it is kept as a separate pass
 because LLVM's ADCE becomes control-dependence aware later. The current slice is
 the data-dependence foundation.
+
+Do not treat this as a faithful LLVM ADCE implementation yet. It should keep
+the foundation label until post-dominator analysis, control-dependence liveness,
+and branch rewriting are implemented.
 
 Fixture coverage:
 

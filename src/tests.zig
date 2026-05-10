@@ -2065,6 +2065,39 @@ test "mem2reg rejects stores of the stack slot pointer" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "mem2reg ignores non-entry allocas" {
+    const input =
+        \\define i32 @non_entry_alloca(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\else:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {
