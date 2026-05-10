@@ -4,12 +4,13 @@ const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
+const mem2reg = @import("passes/mem2reg.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 
 const usage =
     \\usage: z_llvm [--passes=list] [--trace] <input.ll>
     \\
-    \\Supported passes: instcombine,dce,early-cse,simplifycfg
+    \\Supported passes: instcombine,dce,early-cse,simplifycfg,mem2reg
     \\
 ;
 
@@ -88,6 +89,8 @@ fn addPasses(pm: *pass_manager.ModulePassManager, pass_list: []const u8) !void {
             try pm.add(early_cse.pass);
         } else if (std.mem.eql(u8, name, "simplifycfg")) {
             try pm.add(simplifycfg.pass);
+        } else if (std.mem.eql(u8, name, "mem2reg")) {
+            try pm.add(mem2reg.pass);
         } else {
             return error.UnknownPass;
         }

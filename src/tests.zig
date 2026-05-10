@@ -8,6 +8,7 @@ const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
+const mem2reg = @import("passes/mem2reg.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 
 test "instcombine and dce remove identity arithmetic" {
@@ -338,6 +339,42 @@ test "alias analysis classifies stack slots" {
         alias.AliasResult.may_alias,
         alias.alias(function, .{ .named = "left" }, .{ .named = "arg" }),
     );
+}
+
+test "mem2reg promotes single-block stack slot" {
+    const input =
+        \\define i32 @promote(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @promote(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
 test "simplifycfg folds constant branch and removes unreachable blocks" {

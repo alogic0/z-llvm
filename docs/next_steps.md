@@ -9,7 +9,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add `alloca`, `load`, and `store` parsing, printing, verification, and upstream mapping.
 - [x] Extend def-use and DCE side-effect handling for memory operations.
 - [x] Add alias-analysis scaffolding for stack slots and document the LLVM BasicAA mapping.
-- [ ] Implement a first `mem2reg`/PromoteMemToReg subset for single-block stack slots.
+- [x] Implement a first `mem2reg`/PromoteMemToReg subset for single-block stack slots.
 - [ ] Add `opt` comparison fixtures for the memory IR and `mem2reg` subset.
 
 ## Completed Cycles
@@ -44,6 +44,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - alias analysis stack-slot subset: documented in [analysis/alias.md](analysis/alias.md).
 - dominator analysis subset: documented in [analysis/dominator.md](analysis/dominator.md).
 - `early-cse` subset: documented in [passes/early_cse.md](passes/early_cse.md).
+- `mem2reg` single-block subset: documented in [passes/mem2reg.md](passes/mem2reg.md).
 - memory IR subset: documented in [ir_memory.md](ir_memory.md).
 
 ## Completed Step Notes
@@ -63,3 +64,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - Memory IR now parses, prints, and verifies `alloca`, `load`, and `store` over opaque `ptr`.
 - DCE now removes unused loads while preserving stores as memory writes, with def-use counts for load/store operands.
 - Alias analysis now classifies identical stack-slot pointers as `must_alias`, distinct `alloca` results as `no_alias`, and unknown pointers as `may_alias`.
+- `mem2reg` now promotes direct load/store users of a single-block `alloca` when every load is dominated by a prior store in the same block.
