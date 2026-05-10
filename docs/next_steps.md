@@ -4,6 +4,18 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+### Cycle 5: Mem2Reg Completeness and Pointer IR Foundation
+
+- [ ] Add `undef` value parsing, printing, verification, normalization, and upstream mapping for LLVM `UndefValue`/poison-adjacent behavior.
+- [ ] Extend `mem2reg` to handle uninitialized loads with LLVM-compatible `undef` replacement, plus `opt-22` comparison fixtures.
+- [ ] Extend `mem2reg` to promote multiple independent stack slots in one pass run, preserving deterministic LLVM-compatible phi naming.
+- [ ] Add promotability checks and docs for rejected stack slots: escaped allocas, stores of the slot pointer, non-load/store users, and unsupported alloca forms.
+- [ ] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
+- [ ] Extend alias analysis from distinct direct `alloca` pointers to simple `getelementptr`-derived stack objects, documenting the BasicAA mapping and known conservative fallbacks.
+- [ ] Add `opt-22` comparison fixtures for rejected mem2reg cases and simple GEP-backed memory IR normalization.
+
+## Completed Cycles
+
 ### Cycle 4: LLVM Comparison and Multi-Block Promotion
 
 - [x] Add an `opt-22` comparison runner that executes `z_llvm`, executes LLVM `opt-22`, normalizes both outputs, and diffs each fixture.
@@ -13,8 +25,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Implement multi-block `mem2reg` phi insertion for one promotable stack slot using CFG predecessors and dominance-frontier placement.
 - [x] Implement the `mem2reg` rename pass over the dominator tree for promoted stack-slot values, including phi incoming updates.
 - [x] Add LLVM `opt-22` comparison fixtures for multi-block `mem2reg` cases: if/else merge, loop-carried value, and unreachable predecessor cleanup.
-
-## Completed Cycles
 
 ### Cycle 3: Memory IR and Promotion Foundation
 
