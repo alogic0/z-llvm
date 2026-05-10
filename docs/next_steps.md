@@ -8,7 +8,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 - [x] Add an `opt-22` comparison runner that executes `z_llvm`, executes LLVM `opt-22`, normalizes both outputs, and diffs each fixture.
 - [x] Extend IR normalization to strip LLVM-only comparison noise: `ModuleID`, `source_filename`, simple inferred memory `align N`, and harmless trailing whitespace.
-- [ ] Add comparison docs and fixture metadata so every fixture records the LLVM pass name, `z_llvm` pass name, and known acceptable normalization differences.
+- [x] Add comparison docs and fixture metadata so every fixture records the LLVM pass name, `z_llvm` pass name, and known acceptable normalization differences.
 - [ ] Extend dominator analysis with immediate dominator or dominance-frontier support needed by LLVM `PromoteMemToReg` phi placement, with upstream mapping.
 - [ ] Implement multi-block `mem2reg` phi insertion for one promotable stack slot using CFG predecessors and dominance-frontier placement.
 - [ ] Implement the `mem2reg` rename pass over the dominator tree for promoted stack-slot values, including phi incoming updates.
@@ -78,3 +78,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `opt` comparison fixtures now cover memory-aware DCE and the single-block `mem2reg` subset.
 - IR normalization now strips LLVM comparison noise such as `source_filename` and simple inferred memory alignment.
 - `scripts/compare_opt.sh` now runs mapped fixtures through both `z_llvm` and `opt-22`, normalizes both outputs, and diffs the results.
+- `test/opt/fixtures.tsv` now records each comparison fixture's `z_llvm` pass, LLVM pass, expected output, and normalization notes.

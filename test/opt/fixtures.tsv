@@ -1,0 +1,6 @@
+# id	z_pass	llvm_pass	input	expected_z_llvm	notes
+instcombine	instcombine	instcombine	test/opt/inputs/instcombine.ll	test/opt/expected/z_llvm/instcombine.ll	generic LLVM headers only
+dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	generic LLVM headers only
+memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-22 inferred memory alignment is normalized
+simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	generic LLVM headers only
+mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	generic LLVM headers only

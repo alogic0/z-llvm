@@ -2,6 +2,14 @@
 
 These fixtures compare one reproduced `z_llvm` pass against the matching LLVM `opt` pass.
 
+Fixture metadata lives in:
+
+```text
+test/opt/fixtures.tsv
+```
+
+Each row records the fixture id, `z_llvm` pass name, LLVM `opt` pass name, input path, expected `z_llvm` output path, and known normalization notes.
+
 Run `z_llvm`:
 
 ```bash
@@ -23,5 +31,23 @@ opt -passes=mem2reg test/opt/inputs/mem2reg.ll -S -o /tmp/llvm_mem2reg.ll
 ```
 
 Expected `z_llvm` outputs are in `test/opt/expected/z_llvm/`.
+
+Run all metadata-backed comparisons:
+
+```bash
+bash scripts/compare_opt.sh
+```
+
+Use a different `opt` binary:
+
+```bash
+OPT_BIN=opt bash scripts/compare_opt.sh
+```
+
+Run a custom metadata file:
+
+```bash
+bash scripts/compare_opt.sh test/opt/fixtures.tsv
+```
 
 The fixtures are intentionally limited to the reproduced subset of each LLVM algorithm. LLVM may preserve extra module flags, attributes, or formatting when run on richer input; compare normalized behavior rather than raw text.
