@@ -7,7 +7,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 ### Cycle 3: Memory IR and Promotion Foundation
 
 - [x] Add `alloca`, `load`, and `store` parsing, printing, verification, and upstream mapping.
-- [ ] Extend def-use and DCE side-effect handling for memory operations.
+- [x] Extend def-use and DCE side-effect handling for memory operations.
 - [ ] Add alias-analysis scaffolding for stack slots and document the LLVM BasicAA mapping.
 - [ ] Implement a first `mem2reg`/PromoteMemToReg subset for single-block stack slots.
 - [ ] Add `opt` comparison fixtures for the memory IR and `mem2reg` subset.
@@ -60,3 +60,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - Dominator analysis now computes reachable-block dominance queries over the CFG.
 - `early-cse` now eliminates repeated pure binary and `icmp` expressions within one basic block.
 - Memory IR now parses, prints, and verifies `alloca`, `load`, and `store` over opaque `ptr`.
+- DCE now removes unused loads while preserving stores as memory writes, with def-use counts for load/store operands.

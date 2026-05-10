@@ -270,6 +270,44 @@ test "parser normalizes memory instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "dce removes unused loads but keeps stores" {
+    const input =
+        \\define i32 @memory_dce(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  %dead = load i32, ptr %slot
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @memory_dce(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

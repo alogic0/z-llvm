@@ -141,6 +141,14 @@ pub const Instruction = struct {
     replacement: ?Value = null,
 
     pub fn hasSideEffects(instruction: Instruction) bool {
+        return instruction.mayWriteMemory();
+    }
+
+    pub fn mayReadMemory(instruction: Instruction) bool {
+        return instruction.kind == .load;
+    }
+
+    pub fn mayWriteMemory(instruction: Instruction) bool {
         return instruction.kind == .store;
     }
 
