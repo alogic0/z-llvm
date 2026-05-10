@@ -1,0 +1,89 @@
+const std = @import("std");
+const ir = @import("../ir.zig");
+
+pub const BlockEdges = struct {
+    successors: std.ArrayList(usize) = .empty,
+    predecessors: std.ArrayList(usize) = .empty,
+
+    pub fn deinit(edges: *BlockEdges, allocator: std.mem.Allocator) void {
+        edges.successors.deinit(allocator);
+        edges.predecessors.deinit(allocator);
+    }
+};
+
+pub const Graph = struct {
+    allocator: std.mem.Allocator,
+    edges: std.ArrayList(BlockEdges),
+
+    pub fn build(allocator: std.mem.Allocator, function: ir.Function) !Graph {
+        var graph: Graph = .{
+            .allocator = allocator,
+            .edges = .empty,
+        };
+        errdefer graph.deinit();
+
+        try graph.edges.appendNTimes(allocator, .{}, function.blocks.items.len);
+
+        for (function.blocks.items, 0..) |block, block_index| {
+            const terminator = block.terminator orelse continue;
+            switch (terminator) {
+                .ret => {},
+                .br => |br| try graph.addEdge(function, block_index, br.target),
+                .condbr => |condbr| {
+                    try graph.addEdge(function, block_index, condbr.then_target);
+                    try graph.addEdge(function, block_index, condbr.else_target);
+                },
+            }
+        }
+
+        return graph;
+    }
+
+    pub fn deinit(graph: *Graph) void {
+        for (graph.edges.items) |*edges| edges.deinit(graph.allocator);
+        graph.edges.deinit(graph.allocator);
+    }
+
+    pub fn successors(graph: Graph, block_index: usize) []const usize {
+        return graph.edges.items[block_index].successors.items;
+    }
+
+    pub fn predecessors(graph: Graph, block_index: usize) []const usize {
+        return graph.edges.items[block_index].predecessors.items;
+    }
+
+    pub fn reachableFromEntry(graph: Graph, allocator: std.mem.Allocator) ![]bool {
+        const reachable = try allocator.alloc(bool, graph.edges.items.len);
+        @memset(reachable, false);
+        if (reachable.len == 0) return reachable;
+
+        var worklist: std.ArrayList(usize) = .empty;
+        defer worklist.deinit(allocator);
+
+        reachable[0] = true;
+        try worklist.append(allocator, 0);
+
+        while (worklist.pop()) |block_index| {
+            for (graph.successors(block_index)) |successor| {
+                if (reachable[successor]) continue;
+                reachable[successor] = true;
+                try worklist.append(allocator, successor);
+            }
+        }
+
+        return reachable;
+    }
+
+    fn addEdge(graph: *Graph, function: ir.Function, from: usize, target_name: []const u8) !void {
+        const to = function.blockIndex(target_name) orelse return error.UnknownBlock;
+        try appendUnique(graph.allocator, &graph.edges.items[from].successors, to);
+        try appendUnique(graph.allocator, &graph.edges.items[to].predecessors, from);
+    }
+};
+
+fn appendUnique(allocator: std.mem.Allocator, list: *std.ArrayList(usize), value: usize) !void {
+    for (list.items) |existing| {
+        if (existing == value) return;
+    }
+    try list.append(allocator, value);
+}

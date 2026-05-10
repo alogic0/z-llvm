@@ -5,7 +5,7 @@
 - [x] Add `icmp` instruction parsing, printing, verification, and tests.
 - [x] Add `phi` instruction parsing, printing, verification, and tests.
 - [x] Extend `simplifycfg` to update/remove trivial phi inputs.
-- [ ] Add an explicit CFG analysis helper for predecessors and successors.
+- [x] Add an explicit CFG analysis helper for predecessors and successors.
 - [ ] Add dominator tree analysis for reachable blocks.
 - [ ] Implement an `early-cse` subset for repeated pure expressions.
 
@@ -28,6 +28,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - `dce` subset: documented in [passes/dce.md](passes/dce.md).
 - `simplifycfg` subset: documented in [passes/simplifycfg.md](passes/simplifycfg.md).
 - def-use use-count subset: documented in [analysis/def_use.md](analysis/def_use.md).
+- CFG successor/predecessor subset: documented in [analysis/cfg.md](analysis/cfg.md).
 
 ## Completed Step Notes
 
@@ -40,3 +41,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `icmp eq/ne` parsing, printing, verification, and constant folding are now supported.
 - `phi` parsing, printing, verification, and def-use tracking are now supported for the current integer/value subset.
 - `simplifycfg` now prunes phi incoming values from removed unreachable predecessors and replaces trivial phis.
+- CFG analysis now provides successor/predecessor lists and entry-block reachability; `simplifycfg` uses it for unreachable block removal.

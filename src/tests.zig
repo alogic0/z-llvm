@@ -1,4 +1,5 @@
 const std = @import("std");
+const cfg = @import("analysis/cfg.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
@@ -331,4 +332,38 @@ test "simplifycfg prunes unreachable phi incoming and removes trivial phi" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "cfg analysis reports successors predecessors and reachability" {
+    const input =
+        \\define i32 @cfg(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %exit
+        \\right:
+        \\  br label %exit
+        \\dead:
+        \\  ret i32 0
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
+
+    try std.testing.expectEqualSlices(usize, &.{ 1, 2 }, graph.successors(0));
+    try std.testing.expectEqualSlices(usize, &.{0}, graph.predecessors(1));
+    try std.testing.expectEqualSlices(usize, &.{ 1, 2 }, graph.predecessors(4));
+
+    const reachable = try graph.reachableFromEntry(std.testing.allocator);
+    defer std.testing.allocator.free(reachable);
+
+    try std.testing.expectEqualSlices(bool, &.{ true, true, true, false, true }, reachable);
 }

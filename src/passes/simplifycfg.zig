@@ -1,4 +1,5 @@
 const std = @import("std");
+const cfg = @import("../analysis/cfg.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -42,27 +43,11 @@ fn simplifyTerminators(function: *ir.Function) bool {
 fn removeUnreachableBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
     if (function.blocks.items.len == 0) return false;
 
-    var reachable = std.StringHashMap(void).init(allocator);
-    defer reachable.deinit();
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
 
-    var worklist: std.ArrayList([]const u8) = .empty;
-    defer worklist.deinit(allocator);
-
-    try markReachable(&reachable, &worklist, function.blocks.items[0].name);
-
-    while (worklist.pop()) |block_name| {
-        const block_index = function.blockIndex(block_name) orelse continue;
-        const block = function.blocks.items[block_index];
-        const terminator = block.terminator orelse continue;
-        switch (terminator) {
-            .ret => {},
-            .br => |br| try markReachable(&reachable, &worklist, br.target),
-            .condbr => |condbr| {
-                try markReachable(&reachable, &worklist, condbr.then_target);
-                try markReachable(&reachable, &worklist, condbr.else_target);
-            },
-        }
-    }
+    const reachable = try graph.reachableFromEntry(allocator);
+    defer allocator.free(reachable);
 
     var changed = false;
     changed = prunePhiIncoming(function, reachable) or changed;
@@ -70,7 +55,7 @@ fn removeUnreachableBlocks(allocator: std.mem.Allocator, function: *ir.Function)
     var index = function.blocks.items.len;
     while (index > 0) {
         index -= 1;
-        if (reachable.contains(function.blocks.items[index].name)) continue;
+        if (reachable[index]) continue;
 
         var removed = function.blocks.orderedRemove(index);
         removed.deinit(allocator);
@@ -79,7 +64,7 @@ fn removeUnreachableBlocks(allocator: std.mem.Allocator, function: *ir.Function)
     return changed;
 }
 
-fn prunePhiIncoming(function: *ir.Function, reachable: std.StringHashMap(void)) bool {
+fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
     var changed = false;
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*instruction| {
@@ -89,7 +74,12 @@ fn prunePhiIncoming(function: *ir.Function, reachable: std.StringHashMap(void)) 
                     var index = phi.incoming.items.len;
                     while (index > 0) {
                         index -= 1;
-                        if (reachable.contains(phi.incoming.items[index].block)) continue;
+                        const incoming_block_index = function.blockIndex(phi.incoming.items[index].block) orelse {
+                            _ = phi.incoming.orderedRemove(index);
+                            changed = true;
+                            continue;
+                        };
+                        if (reachable[incoming_block_index]) continue;
                         _ = phi.incoming.orderedRemove(index);
                         changed = true;
                     }
@@ -160,10 +150,4 @@ fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.V
         .int => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
-}
-
-fn markReachable(reachable: *std.StringHashMap(void), worklist: *std.ArrayList([]const u8), block_name: []const u8) !void {
-    const gop = try reachable.getOrPut(block_name);
-    if (gop.found_existing) return;
-    try worklist.append(reachable.allocator, block_name);
 }
