@@ -61,9 +61,16 @@ SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, bl
 EarlyCSE: same-block repeated pure-expression elimination subset
 Mem2Reg: single-block, multi-block, undef, and multi-slot stack promotion subsets
 SROA: zero-offset GEP alloca forwarding subset
-GVN: dominating repeated pure-expression elimination subset
+GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
-LICM: pure scalar loop-invariant instruction hoisting subset, including variant-operand rejection and SSA dominance preservation fixtures
+LICM: pure scalar loop-invariant instruction hoisting subset, including variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.
+
+Memory legality fixtures are split into two groups:
+
+```text
+opt-22 equivalent: scalar LICM/GVN/DCE behavior beside volatile memory, volatile load preservation
+local-only conservative: aligned load not hoisted, atomic/store barriers preserved, unknown pointer aliasing remains may-alias/ref
+```

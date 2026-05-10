@@ -39,6 +39,10 @@ This is intentionally closer to a small value-table seed than to full LLVM GVN.
 It is enough to prove the project can move beyond same-block `early-cse` while
 still relying on the existing dominator analysis.
 
+Fixture coverage now includes scalar value numbering in the presence of a
+volatile memory operation. The volatile operation is not value-numbered; it only
+checks that unrelated scalar expressions still use the normal GVN path.
+
 Known gaps:
 
 ```text

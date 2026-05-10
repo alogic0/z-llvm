@@ -132,6 +132,12 @@ Def-use subset:
 Memory IR subset:
   opaque ptr type
   alloca/load/store/getelementptr parsing, printing, and verification
+  load/store align and volatile spelling
+  narrow atomic load/store spelling as a conservative barrier
+
+Memory legality subset:
+  shared memory-effect classification for pure, readonly load, write, and volatile/atomic barrier instructions
+  conservative alias/mod-ref scaffolding for known stack slots and load/store instructions
 
 Control-flow IR subset:
   ret
@@ -153,6 +159,7 @@ SROA subset:
 
 GVN subset:
   dominating repeated pure-expression elimination
+  memory instructions rejected from scalar value numbering
 
 LoopInfo subset:
   natural-loop discovery from dominator backedges
@@ -162,6 +169,7 @@ LoopInfo subset:
 
 LICM subset:
   pure loop-invariant instruction hoisting to an existing preheader
+  memory-effect API blocks load/store/volatile/atomic hoisting
   no memory LICM, store sinking, preheader creation, or MemorySSA promotion yet
 ```
 
@@ -175,6 +183,7 @@ cast instructions
 division/remainder
 instruction flags such as nsw/nuw
 target triple and datalayout records
+full atomic operations and ordering semantics
 ```
 
 These unlock better comparisons with LLVM `opt` and the next algorithms: richer InstCombine folds, SROA slice splitting, memory-aware LICM, and ABI-aware lowering.

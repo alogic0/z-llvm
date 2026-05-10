@@ -56,7 +56,8 @@ Fixture coverage:
 
 ```text
 opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist
-local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, multi-latch rejection
+opt-22 compared memory legality: scalar hoisting beside volatile memory
+local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, atomic barrier rejection, multi-latch rejection
 ```
 
 The local-only cases are intentional current-scope boundaries. LLVM's LICM

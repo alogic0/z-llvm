@@ -602,6 +602,10 @@ test "memory effect and mod-ref classify memory instructions conservatively" {
         alias.modRef(function, block.instructions.items[3], .{ .named = "left" }),
     );
     try std.testing.expectEqual(
+        alias.ModRefInfo.ref,
+        alias.modRef(function, block.instructions.items[3], .{ .named = "arg" }),
+    );
+    try std.testing.expectEqual(
         alias.ModRefInfo.mod,
         alias.modRef(function, block.instructions.items[5], .{ .named = "right" }),
     );
@@ -1221,6 +1225,67 @@ test "licm leaves memory loads in the loop" {
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
     try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "licm leaves aligned loads in the loop until memory LICM is implemented" {
+    const input =
+        \\define i32 @licm_aligned_load_reject(i32 %a, ptr %p) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  %v = load i32, ptr %p, align 4
+        \\  %c = icmp sgt i32 %v, 0
+        \\  br i1 %c, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "dce preserves atomic memory barriers" {
+    const input =
+        \\define i32 @memory_atomic_barrier_reject(i32 %a, ptr %p) {
+        \\entry:
+        \\  store atomic i32 %a, ptr %p, release, align 4
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(dce.pass);
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);

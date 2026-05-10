@@ -66,9 +66,9 @@ replacement needs.
 The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset.
-- CFG, def-use, dominators, dominance frontiers, LoopInfo, and stack-slot alias scaffolding.
+- CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, and stack-slot alias/mod-ref scaffolding.
 - `instcombine`, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
-- IR support for `select`, `unreachable`, bitwise operations, shifts, relational integer `icmp`, `undef`, and simple `getelementptr`.
+- IR support for `select`, `unreachable`, bitwise operations, shifts, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
 - `opt-22` comparison fixtures for the implemented middle-end subset plus unit tests for analysis-only behavior.
 
 This is useful groundwork, but it does not yet cover the largest Zig LLVM

@@ -11,6 +11,10 @@ gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.
 licm_invariant	licm	loop-mssa(licm)	test/opt/inputs/licm_invariant.ll	test/opt/expected/z_llvm/licm_invariant.ll	pure loop-invariant icmp hoisted to preheader
 licm_variant_operand	licm	loop-mssa(licm)	test/opt/inputs/licm_variant_operand.ll	test/opt/expected/z_llvm/licm_variant_operand.ll	loop-variant operand prevents hoisting
 licm_dominates_uses	licm	loop-mssa(licm)	test/opt/inputs/licm_dominates_uses.ll	test/opt/expected/z_llvm/licm_dominates_uses.ll	hoisted scalar chain preserves dominance of uses
+licm_scalar_with_memory	licm	loop-mssa(licm)	test/opt/inputs/licm_scalar_with_memory.ll	test/opt/expected/z_llvm/licm_scalar_with_memory.ll	scalar LICM still works beside volatile memory
+gvn_scalar_with_memory	gvn,simplifycfg	gvn	test/opt/inputs/gvn_scalar_with_memory.ll	test/opt/expected/z_llvm/gvn_scalar_with_memory.ll	scalar GVN still works beside volatile memory
+dce_scalar_with_memory	dce	dce	test/opt/inputs/dce_scalar_with_memory.ll	test/opt/expected/z_llvm/dce_scalar_with_memory.ll	DCE removes pure scalar and readonly load but preserves volatile store
+dce_volatile_load_reject	dce	dce	test/opt/inputs/dce_volatile_load_reject.ll	test/opt/expected/z_llvm/dce_volatile_load_reject.ll	volatile load is preserved
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	generic LLVM headers only
 simplifycfg_thread_empty	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_thread_empty.ll	test/opt/expected/z_llvm/simplifycfg_thread_empty.ll	empty branch block threading
 unreachable_simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/unreachable_simplifycfg.ll	test/opt/expected/z_llvm/unreachable_simplifycfg.ll	constant branch to unreachable is simplified
