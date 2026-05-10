@@ -47,6 +47,8 @@ Pipeline-Ready Optimizer Epic
 
 ## 1. Scope and Target Choice
 
+Status: in progress as Cycle 18 in `docs/next_steps.md`.
+
 - [ ] Choose the first target/object pair, preferably `x86_64-linux-elf`, because it is easy to inspect with common binutils and maps well to the local development environment.
 - [ ] Document why other targets are deferred: Mach-O, COFF/PE, Wasm object format, AArch64, RISC-V, debug info, and relocation-heavy code.
 - [ ] Define the accepted input subset: one module, internal/external scalar functions, integer/pointer parameters, integer return, straight-line blocks first.

@@ -11,14 +11,14 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-### Cycle 17: Target Records and DataLayout Foundation
+### Cycle 18: MC Assembly Bootstrap
 
-Source epic: [Target DataLayout and AIR-to-IR Bridge Epic](roadmap/target_datalayout_air_bridge_epic.md)
-Epic sections: 1, 2, 3, 7, 8
+Source epic: [MC/Object Bootstrap Epic](roadmap/mc_object_bootstrap_epic.md)
+Epic sections: 1, 2, 3, 4, 5, 8, 9, 10, 11
 
-- [x] Add a `src/target/` module for target triple parsing and a minimal `DataLayout` query API, with upstream LLVM mapping.
-- [x] Parse and print module-level `source_filename`, `target triple`, and `target datalayout` records.
-- [x] Add `void` return type and `ret void` parsing, printing, and verification for tiny Zig-emitted IR compatibility.
-- [x] Add tests for target record round-tripping, x86_64 datalayout queries, and void-return functions.
-- [x] Update target/module IR docs, `unsupported_ir.md`, `testing.md`, and inventory coverage.
-- [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh`.
+- [ ] Add minimal x86_64 SysV Machine IR for straight-line i32 leaf functions: return constant, return first/second parameter, and add first two parameters.
+- [ ] Add an assembly printer for that Machine IR with `.text`, `.globl`, function labels, register operands, immediates, and `retq`.
+- [ ] Add `--emit=asm` and `--target=` CLI support while keeping optimizer IR output as the default path.
+- [ ] Add unit tests for lowering, unsupported codegen diagnostics, and assembly text output.
+- [ ] Update MC/codegen docs, `unsupported_ir.md`, `testing.md`, and inventory coverage.
+- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh`.
