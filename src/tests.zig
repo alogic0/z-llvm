@@ -405,6 +405,38 @@ test "alias analysis classifies stack slots" {
     );
 }
 
+test "alias analysis classifies gep-derived stack slots" {
+    const input =
+        \\define i32 @gep_alias() {
+        \\entry:
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  %left0 = getelementptr i32, ptr %left, i32 0
+        \\  %left1 = getelementptr i32, ptr %left, i32 1
+        \\  %right0 = getelementptr i32, ptr %right, i32 0
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expectEqual(
+        alias.AliasResult.must_alias,
+        alias.alias(function, .{ .named = "left" }, .{ .named = "left0" }),
+    );
+    try std.testing.expectEqual(
+        alias.AliasResult.may_alias,
+        alias.alias(function, .{ .named = "left" }, .{ .named = "left1" }),
+    );
+    try std.testing.expectEqual(
+        alias.AliasResult.no_alias,
+        alias.alias(function, .{ .named = "left0" }, .{ .named = "right0" }),
+    );
+}
+
 test "mem2reg promotes single-block stack slot" {
     const input =
         \\define i32 @promote(i32 %a) {

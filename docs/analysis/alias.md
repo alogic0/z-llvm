@@ -15,6 +15,7 @@ AAResults::alias
 AAResultBase::alias
 BasicAAResult::alias
 BasicAAResult::aliasCheck
+BasicAAResult::aliasGEP
 ```
 
 Implemented subset:
@@ -22,13 +23,16 @@ Implemented subset:
 ```text
 must_alias when two pointer values are the same named value
 no_alias when two pointer values are distinct alloca results
+trace simple getelementptr chains back to their stack-slot root
+must_alias for zero-index GEPs from the same stack slot
+may_alias for nonzero or unknown same-root GEP offsets
 may_alias for parameters, unknown values, and non-stack-slot values
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces the stack-slot identity part needed by a first mem2reg implementation.
+This reproduces the stack-slot identity and first GEP-root tracing needed by memory optimizations.
 LLVM BasicAA proves much broader no-alias facts using object identity, GEP offsets, sizes, globals, captures, calls, invariant metadata, and recursive queries through AAResults.
 ```
 
@@ -43,7 +47,7 @@ Known gaps:
 
 ```text
 no MemoryLocation size modeling
-no GEP offset reasoning
+only zero-vs-unknown GEP offset reasoning
 no address spaces
 no capture analysis
 no globals or calls
