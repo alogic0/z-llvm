@@ -288,3 +288,47 @@ test "simplifycfg folds constant branch and removes unreachable blocks" {
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
+
+test "simplifycfg prunes unreachable phi incoming and removes trivial phi" {
+    const input =
+        \\define i32 @phi_cleanup(i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 1, label %then, label %else
+        \\then:
+        \\  br label %merge
+        \\else:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %then ], [ %b, %else ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @phi_cleanup(i32 %a, i32 %b) {
+        \\entry:
+        \\  br label %then
+        \\then:
+        \\  br label %merge
+        \\merge:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}

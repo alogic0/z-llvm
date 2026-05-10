@@ -16,6 +16,8 @@ br i1 1, label %a, label %b -> br label %a
 br i1 0, label %a, label %b -> br label %b
 br i1 %cond, label %a, label %a -> br label %a
 remove blocks unreachable from the entry block
+remove phi incoming values from unreachable predecessor blocks
+replace trivial phi nodes whose remaining incoming values are all identical
 ```
 
 Example:
@@ -40,6 +42,7 @@ Known gaps:
 
 ```text
 no phi-node updates
+no non-trivial phi-node rewrites
 no branch threading
 no block merging
 no switch support
