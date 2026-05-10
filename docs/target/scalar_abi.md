@@ -27,6 +27,7 @@ Implemented subset:
 classify void returns as ignored
 classify integer returns and parameters as integer values with their IR bit width
 classify pointer returns and parameters as pointer values using DataLayout pointer size
+classify whole project IR function signatures into return and parameter ABI slots
 reject void parameters
 require one of the initial supported targets:
   x86_64-linux-gnu
@@ -56,6 +57,7 @@ unit-test only:
   void return classification
   i32 return classification
   pointer parameter classification for the initial target matrix
+  whole-function signature classification for pointer, integer, and void signatures
   void parameter rejection
 ```
 

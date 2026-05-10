@@ -94,12 +94,12 @@ Suggested slice boundary:
 
 Status: scalar ABI classification implemented and verified in Cycle 24.
 
-- [ ] Add a target-aware function type model for scalar integer, pointer, void, and simple aggregate placeholder returns.
+- [x] Add a target-aware function type model for scalar integer, pointer, void, and simple aggregate placeholder returns.
 - [x] Add `void` return type support.
 - [x] Add basic calling convention parsing and preservation for the calling conventions Zig emits in small examples.
 - [x] Add ABI classification docs for scalar parameters and returns on the initial target matrix.
 - [x] Add tests comparing tiny function signatures against Zig-emitted LLVM IR.
-- [ ] Keep full aggregate ABI lowering out of scope until target layout support is strong enough.
+- [x] Keep full aggregate ABI lowering out of scope until target layout support is strong enough.
 
 Suggested slice boundary:
 

@@ -222,6 +222,44 @@ test "target ABI classifies scalar function signatures" {
     }
 }
 
+test "target ABI classifies project IR function signatures" {
+    const input =
+        \\target datalayout = "e-m:e-p:64:64-i64:64"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define ptr @ptr_id(ptr %p, i32 %a) {
+        \\entry:
+        \\  ret ptr %p
+        \\}
+        \\
+        \\define void @void_fn() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const triple = try target.Triple.parse(module.target_triple.?);
+    const layout = try target.DataLayout.parse(module.target_datalayout.?);
+
+    var ptr_signature = try target.abi.classifyFunction(std.testing.allocator, triple, layout, module.functions.items[0]);
+    defer ptr_signature.deinit(std.testing.allocator);
+    try std.testing.expectEqual(target.AbiValueClass.pointer, ptr_signature.return_value.value_class);
+    try std.testing.expectEqual(@as(u16, 64), ptr_signature.return_value.size_bits);
+    try std.testing.expectEqual(@as(usize, 2), ptr_signature.params.items.len);
+    try std.testing.expectEqual(target.AbiValueClass.pointer, ptr_signature.params.items[0].value_class);
+    try std.testing.expectEqual(target.AbiValueClass.integer, ptr_signature.params.items[1].value_class);
+
+    var void_signature = try target.abi.classifyFunction(std.testing.allocator, triple, layout, module.functions.items[1]);
+    defer void_signature.deinit(std.testing.allocator);
+    try std.testing.expectEqual(target.AbiValueClass.ignore, void_signature.return_value.value_class);
+    try std.testing.expectEqual(@as(usize, 0), void_signature.params.items.len);
+}
+
 test "AIR-like bridge lowers scalar binary function" {
     const params = [_]air_bridge.Param{
         .{ .name = "a", .ty = .{ .int = 32 } },

@@ -91,7 +91,7 @@ branch weights / profile metadata
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
-ABI classification beyond void, scalar integer, and pointer signatures
+ABI classification beyond void, scalar integer, pointer, and whole-function scalar signatures
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
@@ -187,7 +187,7 @@ Module IR subset:
   scalar global and constant definitions with integer/undef initializers
   raw global suffix attributes
   initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
-  scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
+  scalar ABI classification for void returns, integer returns/parameters, pointer returns/parameters, and whole-function signatures
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
   AIR-like pre/post optimization driver using named pipelines
   zig-scalar-foundation pipeline alias and CLI target/datalayout record injection

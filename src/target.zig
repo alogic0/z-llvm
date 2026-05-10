@@ -8,3 +8,4 @@ pub const DataLayout = datalayout.DataLayout;
 pub const AbiValueClass = abi.ValueClass;
 pub const AbiSlot = abi.Slot;
 pub const AbiClassification = abi.Classification;
+pub const AbiFunctionSignature = abi.FunctionSignature;
