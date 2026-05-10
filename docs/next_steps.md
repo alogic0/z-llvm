@@ -11,18 +11,14 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle.
+### Cycle 17: Target Records and DataLayout Foundation
 
-When starting a slice, replace this section with:
+Source epic: [Target DataLayout and AIR-to-IR Bridge Epic](roadmap/target_datalayout_air_bridge_epic.md)
+Epic sections: 1, 2, 3, 7, 8
 
-```text
-### Cycle N: Slice Title
-
-Source epic: [Epic Title](roadmap/example_epic.md)
-Epic sections: 1, 7, 8
-
-- [ ] Implement the bounded behavior with upstream LLVM mapping.
-- [ ] Add or update fixtures/tests.
-- [ ] Update docs and inventory coverage.
-- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and required comparison scripts.
-```
+- [ ] Add a `src/target/` module for target triple parsing and a minimal `DataLayout` query API, with upstream LLVM mapping.
+- [ ] Parse and print module-level `source_filename`, `target triple`, and `target datalayout` records.
+- [ ] Add `void` return type and `ret void` parsing, printing, and verification for tiny Zig-emitted IR compatibility.
+- [ ] Add tests for target record round-tripping, x86_64 datalayout queries, and void-return functions.
+- [ ] Update target/module IR docs, `unsupported_ir.md`, `testing.md`, and inventory coverage.
+- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh`.

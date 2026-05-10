@@ -51,6 +51,8 @@ Pipeline-Ready Optimizer Epic
 
 ## 1. Target Triple and DataLayout Foundation
 
+Status: in progress as Cycle 17 in `docs/next_steps.md`.
+
 - [ ] Add a `src/target/` module for target triple parsing and target identity.
 - [ ] Parse LLVM `target triple` module records and preserve them through printing.
 - [ ] Parse LLVM `target datalayout` module records and preserve them through printing.
