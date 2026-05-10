@@ -71,10 +71,10 @@ Suggested slice boundary:
 
 ## 2. Module-Level IR Surface
 
-Status: visibility and parameter attributes implemented and verified in Cycle 20.
+Status: scalar global preservation implemented and verified in Cycle 23.
 
 - [x] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
-- [ ] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
+- [x] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
 - [x] Add linkage parsing for the first supported forms: `internal`, `private`, `external`, and default external definitions.
 - [x] Add visibility parsing for the first supported forms emitted by tiny Zig examples.
 - [x] Add function attributes as parsed-and-preserved metadata where transforms do not understand them yet.

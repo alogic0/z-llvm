@@ -24,7 +24,7 @@ actually uses today. Paths are relative to `prog`.
 | `Context.setOptBisectLimit` | `ZigLLVMSetOptBisectLimit` | pass instrumentation | `src/pass_manager.zig`, `src/pipelines.zig` | pass-limit foundation |
 | `Context.enableBrokenDebugInfoCheck`, `Context.getBrokenDebugInfo` | Zig LLVM debug-info wrappers | debug validation | `src/debug/` | missing |
 | `Context.intType` | `LLVMIntTypeInContext` | LLVM type construction | `src/ir/` | partial integer IR only |
-| `Module.dispose` | `LLVMDisposeModule` | module lifetime | `src/ir/` | partial text IR module only |
+| `Module.dispose` | `LLVMDisposeModule` | module lifetime | `src/ir/` | partial text IR module with scalar globals |
 | `Target.getFromTriple` | `LLVMGetTargetFromTriple` | target discovery | `src/target/` | initial target matrix recognition |
 | `TargetMachine.create` | `ZigLLVMCreateTargetMachine` | target machine setup | `src/target/`, `src/codegen/` | missing |
 | `TargetMachine.emitToFile` | `ZigLLVMTargetMachineEmitToFile` | optimization, codegen, object/asm/IR/bitcode emission | `src/pipeline.zig`, `src/codegen/`, `src/mc/`, `src/bitcode/` | asm bootstrap for tiny x86_64 leaf subset |
@@ -54,7 +54,7 @@ replacement needs.
 | Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/ir/`, `src/passes/` | partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/ir/`, `src/codegen/memory.zig` | partial alloca/load/store/GEP and mem2reg |
 | Atomics | `airCmpxchg`, `airAtomicRmw`, `airAtomicLoad`, `airAtomicStore` | `src/ir/atomics.zig`, `src/codegen/atomics.zig` | missing |
-| Aggregates and pointers | `airAggregateInit`, `airUnionInit`, `airStructFieldVal`, `airPtrElemPtr`, `ptraddConst` | `src/ir/aggregate.zig`, `src/codegen/layout.zig` | minimal GEP only |
+| Aggregates and pointers | `airAggregateInit`, `airUnionInit`, `airStructFieldVal`, `airPtrElemPtr`, `ptraddConst` | `src/ir/aggregate.zig`, `src/codegen/layout.zig` | minimal GEP and scalar global preservation only |
 | Optionals and error unions | `airOptionalPayload`, `airErrUnionPayload`, `airWrapErrUnionErr` | `src/codegen/zig_abi.zig` | missing |
 | Debug info | `airDbgStmt`, `airDbgVarPtr`, `airDbgVarVal`, `getDebugFile`, `getDebugType` | `src/debug/` | missing |
 | Inline assembly | `airAssembly`, constraint helpers | `src/codegen/inline_asm.zig`, `src/target/` | missing |
@@ -65,7 +65,7 @@ replacement needs.
 
 The current project covers phase-zero optimizer infrastructure:
 
-- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, function linkage/visibility, calling convention preservation, raw function and parameter attribute preservation, and void returns.
+- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, scalar globals, function linkage/visibility, calling convention preservation, raw function and parameter attribute preservation, and void returns.
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.

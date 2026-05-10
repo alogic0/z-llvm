@@ -14,7 +14,19 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.print("target triple = \"{s}\"\n", .{target_triple});
         printed_module_record = true;
     }
-    if (printed_module_record and module.functions.items.len != 0) try writer.writeByte('\n');
+    if (printed_module_record and (module.globals.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
+
+    for (module.globals.items) |global| {
+        try writer.print("@{s} = ", .{global.name});
+        try global.linkage.format(writer);
+        try writer.print("{s} ", .{global.kind.name()});
+        try global.ty.format(writer);
+        try writer.writeByte(' ');
+        try global.initializer.format(writer);
+        if (global.attrs) |attrs| try writer.print(", {s}", .{attrs});
+        try writer.writeByte('\n');
+    }
+    if (module.globals.items.len != 0 and module.functions.items.len != 0) try writer.writeByte('\n');
 
     for (module.functions.items, 0..) |function, function_index| {
         if (function_index != 0) try writer.writeByte('\n');

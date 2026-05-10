@@ -2,7 +2,27 @@ const std = @import("std");
 const core = @import("core.zig");
 
 pub fn verify(module: core.Module) !void {
+    var global_defs = std.StringHashMap(void).init(module.allocator);
+    defer global_defs.deinit();
+    for (module.globals.items) |global| {
+        if (global_defs.contains(global.name)) return error.DuplicateDefinition;
+        try global_defs.put(global.name, {});
+        switch (global.ty) {
+            .int => switch (global.initializer) {
+                .int, .undef => {},
+                .named => return error.UnsupportedGlobalVariable,
+            },
+            .ptr => switch (global.initializer) {
+                .undef => {},
+                .int, .named => return error.UnsupportedGlobalVariable,
+            },
+            .void => return error.UnsupportedGlobalVariable,
+        }
+    }
+
     for (module.functions.items) |function| {
+        if (global_defs.contains(function.name)) return error.DuplicateDefinition;
+
         var defs = std.StringHashMap(core.Type).init(module.allocator);
         defer defs.deinit();
 

@@ -6,6 +6,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .allocator = allocator,
         .source = try allocator.dupe(u8, text),
         .owned_strings = .empty,
+        .globals = .empty,
         .functions = .empty,
     };
     errdefer module.deinit();
@@ -39,7 +40,11 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
-        if (current_function == null and std.mem.startsWith(u8, line, "@")) return error.UnsupportedGlobalVariable;
+        if (current_function == null and std.mem.startsWith(u8, line, "@")) {
+            const global = try parseGlobal(line);
+            try module.globals.append(allocator, global);
+            continue;
+        }
         if (current_function == null and std.mem.startsWith(u8, line, "declare ")) return error.UnsupportedFunctionDeclaration;
         if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) return error.UnsupportedAttributeGroup;
         if (current_function == null and std.mem.startsWith(u8, line, "!")) return error.UnsupportedModuleMetadata;
@@ -105,8 +110,57 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.globals.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn parseGlobal(line: []const u8) !core.Global {
+    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.UnsupportedGlobalVariable;
+    const name_text = std.mem.trim(u8, line[0..eq_index], " \t");
+    if (!std.mem.startsWith(u8, name_text, "@") or name_text.len == 1) return error.InvalidGlobalVariable;
+
+    const rest = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    var parts = std.mem.tokenizeAny(u8, rest, " \t");
+    var token = parts.next() orelse return error.UnsupportedGlobalVariable;
+
+    const linkage = core.FunctionLinkage.parse(token) orelse .default;
+    if (linkage != .default) token = parts.next() orelse return error.UnsupportedGlobalVariable;
+
+    const kind = core.GlobalKind.parse(token) orelse return error.UnsupportedGlobalVariable;
+    const ty_text = parts.next() orelse return error.UnsupportedGlobalVariable;
+    const ty = parseType(ty_text) catch return error.UnsupportedGlobalVariable;
+
+    const initializer_start = @intFromPtr(ty_text.ptr) - @intFromPtr(rest.ptr) + ty_text.len;
+    const initializer_and_attrs = std.mem.trim(u8, rest[initializer_start..], " \t");
+    if (initializer_and_attrs.len == 0) return error.UnsupportedGlobalVariable;
+    const comma = std.mem.indexOfScalar(u8, initializer_and_attrs, ',');
+    const initializer_text = std.mem.trim(u8, if (comma) |index|
+        initializer_and_attrs[0..index]
+    else
+        initializer_and_attrs, " \t");
+    const attrs = if (comma) |index|
+        std.mem.trim(u8, initializer_and_attrs[index + 1 ..], " \t")
+    else
+        "";
+    if (std.mem.indexOfAny(u8, initializer_text, " \t") != null) return error.UnsupportedGlobalVariable;
+
+    const initializer = parseGlobalInitializer(initializer_text) catch return error.UnsupportedGlobalVariable;
+    return .{
+        .name = name_text[1..],
+        .linkage = linkage,
+        .kind = kind,
+        .ty = ty,
+        .initializer = initializer,
+        .attrs = if (attrs.len == 0) null else attrs,
+    };
+}
+
+fn parseGlobalInitializer(text: []const u8) !core.Value {
+    const value = try parseValue(text);
+    return switch (value) {
+        .int, .undef => value,
+        .named => error.UnsupportedGlobalVariable,
+    };
 }
 
 fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {

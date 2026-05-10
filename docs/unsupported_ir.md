@@ -15,6 +15,9 @@ parameter attributes preserved as raw text
 source_filename module record
 target datalayout module record
 target triple module record
+scalar global definitions with integer or undef initializers
+scalar constant global definitions with integer or undef initializers
+raw global suffix attributes preserved as text
 integer parameters
 ptr parameters
 named basic blocks
@@ -75,6 +78,7 @@ inline asm
 ```text
 function attributes are preserved but not semantically interpreted
 parameter attributes are preserved but not semantically interpreted
+global attributes are preserved but not semantically interpreted
 fast-math flags
 full alignment semantics
 full volatile semantics
@@ -119,6 +123,7 @@ InvalidRet
 InvalidBr
 InvalidLabel
 UnsupportedGlobalVariable
+InvalidGlobalVariable
 UnsupportedFunctionDeclaration
 UnsupportedAttributeGroup
 UnsupportedModuleMetadata
@@ -174,6 +179,8 @@ Module IR subset:
   source_filename
   target datalayout
   target triple
+  scalar global and constant definitions with integer/undef initializers
+  raw global suffix attributes
   initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
   function linkage on definitions
   function visibility on definitions
@@ -226,8 +233,8 @@ call
 bitcast and pointer casts
 unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
-target triple and datalayout records
-globals
+aggregate, string, TLS, COMDAT, alias, and declaration globals
+semantic global variable use in optimizations
 visibility and attributes with semantic effects
 calling convention ABI semantics
 function declarations

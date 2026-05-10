@@ -18,6 +18,8 @@ Module::setTargetTriple
 Module::setDataLayout
 LLParser::parseTargetDefinition
 GlobalValue::getLinkage
+GlobalVariable
+GlobalVariable::isConstant
 Function::getCallingConv
 Function::getAttributes
 ```
@@ -28,6 +30,9 @@ Implemented subset:
 source_filename = "..."
 target datalayout = "..."
 target triple = "..."
+scalar global definitions: @name = [linkage] global iN <int-or-undef>
+scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
+global suffix attributes preserved as raw text
 function linkage: default, internal, private, external
 function visibility: default, hidden, protected
 function calling conventions preserved: ccc, fastcc, coldcc
@@ -46,6 +51,7 @@ This project now parses and prints the first target records needed before Zig-em
 The records are preserved and lightly validated; transforms do not consume most module-level semantics yet.
 Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
 Calling conventions are preserved in the function signature because they are ABI-relevant in LLVM, but this project does not lower or verify their target ABI effects yet.
+Scalar global definitions are preserved at module level. They are not yet visible to load/store analysis, constant folding, or codegen.
 ```
 
 Fixture coverage:
@@ -62,14 +68,16 @@ unit-test only:
   function linkage and header attribute round-trip
   function visibility and parameter attribute round-trip
   function calling convention round-trip
-  unsupported global diagnostic
+  scalar global and constant global round-trip
+  unsupported aggregate global diagnostic
   void function and ret void verification
 ```
 
 Known gaps:
 
 ```text
-no globals
+no aggregate, string, TLS, COMDAT, alias, or declaration globals
+no semantic use of globals in optimization or codegen
 no semantic use of linkage, visibility, or attributes
 no semantic use of calling conventions
 no attribute group parsing

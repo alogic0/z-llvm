@@ -203,6 +203,30 @@ pub fn isSupportedCallingConvention(text: []const u8) bool {
         std.mem.eql(u8, text, "coldcc");
 }
 
+pub const GlobalKind = enum {
+    global,
+    constant,
+
+    pub fn parse(text: []const u8) ?GlobalKind {
+        if (std.mem.eql(u8, text, "global")) return .global;
+        if (std.mem.eql(u8, text, "constant")) return .constant;
+        return null;
+    }
+
+    pub fn name(kind: GlobalKind) []const u8 {
+        return @tagName(kind);
+    }
+};
+
+pub const Global = struct {
+    name: []const u8,
+    linkage: FunctionLinkage = .default,
+    kind: GlobalKind,
+    ty: Type,
+    initializer: Value,
+    attrs: ?[]const u8 = null,
+};
+
 pub const BinaryInst = struct {
     op: BinaryOp,
     flags: BinaryFlags = .{},
@@ -468,6 +492,7 @@ pub const Module = struct {
     source_filename: ?[]const u8 = null,
     target_triple: ?[]const u8 = null,
     target_datalayout: ?[]const u8 = null,
+    globals: std.ArrayList(Global),
     functions: std.ArrayList(Function),
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) !Module {
@@ -475,6 +500,7 @@ pub const Module = struct {
     }
 
     pub fn deinit(module: *Module) void {
+        module.globals.deinit(module.allocator);
         for (module.functions.items) |*function| function.deinit(module.allocator);
         module.functions.deinit(module.allocator);
         for (module.owned_strings.items) |owned| module.allocator.free(owned);

@@ -261,9 +261,43 @@ test "parser preserves supported calling conventions" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects unsupported top-level globals explicitly" {
+test "parser preserves scalar global variables" {
     const input =
-        \\@g = global i32 0
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@g = internal global i32 42, align 4
+        \\@c = private constant i8 undef
+        \\
+        \\define i32 @readable(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
+    try std.testing.expectEqual(ir.FunctionLinkage.internal, module.globals.items[0].linkage);
+    try std.testing.expectEqual(ir.GlobalKind.global, module.globals.items[0].kind);
+    try std.testing.expectEqual(@as(i128, 42), module.globals.items[0].initializer.int);
+    try std.testing.expectEqualStrings("align 4", module.globals.items[0].attrs.?);
+    try std.testing.expectEqual(ir.FunctionLinkage.private, module.globals.items[1].linkage);
+    try std.testing.expectEqual(ir.GlobalKind.constant, module.globals.items[1].kind);
+    try std.testing.expectEqual(ir.Value.undef, module.globals.items[1].initializer);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported aggregate globals explicitly" {
+    const input =
+        \\@s = private unnamed_addr constant [4 x i8] c"abc\00"
         \\
     ;
 
