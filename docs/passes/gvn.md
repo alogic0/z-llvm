@@ -33,6 +33,7 @@ equivalence by opcode, flags where present, type, and operands
 dominator check for cross-block availability
 same-block availability by instruction order
 replacement of dominated redundant expression uses
+scalar expression equivalence shared with the InstSimplify helper
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.

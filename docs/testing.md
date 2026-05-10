@@ -36,6 +36,7 @@ opt-22 -passes=adce test/opt/inputs/adce_chain.ll -S -o /tmp/llvm_adce.ll
 opt-22 -passes=gvn test/opt/inputs/gvn_dominating_expr.ll -S -o /tmp/llvm_gvn.ll
 opt-22 -passes='loop-mssa(licm)' test/opt/inputs/licm_invariant.ll -S -o /tmp/llvm_licm.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_zero_gep.ll -S -o /tmp/llvm_sroa.ll
+opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_scalar_simplify.ll -S -o /tmp/llvm_scalar_simplify.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 ```
 
@@ -47,7 +48,8 @@ bash scripts/compare_opt.sh
 
 The comparison matrix includes scalar IR round-trip coverage for casts,
 division/remainder, `freeze`, and `nsw`/`nuw`/`exact` flag preservation through
-the `scalar_ir_surface` fixture.
+the `scalar_ir_surface` fixture. It also includes defined scalar cast/div/rem
+fold coverage through `instcombine_scalar_simplify`.
 
 Use a different `opt` binary:
 
@@ -68,7 +70,7 @@ zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instc
 LLVM algorithms covered so far:
 
 ```text
-InstCombine: arithmetic, bitwise, shift, select, relational icmp, conservative scalar flag/division preservation, and commutative canonicalization subsets
+InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, and empty-block threading subsets

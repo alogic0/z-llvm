@@ -30,6 +30,7 @@ InstCombinerImpl::visitZExt
 InstCombinerImpl::visitSExt
 InstCombinerImpl::visitICmpInst
 InstCombinerImpl::visitSelectInst
+InstructionSimplify helpers used by InstCombine
 ```
 
 This pass canonicalizes and folds simple instructions. The first Zig implementation is intentionally small and covers only enough behavior to prove the pass infrastructure and LLVM-compatible IR comparison loop.
@@ -65,7 +66,9 @@ icmp signed and unsigned relational same-operand folding
 select constant-condition folding
 select identical-arm folding
 preserve `nsw`, `nuw`, and `exact` flags without using them for folds
-preserve `trunc`, `zext`, `sext`, `freeze`, and division/remainder instructions
+constant `trunc`, `zext`, and `sext` folding for integer constants
+defined constant `udiv`, `sdiv`, `urem`, and `srem` folding
+preserve `freeze` instructions
 ```
 
 Upstream mapping:
@@ -74,6 +77,7 @@ Upstream mapping:
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
 The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
+Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 ```
 
 Example:
@@ -96,8 +100,8 @@ no poison/undef/freeze simplification
 no vectors
 no width-aware constant folding for non-zero shifts
 unsigned constant folding is limited to integer widths below 128 bits
-no cast simplification yet
-no division/remainder simplification yet
+no non-constant cast simplification yet
+no unsafe division/remainder simplification
 no canonical reassociation
 no non-constant operand complexity ordering
 no target-specific combines

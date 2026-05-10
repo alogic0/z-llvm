@@ -8,13 +8,13 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
 
-- [ ] Add an InstSimplify-style helper layer for reusable local scalar simplifications shared by `instcombine`, GVN, and future passes, with upstream LLVM mapping.
-- [ ] Move duplicated scalar expression equivalence and operand canonicalization helpers out of individual passes where doing so reduces pass-local rules.
-- [ ] Extend `instcombine` with safe cast simplifications that do not require target data layout or poison-sensitive reasoning.
-- [ ] Add conservative constant folding for division/remainder only for defined cases, preserving divide-by-zero and overflow-sensitive cases.
-- [ ] Add `opt-22` equivalent fixtures for accepted folds and local-only tests or fixtures for deliberately conservative non-folds.
-- [ ] Update scalar pass docs, `testing.md`, `unsupported_ir.md`, and inventory coverage for InstSimplify and conservative scalar folds.
-- [ ] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
+- [x] Add an InstSimplify-style helper layer for reusable local scalar simplifications shared by `instcombine`, GVN, and future passes, with upstream LLVM mapping.
+- [x] Move duplicated scalar expression equivalence and operand canonicalization helpers out of individual passes where doing so reduces pass-local rules.
+- [x] Extend `instcombine` with safe cast simplifications that do not require target data layout or poison-sensitive reasoning.
+- [x] Add conservative constant folding for division/remainder only for defined cases, preserving divide-by-zero and overflow-sensitive cases.
+- [x] Add `opt-22` equivalent fixtures for accepted folds and local-only tests or fixtures for deliberately conservative non-folds.
+- [x] Update scalar pass docs, `testing.md`, `unsupported_ir.md`, and inventory coverage for InstSimplify and conservative scalar folds.
+- [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
 
 ## Completed Cycles
 

@@ -161,6 +161,12 @@ Scalar IR subset:
   instruction flags preserved: nsw, nuw, exact
   freeze spelling preserved for scalar integers
 
+InstSimplify subset:
+  local scalar simplification helper for InstCombine
+  constant integer cast folding
+  defined constant division/remainder folding
+  shared scalar expression equivalence for GVN and EarlyCSE
+
 Select subset:
   scalar i1 condition
   matching scalar result arms
@@ -191,7 +197,7 @@ The next useful parser expansions are:
 ```text
 call
 bitcast and pointer casts
-safe division/remainder simplification
+unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
 full atomic operations and ordering semantics

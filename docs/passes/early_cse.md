@@ -25,6 +25,7 @@ pure add/sub/mul expression matching
 pure integer cast expression matching
 pure icmp eq/ne expression matching
 later uses in the same block are rewritten to the earlier value
+scalar expression equivalence shared with the InstSimplify helper
 ```
 
 Upstream mapping:

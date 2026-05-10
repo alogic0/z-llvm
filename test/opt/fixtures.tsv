@@ -3,6 +3,7 @@ instcombine	instcombine	instcombine	test/opt/inputs/instcombine.ll	test/opt/expe
 instcombine_bitwise	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_bitwise.ll	test/opt/expected/z_llvm/instcombine_bitwise.ll	bitwise and shift identity folding
 instcombine_icmp_rel	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_icmp_rel.ll	test/opt/expected/z_llvm/instcombine_icmp_rel.ll	relational icmp constant and same-operand folding
 instcombine_commute	instcombine	instcombine	test/opt/inputs/instcombine_commute.ll	test/opt/expected/z_llvm/instcombine_commute.ll	commutative binary constant canonicalization
+instcombine_scalar_simplify	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_scalar_simplify.ll	test/opt/expected/z_llvm/instcombine_scalar_simplify.ll	scalar cast and defined div-rem constant folding
 select_fold	instcombine,dce	instcombine,dce	test/opt/inputs/select_fold.ll	test/opt/expected/z_llvm/select_fold.ll	select constant and identical-arm folding
 scalar_ir_surface	dce	dce	test/opt/inputs/scalar_ir_surface.ll	test/opt/expected/z_llvm/scalar_ir_surface.ll	scalar casts div rem flags and freeze round-trip
 dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	generic LLVM headers only

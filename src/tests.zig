@@ -347,6 +347,41 @@ test "instcombine preserves flagged arithmetic and division" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "instcombine preserves unsafe division folds" {
+    const input =
+        \\define i32 @unsafe_division() {
+        \\entry:
+        \\  %x = udiv i32 4, 0
+        \\  %y = sdiv i32 -2147483648, -1
+        \\  %z = udiv exact i32 5, 2
+        \\  %sum0 = add i32 %x, %y
+        \\  %sum1 = add i32 %sum0, %z
+        \\  ret i32 %sum1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(instcombine.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var trace: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer trace.deinit();
+
+    _ = try pm.run(&module, &context, &trace.writer, false);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "instcombine folds constant icmp" {
     const input =
         \\define i1 @cmp() {

@@ -3,6 +3,7 @@ const dominator = @import("../analysis/dominator.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
+const inst_simplify = @import("inst_simplify.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "gvn",
@@ -61,7 +62,7 @@ fn findDominatingEquivalent(
             if (candidate.removed or !isCandidate(candidate)) continue;
             if (candidate_block_index == block_index and candidate_index >= instruction_index) continue;
             if (candidate_block_index != block_index and !dom.dominates(candidate_block_index, block_index)) continue;
-            if (!sameExpression(candidate, instruction)) continue;
+            if (!inst_simplify.sameExpression(candidate, instruction)) continue;
             return .{ .named = candidate.result orelse return null };
         }
     }
@@ -72,44 +73,6 @@ fn isCandidate(instruction: ir.Instruction) bool {
     if (memory_effect.classify(instruction) != .none) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp, .select => true,
-        .freeze, .phi, .alloca, .load, .store, .gep => false,
-    };
-}
-
-fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
-    return switch (a.kind) {
-        .binary => |a_binary| switch (b.kind) {
-            .binary => |b_binary| a_binary.op == b_binary.op and
-                a_binary.flags.nsw == b_binary.flags.nsw and
-                a_binary.flags.nuw == b_binary.flags.nuw and
-                a_binary.flags.exact == b_binary.flags.exact and
-                a_binary.ty.eql(b_binary.ty) and
-                a_binary.lhs.eql(b_binary.lhs) and
-                a_binary.rhs.eql(b_binary.rhs),
-            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
-        },
-        .cast => |a_cast| switch (b.kind) {
-            .cast => |b_cast| a_cast.op == b_cast.op and
-                a_cast.from_ty.eql(b_cast.from_ty) and
-                a_cast.value.eql(b_cast.value) and
-                a_cast.to_ty.eql(b_cast.to_ty),
-            .binary, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
-        },
-        .icmp => |a_icmp| switch (b.kind) {
-            .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
-                a_icmp.operand_ty.eql(b_icmp.operand_ty) and
-                a_icmp.lhs.eql(b_icmp.lhs) and
-                a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .cast, .freeze, .select, .phi, .alloca, .load, .store, .gep => false,
-        },
-        .select => |a_select| switch (b.kind) {
-            .select => |b_select| a_select.cond_ty.eql(b_select.cond_ty) and
-                a_select.cond.eql(b_select.cond) and
-                a_select.ty.eql(b_select.ty) and
-                a_select.true_value.eql(b_select.true_value) and
-                a_select.false_value.eql(b_select.false_value),
-            .binary, .cast, .freeze, .icmp, .phi, .alloca, .load, .store, .gep => false,
-        },
         .freeze, .phi, .alloca, .load, .store, .gep => false,
     };
 }
