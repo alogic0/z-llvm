@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle is currently open. Add the next optimization-focused cycle here before implementation starts.
+
+## Completed Cycles
+
 ### Cycle 9: Scalar and Loop Optimizer Refinement
 
 - [x] Extend `icmp` parsing and `instcombine` folding for signed and unsigned integer predicates, with upstream LLVM mapping and `opt-22` fixtures.
@@ -11,8 +15,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Extend `simplifycfg` to thread empty unconditional branch blocks without phi nodes, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Extend LoopInfo with preheader and exit-block queries needed by loop passes, with upstream LLVM mapping and unit tests.
 - [x] Add an LICM foundation pass that hoists pure loop-invariant instructions to an existing preheader, with upstream LLVM mapping and `opt-22` fixtures.
-
-## Completed Cycles
 
 ### Cycle 8: Optimization Pipeline Expansion
 
@@ -143,3 +145,8 @@ Track each reproduced LLVM algorithm here as it lands:
 - Zig's real LLVM backend API surface is now inventoried in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md), with replacement owner components for IR, AIR lowering, target/ABI, codegen, MC/object, debug, bitcode, sanitizer/coverage, LTO, host CPU, and linker-adjacent bindings.
 - The current optimizer is explicitly treated as phase-zero infrastructure rather than the whole LLVM replacement.
 - `src/ir.zig` is now a compatibility facade over `src/ir/core.zig`, starting the move toward separate parser, printer, verifier, and core IR files.
+- `icmp` now supports signed and unsigned relational predicates with InstCombine constant and same-operand folding.
+- InstCombine now canonicalizes constants to the RHS for supported commutative binary operators.
+- SimplifyCFG now threads phi-free empty branch blocks and re-runs terminator simplification to collapse same-target branches.
+- LoopInfo now reports a unique unconditional preheader and loop exit blocks for natural loops.
+- LICM now hoists pure loop-invariant binary, `icmp`, and `select` instructions to an existing preheader.
