@@ -58,6 +58,7 @@ target triple parsing
 target datalayout preservation and pointer/integer alignment queries
 source_filename preservation
 function linkage and raw function-header attribute preservation
+function visibility and raw parameter attribute preservation
 void function and ret void round-tripping
 explicit unsupported global diagnostics
 ```
@@ -102,7 +103,7 @@ GVN: dominating repeated pure-expression elimination subset with memory-effect r
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing and minimal DataLayout query subset
-Module IR: source filename, target records, function linkage, raw function attributes, and void return preservation
+Module IR: source filename, target records, function linkage/visibility, raw function and parameter attributes, and void return preservation
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 

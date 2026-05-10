@@ -8,6 +8,7 @@ pub const CastOp = core.CastOp;
 pub const IcmpPredicate = core.IcmpPredicate;
 pub const Param = core.Param;
 pub const FunctionLinkage = core.FunctionLinkage;
+pub const FunctionVisibility = core.FunctionVisibility;
 pub const BinaryInst = core.BinaryInst;
 pub const CastInst = core.CastInst;
 pub const FreezeInst = core.FreezeInst;

@@ -65,7 +65,7 @@ replacement needs.
 
 The current project covers phase-zero optimizer infrastructure:
 
-- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, function linkage, raw function attribute preservation, and void returns.
+- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, function linkage/visibility, raw function and parameter attribute preservation, and void returns.
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.

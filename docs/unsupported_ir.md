@@ -8,7 +8,9 @@ The current parser is intentionally small. It accepts only the LLVM-compatible s
 define iN @name(...)
 define void @name(...)
 function linkage on definitions: internal, private, external, default
+function visibility on definitions: hidden, protected, default
 function header attributes preserved as raw text
+parameter attributes preserved as raw text
 source_filename module record
 target datalayout module record
 target triple module record
@@ -71,7 +73,7 @@ inline asm
 
 ```text
 function attributes are preserved but not semantically interpreted
-parameter attributes
+parameter attributes are preserved but not semantically interpreted
 fast-math flags
 full alignment semantics
 full volatile semantics
@@ -171,7 +173,9 @@ Module IR subset:
   target datalayout
   target triple
   function linkage on definitions
+  function visibility on definitions
   raw function header attributes
+  raw parameter attributes
   void return type
 
 Scalar IR subset:
@@ -220,7 +224,7 @@ unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
 globals
-visibility
+visibility and attributes with semantic effects
 function declarations
 attribute groups
 module metadata

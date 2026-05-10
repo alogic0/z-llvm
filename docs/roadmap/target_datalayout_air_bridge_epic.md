@@ -71,14 +71,14 @@ Suggested slice boundary:
 
 ## 2. Module-Level IR Surface
 
-Status: visibility and parameter attributes in progress as Cycle 20 in `docs/next_steps.md`.
+Status: visibility and parameter attributes implemented and verified in Cycle 20.
 
 - [x] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
 - [ ] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
 - [x] Add linkage parsing for the first supported forms: `internal`, `private`, `external`, and default external definitions.
-- [ ] Add visibility parsing for the first supported forms emitted by tiny Zig examples.
+- [x] Add visibility parsing for the first supported forms emitted by tiny Zig examples.
 - [x] Add function attributes as parsed-and-preserved metadata where transforms do not understand them yet.
-- [ ] Add parameter attributes as parsed-and-preserved metadata for simple ABI-significant cases.
+- [x] Add parameter attributes as parsed-and-preserved metadata for simple ABI-significant cases.
 - [x] Update verifier rules so unsupported module-level constructs fail explicitly instead of being silently ignored.
 - [x] Add normalized round-trip fixtures for module-level records emitted by Zig's LLVM backend.
 

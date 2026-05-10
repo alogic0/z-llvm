@@ -150,6 +150,7 @@ pub const IcmpPredicate = enum {
 
 pub const Param = struct {
     ty: Type,
+    attrs: ?[]const u8 = null,
     name: []const u8,
 };
 
@@ -172,6 +173,26 @@ pub const FunctionLinkage = enum {
             .internal => try writer.writeAll("internal "),
             .private => try writer.writeAll("private "),
             .external => try writer.writeAll("external "),
+        }
+    }
+};
+
+pub const FunctionVisibility = enum {
+    default,
+    hidden,
+    protected,
+
+    pub fn parse(text: []const u8) ?FunctionVisibility {
+        if (std.mem.eql(u8, text, "hidden")) return .hidden;
+        if (std.mem.eql(u8, text, "protected")) return .protected;
+        return null;
+    }
+
+    pub fn format(visibility: FunctionVisibility, writer: anytype) !void {
+        switch (visibility) {
+            .default => {},
+            .hidden => try writer.writeAll("hidden "),
+            .protected => try writer.writeAll("protected "),
         }
     }
 };
@@ -405,6 +426,7 @@ pub const Function = struct {
     name: []const u8,
     ret_ty: Type,
     linkage: FunctionLinkage = .default,
+    visibility: FunctionVisibility = .default,
     attrs: ?[]const u8 = null,
     params: std.ArrayList(Param),
     blocks: std.ArrayList(BasicBlock),

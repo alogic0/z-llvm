@@ -28,7 +28,9 @@ source_filename = "..."
 target datalayout = "..."
 target triple = "..."
 function linkage: default, internal, private, external
+function visibility: default, hidden, protected
 function header attributes preserved as raw text
+parameter attributes preserved as raw text
 void function return type
 ret void
 explicit parser errors for unsupported globals, declarations, attribute groups, and module metadata
@@ -40,7 +42,7 @@ Upstream mapping:
 LLVM modules carry target identity, datalayout, source file names, globals, aliases, COMDATs, metadata, attributes, and module flags.
 This project now parses and prints the first target records needed before Zig-emitted IR comparison can be honest.
 The records are preserved and lightly validated; transforms do not consume most module-level semantics yet.
-Function linkage is preserved for the first definition forms. Function header attributes are parse-preserve-only metadata today.
+Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
 ```
 
 Fixture coverage:
@@ -55,6 +57,7 @@ local-only conservative:
 unit-test only:
   module record round-trip
   function linkage and header attribute round-trip
+  function visibility and parameter attribute round-trip
   unsupported global diagnostic
   void function and ret void verification
 ```
@@ -63,8 +66,7 @@ Known gaps:
 
 ```text
 no globals
-no visibility parsing
-no parameter attributes
+no semantic use of linkage, visibility, or attributes
 no attribute group parsing
 no module flags
 no metadata

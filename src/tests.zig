@@ -138,6 +138,34 @@ test "parser preserves function linkage and header attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves function visibility and parameter attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define external hidden i32 @visible(i32 noundef %a, ptr nonnull readonly %p) #1 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqual(ir.FunctionLinkage.external, function.linkage);
+    try std.testing.expectEqual(ir.FunctionVisibility.hidden, function.visibility);
+    try std.testing.expectEqualStrings("noundef", function.params.items[0].attrs.?);
+    try std.testing.expectEqualStrings("nonnull readonly", function.params.items[1].attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser rejects unsupported top-level globals explicitly" {
     const input =
         \\@g = global i32 0

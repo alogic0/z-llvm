@@ -129,8 +129,13 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
     var head_parts = std.mem.tokenizeAny(u8, head, " \t");
     const first_head_token = head_parts.next() orelse return error.InvalidFunctionHeader;
     const linkage = core.FunctionLinkage.parse(first_head_token) orelse .default;
-    const ret_ty_text = if (linkage == .default)
+    const after_linkage_token = if (linkage == .default)
         first_head_token
+    else
+        head_parts.next() orelse return error.InvalidFunctionHeader;
+    const visibility = core.FunctionVisibility.parse(after_linkage_token) orelse .default;
+    const ret_ty_text = if (visibility == .default)
+        after_linkage_token
     else
         head_parts.next() orelse return error.InvalidFunctionHeader;
     const ret_ty = try parseType(ret_ty_text);
@@ -140,6 +145,7 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
 
     var function = core.Function.init(name_text[1..], ret_ty);
     function.linkage = linkage;
+    function.visibility = visibility;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
     if (attrs.len != 0) function.attrs = attrs;
     errdefer function.deinit(allocator);
@@ -151,10 +157,29 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
             const param_text = std.mem.trim(u8, raw_param, " \t");
             var parts = std.mem.tokenizeAny(u8, param_text, " \t");
             const param_ty = try parseType(parts.next() orelse return error.InvalidParameter);
-            const param_name = parts.next() orelse return error.InvalidParameter;
+            var param_attrs_start: ?usize = null;
+            var param_name_token: ?[]const u8 = null;
+            while (parts.next()) |part| {
+                if (std.mem.startsWith(u8, part, "%")) {
+                    param_name_token = part;
+                    break;
+                }
+                if (param_attrs_start == null) {
+                    param_attrs_start = @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr);
+                }
+            }
+            const param_name = param_name_token orelse return error.InvalidParameter;
             if (parts.next() != null) return error.InvalidParameter;
             if (!std.mem.startsWith(u8, param_name, "%")) return error.InvalidValueName;
-            try function.params.append(allocator, .{ .ty = param_ty, .name = param_name[1..] });
+            const param_attrs = if (param_attrs_start) |start|
+                std.mem.trim(u8, param_text[start..(@intFromPtr(param_name.ptr) - @intFromPtr(param_text.ptr))], " \t")
+            else
+                "";
+            try function.params.append(allocator, .{
+                .ty = param_ty,
+                .attrs = if (param_attrs.len == 0) null else param_attrs,
+                .name = param_name[1..],
+            });
         }
     }
 
