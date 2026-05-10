@@ -35,6 +35,18 @@ opt-22 -passes=dce test/opt/inputs/dce.ll -S -o /tmp/llvm_dce.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 ```
 
+Run all currently mapped LLVM comparisons:
+
+```bash
+bash scripts/compare_opt.sh
+```
+
+Use a different `opt` binary:
+
+```bash
+OPT_BIN=opt bash scripts/compare_opt.sh
+```
+
 LLVM algorithms covered so far:
 
 ```text

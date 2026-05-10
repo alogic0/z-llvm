@@ -437,8 +437,6 @@ test "simplifycfg folds constant branch and removes unreachable blocks" {
     const expected =
         \\define i32 @branch(i32 %a) {
         \\entry:
-        \\  br label %then
-        \\then:
         \\  ret i32 %a
         \\}
         \\
@@ -479,10 +477,6 @@ test "simplifycfg prunes unreachable phi incoming and removes trivial phi" {
     const expected =
         \\define i32 @phi_cleanup(i32 %a, i32 %b) {
         \\entry:
-        \\  br label %then
-        \\then:
-        \\  br label %merge
-        \\merge:
         \\  ret i32 %a
         \\}
         \\

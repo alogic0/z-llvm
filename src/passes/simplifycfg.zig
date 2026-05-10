@@ -13,7 +13,9 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
         changed = try removeUnreachableBlocks(module.allocator, function) or changed;
+        changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTrivialPhis(function) or changed;
+        changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
@@ -38,6 +40,66 @@ fn simplifyTerminators(function: *ir.Function) bool {
         }
     }
     return changed;
+}
+
+fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(allocator, function.*);
+        defer graph.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const br = switch (block.terminator orelse continue) {
+                .br => |br| br,
+                .ret, .condbr => continue,
+            };
+            const target_index = function.blockIndex(br.target) orelse continue;
+            if (target_index == block_index) continue;
+            if (graph.predecessors(target_index).len != 1) continue;
+            if (hasPhi(function.blocks.items[target_index])) continue;
+
+            const target = &function.blocks.items[target_index];
+            for (target.instructions.items) |instruction| {
+                try block.instructions.append(allocator, instruction);
+            }
+            target.instructions.deinit(allocator);
+            target.instructions = .empty;
+            block.terminator = target.terminator;
+            target.terminator = null;
+            replacePhiIncomingBlock(function, target.name, block.name);
+
+            var removed = function.blocks.orderedRemove(target_index);
+            removed.deinit(allocator);
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_name: []const u8) void {
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .phi => |*phi| for (phi.incoming.items) |*incoming| {
+                    if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
+                },
+                .binary, .icmp, .alloca, .load, .store => {},
+            }
+        }
+    }
+}
+
+fn hasPhi(block: ir.BasicBlock) bool {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        if (instruction.kind == .phi) return true;
+    }
+    return false;
 }
 
 fn removeUnreachableBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
