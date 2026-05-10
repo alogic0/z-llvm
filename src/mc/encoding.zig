@@ -31,8 +31,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
-            .spill_arg_rsp => |reg| try encodeRegToRspSlot(&bytes, allocator, 0x89, reg),
-            .reload_arg_rsp => |reg| try encodeRspSlotToReg(&bytes, allocator, 0x8b, reg),
+            .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
+            .reload_arg_rsp => |reload| try encodeFrameSlotToReg(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
             .direct_call => {
                 try bytes.append(allocator, 0xe8);
@@ -63,7 +63,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .sub_rsp_8, .add_rsp_8 => 4,
-        .spill_arg_rsp, .reload_arg_rsp => |reg| if (reg.rexR()) 4 else 3,
+        .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
+        .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
         .reload_rsp_eax => 3,
         .direct_call => 5,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
@@ -99,14 +100,16 @@ fn encodeRegToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: 
     try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
 }
 
-fn encodeRegToRspSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg) !void {
+fn encodeRegToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
+    if (frame_index != .slot0) return error.UnsupportedFrameIndex;
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, opcode);
     try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));
     try bytes.append(allocator, 0x24);
 }
 
-fn encodeRspSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg) !void {
+fn encodeFrameSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
+    if (frame_index != .slot0) return error.UnsupportedFrameIndex;
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, opcode);
     try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));

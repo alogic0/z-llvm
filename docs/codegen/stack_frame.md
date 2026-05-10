@@ -31,10 +31,11 @@ local-only conservative:
   no frame pointer
   no red zone
   one fixed 8-byte %rsp-relative slot
+  explicit Machine IR frame-index operand for slot0
   only i32 alloca/store/load/return pattern
 
 bootstrap-only:
-  no frame-index MachineOperand abstraction yet
+  no general frame-index allocator yet
   no dynamic alloca
   no stack realignment
   no callee-saved spills
@@ -63,7 +64,8 @@ retq
 ```
 
 The slot is intentionally fixed at `(%rsp)` after the prologue adjustment.
-General frame indexes, multiple slots, slot coloring, callee-saved areas, and
+The Machine IR carries an explicit `slot0` frame-index operand, but only that one
+slot is legal today. Multiple slots, slot coloring, callee-saved areas, and
 outgoing call-argument areas are still out of scope.
 
 ## Fixture Coverage

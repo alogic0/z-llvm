@@ -212,7 +212,7 @@ Suggested slice boundary:
 
 ## 7. Stack Slot Loads and Stores
 
-- [ ] Add frame-index Machine IR operands.
+- [x] Add frame-index Machine IR operands.
 - [x] Add x86_64 stack-relative addressing for `%rsp` or `%rbp` based on the
       selected frame policy.
 - [x] Encode and print loads/stores for the integer widths required by fixtures.

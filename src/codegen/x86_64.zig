@@ -82,6 +82,10 @@ pub const MachineBinaryOp = enum {
     }
 };
 
+pub const FrameIndex = enum {
+    slot0,
+};
+
 pub const Instruction = union(enum) {
     label: []const u8,
     mov_imm_eax: i32,
@@ -96,9 +100,15 @@ pub const Instruction = union(enum) {
     },
     sub_rsp_8,
     add_rsp_8,
-    spill_arg_rsp: ArgReg,
-    reload_arg_rsp: ArgReg,
-    reload_rsp_eax,
+    spill_arg_rsp: struct {
+        frame_index: FrameIndex,
+        reg: ArgReg,
+    },
+    reload_arg_rsp: struct {
+        reg: ArgReg,
+        frame_index: FrameIndex,
+    },
+    reload_rsp_eax: FrameIndex,
     direct_call: struct {
         symbol: []const u8,
         ret_ty: ir.Type,
@@ -218,8 +228,11 @@ fn lowerSingleStackSlotReturn(
     if (!load.ty.eql(.{ .int = 32 }) or !isNamed(load.ptr, slot)) return false;
 
     try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .spill_arg_rsp = store_reg });
-    try machine.instructions.append(allocator, .reload_rsp_eax);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+        .frame_index = .slot0,
+        .reg = store_reg,
+    } });
+    try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -279,7 +292,10 @@ fn lowerCall(
 
     const live_param = try singleLiveParamAfter(function, block, instruction_index);
     try machine.instructions.append(allocator, .sub_rsp_8);
-    if (live_param) |reg| try machine.instructions.append(allocator, .{ .spill_arg_rsp = reg });
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+        .frame_index = .slot0,
+        .reg = reg,
+    } });
 
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -293,7 +309,10 @@ fn lowerCall(
         .ret_ty = call.ret_ty,
     } });
 
-    if (live_param) |reg| try machine.instructions.append(allocator, .{ .reload_arg_rsp = reg });
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
+        .reg = reg,
+        .frame_index = .slot0,
+    } });
     try machine.instructions.append(allocator, .add_rsp_8);
 
     if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
@@ -602,7 +621,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
         .sub_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
-        .spill_arg_rsp, .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .spill_arg_rsp => |spill| {
+            if (spill.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+        },
+        .reload_arg_rsp => |reload| {
+            if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+        },
         .mov_arg_arg, .test_arg8, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;

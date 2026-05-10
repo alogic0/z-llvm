@@ -13,8 +13,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
-            .spill_arg_rsp => |reg| try writer.print("\tmovl {s}, (%rsp)\n", .{reg.name32()}),
-            .reload_arg_rsp => |reg| try writer.print("\tmovl (%rsp), {s}\n", .{reg.name32()}),
+            .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),
+            .reload_arg_rsp => |reload| try writer.print("\tmovl {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name32() }),
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),
@@ -22,4 +22,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ret => try writer.writeAll("\tretq\n"),
         }
     }
+}
+
+fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {
+    return switch (frame_index) {
+        .slot0 => "(%rsp)",
+    };
 }
