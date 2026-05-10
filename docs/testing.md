@@ -26,12 +26,13 @@ test/opt/inputs/
 test/opt/expected/z_llvm/
 ```
 
-Use these to compare each reproduced pass with the matching LLVM pass when `opt` is installed:
+Use these to compare each reproduced pass with the matching LLVM pass when `opt` is installed.
+The current development environment uses versioned LLVM 22 commands; see [environment.md](environment.md).
 
 ```bash
-opt -passes=instcombine test/opt/inputs/instcombine.ll -S -o /tmp/llvm_instcombine.ll
-opt -passes=dce test/opt/inputs/dce.ll -S -o /tmp/llvm_dce.ll
-opt -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
+opt-22 -passes=instcombine test/opt/inputs/instcombine.ll -S -o /tmp/llvm_instcombine.ll
+opt-22 -passes=dce test/opt/inputs/dce.ll -S -o /tmp/llvm_dce.ll
+opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 ```
 
 LLVM algorithms covered so far:

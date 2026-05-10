@@ -4,6 +4,18 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+### Cycle 4: LLVM Comparison and Multi-Block Promotion
+
+- [ ] Add an `opt-22` comparison runner that executes `z_llvm`, executes LLVM `opt-22`, normalizes both outputs, and diffs each fixture.
+- [ ] Extend IR normalization to strip LLVM-only comparison noise: `ModuleID`, `source_filename`, simple inferred memory `align N`, and harmless trailing whitespace.
+- [ ] Add comparison docs and fixture metadata so every fixture records the LLVM pass name, `z_llvm` pass name, and known acceptable normalization differences.
+- [ ] Extend dominator analysis with immediate dominator or dominance-frontier support needed by LLVM `PromoteMemToReg` phi placement, with upstream mapping.
+- [ ] Implement multi-block `mem2reg` phi insertion for one promotable stack slot using CFG predecessors and dominance-frontier placement.
+- [ ] Implement the `mem2reg` rename pass over the dominator tree for promoted stack-slot values, including phi incoming updates.
+- [ ] Add LLVM `opt-22` comparison fixtures for multi-block `mem2reg` cases: if/else merge, loop-carried value, and unreachable predecessor cleanup.
+
+## Completed Cycles
+
 ### Cycle 3: Memory IR and Promotion Foundation
 
 - [x] Add `alloca`, `load`, and `store` parsing, printing, verification, and upstream mapping.
@@ -11,8 +23,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add alias-analysis scaffolding for stack slots and document the LLVM BasicAA mapping.
 - [x] Implement a first `mem2reg`/PromoteMemToReg subset for single-block stack slots.
 - [x] Add `opt` comparison fixtures for the memory IR and `mem2reg` subset.
-
-## Completed Cycles
 
 ### Cycle 2: Branch, CFG, Dominators, and Early CSE
 
