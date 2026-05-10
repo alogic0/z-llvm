@@ -11,4 +11,13 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle. Pull the next bounded slice from one epic before implementing.
+### Cycle 36: Target Bridge Epic Closeout
+
+Source epic: [Target DataLayout and AIR-to-IR Bridge Epic](roadmap/target_datalayout_air_bridge_epic.md)
+Epic sections: 1, 2, 4, 7, 8
+
+- [x] Mark completed suggested-slice and documentation checklist items in the target bridge epic.
+- [x] Confirm unsupported target, ABI, module, and AIR constructs are documented.
+- [x] Keep MC/Object bootstrap explicitly out of scope until this epic is closed.
+- [x] Run final verification: `zig fmt`, `zig build test`, `bash scripts/compare_opt.sh`, and Zig-emitted fixture tests.
+- [ ] Clear `docs/next_steps.md` after committing the closeout.

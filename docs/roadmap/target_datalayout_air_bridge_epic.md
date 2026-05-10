@@ -63,7 +63,7 @@ Status: initial target matrix implemented and verified in Cycle 22.
 
 Suggested slice boundary:
 
-- [ ] First land parse/preserve for `target triple` and `target datalayout`
+- [x] First land parse/preserve for `target triple` and `target datalayout`
       without interpreting every field.
 - [x] Then add one target's pointer-size and integer-alignment queries with
       tests against LLVM.
@@ -84,10 +84,10 @@ Status: scalar global preservation implemented and verified in Cycle 23.
 
 Suggested slice boundary:
 
-- [ ] Split parse-and-preserve metadata from verifier-enforced semantics. For
+- [x] Split parse-and-preserve metadata from verifier-enforced semantics. For
       example, function attributes can initially be preserved and documented as
       not consumed by transforms.
-- [ ] Add explicit unsupported diagnostics for globals or attributes that would
+- [x] Add explicit unsupported diagnostics for globals or attributes that would
       affect optimization correctness if silently ignored.
 
 ## 3. ABI-Aware Function Signature Foundation
@@ -116,7 +116,7 @@ Suggested slice boundary:
 - [x] Lower stack memory into the project IR: alloca/load/store/GEP for scalar stack slots.
 - [x] Lower loops in the canonical form expected by current LoopInfo/LICM where possible.
 - [x] Add a small bridge driver that can print pre-optimization IR and run named optimizer pipelines.
-- [ ] Keep comptime, generics, full AIR semantics, error unions, optionals, async, and debug info out of scope.
+- [x] Keep comptime, generics, full AIR semantics, error unions, optionals, async, and debug info out of scope.
 
 Suggested slice boundary:
 
@@ -152,21 +152,21 @@ Suggested slice boundary:
 
 ## 7. Documentation and Inventory Updates
 
-- [ ] Update `docs/inventory/zig_llvm_api_inventory.md` for target triple, datalayout, ABI query, and AIR lowering coverage.
-- [ ] Add `docs/target/datalayout.md` with LLVM references, supported targets, implemented queries, and known gaps.
-- [ ] Add `docs/codegen/air_lowering.md` for the tiny AIR-like bridge and how it maps to Zig's `FuncGen.zig`.
-- [ ] Add `docs/ir_module.md` for module-level records, globals, linkage, and attributes.
-- [ ] Update `docs/testing.md` with Zig-emitted fixture generation and comparison policy.
-- [ ] Keep this epic separate from MC/object emission; link to a future object-emission epic instead of expanding scope.
+- [x] Update `docs/inventory/zig_llvm_api_inventory.md` for target triple, datalayout, ABI query, and AIR lowering coverage.
+- [x] Add `docs/target/datalayout.md` with LLVM references, supported targets, implemented queries, and known gaps.
+- [x] Add `docs/codegen/air_lowering.md` for the tiny AIR-like bridge and how it maps to Zig's `FuncGen.zig`.
+- [x] Add `docs/ir_module.md` for module-level records, globals, linkage, and attributes.
+- [x] Update `docs/testing.md` with Zig-emitted fixture generation and comparison policy.
+- [x] Keep this epic separate from MC/object emission; link to a future object-emission epic instead of expanding scope.
 
 ## 8. Verification Gate
 
-- [ ] Run `zig fmt` on touched Zig files.
-- [ ] Run `zig build test`.
-- [ ] Run `bash scripts/compare_opt.sh`.
-- [ ] Run Zig-emitted IR comparison fixtures.
-- [ ] Verify the initial target matrix.
-- [ ] Confirm docs list all unsupported target, ABI, module, and AIR constructs before marking implementation slices complete.
+- [x] Run `zig fmt` on touched Zig files.
+- [x] Run `zig build test`.
+- [x] Run `bash scripts/compare_opt.sh`.
+- [x] Run Zig-emitted IR comparison fixtures.
+- [x] Verify the initial target matrix.
+- [x] Confirm docs list all unsupported target, ABI, module, and AIR constructs before marking implementation slices complete.
 
 ## Out of Scope
 
