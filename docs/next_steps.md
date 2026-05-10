@@ -12,8 +12,8 @@ This is a bounded vertical slice: IR surface, legality API, pass integration,
 docs, and fixture coverage should land together without trying to model full
 LLVM memory optimization yet.
 
-- [ ] Parse, print, verify, and normalize `align N` and `volatile` for `load` and `store`, with upstream LLVM mapping.
-- [ ] Recognize narrow atomic memory forms only far enough to classify them as unsupported/atomic barriers or reject them with a clear parser error; do not model ordering, `syncscope`, `cmpxchg`, or `atomicrmw` yet.
+- [x] Parse, print, verify, and normalize `align N` and `volatile` for `load` and `store`, with upstream LLVM mapping.
+- [x] Recognize narrow atomic memory forms only far enough to classify them as unsupported/atomic barriers or reject them with a clear parser error; do not model ordering, `syncscope`, `cmpxchg`, or `atomicrmw` yet.
 - [ ] Add a small memory-effect classification API for IR instructions: no memory access, readonly load, memory write, volatile/atomic barrier, and unknown/unsupported memory behavior.
 - [ ] Add an alias/mod-ref foundation document and code scaffold that can answer only conservative questions today: `no_alias`/`must_alias` for known stack slots, otherwise `may_alias`; `mod_ref` for loads/stores, otherwise unknown.
 - [ ] Wire LICM legality through the memory-effect API first, so pure scalar hoisting remains supported, loads remain rejected unless explicitly proven safe later, and stores/volatile/atomic/unknown memory always block hoisting.

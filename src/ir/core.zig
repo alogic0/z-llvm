@@ -155,15 +155,31 @@ pub const AllocaInst = struct {
     allocated_ty: Type,
 };
 
+pub const MemoryAttrs = struct {
+    is_volatile: bool = false,
+    atomic_ordering: ?[]const u8 = null,
+    @"align": ?u32 = null,
+
+    pub fn isAtomic(attrs: MemoryAttrs) bool {
+        return attrs.atomic_ordering != null;
+    }
+
+    pub fn isBarrier(attrs: MemoryAttrs) bool {
+        return attrs.is_volatile or attrs.isAtomic();
+    }
+};
+
 pub const LoadInst = struct {
     ty: Type,
     ptr: Value,
+    attrs: MemoryAttrs = .{},
 };
 
 pub const StoreInst = struct {
     ty: Type,
     value: Value,
     ptr: Value,
+    attrs: MemoryAttrs = .{},
 };
 
 pub const GepIndex = struct {

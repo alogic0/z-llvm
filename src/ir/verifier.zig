@@ -51,11 +51,13 @@ pub fn verify(module: core.Module) !void {
                     .load => |load| {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try verifyValue(defs, .ptr, load.ptr);
+                        try verifyMemoryAttrs(load.attrs);
                     },
                     .store => |store| {
                         if (instruction.result != null) return error.StoreHasResult;
                         try verifyValue(defs, store.ty, store.value);
                         try verifyValue(defs, .ptr, store.ptr);
+                        try verifyMemoryAttrs(store.attrs);
                     },
                     .gep => |gep| {
                         if (instruction.result == null) return error.InstructionNeedsResult;
@@ -84,6 +86,15 @@ pub fn verify(module: core.Module) !void {
                 .@"unreachable" => {},
             }
         }
+    }
+}
+
+fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {
+    if (attrs.@"align") |alignment| {
+        if (alignment == 0) return error.InvalidAlignment;
+    }
+    if (attrs.atomic_ordering) |ordering| {
+        if (ordering.len == 0) return error.InvalidAtomicMemory;
     }
 }
 

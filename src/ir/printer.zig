@@ -75,18 +75,22 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     },
                     .load => |load| {
                         try writer.writeAll("load ");
+                        try printMemoryPrefix(load.attrs, writer);
                         try load.ty.format(writer);
                         try writer.writeAll(", ptr ");
                         try load.ptr.format(writer);
+                        try printMemorySuffix(load.attrs, writer);
                         try writer.writeByte('\n');
                     },
                     .store => |store| {
                         try writer.writeAll("store ");
+                        try printMemoryPrefix(store.attrs, writer);
                         try store.ty.format(writer);
                         try writer.writeByte(' ');
                         try store.value.format(writer);
                         try writer.writeAll(", ptr ");
                         try store.ptr.format(writer);
+                        try printMemorySuffix(store.attrs, writer);
                         try writer.writeByte('\n');
                     },
                     .gep => |gep| {
@@ -126,4 +130,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
 
         try writer.writeAll("}\n");
     }
+}
+
+fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {
+    if (attrs.is_volatile) try writer.writeAll("volatile ");
+    if (attrs.atomic_ordering != null) try writer.writeAll("atomic ");
+}
+
+fn printMemorySuffix(attrs: core.MemoryAttrs, writer: anytype) !void {
+    if (attrs.atomic_ordering) |ordering| try writer.print(", {s}", .{ordering});
+    if (attrs.@"align") |alignment| try writer.print(", align {}", .{alignment});
 }

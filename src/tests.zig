@@ -341,6 +341,65 @@ test "parser normalizes memory instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser prints load and store memory attributes" {
+    const input =
+        \\define i32 @memory_attrs(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store volatile i32 %a, ptr %slot, align 4
+        \\  %v = load volatile i32, ptr %slot, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser accepts narrow atomic load and store spelling as barriers" {
+    const input =
+        \\define i32 @memory_atomic(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store atomic i32 %a, ptr %slot, release, align 4
+        \\  %v = load atomic i32, ptr %slot, acquire, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported atomic memory operations" {
+    const input =
+        \\define i32 @memory_atomicrmw(ptr %p) {
+        \\entry:
+        \\  %v = atomicrmw add ptr %p, i32 1 monotonic
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "parser normalizes getelementptr instructions" {
     const input =
         \\define i32 @gep(i32 %a) {

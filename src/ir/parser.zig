@@ -139,6 +139,8 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
     var parts = std.mem.tokenizeAny(u8, rhs_text, " \t,");
     const op_text = parts.next() orelse return error.InvalidInstruction;
 
+    if (std.mem.eql(u8, op_text, "atomicrmw") or std.mem.eql(u8, op_text, "cmpxchg")) return error.UnsupportedAtomicMemory;
+
     if (std.mem.eql(u8, op_text, "icmp")) {
         const predicate = core.IcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
         const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
@@ -187,16 +189,18 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
     }
 
     if (std.mem.eql(u8, op_text, "load")) {
+        var attrs = try parseMemoryPrefix(&parts);
         const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         if (ptr_ty != .ptr) return error.ExpectedPointerType;
         const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
+        try parseMemorySuffix(&parts, &attrs);
         return .{
             .result = result_text[1..],
             .kind = .{ .load = .{
                 .ty = ty,
                 .ptr = ptr,
+                .attrs = attrs,
             } },
         };
     }
@@ -249,12 +253,13 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
 fn parseStore(line: []const u8) !core.Instruction {
     var parts = std.mem.tokenizeAny(u8, line, " \t,");
     if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "store")) return error.InvalidInstruction;
+    var attrs = try parseMemoryPrefix(&parts);
     const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
     const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
     const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
     if (ptr_ty != .ptr) return error.ExpectedPointerType;
     const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
-    if (parts.next() != null) return error.InvalidInstruction;
+    try parseMemorySuffix(&parts, &attrs);
 
     return .{
         .result = null,
@@ -262,8 +267,50 @@ fn parseStore(line: []const u8) !core.Instruction {
             .ty = ty,
             .value = value,
             .ptr = ptr,
+            .attrs = attrs,
         } },
     };
+}
+
+fn parseMemoryPrefix(parts: *std.mem.TokenIterator(u8, .any)) !core.MemoryAttrs {
+    var attrs: core.MemoryAttrs = .{};
+    while (true) {
+        const token = parts.peek() orelse return attrs;
+        if (std.mem.eql(u8, token, "volatile")) {
+            _ = parts.next();
+            attrs.is_volatile = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "atomic")) {
+            _ = parts.next();
+            if (attrs.atomic_ordering != null) return error.InvalidAtomicMemory;
+            attrs.atomic_ordering = "";
+            continue;
+        }
+        if (std.mem.startsWith(u8, token, "syncscope")) return error.UnsupportedAtomicMemory;
+        return attrs;
+    }
+}
+
+fn parseMemorySuffix(parts: *std.mem.TokenIterator(u8, .any), attrs: *core.MemoryAttrs) !void {
+    while (parts.next()) |token| {
+        if (std.mem.eql(u8, token, "align")) {
+            const align_text = parts.next() orelse return error.InvalidAlignment;
+            attrs.@"align" = try std.fmt.parseInt(u32, align_text, 10);
+            continue;
+        }
+        if (std.mem.startsWith(u8, token, "syncscope")) return error.UnsupportedAtomicMemory;
+        if (attrs.atomic_ordering) |ordering| {
+            if (ordering.len != 0) return error.InvalidInstruction;
+            attrs.atomic_ordering = token;
+            continue;
+        }
+        return error.InvalidInstruction;
+    }
+
+    if (attrs.atomic_ordering) |ordering| {
+        if (ordering.len == 0) return error.InvalidAtomicMemory;
+    }
 }
 
 fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !core.PhiInst {
