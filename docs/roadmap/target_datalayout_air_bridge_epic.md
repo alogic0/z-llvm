@@ -130,7 +130,7 @@ Suggested slice boundary:
 
 - [x] Add scripts or docs for producing tiny Zig LLVM IR fixtures with the local Zig compiler.
 - [x] Normalize Zig-emitted LLVM IR into the subset this project can compare.
-- [ ] Add fixture pairs: tiny Zig source, Zig-emitted pre-optimization LLVM IR, project-lowered IR if available, and optimized output.
+- [x] Add fixture pairs: tiny Zig source, Zig-emitted pre-optimization LLVM IR, project-lowered IR if available, and optimized output.
 - [x] Compare structure rather than raw text: same function signatures, CFG, def-use shape, memory operations, and optimizer-visible scalar instructions.
 - [x] Mark each fixture as `zig-equivalent`, `opt-equivalent`, or `local-conservative`.
 - [x] Document every mismatch as either unsupported IR, target ABI gap, optimizer gap, or intentional normalization difference.
@@ -148,7 +148,7 @@ Suggested slice boundary:
 - [x] Add command-line flags for selecting target triple and datalayout when they are not present in the input.
 - [x] Add diagnostics that explain when a target feature is missing rather than failing with generic parse or verifier errors.
 - [x] Keep the old LLVM-IR-input optimizer path intact for pass-level development and regression tests.
-- [ ] Add tests proving both entry paths produce equivalent IR for small scalar examples.
+- [x] Add tests proving both entry paths produce equivalent IR for small scalar examples.
 
 ## 7. Documentation and Inventory Updates
 

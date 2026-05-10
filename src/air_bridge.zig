@@ -97,6 +97,7 @@ pub const Block = struct {
 pub const Function = struct {
     name: []const u8,
     ret_ty: ir.Type,
+    linkage: ir.FunctionLinkage = .default,
     params: []const Param,
     phis: []const Phi = &.{},
     allocas: []const Alloca = &.{},
@@ -162,6 +163,7 @@ pub fn lowerPrintAndRunPipeline(
 fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
     var function = ir.Function.init(spec.name, spec.ret_ty);
     errdefer function.deinit(allocator);
+    function.linkage = spec.linkage;
 
     for (spec.params) |param| {
         try function.params.append(allocator, .{

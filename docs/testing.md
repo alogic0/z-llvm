@@ -65,6 +65,7 @@ AIR-like stack-memory builder lowering for alloca/load/store/GEP
 AIR-like canonical loop builder verified with LoopInfo
 AIR-like bridge driver pre/post optimization output through `memory-foundation`
 normalized Zig-emitted LLVM IR fixture for tiny scalar functions
+AIR-like project-lowered and project-optimized fixture pair for the same tiny scalar signatures
 source_filename preservation
 scalar global and constant global preservation
 function linkage and raw function-header attribute preservation
@@ -129,6 +130,7 @@ AIR-like bridge driver: pre/post pipeline output for `memory-foundation`
 Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout record injection
 Target diagnostics: invalid datalayout and unsupported `--emit=asm` target messages
 Zig-emitted IR harness: normalized tiny scalar module records and function signatures
+Zig fixture pair: project-lowered and optimized outputs compared structurally with normalized Zig-emitted signatures
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 

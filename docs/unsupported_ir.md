@@ -95,6 +95,7 @@ ABI classification beyond void, scalar integer, pointer, and whole-function scal
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
+exact Zig-emitted scalar instruction flag parity in AIR-like fixtures
 target-aware pipeline integration beyond CLI target/datalayout record injection
 target diagnostics beyond invalid triple/datalayout and unsupported asm target checks
 ```
@@ -194,6 +195,7 @@ Module IR subset:
   zig-scalar-foundation pipeline alias and CLI target/datalayout record injection
   explicit CLI diagnostics for invalid target datalayout and unsupported asm targets
   normalized Zig-emitted scalar function signature fixture
+  AIR-like project-lowered and project-optimized fixture pair for tiny scalar signatures
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc

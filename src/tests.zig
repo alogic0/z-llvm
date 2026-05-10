@@ -772,6 +772,90 @@ test "parser round-trips normalized Zig-emitted scalar LLVM IR" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "AIR-like bridge fixture matches Zig-emitted scalar signatures" {
+    const params = [_]air_bridge.Param{
+        .{ .name = "0", .ty = .{ .int = 32 } },
+        .{ .name = "1", .ty = .{ .int = 32 } },
+    };
+    const binaries = [_]air_bridge.Binary{
+        .{
+            .result = "2",
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "1" },
+            .rhs = .{ .named = "0" },
+        },
+    };
+    const side_effect_free_blocks = [_]air_bridge.Block{
+        .{
+            .name = "Entry",
+            .terminator = .{ .ret = .{ .ty = .void } },
+        },
+    };
+    const add_blocks = [_]air_bridge.Block{
+        .{
+            .name = "Entry",
+            .binaries = &binaries,
+            .terminator = .{ .ret = .{
+                .ty = .{ .int = 32 },
+                .value = .{ .named = "2" },
+            } },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "tiny_scalar.sideEffectFree",
+            .ret_ty = .void,
+            .linkage = .internal,
+            .params = &.{},
+            .blocks = &side_effect_free_blocks,
+        },
+        .{
+            .name = "tiny_scalar.add",
+            .ret_ty = .{ .int = 32 },
+            .linkage = .internal,
+            .params = &params,
+            .blocks = &add_blocks,
+        },
+    };
+
+    var pre: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer pre.deinit();
+    var post: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer post.deinit();
+
+    try air_bridge.lowerPrintAndRunPipeline(std.testing.allocator, .{
+        .source_filename = "tiny_scalar",
+        .target_datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+        .target_triple = "x86_64-unknown-linux5.10.0-gnu2.31.0",
+        .functions = &functions,
+    }, "zig-scalar-foundation", &pre.writer, &post.writer);
+
+    const expected_lowered = @embedFile("testdata/zig_tiny_scalar.project_lowered.ll");
+    const expected_optimized = @embedFile("testdata/zig_tiny_scalar.project_optimized.ll");
+    try std.testing.expectEqualStrings(expected_lowered, pre.writer.buffered());
+    try std.testing.expectEqualStrings(expected_optimized, post.writer.buffered());
+
+    var zig_module = try ir.Module.parse(std.testing.allocator, @embedFile("testdata/zig_tiny_scalar.normalized.ll"));
+    defer zig_module.deinit();
+    var project_module = try ir.Module.parse(std.testing.allocator, expected_lowered);
+    defer project_module.deinit();
+
+    try std.testing.expectEqualStrings(zig_module.source_filename.?, project_module.source_filename.?);
+    try std.testing.expectEqualStrings(zig_module.target_datalayout.?, project_module.target_datalayout.?);
+    try std.testing.expectEqualStrings(zig_module.target_triple.?, project_module.target_triple.?);
+    try std.testing.expectEqual(zig_module.functions.items.len, project_module.functions.items.len);
+    for (zig_module.functions.items, project_module.functions.items) |zig_function, project_function| {
+        try std.testing.expectEqualStrings(zig_function.name, project_function.name);
+        try std.testing.expectEqual(zig_function.linkage, project_function.linkage);
+        try std.testing.expect(zig_function.ret_ty.eql(project_function.ret_ty));
+        try std.testing.expectEqual(zig_function.params.items.len, project_function.params.items.len);
+        for (zig_function.params.items, project_function.params.items) |zig_param, project_param| {
+            try std.testing.expect(zig_param.ty.eql(project_param.ty));
+        }
+    }
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

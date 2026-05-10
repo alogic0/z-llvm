@@ -14,7 +14,11 @@ Current checked-in fixture:
 ```text
 test/zig/inputs/tiny_scalar.zig
 test/zig/expected/tiny_scalar.normalized.ll
+test/zig/expected/tiny_scalar.project_lowered.ll
+test/zig/expected/tiny_scalar.project_optimized.ll
 src/testdata/zig_tiny_scalar.normalized.ll
+src/testdata/zig_tiny_scalar.project_lowered.ll
+src/testdata/zig_tiny_scalar.project_optimized.ll
 ```
 
 The `src/testdata/` copy exists because Zig `@embedFile` in unit tests cannot
@@ -25,6 +29,10 @@ Fixture classification:
 ```text
 zig-equivalent:
   tiny_scalar.normalized.ll preserves module target records and scalar function signatures from Zig-emitted LLVM IR.
+
+local project bridge:
+  tiny_scalar.project_lowered.ll is the AIR-like bridge output for the same scalar signatures.
+  tiny_scalar.project_optimized.ll is the `zig-scalar-foundation` output for that bridge fixture.
 ```
 
 Normalization policy:
@@ -36,6 +44,7 @@ keep scalar integer arithmetic needed by the comparison
 drop aliases, debug metadata, attribute groups, target-feature strings, and unrelated std/debug support emitted into raw Zig IR
 drop instruction debug attachments
 drop raw function header attrs until the project consumes their semantics
+instruction flags are compared structurally for now; exact Zig-emitted nsw/nuw parity is a later poison/overflow slice
 ```
 
 Known raw Zig IR constructs not represented yet:
