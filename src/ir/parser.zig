@@ -141,6 +141,36 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
 
     if (std.mem.eql(u8, op_text, "atomicrmw") or std.mem.eql(u8, op_text, "cmpxchg")) return error.UnsupportedAtomicMemory;
 
+    if (core.CastOp.parse(op_text)) |op| {
+        const from_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "to")) return error.InvalidInstruction;
+        const to_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .cast = .{
+                .op = op,
+                .from_ty = from_ty,
+                .value = value,
+                .to_ty = to_ty,
+            } },
+        };
+    }
+
+    if (std.mem.eql(u8, op_text, "freeze")) {
+        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .freeze = .{
+                .ty = ty,
+                .value = value,
+            } },
+        };
+    }
+
     if (std.mem.eql(u8, op_text, "icmp")) {
         const predicate = core.IcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
         const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
@@ -234,6 +264,7 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
     }
 
     const op = core.BinaryOp.parse(op_text) orelse return error.UnsupportedInstruction;
+    const flags = try parseBinaryFlags(&parts);
     const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
     const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
     const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
@@ -243,11 +274,38 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
         .result = result_text[1..],
         .kind = .{ .binary = .{
             .op = op,
+            .flags = flags,
             .ty = ty,
             .lhs = lhs,
             .rhs = rhs,
         } },
     };
+}
+
+fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {
+    var flags: core.BinaryFlags = .{};
+    while (parts.peek()) |token| {
+        if (std.mem.eql(u8, token, "nsw")) {
+            if (flags.nsw) return error.InvalidInstruction;
+            _ = parts.next();
+            flags.nsw = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "nuw")) {
+            if (flags.nuw) return error.InvalidInstruction;
+            _ = parts.next();
+            flags.nuw = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "exact")) {
+            if (flags.exact) return error.InvalidInstruction;
+            _ = parts.next();
+            flags.exact = true;
+            continue;
+        }
+        return flags;
+    }
+    return flags;
 }
 
 fn parseStore(line: []const u8) !core.Instruction {

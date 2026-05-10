@@ -21,6 +21,13 @@ InstCombinerImpl::visitXor
 InstCombinerImpl::visitShl
 InstCombinerImpl::visitLShr
 InstCombinerImpl::visitAShr
+InstCombinerImpl::visitUDiv
+InstCombinerImpl::visitSDiv
+InstCombinerImpl::visitURem
+InstCombinerImpl::visitSRem
+InstCombinerImpl::visitTrunc
+InstCombinerImpl::visitZExt
+InstCombinerImpl::visitSExt
 InstCombinerImpl::visitICmpInst
 InstCombinerImpl::visitSelectInst
 ```
@@ -57,13 +64,16 @@ icmp signed and unsigned relational constant folding
 icmp signed and unsigned relational same-operand folding
 select constant-condition folding
 select identical-arm folding
+preserve `nsw`, `nuw`, and `exact` flags without using them for folds
+preserve `trunc`, `zext`, `sext`, `freeze`, and division/remainder instructions
 ```
 
 Upstream mapping:
 
 ```text
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
-LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, and target-specific combines all matter upstream.
+LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
+The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
 ```
 
 Example:
@@ -81,12 +91,13 @@ after instcombine + dce:
 Known gaps:
 
 ```text
-no flags such as nsw/nuw/exact
-no poison/undef/freeze handling
+no use of nsw/nuw/exact for folds
+no poison/undef/freeze simplification
 no vectors
 no width-aware constant folding for non-zero shifts
 unsigned constant folding is limited to integer widths below 128 bits
-no casts
+no cast simplification yet
+no division/remainder simplification yet
 no canonical reassociation
 no non-constant operand complexity ordering
 no target-specific combines

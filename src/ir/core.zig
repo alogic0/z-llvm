@@ -60,6 +60,10 @@ pub const BinaryOp = enum {
     shl,
     lshr,
     ashr,
+    udiv,
+    sdiv,
+    urem,
+    srem,
 
     pub fn parse(text: []const u8) ?BinaryOp {
         if (std.mem.eql(u8, text, "add")) return .add;
@@ -71,10 +75,41 @@ pub const BinaryOp = enum {
         if (std.mem.eql(u8, text, "shl")) return .shl;
         if (std.mem.eql(u8, text, "lshr")) return .lshr;
         if (std.mem.eql(u8, text, "ashr")) return .ashr;
+        if (std.mem.eql(u8, text, "udiv")) return .udiv;
+        if (std.mem.eql(u8, text, "sdiv")) return .sdiv;
+        if (std.mem.eql(u8, text, "urem")) return .urem;
+        if (std.mem.eql(u8, text, "srem")) return .srem;
         return null;
     }
 
     pub fn name(op: BinaryOp) []const u8 {
+        return @tagName(op);
+    }
+};
+
+pub const BinaryFlags = struct {
+    nsw: bool = false,
+    nuw: bool = false,
+    exact: bool = false,
+
+    pub fn any(flags: BinaryFlags) bool {
+        return flags.nsw or flags.nuw or flags.exact;
+    }
+};
+
+pub const CastOp = enum {
+    trunc,
+    zext,
+    sext,
+
+    pub fn parse(text: []const u8) ?CastOp {
+        if (std.mem.eql(u8, text, "trunc")) return .trunc;
+        if (std.mem.eql(u8, text, "zext")) return .zext;
+        if (std.mem.eql(u8, text, "sext")) return .sext;
+        return null;
+    }
+
+    pub fn name(op: CastOp) []const u8 {
         return @tagName(op);
     }
 };
@@ -117,9 +152,22 @@ pub const Param = struct {
 
 pub const BinaryInst = struct {
     op: BinaryOp,
+    flags: BinaryFlags = .{},
     ty: Type,
     lhs: Value,
     rhs: Value,
+};
+
+pub const CastInst = struct {
+    op: CastOp,
+    from_ty: Type,
+    value: Value,
+    to_ty: Type,
+};
+
+pub const FreezeInst = struct {
+    ty: Type,
+    value: Value,
 };
 
 pub const IcmpInst = struct {
@@ -201,6 +249,8 @@ pub const Instruction = struct {
     result: ?[]const u8,
     kind: union(enum) {
         binary: BinaryInst,
+        cast: CastInst,
+        freeze: FreezeInst,
         icmp: IcmpInst,
         select: SelectInst,
         phi: PhiInst,
@@ -227,6 +277,8 @@ pub const Instruction = struct {
     pub fn resultType(instruction: Instruction) ?Type {
         return switch (instruction.kind) {
             .binary => |binary| binary.ty,
+            .cast => |cast| cast.to_ty,
+            .freeze => |freeze| freeze.ty,
             .icmp => .{ .int = 1 },
             .select => |select| select.ty,
             .phi => |phi| phi.ty,
@@ -243,6 +295,8 @@ pub const Instruction = struct {
                 binary.lhs = resolveValue(aliases, binary.lhs);
                 binary.rhs = resolveValue(aliases, binary.rhs);
             },
+            .cast => |*cast| cast.value = resolveValue(aliases, cast.value),
+            .freeze => |*freeze| freeze.value = resolveValue(aliases, freeze.value),
             .icmp => |*icmp| {
                 icmp.lhs = resolveValue(aliases, icmp.lhs);
                 icmp.rhs = resolveValue(aliases, icmp.rhs);
@@ -272,7 +326,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .icmp, .select, .alloca, .load, .store => {},
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
         }

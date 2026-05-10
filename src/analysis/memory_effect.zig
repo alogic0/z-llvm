@@ -33,7 +33,7 @@ pub fn classify(instruction: ir.Instruction) Effect {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
-        .binary, .icmp, .select, .phi, .alloca, .gep => .none,
+        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .none,
     };
 }
 

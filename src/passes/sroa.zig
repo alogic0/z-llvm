@@ -71,6 +71,8 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     binary.lhs = replaceOperand(binary.lhs, name, replacement);
                     binary.rhs = replaceOperand(binary.rhs, name, replacement);
                 },
+                .cast => |*cast| cast.value = replaceOperand(cast.value, name, replacement),
+                .freeze => |*freeze| freeze.value = replaceOperand(freeze.value, name, replacement),
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);

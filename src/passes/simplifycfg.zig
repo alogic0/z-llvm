@@ -139,7 +139,7 @@ fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_nam
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
                 },
-                .binary, .icmp, .select, .alloca, .load, .store, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -197,7 +197,7 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
                         changed = true;
                     }
                 },
-                .binary, .icmp, .select, .alloca, .load, .store, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -211,7 +211,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .icmp, .select, .alloca, .load, .store, .gep => null,
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -242,6 +242,8 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     binary.lhs = replaceOperand(binary.lhs, name, replacement);
                     binary.rhs = replaceOperand(binary.rhs, name, replacement);
                 },
+                .cast => |*cast| cast.value = replaceOperand(cast.value, name, replacement),
+                .freeze => |*freeze| freeze.value = replaceOperand(freeze.value, name, replacement),
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);

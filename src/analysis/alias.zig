@@ -36,7 +36,7 @@ pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Va
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (alias(function, store.ptr, pointer) == .no_alias) .no_mod_ref else .mod;
         },
-        .binary, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
+        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
     };
 }
 
@@ -64,7 +64,7 @@ fn pointerObject(function: ir.Function, value: ir.Value) ?PointerObject {
                     base.zero_offset = base.zero_offset and hasOnlyZeroIndices(gep);
                     return base;
                 },
-                .binary, .icmp, .select, .phi, .load, .store => return null,
+                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store => return null,
             }
         }
     }

@@ -12,6 +12,9 @@ named basic blocks
 add/sub/mul integer instructions
 and/or/xor integer instructions
 shl/lshr/ashr integer instructions
+udiv/sdiv/urem/srem integer instructions
+trunc/zext/sext integer cast instructions
+freeze instructions
 icmp eq/ne/sgt/sge/slt/sle/ugt/uge/ult/ule integer instructions
 select instructions
 phi instructions
@@ -19,6 +22,9 @@ alloca instructions
 load instructions
 store instructions
 getelementptr instructions
+instruction flags: nsw, nuw, exact
+load/store align and volatile spelling
+narrow atomic load/store spelling as a conservative barrier
 ret
 br label %target
 br i1 <value>, label %then, label %else
@@ -48,8 +54,7 @@ token/metadata types
 fcmp
 phi token/blockaddress values
 call/invoke/callbr
-cast instructions
-division/remainder
+bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
 landingpad/cleanupret/catchret
 atomicrmw/cmpxchg/fence
@@ -61,10 +66,10 @@ inline asm
 ```text
 function attributes
 parameter attributes
-instruction flags: nsw, nuw, exact, fast-math flags
-alignment
-volatile
-atomic ordering
+fast-math flags
+full alignment semantics
+full volatile semantics
+full atomic ordering semantics
 TBAA
 noalias / alias.scope
 debug metadata
@@ -150,6 +155,12 @@ Value subset:
   integer constants
   undef constants
 
+Scalar IR subset:
+  integer casts: trunc, zext, sext
+  integer division/remainder spelling: udiv, sdiv, urem, srem
+  instruction flags preserved: nsw, nuw, exact
+  freeze spelling preserved for scalar integers
+
 Select subset:
   scalar i1 condition
   matching scalar result arms
@@ -179,9 +190,9 @@ The next useful parser expansions are:
 
 ```text
 call
-cast instructions
-division/remainder
-instruction flags such as nsw/nuw
+bitcast and pointer casts
+safe division/remainder simplification
+using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
 full atomic operations and ordering semantics
 ```

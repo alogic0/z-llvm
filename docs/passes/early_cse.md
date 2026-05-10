@@ -3,7 +3,7 @@
 LLVM reference:
 
 ```text
-/home/oleg/prog/llvm-project-22/llvm/lib/Transforms/Scalar/EarlyCSE.cpp
+llvm-project-22/llvm/lib/Transforms/Scalar/EarlyCSE.cpp
 ```
 
 Upstream entry points to check:
@@ -22,6 +22,7 @@ Implemented subset:
 ```text
 same-basic-block common subexpression elimination
 pure add/sub/mul expression matching
+pure integer cast expression matching
 pure icmp eq/ne expression matching
 later uses in the same block are rewritten to the earlier value
 ```
@@ -65,6 +66,7 @@ Known gaps:
 no dominator-tree walk yet
 no memory value numbering
 no load CSE
+no freeze CSE because undef/poison semantics need more modeling first
 no commutative operand canonicalization
 no control-flow-aware replacement
 no target-library knowledge

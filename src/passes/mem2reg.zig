@@ -78,6 +78,12 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                 .binary => |binary| {
                     if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
                 },
+                .cast => |cast| {
+                    if (isNamed(cast.value, slot)) return false;
+                },
+                .freeze => |freeze| {
+                    if (isNamed(freeze.value, slot)) return false;
+                },
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
                 },
@@ -173,7 +179,7 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .store => |store| if (isNamed(store.ptr, slot)) return true,
-            .binary, .icmp, .select, .phi, .alloca, .load, .gep => {},
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep => {},
         }
     }
     return false;
@@ -261,7 +267,7 @@ fn renameSlot(
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .icmp, .select, .phi, .alloca, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -291,7 +297,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
                 });
                 return;
             },
-            .binary, .icmp, .select, .alloca, .load, .store, .gep => return,
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => return,
         }
     }
 }
@@ -316,6 +322,12 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                 },
                 .binary => |binary| {
                     if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
+                },
+                .cast => |cast| {
+                    if (isNamed(cast.value, slot)) return false;
+                },
+                .freeze => |freeze| {
+                    if (isNamed(freeze.value, slot)) return false;
                 },
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
@@ -355,7 +367,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .load => |load| {
                 if (isNamed(load.ptr, slot) and !has_current_value) return false;
             },
-            .binary, .icmp, .select, .phi, .alloca, .gep => {},
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
         }
     }
     return true;
@@ -392,7 +404,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .icmp, .select, .phi, .alloca, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -408,6 +420,8 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     binary.lhs = replaceOperand(binary.lhs, name, replacement);
                     binary.rhs = replaceOperand(binary.rhs, name, replacement);
                 },
+                .cast => |*cast| cast.value = replaceOperand(cast.value, name, replacement),
+                .freeze => |*freeze| freeze.value = replaceOperand(freeze.value, name, replacement),
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);

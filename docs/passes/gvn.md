@@ -27,9 +27,9 @@ use.
 Implemented subset:
 
 ```text
-per-function scan for pure binary, icmp, and select expressions
+per-function scan for pure binary, integer cast, icmp, and select expressions
 shared memory-effect API rejects memory-reading, memory-writing, volatile/atomic, and unknown instructions from value numbering
-equivalence by opcode, type, and operands
+equivalence by opcode, flags where present, type, and operands
 dominator check for cross-block availability
 same-block availability by instruction order
 replacement of dominated redundant expression uses
@@ -65,5 +65,5 @@ no phi translation
 no congruence-class iteration
 no expression hashing
 no critical-edge or partial redundancy handling
-no assume, call, GEP, cast, vector, or memory value numbering
+no assume, call, GEP, freeze, vector, or memory value numbering
 ```

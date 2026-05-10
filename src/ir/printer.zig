@@ -25,11 +25,28 @@ pub fn print(module: core.Module, writer: anytype) !void {
                 switch (instruction.kind) {
                     .binary => |binary| {
                         try writer.print("{s} ", .{binary.op.name()});
+                        try printBinaryFlags(binary.flags, writer);
                         try binary.ty.format(writer);
                         try writer.writeByte(' ');
                         try binary.lhs.format(writer);
                         try writer.writeAll(", ");
                         try binary.rhs.format(writer);
+                        try writer.writeByte('\n');
+                    },
+                    .cast => |cast| {
+                        try writer.print("{s} ", .{cast.op.name()});
+                        try cast.from_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try cast.value.format(writer);
+                        try writer.writeAll(" to ");
+                        try cast.to_ty.format(writer);
+                        try writer.writeByte('\n');
+                    },
+                    .freeze => |freeze| {
+                        try writer.writeAll("freeze ");
+                        try freeze.ty.format(writer);
+                        try writer.writeByte(' ');
+                        try freeze.value.format(writer);
                         try writer.writeByte('\n');
                     },
                     .icmp => |icmp| {
@@ -130,6 +147,12 @@ pub fn print(module: core.Module, writer: anytype) !void {
 
         try writer.writeAll("}\n");
     }
+}
+
+fn printBinaryFlags(flags: core.BinaryFlags, writer: anytype) !void {
+    if (flags.nsw) try writer.writeAll("nsw ");
+    if (flags.nuw) try writer.writeAll("nuw ");
+    if (flags.exact) try writer.writeAll("exact ");
 }
 
 fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {

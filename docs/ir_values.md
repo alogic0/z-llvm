@@ -17,6 +17,7 @@ Constant
 UndefValue
 UndefValue::get
 PoisonValue
+FreezeInst
 AsmWriter support for undef
 AsmWriter support for i1 true/false constants
 ```
@@ -28,6 +29,7 @@ named SSA values: %name
 integer constants
 i1 boolean constants parsed as integer 1/0 for normalization
 undef constants
+freeze instruction syntax is documented separately in [ir_scalar.md](ir_scalar.md)
 ```
 
 Upstream mapping:
@@ -35,6 +37,7 @@ Upstream mapping:
 ```text
 This reproduces the printed `undef` constant form and treats it as type-compatible with the expected operand type.
 LLVM models `undef` as a typed constant, distinguishes it from poison, and has much richer constant folding rules around undefined values.
+LLVM uses `freeze` to turn undef/poison-sensitive values into a stable value before transforms that require that guarantee.
 ```
 
 Known gaps:
@@ -44,5 +47,5 @@ no poison value
 no typed constant objects
 no aggregate/vector constants
 no constant expressions
-no undef-specific instruction folding rules
+no undef-specific instruction folding rules beyond preserving `freeze`
 ```

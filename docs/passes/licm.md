@@ -33,7 +33,7 @@ use LoopInfo natural loops
 require an existing unique unconditional preheader
 require the loop header to map to one current NaturalLoop record
 use shared memory-effect classification for legality
-hoist pure binary, icmp, and select instructions
+hoist pure binary, integer cast, icmp, and select instructions
 require every operand to be constant, undef, a function parameter, or defined outside the loop
 move hoisted instructions to the preheader instruction list
 preserve SSA validity by moving only to the preheader, which dominates the loop header in the supported canonical shape
@@ -42,8 +42,8 @@ preserve SSA validity by moving only to the preheader, which dominates the loop 
 Current legality boundary:
 
 ```text
-hoistable: side-effect-free scalar binary, icmp, and select instructions
-not hoistable: phi, alloca, load, store, getelementptr, volatile or atomic barriers
+hoistable: side-effect-free scalar binary, integer cast, icmp, and select instructions
+not hoistable: freeze, phi, alloca, load, store, getelementptr, volatile or atomic barriers
 not represented yet and therefore not hoistable: calls and unknown memory effects
 ```
 
@@ -72,7 +72,7 @@ Known gaps:
 ```text
 no load/store/call hoisting or sinking
 no MemorySSA or alias analysis integration
-no trapping, poison, or speculation safety checks
+no trapping, poison, freeze, or speculation safety checks
 no loop nest ordering beyond current natural-loop list
 no multi-latch loop hoisting
 no preheader creation

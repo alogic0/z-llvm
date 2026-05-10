@@ -45,6 +45,10 @@ Run all currently mapped LLVM comparisons:
 bash scripts/compare_opt.sh
 ```
 
+The comparison matrix includes scalar IR round-trip coverage for casts,
+division/remainder, `freeze`, and `nsw`/`nuw`/`exact` flag preservation through
+the `scalar_ir_surface` fixture.
+
 Use a different `opt` binary:
 
 ```bash
@@ -64,7 +68,7 @@ zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instc
 LLVM algorithms covered so far:
 
 ```text
-InstCombine: arithmetic, bitwise, shift, select, relational icmp, and commutative canonicalization subsets
+InstCombine: arithmetic, bitwise, shift, select, relational icmp, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, and empty-block threading subsets
@@ -73,7 +77,7 @@ Mem2Reg: single-block, multi-block, undef, and multi-slot stack promotion subset
 SROA: zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
-LICM: pure scalar loop-invariant instruction hoisting subset, including variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
+LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

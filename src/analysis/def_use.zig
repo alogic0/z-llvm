@@ -41,6 +41,8 @@ pub const UseCounts = struct {
                 try uses.addValue(binary.lhs);
                 try uses.addValue(binary.rhs);
             },
+            .cast => |cast| try uses.addValue(cast.value),
+            .freeze => |freeze| try uses.addValue(freeze.value),
             .icmp => |icmp| {
                 try uses.addValue(icmp.lhs);
                 try uses.addValue(icmp.rhs);
@@ -72,6 +74,8 @@ pub const UseCounts = struct {
                 uses.removeValue(binary.lhs);
                 uses.removeValue(binary.rhs);
             },
+            .cast => |cast| uses.removeValue(cast.value),
+            .freeze => |freeze| uses.removeValue(freeze.value),
             .icmp => |icmp| {
                 uses.removeValue(icmp.lhs);
                 uses.removeValue(icmp.rhs);

@@ -22,8 +22,18 @@ pub fn verify(module: core.Module) !void {
                 switch (instruction.kind) {
                     .binary => |binary| {
                         if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyBinaryFlags(binary);
                         try verifyValue(defs, binary.ty, binary.lhs);
                         try verifyValue(defs, binary.ty, binary.rhs);
+                    },
+                    .cast => |cast| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyCast(cast);
+                        try verifyValue(defs, cast.from_ty, cast.value);
+                    },
+                    .freeze => |freeze| {
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyValue(defs, freeze.ty, freeze.value);
                     },
                     .icmp => |icmp| {
                         if (instruction.result == null) return error.InstructionNeedsResult;
@@ -86,6 +96,40 @@ pub fn verify(module: core.Module) !void {
                 .@"unreachable" => {},
             }
         }
+    }
+}
+
+fn verifyBinaryFlags(binary: core.BinaryInst) !void {
+    if (binary.flags.nsw or binary.flags.nuw) {
+        switch (binary.op) {
+            .add, .sub, .mul, .shl => {},
+            .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+        }
+    }
+    if (binary.flags.exact) {
+        switch (binary.op) {
+            .udiv, .sdiv, .lshr, .ashr => {},
+            .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
+        }
+    }
+    switch (binary.ty) {
+        .int => {},
+        .ptr => return error.TypeMismatch,
+    }
+}
+
+fn verifyCast(cast: core.CastInst) !void {
+    const from_bits = switch (cast.from_ty) {
+        .int => |bits| bits,
+        .ptr => return error.TypeMismatch,
+    };
+    const to_bits = switch (cast.to_ty) {
+        .int => |bits| bits,
+        .ptr => return error.TypeMismatch,
+    };
+    switch (cast.op) {
+        .trunc => if (from_bits <= to_bits) return error.InvalidCast,
+        .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
     }
 }
 

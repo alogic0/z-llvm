@@ -42,11 +42,12 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 fn canonicalize(instruction: *ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |*binary| canonicalizeBinary(binary),
-        .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
     };
 }
 
 fn canonicalizeBinary(binary: *ir.BinaryInst) bool {
+    if (binary.flags.any()) return false;
     if (!isCommutative(binary.op)) return false;
     if (binary.lhs != .int or binary.rhs == .int) return false;
     const old_lhs = binary.lhs;
@@ -58,7 +59,7 @@ fn canonicalizeBinary(binary: *ir.BinaryInst) bool {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .sub, .shl, .lshr, .ashr => false,
+        .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 
@@ -74,11 +75,12 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
         .binary => |binary| foldBinary(binary),
         .icmp => |icmp| foldIcmp(icmp),
         .select => |select| foldSelect(select),
-        .phi, .alloca, .load, .store, .gep => null,
+        .cast, .freeze, .phi, .alloca, .load, .store, .gep => null,
     };
 }
 
 fn foldBinary(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.flags.any()) return null;
     if (binary.lhs == .int and binary.rhs == .int) {
         if (foldBinaryConstants(binary)) |replacement| return replacement;
     }
@@ -131,6 +133,7 @@ fn foldBinary(binary: ir.BinaryInst) ?ir.Value {
             .{ .int = 0 }
         else
             null,
+        .udiv, .sdiv, .urem, .srem => null,
     };
 }
 
@@ -150,6 +153,7 @@ fn foldBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
             .{ .int = 0 }
         else
             null,
+        .udiv, .sdiv, .urem, .srem => null,
     };
 }
 
