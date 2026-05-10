@@ -216,3 +216,20 @@ full atomic operations and ordering semantics
 ```
 
 These unlock better comparisons with LLVM `opt` and the next algorithms: richer InstCombine folds, SROA slice splitting, memory-aware LICM, and ABI-aware lowering.
+
+## Unsupported Codegen Constructs
+
+The `--emit=asm` path is intentionally smaller than the IR parser:
+
+```text
+only x86_64-linux target triples
+only one-block leaf functions
+only i32 return values or void returns
+only first and second i32 parameters
+only return constant, return parameter, and add first two parameters
+no branches
+no memory operations
+no calls
+no stack frame
+no object emission
+```

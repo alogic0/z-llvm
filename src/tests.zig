@@ -1,12 +1,14 @@
 const std = @import("std");
 const alias = @import("analysis/alias.zig");
 const cfg = @import("analysis/cfg.zig");
+const codegen = @import("codegen.zig");
 const dominator = @import("analysis/dominator.zig");
 const loop_info = @import("analysis/loop_info.zig");
 const memory_effect = @import("analysis/memory_effect.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
+const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
@@ -107,6 +109,64 @@ test "parser preserves module target records and void return" {
     try module.print(&output.writer);
 
     try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "x86_64 codegen lowers add args to assembly" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @add_args(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    const expected =
+        "\t.text\n" ++
+        "\t.globl add_args\n" ++
+        "add_args:\n" ++
+        "\tmovl %edi, %eax\n" ++
+        "\taddl %esi, %eax\n" ++
+        "\tretq\n";
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "x86_64 codegen rejects unsupported control flow" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  ret i32 %a
+        \\else:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenControlFlow,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
 }
 
 test "instcombine and dce remove identity arithmetic" {

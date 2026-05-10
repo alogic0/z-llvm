@@ -76,6 +76,16 @@ zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.l
 zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
 ```
 
+Assembly bootstrap command:
+
+```bash
+zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll
+```
+
+The assembly path currently has unit-test coverage plus a tiny CLI smoke input.
+It covers x86_64 SysV straight-line i32 leaf functions and explicit diagnostics
+for unsupported control flow.
+
 LLVM algorithms covered so far:
 
 ```text
@@ -90,6 +100,7 @@ GVN: dominating repeated pure-expression elimination subset with memory-effect r
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing and minimal DataLayout query subset
+MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

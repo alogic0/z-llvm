@@ -1,15 +1,22 @@
 const std = @import("std");
+const codegen = @import("codegen.zig");
 const ir = @import("ir.zig");
+const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 
 const usage =
-    \\usage: z_llvm [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm] [--target=triple] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa
     \\Supported pipelines: scalar-foundation,memory-foundation
     \\
 ;
+
+const Emit = enum {
+    ir,
+    @"asm",
+};
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -23,6 +30,8 @@ pub fn main(init: std.process.Init) !void {
     var trace = false;
     var timing = false;
     var pass_limit: ?usize = null;
+    var emit: Emit = .ir;
+    var target_triple: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
@@ -38,6 +47,17 @@ pub fn main(init: std.process.Init) !void {
             timing = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--emit=")) {
+            const emit_text = arg["--emit=".len..];
+            if (std.mem.eql(u8, emit_text, "ir")) {
+                emit = .ir;
+            } else if (std.mem.eql(u8, emit_text, "asm")) {
+                emit = .@"asm";
+            } else {
+                return error.UnsupportedEmitMode;
+            }
+        } else if (std.mem.startsWith(u8, arg, "--target=")) {
+            target_triple = arg["--target=".len..];
         } else if (std.mem.startsWith(u8, arg, "--pipeline=")) {
             pass_list = arg["--pipeline=".len..];
         } else if (std.mem.startsWith(u8, arg, "--passes=")) {
@@ -68,14 +88,26 @@ pub fn main(init: std.process.Init) !void {
     defer module.deinit();
     try module.verify();
 
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    if (emit == .@"asm") {
+        const triple = target_triple orelse module.target_triple orelse return error.MissingTargetTriple;
+        for (module.functions.items) |function| {
+            var machine = try codegen.x86_64.lowerFunction(allocator, triple, function);
+            defer machine.deinit(allocator);
+            try mc.assembly.printFunction(machine, stdout);
+        }
+        try stdout.flush();
+        return;
+    }
+
     var pm = pass_manager.ModulePassManager.init(allocator);
     defer pm.deinit();
     try pipelines.addPasses(&pm, pass_list);
 
     var context: pass_manager.Context = .{ .allocator = allocator, .io = io };
-    var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    const stdout = &stdout_writer.interface;
     _ = try pm.runWithOptions(&module, &context, stdout, .{
         .trace = trace,
         .timing = timing,
