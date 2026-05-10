@@ -18,12 +18,28 @@ LoopAnalysis::run
 LoopInfo::analyze
 LoopInfoWrapperPass
 Loop
+Loop::getHeader
+Loop::getLoopLatch
+Loop::getLoopLatches
+Loop::contains
 Loop::getLoopPreheader
+Loop::getExitingBlocks
 Loop::getExitBlocks
 ```
 
 LLVM LoopInfo identifies natural loops from a dominator tree and records loop
 nests, headers, latches, blocks, exits, and relationships used by loop passes.
+
+Loop terminology used here follows LLVM's `Loop` query API:
+
+```text
+header: the single loop entry block
+latch: a loop block with a backedge to the header
+preheader: a non-loop predecessor that branches unconditionally to the header
+exiting block: a block inside the loop with at least one successor outside the loop
+exit block: a block outside the loop with at least one predecessor inside the loop
+dedicated exit: an exit block whose predecessors are all inside the loop
+```
 
 Implemented subset:
 
@@ -31,9 +47,11 @@ Implemented subset:
 build CFG and dominator analysis for one function
 recognize a backedge when successor dominates predecessor
 construct the natural loop for each backedge by walking predecessors from latch
-record loop header, latch, and member block indexes
+query loop header, latch, and member block indexes
 lookup a loop by header block index
+test whether a block index is inside a loop
 query a unique unconditional preheader
+collect unique exiting block indexes
 collect unique exit block indexes
 ```
 
@@ -42,7 +60,7 @@ Known gaps:
 ```text
 no nested loop forest
 no block-to-innermost-loop map
-no exiting-block or dedicated-exit queries
+no dedicated-exit query
 no loop verification
 no LoopSimplify or LCSSA integration
 no irreducible control-flow handling beyond natural-loop backedges

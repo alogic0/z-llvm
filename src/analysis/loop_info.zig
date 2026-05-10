@@ -19,6 +19,14 @@ pub const NaturalLoop = struct {
         return false;
     }
 
+    pub fn headerBlock(loop: NaturalLoop) usize {
+        return loop.header;
+    }
+
+    pub fn latchBlock(loop: NaturalLoop) usize {
+        return loop.latch;
+    }
+
     pub fn preheader(loop: NaturalLoop, function: ir.Function, graph: cfg.Graph) ?usize {
         var candidate: ?usize = null;
         for (graph.predecessors(loop.header)) |predecessor| {
@@ -35,6 +43,22 @@ pub const NaturalLoop = struct {
             },
             .ret, .condbr, .@"unreachable" => return null,
         }
+    }
+
+    pub fn exitingBlocks(loop: NaturalLoop, allocator: std.mem.Allocator, graph: cfg.Graph) !std.ArrayList(usize) {
+        var exiting: std.ArrayList(usize) = .empty;
+        errdefer exiting.deinit(allocator);
+
+        for (loop.blocks.items) |block_index| {
+            for (graph.successors(block_index)) |successor| {
+                if (!loop.contains(successor)) {
+                    try appendUnique(allocator, &exiting, block_index);
+                    break;
+                }
+            }
+        }
+        sortBlocks(exiting.items);
+        return exiting;
     }
 
     pub fn exitBlocks(loop: NaturalLoop, allocator: std.mem.Allocator, graph: cfg.Graph) !std.ArrayList(usize) {

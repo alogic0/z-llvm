@@ -1001,10 +1001,16 @@ test "loop info finds a natural loop from a dominator backedge" {
     const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
     try std.testing.expectEqual(@as(usize, 1), natural_loop.header);
     try std.testing.expectEqual(@as(usize, 3), natural_loop.latch);
+    try std.testing.expectEqual(@as(usize, 1), natural_loop.headerBlock());
+    try std.testing.expectEqual(@as(usize, 3), natural_loop.latchBlock());
     try std.testing.expectEqualSlices(usize, &.{ 1, 2, 3 }, natural_loop.blocks.items);
     try std.testing.expect(natural_loop.contains(2));
     try std.testing.expect(!natural_loop.contains(4));
     try std.testing.expectEqual(@as(?usize, 0), natural_loop.preheader(function, graph));
+
+    var exiting = try natural_loop.exitingBlocks(std.testing.allocator, graph);
+    defer exiting.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{1}, exiting.items);
 
     var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
     defer exits.deinit(std.testing.allocator);
