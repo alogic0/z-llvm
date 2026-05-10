@@ -71,7 +71,7 @@ Suggested slice boundary:
 
 ## 2. Module-Level IR Surface
 
-Status: linkage and function-header attribute preservation implemented and verified in Cycle 19.
+Status: visibility and parameter attributes in progress as Cycle 20 in `docs/next_steps.md`.
 
 - [x] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
 - [ ] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
