@@ -33,7 +33,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
             .spill_arg_rsp => |reg| try encodeRegToRspSlot(&bytes, allocator, 0x89, reg),
             .reload_arg_rsp => |reg| try encodeRspSlotToReg(&bytes, allocator, 0x8b, reg),
-            .direct_call => return error.UnsupportedObjectRelocation,
+            .direct_call => {
+                try bytes.append(allocator, 0xe8);
+                try appendI32(&bytes, allocator, 0);
+            },
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
@@ -51,7 +54,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
     return try bytes.toOwnedSlice(allocator);
 }
 
-fn instructionSize(instruction: x86_64.Instruction) u32 {
+pub fn instructionSize(instruction: x86_64.Instruction) u32 {
     return switch (instruction) {
         .label => 0,
         .mov_imm_eax => 5,

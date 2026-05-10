@@ -32,8 +32,8 @@ Current status:
 - First slice implemented: IR declarations and direct call parser/printer/verifier
   support is in place. Direct-call x86_64 assembly lowering is in place for tiny
   i32 register-argument fixtures, including the minimal stack-alignment
-  adjustment and one deterministic i32 spill. ELF call relocations and general
-  stack frames are still open.
+  adjustment, one deterministic i32 spill, and external PLT32 call relocations.
+  General stack frames are still open.
 - Target/object pair is fixed to `x86_64-linux-elf` with SysV ABI.
 - The previous epic already supports register-only scalar i32 leaf functions,
   simple conditional returns, assembly text, instruction bytes, and ELF64
@@ -163,24 +163,24 @@ Suggested slice boundary:
 
 ## 5. Object Relocations for Calls
 
-- [ ] Add ELF64 relocation section support for `.rela.text`.
-- [ ] Add undefined external function symbols to `.symtab`.
-- [ ] Emit relocation records for direct `callq` targets that cannot be resolved
+- [x] Add ELF64 relocation section support for `.rela.text`.
+- [x] Add undefined external function symbols to `.symtab`.
+- [x] Emit relocation records for direct `callq` targets that cannot be resolved
       as local fixed offsets.
-- [ ] Use `R_X86_64_PLT32` for external direct `callq` relocations at first,
+- [x] Use `R_X86_64_PLT32` for external direct `callq` relocations at first,
       with the usual x86_64 PC-relative addend for a 32-bit call displacement.
-- [ ] Compare the relocation kind/addend against LLVM or assembler output for a
+- [x] Compare the relocation kind/addend against LLVM or assembler output for a
       tiny external-call object before marking relocation support complete.
-- [ ] Inspect generated objects with:
+- [x] Inspect generated objects with:
       `readelf -r -s` and `objdump -dr`.
-- [ ] Document mapping to LLVM `MCFixup`, `MCELFStreamer`, and
+- [x] Document mapping to LLVM `MCFixup`, `MCELFStreamer`, and
       `ELFObjectWriter`.
-- [ ] Keep PLT/GOT, weak symbols, COMDAT, TLS, and dynamic linker semantics out
+- [x] Keep PLT/GOT, weak symbols, COMDAT, TLS, and dynamic linker semantics out
       of scope.
 
 Suggested slice boundary:
 
-- [ ] First support external direct call relocations.
+- [x] First support external direct call relocations.
 - [ ] Then decide whether internal calls use relocations or resolved local
       displacements.
 
@@ -265,9 +265,9 @@ Suggested slice boundary:
 - [ ] Add `docs/codegen/stack_frame.md`.
 - [x] Extend `docs/codegen/abi_x86_64_sysv.md` with call, stack alignment, and
       caller/callee-saved register rules.
-- [ ] Extend `docs/mc/instruction_encoding.md` for `callq` and stack-relative
+- [x] Extend `docs/mc/instruction_encoding.md` for `callq` and stack-relative
       load/store encodings.
-- [ ] Extend `docs/mc/elf_object_writer.md` for `.rela.text` and undefined
+- [x] Extend `docs/mc/elf_object_writer.md` for `.rela.text` and undefined
       symbols.
 - [ ] Update `docs/inventory/zig_llvm_api_inventory.md` for call lowering,
       frame lowering, relocation handling, and covered `TargetMachine.emitToFile`

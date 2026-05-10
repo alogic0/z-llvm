@@ -1323,6 +1323,34 @@ test "x86_64 elf writer emits relocatable object metadata" {
     try std.testing.expect(std.mem.indexOf(u8, object, "add_args") != null);
 }
 
+test "x86_64 elf writer emits direct call relocation metadata" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee()
+        \\
+        \\define i32 @call_no_args() {
+        \\entry:
+        \\  %r = call i32 @callee()
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    const object = try mc.elf.buildObject(std.testing.allocator, &.{machine});
+    defer std.testing.allocator.free(object);
+
+    try std.testing.expect(std.mem.indexOf(u8, object, ".rela.text") != null);
+    try std.testing.expect(std.mem.indexOf(u8, object, "callee") != null);
+}
+
 test "x86_64 codegen rejects unsupported control flow" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

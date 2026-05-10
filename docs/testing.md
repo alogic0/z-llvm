@@ -112,15 +112,14 @@ zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/input
 bash scripts/compare_codegen_asm.sh
 bash scripts/compare_codegen_objdump.sh
 readelf -h -S -s /tmp/z_llvm_add_args.o
-objdump -d /tmp/z_llvm_add_args.o
+objdump -dr /tmp/z_llvm_add_args.o
 ```
 
 The assembly/object path currently has unit-test coverage plus tiny CLI smoke
 inputs. It covers x86_64 SysV i32 leaf functions, simple conditional returns,
 tiny direct-call assembly functions, one deterministic i32 call spill, minimal
-instruction encoding, ELF64 relocatable metadata, and explicit diagnostics for
-unsupported control flow. Object relocation support for calls is still pending,
-so call fixtures currently participate in assembly comparison only.
+instruction encoding, ELF64 relocatable metadata, direct-call PLT32 relocation
+records, and explicit diagnostics for unsupported control flow.
 
 LLVM algorithms covered so far:
 
@@ -144,7 +143,7 @@ Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout re
 Target diagnostics: invalid datalayout and unsupported `--emit=asm` target messages
 Zig-emitted IR harness: normalized tiny scalar module records and function signatures
 Zig fixture pair: project-lowered and optimized outputs compared structurally with normalized Zig-emitted signatures
-MC/CodeGen: tiny x86_64 Machine IR, assembly printer, direct-call assembly lowering, instruction encoder, and ELF64 relocatable object bootstrap
+MC/CodeGen: tiny x86_64 Machine IR, assembly printer, direct-call assembly/object lowering, instruction encoder, and ELF64 relocatable object bootstrap
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

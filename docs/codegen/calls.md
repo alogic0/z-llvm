@@ -34,9 +34,9 @@ local-only conservative:
   call attributes beyond the tiny preserved calling-convention subset are rejected
 
 bootstrap-only:
-  Machine IR direct-call representation is assembly-only until ELF relocations land
+  Machine IR direct-call representation supports assembly and ELF call relocations only
   x86_64 argument move lowering only accepts already-matching i32 argument registers
-  no call relocations or stack-frame emission yet
+  no general stack-frame emission yet
 ```
 
 ## Accepted IR Contract
@@ -148,5 +148,6 @@ call_two_args assembly fixture
 call_return_used one-spill assembly fixture
 ```
 
-Object call relocation fixtures are still pending. Later slices must compare
-accepted x86_64 call relocations against LLVM or assembler output.
+Object relocation fixtures cover the current direct external call subset with
+`R_X86_64_PLT32` and addend `-4`. Later slices must add internal-call policy,
+stack-slot object fixtures, and broader readelf checks.

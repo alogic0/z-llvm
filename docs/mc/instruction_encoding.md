@@ -27,6 +27,7 @@ near je rel32 to a local Machine IR label
 retq
 subq/addq 8-byte %rsp adjustment
 movl r32, (%rsp) and movl (%rsp), r32 for one deterministic spill slot
+callq rel32 placeholder bytes for ELF relocation
 ```
 
 Upstream mapping:
@@ -57,6 +58,6 @@ Known gaps:
 no ModRM/SIB memory forms
 no general immediates beyond mov imm32 to eax
 no short-branch relaxation
-no fixup/relocation model for callq yet
+only callq fixups are modeled, through ELF .rela.text records
 no VEX/EVEX, floating-point, vector, general call, general stack, or memory encodings
 ```

@@ -15,7 +15,7 @@ for input in test/codegen/inputs/*.ll; do
   object="$tmp_dir/$id.o"
   actual="$tmp_dir/$id.objdump.txt"
   zig build run -- --emit=obj --target="$target" "$input" > "$object"
-  objdump -d "$object" | sed -n '/Disassembly of section .text:/,$p' > "$actual"
+  objdump -dr "$object" | sed -n '/Disassembly of section .text:/,$p' > "$actual"
   diff -u "$expected" "$actual"
   printf 'ok codegen objdump %s\n' "$id"
 done

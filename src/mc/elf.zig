@@ -14,6 +14,21 @@ const Section = struct {
     entsize: u64 = 0,
 };
 
+const Symbol = struct {
+    name: []const u8,
+    value: u64,
+    size: u64,
+    section_index: u16,
+    info: u8,
+};
+
+const Relocation = struct {
+    offset: u64,
+    symbol_index: u32,
+    kind: u32,
+    addend: i64,
+};
+
 pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction, writer: anytype) !void {
     const object = try buildObject(allocator, functions);
     defer allocator.free(object);
@@ -26,16 +41,17 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
 
-    const Symbol = struct {
-        name: []const u8,
-        value: u64,
-        size: u64,
-    };
     var symbols: std.ArrayList(Symbol) = .empty;
     defer symbols.deinit(allocator);
+    var symbol_indices = std.StringHashMap(u32).init(allocator);
+    defer symbol_indices.deinit();
 
-    for (functions) |function| {
+    const function_offsets = try allocator.alloc(u64, functions.len);
+    defer allocator.free(function_offsets);
+
+    for (functions, 0..) |function, function_index| {
         const start: u64 = text.items.len;
+        function_offsets[function_index] = start;
         const bytes = try encoding.encodeFunction(allocator, function);
         defer allocator.free(bytes);
         try text.appendSlice(allocator, bytes);
@@ -43,7 +59,16 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
             .name = function.name,
             .value = start,
             .size = bytes.len,
+            .section_index = 1,
+            .info = 0x12,
         });
+        try symbol_indices.put(function.name, @intCast(symbols.items.len));
+    }
+
+    var relocations: std.ArrayList(Relocation) = .empty;
+    defer relocations.deinit(allocator);
+    for (functions, 0..) |function, function_index| {
+        try collectCallRelocations(allocator, &relocations, &symbols, &symbol_indices, function_offsets[function_index], function);
     }
 
     var strtab: std.ArrayList(u8) = .empty;
@@ -61,6 +86,7 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     defer shstrtab.deinit(allocator);
     try shstrtab.append(allocator, 0);
     const text_name = try appendString(&shstrtab, allocator, ".text");
+    const rela_text_name = try appendString(&shstrtab, allocator, ".rela.text");
     const symtab_name = try appendString(&shstrtab, allocator, ".symtab");
     const strtab_name = try appendString(&shstrtab, allocator, ".strtab");
     const shstrtab_name = try appendString(&shstrtab, allocator, ".shstrtab");
@@ -69,6 +95,11 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     var cursor = alignForward(ehdr_size, 16);
     const text_offset = cursor;
     cursor += text.items.len;
+    cursor = alignForward(cursor, 8);
+
+    const rela_text_offset = cursor;
+    const rela_text_size = relocations.items.len * 24;
+    cursor += rela_text_size;
     cursor = alignForward(cursor, 8);
 
     const symtab_offset = cursor;
@@ -84,14 +115,15 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     cursor = alignForward(cursor, 8);
     const shoff = cursor;
 
-    const section_count = 5;
+    const section_count = 6;
     const total_size = shoff + section_count * 64;
     var object = try allocator.alloc(u8, total_size);
     errdefer allocator.free(object);
     @memset(object, 0);
 
-    writeElfHeader(object[0..64], shoff, section_count);
+    writeElfHeader(object[0..64], shoff, section_count, 5);
     @memcpy(object[text_offset..][0..text.items.len], text.items);
+    writeRelocationTable(object[rela_text_offset..][0..rela_text_size], relocations.items);
     writeSymbolTable(object[symtab_offset..][0..symtab_size], symbols.items, symbol_name_offsets);
     @memcpy(object[strtab_offset..][0..strtab.items.len], strtab.items);
     @memcpy(object[shstrtab_offset..][0..shstrtab.items.len], shstrtab.items);
@@ -99,7 +131,8 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     const sections = [_]Section{
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
-        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 3, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 3, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 4, .info = 1, .addralign = 8, .entsize = 24 },
         .{ .name_offset = strtab_name, .kind = 3, .flags = 0, .offset = strtab_offset, .size = strtab.items.len },
         .{ .name_offset = shstrtab_name, .kind = 3, .flags = 0, .offset = shstrtab_offset, .size = shstrtab.items.len },
     };
@@ -110,6 +143,51 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     return object;
 }
 
+fn collectCallRelocations(
+    allocator: std.mem.Allocator,
+    relocations: *std.ArrayList(Relocation),
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    function_offset: u64,
+    function: x86_64.MachineFunction,
+) !void {
+    var offset: u64 = 0;
+    for (function.instructions.items) |instruction| {
+        switch (instruction) {
+            .direct_call => |call| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, call.symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 1,
+                    .symbol_index = symbol_index,
+                    .kind = 4,
+                    .addend = -4,
+                });
+            },
+            else => {},
+        }
+        offset += encoding.instructionSize(instruction);
+    }
+}
+
+fn symbolIndexForCall(
+    allocator: std.mem.Allocator,
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    name: []const u8,
+) !u32 {
+    if (symbol_indices.get(name)) |index| return index;
+    try symbols.append(allocator, .{
+        .name = name,
+        .value = 0,
+        .size = 0,
+        .section_index = 0,
+        .info = 0x10,
+    });
+    const index: u32 = @intCast(symbols.items.len);
+    try symbol_indices.put(name, index);
+    return index;
+}
+
 fn appendString(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: []const u8) !u32 {
     const offset: u32 = @intCast(buffer.items.len);
     try buffer.appendSlice(allocator, text);
@@ -117,7 +195,7 @@ fn appendString(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: 
     return offset;
 }
 
-fn writeElfHeader(header: []u8, shoff: u64, section_count: u16) void {
+fn writeElfHeader(header: []u8, shoff: u64, section_count: u16, shstr_index: u16) void {
     header[0] = 0x7f;
     header[1] = 'E';
     header[2] = 'L';
@@ -132,15 +210,24 @@ fn writeElfHeader(header: []u8, shoff: u64, section_count: u16) void {
     writeU16(header, 52, 64);
     writeU16(header, 58, 64);
     writeU16(header, 60, section_count);
-    writeU16(header, 62, 4);
+    writeU16(header, 62, shstr_index);
 }
 
-fn writeSymbolTable(buffer: []u8, symbols: anytype, name_offsets: []const u32) void {
+fn writeRelocationTable(buffer: []u8, relocations: []const Relocation) void {
+    for (relocations, 0..) |relocation, index| {
+        const entry = buffer[index * 24 ..][0..24];
+        writeU64(entry, 0, relocation.offset);
+        writeU64(entry, 8, (@as(u64, relocation.symbol_index) << 32) | relocation.kind);
+        writeU64(entry, 16, @bitCast(relocation.addend));
+    }
+}
+
+fn writeSymbolTable(buffer: []u8, symbols: []const Symbol, name_offsets: []const u32) void {
     for (symbols, 0..) |symbol, index| {
         const entry = buffer[(index + 1) * 24 ..][0..24];
         writeU32(entry, 0, name_offsets[index]);
-        entry[4] = 0x12;
-        writeU16(entry, 6, 1);
+        entry[4] = symbol.info;
+        writeU16(entry, 6, symbol.section_index);
         writeU64(entry, 8, symbol.value);
         writeU64(entry, 16, symbol.size);
     }

@@ -1,0 +1,8 @@
+Disassembly of section .text:
+
+0000000000000000 <call_one_arg>:
+   0:	48 83 ec 08          	sub    $0x8,%rsp
+   4:	e8 00 00 00 00       	call   9 <call_one_arg+0x9>
+			5: R_X86_64_PLT32	callee-0x4
+   9:	48 83 c4 08          	add    $0x8,%rsp
+   d:	c3                   	ret
