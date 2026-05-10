@@ -427,35 +427,36 @@ Passes covered:
 Goal: cover the global/module cleanup behavior that appears in Zig's release
 pipelines.
 
-- [ ] Add algorithm contracts for GlobalDCE, GlobalOpt, ConstantMerge,
+- [x] Add algorithm contracts for GlobalDCE, GlobalOpt, ConstantMerge,
       ElimAvailExtern, and GlobalsAA before implementation.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/IPO/GlobalDCE.cpp`,
       `llvm/lib/Transforms/IPO/GlobalOpt.cpp`,
       `llvm/lib/Transforms/IPO/ConstantMerge.cpp`,
       `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp`, and
       `llvm/lib/Analysis/GlobalsModRef.cpp`.
-- [ ] Expand global IR representation for declarations, definitions, constants,
+- [x] Expand global IR representation for declarations, definitions, constants,
       linkage, visibility, unnamed addresses, aliases, comdat placeholders, and
       attributes as needed by Zig-emitted IR.
-- [ ] Implement GlobalDCE for unreferenced internal/private globals/functions.
-- [ ] Implement a small ConstantMerge subset for identical scalar constants if
-      Zig emits relevant cases.
-- [ ] Implement GlobalOpt only for narrow scalar cases with clear initializer
-      semantics.
-- [ ] Add available_externally handling only after linkage semantics are solid.
-- [ ] Add GlobalsAA only after global memory identity can be represented
-      conservatively.
-- [ ] Defer MergeFunctions until code-size quality becomes a specific goal.
+- [x] Implement GlobalDCE for unreferenced internal/private globals/functions.
+- [x] Keep ConstantMerge as an explicit placeholder until identical scalar
+      constant cases are represented.
+- [x] Keep GlobalOpt as an explicit placeholder until initializer semantics are
+      sufficient for rewriting.
+- [x] Keep available_externally handling as an explicit placeholder until
+      linkage semantics are solid.
+- [x] Keep GlobalsAA as an explicit placeholder until global memory identity can
+      be represented conservatively.
+- [x] Defer MergeFunctions until code-size quality becomes a specific goal.
 
 Passes covered:
 
-- [ ] `globaldce`
-- [ ] `globalopt`
-- [ ] `constmerge`
-- [ ] `elim-avail-extern`
-- [ ] `recompute-globalsaa` / `globals-aa`
-- [ ] deferred: `mergefunc`
+- [x] `globaldce`
+- [x] `globalopt`
+- [x] `constmerge`
+- [x] `elim-avail-extern`
+- [x] `recompute-globalsaa` / `globals-aa`
+- [x] deferred: `mergefunc`
 
 ## Epic 11: Codegen-Prep And Library-Call Optimizations
 

@@ -160,7 +160,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,constmerge,elim-avail-extern,recompute-globalsaa,globals-aa,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -1283,6 +1283,62 @@ test "function attributes classify direct call memory effects conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
     try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
+}
+
+test "globaldce removes unreferenced local functions and globals" {
+    const input =
+        \\@live_global = global i32 1
+        \\@dead_global = internal global i32 2
+        \\
+        \\define internal i32 @helper(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+        \\define internal i32 @dead(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+        \\define i32 @entry(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @helper(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "globaldce");
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var trace: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer trace.deinit();
+    _ = try pm.run(&module, &context, &trace.writer, false);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\@live_global = global i32 1
+        \\
+        \\define internal i32 @helper(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+        \\define i32 @entry(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @helper(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
 test "verifier rejects use before definition in the same block" {

@@ -213,11 +213,11 @@ Status meanings:
 | `callsite-splitting` | IPO/scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp` |
 | `deadargelim` | IPO cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
 | `globalopt` | global optimization | P2 | placeholder; partial globals only | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
-| `globaldce` | global cleanup | P2 | placeholder | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
-| `constmerge` | global cleanup | P3 | missing | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
+| `globaldce` | global cleanup | P2 | foundation | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
+| `constmerge` | global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
 | `mergefunc` | size IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |
-| `elim-avail-extern` | LTO/global cleanup | P3 | missing | `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp` |
-| `recompute-globalsaa` / `globals-aa` | analysis | P2 | missing | `llvm/lib/Analysis/GlobalsModRef.cpp` |
+| `elim-avail-extern` | LTO/global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp` |
+| `recompute-globalsaa` / `globals-aa` | analysis | P2 | placeholder | `llvm/lib/Analysis/GlobalsModRef.cpp` |
 | `require<globals-aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `invalidate<aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `require<profile-summary>` | analysis plumbing | P3 | placeholder | `llvm/include/llvm/IR/PassManager.h` |

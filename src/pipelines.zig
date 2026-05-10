@@ -5,6 +5,7 @@ const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
+const globaldce = @import("passes/globaldce.zig");
 const gvn = @import("passes/gvn.zig");
 const licm = @import("passes/licm.zig");
 const loop_instsimplify = @import("passes/loop_instsimplify.zig");
@@ -304,6 +305,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(sccp.pass);
     } else if (std.mem.eql(u8, name, "gvn")) {
         try pm.add(gvn.pass);
+    } else if (std.mem.eql(u8, name, "globaldce")) {
+        try pm.add(globaldce.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
         try pm.add(licm.pass);
     } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
@@ -366,7 +369,10 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "deadargelim")) return placeholder.make("deadargelim", .ipo, "llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp");
     if (std.mem.eql(u8, name, "dse")) return placeholder.make("dse", .memory, "llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp");
     if (std.mem.eql(u8, name, "globalopt")) return placeholder.make("globalopt", .ipo, "llvm/lib/Transforms/IPO/GlobalOpt.cpp");
-    if (std.mem.eql(u8, name, "globaldce")) return placeholder.make("globaldce", .ipo, "llvm/lib/Transforms/IPO/GlobalDCE.cpp");
+    if (std.mem.eql(u8, name, "constmerge")) return placeholder.make("constmerge", .ipo, "llvm/lib/Transforms/IPO/ConstantMerge.cpp");
+    if (std.mem.eql(u8, name, "elim-avail-extern")) return placeholder.make("elim-avail-extern", .ipo, "llvm/lib/Transforms/IPO/ElimAvailExtern.cpp");
+    if (std.mem.eql(u8, name, "recompute-globalsaa")) return placeholder.make("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
+    if (std.mem.eql(u8, name, "globals-aa")) return placeholder.make("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
     if (std.mem.eql(u8, name, "mergefunc")) return placeholder.make("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp");
     if (std.mem.eql(u8, name, "canonicalize-aliases")) return placeholder.make("canonicalize-aliases", .lto, "llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp");
     if (std.mem.eql(u8, name, "name-anon-globals")) return placeholder.make("name-anon-globals", .lto, "llvm/lib/Transforms/Utils/NameAnonGlobals.cpp");
