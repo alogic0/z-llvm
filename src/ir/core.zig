@@ -544,6 +544,7 @@ pub const Module = struct {
     globals: std.ArrayList(Global),
     declarations: std.ArrayList(FunctionDecl),
     functions: std.ArrayList(Function),
+    metadata: std.ArrayList([]const u8),
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) !Module {
         return @import("parser.zig").parse(allocator, text);
@@ -555,6 +556,7 @@ pub const Module = struct {
         module.declarations.deinit(module.allocator);
         for (module.functions.items) |*function| function.deinit(module.allocator);
         module.functions.deinit(module.allocator);
+        module.metadata.deinit(module.allocator);
         for (module.owned_strings.items) |owned| module.allocator.free(owned);
         module.owned_strings.deinit(module.allocator);
         module.allocator.free(module.source);

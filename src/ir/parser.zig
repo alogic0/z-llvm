@@ -9,6 +9,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .globals = .empty,
         .declarations = .empty,
         .functions = .empty,
+        .metadata = .empty,
     };
     errdefer module.deinit();
 
@@ -52,7 +53,10 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
         if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) return error.UnsupportedAttributeGroup;
-        if (current_function == null and std.mem.startsWith(u8, line, "!")) return error.UnsupportedModuleMetadata;
+        if (current_function == null and std.mem.startsWith(u8, line, "!")) {
+            try module.metadata.append(allocator, line);
+            continue;
+        }
 
         if (std.mem.startsWith(u8, line, "define ")) {
             if (current_function != null) return error.NestedFunction;
@@ -115,7 +119,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.declarations.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0) return error.EmptyModule;
     return module;
 }
 

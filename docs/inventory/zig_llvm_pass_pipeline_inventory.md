@@ -201,7 +201,7 @@ Status meanings:
 | `mldst-motion` | memory optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp` |
 | `move-auto-init` | memory/security | P3 | placeholder | `llvm/lib/Transforms/Scalar/MoveAutoInit.cpp` |
 | `aggressive-instcombine` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/AggressiveInstCombine/` |
-| `annotation2metadata` | metadata canonicalization | P3 | missing | `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp` |
+| `annotation2metadata` | metadata canonicalization | P3 | placeholder | `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp` |
 | `annotation-remarks` | diagnostics/remarks | P3 | placeholder | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |
 | `forceattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp` |
 | `inferattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp` |
@@ -232,8 +232,8 @@ Status meanings:
 | `cg-profile` | profile metadata | P3 | defer | `llvm/lib/Transforms/Instrumentation/CGProfile.cpp` |
 | `ee-instrument` | instrumentation | P3 | placeholder | `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp` |
 | `add-discriminators` | debug/profile metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/AddDiscriminators.cpp` |
-| `sancov` / `SanitizerCoveragePass` | sanitizer instrumentation | P3 | missing | `llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp` |
-| `module-tsan`, `tsan` | sanitizer instrumentation | P3 | missing | `llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp` |
+| `sancov` / `SanitizerCoveragePass` | sanitizer instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp` |
+| `module-tsan`, `tsan` | sanitizer instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp` |
 | `coro-early` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroEarly.cpp` |
 | `coro-split` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroSplit.cpp` |
 | `coro-elide` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroElide.cpp` |

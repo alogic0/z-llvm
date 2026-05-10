@@ -97,7 +97,7 @@ full atomic ordering semantics
 calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope
-debug metadata
+instruction debug metadata
 branch weights / profile metadata
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
@@ -319,7 +319,7 @@ AIR-like non-canonical loops, calls, select, overflow operations, intrinsics, ag
 raw Zig-emitted aliases, debug metadata, attribute groups, and target-feature strings before normalization
 function declarations
 attribute groups
-module metadata
+interpreted module metadata
 full atomic operations and ordering semantics
 ```
 

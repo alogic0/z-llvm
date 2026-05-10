@@ -364,6 +364,10 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");
     if (std.mem.eql(u8, name, "add-discriminators")) return placeholder.make("add-discriminators", .instrumentation, "llvm/lib/Transforms/Utils/AddDiscriminators.cpp");
+    if (std.mem.eql(u8, name, "annotation2metadata")) return placeholder.make("annotation2metadata", .instrumentation, "llvm/lib/Transforms/IPO/Annotation2Metadata.cpp");
+    if (std.mem.eql(u8, name, "sancov")) return placeholder.make("sancov", .instrumentation, "llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp");
+    if (std.mem.eql(u8, name, "module-tsan")) return placeholder.make("module-tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp");
+    if (std.mem.eql(u8, name, "tsan")) return placeholder.make("tsan", .instrumentation, "llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp");
     if (std.mem.eql(u8, name, "forceattrs")) return placeholder.make("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "inferattrs")) return placeholder.make("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "function-attrs")) return placeholder.make("function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");

@@ -501,39 +501,40 @@ Passes covered:
 Goal: model optimizer-visible instrumentation hooks without mixing them into
 core scalar optimization too early.
 
-- [ ] Add algorithm contracts or explicit placeholder contracts for metadata,
+- [x] Add algorithm contracts or explicit placeholder contracts for metadata,
       AddDiscriminators, annotation passes, SanitizerCoverage, TSan, and
       EntryExitInstrumenter.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Utils/AddDiscriminators.cpp`,
       `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp`,
       `llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp`,
       `llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp`, and
       `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp`.
-- [ ] Add metadata representation needed for debug/profile preservation.
-- [ ] Add `AddDiscriminatorsPass` behavior or a conservative placeholder.
-- [ ] Add annotation metadata preservation before implementing
+- [x] Add metadata representation needed for debug/profile preservation.
+- [x] Add `AddDiscriminatorsPass` behavior or a conservative placeholder.
+- [x] Add annotation metadata preservation before implementing
       `annotation2metadata`.
-- [ ] Add annotation remarks only after diagnostics infrastructure exists.
-- [ ] Add SanitizerCoverage and ThreadSanitizer placeholders that fail clearly
-      unless instrumentation is explicitly supported.
-- [ ] Add `alloc-token` as an explicit allocation-instrumentation placeholder
+- [x] Keep annotation remarks as an explicit placeholder until diagnostics
+      infrastructure exists.
+- [x] Add SanitizerCoverage and ThreadSanitizer placeholders that make the
+      unsupported instrumentation boundary explicit.
+- [x] Add `alloc-token` as an explicit allocation-instrumentation placeholder
       until allocation identity and instrumentation metadata are represented.
-- [ ] Add EntryExitInstrumenter only if Zig relies on it for selected modes.
-- [ ] Keep MemProf, CGProfile, CHR, and transform-warning as deferred unless a
+- [x] Keep EntryExitInstrumenter as an explicit placeholder for selected modes.
+- [x] Keep MemProf, CGProfile, CHR, and transform-warning as deferred unless a
       concrete Zig mode requires them.
 
 Passes covered:
 
-- [ ] `add-discriminators`
-- [ ] `annotation2metadata`
-- [ ] `annotation-remarks`
-- [ ] `sancov`
-- [ ] `module-tsan`
-- [ ] `tsan`
-- [ ] `alloc-token` placeholder
-- [ ] `ee-instrument`
-- [ ] deferred: `memprof-remove-attributes`, `cg-profile`, `chr`,
+- [x] `add-discriminators`
+- [x] `annotation2metadata`
+- [x] `annotation-remarks`
+- [x] `sancov`
+- [x] `module-tsan`
+- [x] `tsan`
+- [x] `alloc-token` placeholder
+- [x] `ee-instrument`
+- [x] deferred: `memprof-remove-attributes`, `cg-profile`, `chr`,
       `transform-warning`
 
 ## Epic 13: LTO Pre-Link Surface

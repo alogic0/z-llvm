@@ -40,14 +40,15 @@ function header attributes preserved as raw text
 parameter attributes preserved as raw text
 void function return type
 ret void
-explicit parser errors for unsupported globals, declarations, attribute groups, and module metadata
+explicit parser errors for unsupported globals, declarations, and attribute groups
+raw top-level module metadata preservation
 ```
 
 Upstream mapping:
 
 ```text
 LLVM modules carry target identity, datalayout, source file names, globals, aliases, COMDATs, metadata, attributes, and module flags.
-This project now parses and prints the first target records needed before Zig-emitted IR comparison can be honest.
+This project now parses and prints the first target records and raw top-level module metadata needed before Zig-emitted IR comparison can be honest.
 The records are preserved and lightly validated; transforms do not consume most module-level semantics yet.
 Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
 Calling conventions are preserved in the function signature because they are ABI-relevant in LLVM, but this project does not lower or verify their target ABI effects yet.
@@ -69,6 +70,7 @@ unit-test only:
   function visibility and parameter attribute round-trip
   function calling convention round-trip
   scalar global and constant global round-trip
+  raw top-level module metadata round-trip
   unsupported aggregate global diagnostic
   void function and ret void verification
 ```
@@ -81,7 +83,7 @@ no semantic use of globals in optimization or codegen
 no semantic use of linkage, visibility, or attributes
 no semantic use of calling conventions
 no attribute group parsing
-no module flags
-no metadata
+no interpreted module flags
+no instruction metadata attachments
 no source filename escaping
 ```
