@@ -84,6 +84,74 @@ test "target triple and datalayout parse supported x86_64 linux records" {
     try std.testing.expectEqual(@as(u16, 64), try layout.integerAbiAlignmentBits(64));
 }
 
+test "target matrix matches clang emitted datalayout records" {
+    const cases = [_]struct {
+        triple_text: []const u8,
+        supported: target.SupportedTarget,
+        datalayout: []const u8,
+        pointer_bits: u16,
+        pointer_align_bits: u16,
+        integer_bits: u16,
+        integer_align_bits: u16,
+    }{
+        .{
+            .triple_text = "x86_64-unknown-linux-gnu",
+            .supported = .x86_64_linux_gnu,
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            .pointer_bits = 64,
+            .pointer_align_bits = 64,
+            .integer_bits = 128,
+            .integer_align_bits = 128,
+        },
+        .{
+            .triple_text = "x86_64-unknown-linux-musl",
+            .supported = .x86_64_linux_musl,
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            .pointer_bits = 64,
+            .pointer_align_bits = 64,
+            .integer_bits = 128,
+            .integer_align_bits = 128,
+        },
+        .{
+            .triple_text = "aarch64-unknown-linux-gnu",
+            .supported = .aarch64_linux_gnu,
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32",
+            .pointer_bits = 64,
+            .pointer_align_bits = 64,
+            .integer_bits = 16,
+            .integer_align_bits = 16,
+        },
+        .{
+            .triple_text = "wasm32-unknown-wasi",
+            .supported = .wasm32_wasi,
+            .datalayout = "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-i128:128-n32:64-S128-ni:1:10:20",
+            .pointer_bits = 32,
+            .pointer_align_bits = 32,
+            .integer_bits = 64,
+            .integer_align_bits = 64,
+        },
+    };
+
+    for (cases) |case| {
+        const triple = try target.Triple.parse(case.triple_text);
+        try std.testing.expectEqual(case.supported, triple.supportedTarget().?);
+        try std.testing.expect(triple.isSupported());
+
+        const layout = try target.DataLayout.parse(case.datalayout);
+        try std.testing.expectEqual(case.pointer_bits, try layout.pointerSizeBits());
+        try std.testing.expectEqual(case.pointer_align_bits, try layout.pointerAbiAlignmentBits());
+        try std.testing.expectEqual(case.integer_align_bits, try layout.integerAbiAlignmentBits(case.integer_bits));
+    }
+}
+
+test "target triple parser accepts compact wasm32 wasi spelling" {
+    const triple = try target.Triple.parse("wasm32-wasi");
+    try std.testing.expect(triple.isWasm32());
+    try std.testing.expect(triple.isWasi());
+    try std.testing.expectEqualStrings("unknown", triple.vendor);
+    try std.testing.expectEqual(target.SupportedTarget.wasm32_wasi, triple.supportedTarget().?);
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

@@ -25,10 +25,10 @@ actually uses today. Paths are relative to `prog`.
 | `Context.enableBrokenDebugInfoCheck`, `Context.getBrokenDebugInfo` | Zig LLVM debug-info wrappers | debug validation | `src/debug/` | missing |
 | `Context.intType` | `LLVMIntTypeInContext` | LLVM type construction | `src/ir/` | partial integer IR only |
 | `Module.dispose` | `LLVMDisposeModule` | module lifetime | `src/ir/` | partial text IR module only |
-| `Target.getFromTriple` | `LLVMGetTargetFromTriple` | target discovery | `src/target/` | triple parse foundation |
+| `Target.getFromTriple` | `LLVMGetTargetFromTriple` | target discovery | `src/target/` | initial target matrix recognition |
 | `TargetMachine.create` | `ZigLLVMCreateTargetMachine` | target machine setup | `src/target/`, `src/codegen/` | missing |
 | `TargetMachine.emitToFile` | `ZigLLVMTargetMachineEmitToFile` | optimization, codegen, object/asm/IR/bitcode emission | `src/pipeline.zig`, `src/codegen/`, `src/mc/`, `src/bitcode/` | asm bootstrap for tiny x86_64 leaf subset |
-| `TargetMachine.createTargetDataLayout` | `LLVMCreateTargetDataLayout` | data layout | `src/target/` | parse/query foundation |
+| `TargetMachine.createTargetDataLayout` | `LLVMCreateTargetDataLayout` | data layout | `src/target/` | parse/query foundation tested against clang-22 emitted datalayouts |
 | `TargetData.abiAlignmentOfType` | `LLVMABIAlignmentOfType` | ABI query | `src/target/abi.zig` | partial integer ABI alignment query |
 | `LLVMInitialize*TargetInfo` | LLVM target registration | target registry | `src/target/` | missing |
 | `LLVMInitialize*Target` | LLVM target lowering registration | target registry/codegen | `src/target/`, `src/codegen/` | missing |
@@ -69,7 +69,7 @@ The current project covers phase-zero optimizer infrastructure:
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
-- Target support for basic triple parsing and default pointer/integer DataLayout queries.
+- Target support for initial target matrix recognition and default pointer/integer DataLayout queries.
 - Codegen bootstrap support for `--emit=asm` over tiny x86_64 SysV straight-line i32 leaf functions.
 - Named `scalar-foundation` and `memory-foundation` pipeline aliases, plus `opt-22` comparison fixtures for the implemented middle-end subset and unit tests for analysis-only behavior.
 

@@ -86,7 +86,7 @@ debug metadata
 branch weights / profile metadata
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
-target triple semantics beyond basic parsing
+target triple semantics beyond initial target matrix recognition
 ```
 
 ## Current Parser Errors
@@ -174,6 +174,7 @@ Module IR subset:
   source_filename
   target datalayout
   target triple
+  initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc

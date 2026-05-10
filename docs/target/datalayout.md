@@ -25,9 +25,11 @@ Implemented subset:
 
 ```text
 parse target triples shaped like arch-vendor-os-abi
-classify x86_64 and linux triples
+parse compact arch-os triples for Zig-style wasm32-wasi input
+classify supported targets: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
 parse and preserve LLVM target datalayout strings
 query the default pointer size and pointer ABI alignment from p:<size>:<abi>
+use LLVM's 64-bit default pointer layout when no default p: entry is present
 query integer ABI alignment from iN:<abi> entries
 ignore address-space-specific pointer specs such as p270 for default pointer queries
 ```
@@ -38,6 +40,7 @@ Upstream mapping:
 This is the first target-aware replacement slice for LLVM Triple and DataLayout behavior.
 LLVM's DataLayout is far richer: endian rules, mangling, native integer widths, stack alignment, address spaces, aggregates, vectors, function pointers, and target-specific defaults all matter upstream.
 This project currently preserves the full string but only interprets the fields required by early scalar pointer/integer tests.
+The target matrix expectations are copied from `clang-22 -target <triple> -S -emit-llvm -xc /dev/null -o -`, which exercises LLVM's target datalayout creation path without relying on object emission.
 ```
 
 Fixture coverage:
@@ -51,8 +54,10 @@ local-only conservative:
 
 unit-test only:
   x86_64-linux triple parsing
-  x86_64 datalayout default pointer-size and ABI-alignment queries
-  i64 ABI alignment query
+  x86_64-linux-gnu and x86_64-linux-musl datalayout default pointer-size, pointer ABI-alignment, and i128 ABI-alignment queries
+  aarch64-linux-gnu datalayout default pointer-size, pointer ABI-alignment, and i16 ABI-alignment queries
+  wasm32-wasi datalayout p:32 pointer-size, pointer ABI-alignment, and i64 ABI-alignment queries
+  compact wasm32-wasi triple parsing
 ```
 
 Known gaps:
@@ -63,5 +68,5 @@ no TargetMachine construction
 no aggregate, vector, or stack alignment queries
 no endian or mangling queries
 no address-space-specific pointer query API
-no LLVM-generated target matrix fixtures yet
+no automatic LLVM-generated target matrix fixture regeneration yet
 ```

@@ -51,23 +51,23 @@ Pipeline-Ready Optimizer Epic
 
 ## 1. Target Triple and DataLayout Foundation
 
-Status: partially implemented and verified in Cycle 17.
+Status: initial target matrix implemented and verified in Cycle 22.
 
 - [x] Add a `src/target/` module for target triple parsing and target identity.
 - [x] Parse LLVM `target triple` module records and preserve them through printing.
 - [x] Parse LLVM `target datalayout` module records and preserve them through printing.
 - [x] Add a minimal `DataLayout` query API for pointer size, pointer alignment, integer ABI alignment, and aggregate alignment placeholders.
-- [ ] Support a small initial target matrix: `x86_64-linux-gnu`, `x86_64-linux-musl`, `aarch64-linux-gnu`, and `wasm32-wasi`.
-- [ ] Compare parsed/query results against LLVM for the target matrix with unit tests or fixture-generated expectations.
+- [x] Support a small initial target matrix: `x86_64-linux-gnu`, `x86_64-linux-musl`, `aarch64-linux-gnu`, and `wasm32-wasi`.
+- [x] Compare parsed/query results against LLVM for the target matrix with unit tests or fixture-generated expectations.
 - [x] Document the mapping to LLVM `DataLayout`, `Triple`, `TargetMachine`, and Zig's `Compilation/Config.zig` backend selection.
 
 Suggested slice boundary:
 
 - [ ] First land parse/preserve for `target triple` and `target datalayout`
       without interpreting every field.
-- [ ] Then add one target's pointer-size and integer-alignment queries with
+- [x] Then add one target's pointer-size and integer-alignment queries with
       tests against LLVM.
-- [ ] Only after that, expand the target matrix.
+- [x] Only after that, expand the target matrix.
 
 ## 2. Module-Level IR Surface
 

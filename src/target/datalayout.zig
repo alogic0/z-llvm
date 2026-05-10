@@ -2,8 +2,8 @@ const std = @import("std");
 
 pub const DataLayout = struct {
     text: []const u8,
-    pointer_size_bits: ?u16 = null,
-    pointer_abi_align_bits: ?u16 = null,
+    pointer_size_bits: ?u16 = 64,
+    pointer_abi_align_bits: ?u16 = 64,
 
     pub fn parse(text: []const u8) !DataLayout {
         var layout: DataLayout = .{ .text = text };
