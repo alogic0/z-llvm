@@ -272,6 +272,25 @@ test "parser normalizes memory instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes getelementptr instructions" {
+    const input =
+        \\define i32 @gep(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  %p = getelementptr i32, ptr %slot, i32 0
+        \\  store i32 %a, ptr %p
+        \\  %v = load i32, ptr %p
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "parser normalizes undef values" {
     const input =
         \\define i32 @undef_value(i1 %cond, i32 %a) {

@@ -54,6 +54,10 @@ pub const UseCounts = struct {
                 try uses.addValue(store.value);
                 try uses.addValue(store.ptr);
             },
+            .gep => |gep| {
+                try uses.addValue(gep.ptr);
+                for (gep.indices.items) |index| try uses.addValue(index.value);
+            },
         }
     }
 
@@ -75,6 +79,10 @@ pub const UseCounts = struct {
             .store => |store| {
                 uses.removeValue(store.value);
                 uses.removeValue(store.ptr);
+            },
+            .gep => |gep| {
+                uses.removeValue(gep.ptr);
+                for (gep.indices.items) |index| uses.removeValue(index.value);
             },
         }
     }

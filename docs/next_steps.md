@@ -10,7 +10,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Extend `mem2reg` to handle uninitialized loads with LLVM-compatible `undef` replacement, plus `opt-22` comparison fixtures.
 - [x] Extend `mem2reg` to promote multiple independent stack slots in one pass run, preserving deterministic LLVM-compatible phi naming.
 - [x] Add promotability checks and docs for rejected stack slots: escaped allocas, stores of the slot pointer, non-load/store users, and unsupported alloca forms.
-- [ ] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
+- [x] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
 - [ ] Extend alias analysis from distinct direct `alloca` pointers to simple `getelementptr`-derived stack objects, documenting the BasicAA mapping and known conservative fallbacks.
 - [ ] Add `opt-22` comparison fixtures for rejected mem2reg cases and simple GEP-backed memory IR normalization.
 
@@ -96,3 +96,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `mem2reg` now replaces promoted uninitialized loads with `undef` and compares that behavior against `opt-22`.
 - `mem2reg` now keeps promoting independent stack slots until no promotable alloca remains, with `opt-22` coverage for two promoted slots.
 - `mem2reg` promotability rejection is now tested and documented for escaped stack slots and stores of the stack-slot pointer.
+- Memory IR now parses, prints, and verifies a first opaque-pointer `getelementptr` form.

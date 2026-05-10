@@ -130,6 +130,21 @@ pub const StoreInst = struct {
     ptr: Value,
 };
 
+pub const GepIndex = struct {
+    ty: Type,
+    value: Value,
+};
+
+pub const GepInst = struct {
+    source_ty: Type,
+    ptr: Value,
+    indices: std.ArrayList(GepIndex),
+
+    pub fn deinit(gep: *GepInst, allocator: std.mem.Allocator) void {
+        gep.indices.deinit(allocator);
+    }
+};
+
 pub const Instruction = struct {
     result: ?[]const u8,
     kind: union(enum) {
@@ -139,6 +154,7 @@ pub const Instruction = struct {
         alloca: AllocaInst,
         load: LoadInst,
         store: StoreInst,
+        gep: GepInst,
     },
     removed: bool = false,
     replacement: ?Value = null,
@@ -162,6 +178,7 @@ pub const Instruction = struct {
             .phi => |phi| phi.ty,
             .alloca => .ptr,
             .load => |load| load.ty,
+            .gep => .ptr,
             .store => null,
         };
     }
@@ -185,6 +202,12 @@ pub const Instruction = struct {
                 store.value = resolveValue(aliases, store.value);
                 store.ptr = resolveValue(aliases, store.ptr);
             },
+            .gep => |*gep| {
+                gep.ptr = resolveValue(aliases, gep.ptr);
+                for (gep.indices.items) |*index| {
+                    index.value = resolveValue(aliases, index.value);
+                }
+            },
         }
     }
 
@@ -192,6 +215,7 @@ pub const Instruction = struct {
         switch (instruction.kind) {
             .binary, .icmp, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
+            .gep => |*gep| gep.deinit(allocator),
         }
     }
 };
@@ -440,6 +464,19 @@ pub const Module = struct {
                             try store.ptr.format(writer);
                             try writer.writeByte('\n');
                         },
+                        .gep => |gep| {
+                            try writer.writeAll("getelementptr ");
+                            try gep.source_ty.format(writer);
+                            try writer.writeAll(", ptr ");
+                            try gep.ptr.format(writer);
+                            for (gep.indices.items) |index| {
+                                try writer.writeAll(", ");
+                                try index.ty.format(writer);
+                                try writer.writeByte(' ');
+                                try index.value.format(writer);
+                            }
+                            try writer.writeByte('\n');
+                        },
                     }
                 }
                 if (block.terminator) |terminator| switch (terminator) {
@@ -513,6 +550,14 @@ pub const Module = struct {
                             if (instruction.result != null) return error.StoreHasResult;
                             try verifyValue(defs, store.ty, store.value);
                             try verifyValue(defs, .ptr, store.ptr);
+                        },
+                        .gep => |gep| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
+                            try verifyValue(defs, .ptr, gep.ptr);
+                            if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
+                            for (gep.indices.items) |index| {
+                                try verifyValue(defs, index.ty, index.value);
+                            }
                         },
                     }
                 }
@@ -640,6 +685,34 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction
                 .ty = ty,
                 .ptr = ptr,
             } },
+        };
+    }
+
+    if (std.mem.eql(u8, op_text, "getelementptr")) {
+        var gep: GepInst = .{
+            .source_ty = try parseType(parts.next() orelse return error.InvalidInstruction),
+            .ptr = undefined,
+            .indices = .empty,
+        };
+        errdefer gep.deinit(allocator);
+
+        const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        if (ptr_ty != .ptr) return error.ExpectedPointerType;
+        gep.ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
+
+        while (parts.next()) |index_ty_text| {
+            const index_ty = try parseType(index_ty_text);
+            const index_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+            try gep.indices.append(allocator, .{
+                .ty = index_ty,
+                .value = index_value,
+            });
+        }
+        if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
+
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .gep = gep },
         };
     }
 

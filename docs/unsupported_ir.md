@@ -15,6 +15,7 @@ phi instructions
 alloca instructions
 load instructions
 store instructions
+getelementptr instructions
 ret
 br label %target
 br i1 <value>, label %then, label %else
@@ -43,7 +44,6 @@ icmp predicates except eq/ne
 fcmp
 phi token/blockaddress values
 select
-getelementptr
 call/invoke/callbr
 cast instructions
 division/remainder

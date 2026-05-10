@@ -88,7 +88,7 @@ fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_nam
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
                 },
-                .binary, .icmp, .alloca, .load, .store => {},
+                .binary, .icmp, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -146,7 +146,7 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
                         changed = true;
                     }
                 },
-                .binary, .icmp, .alloca, .load, .store => {},
+                .binary, .icmp, .alloca, .load, .store, .gep => {},
             }
         }
     }
@@ -160,7 +160,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .icmp, .alloca, .load, .store => null,
+                .binary, .icmp, .alloca, .load, .store, .gep => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -203,6 +203,12 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .store => |*store| {
                     store.value = replaceOperand(store.value, name, replacement);
                     store.ptr = replaceOperand(store.ptr, name, replacement);
+                },
+                .gep => |*gep| {
+                    gep.ptr = replaceOperand(gep.ptr, name, replacement);
+                    for (gep.indices.items) |*index| {
+                        index.value = replaceOperand(index.value, name, replacement);
+                    }
                 },
             }
         }
