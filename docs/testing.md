@@ -57,7 +57,9 @@ Target-aware infrastructure currently has unit-test-only coverage for:
 target triple parsing
 target datalayout preservation and pointer/integer alignment queries
 source_filename preservation
+function linkage and raw function-header attribute preservation
 void function and ret void round-tripping
+explicit unsupported global diagnostics
 ```
 
 Use a different `opt` binary:
@@ -100,6 +102,7 @@ GVN: dominating repeated pure-expression elimination subset with memory-effect r
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing and minimal DataLayout query subset
+Module IR: source filename, target records, function linkage, raw function attributes, and void return preservation
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 

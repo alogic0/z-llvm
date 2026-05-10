@@ -71,15 +71,16 @@ Suggested slice boundary:
 
 ## 2. Module-Level IR Surface
 
-Status: in progress as Cycle 19 in `docs/next_steps.md`.
+Status: linkage and function-header attribute preservation implemented and verified in Cycle 19.
 
 - [x] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
 - [ ] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
-- [ ] Add linkage and visibility parsing for the first supported forms: `internal`, `private`, `external`, and default external definitions.
-- [ ] Add function attributes as parsed-and-preserved metadata where transforms do not understand them yet.
+- [x] Add linkage parsing for the first supported forms: `internal`, `private`, `external`, and default external definitions.
+- [ ] Add visibility parsing for the first supported forms emitted by tiny Zig examples.
+- [x] Add function attributes as parsed-and-preserved metadata where transforms do not understand them yet.
 - [ ] Add parameter attributes as parsed-and-preserved metadata for simple ABI-significant cases.
-- [ ] Update verifier rules so unsupported module-level constructs fail explicitly instead of being silently ignored.
-- [ ] Add normalized round-trip fixtures for module-level records emitted by Zig's LLVM backend.
+- [x] Update verifier rules so unsupported module-level constructs fail explicitly instead of being silently ignored.
+- [x] Add normalized round-trip fixtures for module-level records emitted by Zig's LLVM backend.
 
 Suggested slice boundary:
 

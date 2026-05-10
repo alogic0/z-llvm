@@ -111,6 +111,42 @@ test "parser preserves module target records and void return" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves function linkage and header attributes" {
+    const input =
+        \\source_filename = "attrs.zig"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal i32 @kept(i32 %a) local_unnamed_addr #0 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqual(ir.FunctionLinkage.internal, function.linkage);
+    try std.testing.expectEqualStrings("local_unnamed_addr #0", function.attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported top-level globals explicitly" {
+    const input =
+        \\@g = global i32 0
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedGlobalVariable, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "x86_64 codegen lowers add args to assembly" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

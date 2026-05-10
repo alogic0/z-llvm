@@ -39,6 +39,11 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
+        if (current_function == null and std.mem.startsWith(u8, line, "@")) return error.UnsupportedGlobalVariable;
+        if (current_function == null and std.mem.startsWith(u8, line, "declare ")) return error.UnsupportedFunctionDeclaration;
+        if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) return error.UnsupportedAttributeGroup;
+        if (current_function == null and std.mem.startsWith(u8, line, "!")) return error.UnsupportedModuleMetadata;
+
         if (std.mem.startsWith(u8, line, "define ")) {
             if (current_function != null) return error.NestedFunction;
             const function = try parseFunctionHeader(allocator, line);
@@ -122,12 +127,21 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
 
     const head = std.mem.trim(u8, body[0..open_paren], " \t");
     var head_parts = std.mem.tokenizeAny(u8, head, " \t");
-    const ret_ty = try parseType(head_parts.next() orelse return error.InvalidFunctionHeader);
+    const first_head_token = head_parts.next() orelse return error.InvalidFunctionHeader;
+    const linkage = core.FunctionLinkage.parse(first_head_token) orelse .default;
+    const ret_ty_text = if (linkage == .default)
+        first_head_token
+    else
+        head_parts.next() orelse return error.InvalidFunctionHeader;
+    const ret_ty = try parseType(ret_ty_text);
     const name_text = head_parts.next() orelse return error.InvalidFunctionHeader;
     if (head_parts.next() != null) return error.InvalidFunctionHeader;
     if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
 
     var function = core.Function.init(name_text[1..], ret_ty);
+    function.linkage = linkage;
+    const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
+    if (attrs.len != 0) function.attrs = attrs;
     errdefer function.deinit(allocator);
 
     const params_text = std.mem.trim(u8, body[open_paren + 1 .. close_paren], " \t");

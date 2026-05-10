@@ -153,6 +153,29 @@ pub const Param = struct {
     name: []const u8,
 };
 
+pub const FunctionLinkage = enum {
+    default,
+    internal,
+    private,
+    external,
+
+    pub fn parse(text: []const u8) ?FunctionLinkage {
+        if (std.mem.eql(u8, text, "internal")) return .internal;
+        if (std.mem.eql(u8, text, "private")) return .private;
+        if (std.mem.eql(u8, text, "external")) return .external;
+        return null;
+    }
+
+    pub fn format(linkage: FunctionLinkage, writer: anytype) !void {
+        switch (linkage) {
+            .default => {},
+            .internal => try writer.writeAll("internal "),
+            .private => try writer.writeAll("private "),
+            .external => try writer.writeAll("external "),
+        }
+    }
+};
+
 pub const BinaryInst = struct {
     op: BinaryOp,
     flags: BinaryFlags = .{},
@@ -381,6 +404,8 @@ pub const BasicBlock = struct {
 pub const Function = struct {
     name: []const u8,
     ret_ty: Type,
+    linkage: FunctionLinkage = .default,
+    attrs: ?[]const u8 = null,
     params: std.ArrayList(Param),
     blocks: std.ArrayList(BasicBlock),
 

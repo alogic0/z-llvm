@@ -19,6 +19,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
     for (module.functions.items, 0..) |function, function_index| {
         if (function_index != 0) try writer.writeByte('\n');
         try writer.writeAll("define ");
+        try function.linkage.format(writer);
         try function.ret_ty.format(writer);
         try writer.print(" @{s}(", .{function.name});
         for (function.params.items, 0..) |param, index| {
@@ -26,7 +27,9 @@ pub fn print(module: core.Module, writer: anytype) !void {
             try param.ty.format(writer);
             try writer.print(" %{s}", .{param.name});
         }
-        try writer.writeAll(") {\n");
+        try writer.writeByte(')');
+        if (function.attrs) |attrs| try writer.print(" {s}", .{attrs});
+        try writer.writeAll(" {\n");
 
         for (function.blocks.items) |block| {
             try writer.print("{s}:\n", .{block.name});

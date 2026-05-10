@@ -7,6 +7,8 @@ The current parser is intentionally small. It accepts only the LLVM-compatible s
 ```text
 define iN @name(...)
 define void @name(...)
+function linkage on definitions: internal, private, external, default
+function header attributes preserved as raw text
 source_filename module record
 target datalayout module record
 target triple module record
@@ -68,7 +70,7 @@ inline asm
 ## Unsupported Attributes and Metadata
 
 ```text
-function attributes
+function attributes are preserved but not semantically interpreted
 parameter attributes
 fast-math flags
 full alignment semantics
@@ -112,6 +114,10 @@ InvalidInstruction
 InvalidRet
 InvalidBr
 InvalidLabel
+UnsupportedGlobalVariable
+UnsupportedFunctionDeclaration
+UnsupportedAttributeGroup
+UnsupportedModuleMetadata
 ```
 
 ## Reproduced LLVM Functionality So Far
@@ -164,6 +170,8 @@ Module IR subset:
   source_filename
   target datalayout
   target triple
+  function linkage on definitions
+  raw function header attributes
   void return type
 
 Scalar IR subset:
@@ -211,7 +219,11 @@ bitcast and pointer casts
 unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
-globals and linkage
+globals
+visibility
+function declarations
+attribute groups
+module metadata
 full atomic operations and ordering semantics
 ```
 
