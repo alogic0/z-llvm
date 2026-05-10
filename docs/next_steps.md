@@ -6,7 +6,7 @@
 - [x] Add `phi` instruction parsing, printing, verification, and tests.
 - [x] Extend `simplifycfg` to update/remove trivial phi inputs.
 - [x] Add an explicit CFG analysis helper for predecessors and successors.
-- [ ] Add dominator tree analysis for reachable blocks.
+- [x] Add dominator tree analysis for reachable blocks.
 - [ ] Implement an `early-cse` subset for repeated pure expressions.
 
 ## Completed Cycles
@@ -29,6 +29,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - `simplifycfg` subset: documented in [passes/simplifycfg.md](passes/simplifycfg.md).
 - def-use use-count subset: documented in [analysis/def_use.md](analysis/def_use.md).
 - CFG successor/predecessor subset: documented in [analysis/cfg.md](analysis/cfg.md).
+- dominator analysis subset: documented in [analysis/dominator.md](analysis/dominator.md).
 
 ## Completed Step Notes
 
@@ -42,3 +43,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `phi` parsing, printing, verification, and def-use tracking are now supported for the current integer/value subset.
 - `simplifycfg` now prunes phi incoming values from removed unreachable predecessors and replaces trivial phis.
 - CFG analysis now provides successor/predecessor lists and entry-block reachability; `simplifycfg` uses it for unreachable block removal.
+- Dominator analysis now computes reachable-block dominance queries over the CFG.

@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("analysis/cfg.zig");
+const dominator = @import("analysis/dominator.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
@@ -366,4 +367,35 @@ test "cfg analysis reports successors predecessors and reachability" {
     defer std.testing.allocator.free(reachable);
 
     try std.testing.expectEqualSlices(bool, &.{ true, true, true, false, true }, reachable);
+}
+
+test "dominator analysis answers dominance queries" {
+    const input =
+        \\define i32 @dom(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %exit
+        \\right:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var dom = try dominator.Dominators.build(std.testing.allocator, function);
+    defer dom.deinit();
+
+    try std.testing.expect(dom.dominates(0, 0));
+    try std.testing.expect(dom.dominates(0, 1));
+    try std.testing.expect(dom.dominates(0, 2));
+    try std.testing.expect(dom.dominates(0, 3));
+    try std.testing.expect(dom.dominates(1, 1));
+    try std.testing.expect(!dom.dominates(1, 3));
+    try std.testing.expect(!dom.dominates(2, 3));
 }
