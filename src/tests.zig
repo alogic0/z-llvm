@@ -561,6 +561,63 @@ test "mem2reg promotes loop-carried stack slot" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "mem2reg promotes multiple independent stack slots" {
+    const input =
+        \\define i32 @promote_two(i1 %cond, i32 %a, i32 %b, i32 %c, i32 %d) {
+        \\entry:
+        \\  %x = alloca i32
+        \\  %y = alloca i32
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  store i32 %a, ptr %x
+        \\  store i32 %b, ptr %y
+        \\  br label %merge
+        \\right:
+        \\  store i32 %c, ptr %x
+        \\  store i32 %d, ptr %y
+        \\  br label %merge
+        \\merge:
+        \\  %vx = load i32, ptr %x
+        \\  %vy = load i32, ptr %y
+        \\  %sum = add i32 %vx, %vy
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @promote_two(i1 %cond, i32 %a, i32 %b, i32 %c, i32 %d) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %y.0 = phi i32 [ %b, %left ], [ %d, %right ]
+        \\  %x.0 = phi i32 [ %a, %left ], [ %c, %right ]
+        \\  %sum = add i32 %x.0, %y.0
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

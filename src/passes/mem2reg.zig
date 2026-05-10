@@ -18,6 +18,14 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 }
 
 fn promoteFunction(module: *ir.Module, function_index: usize) !bool {
+    var changed = false;
+    while (try promoteOneFunctionSlot(module, function_index)) {
+        changed = true;
+    }
+    return changed;
+}
+
+fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
     const function = &module.functions.items[function_index];
     var changed = false;
     var block_index: usize = 0;
@@ -250,8 +258,7 @@ fn renameSlot(
     const outgoing_value = current_value orelse .undef;
     for (graph.successors(block_index)) |successor| {
         const phi_name = phi_names[successor] orelse continue;
-        try addPhiIncoming(allocator, function, successor, outgoing_value, function.blocks.items[block_index].name);
-        _ = phi_name;
+        try addPhiIncoming(allocator, function, successor, phi_name, outgoing_value, function.blocks.items[block_index].name);
     }
 
     for (children[block_index].items) |child| {
@@ -259,11 +266,13 @@ fn renameSlot(
     }
 }
 
-fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, value: ir.Value, predecessor: []const u8) !void {
+fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, phi_name: []const u8, value: ir.Value, predecessor: []const u8) !void {
     for (function.blocks.items[block_index].instructions.items) |*instruction| {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .phi => |*phi| {
+                const result = instruction.result orelse continue;
+                if (!std.mem.eql(u8, result, phi_name)) continue;
                 try phi.incoming.append(allocator, .{
                     .value = value,
                     .block = predecessor,

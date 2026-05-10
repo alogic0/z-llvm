@@ -8,7 +8,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 
 - [x] Add `undef` value parsing, printing, verification, normalization, and upstream mapping for LLVM `UndefValue`/poison-adjacent behavior.
 - [x] Extend `mem2reg` to handle uninitialized loads with LLVM-compatible `undef` replacement, plus `opt-22` comparison fixtures.
-- [ ] Extend `mem2reg` to promote multiple independent stack slots in one pass run, preserving deterministic LLVM-compatible phi naming.
+- [x] Extend `mem2reg` to promote multiple independent stack slots in one pass run, preserving deterministic LLVM-compatible phi naming.
 - [ ] Add promotability checks and docs for rejected stack slots: escaped allocas, stores of the slot pointer, non-load/store users, and unsupported alloca forms.
 - [ ] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
 - [ ] Extend alias analysis from distinct direct `alloca` pointers to simple `getelementptr`-derived stack objects, documenting the BasicAA mapping and known conservative fallbacks.
@@ -94,3 +94,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `opt-22` comparison fixtures now cover multi-block `mem2reg` if/else, loop-carried, and unreachable-predecessor cases.
 - `undef` values now parse, print, verify, and normalize as documented in [ir_values.md](ir_values.md).
 - `mem2reg` now replaces promoted uninitialized loads with `undef` and compares that behavior against `opt-22`.
+- `mem2reg` now keeps promoting independent stack slots until no promotable alloca remains, with `opt-22` coverage for two promoted slots.

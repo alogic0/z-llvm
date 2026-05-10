@@ -21,6 +21,7 @@ zig build run -- --passes=mem2reg test/opt/inputs/mem2reg.ll
 zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_undef.ll
 zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_if.ll
 zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_loop.ll
+zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_two_slots.ll
 zig build run -- --passes=simplifycfg,mem2reg test/opt/inputs/mem2reg_unreachable.ll
 ```
 
@@ -35,6 +36,7 @@ opt -passes=mem2reg test/opt/inputs/mem2reg.ll -S -o /tmp/llvm_mem2reg.ll
 opt -passes=mem2reg test/opt/inputs/mem2reg_undef.ll -S -o /tmp/llvm_mem2reg_undef.ll
 opt -passes=mem2reg test/opt/inputs/mem2reg_if.ll -S -o /tmp/llvm_mem2reg_if.ll
 opt -passes=mem2reg test/opt/inputs/mem2reg_loop.ll -S -o /tmp/llvm_mem2reg_loop.ll
+opt -passes=mem2reg test/opt/inputs/mem2reg_two_slots.ll -S -o /tmp/llvm_mem2reg_two_slots.ll
 opt -passes=simplifycfg,mem2reg test/opt/inputs/mem2reg_unreachable.ll -S -o /tmp/llvm_mem2reg_unreachable.ll
 ```
 

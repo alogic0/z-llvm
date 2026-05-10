@@ -27,6 +27,7 @@ Implemented subset:
 ```text
 single-basic-block alloca promotion
 one multi-block stack slot per pass invocation
+multiple independent stack slots promoted until no promotable alloca remains
 only direct load/store users of the alloca pointer are promotable
 loads before the first store keep the slot unpromoted
 uninitialized promoted loads are replaced with undef
@@ -42,7 +43,7 @@ Upstream mapping:
 
 ```text
 This reproduces LLVM mem2reg's same-block scalar replacement and the first dominance-frontier phi-placement plus rename-walk shape.
-LLVM's PromoteMemToReg supports many allocas per run, precise debug-info assignment tracking, lifetime intrinsics, unreachable uses, and poison/undef details for uninitialized loads.
+LLVM's PromoteMemToReg promotes many allocas per run and supports precise debug-info assignment tracking, lifetime intrinsics, unreachable uses, and poison/undef details for uninitialized loads.
 This subset models the basic uninitialized-load result as `undef`, but does not yet implement LLVM's full poison/undef semantics.
 ```
 
@@ -82,7 +83,7 @@ merge:
 Known gaps:
 
 ```text
-only one multi-block alloca is promoted per pass invocation
+multi-block allocas are currently promoted one at a time in a loop rather than batched like LLVM
 generated phi names follow the first LLVM-compatible stack-slot form: %slot.0, %slot.1, ...
 no alloca arrays
 no lifetime intrinsics
