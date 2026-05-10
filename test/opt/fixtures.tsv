@@ -4,6 +4,7 @@ dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	generic LLVM 
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-22 inferred memory alignment is normalized
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	generic LLVM headers only
 mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	generic LLVM headers only
+mem2reg_undef	mem2reg	mem2reg	test/opt/inputs/mem2reg_undef.ll	test/opt/expected/z_llvm/mem2reg_undef.ll	uninitialized stack load becomes undef
 mem2reg_if	mem2reg	mem2reg	test/opt/inputs/mem2reg_if.ll	test/opt/expected/z_llvm/mem2reg_if.ll	multi-block phi placement
 mem2reg_loop	mem2reg	mem2reg	test/opt/inputs/mem2reg_loop.ll	test/opt/expected/z_llvm/mem2reg_loop.ll	loop-carried phi placement
 mem2reg_unreachable	simplifycfg,mem2reg	simplifycfg,mem2reg	test/opt/inputs/mem2reg_unreachable.ll	test/opt/expected/z_llvm/mem2reg_unreachable.ll	unreachable predecessor removed before promotion

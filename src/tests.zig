@@ -422,6 +422,41 @@ test "mem2reg promotes single-block stack slot" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "mem2reg replaces uninitialized stack loads with undef" {
+    const input =
+        \\define i32 @promote_undef() {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @promote_undef() {
+        \\entry:
+        \\  ret i32 undef
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "mem2reg promotes if-else stack slot with phi" {
     const input =
         \\define i32 @promote_if(i1 %cond, i32 %a, i32 %b) {

@@ -236,7 +236,7 @@ fn renameSlot(
                 .load => |load| {
                     if (!isNamed(load.ptr, slot)) continue;
                     const result = instruction.result orelse continue;
-                    const value = current_value orelse continue;
+                    const value = current_value orelse .undef;
                     instruction.removed = true;
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
@@ -247,12 +247,11 @@ fn renameSlot(
         if (replacement) |item| replaceValue(function, item.name, item.value);
     }
 
-    if (current_value) |value| {
-        for (graph.successors(block_index)) |successor| {
-            const phi_name = phi_names[successor] orelse continue;
-            try addPhiIncoming(allocator, function, successor, value, function.blocks.items[block_index].name);
-            _ = phi_name;
-        }
+    const outgoing_value = current_value orelse .undef;
+    for (graph.successors(block_index)) |successor| {
+        const phi_name = phi_names[successor] orelse continue;
+        try addPhiIncoming(allocator, function, successor, outgoing_value, function.blocks.items[block_index].name);
+        _ = phi_name;
     }
 
     for (children[block_index].items) |child| {
@@ -355,7 +354,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                 .load => |load| {
                     if (!isNamed(load.ptr, slot)) continue;
                     const result = instruction.result orelse continue;
-                    const value = current_value orelse continue;
+                    const value = current_value orelse .undef;
                     instruction.removed = true;
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };

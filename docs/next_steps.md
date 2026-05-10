@@ -7,7 +7,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 ### Cycle 5: Mem2Reg Completeness and Pointer IR Foundation
 
 - [x] Add `undef` value parsing, printing, verification, normalization, and upstream mapping for LLVM `UndefValue`/poison-adjacent behavior.
-- [ ] Extend `mem2reg` to handle uninitialized loads with LLVM-compatible `undef` replacement, plus `opt-22` comparison fixtures.
+- [x] Extend `mem2reg` to handle uninitialized loads with LLVM-compatible `undef` replacement, plus `opt-22` comparison fixtures.
 - [ ] Extend `mem2reg` to promote multiple independent stack slots in one pass run, preserving deterministic LLVM-compatible phi naming.
 - [ ] Add promotability checks and docs for rejected stack slots: escaped allocas, stores of the slot pointer, non-load/store users, and unsupported alloca forms.
 - [ ] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
@@ -93,3 +93,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `mem2reg` now promotes one multi-block stack slot with dominance-frontier phi insertion and a dominator-tree rename walk.
 - `opt-22` comparison fixtures now cover multi-block `mem2reg` if/else, loop-carried, and unreachable-predecessor cases.
 - `undef` values now parse, print, verify, and normalize as documented in [ir_values.md](ir_values.md).
+- `mem2reg` now replaces promoted uninitialized loads with `undef` and compares that behavior against `opt-22`.
