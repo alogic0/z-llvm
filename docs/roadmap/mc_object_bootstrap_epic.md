@@ -25,6 +25,14 @@ Pipeline-Ready Optimizer Epic
 - Keep this epic separate from target/DataLayout and AIR lowering work; unresolved
   IR or ABI questions should be fixed in the previous epic first.
 
+Current status:
+
+- Paused until the [Target DataLayout and AIR-to-IR Bridge Epic](target_datalayout_air_bridge_epic.md)
+  is complete.
+- Cycle 18 landed an early assembly bootstrap slice before this sequencing rule
+  was made explicit. Keep that code, but do not pull more slices from this epic
+  until the previous epic is finished.
+
 ## Suggestions Before Starting
 
 - Do not start this epic until the previous target/DataLayout epic has one

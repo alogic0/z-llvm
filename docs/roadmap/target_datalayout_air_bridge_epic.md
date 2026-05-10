@@ -51,15 +51,15 @@ Pipeline-Ready Optimizer Epic
 
 ## 1. Target Triple and DataLayout Foundation
 
-Status: implemented and verified in Cycle 17.
+Status: partially implemented and verified in Cycle 17.
 
-- [ ] Add a `src/target/` module for target triple parsing and target identity.
-- [ ] Parse LLVM `target triple` module records and preserve them through printing.
-- [ ] Parse LLVM `target datalayout` module records and preserve them through printing.
-- [ ] Add a minimal `DataLayout` query API for pointer size, pointer alignment, integer ABI alignment, and aggregate alignment placeholders.
+- [x] Add a `src/target/` module for target triple parsing and target identity.
+- [x] Parse LLVM `target triple` module records and preserve them through printing.
+- [x] Parse LLVM `target datalayout` module records and preserve them through printing.
+- [x] Add a minimal `DataLayout` query API for pointer size, pointer alignment, integer ABI alignment, and aggregate alignment placeholders.
 - [ ] Support a small initial target matrix: `x86_64-linux-gnu`, `x86_64-linux-musl`, `aarch64-linux-gnu`, and `wasm32-wasi`.
 - [ ] Compare parsed/query results against LLVM for the target matrix with unit tests or fixture-generated expectations.
-- [ ] Document the mapping to LLVM `DataLayout`, `Triple`, `TargetMachine`, and Zig's `Compilation/Config.zig` backend selection.
+- [x] Document the mapping to LLVM `DataLayout`, `Triple`, `TargetMachine`, and Zig's `Compilation/Config.zig` backend selection.
 
 Suggested slice boundary:
 
@@ -71,7 +71,9 @@ Suggested slice boundary:
 
 ## 2. Module-Level IR Surface
 
-- [ ] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
+Status: in progress as Cycle 19 in `docs/next_steps.md`.
+
+- [x] Add module-level target records to the IR model: triple, datalayout, source filename if useful for round-tripping.
 - [ ] Add global variables and constant global initializers for the subset emitted by tiny Zig examples.
 - [ ] Add linkage and visibility parsing for the first supported forms: `internal`, `private`, `external`, and default external definitions.
 - [ ] Add function attributes as parsed-and-preserved metadata where transforms do not understand them yet.
