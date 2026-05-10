@@ -93,6 +93,7 @@ target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
 ABI classification beyond void, scalar integer, and pointer signatures
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
+AIR-like standalone CLI/text input mode
 ```
 
 ## Current Parser Errors
@@ -186,6 +187,7 @@ Module IR subset:
   initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
   scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
+  AIR-like pre/post optimization driver using named pipelines
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc

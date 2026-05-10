@@ -1,5 +1,7 @@
 const std = @import("std");
 const ir = @import("ir.zig");
+const pass_manager = @import("pass_manager.zig");
+const pipelines = @import("pipelines.zig");
 
 pub const Param = struct {
     name: []const u8,
@@ -133,6 +135,28 @@ pub fn lowerModule(allocator: std.mem.Allocator, spec: Module) !ir.Module {
     }
 
     return module;
+}
+
+pub fn lowerPrintAndRunPipeline(
+    allocator: std.mem.Allocator,
+    spec: Module,
+    pipeline_name: []const u8,
+    pre_writer: anytype,
+    post_writer: anytype,
+) !void {
+    var module = try lowerModule(allocator, spec);
+    defer module.deinit();
+    try module.verify();
+
+    try module.print(pre_writer);
+
+    var pm = pass_manager.ModulePassManager.init(allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, pipeline_name);
+
+    var context: pass_manager.Context = .{ .allocator = allocator };
+    _ = try pm.run(&module, &context, post_writer, false);
+    try module.print(post_writer);
 }
 
 fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {

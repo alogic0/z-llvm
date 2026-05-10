@@ -115,7 +115,7 @@ Suggested slice boundary:
 - [x] Lower control flow into the project IR: blocks, conditional branch, return, unreachable.
 - [x] Lower stack memory into the project IR: alloca/load/store/GEP for scalar stack slots.
 - [x] Lower loops in the canonical form expected by current LoopInfo/LICM where possible.
-- [ ] Add a small bridge driver that can print pre-optimization IR and run named optimizer pipelines.
+- [x] Add a small bridge driver that can print pre-optimization IR and run named optimizer pipelines.
 - [ ] Keep comptime, generics, full AIR semantics, error unions, optionals, async, and debug info out of scope.
 
 Suggested slice boundary:
@@ -123,7 +123,7 @@ Suggested slice boundary:
 - [x] Define the bridge input as a test/build helper format with a stable
       printer, so failures can be reduced without invoking the whole Zig
       compiler every time.
-- [ ] Add bridge output before optimization and after the named optimizer
+- [x] Add bridge output before optimization and after the named optimizer
       pipeline, so lowering bugs and optimizer bugs are easier to separate.
 
 ## 5. Zig-Emitted IR Comparison Harness

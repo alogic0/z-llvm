@@ -48,6 +48,7 @@ Implemented subset:
 ```text
 test/helper builder, not a text input language
 module source_filename, target triple, and datalayout preservation
+helper driver for pre-optimization IR, named pipeline execution, and post-optimization IR
 one-entry-block functions
 explicit basic blocks
 scalar integer parameters
@@ -68,6 +69,7 @@ This project now has a tiny builder that can construct the same project IR shape
 Stack memory lowering maps directly onto the existing LLVM-compatible alloca/load/store/GEP project IR surface; alias analysis, SROA, and mem2reg behavior remain owned by the existing passes.
 Loop lowering emits the canonical shape required by the local LoopInfo and LICM foundation: a single preheader branch into a header, a single latch backedge, and a distinct exit block.
 The bridge is deliberately synthetic so optimizer and target tests can reduce failures to small inputs.
+The helper driver reuses the existing pass manager and pipeline registry; it is not a second optimizer path.
 ```
 
 Fixture coverage:
@@ -86,6 +88,7 @@ unit-test only:
   scalar stack slot with aligned store/load
   scalar zero-index GEP from a stack slot
   canonical loop shape accepted by LoopInfo preheader, latch, exiting block, and exit block queries
+  memory-foundation pipeline turns an AIR-like stack slot into a scalar return
   target triple and datalayout preservation on lowered modules
 ```
 
@@ -93,6 +96,7 @@ Known gaps:
 
 ```text
 no AIR text parser
+no standalone AIR bridge CLI mode
 no full Zig AIR semantics
 no LoopSimplify or LCSSA insertion
 no multi-latch loops

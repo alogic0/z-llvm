@@ -622,6 +622,75 @@ test "AIR-like bridge lowers canonical loop shape" {
     try std.testing.expectEqualSlices(usize, &.{4}, exits.items);
 }
 
+test "AIR-like bridge driver prints pre and post optimization IR" {
+    const allocas = [_]air_bridge.Alloca{
+        .{
+            .result = "slot",
+            .allocated_ty = .{ .int = 32 },
+        },
+    };
+    const stores = [_]air_bridge.Store{
+        .{
+            .ty = .{ .int = 32 },
+            .value = .{ .int = 7 },
+            .ptr = .{ .named = "slot" },
+        },
+    };
+    const loads = [_]air_bridge.Load{
+        .{
+            .result = "value",
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "slot" },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "stack_pipeline",
+            .ret_ty = .{ .int = 32 },
+            .params = &.{},
+            .allocas = &allocas,
+            .stores = &stores,
+            .loads = &loads,
+            .ret = .{ .named = "value" },
+        },
+    };
+
+    var pre: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer pre.deinit();
+    var post: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer post.deinit();
+
+    try air_bridge.lowerPrintAndRunPipeline(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    }, "memory-foundation", &pre.writer, &post.writer);
+
+    const expected_pre =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_pipeline() {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 7, ptr %slot
+        \\  %value = load i32, ptr %slot
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected_pre, pre.writer.buffered());
+
+    const expected_post =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_pipeline() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected_post, post.writer.buffered());
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"
