@@ -9,6 +9,7 @@ adce_chain	adce	adce	test/opt/inputs/adce_chain.ll	test/opt/expected/z_llvm/adce
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-22 inferred memory alignment is normalized
 gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.ll	test/opt/expected/z_llvm/gvn_dominating_expr.ll	dominating repeated expression eliminated; LLVM simplifycfg also removes the now-redundant branch
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	generic LLVM headers only
+simplifycfg_thread_empty	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_thread_empty.ll	test/opt/expected/z_llvm/simplifycfg_thread_empty.ll	empty branch block threading
 unreachable_simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/unreachable_simplifycfg.ll	test/opt/expected/z_llvm/unreachable_simplifycfg.ll	constant branch to unreachable is simplified
 mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	generic LLVM headers only
 mem2reg_undef	mem2reg	mem2reg	test/opt/inputs/mem2reg_undef.ll	test/opt/expected/z_llvm/mem2reg_undef.ll	uninitialized stack load becomes undef

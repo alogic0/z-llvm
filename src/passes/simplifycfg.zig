@@ -12,6 +12,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
+        changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
+        changed = simplifyTerminators(function) or changed;
         changed = try removeUnreachableBlocks(module.allocator, function) or changed;
         changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTrivialPhis(function) or changed;
@@ -42,6 +44,51 @@ fn simplifyTerminators(function: *ir.Function) bool {
         }
     }
     return changed;
+}
+
+fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(allocator, function.*);
+        defer graph.deinit();
+
+        for (function.blocks.items, 0..) |block, block_index| {
+            if (block_index == 0) continue;
+            if (block.instructions.items.len != 0) continue;
+            const br = switch (block.terminator orelse continue) {
+                .br => |br| br,
+                .ret, .condbr, .@"unreachable" => continue,
+            };
+            const target_index = function.blockIndex(br.target) orelse continue;
+            if (target_index == block_index) continue;
+            if (hasPhi(function.blocks.items[target_index])) continue;
+            if (graph.predecessors(block_index).len == 0) continue;
+
+            replaceBranchTarget(function, block.name, br.target);
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+fn replaceBranchTarget(function: *ir.Function, old_target: []const u8, new_target: []const u8) void {
+    for (function.blocks.items) |*block| {
+        if (block.terminator) |*terminator| switch (terminator.*) {
+            .br => |*br| {
+                if (std.mem.eql(u8, br.target, old_target)) br.target = new_target;
+            },
+            .condbr => |*condbr| {
+                if (std.mem.eql(u8, condbr.then_target, old_target)) condbr.then_target = new_target;
+                if (std.mem.eql(u8, condbr.else_target, old_target)) condbr.else_target = new_target;
+            },
+            .ret => {},
+            .@"unreachable" => {},
+        };
+    }
 }
 
 fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {

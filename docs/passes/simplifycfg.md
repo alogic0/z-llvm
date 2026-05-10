@@ -30,12 +30,13 @@ remove blocks unreachable from the entry block
 remove phi incoming values from unreachable predecessor blocks
 replace trivial phi nodes whose remaining incoming values are all identical
 merge a block ending in an unconditional branch into its single-predecessor successor when the successor has no live phi nodes
+thread an empty unconditional branch block to its successor when the successor has no live phi nodes
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, and a simple unconditional branch block merge.
+This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, a simple unconditional branch block merge, and a phi-free empty-block threading subset.
 LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
 ```
 
@@ -59,7 +60,7 @@ Known gaps:
 
 ```text
 no non-trivial phi-node rewrites
-no branch threading
+no phi-aware branch threading
 no general block merging
 no switch support
 no invoke/landingpad support
