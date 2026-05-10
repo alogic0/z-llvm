@@ -6,6 +6,7 @@ const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
+const early_cse = @import("passes/early_cse.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 
 test "instcombine and dce remove identity arithmetic" {
@@ -398,4 +399,43 @@ test "dominator analysis answers dominance queries" {
     try std.testing.expect(dom.dominates(1, 1));
     try std.testing.expect(!dom.dominates(1, 3));
     try std.testing.expect(!dom.dominates(2, 3));
+}
+
+test "early-cse removes repeated pure expressions in a block" {
+    const input =
+        \\define i32 @cse(i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 1
+        \\  %y = add i32 %a, 1
+        \\  %z = mul i32 %y, 2
+        \\  ret i32 %z
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(early_cse.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @cse(i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 1
+        \\  %z = mul i32 %x, 2
+        \\  ret i32 %z
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
