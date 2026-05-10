@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+## Completed Cycles
+
 ### Cycle 15: InstCombine and InstSimplify Foundation
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
@@ -15,8 +19,6 @@ Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer
 - [x] Add `opt-22` equivalent fixtures for accepted folds and local-only tests or fixtures for deliberately conservative non-folds.
 - [x] Update scalar pass docs, `testing.md`, `unsupported_ir.md`, and inventory coverage for InstSimplify and conservative scalar folds.
 - [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
-
-## Completed Cycles
 
 ### Cycle 14: Scalar IR Expansion
 
@@ -191,6 +193,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - named pipeline aliases: documented in [pipelines.md](pipelines.md).
 - pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](pass_manager.md).
 - scalar IR casts, div/rem spelling, flags, and freeze: documented in [ir_scalar.md](ir_scalar.md).
+- InstSimplify-style scalar helper: documented in [passes/inst_simplify.md](passes/inst_simplify.md).
 
 ## Completed Step Notes
 
