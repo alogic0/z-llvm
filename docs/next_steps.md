@@ -10,7 +10,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add `instcombine` commutative binary canonicalization so constants move to the RHS for supported commutative operators, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Extend `simplifycfg` to thread empty unconditional branch blocks without phi nodes, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Extend LoopInfo with preheader and exit-block queries needed by loop passes, with upstream LLVM mapping and unit tests.
-- [ ] Add an LICM foundation pass that hoists pure loop-invariant instructions to an existing preheader, with upstream LLVM mapping and `opt-22` fixtures.
+- [x] Add an LICM foundation pass that hoists pure loop-invariant instructions to an existing preheader, with upstream LLVM mapping and `opt-22` fixtures.
 
 ## Completed Cycles
 
@@ -101,6 +101,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - SROA zero-offset alloca forwarding subset: documented in [passes/sroa.md](passes/sroa.md).
 - GVN dominating-expression subset: documented in [passes/gvn.md](passes/gvn.md).
 - ADCE dead-chain subset: documented in [passes/adce.md](passes/adce.md).
+- LICM pure-instruction hoisting subset: documented in [passes/licm.md](passes/licm.md).
 - memory IR subset: documented in [ir_memory.md](ir_memory.md).
 
 ## Completed Step Notes
