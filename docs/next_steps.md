@@ -1,7 +1,7 @@
 # Next Steps
 
 - [x] Add LLVM IR normalization and golden-output comparison.
-- [ ] Expand the parser to support multiple functions and basic branches.
+- [x] Expand the parser to support multiple functions and basic branches.
 - [ ] Implement `simplifycfg` for trivial branch and unreachable-block cleanup.
 - [ ] Add `opt` comparison fixtures for `instcombine`, `dce`, and `simplifycfg`.
 - [ ] Add def-use maintenance instead of recomputing usage ad hoc.
@@ -17,3 +17,4 @@ Track each reproduced LLVM algorithm here as it lands:
 ## Completed Step Notes
 
 - LLVM IR normalization and golden-output comparison is infrastructure, not an optimization pass. It is now used to check the implemented `instcombine` and `dce` subsets against normalized expected LLVM-compatible IR.
+- Parser support for multiple functions plus `br` and conditional `br` is infrastructure for reproducing LLVM's `simplifycfg` algorithm.

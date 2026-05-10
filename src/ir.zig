@@ -84,6 +84,15 @@ pub const Terminator = union(enum) {
         ty: Type,
         value: Value,
     },
+    br: struct {
+        target: []const u8,
+    },
+    condbr: struct {
+        cond_ty: Type,
+        cond: Value,
+        then_target: []const u8,
+        else_target: []const u8,
+    },
 };
 
 pub const BasicBlock = struct {
@@ -122,6 +131,13 @@ pub const Function = struct {
         function.params.deinit(allocator);
         for (function.blocks.items) |*block| block.deinit(allocator);
         function.blocks.deinit(allocator);
+    }
+
+    pub fn blockIndex(function: Function, name: []const u8) ?usize {
+        for (function.blocks.items, 0..) |block, index| {
+            if (std.mem.eql(u8, block.name, name)) return index;
+        }
+        return null;
     }
 };
 
@@ -177,6 +193,7 @@ pub const Module = struct {
             if (std.mem.endsWith(u8, line, ":")) {
                 const name = std.mem.trim(u8, line[0 .. line.len - 1], " \t");
                 if (name.len == 0) return error.EmptyBlockName;
+                if (function.blockIndex(name) != null) return error.DuplicateBlock;
                 try function.blocks.append(allocator, BasicBlock.init(name));
                 current_block = function.blocks.items.len - 1;
                 continue;
@@ -191,6 +208,12 @@ pub const Module = struct {
             if (std.mem.startsWith(u8, line, "ret ")) {
                 if (block.terminator != null) return error.MultipleTerminators;
                 block.terminator = try parseRet(line);
+                continue;
+            }
+
+            if (std.mem.startsWith(u8, line, "br ")) {
+                if (block.terminator != null) return error.MultipleTerminators;
+                block.terminator = try parseBr(line);
                 continue;
             }
 
@@ -241,6 +264,14 @@ pub const Module = struct {
                         try ret.value.format(writer);
                         try writer.writeByte('\n');
                     },
+                    .br => |br| try writer.print("  br label %{s}\n", .{br.target}),
+                    .condbr => |condbr| {
+                        try writer.writeAll("  br ");
+                        try condbr.cond_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try condbr.cond.format(writer);
+                        try writer.print(", label %{s}, label %{s}\n", .{ condbr.then_target, condbr.else_target });
+                    },
                 };
             }
 
@@ -269,6 +300,13 @@ pub const Module = struct {
                         if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
                         try verifyValue(defs, ret.ty, ret.value);
                     },
+                    .br => |br| try verifyBlockTarget(function, br.target),
+                    .condbr => |condbr| {
+                        if (!condbr.cond_ty.eql(.{ .int = 1 })) return error.BranchConditionTypeMismatch;
+                        try verifyValue(defs, condbr.cond_ty, condbr.cond);
+                        try verifyBlockTarget(function, condbr.then_target);
+                        try verifyBlockTarget(function, condbr.else_target);
+                    },
                 }
             }
         }
@@ -283,6 +321,10 @@ fn verifyValue(defs: std.StringHashMap(Type), ty: Type, value: Value) !void {
             if (!def_ty.eql(ty)) return error.TypeMismatch;
         },
     }
+}
+
+fn verifyBlockTarget(function: Function, target: []const u8) !void {
+    if (function.blockIndex(target) == null) return error.UnknownBlock;
 }
 
 fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !Function {
@@ -348,6 +390,50 @@ fn parseRet(line: []const u8) !Terminator {
     const value = try parseValue(parts.next() orelse return error.InvalidRet);
     if (parts.next() != null) return error.InvalidRet;
     return .{ .ret = .{ .ty = ty, .value = value } };
+}
+
+fn parseBr(line: []const u8) !Terminator {
+    var parts = std.mem.tokenizeAny(u8, line, " \t,");
+    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidBr, "br")) return error.InvalidBr;
+    const first_ty = try parseTypeOrLabel(parts.next() orelse return error.InvalidBr);
+    switch (first_ty) {
+        .label => {
+            const target = try parseLabel(parts.next() orelse return error.InvalidBr);
+            if (parts.next() != null) return error.InvalidBr;
+            return .{ .br = .{ .target = target } };
+        },
+        .ty => |cond_ty| {
+            const cond = try parseValue(parts.next() orelse return error.InvalidBr);
+            const then_label = parts.next() orelse return error.InvalidBr;
+            if (!std.mem.eql(u8, then_label, "label")) return error.InvalidBr;
+            const then_target = try parseLabel(parts.next() orelse return error.InvalidBr);
+            const else_label = parts.next() orelse return error.InvalidBr;
+            if (!std.mem.eql(u8, else_label, "label")) return error.InvalidBr;
+            const else_target = try parseLabel(parts.next() orelse return error.InvalidBr);
+            if (parts.next() != null) return error.InvalidBr;
+            return .{ .condbr = .{
+                .cond_ty = cond_ty,
+                .cond = cond,
+                .then_target = then_target,
+                .else_target = else_target,
+            } };
+        },
+    }
+}
+
+const TypeOrLabel = union(enum) {
+    ty: Type,
+    label,
+};
+
+fn parseTypeOrLabel(text: []const u8) !TypeOrLabel {
+    if (std.mem.eql(u8, text, "label")) return .label;
+    return .{ .ty = try parseType(text) };
+}
+
+fn parseLabel(text: []const u8) ![]const u8 {
+    if (!std.mem.startsWith(u8, text, "%") or text.len == 1) return error.InvalidLabel;
+    return text[1..];
 }
 
 fn parseType(text: []const u8) !Type {

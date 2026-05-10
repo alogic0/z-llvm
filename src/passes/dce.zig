@@ -22,6 +22,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             }
             if (block.terminator) |terminator| switch (terminator) {
                 .ret => |ret| try markValue(&used, ret.value),
+                .br => {},
+                .condbr => |condbr| try markValue(&used, condbr.cond),
             };
         }
 
@@ -49,6 +51,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                     }
                     if (block.terminator) |terminator| switch (terminator) {
                         .ret => |ret| try markValue(&used, ret.value),
+                        .br => {},
+                        .condbr => |condbr| try markValue(&used, condbr.cond),
                     };
                 }
             }

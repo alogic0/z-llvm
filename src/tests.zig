@@ -113,3 +113,29 @@ test "instcombine dce output matches golden file" {
 
     try std.testing.expectEqualStrings(normalized_expected, normalized_actual);
 }
+
+test "parser normalizes multiple functions and branch terminators" {
+    const input =
+        \\define i32 @branch(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  br label %exit
+        \\else:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\define i32 @second(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
