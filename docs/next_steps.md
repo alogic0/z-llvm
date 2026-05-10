@@ -4,7 +4,26 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-No active cycle is currently open.
+### Cycle 12: Memory Legality Foundation
+
+Goal: make memory operations explicit enough that future optimization passes can
+reject unsafe transforms by default and later opt into proven-safe memory motion.
+This is a bounded vertical slice: IR surface, legality API, pass integration,
+docs, and fixture coverage should land together without trying to model full
+LLVM memory optimization yet.
+
+- [ ] Parse, print, verify, and normalize `align N` and `volatile` for `load` and `store`, with upstream LLVM mapping.
+- [ ] Recognize narrow atomic memory forms only far enough to classify them as unsupported/atomic barriers or reject them with a clear parser error; do not model ordering, `syncscope`, `cmpxchg`, or `atomicrmw` yet.
+- [ ] Add a small memory-effect classification API for IR instructions: no memory access, readonly load, memory write, volatile/atomic barrier, and unknown/unsupported memory behavior.
+- [ ] Add an alias/mod-ref foundation document and code scaffold that can answer only conservative questions today: `no_alias`/`must_alias` for known stack slots, otherwise `may_alias`; `mod_ref` for loads/stores, otherwise unknown.
+- [ ] Wire LICM legality through the memory-effect API first, so pure scalar hoisting remains supported, loads remain rejected unless explicitly proven safe later, and stores/volatile/atomic/unknown memory always block hoisting.
+- [ ] Wire DCE/ADCE/GVN through the same memory-effect API only after the LICM integration proves the API shape, preserving existing behavior while centralizing the contract.
+- [ ] Add negative fixtures for unsafe memory optimization cases: aligned load not hoisted yet, volatile load rejected, store rejected, atomic/unsupported memory rejected, and unknown pointer aliasing rejected.
+- [ ] Add accepted fixtures showing that scalar-only LICM/GVN/DCE behavior still works in the presence of unrelated non-hoistable memory instructions.
+- [ ] Split fixture expectations into `opt-22` equivalent cases and local-only conservative cases.
+- [ ] Compare every fixture against `opt-22` where LLVM behavior is expected to match; for deliberate conservative differences, add local fixtures and document the upstream behavior gap.
+- [ ] Update docs for `ir_memory.md`, `analysis/alias.md`, `passes/licm.md`, `passes/gvn.md`, `passes/dce.md`, `passes/adce.md`, `testing.md`, `unsupported_ir.md`, and the inventory current-coverage section.
+- [ ] Run `zig build test` and `bash scripts/compare_opt.sh` before marking the cycle complete.
 
 ## Completed Cycles
 
