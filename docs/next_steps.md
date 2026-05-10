@@ -7,7 +7,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 ### Cycle 9: Scalar and Loop Optimizer Refinement
 
 - [x] Extend `icmp` parsing and `instcombine` folding for signed and unsigned integer predicates, with upstream LLVM mapping and `opt-22` fixtures.
-- [ ] Add `instcombine` commutative binary canonicalization so constants move to the RHS for supported commutative operators, with upstream LLVM mapping and `opt-22` fixtures.
+- [x] Add `instcombine` commutative binary canonicalization so constants move to the RHS for supported commutative operators, with upstream LLVM mapping and `opt-22` fixtures.
 - [ ] Extend `simplifycfg` to thread empty unconditional branch blocks without phi nodes, with upstream LLVM mapping and `opt-22` fixtures.
 - [ ] Extend LoopInfo with preheader and exit-block queries needed by loop passes, with upstream LLVM mapping and unit tests.
 - [ ] Add an LICM foundation pass that hoists pure loop-invariant instructions to an existing preheader, with upstream LLVM mapping and `opt-22` fixtures.

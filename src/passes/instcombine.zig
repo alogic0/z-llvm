@@ -17,6 +17,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             for (block.instructions.items) |*instruction| {
                 instruction.mapOperands(aliases);
 
+                if (canonicalize(instruction)) changed = true;
+
                 if (fold(instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
@@ -35,6 +37,29 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         }
     }
     return if (changed) .changed else .unchanged;
+}
+
+fn canonicalize(instruction: *ir.Instruction) bool {
+    return switch (instruction.kind) {
+        .binary => |*binary| canonicalizeBinary(binary),
+        .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
+    };
+}
+
+fn canonicalizeBinary(binary: *ir.BinaryInst) bool {
+    if (!isCommutative(binary.op)) return false;
+    if (binary.lhs != .int or binary.rhs == .int) return false;
+    const old_lhs = binary.lhs;
+    binary.lhs = binary.rhs;
+    binary.rhs = old_lhs;
+    return true;
+}
+
+fn isCommutative(op: ir.BinaryOp) bool {
+    return switch (op) {
+        .add, .mul, .@"and", .@"or", .xor => true,
+        .sub, .shl, .lshr, .ashr => false,
+    };
 }
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {

@@ -11,6 +11,7 @@ Upstream entry points to check:
 ```text
 InstCombinePass::run
 InstructionCombiningPass
+InstCombinerImpl::canonicalizeOperands
 InstCombinerImpl::visitAdd
 InstCombinerImpl::visitSub
 InstCombinerImpl::visitMul
@@ -31,6 +32,7 @@ Implemented subset:
 ```text
 x + 0 -> x
 0 + x -> x
+commutative binary constants on the LHS are swapped to the RHS
 x - 0 -> x
 x * 1 -> x
 1 * x -> x
@@ -86,5 +88,6 @@ no width-aware constant folding for non-zero shifts
 unsigned constant folding is limited to integer widths below 128 bits
 no casts
 no canonical reassociation
+no non-constant operand complexity ordering
 no target-specific combines
 ```
