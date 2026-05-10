@@ -2,18 +2,22 @@ const std = @import("std");
 
 pub const Type = union(enum) {
     int: u16,
+    ptr,
 
     pub fn eql(a: Type, b: Type) bool {
         return switch (a) {
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
+                .ptr => false,
             },
+            .ptr => b == .ptr,
         };
     }
 
     pub fn format(ty: Type, writer: anytype) !void {
         switch (ty) {
             .int => |bits| try writer.print("i{}", .{bits}),
+            .ptr => try writer.writeAll("ptr"),
         }
     }
 };
@@ -108,25 +112,46 @@ pub const PhiInst = struct {
     }
 };
 
+pub const AllocaInst = struct {
+    allocated_ty: Type,
+};
+
+pub const LoadInst = struct {
+    ty: Type,
+    ptr: Value,
+};
+
+pub const StoreInst = struct {
+    ty: Type,
+    value: Value,
+    ptr: Value,
+};
+
 pub const Instruction = struct {
-    result: []const u8,
+    result: ?[]const u8,
     kind: union(enum) {
         binary: BinaryInst,
         icmp: IcmpInst,
         phi: PhiInst,
+        alloca: AllocaInst,
+        load: LoadInst,
+        store: StoreInst,
     },
     removed: bool = false,
     replacement: ?Value = null,
 
-    pub fn hasSideEffects(_: Instruction) bool {
-        return false;
+    pub fn hasSideEffects(instruction: Instruction) bool {
+        return instruction.kind == .store;
     }
 
-    pub fn resultType(instruction: Instruction) Type {
+    pub fn resultType(instruction: Instruction) ?Type {
         return switch (instruction.kind) {
             .binary => |binary| binary.ty,
             .icmp => .{ .int = 1 },
             .phi => |phi| phi.ty,
+            .alloca => .ptr,
+            .load => |load| load.ty,
+            .store => null,
         };
     }
 
@@ -143,12 +168,18 @@ pub const Instruction = struct {
             .phi => |*phi| for (phi.incoming.items) |*incoming| {
                 incoming.value = resolveValue(aliases, incoming.value);
             },
+            .alloca => {},
+            .load => |*load| load.ptr = resolveValue(aliases, load.ptr),
+            .store => |*store| {
+                store.value = resolveValue(aliases, store.value);
+                store.ptr = resolveValue(aliases, store.ptr);
+            },
         }
     }
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .icmp => {},
+            .binary, .icmp, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
         }
     }
@@ -331,7 +362,11 @@ pub const Module = struct {
                 try writer.print("{s}:\n", .{block.name});
                 for (block.instructions.items) |instruction| {
                     if (instruction.removed) continue;
-                    try writer.print("  %{s} = ", .{instruction.result});
+                    if (instruction.result) |result| {
+                        try writer.print("  %{s} = ", .{result});
+                    } else {
+                        try writer.writeAll("  ");
+                    }
                     switch (instruction.kind) {
                         .binary => |binary| {
                             try writer.print("{s} ", .{binary.op.name()});
@@ -361,6 +396,27 @@ pub const Module = struct {
                                 try incoming.value.format(writer);
                                 try writer.print(", %{s} ]", .{incoming.block});
                             }
+                            try writer.writeByte('\n');
+                        },
+                        .alloca => |alloca| {
+                            try writer.writeAll("alloca ");
+                            try alloca.allocated_ty.format(writer);
+                            try writer.writeByte('\n');
+                        },
+                        .load => |load| {
+                            try writer.writeAll("load ");
+                            try load.ty.format(writer);
+                            try writer.writeAll(", ptr ");
+                            try load.ptr.format(writer);
+                            try writer.writeByte('\n');
+                        },
+                        .store => |store| {
+                            try writer.writeAll("store ");
+                            try store.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try store.value.format(writer);
+                            try writer.writeAll(", ptr ");
+                            try store.ptr.format(writer);
                             try writer.writeByte('\n');
                         },
                     }
@@ -397,8 +453,10 @@ pub const Module = struct {
 
             for (function.blocks.items) |block| {
                 for (block.instructions.items) |instruction| {
-                    if (defs.contains(instruction.result)) return error.DuplicateDefinition;
-                    try defs.put(instruction.result, instruction.resultType());
+                    const result = instruction.result orelse continue;
+                    if (defs.contains(result)) return error.DuplicateDefinition;
+                    const result_ty = instruction.resultType() orelse return error.InstructionWithoutResultType;
+                    try defs.put(result, result_ty);
                 }
             }
 
@@ -406,19 +464,34 @@ pub const Module = struct {
                 for (block.instructions.items) |instruction| {
                     switch (instruction.kind) {
                         .binary => |binary| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
                             try verifyValue(defs, binary.ty, binary.lhs);
                             try verifyValue(defs, binary.ty, binary.rhs);
                         },
                         .icmp => |icmp| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
                             try verifyValue(defs, icmp.operand_ty, icmp.lhs);
                             try verifyValue(defs, icmp.operand_ty, icmp.rhs);
                         },
                         .phi => |phi| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
                             if (phi.incoming.items.len == 0) return error.EmptyPhi;
                             for (phi.incoming.items) |incoming| {
                                 try verifyValue(defs, phi.ty, incoming.value);
                                 try verifyBlockTarget(function, incoming.block);
                             }
+                        },
+                        .alloca => {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
+                        },
+                        .load => |load| {
+                            if (instruction.result == null) return error.InstructionNeedsResult;
+                            try verifyValue(defs, .ptr, load.ptr);
+                        },
+                        .store => |store| {
+                            if (instruction.result != null) return error.StoreHasResult;
+                            try verifyValue(defs, store.ty, store.value);
+                            try verifyValue(defs, .ptr, store.ptr);
                         },
                     }
                 }
@@ -491,6 +564,8 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !Function
 }
 
 fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction {
+    if (std.mem.startsWith(u8, line, "store ")) return parseStore(line);
+
     const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidInstruction;
     const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, result_text, "%")) return error.InvalidValueName;
@@ -523,6 +598,30 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction
         };
     }
 
+    if (std.mem.eql(u8, op_text, "alloca")) {
+        const allocated_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .alloca = .{ .allocated_ty = allocated_ty } },
+        };
+    }
+
+    if (std.mem.eql(u8, op_text, "load")) {
+        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        if (ptr_ty != .ptr) return error.ExpectedPointerType;
+        const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .load = .{
+                .ty = ty,
+                .ptr = ptr,
+            } },
+        };
+    }
+
     const op = BinaryOp.parse(op_text) orelse return error.UnsupportedInstruction;
     const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
     const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
@@ -536,6 +635,26 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !Instruction
             .ty = ty,
             .lhs = lhs,
             .rhs = rhs,
+        } },
+    };
+}
+
+fn parseStore(line: []const u8) !Instruction {
+    var parts = std.mem.tokenizeAny(u8, line, " \t,");
+    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "store")) return error.InvalidInstruction;
+    const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+    const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
+    const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+    if (ptr_ty != .ptr) return error.ExpectedPointerType;
+    const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
+    if (parts.next() != null) return error.InvalidInstruction;
+
+    return .{
+        .result = null,
+        .kind = .{ .store = .{
+            .ty = ty,
+            .value = value,
+            .ptr = ptr,
         } },
     };
 }
@@ -629,6 +748,7 @@ fn parseLabel(text: []const u8) ![]const u8 {
 }
 
 fn parseType(text: []const u8) !Type {
+    if (std.mem.eql(u8, text, "ptr")) return .ptr;
     if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, text[1..], 10);
     if (bits == 0) return error.UnsupportedType;

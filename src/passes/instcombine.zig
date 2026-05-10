@@ -20,7 +20,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                 if (fold(instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
-                    try aliases.put(instruction.result, replacement);
+                    const result = instruction.result orelse return error.InstructionWithoutResult;
+                    try aliases.put(result, replacement);
                     changed = true;
                 }
             }
@@ -46,7 +47,7 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .binary => |binary| foldBinary(binary),
         .icmp => |icmp| foldIcmp(icmp),
-        .phi => null,
+        .phi, .alloca, .load, .store => null,
     };
 }
 

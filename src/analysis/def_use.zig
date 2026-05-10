@@ -48,6 +48,12 @@ pub const UseCounts = struct {
             .phi => |phi| for (phi.incoming.items) |incoming| {
                 try uses.addValue(incoming.value);
             },
+            .alloca => {},
+            .load => |load| try uses.addValue(load.ptr),
+            .store => |store| {
+                try uses.addValue(store.value);
+                try uses.addValue(store.ptr);
+            },
         }
     }
 
@@ -63,6 +69,12 @@ pub const UseCounts = struct {
             },
             .phi => |phi| for (phi.incoming.items) |incoming| {
                 uses.removeValue(incoming.value);
+            },
+            .alloca => {},
+            .load => |load| uses.removeValue(load.ptr),
+            .store => |store| {
+                uses.removeValue(store.value);
+                uses.removeValue(store.ptr);
             },
         }
     }

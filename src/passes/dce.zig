@@ -21,7 +21,9 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             for (function.blocks.items) |*block| {
                 for (block.instructions.items) |*instruction| {
                     if (instruction.removed) continue;
-                    if (uses.isUsed(instruction.result) or instruction.hasSideEffects()) continue;
+                    if (instruction.hasSideEffects()) continue;
+                    const result = instruction.result orelse continue;
+                    if (uses.isUsed(result)) continue;
 
                     uses.removeInstructionOperands(instruction.*);
                     instruction.removed = true;

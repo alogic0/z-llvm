@@ -84,7 +84,7 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
                         changed = true;
                     }
                 },
-                .binary, .icmp => {},
+                .binary, .icmp, .alloca, .load, .store => {},
             }
         }
     }
@@ -98,10 +98,11 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .icmp => null,
+                .binary, .icmp, .alloca, .load, .store => null,
             } orelse continue;
 
-            replaceValue(function, instruction.result, replacement);
+            const result = instruction.result orelse continue;
+            replaceValue(function, result, replacement);
             instruction.removed = true;
             instruction.replacement = replacement;
             changed = true;
@@ -134,6 +135,12 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 },
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     incoming.value = replaceOperand(incoming.value, name, replacement);
+                },
+                .alloca => {},
+                .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
+                .store => |*store| {
+                    store.value = replaceOperand(store.value, name, replacement);
+                    store.ptr = replaceOperand(store.ptr, name, replacement);
                 },
             }
         }

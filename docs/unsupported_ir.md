@@ -7,10 +7,14 @@ The current parser is intentionally small. It accepts only the LLVM-compatible s
 ```text
 define iN @name(...)
 integer parameters
+ptr parameters
 named basic blocks
 add/sub/mul integer instructions
 icmp eq/ne integer instructions
 phi instructions
+alloca instructions
+load instructions
+store instructions
 ret
 br label %target
 br i1 <value>, label %then, label %else
@@ -23,8 +27,6 @@ named SSA values
 ```text
 void
 float/double/fp80/fp128
-pointers
-opaque pointers
 arrays
 vectors
 structs
@@ -40,8 +42,6 @@ icmp predicates except eq/ne
 fcmp
 phi token/blockaddress values
 select
-alloca
-load/store
 getelementptr
 call/invoke/callbr
 cast instructions
@@ -119,7 +119,11 @@ SimplifyCFG subset:
   unreachable block removal
 
 Def-use subset:
-  per-function use counts for named SSA values
+  per-function use counts for named SSA values, including load/store operands
+
+Memory IR subset:
+  opaque ptr type
+  alloca/load/store parsing, printing, and verification
 ```
 
 ## Next Unsupported Areas To Remove
@@ -130,7 +134,6 @@ The next useful parser expansions are:
 icmp predicates beyond eq/ne
 phi
 unreachable terminator
-alloca/load/store
 call
 instruction flags such as nsw/nuw
 target triple and datalayout records

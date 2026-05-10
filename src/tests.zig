@@ -252,6 +252,24 @@ test "parser normalizes phi instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes memory instructions" {
+    const input =
+        \\define i32 @memory(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

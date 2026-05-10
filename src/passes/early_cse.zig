@@ -21,7 +21,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                 if (findEarlierEquivalent(block.*, index, instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
-                    try aliases.put(instruction.result, replacement);
+                    const result = instruction.result orelse return error.InstructionWithoutResult;
+                    try aliases.put(result, replacement);
                     changed = true;
                 }
             }
@@ -42,7 +43,9 @@ fn findEarlierEquivalent(block: ir.BasicBlock, before_index: usize, instruction:
         index -= 1;
         const earlier = block.instructions.items[index];
         if (earlier.removed or !isCseCandidate(earlier)) continue;
-        if (sameExpression(earlier, instruction)) return .{ .named = earlier.result };
+        if (sameExpression(earlier, instruction)) {
+            return .{ .named = earlier.result orelse return null };
+        }
     }
     return null;
 }
@@ -51,7 +54,7 @@ fn isCseCandidate(instruction: ir.Instruction) bool {
     if (instruction.hasSideEffects()) return false;
     return switch (instruction.kind) {
         .binary, .icmp => true,
-        .phi => false,
+        .phi, .alloca, .load, .store => false,
     };
 }
 
@@ -62,16 +65,16 @@ fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),
-            .icmp, .phi => false,
+            .icmp, .phi, .alloca, .load, .store => false,
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .phi => false,
+            .binary, .phi, .alloca, .load, .store => false,
         },
-        .phi => false,
+        .phi, .alloca, .load, .store => false,
     };
 }
 
