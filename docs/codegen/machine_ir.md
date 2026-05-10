@@ -26,9 +26,13 @@ Implemented subset:
 x86_64-linux SysV only
 one straight-line basic block
 i32 leaf functions
+tiny i32 direct-call functions
 return i32 constant
 return register-passed i32 parameter
 return add/sub/and/or/xor i32 of register-passed parameters
+direct call symbol pseudo-instruction for assembly printing
+minimal %rsp adjustment around calls
+one deterministic i32 argument spill/reload across one direct call
 simple three-block conditional return with an i1 register-passed condition
 void leaf return
 machine labels and conditional branch to a local label
@@ -59,6 +63,8 @@ unit-test only:
   return_constant and return_arg lowering
   bitwise_args lowering
   conditional_return lowering
+  direct call assembly lowering
+  one-live-argument call spill lowering
   x86_64 instruction encoding
   ELF relocatable metadata
   unsupported control-flow diagnostic
@@ -67,9 +73,9 @@ unit-test only:
 Known gaps:
 
 ```text
-no calls
+no object relocation encoding for calls yet
 no stack-passed parameters
-no spills
+no general spills beyond one i32 argument across one direct call
 no general register allocation
 no instruction scheduling
 no memory operations

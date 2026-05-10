@@ -25,6 +25,8 @@ add/sub/and/or/xor r32, %eax
 test r8, r8 for register-passed i1 conditions
 near je rel32 to a local Machine IR label
 retq
+subq/addq 8-byte %rsp adjustment
+movl r32, (%rsp) and movl (%rsp), r32 for one deterministic spill slot
 ```
 
 Upstream mapping:
@@ -55,6 +57,6 @@ Known gaps:
 no ModRM/SIB memory forms
 no general immediates beyond mov imm32 to eax
 no short-branch relaxation
-no fixup/relocation model
-no VEX/EVEX, floating-point, vector, call, stack, or memory encodings
+no fixup/relocation model for callq yet
+no VEX/EVEX, floating-point, vector, general call, general stack, or memory encodings
 ```

@@ -30,8 +30,10 @@ Pipeline-Ready Optimizer Epic
 Current status:
 
 - First slice implemented: IR declarations and direct call parser/printer/verifier
-  support are in place. Machine IR, x86_64 call lowering, stack frames, and call
-  relocations are still open.
+  support is in place. Direct-call x86_64 assembly lowering is in place for tiny
+  i32 register-argument fixtures, including the minimal stack-alignment
+  adjustment and one deterministic i32 spill. ELF call relocations and general
+  stack frames are still open.
 - Target/object pair is fixed to `x86_64-linux-elf` with SysV ABI.
 - The previous epic already supports register-only scalar i32 leaf functions,
   simple conditional returns, assembly text, instruction bytes, and ELF64
@@ -111,52 +113,52 @@ Suggested first slice:
 
 ## 2. ABI Call Classification
 
-- [ ] Extend x86_64 SysV ABI docs from leaf arguments/returns to call operands.
-- [ ] Write the concrete SysV stack rule in the ABI docs:
+- [x] Extend x86_64 SysV ABI docs from leaf arguments/returns to call operands.
+- [x] Write the concrete SysV stack rule in the ABI docs:
       on function entry `%rsp % 16 == 8`; immediately before a nested `callq`,
       the caller must have `%rsp % 16 == 0`.
-- [ ] Model integer/pointer argument registers:
+- [x] Model integer/pointer argument registers:
       `%rdi`, `%rsi`, `%rdx`, `%rcx`, `%r8`, `%r9` and their 32-bit forms.
-- [ ] Model return registers:
+- [x] Model return registers:
       `%rax`/`%eax` for scalar integer/pointer returns.
-- [ ] Model caller-saved and callee-saved register sets.
-- [ ] Reject stack-passed call arguments until outgoing stack argument layout is
+- [x] Model caller-saved and callee-saved register sets.
+- [x] Reject stack-passed call arguments until outgoing stack argument layout is
       implemented.
-- [ ] Reject varargs, aggregate args, sret/byval/inalloca, floats, vectors, and
+- [x] Reject varargs, aggregate args, sret/byval/inalloca, floats, vectors, and
       non-default calling conventions.
-- [ ] Compare tiny call ABI examples with LLVM assembly from `llc-22`.
+- [x] Compare tiny call ABI examples with LLVM assembly from `llc-22`.
 
 Suggested slice boundary:
 
-- [ ] Start with `call_no_args` and `call_one_arg` where no caller value is live
+- [x] Start with `call_no_args` and `call_one_arg` where no caller value is live
       across the call.
 
 ## 3. Machine Call Representation
 
-- [ ] Add Machine IR instructions for:
+- [x] Add Machine IR instructions for:
       direct call symbol, argument register moves, return register capture, and
       caller-saved clobber boundary.
 - [ ] Extend the machine verifier:
       all call arguments are defined before the call, `%eax` is defined after a
       non-void call, and unsupported live caller-saved values are rejected.
-- [ ] Keep a deterministic physical-register plan. Do not introduce general
+- [x] Keep a deterministic physical-register plan. Do not introduce general
       register allocation in this epic.
 - [ ] Add failure tests for live values across a call before spills exist.
 
 Suggested slice boundary:
 
-- [ ] Implement calls only when the return value is immediately returned or
+- [x] Implement calls only when the return value is immediately returned or
       unused.
 
 ## 4. Assembly Call Printing
 
-- [ ] Print `callq symbol` for direct internal/external calls.
-- [ ] Preserve existing function labels and local labels.
-- [ ] Add assembly golden fixtures for:
+- [x] Print `callq symbol` for direct internal/external calls.
+- [x] Preserve existing function labels and local labels.
+- [x] Add assembly golden fixtures for:
       `call_no_args`, `call_one_arg`, `call_two_args`, and `call_return_used`.
-- [ ] Compare selected assembly shape with `llc-22`, normalizing comments,
+- [x] Compare selected assembly shape with `llc-22`, normalizing comments,
       `.cfi_*`, and harmless directive differences.
-- [ ] Keep PLT spelling, GOT references, tail calls, and indirect calls out of
+- [x] Keep PLT spelling, GOT references, tail calls, and indirect calls out of
       scope.
 
 ## 5. Object Relocations for Calls
@@ -191,7 +193,7 @@ Suggested slice boundary:
       no frame pointer, no red zone, fixed `%rsp`-relative offsets, and introduce
       `%rbp` only in a later slice if fixtures require it.
 - [ ] Emit prologue and epilogue only for functions that need a frame.
-- [ ] Preserve SysV stack alignment before every `callq`:
+- [x] Preserve SysV stack alignment before every `callq`:
       for call-capable functions without a full frame, subtract/add 8 around the
       call or create the minimal fixed frame needed to make `%rsp % 16 == 0`
       before the call.
@@ -223,10 +225,10 @@ Suggested slice boundary:
 
 ## 8. Deterministic Spills Across Calls
 
-- [ ] Add explicit spill/reload Machine IR instructions.
-- [ ] Spill only known caller-saved values required by tiny call fixtures.
-- [ ] Reload spilled values after the call before their next use.
-- [ ] Add tests proving values survive calls.
+- [x] Add explicit spill/reload Machine IR instructions.
+- [x] Spill only known caller-saved values required by tiny call fixtures.
+- [x] Reload spilled values after the call before their next use.
+- [x] Add tests proving values survive calls.
 - [ ] Document the boundary from deterministic spill insertion to real register
       allocation.
 - [ ] Keep general liveness, coalescing, rematerialization, and spill-cost
@@ -234,7 +236,7 @@ Suggested slice boundary:
 
 Suggested slice boundary:
 
-- [ ] Support one live value across one call before allowing multiple spills.
+- [x] Support one live value across one call before allowing multiple spills.
 
 ## 9. End-To-End Fixtures
 
@@ -261,7 +263,7 @@ Suggested slice boundary:
 
 - [ ] Add `docs/codegen/calls.md`.
 - [ ] Add `docs/codegen/stack_frame.md`.
-- [ ] Extend `docs/codegen/abi_x86_64_sysv.md` with call, stack alignment, and
+- [x] Extend `docs/codegen/abi_x86_64_sysv.md` with call, stack alignment, and
       caller/callee-saved register rules.
 - [ ] Extend `docs/mc/instruction_encoding.md` for `callq` and stack-relative
       load/store encodings.

@@ -43,6 +43,18 @@ pub const ArgReg = enum {
         };
     }
 
+    pub fn fromIndex(index: usize) !ArgReg {
+        return switch (index) {
+            0 => .rdi,
+            1 => .rsi,
+            2 => .rdx,
+            3 => .rcx,
+            4 => .r8,
+            5 => .r9,
+            else => error.UnsupportedCodegenAbi,
+        };
+    }
+
     pub fn rexR(reg: ArgReg) bool {
         return reg == .r8 or reg == .r9;
     }
@@ -74,9 +86,21 @@ pub const Instruction = union(enum) {
     label: []const u8,
     mov_imm_eax: i32,
     mov_arg_eax: ArgReg,
+    mov_arg_arg: struct {
+        dst: ArgReg,
+        src: ArgReg,
+    },
     binary_arg_eax: struct {
         op: MachineBinaryOp,
         reg: ArgReg,
+    },
+    sub_rsp_8,
+    add_rsp_8,
+    spill_arg_rsp: ArgReg,
+    reload_arg_rsp: ArgReg,
+    direct_call: struct {
+        symbol: []const u8,
+        ret_ty: ir.Type,
     },
     test_arg8: ArgReg,
     je: []const u8,
@@ -134,6 +158,10 @@ fn lowerStraightLineReturn(
     switch (terminator) {
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+            if (block.instructions.items.len != 0) {
+                try lowerStraightLineInstructions(allocator, machine, function, block, ret);
+                return;
+            }
             if (ret.ty == .void) {
                 try machine.instructions.append(allocator, .ret);
                 return;
@@ -144,6 +172,81 @@ fn lowerStraightLineReturn(
         },
         .br, .condbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
+}
+
+fn lowerStraightLineInstructions(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !void {
+    if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+
+    var last_eax_value: ?[]const u8 = null;
+    var call_count: usize = 0;
+    for (block.instructions.items, 0..) |instruction, instruction_index| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .call => |call| {
+                try lowerCall(allocator, machine, function, block, instruction_index, instruction.result, call);
+                call_count += 1;
+                if (call.ret_ty == .void) {
+                    if (instruction.result != null) return error.VoidCallHasResult;
+                    last_eax_value = null;
+                } else {
+                    last_eax_value = instruction.result orelse return error.InstructionNeedsResult;
+                }
+            },
+            .binary => {},
+            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return error.UnsupportedCodegenInstruction,
+        }
+    }
+
+    if (ret.ty == .void) {
+        if (ret.value != null) return error.InvalidRet;
+        try machine.instructions.append(allocator, .ret);
+        return;
+    }
+    if (!ret.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    try lowerReturnValueAfterCalls(allocator, machine, function, block, ret.value orelse return error.InvalidRet, last_eax_value, call_count);
+    try machine.instructions.append(allocator, .ret);
+}
+
+fn lowerCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    instruction_index: usize,
+    result: ?[]const u8,
+    call: ir.CallInst,
+) !void {
+    try validateDefaultCallConv(call.calling_conv);
+    if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
+    if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+
+    const live_param = try singleLiveParamAfter(function, block, instruction_index);
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .spill_arg_rsp = reg });
+
+    for (call.args.items, 0..) |arg, index| {
+        if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+        const dst = try ArgReg.fromIndex(index);
+        const src = try paramValueReg(function, arg.value, arg.ty);
+        if (src != dst) return error.UnsupportedCodegenAbi;
+    }
+
+    try machine.instructions.append(allocator, .{ .direct_call = .{
+        .symbol = call.callee,
+        .ret_ty = call.ret_ty,
+    } });
+
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .reload_arg_rsp = reg });
+    try machine.instructions.append(allocator, .add_rsp_8);
+
+    if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
+    if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
 }
 
 fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -225,6 +328,56 @@ fn lowerReturnValue(
     }
 }
 
+fn lowerReturnValueAfterCalls(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    last_eax_value: ?[]const u8,
+    call_count: usize,
+) !void {
+    switch (value) {
+        .int, .undef => return lowerReturnValue(allocator, machine, function, block, value),
+        .named => |name| {
+            if (call_count == 0) return lowerReturnValue(allocator, machine, function, block, value);
+            if (last_eax_value) |eax_name| {
+                if (std.mem.eql(u8, name, eax_name)) return;
+            }
+            const instruction = findInstruction(block, name) orelse return lowerReturnValue(allocator, machine, function, block, value);
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    if (call_count != 1) return error.UnsupportedCodegenInstruction;
+                    try lowerBinaryReturnAfterCall(allocator, machine, function, binary, last_eax_value orelse return error.UnsupportedCodegenValue);
+                },
+                else => return lowerReturnValue(allocator, machine, function, block, value),
+            }
+        },
+    }
+}
+
+fn lowerBinaryReturnAfterCall(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    binary: ir.BinaryInst,
+    eax_name: []const u8,
+) !void {
+    if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+    const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+    if (isNamed(binary.lhs, eax_name)) {
+        const rhs = try paramValueReg(function, binary.rhs, .{ .int = 32 });
+        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
+        return;
+    }
+    if (isCommutative(binary.op) and isNamed(binary.rhs, eax_name)) {
+        const lhs = try paramValueReg(function, binary.lhs, .{ .int = 32 });
+        try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = lhs } });
+        return;
+    }
+    return error.UnsupportedCodegenInstruction;
+}
+
 fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
     return switch (op) {
         .add => .add,
@@ -233,6 +386,84 @@ fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
         .@"or" => .@"or",
         .xor => .xor,
         .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
+    };
+}
+
+fn validateDefaultCallConv(calling_conv: ?[]const u8) !void {
+    if (calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "ccc")) return error.UnsupportedCodegenCallingConvention;
+    }
+}
+
+fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction_index: usize) !?ArgReg {
+    var live: ?ArgReg = null;
+    for (block.instructions.items[instruction_index + 1 ..]) |instruction| {
+        if (instruction.removed) continue;
+        try noteLiveParams(function, instruction, &live);
+    }
+    if (block.terminator) |terminator| switch (terminator) {
+        .ret => |ret| if (ret.value) |value| try noteLiveValue(function, value, &live),
+        .br, .condbr, .@"unreachable" => {},
+    };
+    return live;
+}
+
+fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?ArgReg) !void {
+    switch (instruction.kind) {
+        .binary => |binary| {
+            try noteLiveValue(function, binary.lhs, live);
+            try noteLiveValue(function, binary.rhs, live);
+        },
+        .call => |call| for (call.args.items) |arg| try noteLiveValue(function, arg.value, live),
+        .cast => |cast| try noteLiveValue(function, cast.value, live),
+        .freeze => |freeze| try noteLiveValue(function, freeze.value, live),
+        .icmp => |icmp| {
+            try noteLiveValue(function, icmp.lhs, live);
+            try noteLiveValue(function, icmp.rhs, live);
+        },
+        .select => |select| {
+            try noteLiveValue(function, select.cond, live);
+            try noteLiveValue(function, select.true_value, live);
+            try noteLiveValue(function, select.false_value, live);
+        },
+        .phi => |phi| for (phi.incoming.items) |incoming| try noteLiveValue(function, incoming.value, live),
+        .alloca => {},
+        .load => |load| try noteLiveValue(function, load.ptr, live),
+        .store => |store| {
+            try noteLiveValue(function, store.value, live);
+            try noteLiveValue(function, store.ptr, live);
+        },
+        .gep => |gep| {
+            try noteLiveValue(function, gep.ptr, live);
+            for (gep.indices.items) |index| try noteLiveValue(function, index.value, live);
+        },
+    }
+}
+
+fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .undef => return,
+    };
+    const reg = try paramRegOrNull(function, name, .{ .int = 32 }) orelse return;
+    if (live.*) |existing| {
+        if (existing != reg) return error.UnsupportedLiveAcrossCall;
+    } else {
+        live.* = reg;
+    }
+}
+
+fn isNamed(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .named => |value_name| std.mem.eql(u8, value_name, name),
+        .int, .undef => false,
+    };
+}
+
+fn isCommutative(op: ir.BinaryOp) bool {
+    return switch (op) {
+        .add, .mul, .@"and", .@"or", .xor => true,
+        .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 
@@ -288,7 +519,19 @@ fn i32Value(value: i128) !i32 {
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .je => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
-        .label, .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .test_arg8, .ret => {},
+        .label,
+        .mov_imm_eax,
+        .mov_arg_eax,
+        .mov_arg_arg,
+        .binary_arg_eax,
+        .sub_rsp_8,
+        .add_rsp_8,
+        .spill_arg_rsp,
+        .reload_arg_rsp,
+        .direct_call,
+        .test_arg8,
+        .ret,
+        => {},
     };
 
     var eax_defined = function.ret_ty == .void;
@@ -296,7 +539,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_arg_eax, .binary_arg_eax => eax_defined = true,
-        .test_arg8, .je => {},
+        .direct_call => |call| eax_defined = call.ret_ty != .void,
+        .mov_arg_arg, .sub_rsp_8, .add_rsp_8, .spill_arg_rsp, .reload_arg_rsp, .test_arg8, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             saw_ret = true;
@@ -309,7 +553,19 @@ pub fn verifyFunction(function: MachineFunction) !void {
 fn hasLabel(function: MachineFunction, name: []const u8) bool {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .test_arg8, .je, .ret => {},
+        .mov_imm_eax,
+        .mov_arg_eax,
+        .mov_arg_arg,
+        .binary_arg_eax,
+        .sub_rsp_8,
+        .add_rsp_8,
+        .spill_arg_rsp,
+        .reload_arg_rsp,
+        .direct_call,
+        .test_arg8,
+        .je,
+        .ret,
+        => {},
     };
     return false;
 }

@@ -34,8 +34,8 @@ local-only conservative:
   call attributes beyond the tiny preserved calling-convention subset are rejected
 
 bootstrap-only:
-  no Machine IR call representation yet
-  no x86_64 argument move lowering yet
+  Machine IR direct-call representation is assembly-only until ELF relocations land
+  x86_64 argument move lowering only accepts already-matching i32 argument registers
   no call relocations or stack-frame emission yet
 ```
 
@@ -59,6 +59,49 @@ The verifier requires the callee to be either a direct declaration or a direct
 definition in the same module. Argument count and argument types must match the
 callee signature. Non-void calls require a result name; void calls must not have
 one.
+
+## Current Codegen Slice
+
+The x86_64 backend now lowers tiny direct-call assembly fixtures:
+
+```llvm
+%r = call i32 @callee(i32 %a)
+ret i32 %r
+```
+
+Accepted call-codegen shape:
+
+```text
+x86_64-linux SysV only
+i32 direct call arguments already in their ABI argument registers
+i32 call return in %eax
+void calls with no result
+one straight-line basic block
+at most one live i32 caller argument across one call
+```
+
+The local stack-alignment sequence is:
+
+```asm
+subq $8, %rsp
+callq callee
+addq $8, %rsp
+```
+
+For one live caller argument, the same 8-byte alignment slot is used as a
+deterministic spill slot:
+
+```asm
+subq $8, %rsp
+movl %edi, (%rsp)
+callq callee
+movl (%rsp), %edi
+addq $8, %rsp
+```
+
+LLVM `llc-22 -O0` commonly emits `pushq %rax` / `popq` for the same tiny
+alignment need. This project uses `subq` / `addq` so the spill slot is explicit
+and easy to inspect.
 
 ## Rejected Surface
 
@@ -99,8 +142,11 @@ call signature mismatch rejection
 indirect call rejection
 tail-call marker rejection
 invoke rejection
+call_no_args assembly fixture
+call_one_arg assembly fixture
+call_two_args assembly fixture
+call_return_used one-spill assembly fixture
 ```
 
-No `llc-22` fixture is required for this slice because it does not lower calls
-to Machine IR yet. Later slices must compare accepted x86_64 call assembly and
-relocations against LLVM or assembler output.
+Object call relocation fixtures are still pending. Later slices must compare
+accepted x86_64 call relocations against LLVM or assembler output.

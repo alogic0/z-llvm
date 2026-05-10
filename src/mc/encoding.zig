@@ -27,7 +27,13 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendI32(&bytes, allocator, value);
             },
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
+            .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
+            .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
+            .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
+            .spill_arg_rsp => |reg| try encodeRegToRspSlot(&bytes, allocator, 0x89, reg),
+            .reload_arg_rsp => |reg| try encodeRspSlotToReg(&bytes, allocator, 0x8b, reg),
+            .direct_call => return error.UnsupportedObjectRelocation,
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
@@ -50,7 +56,11 @@ fn instructionSize(instruction: x86_64.Instruction) u32 {
         .label => 0,
         .mov_imm_eax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
+        .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
+        .sub_rsp_8, .add_rsp_8 => 4,
+        .spill_arg_rsp, .reload_arg_rsp => |reg| if (reg.rexR()) 4 else 3,
+        .direct_call => 5,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .je => 6,
         .ret => 1,
@@ -71,6 +81,31 @@ fn encodeRegToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcod
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, opcode);
     try bytes.append(allocator, 0xc0 | (@as(u8, reg.lowCode()) << 3));
+}
+
+fn encodeRegToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg, src: x86_64.ArgReg) !void {
+    if (src.rexR() or dst.rexR()) {
+        var rex: u8 = 0x40;
+        if (src.rexR()) rex |= 0x04;
+        if (dst.rexR()) rex |= 0x01;
+        try bytes.append(allocator, rex);
+    }
+    try bytes.append(allocator, 0x89);
+    try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
+}
+
+fn encodeRegToRspSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg) !void {
+    if (reg.rexR()) try bytes.append(allocator, 0x44);
+    try bytes.append(allocator, opcode);
+    try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));
+    try bytes.append(allocator, 0x24);
+}
+
+fn encodeRspSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg) !void {
+    if (reg.rexR()) try bytes.append(allocator, 0x44);
+    try bytes.append(allocator, opcode);
+    try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));
+    try bytes.append(allocator, 0x24);
 }
 
 fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

@@ -103,6 +103,8 @@ module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
 ABI classification beyond void, scalar integer, pointer, and whole-function scalar signatures
+object emission for direct calls before ELF relocation support lands
+call codegen beyond i32 direct calls with register arguments and one deterministic spill
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
