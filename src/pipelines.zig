@@ -3,6 +3,7 @@ const pass_manager = @import("pass_manager.zig");
 const adce = @import("passes/adce.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
+const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
 const gvn = @import("passes/gvn.zig");
 const licm = @import("passes/licm.zig");
@@ -282,6 +283,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(verify.pass);
     } else if (std.mem.eql(u8, name, "dce")) {
         try pm.add(dce.pass);
+    } else if (std.mem.eql(u8, name, "dse")) {
+        try pm.add(dse.pass);
     } else if (std.mem.eql(u8, name, "adce")) {
         try pm.add(adce.pass);
     } else if (std.mem.eql(u8, name, "early-cse")) {
@@ -311,6 +314,11 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "jump-threading")) return placeholder.make("jump-threading", .scalar, "llvm/lib/Transforms/Scalar/JumpThreading.cpp");
     if (std.mem.eql(u8, name, "correlated-propagation")) return placeholder.make("correlated-propagation", .scalar, "llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp");
     if (std.mem.eql(u8, name, "tailcallelim")) return placeholder.make("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp");
+    if (std.mem.eql(u8, name, "memcpyopt")) return placeholder.make("memcpyopt", .memory, "llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp");
+    if (std.mem.eql(u8, name, "mldst-motion")) return placeholder.make("mldst-motion", .memory, "llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp");
+    if (std.mem.eql(u8, name, "infer-alignment")) return placeholder.make("infer-alignment", .memory, "llvm/lib/Transforms/Scalar/InferAlignment.cpp");
+    if (std.mem.eql(u8, name, "alignment-from-assumptions")) return placeholder.make("alignment-from-assumptions", .memory, "llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp");
+    if (std.mem.eql(u8, name, "move-auto-init")) return placeholder.make("move-auto-init", .memory, "llvm/lib/Transforms/Scalar/MoveAutoInit.cpp");
     if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");

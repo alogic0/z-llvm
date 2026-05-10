@@ -15,6 +15,7 @@ const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
+const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
 const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
@@ -2399,6 +2400,42 @@ test "dce removes unused loads but keeps stores" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "dse preserves stores across unknown memory barriers" {
+    const input =
+        \\declare void @touch()
+        \\
+        \\define i32 @barriers(i32 %a, i32 %b, ptr %p) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  call void @touch()
+        \\  store i32 %b, ptr %slot
+        \\  store volatile i32 %a, ptr %slot
+        \\  store i32 %b, ptr %p
+        \\  store i32 %a, ptr %slot
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(dse.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "alias analysis classifies stack slots" {

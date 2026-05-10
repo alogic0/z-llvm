@@ -42,6 +42,7 @@ opt-22 -passes=sroa test/opt/inputs/sroa_zero_gep.ll -S -o /tmp/llvm_sroa.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_nested_zero_gep.ll -S -o /tmp/llvm_sroa_nested.ll
 opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_scalar_simplify.ll -S -o /tmp/llvm_scalar_simplify.ll
 opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_safe_scalar.ll -S -o /tmp/llvm_safe_scalar.ll
+opt-22 -passes=dse test/opt/inputs/dse_overwrite.ll -S -o /tmp/llvm_dse_overwrite.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg_common_ret.ll -S -o /tmp/llvm_simplifycfg_common_ret.ll
 ```
@@ -147,6 +148,7 @@ PassBuilder pipeline surface: named pass registry, Zig mode pipeline descriptors
 PassBuilder nesting surface: textual module/function/loop/CGSCC group placeholders flattened to module pass execution
 InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, safe variable div/rem identities, freeze-constant folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
+DSE: single-block overwritten stack-store removal with intervening read/barrier rejection
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, empty-block threading, and matching return-block merge subsets
 EarlyCSE: same-block repeated pure-expression elimination subset

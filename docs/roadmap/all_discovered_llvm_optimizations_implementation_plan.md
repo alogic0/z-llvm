@@ -228,34 +228,34 @@ Passes covered:
 Goal: provide the shared legality layer needed by DSE, GVN, LICM, memcpyopt,
 and later MemorySSA-like behavior.
 
-- [ ] Add algorithm contracts for MemoryLocation, AliasAnalysis, ModRef, DSE,
+- [x] Add algorithm contracts for MemoryLocation, AliasAnalysis, ModRef, DSE,
       and the planned MemorySSA-like subset.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/include/llvm/Analysis/MemoryLocation.h`,
       `llvm/include/llvm/Analysis/AliasAnalysis.h`,
       `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp`, and
       `llvm/lib/Analysis/MemorySSA.cpp`.
-- [ ] Expand `MemoryLocation` to cover known scalar stack offsets and sizes
+- [x] Expand `MemoryLocation` to cover known scalar stack offsets and sizes
       with DataLayout-backed size queries.
-- [ ] Expand alias analysis for direct stack slots, simple GEP-derived stack
+- [x] Expand alias analysis for direct stack slots, simple GEP-derived stack
       slots, known disjoint offsets, and conservative unknowns.
-- [ ] Add mod/ref queries for loads, stores, calls, volatile, atomic, and
+- [x] Add mod/ref queries for loads, stores, calls, volatile, atomic, and
       unknown barriers.
-- [ ] Implement DSE for overwritten stack stores with no intervening read or
+- [x] Implement DSE for overwritten stack stores with no intervening read or
       barrier.
-- [ ] Add local-only conservative fixtures for calls, volatile, atomic,
+- [x] Add local-only conservative fixtures for calls, volatile, atomic,
       unknown pointer, partial overlap, and unsupported aggregate layout.
-- [ ] Add a MemorySSA design note before implementing MemorySSA-like state.
-- [ ] Do not add general memory motion until alias/mod-ref proves it safe.
+- [x] Add a MemorySSA design note before implementing MemorySSA-like state.
+- [x] Do not add general memory motion until alias/mod-ref proves it safe.
 
 Passes covered:
 
-- [ ] `dse`
-- [ ] `memcpyopt` placeholder
-- [ ] `mldst-motion` placeholder
-- [ ] `infer-alignment` narrow subset
-- [ ] `alignment-from-assumptions` placeholder
-- [ ] `move-auto-init` placeholder
+- [x] `dse`
+- [x] `memcpyopt` placeholder
+- [x] `mldst-motion` placeholder
+- [x] `infer-alignment` narrow subset
+- [x] `alignment-from-assumptions` placeholder
+- [x] `move-auto-init` placeholder
 
 ## Epic 6: EarlyCSE, GVN, SCCP, And Dead-Code Quality
 

@@ -272,6 +272,11 @@ SROA subset:
   nested zero-offset GEP alloca forwarding
   non-zero aggregate/vector slice rewriting remains unsupported
 
+DSE subset:
+  single-block overwritten stack-store removal
+  intervening loads, calls, volatile/atomic memory, unknown pointers, and
+  may-alias accesses are conservative barriers
+
 Select subset:
   scalar i1 condition
   matching scalar result arms

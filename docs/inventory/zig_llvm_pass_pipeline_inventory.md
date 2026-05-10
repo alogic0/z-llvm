@@ -166,7 +166,7 @@ Status meanings:
 | `instsimplify` | canonicalization query | P0 | foundation | `llvm/lib/Analysis/InstructionSimplify.cpp` |
 | `simplifycfg` | canonicalization / CFG | P0 | foundation | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
 | `early-cse` | canonicalization / scalar | P1 | foundation | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
-| `dse` | memory optimization | P1 | placeholder | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
+| `dse` | memory optimization | P1 | foundation | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | foundation | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
 | `bdce` | scalar DCE | P2 | missing | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
 | `sccp` / `ipsccp` | scalar / IPO | P1 | missing | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
@@ -195,11 +195,11 @@ Status meanings:
 | `lower-expect` | canonicalization / profiling metadata | P2 | missing | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
 | `lower-constant-intrinsics` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp` |
 | `drop-unnecessary-assumes` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp` |
-| `infer-alignment` | memory / target facts | P2 | missing | `llvm/lib/Transforms/Scalar/InferAlignment.cpp` |
-| `alignment-from-assumptions` | memory / target facts | P3 | missing | `llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp` |
-| `memcpyopt` | memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp` |
-| `mldst-motion` | memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp` |
-| `move-auto-init` | memory/security | P3 | defer | `llvm/lib/Transforms/Scalar/MoveAutoInit.cpp` |
+| `infer-alignment` | memory / target facts | P2 | placeholder | `llvm/lib/Transforms/Scalar/InferAlignment.cpp` |
+| `alignment-from-assumptions` | memory / target facts | P3 | placeholder | `llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp` |
+| `memcpyopt` | memory optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp` |
+| `mldst-motion` | memory optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp` |
+| `move-auto-init` | memory/security | P3 | placeholder | `llvm/lib/Transforms/Scalar/MoveAutoInit.cpp` |
 | `aggressive-instcombine` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/AggressiveInstCombine/` |
 | `annotation2metadata` | metadata canonicalization | P3 | missing | `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp` |
 | `annotation-remarks` | diagnostics/remarks | P3 | placeholder | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |

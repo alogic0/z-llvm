@@ -22,6 +22,59 @@ AAResults::getModRefInfo
 ModRefInfo
 ```
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/include/llvm/Analysis/AliasAnalysis.h
+  llvm-project-22/llvm/lib/Analysis/BasicAliasAnalysis.cpp
+  llvm-project-22/llvm/include/llvm/Analysis/MemoryLocation.h
+
+LLVM entry points/classes:
+  AAResults::alias
+  AAResults::getModRefInfo
+  BasicAAResult::aliasGEP
+  ModRefInfo
+
+Required analyses:
+  MemoryLocation for stack roots, offsets, and sizes.
+
+Required IR invariants:
+  Verified pointer-producing alloca/GEP instructions and load/store users.
+
+Core LLVM algorithm data structures:
+  AliasResult
+  ModRefInfo
+  MemoryLocation ranges
+  Conservative unknown answers for unsupported memory facts
+
+Local target status:
+  LLVM-shaped algorithm subset
+
+Implemented subset:
+  Stack-slot identity
+  Simple GEP-derived stack locations
+  Known disjoint byte ranges
+  Load/store mod-ref queries
+  Volatile/atomic/call unknown barriers
+
+Intentional divergences:
+  No target DataLayout, captures, globals, recursive AA stack, metadata, or
+  partial-alias result.
+
+Analysis preservation/invalidation:
+  Alias analysis is rebuilt on demand and has no preserved state.
+
+Fixture coverage:
+  unit tests in src/tests.zig
+
+opt-22 comparison command:
+  not applicable; currently analysis-only
+
+Local-only fixture command:
+  zig build test
+```
+
 Implemented subset:
 
 ```text

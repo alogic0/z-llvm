@@ -19,6 +19,57 @@ AAResults::alias
 AAResults::getModRefInfo
 ```
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/include/llvm/Analysis/MemoryLocation.h
+  llvm-project-22/llvm/lib/Analysis/MemoryLocation.cpp
+  llvm-project-22/llvm/lib/Analysis/BasicAliasAnalysis.cpp
+
+LLVM entry points/classes:
+  MemoryLocation
+  MemoryLocation::get
+  LocationSize
+  BasicAAResult::aliasGEP
+
+Required analyses:
+  Local scalar type-size query.
+
+Required IR invariants:
+  Verified alloca/GEP/load/store spelling for the accepted memory subset.
+
+Core LLVM algorithm data structures:
+  Pointer value
+  Root object identity
+  Byte offset
+  Byte size
+
+Local target status:
+  LLVM-shaped algorithm subset
+
+Implemented subset:
+  Direct stack-slot locations
+  Simple scalar GEP offsets
+  Load/store access sizes
+
+Intentional divergences:
+  The offset calculation is scalar-only and not a general LLVM GEP/DataLayout
+  implementation.
+
+Analysis preservation/invalidation:
+  Memory locations are rebuilt on demand and have no preserved state.
+
+Fixture coverage:
+  unit tests in src/tests.zig
+
+opt-22 comparison command:
+  not applicable; currently analysis-only
+
+Local-only fixture command:
+  zig build test
+```
+
 Implemented subset:
 
 ```text
