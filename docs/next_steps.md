@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+## Completed Cycles
+
 ### Cycle 16: Memory Location and Alias Precision
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
@@ -15,8 +19,6 @@ Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer
 - [x] Add unit tests for alias and mod/ref queries: same slot, distinct slot, zero-offset GEP, known disjoint offset, unknown offset, volatile/atomic barrier.
 - [x] Update `docs/analysis/alias.md`, `docs/analysis/memory_effect.md`, `docs/ir_memory.md`, `testing.md`, and inventory coverage for the MemoryLocation slice.
 - [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
-
-## Completed Cycles
 
 ### Cycle 15: InstCombine and InstSimplify Foundation
 
@@ -204,6 +206,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](pass_manager.md).
 - scalar IR casts, div/rem spelling, flags, and freeze: documented in [ir_scalar.md](ir_scalar.md).
 - InstSimplify-style scalar helper: documented in [passes/inst_simplify.md](passes/inst_simplify.md).
+- stack-slot MemoryLocation subset: documented in [analysis/memory_location.md](analysis/memory_location.md).
 
 ## Completed Step Notes
 
