@@ -7,7 +7,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 ### Cycle 4: LLVM Comparison and Multi-Block Promotion
 
 - [ ] Add an `opt-22` comparison runner that executes `z_llvm`, executes LLVM `opt-22`, normalizes both outputs, and diffs each fixture.
-- [ ] Extend IR normalization to strip LLVM-only comparison noise: `ModuleID`, `source_filename`, simple inferred memory `align N`, and harmless trailing whitespace.
+- [x] Extend IR normalization to strip LLVM-only comparison noise: `ModuleID`, `source_filename`, simple inferred memory `align N`, and harmless trailing whitespace.
 - [ ] Add comparison docs and fixture metadata so every fixture records the LLVM pass name, `z_llvm` pass name, and known acceptable normalization differences.
 - [ ] Extend dominator analysis with immediate dominator or dominance-frontier support needed by LLVM `PromoteMemToReg` phi placement, with upstream mapping.
 - [ ] Implement multi-block `mem2reg` phi insertion for one promotable stack slot using CFG predecessors and dominance-frontier placement.
@@ -76,3 +76,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - Alias analysis now classifies identical stack-slot pointers as `must_alias`, distinct `alloca` results as `no_alias`, and unknown pointers as `may_alias`.
 - `mem2reg` now promotes direct load/store users of a single-block `alloca` when every load is dominated by a prior store in the same block.
 - `opt` comparison fixtures now cover memory-aware DCE and the single-block `mem2reg` subset.
+- IR normalization now strips LLVM comparison noise such as `source_filename` and simple inferred memory alignment.

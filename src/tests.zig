@@ -272,6 +272,35 @@ test "parser normalizes memory instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "normalization strips LLVM comparison noise" {
+    const input =
+        \\; ModuleID = 'test/opt/inputs/memory_dce.ll'
+        \\source_filename = "test/opt/inputs/memory_dce.ll"
+        \\
+        \\define i32 @memory_dce(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32, align 4
+        \\  store i32 %a, ptr %slot, align 4
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    const expected =
+        \\define i32 @memory_dce(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, normalized);
+}
+
 test "dce removes unused loads but keeps stores" {
     const input =
         \\define i32 @memory_dce(i32 %a) {
