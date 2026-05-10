@@ -96,8 +96,12 @@ Implemented development pipelines:
 ```text
 scalar-foundation:
   simplifycfg
+  jump-threading placeholder
+  correlated-propagation placeholder
   instcombine
   simplifycfg
+  jump-threading placeholder
+  correlated-propagation placeholder
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder
@@ -114,6 +118,8 @@ memory-foundation:
 
 zig-scalar-foundation:
   simplifycfg
+  jump-threading placeholder
+  correlated-propagation placeholder
   instcombine
   simplifycfg
   instcombine

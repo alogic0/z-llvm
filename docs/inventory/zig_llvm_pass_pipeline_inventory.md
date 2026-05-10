@@ -184,12 +184,12 @@ Status meanings:
 | `loop-load-elim` | loop/memory optimization | P3 | defer | `llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp` |
 | `loop-sink` | loop canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/LoopSink.cpp` |
 | `extra-simple-loop-unswitch-passes` | loop optimization | P3 | defer | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
-| `jump-threading` | CFG/scalar | P2 | missing | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
-| `correlated-propagation` | scalar | P2 | missing | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
+| `jump-threading` | CFG/scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
+| `correlated-propagation` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
 | `reassociate` | scalar canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
 | `constraint-elimination` | scalar | P2 | missing | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |
 | `speculative-execution` | scalar/code motion | P3 | defer | `llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp` |
-| `tailcallelim` | call/CFG | P2 | missing | `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp` |
+| `tailcallelim` | call/CFG | P2 | placeholder | `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp` |
 | `div-rem-pairs` | scalar/codegen prep | P2 | missing | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
 | `float2int` | scalar | P3 | defer | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |
 | `lower-expect` | canonicalization / profiling metadata | P2 | missing | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |

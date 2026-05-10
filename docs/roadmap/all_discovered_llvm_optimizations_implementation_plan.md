@@ -169,29 +169,29 @@ Passes covered:
 Goal: reproduce the CFG cleanups that make later scalar, memory, and loop
 passes tractable.
 
-- [ ] Add a SimplifyCFG algorithm contract before expanding the pass.
-- [ ] Document LLVM source mapping:
+- [x] Add a SimplifyCFG algorithm contract before expanding the pass.
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp`,
       `llvm/lib/Transforms/Utils/SimplifyCFG.cpp`, and the helper routines used
       by the selected fixture class.
-- [ ] Expand SimplifyCFG beyond empty block threading:
+- [x] Expand SimplifyCFG beyond empty block threading:
       unreachable removal, branch-on-constant folding, trivial phi cleanup,
       merge block with single predecessor, merge return blocks where safe.
-- [ ] Add switch placeholders or explicit unsupported diagnostics.
-- [ ] Add CFG update rules so analyses are invalidated or rebuilt correctly.
-- [ ] Add control-flow fixtures from Zig-emitted IR shapes:
+- [x] Add switch placeholders or explicit unsupported diagnostics.
+- [x] Add CFG update rules so analyses are invalidated or rebuilt correctly.
+- [x] Add control-flow fixtures from Zig-emitted IR shapes:
       if/else, early return, loop preheader/latch skeletons, unreachable panic
       paths.
-- [ ] Compare LLVM-equivalent accepted cases with `opt-22`.
-- [ ] Document all cases where LLVM speculates, sinks, hoists, or rewrites more
+- [x] Compare LLVM-equivalent accepted cases with `opt-22`.
+- [x] Document all cases where LLVM speculates, sinks, hoists, or rewrites more
       aggressively than the local subset.
 
 Passes covered:
 
-- [ ] `simplifycfg`
-- [ ] `jump-threading` placeholder
-- [ ] `correlated-propagation` placeholder
-- [ ] CFG side of `tailcallelim` placeholder
+- [x] `simplifycfg`
+- [x] `jump-threading` placeholder
+- [x] `correlated-propagation` placeholder
+- [x] CFG side of `tailcallelim` placeholder
 
 ## Epic 4: Stack Promotion And Scalar Replacement
 

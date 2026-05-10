@@ -37,6 +37,9 @@ fn simplifyTerminators(function: *ir.Function) bool {
                 if (std.mem.eql(u8, condbr.then_target, condbr.else_target)) {
                     block.terminator = .{ .br = .{ .target = condbr.then_target } };
                     changed = true;
+                } else if (commonReturn(function.*, condbr)) |ret| {
+                    block.terminator = .{ .ret = .{ .ty = ret.ty, .value = ret.value } };
+                    changed = true;
                 } else if (condbr.cond == .int) {
                     block.terminator = .{ .br = .{
                         .target = if (condbr.cond.int == 0) condbr.else_target else condbr.then_target,
@@ -50,6 +53,34 @@ fn simplifyTerminators(function: *ir.Function) bool {
         }
     }
     return changed;
+}
+
+const RetInfo = struct {
+    ty: ir.Type,
+    value: ?ir.Value,
+};
+
+fn commonReturn(function: ir.Function, condbr: anytype) ?RetInfo {
+    const then_block = retOnlyBlock(function, condbr.then_target) orelse return null;
+    const else_block = retOnlyBlock(function, condbr.else_target) orelse return null;
+    if (!then_block.ty.eql(else_block.ty)) return null;
+    if (then_block.value) |then_value| {
+        const else_value = else_block.value orelse return null;
+        if (!then_value.eql(else_value)) return null;
+    } else if (else_block.value != null) {
+        return null;
+    }
+    return then_block;
+}
+
+fn retOnlyBlock(function: ir.Function, name: []const u8) ?RetInfo {
+    const block_index = function.blockIndex(name) orelse return null;
+    const block = function.blocks.items[block_index];
+    if (block.instructions.items.len != 0) return null;
+    return switch (block.terminator orelse return null) {
+        .ret => |ret| .{ .ty = ret.ty, .value = ret.value },
+        .br, .condbr, .@"unreachable" => null,
+    };
 }
 
 fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {

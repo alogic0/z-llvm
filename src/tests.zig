@@ -28,8 +28,12 @@ test "named pipelines expand to stable pass sequences" {
 
     const expected = [_][]const u8{
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "aggressive-instcombine",
         "lower-constant-intrinsics",
@@ -52,8 +56,12 @@ test "zig scalar foundation pipeline aliases scalar foundation passes" {
 
     const expected = [_][]const u8{
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "aggressive-instcombine",
         "lower-constant-intrinsics",
@@ -104,8 +112,12 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
         "sroa",
         "mem2reg",
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "simplifycfg",
+        "jump-threading",
+        "correlated-propagation",
         "instcombine",
         "aggressive-instcombine",
         "lower-constant-intrinsics",
@@ -140,7 +152,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,dse,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -2963,6 +2975,43 @@ test "simplifycfg prunes unreachable phi incoming and removes trivial phi" {
 
     const expected =
         \\define i32 @phi_cleanup(i32 %a, i32 %b) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "simplifycfg merges matching return blocks" {
+    const input =
+        \\define i32 @common_ret(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  ret i32 %a
+        \\else:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @common_ret(i1 %cond, i32 %a) {
         \\entry:
         \\  ret i32 %a
         \\}
