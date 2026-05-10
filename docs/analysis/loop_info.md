@@ -25,6 +25,7 @@ Loop::contains
 Loop::getLoopPreheader
 Loop::getExitingBlocks
 Loop::getExitBlocks
+Loop::hasDedicatedExits
 ```
 
 LLVM LoopInfo identifies natural loops from a dominator tree and records loop
@@ -53,14 +54,15 @@ test whether a block index is inside a loop
 query a unique unconditional preheader
 collect unique exiting block indexes
 collect unique exit block indexes
+query whether exit blocks are dedicated
+record parent loop index and nesting depth for natural loops
+lookup the innermost known loop for a block index
 ```
 
 Known gaps:
 
 ```text
-no nested loop forest
-no block-to-innermost-loop map
-no dedicated-exit query
+no full LLVM loop forest mutation API
 no loop verification
 no LoopSimplify or LCSSA integration
 no irreducible control-flow handling beyond natural-loop backedges

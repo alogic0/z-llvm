@@ -7,6 +7,8 @@ pub const NaturalLoop = struct {
     header: usize,
     latch: usize,
     blocks: std.ArrayList(usize),
+    parent_index: ?usize = null,
+    depth: usize = 0,
 
     pub fn deinit(loop: *NaturalLoop, allocator: std.mem.Allocator) void {
         loop.blocks.deinit(allocator);
@@ -17,6 +19,10 @@ pub const NaturalLoop = struct {
             if (member == block_index) return true;
         }
         return false;
+    }
+
+    pub fn containsBlock(loop: NaturalLoop, block_index: usize) bool {
+        return loop.contains(block_index);
     }
 
     pub fn headerBlock(loop: NaturalLoop) usize {
@@ -74,6 +80,18 @@ pub const NaturalLoop = struct {
         sortBlocks(exits.items);
         return exits;
     }
+
+    pub fn hasDedicatedExits(loop: NaturalLoop, allocator: std.mem.Allocator, graph: cfg.Graph) !bool {
+        var exits = try loop.exitBlocks(allocator, graph);
+        defer exits.deinit(allocator);
+
+        for (exits.items) |exit_block| {
+            for (graph.predecessors(exit_block)) |predecessor| {
+                if (!loop.contains(predecessor)) return false;
+            }
+        }
+        return true;
+    }
 };
 
 pub const LoopInfo = struct {
@@ -99,6 +117,7 @@ pub const LoopInfo = struct {
                 try info.loops.append(allocator, try buildNaturalLoop(allocator, graph, header, latch));
             }
         }
+        info.computeNesting();
 
         return info;
     }
@@ -114,7 +133,49 @@ pub const LoopInfo = struct {
         }
         return null;
     }
+
+    pub fn loopForBlock(info: LoopInfo, block_index: usize) ?*const NaturalLoop {
+        var best: ?*const NaturalLoop = null;
+        for (info.loops.items) |*loop| {
+            if (!loop.contains(block_index)) continue;
+            if (best == null or loop.depth > best.?.depth) best = loop;
+        }
+        return best;
+    }
+
+    fn computeNesting(info: *LoopInfo) void {
+        for (info.loops.items, 0..) |*child, child_index| {
+            var parent_index: ?usize = null;
+            for (info.loops.items, 0..) |parent, maybe_parent_index| {
+                if (child_index == maybe_parent_index) continue;
+                if (!containsLoop(parent, child.*)) continue;
+                if (parent_index == null or parent.blocks.items.len < info.loops.items[parent_index.?].blocks.items.len) {
+                    parent_index = maybe_parent_index;
+                }
+            }
+            child.parent_index = parent_index;
+        }
+
+        var changed = true;
+        while (changed) {
+            changed = false;
+            for (info.loops.items) |*loop| {
+                const new_depth = if (loop.parent_index) |parent_index| info.loops.items[parent_index].depth + 1 else 0;
+                if (loop.depth == new_depth) continue;
+                loop.depth = new_depth;
+                changed = true;
+            }
+        }
+    }
 };
+
+fn containsLoop(parent: NaturalLoop, child: NaturalLoop) bool {
+    if (parent.blocks.items.len <= child.blocks.items.len) return false;
+    for (child.blocks.items) |block_index| {
+        if (!parent.contains(block_index)) return false;
+    }
+    return true;
+}
 
 fn buildNaturalLoop(allocator: std.mem.Allocator, graph: cfg.Graph, header: usize, latch: usize) !NaturalLoop {
     var loop: NaturalLoop = .{

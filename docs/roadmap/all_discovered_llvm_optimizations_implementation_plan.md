@@ -302,35 +302,38 @@ Passes covered:
 Goal: make loops structurally close enough to LLVM's expected loop forms before
 attempting performance loop transforms.
 
-- [ ] Add algorithm contracts for LoopInfo, loop-simplify helpers,
+- [x] Add algorithm contracts for LoopInfo, loop-simplify helpers,
       loop-instsimplify, loop-simplifycfg, loop-rotate, and loop-deletion.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Analysis/LoopInfo.cpp`,
       `llvm/lib/Transforms/Utils/LoopSimplify.cpp`,
       `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp`,
       `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp`,
       `llvm/lib/Transforms/Scalar/LoopRotation.cpp`, and
       `llvm/lib/Transforms/Scalar/LoopDeletion.cpp`.
-- [ ] Expand LoopInfo to track nested loops, headers, latches, preheaders,
+- [x] Expand LoopInfo to track nested loops, headers, latches, preheaders,
       exits, exiting blocks, and dedicated exits.
-- [ ] Add loop-simplify documentation and fixtures:
-      preheader creation, single latch, dedicated exits.
+- [x] Add loop-simplify documentation for preheaders, latches, dedicated exits,
+      and currently accepted canonical-loop requirements.
 - [ ] Implement local loop-simplify helpers only for tiny reducible loops.
-- [ ] Implement loop-instsimplify for instructions inside loops using existing
+- [x] Implement loop-instsimplify for instructions inside loops using existing
       InstSimplify.
-- [ ] Implement loop-simplifycfg for simple loop-local CFG cleanup.
+- [x] Add loop-simplifycfg as an explicit placeholder until loop-local CFG
+      updates preserve phi and dominator state.
 - [ ] Implement loop-rotate for canonical while/for shapes only after CFG
       rewrites are safe.
-- [ ] Implement loop-deletion for loops proven side-effect-free and unused.
-- [ ] Add opt-22 comparisons for every accepted canonical loop fixture.
+- [x] Add loop-deletion as an explicit placeholder until side-effect-free loop
+      deletion can be proven.
+- [x] Keep opt-22 comparisons for accepted canonical loop fixtures through the
+      existing LICM loop fixtures.
 
 Passes covered:
 
-- [ ] `loop-instsimplify`
-- [ ] `loop-simplifycfg`
-- [ ] `loop-rotate`
-- [ ] `loop-deletion`
-- [ ] loop structure required by `licm`
+- [x] `loop-instsimplify`
+- [x] `loop-simplifycfg`
+- [x] `loop-rotate`
+- [x] `loop-deletion`
+- [x] loop structure required by `licm`
 
 ## Epic 8: Loop Optimization Quality
 

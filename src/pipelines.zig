@@ -7,6 +7,7 @@ const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
 const gvn = @import("passes/gvn.zig");
 const licm = @import("passes/licm.zig");
+const loop_instsimplify = @import("passes/loop_instsimplify.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const placeholder = @import("passes/placeholder.zig");
 const sccp = @import("passes/sccp.zig");
@@ -79,7 +80,9 @@ const release_o3_passes = [_][]const u8{
     "gvn",
     "dse",
     "adce",
+    "loop-instsimplify",
     "licm",
+    "loop-simplifycfg",
     "globalopt",
     "globaldce",
     "mergefunc",
@@ -132,7 +135,9 @@ const lto_prelink_o3_passes = [_][]const u8{
     "gvn",
     "dse",
     "adce",
+    "loop-instsimplify",
     "licm",
+    "loop-simplifycfg",
     "globalopt",
     "globaldce",
     "verify",
@@ -301,6 +306,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(gvn.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
         try pm.add(licm.pass);
+    } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
+        try pm.add(loop_instsimplify.pass);
     } else if (std.mem.eql(u8, name, "simplifycfg")) {
         try pm.add(simplifycfg.pass);
     } else if (std.mem.eql(u8, name, "mem2reg")) {
@@ -332,6 +339,9 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "reassociate")) return placeholder.make("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp");
     if (std.mem.eql(u8, name, "constraint-elimination")) return placeholder.make("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp");
     if (std.mem.eql(u8, name, "speculative-execution")) return placeholder.make("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp");
+    if (std.mem.eql(u8, name, "loop-simplifycfg")) return placeholder.make("loop-simplifycfg", .loop, "llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp");
+    if (std.mem.eql(u8, name, "loop-rotate")) return placeholder.make("loop-rotate", .loop, "llvm/lib/Transforms/Scalar/LoopRotation.cpp");
+    if (std.mem.eql(u8, name, "loop-deletion")) return placeholder.make("loop-deletion", .loop, "llvm/lib/Transforms/Scalar/LoopDeletion.cpp");
     if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");

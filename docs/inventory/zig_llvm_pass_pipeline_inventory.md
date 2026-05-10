@@ -172,10 +172,10 @@ Status meanings:
 | `sccp` / `ipsccp` | scalar / IPO | P1 | foundation / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
 | `gvn` | scalar / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/GVN.cpp` |
 | `licm` | loop / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/LICM.cpp` |
-| `loop-instsimplify` | loop canonicalization | P1 | missing | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
-| `loop-simplifycfg` | loop canonicalization | P1 | missing | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
-| `loop-rotate` | loop canonicalization | P1 | missing | `llvm/lib/Transforms/Scalar/LoopRotation.cpp` |
-| `loop-deletion` | loop cleanup | P1 | missing | `llvm/lib/Transforms/Scalar/LoopDeletion.cpp` |
+| `loop-instsimplify` | loop canonicalization | P1 | foundation | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
+| `loop-simplifycfg` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
+| `loop-rotate` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopRotation.cpp` |
+| `loop-deletion` | loop cleanup | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopDeletion.cpp` |
 | `indvars` | loop canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` |
 | `simple-loop-unswitch` | loop optimization | P2 | missing | `llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp` |
 | `loop-idiom` | loop/memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp` |
