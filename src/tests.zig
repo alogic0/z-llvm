@@ -4,6 +4,7 @@ const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
+const simplifycfg = @import("passes/simplifycfg.zig");
 
 test "instcombine and dce remove identity arithmetic" {
     const input =
@@ -138,4 +139,44 @@ test "parser normalizes multiple functions and branch terminators" {
     defer std.testing.allocator.free(normalized);
 
     try std.testing.expectEqualStrings(input, normalized);
+}
+
+test "simplifycfg folds constant branch and removes unreachable blocks" {
+    const input =
+        \\define i32 @branch(i32 %a) {
+        \\entry:
+        \\  br i1 1, label %then, label %else
+        \\then:
+        \\  ret i32 %a
+        \\else:
+        \\  %dead = add i32 %a, 1
+        \\  ret i32 %dead
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @branch(i32 %a) {
+        \\entry:
+        \\  br label %then
+        \\then:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
