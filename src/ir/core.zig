@@ -1,14 +1,16 @@
 const std = @import("std");
 
 pub const Type = union(enum) {
+    void,
     int: u16,
     ptr,
 
     pub fn eql(a: Type, b: Type) bool {
         return switch (a) {
+            .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .ptr => false,
+                .void, .ptr => false,
             },
             .ptr => b == .ptr,
         };
@@ -16,6 +18,7 @@ pub const Type = union(enum) {
 
     pub fn format(ty: Type, writer: anytype) !void {
         switch (ty) {
+            .void => try writer.writeAll("void"),
             .int => |bits| try writer.print("i{}", .{bits}),
             .ptr => try writer.writeAll("ptr"),
         }
@@ -343,7 +346,7 @@ fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
 pub const Terminator = union(enum) {
     ret: struct {
         ty: Type,
-        value: Value,
+        value: ?Value = null,
     },
     br: struct {
         target: []const u8,
@@ -408,6 +411,9 @@ pub const Module = struct {
     allocator: std.mem.Allocator,
     source: []u8,
     owned_strings: std.ArrayList([]u8),
+    source_filename: ?[]const u8 = null,
+    target_triple: ?[]const u8 = null,
+    target_datalayout: ?[]const u8 = null,
     functions: std.ArrayList(Function),
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) !Module {

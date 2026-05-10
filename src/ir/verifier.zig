@@ -84,7 +84,11 @@ pub fn verify(module: core.Module) !void {
             switch (terminator) {
                 .ret => |ret| {
                     if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
-                    try verifyValue(defs, ret.ty, ret.value);
+                    if (ret.ty == .void) {
+                        if (ret.value != null) return error.ReturnTypeMismatch;
+                    } else {
+                        try verifyValue(defs, ret.ty, ret.value orelse return error.InvalidRet);
+                    }
                 },
                 .br => |br| try verifyBlockTarget(function, br.target),
                 .condbr => |condbr| {
@@ -114,18 +118,18 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     }
     switch (binary.ty) {
         .int => {},
-        .ptr => return error.TypeMismatch,
+        .void, .ptr => return error.TypeMismatch,
     }
 }
 
 fn verifyCast(cast: core.CastInst) !void {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .ptr => return error.TypeMismatch,
+        .void, .ptr => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .ptr => return error.TypeMismatch,
+        .void, .ptr => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,

@@ -271,7 +271,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             }
         }
         if (block.terminator) |*terminator| switch (terminator.*) {
-            .ret => |*ret| ret.value = replaceOperand(ret.value, name, replacement),
+            .ret => |*ret| {
+                if (ret.value) |value| ret.value = replaceOperand(value, name, replacement);
+            },
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),

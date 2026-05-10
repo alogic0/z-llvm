@@ -9,6 +9,7 @@ const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
+const target = @import("target.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const early_cse = @import("passes/early_cse.zig");
@@ -67,6 +68,45 @@ test "pass manager pass limit and timing output are deterministic without an io 
 
 fn noopPass(_: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     return .unchanged;
+}
+
+test "target triple and datalayout parse supported x86_64 linux records" {
+    const triple = try target.Triple.parse("x86_64-unknown-linux-gnu");
+    try std.testing.expect(triple.isX86_64());
+    try std.testing.expect(triple.isLinux());
+    try std.testing.expectEqualStrings("gnu", triple.abi.?);
+
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-p:64:64-i64:64-f80:128-n8:16:32:64-S128");
+    try std.testing.expectEqual(@as(u16, 64), try layout.pointerSizeBits());
+    try std.testing.expectEqual(@as(u16, 64), try layout.pointerAbiAlignmentBits());
+    try std.testing.expectEqual(@as(u16, 64), try layout.integerAbiAlignmentBits(64));
+}
+
+test "parser preserves module target records and void return" {
+    const input =
+        \\source_filename = "tiny.zig"
+        \\target datalayout = "e-m:e-p:64:64-i64:64-n8:16:32:64-S128"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @side_effect_free() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const layout = try target.DataLayout.parse(module.target_datalayout.?);
+    try std.testing.expectEqual(@as(u16, 64), try layout.pointerSizeBits());
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "instcombine and dce remove identity arithmetic" {

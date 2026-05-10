@@ -51,6 +51,15 @@ division/remainder, `freeze`, and `nsw`/`nuw`/`exact` flag preservation through
 the `scalar_ir_surface` fixture. It also includes defined scalar cast/div/rem
 fold coverage through `instcombine_scalar_simplify`.
 
+Target-aware infrastructure currently has unit-test-only coverage for:
+
+```text
+target triple parsing
+target datalayout preservation and pointer/integer alignment queries
+source_filename preservation
+void function and ret void round-tripping
+```
+
 Use a different `opt` binary:
 
 ```bash
@@ -80,6 +89,7 @@ SROA: zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
+Target/DataLayout: target triple parsing and minimal DataLayout query subset
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

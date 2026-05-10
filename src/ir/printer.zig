@@ -1,6 +1,21 @@
 const core = @import("core.zig");
 
 pub fn print(module: core.Module, writer: anytype) !void {
+    var printed_module_record = false;
+    if (module.source_filename) |source_filename| {
+        try writer.print("source_filename = \"{s}\"\n", .{source_filename});
+        printed_module_record = true;
+    }
+    if (module.target_datalayout) |target_datalayout| {
+        try writer.print("target datalayout = \"{s}\"\n", .{target_datalayout});
+        printed_module_record = true;
+    }
+    if (module.target_triple) |target_triple| {
+        try writer.print("target triple = \"{s}\"\n", .{target_triple});
+        printed_module_record = true;
+    }
+    if (printed_module_record and module.functions.items.len != 0) try writer.writeByte('\n');
+
     for (module.functions.items, 0..) |function, function_index| {
         if (function_index != 0) try writer.writeByte('\n');
         try writer.writeAll("define ");
@@ -129,8 +144,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
                 .ret => |ret| {
                     try writer.writeAll("  ret ");
                     try ret.ty.format(writer);
-                    try writer.writeByte(' ');
-                    try ret.value.format(writer);
+                    if (ret.value) |value| {
+                        try writer.writeByte(' ');
+                        try value.format(writer);
+                    }
                     try writer.writeByte('\n');
                 },
                 .br => |br| try writer.print("  br label %{s}\n", .{br.target}),

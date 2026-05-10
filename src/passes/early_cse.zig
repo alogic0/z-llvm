@@ -29,7 +29,9 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             }
 
             if (block.terminator) |*terminator| switch (terminator.*) {
-                .ret => |*ret| ret.value = resolveValue(aliases, ret.value),
+                .ret => |*ret| {
+                    if (ret.value) |value| ret.value = resolveValue(aliases, value);
+                },
                 .br => {},
                 .@"unreachable" => {},
                 .condbr => |*condbr| condbr.cond = resolveValue(aliases, condbr.cond),

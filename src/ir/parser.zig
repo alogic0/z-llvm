@@ -22,6 +22,23 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         const line = std.mem.trim(u8, line_without_comment, " \t\r");
         if (line.len == 0) continue;
 
+        if (current_function == null and std.mem.startsWith(u8, line, "source_filename")) {
+            module.source_filename = try parseModuleStringRecord(line, "source_filename");
+            continue;
+        }
+
+        if (current_function == null and std.mem.startsWith(u8, line, "target triple")) {
+            module.target_triple = try parseModuleStringRecord(line, "target triple");
+            _ = try @import("../target.zig").Triple.parse(module.target_triple.?);
+            continue;
+        }
+
+        if (current_function == null and std.mem.startsWith(u8, line, "target datalayout")) {
+            module.target_datalayout = try parseModuleStringRecord(line, "target datalayout");
+            _ = try @import("../target.zig").DataLayout.parse(module.target_datalayout.?);
+            continue;
+        }
+
         if (std.mem.startsWith(u8, line, "define ")) {
             if (current_function != null) return error.NestedFunction;
             const function = try parseFunctionHeader(allocator, line);
@@ -85,6 +102,15 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     if (current_function != null) return error.UnclosedFunction;
     if (module.functions.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
+    if (!std.mem.startsWith(u8, line, key)) return error.InvalidModuleRecord;
+    var rest = std.mem.trim(u8, line[key.len..], " \t");
+    if (!std.mem.startsWith(u8, rest, "=")) return error.InvalidModuleRecord;
+    rest = std.mem.trim(u8, rest[1..], " \t");
+    if (rest.len < 2 or rest[0] != '"' or rest[rest.len - 1] != '"') return error.InvalidModuleRecord;
+    return rest[1 .. rest.len - 1];
 }
 
 fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Function {
@@ -410,6 +436,10 @@ fn parseRet(line: []const u8) !core.Terminator {
     var parts = std.mem.tokenizeAny(u8, line, " \t");
     if (!std.mem.eql(u8, parts.next() orelse return error.InvalidRet, "ret")) return error.InvalidRet;
     const ty = try parseType(parts.next() orelse return error.InvalidRet);
+    if (ty == .void) {
+        if (parts.next() != null) return error.InvalidRet;
+        return .{ .ret = .{ .ty = ty } };
+    }
     const value = try parseValue(parts.next() orelse return error.InvalidRet);
     if (parts.next() != null) return error.InvalidRet;
     return .{ .ret = .{ .ty = ty, .value = value } };
@@ -460,6 +490,7 @@ fn parseLabel(text: []const u8) ![]const u8 {
 }
 
 fn parseType(text: []const u8) !core.Type {
+    if (std.mem.eql(u8, text, "void")) return .void;
     if (std.mem.eql(u8, text, "ptr")) return .ptr;
     if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, text[1..], 10);

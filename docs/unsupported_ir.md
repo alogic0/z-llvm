@@ -6,6 +6,10 @@ The current parser is intentionally small. It accepts only the LLVM-compatible s
 
 ```text
 define iN @name(...)
+define void @name(...)
+source_filename module record
+target datalayout module record
+target triple module record
 integer parameters
 ptr parameters
 named basic blocks
@@ -26,6 +30,7 @@ instruction flags: nsw, nuw, exact
 load/store align and volatile spelling
 narrow atomic load/store spelling as a conservative barrier
 ret
+ret void
 br label %target
 br i1 <value>, label %then, label %else
 unreachable
@@ -38,7 +43,6 @@ named SSA values
 ## Unsupported Types
 
 ```text
-void
 float/double/fp80/fp128
 arrays
 vectors
@@ -75,8 +79,8 @@ noalias / alias.scope
 debug metadata
 branch weights / profile metadata
 module flags
-target datalayout
-target triple
+target datalayout semantics beyond default pointer/integer alignment queries
+target triple semantics beyond basic parsing
 ```
 
 ## Current Parser Errors
@@ -146,6 +150,7 @@ Memory legality subset:
 
 Control-flow IR subset:
   ret
+  ret void
   br
   conditional br
   unreachable
@@ -154,6 +159,12 @@ Value subset:
   named SSA values
   integer constants
   undef constants
+
+Module IR subset:
+  source_filename
+  target datalayout
+  target triple
+  void return type
 
 Scalar IR subset:
   integer casts: trunc, zext, sext
@@ -200,6 +211,7 @@ bitcast and pointer casts
 unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
+globals and linkage
 full atomic operations and ordering semantics
 ```
 

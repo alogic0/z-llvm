@@ -75,6 +75,6 @@ fn gepOffset(gep: ir.GepInst) ?i128 {
 fn typeSize(ty: ir.Type) ?u64 {
     return switch (ty) {
         .int => |bits| if (bits % 8 == 0) bits / 8 else null,
-        .ptr => null,
+        .void, .ptr => null,
     };
 }

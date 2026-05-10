@@ -103,7 +103,7 @@ pub const UseCounts = struct {
 
     pub fn addTerminator(uses: *UseCounts, terminator: ir.Terminator) !void {
         switch (terminator) {
-            .ret => |ret| try uses.addValue(ret.value),
+            .ret => |ret| if (ret.value) |value| try uses.addValue(value),
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| try uses.addValue(condbr.cond),
