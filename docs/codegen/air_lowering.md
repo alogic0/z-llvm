@@ -15,6 +15,12 @@ Upstream entry points to check:
 FuncGen.airAdd
 FuncGen.airSub
 FuncGen.airMul
+FuncGen.airShl
+FuncGen.airShr
+FuncGen.airBitAnd
+FuncGen.airBitOr
+FuncGen.airBitXor
+FuncGen.airIntCast
 FuncGen.airRet
 FuncGen.airRetLoad
 FuncGen.resolveInst
@@ -30,6 +36,7 @@ module source_filename, target triple, and datalayout preservation
 one-entry-block functions
 scalar integer parameters
 scalar integer binary operations
+scalar integer casts: trunc, zext, sext
 return of a scalar SSA value or constant
 ```
 
@@ -52,6 +59,7 @@ local-only conservative:
 
 unit-test only:
   scalar add function with two i32 parameters and an SSA return
+  scalar sub/and/shl arithmetic with zext return
   target triple and datalayout preservation on lowered modules
 ```
 
@@ -64,6 +72,6 @@ no control-flow builder beyond a single entry block
 no stack memory lowering
 no loops
 no calls
-no casts, comparisons, select, overflow operations, or intrinsics
+no comparisons, select, overflow operations, or intrinsics
 no aggregate, optional, error-union, async, comptime, or debug-info lowering
 ```

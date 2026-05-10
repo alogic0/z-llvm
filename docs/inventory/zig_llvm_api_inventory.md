@@ -51,7 +51,7 @@ replacement needs.
 | --- | --- | --- | --- |
 | Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | scalar return/parameter ABI classification only; full ABI lowering missing |
 | Control flow | `lowerBlock`, `airBr`, `airCondBr`, `airSwitchBr`, `airLoop`, `airUnreach` | `src/ir/`, `src/codegen/control_flow.zig` | partial `br`, `condbr`, `unreachable` text IR |
-| Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/air_bridge.zig`, `src/ir/`, `src/passes/` | AIR-like scalar binary builder plus partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
+| Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/air_bridge.zig`, `src/ir/`, `src/passes/` | AIR-like scalar binary/cast builder plus partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/ir/`, `src/codegen/memory.zig` | partial alloca/load/store/GEP and mem2reg |
 | Atomics | `airCmpxchg`, `airAtomicRmw`, `airAtomicLoad`, `airAtomicStore` | `src/ir/atomics.zig`, `src/codegen/atomics.zig` | missing |
 | Aggregates and pointers | `airAggregateInit`, `airUnionInit`, `airStructFieldVal`, `airPtrElemPtr`, `ptraddConst` | `src/ir/aggregate.zig`, `src/codegen/layout.zig` | minimal GEP and scalar global preservation only |
@@ -66,7 +66,7 @@ replacement needs.
 The current project covers phase-zero optimizer infrastructure:
 
 - LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, scalar globals, function linkage/visibility, calling convention preservation, raw function and parameter attribute preservation, and void returns.
-- AIR-like helper bridge for lowering tiny scalar arithmetic function specs into project IR.
+- AIR-like helper bridge for lowering tiny scalar binary/cast arithmetic function specs into project IR.
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.

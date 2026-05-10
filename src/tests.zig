@@ -254,6 +254,81 @@ test "AIR-like bridge lowers scalar binary function" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "AIR-like bridge lowers scalar arithmetic and casts" {
+    const params = [_]air_bridge.Param{
+        .{ .name = "a", .ty = .{ .int = 32 } },
+        .{ .name = "b", .ty = .{ .int = 32 } },
+    };
+    const binaries = [_]air_bridge.Binary{
+        .{
+            .result = "sub",
+            .op = .sub,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "a" },
+            .rhs = .{ .named = "b" },
+        },
+        .{
+            .result = "masked",
+            .op = .@"and",
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "sub" },
+            .rhs = .{ .int = 255 },
+        },
+        .{
+            .result = "shifted",
+            .op = .shl,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "masked" },
+            .rhs = .{ .int = 1 },
+        },
+    };
+    const casts = [_]air_bridge.Cast{
+        .{
+            .result = "wide",
+            .op = .zext,
+            .from_ty = .{ .int = 32 },
+            .value = .{ .named = "shifted" },
+            .to_ty = .{ .int = 64 },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "arith",
+            .ret_ty = .{ .int = 64 },
+            .params = &params,
+            .binaries = &binaries,
+            .casts = &casts,
+            .ret = .{ .named = "wide" },
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @arith(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sub = sub i32 %a, %b
+        \\  %masked = and i32 %sub, 255
+        \\  %shifted = shl i32 %masked, 1
+        \\  %wide = zext i32 %shifted to i64
+        \\  ret i64 %wide
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

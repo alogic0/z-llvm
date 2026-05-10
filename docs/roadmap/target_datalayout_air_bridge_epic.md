@@ -111,7 +111,7 @@ Suggested slice boundary:
 ## 4. AIR-Like Input Bridge
 
 - [x] Define a tiny AIR-like test input format or helper builder inside `src/tools/` or tests, not a full Zig frontend.
-- [ ] Lower scalar integer arithmetic into the project IR: add/sub/mul/bitwise/shift/casts.
+- [x] Lower scalar integer arithmetic into the project IR: add/sub/mul/bitwise/shift/casts.
 - [ ] Lower control flow into the project IR: blocks, conditional branch, return, unreachable.
 - [ ] Lower stack memory into the project IR: alloca/load/store/GEP for scalar stack slots.
 - [ ] Lower loops in the canonical form expected by current LoopInfo/LICM where possible.

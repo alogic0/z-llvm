@@ -14,11 +14,20 @@ pub const Binary = struct {
     rhs: ir.Value,
 };
 
+pub const Cast = struct {
+    result: []const u8,
+    op: ir.CastOp,
+    from_ty: ir.Type,
+    value: ir.Value,
+    to_ty: ir.Type,
+};
+
 pub const Function = struct {
     name: []const u8,
     ret_ty: ir.Type,
     params: []const Param,
     binaries: []const Binary,
+    casts: []const Cast = &.{},
     ret: ?ir.Value = null,
 };
 
@@ -71,6 +80,17 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
                 .ty = binary.ty,
                 .lhs = binary.lhs,
                 .rhs = binary.rhs,
+            } },
+        });
+    }
+    for (spec.casts) |cast| {
+        try entry.instructions.append(allocator, .{
+            .result = cast.result,
+            .kind = .{ .cast = .{
+                .op = cast.op,
+                .from_ty = cast.from_ty,
+                .value = cast.value,
+                .to_ty = cast.to_ty,
             } },
         });
     }
