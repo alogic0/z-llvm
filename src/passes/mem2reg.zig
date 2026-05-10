@@ -1,4 +1,6 @@
 const std = @import("std");
+const cfg = @import("../analysis/cfg.zig");
+const dominator = @import("../analysis/dominator.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -7,15 +9,15 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        changed = promoteFunction(function) or changed;
+        changed = try promoteFunction(context.allocator, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
 
-fn promoteFunction(function: *ir.Function) bool {
+fn promoteFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
     var changed = false;
     var block_index: usize = 0;
     while (block_index < function.blocks.items.len) : (block_index += 1) {
@@ -30,7 +32,227 @@ fn promoteFunction(function: *ir.Function) bool {
             changed = true;
         }
     }
+    if (changed) return true;
+
+    block_index = 0;
+    while (block_index < function.blocks.items.len) : (block_index += 1) {
+        var instruction_index: usize = 0;
+        while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
+            const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
+            if (instruction.removed or instruction.kind != .alloca) continue;
+            const slot = instruction.result orelse continue;
+            if (!isPromotableStackSlot(function.*, slot)) continue;
+
+            try promoteMultiBlockSlot(allocator, function, block_index, instruction_index, slot, instruction.kind.alloca.allocated_ty);
+            return true;
+        }
+    }
     return changed;
+}
+
+fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, slot)) continue;
+            }
+
+            switch (instruction.kind) {
+                .load => |load| {
+                    if (isNamed(load.ptr, slot)) continue;
+                },
+                .store => |store| {
+                    if (isNamed(store.value, slot)) return false;
+                    if (isNamed(store.ptr, slot)) continue;
+                },
+                .binary => |binary| {
+                    if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
+                },
+                .icmp => |icmp| {
+                    if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
+                },
+                .phi => |phi| for (phi.incoming.items) |incoming| {
+                    if (isNamed(incoming.value, slot)) return false;
+                },
+                .alloca => {},
+            }
+        }
+        if (block.terminator) |terminator| switch (terminator) {
+            .ret => |ret| if (isNamed(ret.value, slot)) return false,
+            .br => {},
+            .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
+        };
+    }
+    return true;
+}
+
+fn promoteMultiBlockSlot(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    alloca_block_index: usize,
+    alloca_instruction_index: usize,
+    slot: []const u8,
+    ty: ir.Type,
+) !void {
+    var dom = try dominator.Dominators.build(allocator, function.*);
+    defer dom.deinit();
+
+    var frontiers = try dominator.DominanceFrontiers.build(allocator, function.*, dom);
+    defer frontiers.deinit();
+
+    const block_count = function.blocks.items.len;
+    const has_phi = try allocator.alloc(bool, block_count);
+    defer allocator.free(has_phi);
+    @memset(has_phi, false);
+
+    const defines = try allocator.alloc(bool, block_count);
+    defer allocator.free(defines);
+    @memset(defines, false);
+
+    var worklist: std.ArrayList(usize) = .empty;
+    defer worklist.deinit(allocator);
+
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (blockStoresSlot(block, slot)) {
+            defines[block_index] = true;
+            try worklist.append(allocator, block_index);
+        }
+    }
+
+    while (worklist.pop()) |def_block| {
+        for (frontiers.frontier(def_block)) |frontier_block| {
+            if (has_phi[frontier_block]) continue;
+            try insertSlotPhi(allocator, function, frontier_block, ty);
+            has_phi[frontier_block] = true;
+            if (!defines[frontier_block]) try worklist.append(allocator, frontier_block);
+        }
+    }
+
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
+    var children = try buildDominatorChildren(allocator, dom);
+    defer deinitChildren(allocator, &children);
+
+    function.blocks.items[alloca_block_index].instructions.items[alloca_instruction_index].removed = true;
+    try renameSlot(allocator, function, graph, children.items, has_phi, slot, 0, null);
+}
+
+fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .store => |store| if (isNamed(store.ptr, slot)) return true,
+            .binary, .icmp, .phi, .alloca, .load => {},
+        }
+    }
+    return false;
+}
+
+fn insertSlotPhi(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, ty: ir.Type) !void {
+    var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+    errdefer incoming.deinit(allocator);
+
+    try function.blocks.items[block_index].instructions.insert(allocator, 0, .{
+        .result = function.blocks.items[block_index].name,
+        .kind = .{ .phi = .{
+            .ty = ty,
+            .incoming = incoming,
+        } },
+    });
+}
+
+fn buildDominatorChildren(allocator: std.mem.Allocator, dom: dominator.Dominators) !std.ArrayList(std.ArrayList(usize)) {
+    var children: std.ArrayList(std.ArrayList(usize)) = .empty;
+    errdefer deinitChildren(allocator, &children);
+    try children.appendNTimes(allocator, .empty, dom.block_count);
+
+    for (1..dom.block_count) |block_index| {
+        const parent = dom.immediateDominator(block_index) orelse continue;
+        try children.items[parent].append(allocator, block_index);
+    }
+    return children;
+}
+
+fn deinitChildren(allocator: std.mem.Allocator, children: *std.ArrayList(std.ArrayList(usize))) void {
+    for (children.items) |*child_list| child_list.deinit(allocator);
+    children.deinit(allocator);
+}
+
+fn renameSlot(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    graph: cfg.Graph,
+    children: []const std.ArrayList(usize),
+    has_phi: []const bool,
+    slot: []const u8,
+    block_index: usize,
+    incoming_value: ?ir.Value,
+) !void {
+    var current_value = incoming_value;
+    if (has_phi[block_index]) current_value = .{ .named = function.blocks.items[block_index].name };
+
+    var instruction_index: usize = 0;
+    while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
+        var replacement: ?struct { name: []const u8, value: ir.Value } = null;
+        {
+            const instruction = &function.blocks.items[block_index].instructions.items[instruction_index];
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, slot)) {
+                    instruction.removed = true;
+                    continue;
+                }
+            }
+
+            switch (instruction.kind) {
+                .store => |store| {
+                    if (!isNamed(store.ptr, slot)) continue;
+                    current_value = store.value;
+                    instruction.removed = true;
+                },
+                .load => |load| {
+                    if (!isNamed(load.ptr, slot)) continue;
+                    const result = instruction.result orelse continue;
+                    const value = current_value orelse continue;
+                    instruction.removed = true;
+                    instruction.replacement = value;
+                    replacement = .{ .name = result, .value = value };
+                },
+                .binary, .icmp, .phi, .alloca => {},
+            }
+        }
+        if (replacement) |item| replaceValue(function, item.name, item.value);
+    }
+
+    if (current_value) |value| {
+        for (graph.successors(block_index)) |successor| {
+            if (!has_phi[successor]) continue;
+            try addPhiIncoming(allocator, function, successor, value, function.blocks.items[block_index].name);
+        }
+    }
+
+    for (children[block_index].items) |child| {
+        try renameSlot(allocator, function, graph, children, has_phi, slot, child, current_value);
+    }
+}
+
+fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_index: usize, value: ir.Value, predecessor: []const u8) !void {
+    for (function.blocks.items[block_index].instructions.items) |*instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => |*phi| {
+                if (!std.mem.eql(u8, instruction.result orelse return, function.blocks.items[block_index].name)) continue;
+                try phi.incoming.append(allocator, .{
+                    .value = value,
+                    .block = predecessor,
+                });
+                return;
+            },
+            .binary, .icmp, .alloca, .load, .store => return,
+        }
+    }
 }
 
 fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, slot: []const u8) bool {

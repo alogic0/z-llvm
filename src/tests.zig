@@ -406,6 +406,110 @@ test "mem2reg promotes single-block stack slot" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "mem2reg promotes if-else stack slot with phi" {
+    const input =
+        \\define i32 @promote_if(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  store i32 %a, ptr %slot
+        \\  br label %merge
+        \\right:
+        \\  store i32 %b, ptr %slot
+        \\  br label %merge
+        \\merge:
+        \\  %v = load i32, ptr %slot
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @promote_if(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %merge = phi i32 [ %a, %left ], [ %b, %right ]
+        \\  ret i32 %merge
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "mem2reg promotes loop-carried stack slot" {
+    const input =
+        \\define i32 @promote_loop(i32 %a) {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 %a, ptr %slot
+        \\  br label %loop
+        \\loop:
+        \\  %v = load i32, ptr %slot
+        \\  %more = icmp ne i32 %v, 0
+        \\  br i1 %more, label %body, label %exit
+        \\body:
+        \\  %next = sub i32 %v, 1
+        \\  store i32 %next, ptr %slot
+        \\  br label %loop
+        \\exit:
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(mem2reg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @promote_loop(i32 %a) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %loop = phi i32 [ %a, %entry ], [ %next, %body ]
+        \\  %more = icmp ne i32 %loop, 0
+        \\  br i1 %more, label %body, label %exit
+        \\body:
+        \\  %next = sub i32 %loop, 1
+        \\  br label %loop
+        \\exit:
+        \\  ret i32 %loop
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {
