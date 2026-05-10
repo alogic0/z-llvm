@@ -146,7 +146,7 @@ Suggested slice boundary:
 
 - [x] Add a named `zig-scalar-foundation` pipeline that runs target parsing, AIR-like lowering, verifier, optimizer pipeline, and normalized output.
 - [x] Add command-line flags for selecting target triple and datalayout when they are not present in the input.
-- [ ] Add diagnostics that explain when a target feature is missing rather than failing with generic parse or verifier errors.
+- [x] Add diagnostics that explain when a target feature is missing rather than failing with generic parse or verifier errors.
 - [x] Keep the old LLVM-IR-input optimizer path intact for pass-level development and regression tests.
 - [ ] Add tests proving both entry paths produce equivalent IR for small scalar examples.
 

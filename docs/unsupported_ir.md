@@ -96,6 +96,7 @@ AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
 target-aware pipeline integration beyond CLI target/datalayout record injection
+target diagnostics beyond invalid triple/datalayout and unsupported asm target checks
 ```
 
 ## Current Parser Errors
@@ -191,6 +192,7 @@ Module IR subset:
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
   AIR-like pre/post optimization driver using named pipelines
   zig-scalar-foundation pipeline alias and CLI target/datalayout record injection
+  explicit CLI diagnostics for invalid target datalayout and unsupported asm targets
   normalized Zig-emitted scalar function signature fixture
   function linkage on definitions
   function visibility on definitions

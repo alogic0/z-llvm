@@ -4,6 +4,7 @@ const ir = @import("ir.zig");
 const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
+const target = @import("target.zig");
 
 const usage =
     \\usage: z_llvm [--emit=ir|asm] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
@@ -89,8 +90,18 @@ pub fn main(init: std.process.Init) !void {
 
     var module = try ir.Module.parse(allocator, input);
     defer module.deinit();
-    if (module.target_triple == null) module.target_triple = target_triple;
-    if (module.target_datalayout == null) module.target_datalayout = target_datalayout;
+    if (target_triple) |triple| {
+        _ = target.Triple.parse(triple) catch {
+            try fatal(io, "invalid target triple: {s}\n", .{triple});
+        };
+        if (module.target_triple == null) module.target_triple = triple;
+    }
+    if (target_datalayout) |datalayout| {
+        _ = target.DataLayout.parse(datalayout) catch {
+            try fatal(io, "invalid target datalayout: {s}\n", .{datalayout});
+        };
+        if (module.target_datalayout == null) module.target_datalayout = datalayout;
+    }
     try module.verify();
 
     var stdout_buffer: [4096]u8 = undefined;
@@ -98,7 +109,15 @@ pub fn main(init: std.process.Init) !void {
     const stdout = &stdout_writer.interface;
 
     if (emit == .@"asm") {
-        const triple = target_triple orelse module.target_triple orelse return error.MissingTargetTriple;
+        const triple = target_triple orelse module.target_triple orelse {
+            try fatal(io, "missing target triple for --emit=asm; pass --target=<triple> or include target triple in the input\n", .{});
+        };
+        const parsed_triple = target.Triple.parse(triple) catch {
+            try fatal(io, "invalid target triple for --emit=asm: {s}\n", .{triple});
+        };
+        if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) {
+            try fatal(io, "unsupported --emit=asm target: {s}; supported target subset is x86_64-linux\n", .{triple});
+        }
         for (module.functions.items) |function| {
             var machine = try codegen.x86_64.lowerFunction(allocator, triple, function);
             defer machine.deinit(allocator);
@@ -120,4 +139,12 @@ pub fn main(init: std.process.Init) !void {
     });
     if (!trace) try module.print(stdout);
     try stdout.flush();
+}
+
+fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    stderr_writer.interface.print(fmt, args) catch {};
+    stderr_writer.interface.flush() catch {};
+    std.process.exit(2);
 }
