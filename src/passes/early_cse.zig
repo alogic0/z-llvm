@@ -5,6 +5,9 @@ const inst_simplify = @import("inst_simplify.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "early-cse",
+    .category = .canonicalization,
+    .target_status = "LLVM-shaped algorithm subset",
+    .upstream_owner = "llvm/lib/Transforms/Scalar/EarlyCSE.cpp",
     .run = run,
 };
 

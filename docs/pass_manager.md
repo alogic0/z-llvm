@@ -31,10 +31,14 @@ Implemented subset:
 
 ```text
 module pass list with stable pass names
+pass category metadata
+pass target-status metadata
+upstream-owner metadata
 trace output before and after each pass
 optional per-pass timing comments
 optional pass execution limit
 module verification after each executed pass
+explicit placeholder passes that return unchanged
 ```
 
 CLI:
@@ -61,6 +65,8 @@ All analyses are considered invalid after a pass runs.
 Passes that need analyses rebuild them locally from the current module/function state.
 No pass currently advertises preserved analyses.
 This is deliberately conservative until an analysis manager lands.
+Placeholder passes preserve the IR by behavior, but the pass manager still
+treats analysis state conservatively.
 ```
 
 Upstream mapping:

@@ -60,6 +60,89 @@ test "zig scalar foundation pipeline aliases scalar foundation passes" {
     }
 }
 
+test "Zig mode pipelines expand to stable pass and placeholder sequences" {
+    var debug_pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer debug_pm.deinit();
+    try pipelines.addPasses(&debug_pm, "debug-o0");
+
+    const debug_expected = [_]struct {
+        name: []const u8,
+        category: pass_manager.PassCategory,
+        status: []const u8,
+    }{
+        .{ .name = "verify", .category = .mandatory, .status = "LLVM-shaped algorithm subset" },
+        .{ .name = "ee-instrument", .category = .instrumentation, .status = "placeholder" },
+        .{ .name = "always-inline", .category = .ipo, .status = "placeholder" },
+        .{ .name = "alloc-token", .category = .instrumentation, .status = "placeholder" },
+        .{ .name = "annotation-remarks", .category = .instrumentation, .status = "placeholder" },
+        .{ .name = "verify", .category = .mandatory, .status = "LLVM-shaped algorithm subset" },
+    };
+    try std.testing.expectEqual(debug_expected.len, debug_pm.passes.items.len);
+    for (debug_expected, debug_pm.passes.items) |expected, pass| {
+        try std.testing.expectEqualStrings(expected.name, pass.name);
+        try std.testing.expectEqual(expected.category, pass.category);
+        try std.testing.expectEqualStrings(expected.status, pass.target_status);
+    }
+
+    var release_pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer release_pm.deinit();
+    try pipelines.addPasses(&release_pm, "release-o3");
+
+    const release_expected = [_][]const u8{
+        "verify",
+        "add-discriminators",
+        "forceattrs",
+        "inferattrs",
+        "sroa",
+        "mem2reg",
+        "simplifycfg",
+        "instcombine",
+        "early-cse",
+        "gvn",
+        "dse",
+        "adce",
+        "licm",
+        "globalopt",
+        "globaldce",
+        "mergefunc",
+        "annotation-remarks",
+        "verify",
+    };
+    try std.testing.expectEqual(release_expected.len, release_pm.passes.items.len);
+    for (release_expected, release_pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
+}
+
+test "inventory placeholders run as documented no-op passes" {
+    const input =
+        \\define i32 @placeholder(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "verify,always-inline,dse,canonicalize-aliases");
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    const result = try pm.run(&module, &context, &output.writer, false);
+    try std.testing.expectEqual(pass_manager.PassResult.unchanged, result);
+
+    var printed: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer printed.deinit();
+    try module.print(&printed.writer);
+    try std.testing.expectEqualStrings(input, printed.writer.buffered());
+}
+
 test "pass manager pass limit and timing output are deterministic without an io clock" {
     const input =
         \\define i32 @limit(i32 %a) {

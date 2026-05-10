@@ -9,8 +9,8 @@ const target = @import("target.zig");
 const usage =
     \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
     \\
-    \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa
-    \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation
+    \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,verify plus inventory placeholders
+    \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
     \\
 ;
 

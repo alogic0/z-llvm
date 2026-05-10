@@ -7,6 +7,9 @@ const pass_manager = @import("../pass_manager.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "licm",
+    .category = .loop,
+    .target_status = "LLVM-shaped algorithm subset",
+    .upstream_owner = "llvm/lib/Transforms/Scalar/LICM.cpp",
     .run = run,
 };
 

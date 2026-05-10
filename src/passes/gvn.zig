@@ -7,6 +7,9 @@ const inst_simplify = @import("inst_simplify.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "gvn",
+    .category = .scalar,
+    .target_status = "LLVM-shaped algorithm subset",
+    .upstream_owner = "llvm/lib/Transforms/Scalar/GVN.cpp",
     .run = run,
 };
 

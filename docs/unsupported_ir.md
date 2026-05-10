@@ -110,6 +110,7 @@ AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
 exact Zig-emitted scalar instruction flag parity in AIR-like fixtures
 target-aware pipeline integration beyond CLI target/datalayout record injection
+mode pipeline descriptors are dependency-ordered approximations, not full LLVM pipeline-equivalent implementations
 target diagnostics beyond invalid triple/datalayout and unsupported asm target checks
 ```
 
@@ -228,6 +229,7 @@ Module IR subset:
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
   AIR-like pre/post optimization driver using named pipelines
   zig-scalar-foundation pipeline alias and CLI target/datalayout record injection
+  debug-o0, release-o3, release-oz, lto-prelink-o3, and lto-prelink-oz pipeline descriptors with explicit no-op placeholders
   explicit CLI diagnostics for invalid target datalayout and unsupported asm targets
   normalized Zig-emitted scalar function signature fixture
   AIR-like project-lowered and project-optimized fixture pair for tiny scalar signatures

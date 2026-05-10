@@ -10,6 +10,21 @@ pub const PassResult = enum {
     }
 };
 
+pub const PassCategory = enum {
+    mandatory,
+    canonicalization,
+    scalar,
+    memory,
+    loop,
+    ipo,
+    vector,
+    instrumentation,
+    lto,
+    analysis,
+    pipeline_guard,
+    codegen_prep,
+};
+
 pub const Context = struct {
     allocator: std.mem.Allocator,
     io: ?std.Io = null,
@@ -17,6 +32,9 @@ pub const Context = struct {
 
 pub const ModulePass = struct {
     name: []const u8,
+    category: PassCategory = .scalar,
+    target_status: []const u8 = "LLVM-shaped algorithm subset",
+    upstream_owner: []const u8 = "",
     run: *const fn (*ir.Module, *Context) anyerror!PassResult,
 };
 

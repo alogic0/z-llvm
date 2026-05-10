@@ -81,7 +81,7 @@ depend on them:
 - [ ] DataLayout-backed type sizes and offsets for stack, GEP, and SROA work.
 - [ ] Target-independent versus target-aware folds.
 - [ ] Volatile, atomic, call, and unknown-memory barriers.
-- [ ] SSA dominance, phi incoming predecessor validity, and use-before-def
+- [x] SSA dominance, phi incoming predecessor validity, and use-before-def
       checks.
 
 ## Required Comparison Recipe
@@ -103,34 +103,34 @@ behavior note explaining what LLVM does that this project does not yet model.
 Goal: make the local IR and pass manager strong enough to run LLVM-like
 pipelines without silently accepting invalid inputs.
 
-- [ ] Add algorithm contracts for the verifier and pass-manager plumbing before
+- [x] Add algorithm contracts for the verifier and pass-manager plumbing before
       expanding implementation.
-- [ ] Document LLVM verifier source mapping:
+- [x] Document LLVM verifier source mapping:
       `llvm/lib/IR/Verifier.cpp`, `VerifierPass`, and the IR invariants it
       enforces for the locally accepted IR subset.
-- [ ] Expand verifier coverage for all IR currently accepted by the parser.
-- [ ] Add verifier checks needed by known P0 passes:
+- [x] Expand verifier coverage for all IR currently accepted by the parser.
+- [x] Add verifier checks needed by known P0 passes:
       dominance for SSA values, phi incoming validity, terminator shape,
       function declaration/reference validity, call signature checks, and
       memory instruction legality.
-- [ ] Add analysis preservation/invalidation policy for local pass-manager
+- [x] Add analysis preservation/invalidation policy for local pass-manager
       nesting and placeholders.
-- [ ] Add pass pipeline categories matching the inventory:
+- [x] Add pass pipeline categories matching the inventory:
       mandatory, canonicalization, scalar, memory, loop, IPO, vector,
       instrumentation, LTO.
-- [ ] Add a local pipeline descriptor for Zig modes:
+- [x] Add a local pipeline descriptor for Zig modes:
       `debug-o0`, `release-o3`, `release-oz`, `lto-prelink-o3`,
       `lto-prelink-oz`.
-- [ ] Keep unsupported passes as explicit pipeline placeholders with targeted
+- [x] Keep unsupported passes as explicit pipeline placeholders with targeted
       diagnostics or documented no-op behavior.
-- [ ] Add pass-limit/trace output that can show the expanded local pipeline.
+- [x] Add pass-limit/trace output that can show the expanded local pipeline.
 - [ ] Add fixture metadata tying every optimizer fixture to the inventory pass
       it covers.
 
 Passes covered:
 
-- [ ] `verify`
-- [ ] analysis plumbing: `require<...>`, `invalidate<...>` placeholders
+- [x] `verify`
+- [x] analysis plumbing: `require<...>`, `invalidate<...>` placeholders
 - [ ] pass-manager nesting placeholders for module/function/loop/CGSCC groups
 
 ## Epic 2: P0 Scalar Canonicalization Foundation

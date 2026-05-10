@@ -151,20 +151,22 @@ Status meanings:
   LLVM.
 - `partial`: local IR or analysis support exists, but the pass is not a real
   implementation yet.
+- `placeholder`: executable no-op pipeline entry exists so the discovered
+  pipeline surface is explicit, but the LLVM algorithm is not implemented.
 - `missing`: no meaningful local implementation.
 - `defer`: not a near-term optimizer target.
 
 | LLVM pass | Category | Priority | Local status | Upstream owner |
 | --- | --- | --- | --- | --- |
 | `verify` / `VerifierPass` | mandatory | P0 | foundation: SSA dominance and phi predecessor checks for accepted IR | `llvm/lib/IR/Verifier.cpp` |
-| `always-inline` | mandatory IPO | P0 | missing | `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` |
+| `always-inline` | mandatory IPO | P0 | placeholder | `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` |
 | `mem2reg` | canonicalization | P0 | foundation | `llvm/lib/Transforms/Utils/Mem2Reg.cpp` |
 | `sroa` | canonicalization / memory | P0 | foundation | `llvm/lib/Transforms/Scalar/SROA.cpp` |
 | `instcombine` | canonicalization | P0 | foundation | `llvm/lib/Transforms/InstCombine/` |
 | `instsimplify` | canonicalization query | P0 | foundation | `llvm/lib/Analysis/InstructionSimplify.cpp` |
 | `simplifycfg` | canonicalization / CFG | P0 | foundation | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
 | `early-cse` | canonicalization / scalar | P1 | foundation | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
-| `dse` | memory optimization | P1 | missing | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
+| `dse` | memory optimization | P1 | placeholder | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | foundation | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
 | `bdce` | scalar DCE | P2 | missing | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
 | `sccp` / `ipsccp` | scalar / IPO | P1 | missing | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
@@ -200,26 +202,26 @@ Status meanings:
 | `move-auto-init` | memory/security | P3 | defer | `llvm/lib/Transforms/Scalar/MoveAutoInit.cpp` |
 | `aggressive-instcombine` | canonicalization | P2 | missing | `llvm/lib/Transforms/AggressiveInstCombine/` |
 | `annotation2metadata` | metadata canonicalization | P3 | missing | `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp` |
-| `annotation-remarks` | diagnostics/remarks | P3 | defer | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |
-| `forceattrs` | attribute IPO | P2 | missing | `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp` |
-| `inferattrs` | attribute IPO | P2 | missing | `llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp` |
-| `function-attrs` | attribute IPO | P2 | missing | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
-| `rpo-function-attrs` | attribute IPO | P2 | missing | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
+| `annotation-remarks` | diagnostics/remarks | P3 | placeholder | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |
+| `forceattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp` |
+| `inferattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp` |
+| `function-attrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
+| `rpo-function-attrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
 | `called-value-propagation` | IPO | P3 | missing | `llvm/lib/Transforms/IPO/CalledValuePropagation.cpp` |
 | `argpromotion` | IPO | P3 | missing | `llvm/lib/Transforms/IPO/ArgumentPromotion.cpp` |
 | `inline` | IPO | P2 | missing | `llvm/lib/Transforms/IPO/Inliner.cpp` |
 | `callsite-splitting` | IPO/scalar | P3 | missing | `llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp` |
 | `deadargelim` | IPO cleanup | P3 | missing | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
-| `globalopt` | global optimization | P2 | partial globals only | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
-| `globaldce` | global cleanup | P2 | missing | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
+| `globalopt` | global optimization | P2 | placeholder; partial globals only | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
+| `globaldce` | global cleanup | P2 | placeholder | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
 | `constmerge` | global cleanup | P3 | missing | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
-| `mergefunc` | size IPO | P3 | defer | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |
+| `mergefunc` | size IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |
 | `elim-avail-extern` | LTO/global cleanup | P3 | missing | `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp` |
 | `recompute-globalsaa` / `globals-aa` | analysis | P2 | missing | `llvm/lib/Analysis/GlobalsModRef.cpp` |
-| `require<globals-aa>` | analysis plumbing | P2 | missing | `llvm/include/llvm/IR/PassManager.h` |
-| `invalidate<aa>` | analysis plumbing | P2 | missing | `llvm/include/llvm/IR/PassManager.h` |
-| `require<profile-summary>` | analysis plumbing | P3 | missing | `llvm/include/llvm/IR/PassManager.h` |
-| `require<should-not-run-function-passes>` | pipeline guard | P3 | defer | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
+| `require<globals-aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
+| `invalidate<aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
+| `require<profile-summary>` | analysis plumbing | P3 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
+| `require<should-not-run-function-passes>` | pipeline guard | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `openmp-opt`, `openmp-opt-cgscc` | OpenMP IPO | P3 | defer | `llvm/lib/Transforms/IPO/OpenMPOpt.cpp` |
 | `libcalls-shrinkwrap` | library-call optimization | P3 | missing | `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp` |
 | `inject-tli-mappings` | TLI/vector library metadata | P3 | missing | `llvm/lib/Transforms/Utils/InjectTLIMappings.cpp` |
@@ -228,8 +230,8 @@ Status meanings:
 | `vector-combine` | vector canonicalization | P3 | defer | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
 | `chr` | control-height reduction | P3 | defer | `llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp` |
 | `cg-profile` | profile metadata | P3 | defer | `llvm/lib/Transforms/Instrumentation/CGProfile.cpp` |
-| `ee-instrument` | instrumentation | P3 | missing | `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp` |
-| `add-discriminators` | debug/profile metadata | P3 | missing | `llvm/lib/Transforms/Utils/AddDiscriminators.cpp` |
+| `ee-instrument` | instrumentation | P3 | placeholder | `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp` |
+| `add-discriminators` | debug/profile metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/AddDiscriminators.cpp` |
 | `sancov` / `SanitizerCoveragePass` | sanitizer instrumentation | P3 | missing | `llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp` |
 | `module-tsan`, `tsan` | sanitizer instrumentation | P3 | missing | `llvm/lib/Transforms/Instrumentation/ThreadSanitizer.cpp` |
 | `coro-early` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroEarly.cpp` |
@@ -237,10 +239,10 @@ Status meanings:
 | `coro-elide` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroElide.cpp` |
 | `coro-cleanup` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroCleanup.cpp` |
 | `coro-annotation-elide` | coroutine lowering | P3 | defer | `llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp` |
-| `alloc-token` | allocation instrumentation | P3 | missing | `llvm/lib/Transforms/Instrumentation/AllocToken.cpp` |
+| `alloc-token` | allocation instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/AllocToken.cpp` |
 | `memprof-remove-attributes` | MemProf cleanup | P3 | defer | `llvm/lib/Transforms/Instrumentation/MemProfUse.cpp` |
-| `canonicalize-aliases` | LTO/global canonicalization | P3 | missing | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
-| `name-anon-globals` | LTO/global canonicalization | P3 | missing | `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp` |
+| `canonicalize-aliases` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
+| `name-anon-globals` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp` |
 | `rel-lookup-table-converter` | codegen/linker prep | P3 | defer | `llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp` |
 | `transform-warning` | diagnostics | P3 | defer | `llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp` |
 

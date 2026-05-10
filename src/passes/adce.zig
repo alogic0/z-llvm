@@ -6,6 +6,9 @@ const pass_manager = @import("../pass_manager.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "adce",
+    .category = .scalar,
+    .target_status = "local conservative substitute",
+    .upstream_owner = "llvm/lib/Transforms/Scalar/ADCE.cpp",
     .run = run,
 };
 

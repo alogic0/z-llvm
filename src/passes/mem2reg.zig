@@ -6,6 +6,9 @@ const pass_manager = @import("../pass_manager.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "mem2reg",
+    .category = .canonicalization,
+    .target_status = "LLVM-shaped algorithm subset",
+    .upstream_owner = "llvm/lib/Transforms/Utils/Mem2Reg.cpp",
     .run = run,
 };
 

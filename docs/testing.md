@@ -74,6 +74,7 @@ calling convention preservation for ccc/fastcc/coldcc-compatible header parsing
 function declaration and direct call round-tripping
 direct call verifier mismatch and unsupported-call diagnostics
 verifier dominance, use-before-def, exact phi predecessor, and phi ordering diagnostics
+Zig mode pipeline expansion for debug-o0 and release-o3, including executable placeholders
 void function and ret void round-tripping
 explicit unsupported global diagnostics
 ```
@@ -89,6 +90,11 @@ Named pipeline and pass-manager debugging commands:
 ```bash
 zig build run -- --passes=scalar-foundation test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
+zig build run -- --pipeline=debug-o0 test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=release-o3 test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=release-oz test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=lto-prelink-o3 test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=lto-prelink-oz test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --trace test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.ll
 zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
@@ -129,6 +135,7 @@ LLVM algorithms covered so far:
 
 ```text
 Verifier: accepted-IR subset for terminators, call signatures, memory attributes, SSA dominance, use-before-def, and phi predecessor validation
+PassBuilder pipeline surface: named pass registry, Zig mode pipeline descriptors, and no-op placeholders for not-yet-implemented inventory passes
 InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset
