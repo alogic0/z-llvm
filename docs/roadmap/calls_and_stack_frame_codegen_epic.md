@@ -230,9 +230,9 @@ Suggested slice boundary:
 - [x] Spill only known caller-saved values required by tiny call fixtures.
 - [x] Reload spilled values after the call before their next use.
 - [x] Add tests proving values survive calls.
-- [ ] Document the boundary from deterministic spill insertion to real register
+- [x] Document the boundary from deterministic spill insertion to real register
       allocation.
-- [ ] Keep general liveness, coalescing, rematerialization, and spill-cost
+- [x] Keep general liveness, coalescing, rematerialization, and spill-cost
       heuristics out of scope.
 
 Suggested slice boundary:
@@ -247,22 +247,22 @@ Suggested slice boundary:
 - [x] Add negative fixtures:
       varargs, aggregate args, floats, vectors, too many args, indirect calls,
       unsupported calling convention, call with unsupported live pressure.
-- [ ] Keep each fixture tiny and independently reducible.
-- [ ] Compare assembly with LLVM when the local accepted behavior is intended to
+- [x] Keep each fixture tiny and independently reducible.
+- [x] Compare assembly with LLVM when the local accepted behavior is intended to
       match LLVM for the selected subset.
 
 ## 10. CLI and Test Workflow
 
-- [ ] Keep `--emit=asm` and `--emit=obj` as the codegen entry points.
+- [x] Keep `--emit=asm` and `--emit=obj` as the codegen entry points.
 - [x] Extend codegen fixture scripts to cover call assembly and objdump output.
-- [ ] Add relocation inspection checks when `readelf` and `objdump` are
+- [x] Add relocation inspection checks when `readelf` and `objdump` are
       available.
-- [ ] Keep generated temporary objects under `/tmp` or `zig-out/`.
-- [ ] Keep optimizer comparison tests independent from call-codegen tests.
+- [x] Keep generated temporary objects under `/tmp` or `zig-out/`.
+- [x] Keep optimizer comparison tests independent from call-codegen tests.
 
 ## 11. Documentation and Inventory Updates
 
-- [ ] Add `docs/codegen/calls.md`.
+- [x] Add `docs/codegen/calls.md`.
 - [x] Add `docs/codegen/stack_frame.md`.
 - [x] Extend `docs/codegen/abi_x86_64_sysv.md` with call, stack alignment, and
       caller/callee-saved register rules.
@@ -273,19 +273,19 @@ Suggested slice boundary:
 - [ ] Update `docs/inventory/zig_llvm_api_inventory.md` for call lowering,
       frame lowering, relocation handling, and covered `TargetMachine.emitToFile`
       responsibilities.
-- [ ] Update `docs/unsupported_ir.md` with call/frame codegen limitations.
-- [ ] Update `docs/testing.md` with call/frame fixture workflows.
+- [x] Update `docs/unsupported_ir.md` with call/frame codegen limitations.
+- [x] Update `docs/testing.md` with call/frame fixture workflows.
 
 ## 12. Verification Gate
 
-- [ ] Run `zig fmt` on touched Zig files.
-- [ ] Run `zig build test`.
-- [ ] Run `bash scripts/compare_opt.sh`.
-- [ ] Run assembly golden tests.
-- [ ] Run objdump comparison tests.
-- [ ] Inspect relocation records with `readelf -r -s` where available.
-- [ ] Compare selected accepted cases with `llc-22` assembly shape.
-- [ ] Confirm every unsupported call/frame path fails with a targeted diagnostic.
+- [x] Run `zig fmt` on touched Zig files.
+- [x] Run `zig build test`.
+- [x] Run `bash scripts/compare_opt.sh`.
+- [x] Run assembly golden tests.
+- [x] Run objdump comparison tests.
+- [x] Inspect relocation records with `readelf -r -s` where available.
+- [x] Compare selected accepted cases with `llc-22` assembly shape.
+- [x] Confirm every unsupported call/frame path fails with a targeted diagnostic.
 
 ## Out Of Scope
 
