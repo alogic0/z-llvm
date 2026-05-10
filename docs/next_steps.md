@@ -4,13 +4,9 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-### Cycle 7: Zig LLVM API Inventory and IR Structure
+No active cycle is currently open. Add the next optimization-focused cycle here before implementation starts.
 
-- [x] Create `docs/inventory/zig_llvm_api_inventory.md` and map Zig's real LLVM backend entry points to replacement owner components.
-- [x] Classify the current optimizer work as phase-zero infrastructure, with the largest missing LLVM dependencies called out explicitly.
-- [x] Add the inventory-backed owner map for future `src/target/`, `src/codegen/`, `src/mc/`, `src/debug/`, and `src/bitcode/` work without creating empty implementation directories yet.
-- [x] Start splitting the IR module by moving the implementation behind a compatibility facade at `src/ir.zig` and `src/ir/core.zig`.
-- [x] Verify the refactor and inventory cycle with the existing Zig tests and `opt-22` comparison fixtures.
+## Completed Cycles
 
 ### Cycle 8: Optimization Pipeline Expansion
 
@@ -20,7 +16,13 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add an ADCE foundation pass for aggressively removing unused side-effect-free instruction chains, with upstream LLVM mapping and `opt-22` fixtures.
 - [x] Add LoopInfo-style natural loop analysis over dominator backedges, with upstream LLVM mapping and unit tests.
 
-## Completed Cycles
+### Cycle 7: Zig LLVM API Inventory and IR Structure
+
+- [x] Create `docs/inventory/zig_llvm_api_inventory.md` and map Zig's real LLVM backend entry points to replacement owner components.
+- [x] Classify the current optimizer work as phase-zero infrastructure, with the largest missing LLVM dependencies called out explicitly.
+- [x] Add the inventory-backed owner map for future `src/target/`, `src/codegen/`, `src/mc/`, `src/debug/`, and `src/bitcode/` work without creating empty implementation directories yet.
+- [x] Start splitting the IR module by moving the implementation behind a compatibility facade at `src/ir.zig` and `src/ir/core.zig`.
+- [x] Verify the refactor and inventory cycle with the existing Zig tests and `opt-22` comparison fixtures.
 
 ### Cycle 6: Select and Unreachable Control Flow
 
