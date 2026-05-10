@@ -4,14 +4,24 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+### Cycle 3: Memory IR and Promotion Foundation
+
+- [ ] Add `alloca`, `load`, and `store` parsing, printing, verification, and upstream mapping.
+- [ ] Extend def-use and DCE side-effect handling for memory operations.
+- [ ] Add alias-analysis scaffolding for stack slots and document the LLVM BasicAA mapping.
+- [ ] Implement a first `mem2reg`/PromoteMemToReg subset for single-block stack slots.
+- [ ] Add `opt` comparison fixtures for the memory IR and `mem2reg` subset.
+
+## Completed Cycles
+
+### Cycle 2: Branch, CFG, Dominators, and Early CSE
+
 - [x] Add `icmp` instruction parsing, printing, verification, and tests.
 - [x] Add `phi` instruction parsing, printing, verification, and tests.
 - [x] Extend `simplifycfg` to update/remove trivial phi inputs.
 - [x] Add an explicit CFG analysis helper for predecessors and successors.
 - [x] Add dominator tree analysis for reachable blocks.
 - [x] Implement an `early-cse` subset for repeated pure expressions.
-
-## Completed Cycles
 
 ### Cycle 1: Initial IR and Scalar Cleanup
 
