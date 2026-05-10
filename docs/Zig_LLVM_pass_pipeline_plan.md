@@ -78,6 +78,8 @@ docs/inventory/zig_llvm_api_inventory.md
 
 This document must list each Zig binding, the C++/LLVM function it reaches, the replacement component that will own it, and whether it is required for Debug, ReleaseFast, ReleaseSmall, LTO, tests, or tooling.
 
+Status: the first inventory lives in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md). It shows that the current project is phase-zero optimizer infrastructure: useful IR and pass groundwork, but still much narrower than the full Zig LLVM dependency surface. New implementation cycles should start from that inventory before adding more familiar LLVM passes.
+
 ## 2. Define the Replacement Architecture
 
 The replacement should be split into explicit compiler layers:
@@ -154,11 +156,14 @@ Deliverables:
 
 ```text
 src/ir.zig
-src/ir/print.zig
-src/ir/verify.zig
+src/ir/core.zig
+src/ir/printer.zig
+src/ir/verifier.zig
 src/ir/parser.zig
 docs/ir.md
 ```
+
+Status: `src/ir.zig` is now a compatibility facade over `src/ir/core.zig`. Parser, printer, and verifier extraction should be done in later focused steps after inventory-backed behavior is stable.
 
 ## 4. Reproduce LLVM's Pass Manager Functionality
 

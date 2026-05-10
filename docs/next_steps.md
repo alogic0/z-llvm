@@ -4,6 +4,16 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+### Cycle 7: Zig LLVM API Inventory and IR Structure
+
+- [x] Create `docs/inventory/zig_llvm_api_inventory.md` and map Zig's real LLVM backend entry points to replacement owner components.
+- [x] Classify the current optimizer work as phase-zero infrastructure, with the largest missing LLVM dependencies called out explicitly.
+- [x] Add the inventory-backed owner map for future `src/target/`, `src/codegen/`, `src/mc/`, `src/debug/`, and `src/bitcode/` work without creating empty implementation directories yet.
+- [x] Start splitting the IR module by moving the implementation behind a compatibility facade at `src/ir.zig` and `src/ir/core.zig`.
+- [x] Verify the refactor and inventory cycle with the existing Zig tests and `opt-22` comparison fixtures.
+
+## Completed Cycles
+
 ### Cycle 6: Select and Unreachable Control Flow
 
 - [x] Add `unreachable` terminator parsing, printing, verification, CFG handling, and upstream LLVM mapping.
@@ -11,8 +21,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Extend `instcombine` to fold simple `select` forms: constant condition and identical arms.
 - [x] Extend value replacement paths across `select` so `instcombine`, `simplifycfg`, and `mem2reg` keep select operands current.
 - [x] Add `opt-22` comparison fixtures for `select` folding and `unreachable` CFG simplification.
-
-## Completed Cycles
 
 ### Cycle 5: Mem2Reg Completeness and Pointer IR Foundation
 
@@ -111,3 +119,6 @@ Track each reproduced LLVM algorithm here as it lands:
 - Select IR now parses, prints, verifies, tracks def-use, and participates in value replacement paths as documented in [ir_select.md](ir_select.md).
 - `instcombine` now folds `select` with constant conditions and identical arms.
 - `opt-22` comparison fixtures now cover `select` folding and constant-branch simplification to `unreachable`.
+- Zig's real LLVM backend API surface is now inventoried in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md), with replacement owner components for IR, AIR lowering, target/ABI, codegen, MC/object, debug, bitcode, sanitizer/coverage, LTO, host CPU, and linker-adjacent bindings.
+- The current optimizer is explicitly treated as phase-zero infrastructure rather than the whole LLVM replacement.
+- `src/ir.zig` is now a compatibility facade over `src/ir/core.zig`, starting the move toward separate parser, printer, verifier, and core IR files.
