@@ -1,4 +1,5 @@
 const std = @import("std");
+const alias = @import("analysis/alias.zig");
 const cfg = @import("analysis/cfg.zig");
 const dominator = @import("analysis/dominator.zig");
 const ir = @import("ir.zig");
@@ -306,6 +307,37 @@ test "dce removes unused loads but keeps stores" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "alias analysis classifies stack slots" {
+    const input =
+        \\define i32 @alias(ptr %arg) {
+        \\entry:
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  store i32 1, ptr %left
+        \\  store i32 2, ptr %right
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expectEqual(
+        alias.AliasResult.must_alias,
+        alias.alias(function, .{ .named = "left" }, .{ .named = "left" }),
+    );
+    try std.testing.expectEqual(
+        alias.AliasResult.no_alias,
+        alias.alias(function, .{ .named = "left" }, .{ .named = "right" }),
+    );
+    try std.testing.expectEqual(
+        alias.AliasResult.may_alias,
+        alias.alias(function, .{ .named = "left" }, .{ .named = "arg" }),
+    );
 }
 
 test "simplifycfg folds constant branch and removes unreachable blocks" {
