@@ -1,9 +1,11 @@
 const std = @import("std");
 const air_bridge = @import("air_bridge.zig");
 const alias = @import("analysis/alias.zig");
+const call_graph = @import("analysis/call_graph.zig");
 const cfg = @import("analysis/cfg.zig");
 const codegen = @import("codegen.zig");
 const dominator = @import("analysis/dominator.zig");
+const function_attrs = @import("analysis/function_attrs.zig");
 const loop_info = @import("analysis/loop_info.zig");
 const memory_effect = @import("analysis/memory_effect.zig");
 const memory_location = @import("analysis/memory_location.zig");
@@ -158,7 +160,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,inline,argpromotion,called-value-propagation,callsite-splitting,deadargelim,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -1220,6 +1222,67 @@ test "verifier accepts matching declaration and definition" {
     defer module.deinit();
 
     try module.verify();
+}
+
+test "call graph records direct call edges once" {
+    const input =
+        \\declare i32 @extern(i32)
+        \\
+        \\define i32 @helper(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %x = call i32 @helper(i32 %a)
+        \\  %y = call i32 @helper(i32 %x)
+        \\  %z = call i32 @extern(i32 %y)
+        \\  ret i32 %z
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var graph = try call_graph.CallGraph.build(std.testing.allocator, module);
+    defer graph.deinit();
+
+    const callees = graph.calleesOf("caller") orelse return error.MissingCallGraphNode;
+    try std.testing.expectEqual(@as(usize, 2), callees.len);
+    try std.testing.expect(graph.hasDirectEdge("caller", "helper"));
+    try std.testing.expect(graph.hasDirectEdge("caller", "extern"));
+    try std.testing.expect(!graph.hasDirectEdge("helper", "extern"));
+}
+
+test "function attributes classify direct call memory effects conservatively" {
+    const input =
+        \\declare i32 @pure(i32) readnone
+        \\declare i32 @reads(ptr) readonly
+        \\declare i32 @unknown(i32)
+        \\
+        \\define i32 @caller(ptr %p, i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  %y = call i32 @reads(ptr %p)
+        \\  %z = call i32 @unknown(i32 %y)
+        \\  ret i32 %z
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const block = module.functions.items[0].blocks.items[0];
+
+    const pure_call = block.instructions.items[0].kind.call;
+    const readonly_call = block.instructions.items[1].kind.call;
+    const unknown_call = block.instructions.items[2].kind.call;
+
+    try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
+    try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
+    try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
 }
 
 test "verifier rejects use before definition in the same block" {

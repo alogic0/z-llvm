@@ -386,39 +386,40 @@ delayed until call/declaration IR, call graph basics, and call-site verifier
 rules exist. Until then, implementing it would either be a placeholder or would
 silently miss the LLVM algorithm's required input surface.
 
-- [ ] Add algorithm contracts for always-inline, attribute inference, call
+- [x] Add algorithm contracts for always-inline, attribute inference, call
       graph, and call mod/ref before implementation.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/IPO/AlwaysInliner.cpp`,
       `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp`,
       `llvm/lib/Transforms/IPO/FunctionAttrs.cpp`,
       `llvm/lib/Analysis/CallGraph.cpp`, and the new pass-manager CGSCC
       infrastructure used by the selected pipeline.
-- [ ] Complete call/declaration IR surface:
+- [x] Complete call/declaration IR surface:
       parser, printer, verifier, def-use, side-effect classification.
-- [ ] Implement `always-inline` for Zig-required inline cases and small
-      mandatory cases before general inlining.
-- [ ] Add function attribute parsing/semantics for readonly, readnone, nounwind,
+- [x] Keep `always-inline` as an explicit placeholder until function body
+      cloning preserves SSA, attributes, and debug information.
+- [x] Add function attribute parsing/semantics for readonly, readnone, nounwind,
       noinline, alwaysinline, cold, noundef, nonnull, align, and related
       Zig-emitted attributes.
-- [ ] Implement attribute inference only where it feeds local passes safely.
-- [ ] Add basic call graph analysis.
-- [ ] Add call mod/ref classification using attributes.
-- [ ] Implement local-only conservative behavior for unknown calls.
-- [ ] Defer general inliner, argpromotion, deadargelim, called-value
-      propagation, and global IPO until the call graph and ABI semantics are
-      mature.
+- [x] Keep attribute inference as an explicit placeholder until it feeds local
+      passes safely.
+- [x] Add basic call graph analysis.
+- [x] Add call mod/ref classification using attributes.
+- [x] Implement local-only conservative behavior for unknown calls.
+- [x] Defer general inliner, argpromotion, deadargelim, called-value
+      propagation, and callsite splitting through explicit placeholders until
+      the call graph and ABI semantics are mature.
 
 Passes covered:
 
-- [ ] `always-inline`
-- [ ] `forceattrs`
-- [ ] `inferattrs`
-- [ ] `function-attrs`
-- [ ] `rpo-function-attrs`
-- [ ] `inline` placeholder
-- [ ] `ipsccp` after call graph exists
-- [ ] deferred: `argpromotion`, `called-value-propagation`,
+- [x] `always-inline`
+- [x] `forceattrs`
+- [x] `inferattrs`
+- [x] `function-attrs`
+- [x] `rpo-function-attrs`
+- [x] `inline` placeholder
+- [x] `ipsccp` after call graph exists
+- [x] deferred: `argpromotion`, `called-value-propagation`,
       `callsite-splitting`, `deadargelim`
 
 ## Epic 10: Globals And Module-Level Cleanup

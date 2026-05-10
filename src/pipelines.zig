@@ -359,6 +359,11 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "inferattrs")) return placeholder.make("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "function-attrs")) return placeholder.make("function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "rpo-function-attrs")) return placeholder.make("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");
+    if (std.mem.eql(u8, name, "inline")) return placeholder.make("inline", .ipo, "llvm/lib/Transforms/IPO/Inliner.cpp");
+    if (std.mem.eql(u8, name, "argpromotion")) return placeholder.make("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp");
+    if (std.mem.eql(u8, name, "called-value-propagation")) return placeholder.make("called-value-propagation", .ipo, "llvm/lib/Transforms/IPO/CalledValuePropagation.cpp");
+    if (std.mem.eql(u8, name, "callsite-splitting")) return placeholder.make("callsite-splitting", .scalar, "llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp");
+    if (std.mem.eql(u8, name, "deadargelim")) return placeholder.make("deadargelim", .ipo, "llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp");
     if (std.mem.eql(u8, name, "dse")) return placeholder.make("dse", .memory, "llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp");
     if (std.mem.eql(u8, name, "globalopt")) return placeholder.make("globalopt", .ipo, "llvm/lib/Transforms/IPO/GlobalOpt.cpp");
     if (std.mem.eql(u8, name, "globaldce")) return placeholder.make("globaldce", .ipo, "llvm/lib/Transforms/IPO/GlobalDCE.cpp");
