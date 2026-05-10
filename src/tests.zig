@@ -176,6 +176,57 @@ test "parser normalizes multiple functions and branch terminators" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes icmp instructions" {
+    const input =
+        \\define i1 @cmp(i32 %a) {
+        \\entry:
+        \\  %c = icmp eq i32 %a, 0
+        \\  ret i1 %c
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
+test "instcombine folds constant icmp" {
+    const input =
+        \\define i1 @cmp() {
+        \\entry:
+        \\  %c = icmp ne i32 1, 1
+        \\  ret i1 %c
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(instcombine.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i1 @cmp() {
+        \\entry:
+        \\  ret i1 0
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "simplifycfg folds constant branch and removes unreachable blocks" {
     const input =
         \\define i32 @branch(i32 %a) {

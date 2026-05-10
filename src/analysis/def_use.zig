@@ -23,8 +23,7 @@ pub const UseCounts = struct {
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
                 if (instruction.removed) continue;
-                try uses.addValue(instruction.lhs);
-                try uses.addValue(instruction.rhs);
+                try uses.addInstructionOperands(instruction);
             }
             if (block.terminator) |terminator| try uses.addTerminator(terminator);
         }
@@ -37,13 +36,29 @@ pub const UseCounts = struct {
     }
 
     pub fn addInstructionOperands(uses: *UseCounts, instruction: ir.Instruction) !void {
-        try uses.addValue(instruction.lhs);
-        try uses.addValue(instruction.rhs);
+        switch (instruction.kind) {
+            .binary => |binary| {
+                try uses.addValue(binary.lhs);
+                try uses.addValue(binary.rhs);
+            },
+            .icmp => |icmp| {
+                try uses.addValue(icmp.lhs);
+                try uses.addValue(icmp.rhs);
+            },
+        }
     }
 
     pub fn removeInstructionOperands(uses: *UseCounts, instruction: ir.Instruction) void {
-        uses.removeValue(instruction.lhs);
-        uses.removeValue(instruction.rhs);
+        switch (instruction.kind) {
+            .binary => |binary| {
+                uses.removeValue(binary.lhs);
+                uses.removeValue(binary.rhs);
+            },
+            .icmp => |icmp| {
+                uses.removeValue(icmp.lhs);
+                uses.removeValue(icmp.rhs);
+            },
+        }
     }
 
     pub fn addTerminator(uses: *UseCounts, terminator: ir.Terminator) !void {

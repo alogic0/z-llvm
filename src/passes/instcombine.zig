@@ -15,8 +15,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
         for (function.blocks.items) |*block| {
             for (block.instructions.items) |*instruction| {
-                instruction.lhs = resolveValue(aliases, instruction.lhs);
-                instruction.rhs = resolveValue(aliases, instruction.rhs);
+                instruction.mapOperands(aliases);
 
                 if (fold(instruction.*)) |replacement| {
                     instruction.removed = true;
@@ -44,33 +43,58 @@ fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value 
 }
 
 fn fold(instruction: ir.Instruction) ?ir.Value {
-    if (instruction.lhs == .int and instruction.rhs == .int) {
-        const lhs = instruction.lhs.int;
-        const rhs = instruction.rhs.int;
-        return .{ .int = switch (instruction.op) {
+    return switch (instruction.kind) {
+        .binary => |binary| foldBinary(binary),
+        .icmp => |icmp| foldIcmp(icmp),
+    };
+}
+
+fn foldBinary(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.lhs == .int and binary.rhs == .int) {
+        const lhs = binary.lhs.int;
+        const rhs = binary.rhs.int;
+        return .{ .int = switch (binary.op) {
             .add => lhs + rhs,
             .sub => lhs - rhs,
             .mul => lhs * rhs,
         } };
     }
 
-    return switch (instruction.op) {
-        .add => if (isZero(instruction.rhs))
-            instruction.lhs
-        else if (isZero(instruction.lhs))
-            instruction.rhs
+    return switch (binary.op) {
+        .add => if (isZero(binary.rhs))
+            binary.lhs
+        else if (isZero(binary.lhs))
+            binary.rhs
         else
             null,
-        .sub => if (isZero(instruction.rhs)) instruction.lhs else null,
-        .mul => if (isOne(instruction.rhs))
-            instruction.lhs
-        else if (isOne(instruction.lhs))
-            instruction.rhs
-        else if (isZero(instruction.rhs) or isZero(instruction.lhs))
+        .sub => if (isZero(binary.rhs)) binary.lhs else null,
+        .mul => if (isOne(binary.rhs))
+            binary.lhs
+        else if (isOne(binary.lhs))
+            binary.rhs
+        else if (isZero(binary.rhs) or isZero(binary.lhs))
             .{ .int = 0 }
         else
             null,
     };
+}
+
+fn foldIcmp(icmp: ir.IcmpInst) ?ir.Value {
+    if (icmp.lhs == .int and icmp.rhs == .int) {
+        return .{ .int = switch (icmp.predicate) {
+            .eq => @intFromBool(icmp.lhs.int == icmp.rhs.int),
+            .ne => @intFromBool(icmp.lhs.int != icmp.rhs.int),
+        } };
+    }
+
+    if (icmp.lhs.eql(icmp.rhs)) {
+        return .{ .int = switch (icmp.predicate) {
+            .eq => 1,
+            .ne => 0,
+        } };
+    }
+
+    return null;
 }
 
 fn isZero(value: ir.Value) bool {

@@ -19,6 +19,8 @@ x * 1 -> x
 x * 0 -> 0
 0 * x -> 0
 integer constant folding for add/sub/mul
+icmp eq/ne constant folding
+icmp eq/ne same-operand folding
 ```
 
 Example:
@@ -39,7 +41,7 @@ Known gaps:
 no flags such as nsw/nuw/exact
 no poison/undef/freeze handling
 no vectors
-no comparisons
+no icmp predicates other than eq/ne
 no casts
 no canonical reassociation
 no target-specific combines

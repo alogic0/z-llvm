@@ -9,6 +9,7 @@ define iN @name(...)
 integer parameters
 named basic blocks
 add/sub/mul integer instructions
+icmp eq/ne integer instructions
 ret
 br label %target
 br i1 <value>, label %then, label %else
@@ -34,7 +35,8 @@ token/metadata types
 ## Unsupported Instructions
 
 ```text
-icmp/fcmp
+icmp predicates except eq/ne
+fcmp
 phi
 select
 alloca
@@ -124,7 +126,7 @@ Def-use subset:
 The next useful parser expansions are:
 
 ```text
-icmp
+icmp predicates beyond eq/ne
 phi
 unreachable terminator
 alloca/load/store

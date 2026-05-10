@@ -60,24 +60,80 @@ pub const BinaryOp = enum {
     }
 };
 
+pub const IcmpPredicate = enum {
+    eq,
+    ne,
+
+    pub fn parse(text: []const u8) ?IcmpPredicate {
+        if (std.mem.eql(u8, text, "eq")) return .eq;
+        if (std.mem.eql(u8, text, "ne")) return .ne;
+        return null;
+    }
+
+    pub fn name(predicate: IcmpPredicate) []const u8 {
+        return @tagName(predicate);
+    }
+};
+
 pub const Param = struct {
     ty: Type,
     name: []const u8,
 };
 
-pub const Instruction = struct {
-    result: []const u8,
+pub const BinaryInst = struct {
     op: BinaryOp,
     ty: Type,
     lhs: Value,
     rhs: Value,
+};
+
+pub const IcmpInst = struct {
+    predicate: IcmpPredicate,
+    operand_ty: Type,
+    lhs: Value,
+    rhs: Value,
+};
+
+pub const Instruction = struct {
+    result: []const u8,
+    kind: union(enum) {
+        binary: BinaryInst,
+        icmp: IcmpInst,
+    },
     removed: bool = false,
     replacement: ?Value = null,
 
     pub fn hasSideEffects(_: Instruction) bool {
         return false;
     }
+
+    pub fn resultType(instruction: Instruction) Type {
+        return switch (instruction.kind) {
+            .binary => |binary| binary.ty,
+            .icmp => .{ .int = 1 },
+        };
+    }
+
+    pub fn mapOperands(instruction: *Instruction, aliases: std.StringHashMap(Value)) void {
+        switch (instruction.kind) {
+            .binary => |*binary| {
+                binary.lhs = resolveValue(aliases, binary.lhs);
+                binary.rhs = resolveValue(aliases, binary.rhs);
+            },
+            .icmp => |*icmp| {
+                icmp.lhs = resolveValue(aliases, icmp.lhs);
+                icmp.rhs = resolveValue(aliases, icmp.rhs);
+            },
+        }
+    }
 };
+
+fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
+    return switch (value) {
+        .int => value,
+        .named => |name| aliases.get(name) orelse value,
+    };
+}
 
 pub const Terminator = union(enum) {
     ret: struct {
@@ -248,13 +304,27 @@ pub const Module = struct {
                 try writer.print("{s}:\n", .{block.name});
                 for (block.instructions.items) |instruction| {
                     if (instruction.removed) continue;
-                    try writer.print("  %{s} = {s} ", .{ instruction.result, instruction.op.name() });
-                    try instruction.ty.format(writer);
-                    try writer.writeByte(' ');
-                    try instruction.lhs.format(writer);
-                    try writer.writeAll(", ");
-                    try instruction.rhs.format(writer);
-                    try writer.writeByte('\n');
+                    try writer.print("  %{s} = ", .{instruction.result});
+                    switch (instruction.kind) {
+                        .binary => |binary| {
+                            try writer.print("{s} ", .{binary.op.name()});
+                            try binary.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try binary.lhs.format(writer);
+                            try writer.writeAll(", ");
+                            try binary.rhs.format(writer);
+                            try writer.writeByte('\n');
+                        },
+                        .icmp => |icmp| {
+                            try writer.print("icmp {s} ", .{icmp.predicate.name()});
+                            try icmp.operand_ty.format(writer);
+                            try writer.writeByte(' ');
+                            try icmp.lhs.format(writer);
+                            try writer.writeAll(", ");
+                            try icmp.rhs.format(writer);
+                            try writer.writeByte('\n');
+                        },
+                    }
                 }
                 if (block.terminator) |terminator| switch (terminator) {
                     .ret => |ret| {
@@ -288,10 +358,18 @@ pub const Module = struct {
 
             for (function.blocks.items) |block| {
                 for (block.instructions.items) |instruction| {
-                    try verifyValue(defs, instruction.ty, instruction.lhs);
-                    try verifyValue(defs, instruction.ty, instruction.rhs);
+                    switch (instruction.kind) {
+                        .binary => |binary| {
+                            try verifyValue(defs, binary.ty, binary.lhs);
+                            try verifyValue(defs, binary.ty, binary.rhs);
+                        },
+                        .icmp => |icmp| {
+                            try verifyValue(defs, icmp.operand_ty, icmp.lhs);
+                            try verifyValue(defs, icmp.operand_ty, icmp.rhs);
+                        },
+                    }
                     if (defs.contains(instruction.result)) return error.DuplicateDefinition;
-                    try defs.put(instruction.result, instruction.ty);
+                    try defs.put(instruction.result, instruction.resultType());
                 }
 
                 const terminator = block.terminator orelse return error.BlockWithoutTerminator;
@@ -368,7 +446,26 @@ fn parseInstruction(line: []const u8) !Instruction {
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
     var parts = std.mem.tokenizeAny(u8, rhs_text, " \t,");
-    const op = BinaryOp.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedInstruction;
+    const op_text = parts.next() orelse return error.InvalidInstruction;
+
+    if (std.mem.eql(u8, op_text, "icmp")) {
+        const predicate = IcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
+        const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .icmp = .{
+                .predicate = predicate,
+                .operand_ty = operand_ty,
+                .lhs = lhs,
+                .rhs = rhs,
+            } },
+        };
+    }
+
+    const op = BinaryOp.parse(op_text) orelse return error.UnsupportedInstruction;
     const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
     const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
     const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
@@ -376,10 +473,12 @@ fn parseInstruction(line: []const u8) !Instruction {
 
     return .{
         .result = result_text[1..],
-        .op = op,
-        .ty = ty,
-        .lhs = lhs,
-        .rhs = rhs,
+        .kind = .{ .binary = .{
+            .op = op,
+            .ty = ty,
+            .lhs = lhs,
+            .rhs = rhs,
+        } },
     };
 }
 
