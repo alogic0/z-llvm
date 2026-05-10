@@ -26,6 +26,40 @@ computations out of loops when legal. Full LLVM LICM relies on LoopInfo,
 DominatorTree, AliasAnalysis, MemorySSA, safety checks for trapping behavior,
 and metadata updates.
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source file:
+  llvm-project-22/llvm/lib/Transforms/Scalar/LICM.cpp
+
+LLVM entry points/classes:
+  LICMPass::run
+  LoopInvariantCodeMotion::runOnLoop
+  hoistRegion
+  sinkRegion
+  canSinkOrHoistInst
+
+Required analyses:
+  LoopInfo.
+  DominatorTree.
+  AliasAnalysis and MemorySSA for memory LICM.
+  AssumptionCache and TargetLibraryInfo for broader legality checks.
+
+Required IR invariants:
+  Hoist destination must dominate all loop blocks and all rewritten uses.
+  Moved instructions must be safe to execute at the preheader.
+  Memory operations require alias/mod-ref proof before movement.
+
+Core LLVM algorithm data structures:
+  Loop block traversal.
+  Loop preheader and exit queries.
+  MemorySSA updater for memory motion.
+  Worklists for hoist and sink candidates.
+
+Local target status:
+  LLVM-shaped algorithm subset.
+```
+
 Implemented subset:
 
 ```text

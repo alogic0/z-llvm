@@ -342,6 +342,15 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "loop-simplifycfg")) return placeholder.make("loop-simplifycfg", .loop, "llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp");
     if (std.mem.eql(u8, name, "loop-rotate")) return placeholder.make("loop-rotate", .loop, "llvm/lib/Transforms/Scalar/LoopRotation.cpp");
     if (std.mem.eql(u8, name, "loop-deletion")) return placeholder.make("loop-deletion", .loop, "llvm/lib/Transforms/Scalar/LoopDeletion.cpp");
+    if (std.mem.eql(u8, name, "indvars")) return placeholder.make("indvars", .loop, "llvm/lib/Transforms/Scalar/IndVarSimplify.cpp");
+    if (std.mem.eql(u8, name, "simple-loop-unswitch")) return placeholder.make("simple-loop-unswitch", .loop, "llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp");
+    if (std.mem.eql(u8, name, "loop-idiom")) return placeholder.make("loop-idiom", .loop, "llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp");
+    if (std.mem.eql(u8, name, "loop-sink")) return placeholder.make("loop-sink", .loop, "llvm/lib/Transforms/Scalar/LoopSink.cpp");
+    if (std.mem.eql(u8, name, "loop-unroll")) return placeholder.make("loop-unroll", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp");
+    if (std.mem.eql(u8, name, "loop-unroll-full")) return placeholder.make("loop-unroll-full", .loop, "llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp");
+    if (std.mem.eql(u8, name, "loop-distribute")) return placeholder.make("loop-distribute", .loop, "llvm/lib/Transforms/Scalar/LoopDistribute.cpp");
+    if (std.mem.eql(u8, name, "loop-load-elim")) return placeholder.make("loop-load-elim", .loop, "llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp");
+    if (std.mem.eql(u8, name, "extra-simple-loop-unswitch-passes")) return placeholder.make("extra-simple-loop-unswitch-passes", .loop, "llvm/lib/Passes/PassBuilderPipelines.cpp");
     if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");

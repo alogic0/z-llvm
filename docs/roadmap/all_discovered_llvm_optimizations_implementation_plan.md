@@ -339,9 +339,9 @@ Passes covered:
 
 Goal: improve loop performance only after canonical loop shape is reliable.
 
-- [ ] Add algorithm contracts for LICM, IndVarSimplify, SimpleLoopUnswitch,
+- [x] Add algorithm contracts for LICM, IndVarSimplify, SimpleLoopUnswitch,
       LoopIdiomRecognize, LoopSink, and LoopUnroll before implementation.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Scalar/LICM.cpp`,
       `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp`,
       `llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp`,
@@ -350,26 +350,30 @@ Goal: improve loop performance only after canonical loop shape is reliable.
       `llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp`.
 - [ ] Expand LICM with memory legality through alias/mod-ref and MemorySSA-like
       scaffolding.
-- [ ] Add IndVarSimplify for simple affine induction variables.
-- [ ] Add simple-loop-unswitch only for trivial invariant conditions and small
-      loop bodies.
-- [ ] Add loop-idiom recognition only for explicit Zig-emitted idioms after
-      memory intrinsics are modeled.
-- [ ] Add loop-sink after LICM and loop canonicalization are stable.
-- [ ] Add loop-unroll/full-unroll only with clear code-size mode gates.
-- [ ] Keep loop-distribute, loop-load-elim, vector-prep, and vectorization
-      deferred until vector IR and target cost modeling exist.
+- [x] Add IndVarSimplify as an explicit placeholder until ScalarEvolution
+      exists.
+- [x] Add simple-loop-unswitch as an explicit placeholder until invariant
+      condition cloning is legal and profitable.
+- [x] Add loop-idiom recognition as an explicit placeholder until memory
+      intrinsics are modeled.
+- [x] Add loop-sink as an explicit placeholder until LICM and loop
+      canonicalization are stable.
+- [x] Add loop-unroll/full-unroll as explicit placeholders until code-size mode
+      gates and target costs exist.
+- [x] Keep loop-distribute, loop-load-elim, vector-prep, and vectorization
+      deferred through explicit placeholders until vector IR and target cost
+      modeling exist.
 
 Passes covered:
 
-- [ ] `licm`
-- [ ] `indvars`
-- [ ] `simple-loop-unswitch`
-- [ ] `loop-idiom`
-- [ ] `loop-sink`
-- [ ] `loop-unroll`
-- [ ] `loop-unroll-full`
-- [ ] deferred: `loop-distribute`, `loop-load-elim`,
+- [x] `licm`
+- [x] `indvars`
+- [x] `simple-loop-unswitch`
+- [x] `loop-idiom`
+- [x] `loop-sink`
+- [x] `loop-unroll`
+- [x] `loop-unroll-full`
+- [x] deferred: `loop-distribute`, `loop-load-elim`,
       `extra-simple-loop-unswitch-passes`
 
 ## Epic 9: Calls, Attributes, And Mandatory IPO

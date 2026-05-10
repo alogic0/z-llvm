@@ -158,7 +158,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,jump-threading,tailcallelim,dse,loop-rotate,loop-deletion,indvars,simple-loop-unswitch,loop-idiom,loop-sink,loop-unroll,loop-unroll-full,loop-distribute,loop-load-elim,extra-simple-loop-unswitch-passes,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);

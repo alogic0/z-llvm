@@ -176,14 +176,14 @@ Status meanings:
 | `loop-simplifycfg` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
 | `loop-rotate` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopRotation.cpp` |
 | `loop-deletion` | loop cleanup | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopDeletion.cpp` |
-| `indvars` | loop canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` |
-| `simple-loop-unswitch` | loop optimization | P2 | missing | `llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp` |
-| `loop-idiom` | loop/memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp` |
-| `loop-unroll`, `loop-unroll-full` | loop optimization | P2 | missing | `llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp` |
-| `loop-distribute` | loop/vector prep | P3 | defer | `llvm/lib/Transforms/Scalar/LoopDistribute.cpp` |
-| `loop-load-elim` | loop/memory optimization | P3 | defer | `llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp` |
-| `loop-sink` | loop canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/LoopSink.cpp` |
-| `extra-simple-loop-unswitch-passes` | loop optimization | P3 | defer | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
+| `indvars` | loop canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` |
+| `simple-loop-unswitch` | loop optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp` |
+| `loop-idiom` | loop/memory optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp` |
+| `loop-unroll`, `loop-unroll-full` | loop optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp` |
+| `loop-distribute` | loop/vector prep | P3 | placeholder | `llvm/lib/Transforms/Scalar/LoopDistribute.cpp` |
+| `loop-load-elim` | loop/memory optimization | P3 | placeholder | `llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp` |
+| `loop-sink` | loop canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopSink.cpp` |
+| `extra-simple-loop-unswitch-passes` | loop optimization | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `jump-threading` | CFG/scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
 | `correlated-propagation` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
 | `reassociate` | scalar canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
