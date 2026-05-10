@@ -111,6 +111,7 @@ zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu test/codegen/input
 zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll > /tmp/z_llvm_add_args.o
 bash scripts/compare_codegen_asm.sh
 bash scripts/compare_codegen_objdump.sh
+bash scripts/compare_codegen_readelf.sh
 readelf -h -S -s /tmp/z_llvm_add_args.o
 objdump -dr /tmp/z_llvm_add_args.o
 ```

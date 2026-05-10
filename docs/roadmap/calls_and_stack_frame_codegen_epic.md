@@ -139,7 +139,7 @@ Suggested slice boundary:
 - [x] Add Machine IR instructions for:
       direct call symbol, argument register moves, return register capture, and
       caller-saved clobber boundary.
-- [ ] Extend the machine verifier:
+- [x] Extend the machine verifier:
       all call arguments are defined before the call, `%eax` is defined after a
       non-void call, and unsupported live caller-saved values are rejected.
 - [x] Keep a deterministic physical-register plan. Do not introduce general
@@ -198,7 +198,7 @@ Suggested slice boundary:
       for call-capable functions without a full frame, subtract/add 8 around the
       call or create the minimal fixed frame needed to make `%rsp % 16 == 0`
       before the call.
-- [ ] Add frame verifier checks:
+- [x] Add frame verifier checks:
       aligned frame size, non-overlapping slots, valid stack offsets, and no
       frame references without a frame.
 - [x] Document unsupported frame features:
@@ -241,7 +241,7 @@ Suggested slice boundary:
 
 ## 9. End-To-End Fixtures
 
-- [ ] Add positive IR, expected assembly, and expected objdump/readelf fixtures:
+- [x] Add positive IR, expected assembly, and expected objdump/readelf fixtures:
       `call_no_args`, `call_one_arg`, `call_two_args`, `call_return_used`,
       `call_external`, `call_with_spill`, `call_with_local_stack_slot`.
 - [x] Add negative fixtures:

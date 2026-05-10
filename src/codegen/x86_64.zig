@@ -588,14 +588,25 @@ pub fn verifyFunction(function: MachineFunction) !void {
 
     var eax_defined = function.ret_ty == .void;
     var saw_ret = false;
+    var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_arg_eax, .binary_arg_eax => eax_defined = true,
-        .reload_rsp_eax => eax_defined = true,
-        .direct_call => |call| eax_defined = call.ret_ty != .void,
-        .mov_arg_arg, .sub_rsp_8, .add_rsp_8, .spill_arg_rsp, .reload_arg_rsp, .test_arg8, .je => {},
+        .reload_rsp_eax => {
+            if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+            eax_defined = true;
+        },
+        .direct_call => |call| {
+            if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+            eax_defined = call.ret_ty != .void;
+        },
+        .sub_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
+        .spill_arg_rsp, .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .mov_arg_arg, .test_arg8, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
+            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
             saw_ret = true;
             eax_defined = function.ret_ty == .void;
         },

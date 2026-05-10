@@ -1462,6 +1462,24 @@ test "x86_64 codegen rejects unsupported call live pressure" {
     );
 }
 
+test "x86_64 machine verifier checks call stack alignment and frame balance" {
+    var misaligned = codegen.x86_64.MachineFunction.init("bad_call", .{ .int = 32 });
+    defer misaligned.deinit(std.testing.allocator);
+    try misaligned.instructions.append(std.testing.allocator, .{ .direct_call = .{
+        .symbol = "callee",
+        .ret_ty = .{ .int = 32 },
+    } });
+    try misaligned.instructions.append(std.testing.allocator, .ret);
+    try std.testing.expectError(error.MisalignedStackBeforeCall, codegen.x86_64.verifyFunction(misaligned));
+
+    var unbalanced = codegen.x86_64.MachineFunction.init("bad_frame", .{ .int = 32 });
+    defer unbalanced.deinit(std.testing.allocator);
+    try unbalanced.instructions.append(std.testing.allocator, .sub_rsp_8);
+    try unbalanced.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 1 });
+    try unbalanced.instructions.append(std.testing.allocator, .ret);
+    try std.testing.expectError(error.UnbalancedStackFrame, codegen.x86_64.verifyFunction(unbalanced));
+}
+
 test "instcombine and dce remove identity arithmetic" {
     const input =
         \\define i32 @add_mul(i32 %a) {
