@@ -14,10 +14,10 @@ LLVM memory optimization yet.
 
 - [x] Parse, print, verify, and normalize `align N` and `volatile` for `load` and `store`, with upstream LLVM mapping.
 - [x] Recognize narrow atomic memory forms only far enough to classify them as unsupported/atomic barriers or reject them with a clear parser error; do not model ordering, `syncscope`, `cmpxchg`, or `atomicrmw` yet.
-- [ ] Add a small memory-effect classification API for IR instructions: no memory access, readonly load, memory write, volatile/atomic barrier, and unknown/unsupported memory behavior.
-- [ ] Add an alias/mod-ref foundation document and code scaffold that can answer only conservative questions today: `no_alias`/`must_alias` for known stack slots, otherwise `may_alias`; `mod_ref` for loads/stores, otherwise unknown.
-- [ ] Wire LICM legality through the memory-effect API first, so pure scalar hoisting remains supported, loads remain rejected unless explicitly proven safe later, and stores/volatile/atomic/unknown memory always block hoisting.
-- [ ] Wire DCE/ADCE/GVN through the same memory-effect API only after the LICM integration proves the API shape, preserving existing behavior while centralizing the contract.
+- [x] Add a small memory-effect classification API for IR instructions: no memory access, readonly load, memory write, volatile/atomic barrier, and unknown/unsupported memory behavior.
+- [x] Add an alias/mod-ref foundation document and code scaffold that can answer only conservative questions today: `no_alias`/`must_alias` for known stack slots, otherwise `may_alias`; `mod_ref` for loads/stores, otherwise unknown.
+- [x] Wire LICM legality through the memory-effect API first, so pure scalar hoisting remains supported, loads remain rejected unless explicitly proven safe later, and stores/volatile/atomic/unknown memory always block hoisting.
+- [x] Wire DCE/ADCE/GVN through the same memory-effect API only after the LICM integration proves the API shape, preserving existing behavior while centralizing the contract.
 - [ ] Add negative fixtures for unsafe memory optimization cases: aligned load not hoisted yet, volatile load rejected, store rejected, atomic/unsupported memory rejected, and unknown pointer aliasing rejected.
 - [ ] Add accepted fixtures showing that scalar-only LICM/GVN/DCE behavior still works in the presence of unrelated non-hoistable memory instructions.
 - [ ] Split fixture expectations into `opt-22` equivalent cases and local-only conservative cases.

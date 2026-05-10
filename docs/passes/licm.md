@@ -18,6 +18,7 @@ canSinkOrHoistInst
 Loop::getLoopPreheader
 Loop::hasLoopInvariantOperands
 Loop::makeLoopInvariant
+Instruction::mayReadOrWriteMemory
 ```
 
 LLVM LICM hoists loop-invariant computations to a loop preheader and sinks
@@ -31,6 +32,7 @@ Implemented subset:
 use LoopInfo natural loops
 require an existing unique unconditional preheader
 require the loop header to map to one current NaturalLoop record
+use shared memory-effect classification for legality
 hoist pure binary, icmp, and select instructions
 require every operand to be constant, undef, a function parameter, or defined outside the loop
 move hoisted instructions to the preheader instruction list
@@ -41,8 +43,8 @@ Current legality boundary:
 
 ```text
 hoistable: side-effect-free scalar binary, icmp, and select instructions
-not hoistable: phi, alloca, load, store, getelementptr
-not represented yet and therefore not hoistable: calls, atomics, volatile memory operations, unknown memory effects
+not hoistable: phi, alloca, load, store, getelementptr, volatile or atomic barriers
+not represented yet and therefore not hoistable: calls and unknown memory effects
 ```
 
 LLVM's full LICM uses `canSinkOrHoistInst`, alias analysis, MemorySSA, and

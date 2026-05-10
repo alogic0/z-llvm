@@ -1,5 +1,6 @@
 const std = @import("std");
 const def_use = @import("../analysis/def_use.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -32,7 +33,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
             while (instruction_index > 0) {
                 instruction_index -= 1;
                 const instruction = &block.instructions.items[instruction_index];
-                if (instruction.removed or instruction.hasSideEffects()) continue;
+                if (instruction.removed or memory_effect.hasSideEffects(instruction.*)) continue;
                 const result = instruction.result orelse continue;
                 if (uses.isUsed(result)) continue;
 

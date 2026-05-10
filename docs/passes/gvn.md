@@ -17,6 +17,7 @@ GVNPass::ValueTable
 GVNPass::ValueTable::createExpr
 NewGVNPass::run
 NewGVN::CongruenceClass
+Instruction::mayReadOrWriteMemory
 ```
 
 LLVM GVN removes redundant computations by assigning value numbers to equivalent
@@ -27,6 +28,7 @@ Implemented subset:
 
 ```text
 per-function scan for pure binary, icmp, and select expressions
+shared memory-effect API rejects memory-reading, memory-writing, volatile/atomic, and unknown instructions from value numbering
 equivalence by opcode, type, and operands
 dominator check for cross-block availability
 same-block availability by instruction order
@@ -41,6 +43,7 @@ Known gaps:
 
 ```text
 no load PRE or MemorySSA
+no memory value numbering
 no phi translation
 no congruence-class iteration
 no expression hashing

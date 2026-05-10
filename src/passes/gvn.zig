@@ -1,5 +1,6 @@
 const std = @import("std");
 const dominator = @import("../analysis/dominator.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -68,7 +69,7 @@ fn findDominatingEquivalent(
 }
 
 fn isCandidate(instruction: ir.Instruction) bool {
-    if (instruction.hasSideEffects()) return false;
+    if (memory_effect.classify(instruction) != .none) return false;
     return switch (instruction.kind) {
         .binary, .icmp, .select => true,
         .phi, .alloca, .load, .store, .gep => false,

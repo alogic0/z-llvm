@@ -1,10 +1,19 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+const memory_effect = @import("memory_effect.zig");
 
 pub const AliasResult = enum {
     no_alias,
     may_alias,
     must_alias,
+};
+
+pub const ModRefInfo = enum {
+    no_mod_ref,
+    ref,
+    mod,
+    mod_ref,
+    unknown,
 };
 
 pub fn alias(function: ir.Function, a: ir.Value, b: ir.Value) AliasResult {
@@ -15,6 +24,20 @@ pub fn alias(function: ir.Function, a: ir.Value, b: ir.Value) AliasResult {
 
     if (!std.mem.eql(u8, a_object.root, b_object.root)) return .no_alias;
     return if (a_object.zero_offset and b_object.zero_offset) .must_alias else .may_alias;
+}
+
+pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Value) ModRefInfo {
+    return switch (instruction.kind) {
+        .load => |load| {
+            if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
+            return if (alias(function, load.ptr, pointer) == .no_alias) .no_mod_ref else .ref;
+        },
+        .store => |store| {
+            if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
+            return if (alias(function, store.ptr, pointer) == .no_alias) .no_mod_ref else .mod;
+        },
+        .binary, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
+    };
 }
 
 const PointerObject = struct {

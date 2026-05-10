@@ -1,5 +1,6 @@
 const std = @import("std");
 const def_use = @import("../analysis/def_use.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -21,7 +22,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             for (function.blocks.items) |*block| {
                 for (block.instructions.items) |*instruction| {
                     if (instruction.removed) continue;
-                    if (instruction.hasSideEffects()) continue;
+                    if (memory_effect.hasSideEffects(instruction.*)) continue;
                     const result = instruction.result orelse continue;
                     if (uses.isUsed(result)) continue;
 

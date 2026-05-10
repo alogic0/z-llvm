@@ -3,6 +3,7 @@ const alias = @import("analysis/alias.zig");
 const cfg = @import("analysis/cfg.zig");
 const dominator = @import("analysis/dominator.zig");
 const loop_info = @import("analysis/loop_info.zig");
+const memory_effect = @import("analysis/memory_effect.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
@@ -562,6 +563,51 @@ test "alias analysis classifies gep-derived stack slots" {
     try std.testing.expectEqual(
         alias.AliasResult.no_alias,
         alias.alias(function, .{ .named = "left0" }, .{ .named = "right0" }),
+    );
+}
+
+test "memory effect and mod-ref classify memory instructions conservatively" {
+    const input =
+        \\define i32 @memory_effects(i32 %a, ptr %arg) {
+        \\entry:
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  %pure = add i32 %a, 1
+        \\  %load = load i32, ptr %left
+        \\  %volatile_load = load volatile i32, ptr %arg
+        \\  store i32 %pure, ptr %right
+        \\  store atomic i32 %pure, ptr %arg, release, align 4
+        \\  ret i32 %load
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+    const block = function.blocks.items[0];
+
+    try std.testing.expectEqual(memory_effect.Effect.none, memory_effect.classify(block.instructions.items[2]));
+    try std.testing.expectEqual(memory_effect.Effect.readonly_load, memory_effect.classify(block.instructions.items[3]));
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(block.instructions.items[4]));
+    try std.testing.expectEqual(memory_effect.Effect.memory_write, memory_effect.classify(block.instructions.items[5]));
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(block.instructions.items[6]));
+
+    try std.testing.expectEqual(
+        alias.ModRefInfo.no_mod_ref,
+        alias.modRef(function, block.instructions.items[3], .{ .named = "right" }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.ref,
+        alias.modRef(function, block.instructions.items[3], .{ .named = "left" }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.mod,
+        alias.modRef(function, block.instructions.items[5], .{ .named = "right" }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.unknown,
+        alias.modRef(function, block.instructions.items[6], .{ .named = "arg" }),
     );
 }
 

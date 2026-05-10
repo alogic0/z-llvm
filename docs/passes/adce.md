@@ -15,6 +15,7 @@ AggressiveDeadCodeElimination::markLiveInstructions
 AggressiveDeadCodeElimination::markLive
 AggressiveDeadCodeElimination::removeDeadInstructions
 AggressiveDeadCodeElimination::markLiveBranchesFromControlDependences
+Instruction::mayReadOrWriteMemory
 ```
 
 LLVM ADCE assumes instructions are dead until proven live, marks side effects,
@@ -28,7 +29,7 @@ start from current def-use counts
 walk instructions backward
 remove unused side-effect-free instructions
 repeat until dependent dead instruction chains disappear
-preserve stores and terminators
+preserve stores, volatile/atomic memory barriers, unknown memory effects, and terminators
 ```
 
 This overlaps with the current DCE subset, but it is kept as a separate pass
@@ -42,5 +43,5 @@ no post-dominator tree
 no control-dependence marking
 no branch rewriting
 no debug info salvage
-no musttail, EH, calls, or volatile/atomic handling
+no musttail, EH, calls, or volatile/atomic removal
 ```

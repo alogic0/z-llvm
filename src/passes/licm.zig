@@ -1,6 +1,7 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
 const loop_info = @import("../analysis/loop_info.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -78,7 +79,7 @@ fn collectDefinitionBlocks(def_blocks: *std.StringHashMap(usize), function: ir.F
 }
 
 fn isHoistable(instruction: ir.Instruction) bool {
-    if (instruction.removed or instruction.hasSideEffects()) return false;
+    if (instruction.removed or memory_effect.classify(instruction) != .none) return false;
     if (instruction.result == null) return false;
     return switch (instruction.kind) {
         .binary, .icmp, .select => true,
