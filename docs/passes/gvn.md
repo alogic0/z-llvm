@@ -24,6 +24,37 @@ LLVM GVN removes redundant computations by assigning value numbers to equivalent
 expressions and proving that an available equivalent value dominates a later
 use.
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/lib/Transforms/Scalar/GVN.cpp
+  llvm-project-22/llvm/lib/Transforms/Scalar/NewGVN.cpp
+
+LLVM entry points/classes:
+  GVNPass::run
+  GVNPass::ValueTable
+  NewGVNPass::run
+  NewGVN::CongruenceClass
+
+Required analyses:
+  DominatorTree.
+  AliasAnalysis, MemoryDependence or MemorySSA-like facts for memory values.
+  AssumptionCache and TargetLibraryInfo for broader LLVM folds.
+
+Required IR invariants:
+  Replacement values must dominate every rewritten use.
+  Memory-value replacement requires alias/mod-ref proof.
+
+Core LLVM algorithm data structures:
+  Value table / expression numbering.
+  Leader tables for available values.
+  Memory dependence facts for load and call cases.
+
+Local target status:
+  LLVM-shaped foundation.
+```
+
 Implemented subset:
 
 ```text

@@ -168,8 +168,8 @@ Status meanings:
 | `early-cse` | canonicalization / scalar | P1 | foundation | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
 | `dse` | memory optimization | P1 | foundation | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | foundation | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
-| `bdce` | scalar DCE | P2 | missing | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
-| `sccp` / `ipsccp` | scalar / IPO | P1 | missing | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
+| `bdce` | scalar DCE | P2 | placeholder | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
+| `sccp` / `ipsccp` | scalar / IPO | P1 | foundation / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
 | `gvn` | scalar / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/GVN.cpp` |
 | `licm` | loop / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/LICM.cpp` |
 | `loop-instsimplify` | loop canonicalization | P1 | missing | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
@@ -186,9 +186,9 @@ Status meanings:
 | `extra-simple-loop-unswitch-passes` | loop optimization | P3 | defer | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `jump-threading` | CFG/scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
 | `correlated-propagation` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
-| `reassociate` | scalar canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
-| `constraint-elimination` | scalar | P2 | missing | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |
-| `speculative-execution` | scalar/code motion | P3 | defer | `llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp` |
+| `reassociate` | scalar canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
+| `constraint-elimination` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |
+| `speculative-execution` | scalar/code motion | P3 | placeholder | `llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp` |
 | `tailcallelim` | call/CFG | P2 | placeholder | `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp` |
 | `div-rem-pairs` | scalar/codegen prep | P2 | missing | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
 | `float2int` | scalar | P3 | defer | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |

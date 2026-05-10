@@ -37,6 +37,7 @@ opt-22 -passes=instcombine test/opt/inputs/instcombine.ll -S -o /tmp/llvm_instco
 opt-22 -passes=dce test/opt/inputs/dce.ll -S -o /tmp/llvm_dce.ll
 opt-22 -passes=adce test/opt/inputs/adce_chain.ll -S -o /tmp/llvm_adce.ll
 opt-22 -passes=gvn test/opt/inputs/gvn_dominating_expr.ll -S -o /tmp/llvm_gvn.ll
+opt-22 -passes='sccp,simplifycfg,dce' test/opt/inputs/sccp_branch.ll -S -o /tmp/llvm_sccp_branch.ll
 opt-22 -passes='loop-mssa(licm)' test/opt/inputs/licm_invariant.ll -S -o /tmp/llvm_licm.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_zero_gep.ll -S -o /tmp/llvm_sroa.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_nested_zero_gep.ll -S -o /tmp/llvm_sroa_nested.ll
@@ -58,6 +59,9 @@ division/remainder, `freeze`, and `nsw`/`nuw`/`exact` flag preservation through
 the `scalar_ir_surface` fixture. It also includes defined scalar cast/div/rem
 fold coverage through `instcombine_scalar_simplify` and safe variable div/rem
 plus freeze-constant coverage through `instcombine_safe_scalar`.
+
+Scalar optimizer fixtures also cover function-local SCCP constant propagation
+through a branch condition with SimplifyCFG and DCE cleanup.
 
 Target-aware infrastructure currently has unit-test-only coverage for:
 

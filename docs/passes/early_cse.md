@@ -17,6 +17,34 @@ ScopedHashTable used for available values
 
 Early CSE removes redundant computations early in the scalar optimization pipeline.
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source file:
+  llvm-project-22/llvm/lib/Transforms/Scalar/EarlyCSE.cpp
+
+LLVM entry points/classes:
+  EarlyCSEPass::run
+  EarlyCSE
+  SimpleValue
+
+Required analyses:
+  DominatorTree for LLVM's scoped traversal.
+  AssumptionCache, TargetLibraryInfo, and MemorySSA-backed memory facts for the
+  broader LLVM implementation.
+
+Required IR invariants:
+  Verified SSA.
+  Values recorded in the scoped table must dominate all replacement uses.
+
+Core LLVM algorithm data structures:
+  ScopedHashTable of available expressions and values.
+  Available-load tracking for memory cases.
+
+Local target status:
+  LLVM-shaped foundation.
+```
+
 Implemented subset:
 
 ```text

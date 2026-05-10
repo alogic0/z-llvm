@@ -262,9 +262,9 @@ Passes covered:
 Goal: improve scalar optimization quality after canonicalization and memory
 legality foundations are strong enough.
 
-- [ ] Add algorithm contracts for EarlyCSE, GVN, SCCP, ADCE, and BDCE before
+- [x] Add algorithm contracts for EarlyCSE, GVN, SCCP, ADCE, and BDCE before
       broadening their implementations.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Transforms/Scalar/EarlyCSE.cpp`,
       `llvm/lib/Transforms/Scalar/GVN.cpp`,
       `llvm/lib/Transforms/Scalar/SCCP.cpp`,
@@ -275,26 +275,27 @@ legality foundations are strong enough.
 - [ ] Expand GVN beyond simple expression domination:
       value numbering for compares, casts, select, simple loads, and phi-aware
       cases where dominance is clear.
-- [ ] Implement SCCP for constants through branches, phi nodes, and simple
-      calls only when call semantics are known.
+- [x] Implement SCCP for constants through branches and phi nodes.
+- [ ] Add SCCP support for simple calls only when call semantics are known.
 - [ ] Upgrade ADCE from foundation DCE to true control-dependence-aware ADCE
       only after postdominator/control-dependence analysis exists.
-- [ ] Add BDCE only after bit-level known-bits or demanded-bits analysis exists.
-- [ ] Keep `speculative-execution` as an explicit placeholder until
+- [x] Add BDCE as an explicit placeholder until bit-level known-bits or
+      demanded-bits analysis exists.
+- [x] Keep `speculative-execution` as an explicit placeholder until
       speculation safety, target cost, and side-effect rules are represented.
-- [ ] Keep all memory-ambiguous cases conservative.
+- [x] Keep all memory-ambiguous cases conservative.
 
 Passes covered:
 
-- [ ] `early-cse`
-- [ ] `gvn`
-- [ ] `sccp`
-- [ ] `ipsccp` placeholder until call graph exists
-- [ ] `adce`
-- [ ] `bdce`
-- [ ] `reassociate`
-- [ ] `constraint-elimination` placeholder
-- [ ] `speculative-execution` placeholder
+- [x] `early-cse`
+- [x] `gvn`
+- [x] `sccp`
+- [x] `ipsccp` placeholder until call graph exists
+- [x] `adce`
+- [x] `bdce`
+- [x] `reassociate`
+- [x] `constraint-elimination` placeholder
+- [x] `speculative-execution` placeholder
 
 ## Epic 7: Loop Canonicalization Before Loop Optimization
 

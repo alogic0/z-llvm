@@ -9,6 +9,7 @@ const gvn = @import("passes/gvn.zig");
 const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const placeholder = @import("passes/placeholder.zig");
+const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 const sroa = @import("passes/sroa.zig");
 const verify = @import("passes/verify.zig");
@@ -34,6 +35,7 @@ const scalar_foundation_passes = [_][]const u8{
     "aggressive-instcombine",
     "lower-constant-intrinsics",
     "early-cse",
+    "sccp",
     "gvn",
     "dce",
     "adce",
@@ -73,6 +75,7 @@ const release_o3_passes = [_][]const u8{
     "aggressive-instcombine",
     "lower-constant-intrinsics",
     "early-cse",
+    "sccp",
     "gvn",
     "dse",
     "adce",
@@ -98,6 +101,7 @@ const release_oz_passes = [_][]const u8{
     "aggressive-instcombine",
     "lower-constant-intrinsics",
     "early-cse",
+    "sccp",
     "gvn",
     "dce",
     "adce",
@@ -124,6 +128,7 @@ const lto_prelink_o3_passes = [_][]const u8{
     "aggressive-instcombine",
     "lower-constant-intrinsics",
     "early-cse",
+    "sccp",
     "gvn",
     "dse",
     "adce",
@@ -145,6 +150,7 @@ const lto_prelink_oz_passes = [_][]const u8{
     "simplifycfg",
     "instcombine",
     "early-cse",
+    "sccp",
     "gvn",
     "dce",
     "adce",
@@ -289,6 +295,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(adce.pass);
     } else if (std.mem.eql(u8, name, "early-cse")) {
         try pm.add(early_cse.pass);
+    } else if (std.mem.eql(u8, name, "sccp")) {
+        try pm.add(sccp.pass);
     } else if (std.mem.eql(u8, name, "gvn")) {
         try pm.add(gvn.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
@@ -319,6 +327,11 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "infer-alignment")) return placeholder.make("infer-alignment", .memory, "llvm/lib/Transforms/Scalar/InferAlignment.cpp");
     if (std.mem.eql(u8, name, "alignment-from-assumptions")) return placeholder.make("alignment-from-assumptions", .memory, "llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp");
     if (std.mem.eql(u8, name, "move-auto-init")) return placeholder.make("move-auto-init", .memory, "llvm/lib/Transforms/Scalar/MoveAutoInit.cpp");
+    if (std.mem.eql(u8, name, "ipsccp")) return placeholder.make("ipsccp", .ipo, "llvm/lib/Transforms/IPO/SCCP.cpp");
+    if (std.mem.eql(u8, name, "bdce")) return placeholder.make("bdce", .scalar, "llvm/lib/Transforms/Scalar/BDCE.cpp");
+    if (std.mem.eql(u8, name, "reassociate")) return placeholder.make("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp");
+    if (std.mem.eql(u8, name, "constraint-elimination")) return placeholder.make("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp");
+    if (std.mem.eql(u8, name, "speculative-execution")) return placeholder.make("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp");
     if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");

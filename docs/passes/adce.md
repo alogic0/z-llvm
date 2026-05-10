@@ -22,6 +22,35 @@ LLVM ADCE assumes instructions are dead until proven live, marks side effects,
 terminators, required control dependence, and operand chains as live, then
 removes everything else.
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source file:
+  llvm-project-22/llvm/lib/Transforms/Scalar/ADCE.cpp
+
+LLVM entry points/classes:
+  ADCEPass::run
+  AggressiveDeadCodeElimination::performDeadCodeElimination
+  AggressiveDeadCodeElimination::markLiveBranchesFromControlDependences
+
+Required analyses:
+  PostDominatorTree for control dependence in LLVM's algorithm.
+  DominatorTree is used by the broader pass-manager integration.
+
+Required IR invariants:
+  Required side effects, terminators, and control-flow dependencies must remain
+  live.
+  Removed instructions must have no observable effects.
+
+Core LLVM algorithm data structures:
+  Optimistic live/dead state for blocks and instructions.
+  Worklist of newly live instructions.
+  Control-dependence tracking through postdominators.
+
+Local target status:
+  Foundation only, not full LLVM ADCE.
+```
+
 Implemented foundation subset:
 
 ```text
