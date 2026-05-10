@@ -92,19 +92,19 @@ Suggested slice boundary:
 
 ## 3. ABI-Aware Function Signature Foundation
 
-Status: calling convention preservation implemented and verified in Cycle 21.
+Status: scalar ABI classification implemented and verified in Cycle 24.
 
 - [ ] Add a target-aware function type model for scalar integer, pointer, void, and simple aggregate placeholder returns.
-- [ ] Add `void` return type support.
+- [x] Add `void` return type support.
 - [x] Add basic calling convention parsing and preservation for the calling conventions Zig emits in small examples.
-- [ ] Add ABI classification docs for scalar parameters and returns on the initial target matrix.
+- [x] Add ABI classification docs for scalar parameters and returns on the initial target matrix.
 - [ ] Add tests comparing tiny function signatures against Zig-emitted LLVM IR.
 - [ ] Keep full aggregate ABI lowering out of scope until target layout support is strong enough.
 
 Suggested slice boundary:
 
-- [ ] Start with scalar integer and pointer parameters/returns only.
-- [ ] Add `void` because Zig-emitted LLVM IR needs it for realistic tiny
+- [x] Start with scalar integer and pointer parameters/returns only.
+- [x] Add `void` because Zig-emitted LLVM IR needs it for realistic tiny
       functions, but keep aggregate classification as documentation-only until
       the target layout model can support it.
 

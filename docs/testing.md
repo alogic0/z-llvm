@@ -57,6 +57,7 @@ Target-aware infrastructure currently has unit-test-only coverage for:
 target triple parsing
 initial target matrix recognition for x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, and wasm32-wasi
 target datalayout preservation and pointer/integer alignment queries
+scalar ABI classification for void, integer, and pointer signatures
 source_filename preservation
 scalar global and constant global preservation
 function linkage and raw function-header attribute preservation
@@ -105,7 +106,7 @@ SROA: zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
-Target/DataLayout: target triple parsing, initial target matrix recognition, and minimal DataLayout query subset
+Target/DataLayout: target triple parsing, initial target matrix recognition, minimal DataLayout query subset, and scalar ABI classification
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```

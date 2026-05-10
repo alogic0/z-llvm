@@ -152,6 +152,55 @@ test "target triple parser accepts compact wasm32 wasi spelling" {
     try std.testing.expectEqual(target.SupportedTarget.wasm32_wasi, triple.supportedTarget().?);
 }
 
+test "target ABI classifies scalar function signatures" {
+    const cases = [_]struct {
+        triple_text: []const u8,
+        datalayout: []const u8,
+        pointer_bits: u16,
+    }{
+        .{
+            .triple_text = "x86_64-unknown-linux-gnu",
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            .pointer_bits = 64,
+        },
+        .{
+            .triple_text = "x86_64-unknown-linux-musl",
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            .pointer_bits = 64,
+        },
+        .{
+            .triple_text = "aarch64-unknown-linux-gnu",
+            .datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32",
+            .pointer_bits = 64,
+        },
+        .{
+            .triple_text = "wasm32-unknown-wasi",
+            .datalayout = "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-i128:128-n32:64-S128-ni:1:10:20",
+            .pointer_bits = 32,
+        },
+    };
+
+    for (cases) |case| {
+        const triple = try target.Triple.parse(case.triple_text);
+        const layout = try target.DataLayout.parse(case.datalayout);
+
+        const void_ret = try target.abi.classifyReturn(triple, layout, .void);
+        try std.testing.expectEqual(target.AbiSlot.ret, void_ret.slot);
+        try std.testing.expectEqual(target.AbiValueClass.ignore, void_ret.value_class);
+
+        const int_ret = try target.abi.classifyReturn(triple, layout, .{ .int = 32 });
+        try std.testing.expectEqual(target.AbiValueClass.integer, int_ret.value_class);
+        try std.testing.expectEqual(@as(u16, 32), int_ret.size_bits);
+
+        const ptr_param = try target.abi.classifyParam(triple, layout, .ptr);
+        try std.testing.expectEqual(target.AbiSlot.param, ptr_param.slot);
+        try std.testing.expectEqual(target.AbiValueClass.pointer, ptr_param.value_class);
+        try std.testing.expectEqual(case.pointer_bits, ptr_param.size_bits);
+
+        try std.testing.expectError(error.UnsupportedAbiType, target.abi.classifyParam(triple, layout, .void));
+    }
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

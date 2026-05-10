@@ -91,6 +91,7 @@ branch weights / profile metadata
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
+ABI classification beyond void, scalar integer, and pointer signatures
 ```
 
 ## Current Parser Errors
@@ -182,6 +183,7 @@ Module IR subset:
   scalar global and constant definitions with integer/undef initializers
   raw global suffix attributes
   initial target matrix recognition: x86_64-linux-gnu, x86_64-linux-musl, aarch64-linux-gnu, wasm32-wasi
+  scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc
@@ -237,6 +239,7 @@ aggregate, string, TLS, COMDAT, alias, and declaration globals
 semantic global variable use in optimizations
 visibility and attributes with semantic effects
 calling convention ABI semantics
+aggregate, floating-point, vector, varargs, byval, sret, register, and stack ABI classification
 function declarations
 attribute groups
 module metadata

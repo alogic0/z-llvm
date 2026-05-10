@@ -49,7 +49,7 @@ replacement needs.
 
 | AIR/lowering area | Representative Zig functions | Replacement owner | Current coverage |
 | --- | --- | --- | --- |
-| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | text IR calling convention preservation only; ABI semantics missing |
+| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | scalar return/parameter ABI classification only; full ABI lowering missing |
 | Control flow | `lowerBlock`, `airBr`, `airCondBr`, `airSwitchBr`, `airLoop`, `airUnreach` | `src/ir/`, `src/codegen/control_flow.zig` | partial `br`, `condbr`, `unreachable` text IR |
 | Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/ir/`, `src/passes/` | partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/ir/`, `src/codegen/memory.zig` | partial alloca/load/store/GEP and mem2reg |
@@ -69,7 +69,7 @@ The current project covers phase-zero optimizer infrastructure:
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
-- Target support for initial target matrix recognition and default pointer/integer DataLayout queries.
+- Target support for initial target matrix recognition, default pointer/integer DataLayout queries, and scalar ABI classification.
 - Codegen bootstrap support for `--emit=asm` over tiny x86_64 SysV straight-line i32 leaf functions.
 - Named `scalar-foundation` and `memory-foundation` pipeline aliases, plus `opt-22` comparison fixtures for the implemented middle-end subset and unit tests for analysis-only behavior.
 
