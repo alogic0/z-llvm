@@ -404,6 +404,121 @@ test "AIR-like bridge lowers explicit control flow blocks" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "AIR-like bridge lowers scalar stack memory" {
+    const allocas = [_]air_bridge.Alloca{
+        .{
+            .result = "slot",
+            .allocated_ty = .{ .int = 32 },
+        },
+    };
+    const stores = [_]air_bridge.Store{
+        .{
+            .ty = .{ .int = 32 },
+            .value = .{ .int = 7 },
+            .ptr = .{ .named = "slot" },
+            .attrs = .{ .@"align" = 4 },
+        },
+    };
+    const loads = [_]air_bridge.Load{
+        .{
+            .result = "value",
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = "slot" },
+            .attrs = .{ .@"align" = 4 },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "stack",
+            .ret_ty = .{ .int = 32 },
+            .params = &.{},
+            .allocas = &allocas,
+            .stores = &stores,
+            .loads = &loads,
+            .ret = .{ .named = "value" },
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack() {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  store i32 7, ptr %slot, align 4
+        \\  %value = load i32, ptr %slot, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "AIR-like bridge lowers scalar GEP" {
+    const indices = [_]ir.GepIndex{
+        .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } },
+    };
+    const allocas = [_]air_bridge.Alloca{
+        .{
+            .result = "slot",
+            .allocated_ty = .{ .int = 32 },
+        },
+    };
+    const geps = [_]air_bridge.Gep{
+        .{
+            .result = "ptr",
+            .source_ty = .{ .int = 32 },
+            .ptr = .{ .named = "slot" },
+            .indices = &indices,
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "gep",
+            .ret_ty = .ptr,
+            .params = &.{},
+            .allocas = &allocas,
+            .geps = &geps,
+            .ret = .{ .named = "ptr" },
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define ptr @gep() {
+        \\entry:
+        \\  %slot = alloca i32
+        \\  %ptr = getelementptr i32, ptr %slot, i32 0
+        \\  ret ptr %ptr
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

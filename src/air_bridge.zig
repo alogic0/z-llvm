@@ -22,6 +22,32 @@ pub const Cast = struct {
     to_ty: ir.Type,
 };
 
+pub const Alloca = struct {
+    result: []const u8,
+    allocated_ty: ir.Type,
+};
+
+pub const Load = struct {
+    result: []const u8,
+    ty: ir.Type,
+    ptr: ir.Value,
+    attrs: ir.MemoryAttrs = .{},
+};
+
+pub const Store = struct {
+    ty: ir.Type,
+    value: ir.Value,
+    ptr: ir.Value,
+    attrs: ir.MemoryAttrs = .{},
+};
+
+pub const Gep = struct {
+    result: []const u8,
+    source_ty: ir.Type,
+    ptr: ir.Value,
+    indices: []const ir.GepIndex,
+};
+
 pub const Terminator = union(enum) {
     ret: struct {
         ty: ir.Type,
@@ -41,8 +67,12 @@ pub const Terminator = union(enum) {
 
 pub const Block = struct {
     name: []const u8,
+    allocas: []const Alloca = &.{},
     binaries: []const Binary = &.{},
     casts: []const Cast = &.{},
+    loads: []const Load = &.{},
+    stores: []const Store = &.{},
+    geps: []const Gep = &.{},
     terminator: Terminator,
 };
 
@@ -50,8 +80,12 @@ pub const Function = struct {
     name: []const u8,
     ret_ty: ir.Type,
     params: []const Param,
+    allocas: []const Alloca = &.{},
     binaries: []const Binary = &.{},
     casts: []const Cast = &.{},
+    loads: []const Load = &.{},
+    stores: []const Store = &.{},
+    geps: []const Gep = &.{},
     blocks: []const Block = &.{},
     ret: ?ir.Value = null,
 };
@@ -103,8 +137,12 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
 
     const entry_spec: Block = .{
         .name = "entry",
+        .allocas = spec.allocas,
         .binaries = spec.binaries,
         .casts = spec.casts,
+        .loads = spec.loads,
+        .stores = spec.stores,
+        .geps = spec.geps,
         .terminator = .{ .ret = .{
             .ty = spec.ret_ty,
             .value = spec.ret,
@@ -119,6 +157,12 @@ fn lowerBlock(allocator: std.mem.Allocator, spec: Block) !ir.BasicBlock {
     var block = ir.BasicBlock.init(spec.name);
     errdefer block.deinit(allocator);
 
+    for (spec.allocas) |alloca| {
+        try block.instructions.append(allocator, .{
+            .result = alloca.result,
+            .kind = .{ .alloca = .{ .allocated_ty = alloca.allocated_ty } },
+        });
+    }
     for (spec.binaries) |binary| {
         try block.instructions.append(allocator, .{
             .result = binary.result,
@@ -138,6 +182,40 @@ fn lowerBlock(allocator: std.mem.Allocator, spec: Block) !ir.BasicBlock {
                 .from_ty = cast.from_ty,
                 .value = cast.value,
                 .to_ty = cast.to_ty,
+            } },
+        });
+    }
+    for (spec.geps) |gep| {
+        var lowered_gep: ir.GepInst = .{
+            .source_ty = gep.source_ty,
+            .ptr = gep.ptr,
+            .indices = .empty,
+        };
+        errdefer lowered_gep.deinit(allocator);
+        for (gep.indices) |index| try lowered_gep.indices.append(allocator, index);
+        try block.instructions.append(allocator, .{
+            .result = gep.result,
+            .kind = .{ .gep = lowered_gep },
+        });
+    }
+    for (spec.stores) |store| {
+        try block.instructions.append(allocator, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = store.ty,
+                .value = store.value,
+                .ptr = store.ptr,
+                .attrs = store.attrs,
+            } },
+        });
+    }
+    for (spec.loads) |load| {
+        try block.instructions.append(allocator, .{
+            .result = load.result,
+            .kind = .{ .load = .{
+                .ty = load.ty,
+                .ptr = load.ptr,
+                .attrs = load.attrs,
             } },
         });
     }

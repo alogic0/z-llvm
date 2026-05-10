@@ -25,10 +25,18 @@ FuncGen.airRet
 FuncGen.airBr
 FuncGen.airCondBr
 FuncGen.airUnreach
+FuncGen.airAlloc
+FuncGen.airLoad
+FuncGen.airStore
+FuncGen.airPtrElemPtr
 FuncGen.airRetLoad
 FuncGen.resolveInst
 IRBuilderBase::CreateAdd
 IRBuilderBase::CreateRet
+IRBuilderBase::CreateAlloca
+IRBuilderBase::CreateLoad
+IRBuilderBase::CreateStore
+IRBuilderBase::CreateGEP
 ```
 
 Implemented subset:
@@ -41,6 +49,7 @@ explicit basic blocks
 scalar integer parameters
 scalar integer binary operations
 scalar integer casts: trunc, zext, sext
+scalar stack memory: alloca, load, store, getelementptr
 return, branch, conditional branch, and unreachable terminators
 ```
 
@@ -49,6 +58,7 @@ Upstream mapping:
 ```text
 Zig lowers analyzed AIR instructions through FuncGen into LLVM IRBuilder calls.
 This project now has a tiny builder that can construct the same project IR shape for scalar arithmetic examples without invoking the full Zig compiler.
+Stack memory lowering maps directly onto the existing LLVM-compatible alloca/load/store/GEP project IR surface; alias analysis, SROA, and mem2reg behavior remain owned by the existing passes.
 The bridge is deliberately synthetic so optimizer and target tests can reduce failures to small inputs.
 ```
 
@@ -65,6 +75,8 @@ unit-test only:
   scalar add function with two i32 parameters and an SSA return
   scalar sub/and/shl arithmetic with zext return
   conditional branch to return and unreachable blocks
+  scalar stack slot with aligned store/load
+  scalar zero-index GEP from a stack slot
   target triple and datalayout preservation on lowered modules
 ```
 
@@ -73,7 +85,6 @@ Known gaps:
 ```text
 no AIR text parser
 no full Zig AIR semantics
-no stack memory lowering
 no loops
 no calls
 no comparisons, select, overflow operations, or intrinsics

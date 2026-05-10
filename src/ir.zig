@@ -19,6 +19,7 @@ pub const SelectInst = core.SelectInst;
 pub const PhiIncoming = core.PhiIncoming;
 pub const PhiInst = core.PhiInst;
 pub const AllocaInst = core.AllocaInst;
+pub const MemoryAttrs = core.MemoryAttrs;
 pub const LoadInst = core.LoadInst;
 pub const StoreInst = core.StoreInst;
 pub const GepIndex = core.GepIndex;
