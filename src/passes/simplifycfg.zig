@@ -139,7 +139,7 @@ fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_nam
                 .phi => |*phi| for (phi.incoming.items) |*incoming| {
                     if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
                 },
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
             }
         }
     }
@@ -197,7 +197,7 @@ fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
                         changed = true;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
             }
         }
     }
@@ -211,7 +211,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => null,
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -267,6 +267,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     for (gep.indices.items) |*index| {
                         index.value = replaceOperand(index.value, name, replacement);
                     }
+                },
+                .call => |*call| for (call.args.items) |*arg| {
+                    arg.value = replaceOperand(arg.value, name, replacement);
                 },
             }
         }

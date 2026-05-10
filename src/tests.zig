@@ -965,6 +965,116 @@ test "parser preserves supported calling conventions" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves function declarations and direct calls" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\declare void @sink(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %a)
+        \\  call void @sink(i32 %r)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 2), module.declarations.items.len);
+    try std.testing.expectEqualStrings("callee", module.declarations.items[0].name);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, module.declarations.items[0].ret_ty);
+    try std.testing.expectEqualStrings("sink", module.declarations.items[1].name);
+    try std.testing.expectEqual(ir.Type.void, module.declarations.items[1].ret_ty);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects direct call signature mismatch" {
+    const input =
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(ptr %p) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr %p)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.CallSignatureMismatch, module.verify());
+}
+
+test "verifier accepts matching declaration and definition" {
+    const input =
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @callee(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try module.verify();
+}
+
+test "parser rejects unsupported indirect and control-flow calls" {
+    const indirect =
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = call i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedIndirectCall, ir.Module.parse(std.testing.allocator, indirect));
+
+    const tail =
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = tail call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedCallAttribute, ir.Module.parse(std.testing.allocator, tail));
+
+    const invoke =
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = invoke i32 @callee(i32 %a) to label %ok unwind label %bad
+        \\ok:
+        \\  ret i32 %r
+        \\bad:
+        \\  unreachable
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedCallTerminator, ir.Module.parse(std.testing.allocator, invoke));
+}
+
 test "parser preserves scalar global variables" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

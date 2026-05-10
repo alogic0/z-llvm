@@ -48,7 +48,7 @@ fn build(function: ir.Function, ptr: ir.Value, access_size: ?u64) ?MemoryLocatio
                     base.size = access_size orelse typeSize(gep.source_ty);
                     return base;
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store => return null,
+                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => return null,
             }
         }
     }

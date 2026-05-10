@@ -45,7 +45,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 fn canonicalize(instruction: *ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |*binary| inst_simplify.canonicalizeCommutativeConstantRhs(binary),
-        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 

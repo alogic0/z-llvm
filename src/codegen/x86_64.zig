@@ -219,7 +219,7 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return error.UnsupportedCodegenInstruction,
+                .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
     }

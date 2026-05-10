@@ -44,6 +44,7 @@ pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Va
             return if (accessAliasesPointer(function, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
+        .call => .unknown,
     };
 }
 

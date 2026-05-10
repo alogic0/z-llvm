@@ -7,11 +7,18 @@ The current parser is intentionally small. It accepts only the LLVM-compatible s
 ```text
 define iN @name(...)
 define void @name(...)
+declare iN @name(...)
+declare void @name(...)
 function linkage on definitions: internal, private, external, default
+function linkage on declarations: internal, private, external, default
 function visibility on definitions: hidden, protected, default
+function visibility on declarations: hidden, protected, default
 function calling conventions on definitions: ccc, fastcc, coldcc
+function calling conventions on declarations/calls: ccc, fastcc, coldcc
 function header attributes preserved as raw text
+function declaration attributes preserved as raw text
 parameter attributes preserved as raw text
+declaration parameter attributes preserved as raw text
 source_filename module record
 target datalayout module record
 target triple module record
@@ -34,6 +41,7 @@ alloca instructions
 load instructions
 store instructions
 getelementptr instructions
+direct call instructions
 instruction flags: nsw, nuw, exact
 load/store align and volatile spelling
 narrow atomic load/store spelling as a conservative barrier
@@ -65,7 +73,10 @@ token/metadata types
 ```text
 fcmp
 phi token/blockaddress values
-call/invoke/callbr
+indirect call
+call attributes beyond the supported calling convention spelling
+inline asm call
+invoke/callbr
 bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
 landingpad/cleanupret/catchret
@@ -131,7 +142,12 @@ InvalidBr
 InvalidLabel
 UnsupportedGlobalVariable
 InvalidGlobalVariable
-UnsupportedFunctionDeclaration
+InvalidFunctionDeclaration
+InvalidCall
+UnsupportedIndirectCall
+UnsupportedCallAttribute
+UnsupportedCallTerminator
+UnsupportedVarArgs
 UnsupportedAttributeGroup
 UnsupportedModuleMetadata
 ```
@@ -197,11 +213,23 @@ Module IR subset:
   normalized Zig-emitted scalar function signature fixture
   AIR-like project-lowered and project-optimized fixture pair for tiny scalar signatures
   function linkage on definitions
+  function linkage on declarations
   function visibility on definitions
+  function visibility on declarations
   function calling conventions on definitions: ccc, fastcc, coldcc
+  function calling conventions on declarations/calls: ccc, fastcc, coldcc
   raw function header attributes
+  raw function declaration attributes
   raw parameter attributes
+  raw declaration parameter attributes
   void return type
+
+Call IR subset:
+  direct external declaration and direct internal function callees
+  scalar integer/pointer arguments
+  scalar integer/pointer/void returns
+  parser/printer/verifier coverage for direct calls
+  unknown memory-effect classification for optimizer legality
 
 Scalar IR subset:
   integer casts: trunc, zext, sext

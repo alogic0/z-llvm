@@ -83,7 +83,7 @@ fn isHoistable(instruction: ir.Instruction) bool {
     if (instruction.result == null) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp, .select => true,
-        .freeze, .phi, .alloca, .load, .store, .gep => false,
+        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 
@@ -97,7 +97,7 @@ fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalL
         .select => |select| isInvariantValue(select.cond, natural_loop, def_blocks) and
             isInvariantValue(select.true_value, natural_loop, def_blocks) and
             isInvariantValue(select.false_value, natural_loop, def_blocks),
-        .freeze, .phi, .alloca, .load, .store, .gep => false,
+        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 

@@ -7,6 +7,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .source = try allocator.dupe(u8, text),
         .owned_strings = .empty,
         .globals = .empty,
+        .declarations = .empty,
         .functions = .empty,
     };
     errdefer module.deinit();
@@ -45,7 +46,11 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             try module.globals.append(allocator, global);
             continue;
         }
-        if (current_function == null and std.mem.startsWith(u8, line, "declare ")) return error.UnsupportedFunctionDeclaration;
+        if (current_function == null and std.mem.startsWith(u8, line, "declare ")) {
+            const decl = try parseFunctionDecl(allocator, line);
+            try module.declarations.append(allocator, decl);
+            continue;
+        }
         if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) return error.UnsupportedAttributeGroup;
         if (current_function == null and std.mem.startsWith(u8, line, "!")) return error.UnsupportedModuleMetadata;
 
@@ -110,7 +115,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.globals.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.declarations.items.len == 0) return error.EmptyModule;
     return module;
 }
 
@@ -210,6 +215,66 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
     return function;
 }
 
+fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.FunctionDecl {
+    const body = std.mem.trim(u8, line["declare ".len..], " \t");
+    const open_paren = std.mem.indexOfScalar(u8, body, '(') orelse return error.InvalidFunctionDeclaration;
+    const close_paren = std.mem.lastIndexOfScalar(u8, body, ')') orelse return error.InvalidFunctionDeclaration;
+    if (close_paren < open_paren) return error.InvalidFunctionDeclaration;
+
+    const head = std.mem.trim(u8, body[0..open_paren], " \t");
+    var head_parts = std.mem.tokenizeAny(u8, head, " \t");
+    var token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
+
+    const linkage = core.FunctionLinkage.parse(token) orelse .default;
+    if (linkage != .default) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
+
+    const visibility = core.FunctionVisibility.parse(token) orelse .default;
+    if (visibility != .default) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
+
+    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
+    if (calling_conv != null) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
+
+    const ret_ty = try parseType(token);
+    const name_text = head_parts.next() orelse return error.InvalidFunctionDeclaration;
+    if (head_parts.next() != null) return error.InvalidFunctionDeclaration;
+    if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
+
+    var decl = core.FunctionDecl.init(name_text[1..], ret_ty);
+    decl.linkage = linkage;
+    decl.visibility = visibility;
+    decl.calling_conv = calling_conv;
+    const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
+    if (attrs.len != 0) decl.attrs = attrs;
+    errdefer decl.deinit(allocator);
+
+    try parseDeclParams(allocator, &decl, body[open_paren + 1 .. close_paren]);
+
+    return decl;
+}
+
+fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text: []const u8) !void {
+    const params_text = std.mem.trim(u8, text, " \t");
+    if (params_text.len == 0) return;
+    if (std.mem.eql(u8, params_text, "...")) return error.UnsupportedVarArgs;
+
+    var params = std.mem.splitScalar(u8, params_text, ',');
+    while (params.next()) |raw_param| {
+        const param_text = std.mem.trim(u8, raw_param, " \t");
+        if (std.mem.eql(u8, param_text, "...")) return error.UnsupportedVarArgs;
+        var parts = std.mem.tokenizeAny(u8, param_text, " \t");
+        const param_ty = try parseType(parts.next() orelse return error.InvalidParameter);
+        const attrs_start = if (parts.next()) |part| @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr) else null;
+        if (attrs_start) |start| {
+            try decl.params.append(allocator, .{
+                .ty = param_ty,
+                .attrs = std.mem.trim(u8, param_text[start..], " \t"),
+            });
+        } else {
+            try decl.params.append(allocator, .{ .ty = param_ty });
+        }
+    }
+}
+
 fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, text: []const u8) !void {
     const params_text = std.mem.trim(u8, text, " \t");
     if (params_text.len != 0) {
@@ -247,12 +312,18 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
 
 fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
     if (std.mem.startsWith(u8, line, "store ")) return parseStore(line);
+    if (std.mem.startsWith(u8, line, "call ")) return parseCall(allocator, null, line);
+    if (std.mem.startsWith(u8, line, "tail ") or std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, line, "invoke ") or std.mem.startsWith(u8, line, "callbr ")) return error.UnsupportedCallTerminator;
 
     const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidInstruction;
     const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, result_text, "%")) return error.InvalidValueName;
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    if (std.mem.startsWith(u8, rhs_text, "call ")) return parseCall(allocator, result_text[1..], rhs_text);
+    if (std.mem.startsWith(u8, rhs_text, "tail ") or std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, rhs_text, "invoke ") or std.mem.startsWith(u8, rhs_text, "callbr ")) return error.UnsupportedCallTerminator;
     if (std.mem.startsWith(u8, rhs_text, "phi ")) {
         return .{
             .result = result_text[1..],
@@ -404,6 +475,65 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
             .rhs = rhs,
         } },
     };
+}
+
+fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8) !core.Instruction {
+    var rest = std.mem.trim(u8, text["call ".len..], " \t");
+    var prefix_parts = std.mem.tokenizeAny(u8, rest, " \t");
+    var token = prefix_parts.next() orelse return error.InvalidCall;
+
+    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
+    if (calling_conv != null) token = prefix_parts.next() orelse return error.InvalidCall;
+
+    if (std.mem.indexOfScalar(u8, token, '(') != null) {
+        return error.UnsupportedIndirectCall;
+    }
+
+    const ret_ty = try parseType(token);
+    const ret_ty_offset = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
+    rest = std.mem.trim(u8, rest[ret_ty_offset..], " \t");
+
+    const open_paren = std.mem.indexOfScalar(u8, rest, '(') orelse return error.InvalidCall;
+    const close_paren = std.mem.lastIndexOfScalar(u8, rest, ')') orelse return error.InvalidCall;
+    if (close_paren < open_paren) return error.InvalidCall;
+    const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
+    if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
+    const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
+    if (trailing.len != 0) return error.UnsupportedCallAttribute;
+
+    var call: core.CallInst = .{
+        .ret_ty = ret_ty,
+        .callee = callee_text[1..],
+        .calling_conv = calling_conv,
+        .args = .empty,
+    };
+    errdefer call.deinit(allocator);
+
+    try parseCallArgs(allocator, &call, rest[open_paren + 1 .. close_paren]);
+
+    return .{
+        .result = result,
+        .kind = .{ .call = call },
+    };
+}
+
+fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []const u8) !void {
+    const args_text = std.mem.trim(u8, text, " \t");
+    if (args_text.len == 0) return;
+    if (std.mem.eql(u8, args_text, "...")) return error.UnsupportedVarArgs;
+
+    var args = std.mem.splitScalar(u8, args_text, ',');
+    while (args.next()) |raw_arg| {
+        const arg_text = std.mem.trim(u8, raw_arg, " \t");
+        var parts = std.mem.tokenizeAny(u8, arg_text, " \t");
+        const ty = try parseType(parts.next() orelse return error.InvalidCall);
+        const value = try parseValue(parts.next() orelse return error.InvalidCall);
+        if (parts.next() != null) return error.UnsupportedCallAttribute;
+        try call.args.append(allocator, .{
+            .ty = ty,
+            .value = value,
+        });
+    }
 }
 
 fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {

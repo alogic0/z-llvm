@@ -71,6 +71,8 @@ scalar global and constant global preservation
 function linkage and raw function-header attribute preservation
 function visibility and raw parameter attribute preservation
 calling convention preservation for ccc/fastcc/coldcc-compatible header parsing
+function declaration and direct call round-tripping
+direct call verifier mismatch and unsupported-call diagnostics
 void function and ret void round-tripping
 explicit unsupported global diagnostics
 ```
@@ -132,6 +134,7 @@ LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
 LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing, initial target matrix recognition, minimal DataLayout query subset, and scalar/function ABI classification
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
+Call IR: function declarations, direct calls, scalar call signature verification, and conservative unknown memory-effect classification
 AIR-like bridge: tiny scalar binary/cast, control-flow, stack-memory, and canonical-loop function lowering into project IR
 AIR-like bridge driver: pre/post pipeline output for `memory-foundation`
 Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout record injection

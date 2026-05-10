@@ -65,6 +65,9 @@ pub const UseCounts = struct {
                 try uses.addValue(gep.ptr);
                 for (gep.indices.items) |index| try uses.addValue(index.value);
             },
+            .call => |call| for (call.args.items) |arg| {
+                try uses.addValue(arg.value);
+            },
         }
     }
 
@@ -97,6 +100,9 @@ pub const UseCounts = struct {
             .gep => |gep| {
                 uses.removeValue(gep.ptr);
                 for (gep.indices.items) |index| uses.removeValue(index.value);
+            },
+            .call => |call| for (call.args.items) |arg| {
+                uses.removeValue(arg.value);
             },
         }
     }

@@ -101,6 +101,9 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                         if (isNamed(index.value, slot)) return false;
                     }
                 },
+                .call => |call| for (call.args.items) |arg| {
+                    if (isNamed(arg.value, slot)) return false;
+                },
                 .alloca => {},
             }
         }
@@ -179,7 +182,7 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .store => |store| if (isNamed(store.ptr, slot)) return true,
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep => {},
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep, .call => {},
         }
     }
     return false;
@@ -267,7 +270,7 @@ fn renameSlot(
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -297,7 +300,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
                 });
                 return;
             },
-            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep => return,
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => return,
         }
     }
 }
@@ -348,6 +351,9 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                         if (isNamed(index.value, slot)) return false;
                     }
                 },
+                .call => |call| for (call.args.items) |arg| {
+                    if (isNamed(arg.value, slot)) return false;
+                },
                 .alloca => {},
             }
         }
@@ -369,7 +375,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .load => |load| {
                 if (isNamed(load.ptr, slot) and !has_current_value) return false;
             },
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
         }
     }
     return true;
@@ -406,7 +412,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -447,6 +453,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     for (gep.indices.items) |*index| {
                         index.value = replaceOperand(index.value, name, replacement);
                     }
+                },
+                .call => |*call| for (call.args.items) |*arg| {
+                    arg.value = replaceOperand(arg.value, name, replacement);
                 },
             }
         }

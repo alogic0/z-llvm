@@ -4,6 +4,9 @@ const core = @import("core.zig");
 pub fn verify(module: core.Module) !void {
     var global_defs = std.StringHashMap(void).init(module.allocator);
     defer global_defs.deinit();
+    var decl_defs = std.StringHashMap(void).init(module.allocator);
+    defer decl_defs.deinit();
+
     for (module.globals.items) |global| {
         if (global_defs.contains(global.name)) return error.DuplicateDefinition;
         try global_defs.put(global.name, {});
@@ -20,9 +23,19 @@ pub fn verify(module: core.Module) !void {
         }
     }
 
+    for (module.declarations.items) |decl| {
+        if (global_defs.contains(decl.name)) return error.DuplicateDefinition;
+        if (decl_defs.contains(decl.name)) return error.DuplicateDefinition;
+        try decl_defs.put(decl.name, {});
+    }
+
     for (module.functions.items) |function| {
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
+        if (findDeclaration(module, function.name)) |decl| try verifyDeclMatchesFunction(decl, function);
+        try global_defs.put(function.name, {});
+    }
 
+    for (module.functions.items) |function| {
         var defs = std.StringHashMap(core.Type).init(module.allocator);
         defer defs.deinit();
 
@@ -97,6 +110,14 @@ pub fn verify(module: core.Module) !void {
                             try verifyValue(defs, index.ty, index.value);
                         }
                     },
+                    .call => |call| {
+                        if (call.ret_ty == .void) {
+                            if (instruction.result != null) return error.VoidCallHasResult;
+                        } else if (instruction.result == null) {
+                            return error.InstructionNeedsResult;
+                        }
+                        try verifyCall(module, defs, call);
+                    },
                 }
             }
 
@@ -121,6 +142,73 @@ pub fn verify(module: core.Module) !void {
             }
         }
     }
+}
+
+fn verifyDeclMatchesFunction(decl: core.FunctionDecl, function: core.Function) !void {
+    if (!decl.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
+    if (decl.calling_conv) |decl_cc| {
+        if (function.calling_conv) |function_cc| {
+            if (!std.mem.eql(u8, decl_cc, function_cc)) return error.CallSignatureMismatch;
+        } else {
+            return error.CallSignatureMismatch;
+        }
+    }
+    if (decl.params.items.len != function.params.items.len) return error.CallSignatureMismatch;
+    for (decl.params.items, 0..) |param, index| {
+        if (!param.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
+    }
+}
+
+fn verifyCall(module: core.Module, defs: std.StringHashMap(core.Type), call: core.CallInst) !void {
+    if (call.calling_conv) |calling_conv| {
+        if (!core.isSupportedCallingConvention(calling_conv)) return error.UnsupportedCallingConvention;
+    }
+
+    if (findDeclaration(module, call.callee)) |decl| {
+        if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
+        if (call.calling_conv) |calling_conv| {
+            if (decl.calling_conv) |decl_cc| {
+                if (!std.mem.eql(u8, calling_conv, decl_cc)) return error.CallSignatureMismatch;
+            }
+        }
+        if (call.args.items.len != decl.params.items.len) return error.CallSignatureMismatch;
+        for (call.args.items, 0..) |arg, index| {
+            if (!arg.ty.eql(decl.params.items[index].ty)) return error.CallSignatureMismatch;
+            try verifyValue(defs, arg.ty, arg.value);
+        }
+        return;
+    }
+
+    if (findFunction(module, call.callee)) |function| {
+        if (!call.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
+        if (call.calling_conv) |calling_conv| {
+            if (function.calling_conv) |function_cc| {
+                if (!std.mem.eql(u8, calling_conv, function_cc)) return error.CallSignatureMismatch;
+            }
+        }
+        if (call.args.items.len != function.params.items.len) return error.CallSignatureMismatch;
+        for (call.args.items, 0..) |arg, index| {
+            if (!arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
+            try verifyValue(defs, arg.ty, arg.value);
+        }
+        return;
+    }
+
+    return error.UnknownFunction;
+}
+
+fn findDeclaration(module: core.Module, name: []const u8) ?core.FunctionDecl {
+    for (module.declarations.items) |decl| {
+        if (std.mem.eql(u8, decl.name, name)) return decl;
+    }
+    return null;
+}
+
+fn findFunction(module: core.Module, name: []const u8) ?core.Function {
+    for (module.functions.items) |function| {
+        if (std.mem.eql(u8, function.name, name)) return function;
+    }
+    return null;
 }
 
 fn verifyBinaryFlags(binary: core.BinaryInst) !void {

@@ -16,7 +16,7 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .cast => |cast| simplifyCast(cast),
         .icmp => |icmp| simplifyIcmp(icmp),
         .select => |select| simplifySelect(select),
-        .freeze, .phi, .alloca, .load, .store, .gep => null,
+        .freeze, .phi, .alloca, .load, .store, .gep, .call => null,
     };
 }
 
@@ -30,21 +30,21 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),
-            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
+            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),
-            .binary, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => false,
+            .binary, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .cast, .freeze, .select, .phi, .alloca, .load, .store, .gep => false,
+            .binary, .cast, .freeze, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .select => |a_select| switch (b.kind) {
             .select => |b_select| a_select.cond_ty.eql(b_select.cond_ty) and
@@ -52,9 +52,9 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_select.ty.eql(b_select.ty) and
                 a_select.true_value.eql(b_select.true_value) and
                 a_select.false_value.eql(b_select.false_value),
-            .binary, .cast, .freeze, .icmp, .phi, .alloca, .load, .store, .gep => false,
+            .binary, .cast, .freeze, .icmp, .phi, .alloca, .load, .store, .gep, .call => false,
         },
-        .freeze, .phi, .alloca, .load, .store, .gep => false,
+        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 

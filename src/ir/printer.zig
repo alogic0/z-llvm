@@ -14,7 +14,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.print("target triple = \"{s}\"\n", .{target_triple});
         printed_module_record = true;
     }
-    if (printed_module_record and (module.globals.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
+    if (printed_module_record and (module.globals.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
 
     for (module.globals.items) |global| {
         try writer.print("@{s} = ", .{global.name});
@@ -26,7 +26,26 @@ pub fn print(module: core.Module, writer: anytype) !void {
         if (global.attrs) |attrs| try writer.print(", {s}", .{attrs});
         try writer.writeByte('\n');
     }
-    if (module.globals.items.len != 0 and module.functions.items.len != 0) try writer.writeByte('\n');
+    if (module.globals.items.len != 0 and (module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
+
+    for (module.declarations.items, 0..) |decl, decl_index| {
+        if (decl_index != 0) try writer.writeByte('\n');
+        try writer.writeAll("declare ");
+        try decl.linkage.format(writer);
+        try decl.visibility.format(writer);
+        if (decl.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
+        try decl.ret_ty.format(writer);
+        try writer.print(" @{s}(", .{decl.name});
+        for (decl.params.items, 0..) |param, index| {
+            if (index != 0) try writer.writeAll(", ");
+            try param.ty.format(writer);
+            if (param.attrs) |attrs| try writer.print(" {s}", .{attrs});
+        }
+        try writer.writeByte(')');
+        if (decl.attrs) |attrs| try writer.print(" {s}", .{attrs});
+        try writer.writeByte('\n');
+    }
+    if (module.declarations.items.len != 0 and module.functions.items.len != 0) try writer.writeByte('\n');
 
     for (module.functions.items, 0..) |function, function_index| {
         if (function_index != 0) try writer.writeByte('\n');
@@ -155,6 +174,19 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try index.value.format(writer);
                         }
                         try writer.writeByte('\n');
+                    },
+                    .call => |call| {
+                        try writer.writeAll("call ");
+                        if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
+                        try call.ret_ty.format(writer);
+                        try writer.print(" @{s}(", .{call.callee});
+                        for (call.args.items, 0..) |arg, index| {
+                            if (index != 0) try writer.writeAll(", ");
+                            try arg.ty.format(writer);
+                            try writer.writeByte(' ');
+                            try arg.value.format(writer);
+                        }
+                        try writer.writeAll(")\n");
                     },
                 }
             }

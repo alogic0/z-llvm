@@ -127,6 +127,7 @@ pub fn lowerModule(allocator: std.mem.Allocator, spec: Module) !ir.Module {
         .target_triple = spec.target_triple,
         .target_datalayout = spec.target_datalayout,
         .globals = .empty,
+        .declarations = .empty,
         .functions = .empty,
     };
     errdefer module.deinit();

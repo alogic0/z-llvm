@@ -58,7 +58,7 @@ fn isCseCandidate(instruction: ir.Instruction) bool {
     if (instruction.hasSideEffects()) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp => true,
-        .freeze, .select, .phi, .alloca, .load, .store, .gep => false,
+        .freeze, .select, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 

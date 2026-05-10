@@ -97,6 +97,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                         index.value = replaceOperand(index.value, name, replacement);
                     }
                 },
+                .call => |*call| for (call.args.items) |*arg| {
+                    arg.value = replaceOperand(arg.value, name, replacement);
+                },
             }
         }
         if (block.terminator) |*terminator| switch (terminator.*) {

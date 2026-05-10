@@ -154,6 +154,11 @@ pub const Param = struct {
     name: []const u8,
 };
 
+pub const DeclParam = struct {
+    ty: Type,
+    attrs: ?[]const u8 = null,
+};
+
 pub const FunctionLinkage = enum {
     default,
     internal,
@@ -225,6 +230,28 @@ pub const Global = struct {
     ty: Type,
     initializer: Value,
     attrs: ?[]const u8 = null,
+};
+
+pub const FunctionDecl = struct {
+    name: []const u8,
+    ret_ty: Type,
+    linkage: FunctionLinkage = .default,
+    visibility: FunctionVisibility = .default,
+    calling_conv: ?[]const u8 = null,
+    attrs: ?[]const u8 = null,
+    params: std.ArrayList(DeclParam),
+
+    pub fn init(name: []const u8, ret_ty: Type) FunctionDecl {
+        return .{
+            .name = name,
+            .ret_ty = ret_ty,
+            .params = .empty,
+        };
+    }
+
+    pub fn deinit(decl: *FunctionDecl, allocator: std.mem.Allocator) void {
+        decl.params.deinit(allocator);
+    }
 };
 
 pub const BinaryInst = struct {
@@ -322,6 +349,22 @@ pub const GepInst = struct {
     }
 };
 
+pub const CallArg = struct {
+    ty: Type,
+    value: Value,
+};
+
+pub const CallInst = struct {
+    ret_ty: Type,
+    callee: []const u8,
+    calling_conv: ?[]const u8 = null,
+    args: std.ArrayList(CallArg),
+
+    pub fn deinit(call: *CallInst, allocator: std.mem.Allocator) void {
+        call.args.deinit(allocator);
+    }
+};
+
 pub const Instruction = struct {
     result: ?[]const u8,
     kind: union(enum) {
@@ -335,12 +378,13 @@ pub const Instruction = struct {
         load: LoadInst,
         store: StoreInst,
         gep: GepInst,
+        call: CallInst,
     },
     removed: bool = false,
     replacement: ?Value = null,
 
     pub fn hasSideEffects(instruction: Instruction) bool {
-        return instruction.mayWriteMemory();
+        return instruction.mayWriteMemory() or instruction.kind == .call;
     }
 
     pub fn mayReadMemory(instruction: Instruction) bool {
@@ -362,6 +406,7 @@ pub const Instruction = struct {
             .alloca => .ptr,
             .load => |load| load.ty,
             .gep => .ptr,
+            .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
             .store => null,
         };
     }
@@ -398,6 +443,9 @@ pub const Instruction = struct {
                     index.value = resolveValue(aliases, index.value);
                 }
             },
+            .call => |*call| for (call.args.items) |*arg| {
+                arg.value = resolveValue(aliases, arg.value);
+            },
         }
     }
 
@@ -406,6 +454,7 @@ pub const Instruction = struct {
             .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
+            .call => |*call| call.deinit(allocator),
         }
     }
 };
@@ -493,6 +542,7 @@ pub const Module = struct {
     target_triple: ?[]const u8 = null,
     target_datalayout: ?[]const u8 = null,
     globals: std.ArrayList(Global),
+    declarations: std.ArrayList(FunctionDecl),
     functions: std.ArrayList(Function),
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) !Module {
@@ -501,6 +551,8 @@ pub const Module = struct {
 
     pub fn deinit(module: *Module) void {
         module.globals.deinit(module.allocator);
+        for (module.declarations.items) |*decl| decl.deinit(module.allocator);
+        module.declarations.deinit(module.allocator);
         for (module.functions.items) |*function| function.deinit(module.allocator);
         module.functions.deinit(module.allocator);
         for (module.owned_strings.items) |owned| module.allocator.free(owned);

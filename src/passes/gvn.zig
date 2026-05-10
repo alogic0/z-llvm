@@ -75,7 +75,7 @@ fn isCandidate(instruction: ir.Instruction) bool {
     if (memory_effect.classify(instruction) != .none) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp, .select => true,
-        .freeze, .phi, .alloca, .load, .store, .gep => false,
+        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 
@@ -113,6 +113,9 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     for (gep.indices.items) |*index| {
                         index.value = replaceOperand(index.value, name, replacement);
                     }
+                },
+                .call => |*call| for (call.args.items) |*arg| {
+                    arg.value = replaceOperand(arg.value, name, replacement);
                 },
             }
         }
