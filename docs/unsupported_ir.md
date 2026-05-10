@@ -257,11 +257,14 @@ Scalar IR subset:
   integer division/remainder spelling: udiv, sdiv, urem, srem
   instruction flags preserved: nsw, nuw, exact
   freeze spelling preserved for scalar integers
+  freeze of integer constants folded by InstSimplify/InstCombine
 
 InstSimplify subset:
   local scalar simplification helper for InstCombine
   constant integer cast folding
   defined constant division/remainder folding
+  safe variable division/remainder identity folding
+  freeze-constant folding
   shared scalar expression equivalence for GVN and EarlyCSE
 
 Select subset:

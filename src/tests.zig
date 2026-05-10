@@ -29,6 +29,10 @@ test "named pipelines expand to stable pass sequences" {
     const expected = [_][]const u8{
         "simplifycfg",
         "instcombine",
+        "simplifycfg",
+        "instcombine",
+        "aggressive-instcombine",
+        "lower-constant-intrinsics",
         "early-cse",
         "gvn",
         "dce",
@@ -49,6 +53,10 @@ test "zig scalar foundation pipeline aliases scalar foundation passes" {
     const expected = [_][]const u8{
         "simplifycfg",
         "instcombine",
+        "simplifycfg",
+        "instcombine",
+        "aggressive-instcombine",
+        "lower-constant-intrinsics",
         "early-cse",
         "gvn",
         "dce",
@@ -97,6 +105,10 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
         "mem2reg",
         "simplifycfg",
         "instcombine",
+        "simplifycfg",
+        "instcombine",
+        "aggressive-instcombine",
+        "lower-constant-intrinsics",
         "early-cse",
         "gvn",
         "dse",
@@ -128,7 +140,7 @@ test "inventory placeholders run as documented no-op passes" {
 
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
-    try pipelines.addPasses(&pm, "verify,always-inline,dse,canonicalize-aliases");
+    try pipelines.addPasses(&pm, "verify,always-inline,aggressive-instcombine,drop-unnecessary-assumes,dse,canonicalize-aliases");
 
     var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -167,6 +179,49 @@ test "nested pipeline placeholders reject unbalanced groups" {
     defer pm.deinit();
 
     try std.testing.expectError(error.InvalidPassPipeline, pipelines.addPasses(&pm, "function(instcombine,dce"));
+}
+
+test "debug and release mode pipelines expose mode-sensitive scalar behavior" {
+    const input =
+        \\define i32 @mode(i32 %a) {
+        \\entry:
+        \\  %x = add i32 %a, 0
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var debug_module = try ir.Module.parse(std.testing.allocator, input);
+    defer debug_module.deinit();
+    var debug_pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer debug_pm.deinit();
+    try pipelines.addPasses(&debug_pm, "debug-o0");
+    var debug_context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var debug_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer debug_output.deinit();
+    _ = try debug_pm.run(&debug_module, &debug_context, &debug_output.writer, false);
+    try debug_module.print(&debug_output.writer);
+    try std.testing.expectEqualStrings(input, debug_output.writer.buffered());
+
+    var release_module = try ir.Module.parse(std.testing.allocator, input);
+    defer release_module.deinit();
+    var release_pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer release_pm.deinit();
+    try pipelines.addPasses(&release_pm, "release-o3");
+    var release_context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var release_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer release_output.deinit();
+    _ = try release_pm.run(&release_module, &release_context, &release_output.writer, false);
+    try release_module.print(&release_output.writer);
+
+    const expected_release =
+        \\define i32 @mode(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected_release, release_output.writer.buffered());
 }
 
 test "pass manager pass limit and timing output are deterministic without an io clock" {
@@ -1954,7 +2009,7 @@ test "instcombine preserves flagged arithmetic and division" {
         \\define i32 @conservative(i32 %a) {
         \\entry:
         \\  %x = add nsw i32 %a, 0
-        \\  %y = udiv i32 %x, 1
+        \\  %y = add i32 %x, 1
         \\  ret i32 %y
         \\}
         \\
@@ -1979,6 +2034,46 @@ test "instcombine preserves flagged arithmetic and division" {
     try module.print(&output.writer);
 
     try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "instcombine folds safe division remainder and freeze constants" {
+    const input =
+        \\define i32 @safe_scalar(i32 %a) {
+        \\entry:
+        \\  %d = udiv i32 %a, 1
+        \\  %r = srem i32 %d, 1
+        \\  %f = freeze i32 42
+        \\  %sum0 = add i32 %r, %f
+        \\  %sum1 = add i32 %sum0, %d
+        \\  ret i32 %sum1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(instcombine.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @safe_scalar(i32 %a) {
+        \\entry:
+        \\  %sum1 = add i32 %a, 42
+        \\  ret i32 %sum1
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
 test "instcombine preserves unsafe division folds" {

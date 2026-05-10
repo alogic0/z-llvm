@@ -75,7 +75,7 @@ LICM:
 These semantics must be documented and tested before broadening transforms that
 depend on them:
 
-- [ ] Poison, `undef`, and `freeze` behavior for accepted scalar transforms.
+- [x] Poison, `undef`, and `freeze` behavior for accepted scalar transforms.
 - [ ] Integer overflow flags: `nsw`, `nuw`, `exact`, and when folds must refuse
       to move or drop them.
 - [ ] DataLayout-backed type sizes and offsets for stack, GEP, and SROA work.
@@ -138,31 +138,31 @@ Passes covered:
 Goal: make small Zig-emitted scalar IR canonical in the same broad shape LLVM
 expects before deeper optimizations.
 
-- [ ] Add algorithm contracts for InstSimplify and InstCombine before expanding
+- [x] Add algorithm contracts for InstSimplify and InstCombine before expanding
       either pass.
-- [ ] Document LLVM source mapping:
+- [x] Document LLVM source mapping:
       `llvm/lib/Analysis/InstructionSimplify.cpp`,
       `llvm/lib/Transforms/InstCombine/`, and
       `llvm/lib/Transforms/AggressiveInstCombine/`.
-- [ ] Expand InstSimplify for integer identities, comparisons, casts, select,
+- [x] Expand InstSimplify for integer identities, comparisons, casts, select,
       freeze/undef-safe cases, and branch conditions currently accepted by IR.
-- [ ] Expand InstCombine for arithmetic, bitwise, comparisons, casts, select,
+- [x] Expand InstCombine for arithmetic, bitwise, comparisons, casts, select,
       div/rem conservative folds, and canonical operand ordering.
-- [ ] Add poison/undef/freeze documentation for every transform that depends on
+- [x] Add poison/undef/freeze documentation for every transform that depends on
       it; reject or preserve when semantics are not modeled.
-- [ ] Add fixed-point behavior where LLVM repeatedly runs InstCombine and
+- [x] Add fixed-point behavior where LLVM repeatedly runs InstCombine and
       SimplifyCFG in the selected pipelines.
-- [ ] Add `aggressive-instcombine` as a documented placeholder first; only
+- [x] Add `aggressive-instcombine` as a documented placeholder first; only
       promote concrete transforms after InstCombine coverage is stable.
-- [ ] Add mode-sensitive fixtures where `O0`, `O3`, and `Oz` differ.
+- [x] Add mode-sensitive fixtures where `O0`, `O3`, and `Oz` differ.
 
 Passes covered:
 
-- [ ] `instsimplify`
-- [ ] `instcombine`
-- [ ] `aggressive-instcombine` placeholder
-- [ ] `lower-constant-intrinsics` narrow subset if intrinsics enter IR
-- [ ] `drop-unnecessary-assumes` placeholder until `assume` exists
+- [x] `instsimplify`
+- [x] `instcombine`
+- [x] `aggressive-instcombine` placeholder
+- [x] `lower-constant-intrinsics` narrow subset if intrinsics enter IR
+- [x] `drop-unnecessary-assumes` placeholder until `assume` exists
 
 ## Epic 3: P0 CFG Canonicalization Foundation
 

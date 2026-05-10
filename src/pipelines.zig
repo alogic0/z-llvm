@@ -24,6 +24,10 @@ pub const Pipeline = struct {
 const scalar_foundation_passes = [_][]const u8{
     "simplifycfg",
     "instcombine",
+    "simplifycfg",
+    "instcombine",
+    "aggressive-instcombine",
+    "lower-constant-intrinsics",
     "early-cse",
     "gvn",
     "dce",
@@ -55,6 +59,10 @@ const release_o3_passes = [_][]const u8{
     "mem2reg",
     "simplifycfg",
     "instcombine",
+    "simplifycfg",
+    "instcombine",
+    "aggressive-instcombine",
+    "lower-constant-intrinsics",
     "early-cse",
     "gvn",
     "dse",
@@ -76,6 +84,10 @@ const release_oz_passes = [_][]const u8{
     "mem2reg",
     "simplifycfg",
     "instcombine",
+    "simplifycfg",
+    "instcombine",
+    "aggressive-instcombine",
+    "lower-constant-intrinsics",
     "early-cse",
     "gvn",
     "dce",
@@ -98,6 +110,10 @@ const lto_prelink_o3_passes = [_][]const u8{
     "mem2reg",
     "simplifycfg",
     "instcombine",
+    "simplifycfg",
+    "instcombine",
+    "aggressive-instcombine",
+    "lower-constant-intrinsics",
     "early-cse",
     "gvn",
     "dse",
@@ -281,6 +297,9 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
 
 fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "always-inline")) return placeholder.make("always-inline", .ipo, "llvm/lib/Transforms/IPO/AlwaysInliner.cpp");
+    if (std.mem.eql(u8, name, "aggressive-instcombine")) return placeholder.make("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/");
+    if (std.mem.eql(u8, name, "lower-constant-intrinsics")) return placeholder.make("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp");
+    if (std.mem.eql(u8, name, "drop-unnecessary-assumes")) return placeholder.make("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp");
     if (std.mem.eql(u8, name, "ee-instrument")) return placeholder.make("ee-instrument", .instrumentation, "llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp");
     if (std.mem.eql(u8, name, "alloc-token")) return placeholder.make("alloc-token", .instrumentation, "llvm/lib/Transforms/Instrumentation/AllocToken.cpp");
     if (std.mem.eql(u8, name, "annotation-remarks")) return placeholder.make("annotation-remarks", .instrumentation, "llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp");

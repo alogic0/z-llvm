@@ -193,14 +193,14 @@ Status meanings:
 | `div-rem-pairs` | scalar/codegen prep | P2 | missing | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
 | `float2int` | scalar | P3 | defer | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |
 | `lower-expect` | canonicalization / profiling metadata | P2 | missing | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
-| `lower-constant-intrinsics` | canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp` |
-| `drop-unnecessary-assumes` | canonicalization | P2 | missing | `llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp` |
+| `lower-constant-intrinsics` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp` |
+| `drop-unnecessary-assumes` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp` |
 | `infer-alignment` | memory / target facts | P2 | missing | `llvm/lib/Transforms/Scalar/InferAlignment.cpp` |
 | `alignment-from-assumptions` | memory / target facts | P3 | missing | `llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp` |
 | `memcpyopt` | memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/MemCpyOptimizer.cpp` |
 | `mldst-motion` | memory optimization | P2 | missing | `llvm/lib/Transforms/Scalar/MergedLoadStoreMotion.cpp` |
 | `move-auto-init` | memory/security | P3 | defer | `llvm/lib/Transforms/Scalar/MoveAutoInit.cpp` |
-| `aggressive-instcombine` | canonicalization | P2 | missing | `llvm/lib/Transforms/AggressiveInstCombine/` |
+| `aggressive-instcombine` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/AggressiveInstCombine/` |
 | `annotation2metadata` | metadata canonicalization | P3 | missing | `llvm/lib/Transforms/IPO/Annotation2Metadata.cpp` |
 | `annotation-remarks` | diagnostics/remarks | P3 | placeholder | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |
 | `forceattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp` |

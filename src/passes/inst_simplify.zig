@@ -14,9 +14,10 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .binary => |binary| simplifyBinary(binary),
         .cast => |cast| simplifyCast(cast),
+        .freeze => |freeze| simplifyFreeze(freeze),
         .icmp => |icmp| simplifyIcmp(icmp),
         .select => |select| simplifySelect(select),
-        .freeze, .phi, .alloca, .load, .store, .gep, .call => null,
+        .phi, .alloca, .load, .store, .gep, .call => null,
     };
 }
 
@@ -112,7 +113,8 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
             .{ .int = 0 }
         else
             null,
-        .udiv, .sdiv, .urem, .srem => null,
+        .udiv, .sdiv => if (isOne(binary.rhs)) binary.lhs else null,
+        .urem, .srem => if (isOne(binary.rhs)) .{ .int = 0 } else null,
     };
 }
 
@@ -173,6 +175,13 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
         .trunc => truncateConstant(cast.value.int, to_bits),
         .zext => zeroExtendConstant(cast.value.int, from_bits),
         .sext => signExtendConstant(cast.value.int, from_bits),
+    };
+}
+
+fn simplifyFreeze(freeze: ir.FreezeInst) ?ir.Value {
+    return switch (freeze.value) {
+        .int => freeze.value,
+        .named, .undef => null,
     };
 }
 

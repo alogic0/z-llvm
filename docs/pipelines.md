@@ -97,6 +97,10 @@ Implemented development pipelines:
 scalar-foundation:
   simplifycfg
   instcombine
+  simplifycfg
+  instcombine
+  aggressive-instcombine placeholder
+  lower-constant-intrinsics placeholder
   early-cse
   gvn
   dce
@@ -111,6 +115,10 @@ memory-foundation:
 zig-scalar-foundation:
   simplifycfg
   instcombine
+  simplifycfg
+  instcombine
+  aggressive-instcombine placeholder
+  lower-constant-intrinsics placeholder
   early-cse
   gvn
   dce
@@ -137,6 +145,10 @@ release-o3:
   mem2reg
   simplifycfg
   instcombine
+  simplifycfg
+  instcombine
+  aggressive-instcombine placeholder
+  lower-constant-intrinsics placeholder
   early-cse
   gvn
   dse placeholder
@@ -177,6 +189,8 @@ unit tests check the scalar-foundation pass order
 inventory placeholders are executable documented no-ops
 unit tests check debug-o0 and release-o3 expansion
 textual nested pipeline placeholders are flattened for now
+selected release descriptors repeat simplifycfg and instcombine to model LLVM's
+canonicalization shape
 ```
 
 Upstream mapping:

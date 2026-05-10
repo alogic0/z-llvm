@@ -40,6 +40,7 @@ opt-22 -passes=gvn test/opt/inputs/gvn_dominating_expr.ll -S -o /tmp/llvm_gvn.ll
 opt-22 -passes='loop-mssa(licm)' test/opt/inputs/licm_invariant.ll -S -o /tmp/llvm_licm.ll
 opt-22 -passes=sroa test/opt/inputs/sroa_zero_gep.ll -S -o /tmp/llvm_sroa.ll
 opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_scalar_simplify.ll -S -o /tmp/llvm_scalar_simplify.ll
+opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_safe_scalar.ll -S -o /tmp/llvm_safe_scalar.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 ```
 
@@ -52,7 +53,8 @@ bash scripts/compare_opt.sh
 The comparison matrix includes scalar IR round-trip coverage for casts,
 division/remainder, `freeze`, and `nsw`/`nuw`/`exact` flag preservation through
 the `scalar_ir_surface` fixture. It also includes defined scalar cast/div/rem
-fold coverage through `instcombine_scalar_simplify`.
+fold coverage through `instcombine_scalar_simplify` and safe variable div/rem
+plus freeze-constant coverage through `instcombine_safe_scalar`.
 
 Target-aware infrastructure currently has unit-test-only coverage for:
 
@@ -141,7 +143,7 @@ LLVM algorithms covered so far:
 Verifier: accepted-IR subset for terminators, call signatures, memory attributes, SSA dominance, use-before-def, and phi predecessor validation
 PassBuilder pipeline surface: named pass registry, Zig mode pipeline descriptors, and no-op placeholders for not-yet-implemented inventory passes
 PassBuilder nesting surface: textual module/function/loop/CGSCC group placeholders flattened to module pass execution
-InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
+InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, safe variable div/rem identities, freeze-constant folding, conservative scalar flag/division preservation, and commutative canonicalization subsets
 DCE: unused pure instruction removal subset
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, and empty-block threading subsets

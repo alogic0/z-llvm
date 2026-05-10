@@ -33,6 +33,68 @@ InstCombinerImpl::visitSelectInst
 InstructionSimplify helpers used by InstCombine
 ```
 
+## LLVM Algorithm Contract
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/lib/Transforms/InstCombine/
+  llvm-project-22/llvm/lib/Transforms/AggressiveInstCombine/
+  llvm-project-22/llvm/lib/Analysis/InstructionSimplify.cpp
+
+LLVM entry points/classes:
+  InstCombinePass::run
+  InstCombinerImpl::run
+  InstCombinerImpl::canonicalizeOperands
+  AggressiveInstCombinePass
+
+Required analyses:
+  None for the implemented local subset.
+
+Required IR invariants:
+  Verified scalar integer IR with valid SSA dominance and PHI structure.
+
+Core LLVM algorithm data structures:
+  Worklist-style instruction combining
+  InstructionSimplify query helpers
+  Operand canonicalization for commutative instructions
+  Conservative poison/undef/freeze refusal rules
+
+Local target status:
+  LLVM-shaped algorithm subset
+
+Implemented subset:
+  Local instruction scan with alias replacement
+  Arithmetic, bitwise, shift, cast, ICmp, select, div/rem, and freeze-constant
+  scalar simplifications delegated to the InstSimplify helper
+  Constant-on-RHS canonicalization for supported commutative binary ops
+
+Intentional divergences:
+  The local pass is a linear scan, not LLVM's full fixed-point worklist.
+  Selected mode pipelines repeat InstCombine and SimplifyCFG to model the
+  repeated canonicalization shape used by LLVM.
+  AggressiveInstCombine is an explicit placeholder until concrete rules are
+  implemented.
+
+Analysis preservation/invalidation:
+  InstCombine mutates IR and invalidates analyses under the local pass-manager
+  policy. The pass manager verifies after execution.
+
+Fixture coverage:
+  instcombine
+  instcombine_bitwise
+  instcombine_icmp_rel
+  instcombine_commute
+  instcombine_scalar_simplify
+  instcombine_safe_scalar
+  select_fold
+
+opt-22 comparison command:
+  bash scripts/compare_opt.sh
+
+Local-only fixture command:
+  zig build test
+```
+
 This pass canonicalizes and folds simple instructions. The first Zig implementation is intentionally small and covers only enough behavior to prove the pass infrastructure and LLVM-compatible IR comparison loop.
 
 Implemented subset:
@@ -68,6 +130,8 @@ select identical-arm folding
 preserve `nsw`, `nuw`, and `exact` flags without using them for folds
 constant `trunc`, `zext`, and `sext` folding for integer constants
 defined constant `udiv`, `sdiv`, `urem`, and `srem` folding
+safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
+freeze of an integer constant -> that same constant
 preserve `freeze` instructions
 ```
 
@@ -96,7 +160,8 @@ Known gaps:
 
 ```text
 no use of nsw/nuw/exact for folds
-no poison/undef/freeze simplification
+no poison/undef simplification
+no non-constant freeze simplification
 no vectors
 no width-aware constant folding for non-zero shifts
 unsigned constant folding is limited to integer widths below 128 bits
