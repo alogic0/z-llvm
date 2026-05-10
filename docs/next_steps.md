@@ -4,7 +4,12 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
-### Recommended Next Doc Slice
+No active cycle is currently open. Pull the next bounded implementation slice
+from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+## Completed Cycles
+
+### Documentation Fixture Coverage Slice
 
 This slice should land before pulling implementation work from the
 [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
@@ -13,8 +18,6 @@ This slice should land before pulling implementation work from the
 - [x] Add explicit fixture coverage sections to `docs/passes/dce.md`, `docs/passes/adce.md`, `docs/passes/gvn.md`, `docs/passes/sroa.md`, `docs/passes/mem2reg.md`, `docs/passes/simplifycfg.md`, and `docs/passes/early_cse.md`.
 - [x] In each fixture coverage section, separate `opt-22` equivalent cases, local-only conservative cases, and unit-test-only behavior where relevant.
 - [x] Update `docs/testing.md` if the fixture taxonomy needs more precise wording after those pass docs are refreshed.
-
-## Completed Cycles
 
 ### Cycle 12: Memory Legality Foundation
 
