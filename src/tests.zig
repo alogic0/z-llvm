@@ -1395,6 +1395,73 @@ test "x86_64 codegen rejects stack-passed parameters" {
     );
 }
 
+test "x86_64 codegen rejects unsupported call ABI shapes" {
+    const fastcc_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i32 @callee()
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  %r = call fastcc i32 @callee()
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var fastcc_module = try ir.Module.parse(std.testing.allocator, fastcc_input);
+    defer fastcc_module.deinit();
+    try fastcc_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenCallingConvention,
+        codegen.x86_64.lowerFunction(std.testing.allocator, fastcc_module.target_triple.?, fastcc_module.functions.items[0]),
+    );
+
+    const stack_arg_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32, i32, i32, i32, i32, i32, i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var stack_arg_module = try ir.Module.parse(std.testing.allocator, stack_arg_input);
+    defer stack_arg_module.deinit();
+    try stack_arg_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, stack_arg_module.target_triple.?, stack_arg_module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects unsupported call live pressure" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee()
+        \\
+        \\define i32 @caller(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = call i32 @callee()
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedLiveAcrossCall,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "instcombine and dce remove identity arithmetic" {
     const input =
         \\define i32 @add_mul(i32 %a) {

@@ -120,7 +120,8 @@ inputs. It covers x86_64 SysV i32 leaf functions, simple conditional returns,
 tiny direct-call assembly functions, one deterministic i32 call spill, minimal
 fixed stack-slot load/store lowering, instruction encoding, ELF64 relocatable
 metadata, direct-call PLT32 relocation records, and explicit diagnostics for
-unsupported control flow.
+unsupported control flow, unsupported call conventions, stack-passed call
+arguments, and unsupported call live pressure.
 
 LLVM algorithms covered so far:
 

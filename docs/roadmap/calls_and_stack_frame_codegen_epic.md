@@ -144,7 +144,7 @@ Suggested slice boundary:
       non-void call, and unsupported live caller-saved values are rejected.
 - [x] Keep a deterministic physical-register plan. Do not introduce general
       register allocation in this epic.
-- [ ] Add failure tests for live values across a call before spills exist.
+- [x] Add failure tests for live values across a call before spills exist.
 
 Suggested slice boundary:
 
@@ -182,7 +182,7 @@ Suggested slice boundary:
 Suggested slice boundary:
 
 - [x] First support external direct call relocations.
-- [ ] Then decide whether internal calls use relocations or resolved local
+- [x] Then decide whether internal calls use relocations or resolved local
       displacements.
 
 ## 6. Stack Frame Foundation
@@ -244,7 +244,7 @@ Suggested slice boundary:
 - [ ] Add positive IR, expected assembly, and expected objdump/readelf fixtures:
       `call_no_args`, `call_one_arg`, `call_two_args`, `call_return_used`,
       `call_external`, `call_with_spill`, `call_with_local_stack_slot`.
-- [ ] Add negative fixtures:
+- [x] Add negative fixtures:
       varargs, aggregate args, floats, vectors, too many args, indirect calls,
       unsupported calling convention, call with unsupported live pressure.
 - [ ] Keep each fixture tiny and independently reducible.
@@ -254,7 +254,7 @@ Suggested slice boundary:
 ## 10. CLI and Test Workflow
 
 - [ ] Keep `--emit=asm` and `--emit=obj` as the codegen entry points.
-- [ ] Extend codegen fixture scripts to cover call assembly and objdump output.
+- [x] Extend codegen fixture scripts to cover call assembly and objdump output.
 - [ ] Add relocation inspection checks when `readelf` and `objdump` are
       available.
 - [ ] Keep generated temporary objects under `/tmp` or `zig-out/`.

@@ -146,8 +146,13 @@ call_no_args assembly fixture
 call_one_arg assembly fixture
 call_two_args assembly fixture
 call_return_used one-spill assembly fixture
+call_internal assembly and objdump fixture
+unsupported non-default calling convention diagnostic
+unsupported stack-passed call argument diagnostic
+unsupported multiple-live-value call pressure diagnostic
 ```
 
 Object relocation fixtures cover the current direct external call subset with
-`R_X86_64_PLT32` and addend `-4`. Later slices must add internal-call policy,
-stack-slot object fixtures, and broader readelf checks.
+`R_X86_64_PLT32` and addend `-4`. Internal direct calls use the same relocation
+path instead of resolving local displacements during object emission. Later
+slices must add broader readelf checks.
