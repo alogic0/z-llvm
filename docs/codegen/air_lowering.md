@@ -21,6 +21,8 @@ FuncGen.airBitAnd
 FuncGen.airBitOr
 FuncGen.airBitXor
 FuncGen.airIntCast
+FuncGen.airCmp
+FuncGen.airLoop
 FuncGen.airRet
 FuncGen.airBr
 FuncGen.airCondBr
@@ -37,6 +39,8 @@ IRBuilderBase::CreateAlloca
 IRBuilderBase::CreateLoad
 IRBuilderBase::CreateStore
 IRBuilderBase::CreateGEP
+IRBuilderBase::CreateICmp
+PHINode::Create
 ```
 
 Implemented subset:
@@ -49,8 +53,11 @@ explicit basic blocks
 scalar integer parameters
 scalar integer binary operations
 scalar integer casts: trunc, zext, sext
+scalar integer comparisons
+phi nodes
 scalar stack memory: alloca, load, store, getelementptr
 return, branch, conditional branch, and unreachable terminators
+canonical loop shape: preheader, header, body, latch, exit
 ```
 
 Upstream mapping:
@@ -59,6 +66,7 @@ Upstream mapping:
 Zig lowers analyzed AIR instructions through FuncGen into LLVM IRBuilder calls.
 This project now has a tiny builder that can construct the same project IR shape for scalar arithmetic examples without invoking the full Zig compiler.
 Stack memory lowering maps directly onto the existing LLVM-compatible alloca/load/store/GEP project IR surface; alias analysis, SROA, and mem2reg behavior remain owned by the existing passes.
+Loop lowering emits the canonical shape required by the local LoopInfo and LICM foundation: a single preheader branch into a header, a single latch backedge, and a distinct exit block.
 The bridge is deliberately synthetic so optimizer and target tests can reduce failures to small inputs.
 ```
 
@@ -77,6 +85,7 @@ unit-test only:
   conditional branch to return and unreachable blocks
   scalar stack slot with aligned store/load
   scalar zero-index GEP from a stack slot
+  canonical loop shape accepted by LoopInfo preheader, latch, exiting block, and exit block queries
   target triple and datalayout preservation on lowered modules
 ```
 
@@ -85,8 +94,9 @@ Known gaps:
 ```text
 no AIR text parser
 no full Zig AIR semantics
-no loops
+no LoopSimplify or LCSSA insertion
+no multi-latch loops
 no calls
-no comparisons, select, overflow operations, or intrinsics
+no select, overflow operations, or intrinsics
 no aggregate, optional, error-union, async, comptime, or debug-info lowering
 ```

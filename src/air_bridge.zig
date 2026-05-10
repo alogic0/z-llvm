@@ -22,6 +22,20 @@ pub const Cast = struct {
     to_ty: ir.Type,
 };
 
+pub const Icmp = struct {
+    result: []const u8,
+    predicate: ir.IcmpPredicate,
+    operand_ty: ir.Type,
+    lhs: ir.Value,
+    rhs: ir.Value,
+};
+
+pub const Phi = struct {
+    result: []const u8,
+    ty: ir.Type,
+    incoming: []const ir.PhiIncoming,
+};
+
 pub const Alloca = struct {
     result: []const u8,
     allocated_ty: ir.Type,
@@ -67,9 +81,11 @@ pub const Terminator = union(enum) {
 
 pub const Block = struct {
     name: []const u8,
+    phis: []const Phi = &.{},
     allocas: []const Alloca = &.{},
     binaries: []const Binary = &.{},
     casts: []const Cast = &.{},
+    icmps: []const Icmp = &.{},
     loads: []const Load = &.{},
     stores: []const Store = &.{},
     geps: []const Gep = &.{},
@@ -80,9 +96,11 @@ pub const Function = struct {
     name: []const u8,
     ret_ty: ir.Type,
     params: []const Param,
+    phis: []const Phi = &.{},
     allocas: []const Alloca = &.{},
     binaries: []const Binary = &.{},
     casts: []const Cast = &.{},
+    icmps: []const Icmp = &.{},
     loads: []const Load = &.{},
     stores: []const Store = &.{},
     geps: []const Gep = &.{},
@@ -137,9 +155,11 @@ fn lowerFunction(allocator: std.mem.Allocator, spec: Function) !ir.Function {
 
     const entry_spec: Block = .{
         .name = "entry",
+        .phis = spec.phis,
         .allocas = spec.allocas,
         .binaries = spec.binaries,
         .casts = spec.casts,
+        .icmps = spec.icmps,
         .loads = spec.loads,
         .stores = spec.stores,
         .geps = spec.geps,
@@ -157,6 +177,18 @@ fn lowerBlock(allocator: std.mem.Allocator, spec: Block) !ir.BasicBlock {
     var block = ir.BasicBlock.init(spec.name);
     errdefer block.deinit(allocator);
 
+    for (spec.phis) |phi| {
+        var lowered_phi: ir.PhiInst = .{
+            .ty = phi.ty,
+            .incoming = .empty,
+        };
+        errdefer lowered_phi.deinit(allocator);
+        for (phi.incoming) |incoming| try lowered_phi.incoming.append(allocator, incoming);
+        try block.instructions.append(allocator, .{
+            .result = phi.result,
+            .kind = .{ .phi = lowered_phi },
+        });
+    }
     for (spec.allocas) |alloca| {
         try block.instructions.append(allocator, .{
             .result = alloca.result,
@@ -182,6 +214,17 @@ fn lowerBlock(allocator: std.mem.Allocator, spec: Block) !ir.BasicBlock {
                 .from_ty = cast.from_ty,
                 .value = cast.value,
                 .to_ty = cast.to_ty,
+            } },
+        });
+    }
+    for (spec.icmps) |icmp| {
+        try block.instructions.append(allocator, .{
+            .result = icmp.result,
+            .kind = .{ .icmp = .{
+                .predicate = icmp.predicate,
+                .operand_ty = icmp.operand_ty,
+                .lhs = icmp.lhs,
+                .rhs = icmp.rhs,
             } },
         });
     }

@@ -519,6 +519,109 @@ test "AIR-like bridge lowers scalar GEP" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "AIR-like bridge lowers canonical loop shape" {
+    const params = [_]air_bridge.Param{
+        .{ .name = "limit", .ty = .{ .int = 32 } },
+    };
+    const phi_incoming = [_]ir.PhiIncoming{
+        .{ .value = .{ .int = 0 }, .block = "entry" },
+        .{ .value = .{ .named = "next" }, .block = "latch" },
+    };
+    const header_phis = [_]air_bridge.Phi{
+        .{
+            .result = "i",
+            .ty = .{ .int = 32 },
+            .incoming = &phi_incoming,
+        },
+    };
+    const header_icmps = [_]air_bridge.Icmp{
+        .{
+            .result = "more",
+            .predicate = .slt,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "i" },
+            .rhs = .{ .named = "limit" },
+        },
+    };
+    const latch_binaries = [_]air_bridge.Binary{
+        .{
+            .result = "next",
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "i" },
+            .rhs = .{ .int = 1 },
+        },
+    };
+    const blocks = [_]air_bridge.Block{
+        .{
+            .name = "entry",
+            .terminator = .{ .br = .{ .target = "header" } },
+        },
+        .{
+            .name = "header",
+            .phis = &header_phis,
+            .icmps = &header_icmps,
+            .terminator = .{ .condbr = .{
+                .cond_ty = .{ .int = 1 },
+                .cond = .{ .named = "more" },
+                .then_target = "body",
+                .else_target = "exit",
+            } },
+        },
+        .{
+            .name = "body",
+            .terminator = .{ .br = .{ .target = "latch" } },
+        },
+        .{
+            .name = "latch",
+            .binaries = &latch_binaries,
+            .terminator = .{ .br = .{ .target = "header" } },
+        },
+        .{
+            .name = "exit",
+            .terminator = .{ .ret = .{
+                .ty = .{ .int = 32 },
+                .value = .{ .named = "i" },
+            } },
+        },
+    };
+    const functions = [_]air_bridge.Function{
+        .{
+            .name = "loop",
+            .ret_ty = .{ .int = 32 },
+            .params = &params,
+            .blocks = &blocks,
+        },
+    };
+
+    var module = try air_bridge.lowerModule(std.testing.allocator, .{
+        .target_triple = "x86_64-unknown-linux-gnu",
+        .functions = &functions,
+    });
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
+    defer loops.deinit();
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), loops.loops.items.len);
+    const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expectEqual(@as(usize, 1), natural_loop.headerBlock());
+    try std.testing.expectEqual(@as(usize, 3), natural_loop.latchBlock());
+    try std.testing.expectEqual(@as(?usize, 0), natural_loop.preheader(function, graph));
+
+    var exiting = try natural_loop.exitingBlocks(std.testing.allocator, graph);
+    defer exiting.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{1}, exiting.items);
+
+    var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
+    defer exits.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{4}, exits.items);
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"
