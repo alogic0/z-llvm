@@ -7,6 +7,16 @@ LLVM reference:
 /home/oleg/prog/llvm-project-22/llvm/lib/Transforms/Utils/SimplifyCFG.cpp
 ```
 
+Upstream entry points to check:
+
+```text
+SimplifyCFGPass::run
+simplifyFunctionCFG
+simplifyCFG
+removeUnreachableBlocks
+FoldBranchToCommonDest
+```
+
 This pass simplifies control-flow graph structure.
 
 Implemented subset:
@@ -18,6 +28,13 @@ br i1 %cond, label %a, label %a -> br label %a
 remove blocks unreachable from the entry block
 remove phi incoming values from unreachable predecessor blocks
 replace trivial phi nodes whose remaining incoming values are all identical
+```
+
+Upstream mapping:
+
+```text
+This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, and a small phi cleanup subset.
+LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
 ```
 
 Example:
@@ -41,7 +58,6 @@ then:
 Known gaps:
 
 ```text
-no phi-node updates
 no non-trivial phi-node rewrites
 no branch threading
 no block merging

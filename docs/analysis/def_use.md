@@ -8,6 +8,16 @@ LLVM reference:
 /home/oleg/prog/llvm-project-22/llvm/include/llvm/IR/Value.h
 ```
 
+Upstream entry points to check:
+
+```text
+Value::users
+Value::uses
+Value::replaceAllUsesWith
+User::op_begin / op_end
+Use
+```
+
 LLVM IR keeps explicit use lists through `Value`, `User`, and `Use`. Many LLVM passes, including DCE-style passes, depend on cheap "is this value used?" queries.
 
 Implemented subset:
@@ -17,6 +27,13 @@ per-function named value use counts
 instruction operand use collection
 terminator operand use collection
 decrement use counts when DCE removes an instruction
+```
+
+Upstream mapping:
+
+```text
+This reproduces only the "is this value still used?" capability through per-function use counts.
+LLVM keeps explicit Use/User links and supports replacement, mutation, metadata uses, and cross-function/global uses.
 ```
 
 Current user:

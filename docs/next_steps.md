@@ -2,6 +2,8 @@
 
 ## Active Cycle
 
+Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
+
 - [x] Add `icmp` instruction parsing, printing, verification, and tests.
 - [x] Add `phi` instruction parsing, printing, verification, and tests.
 - [x] Extend `simplifycfg` to update/remove trivial phi inputs.

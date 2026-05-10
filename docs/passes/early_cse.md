@@ -6,6 +6,15 @@ LLVM reference:
 /home/oleg/prog/llvm-project-22/llvm/lib/Transforms/Scalar/EarlyCSE.cpp
 ```
 
+Upstream entry points to check:
+
+```text
+EarlyCSEPass::run
+EarlyCSE
+SimpleValue
+ScopedHashTable used for available values
+```
+
 Early CSE removes redundant computations early in the scalar optimization pipeline.
 
 Implemented subset:
@@ -15,6 +24,13 @@ same-basic-block common subexpression elimination
 pure add/sub/mul expression matching
 pure icmp eq/ne expression matching
 later uses in the same block are rewritten to the earlier value
+```
+
+Upstream mapping:
+
+```text
+This reproduces only the available-value lookup idea from EarlyCSE.
+LLVM's implementation walks with dominator/tree scoped tables and also handles memory, loads, calls, and target/library knowledge.
 ```
 
 Example:

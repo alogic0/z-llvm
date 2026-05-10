@@ -272,11 +272,14 @@ Every pass must have:
 
 ```text
 LLVM source reference
+LLVM classes/functions used as reference entry points
 Zig implementation file
 before/after examples
 correctness tests
 known gaps
 ```
+
+Future implementation steps must satisfy the upstream mapping rule in `docs/development_cycle.md` before their checkbox is marked complete.
 
 ## 6. Reproduce Target Code Generation
 
