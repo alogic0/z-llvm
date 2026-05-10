@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("ir.zig");
+const normalize = @import("normalize.zig");
 const pass_manager = @import("pass_manager.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
@@ -75,4 +76,40 @@ test "constant folding rewrites return value" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "normalization preserves canonical LLVM-compatible fixture output" {
+    const input = @embedFile("testdata/instcombine.ll");
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
+test "instcombine dce output matches golden file" {
+    const input = @embedFile("testdata/instcombine.ll");
+    const expected = @embedFile("testdata/instcombine_dce.ll");
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(instcombine.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const normalized_actual = try normalize.llvmCompatibleIr(std.testing.allocator, output.writer.buffered());
+    defer std.testing.allocator.free(normalized_actual);
+
+    const normalized_expected = try normalize.llvmCompatibleIr(std.testing.allocator, expected);
+    defer std.testing.allocator.free(normalized_expected);
+
+    try std.testing.expectEqualStrings(normalized_expected, normalized_actual);
 }
