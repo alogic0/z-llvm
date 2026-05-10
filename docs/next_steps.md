@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
+
+## Completed Cycles
+
 ### Cycle 13: Pipeline and Pass Infrastructure
 
 Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer_epic.md).
@@ -15,8 +19,6 @@ Pulled from the [Pipeline-Ready Optimizer Epic](roadmap/pipeline_ready_optimizer
 - [x] Add a minimal analysis invalidation contract to the pass manager docs, even if the implementation still rebuilds analyses conservatively.
 - [x] Add trace fixtures or tests proving named pipelines run the expected pass sequence.
 - [x] Run `zig fmt` on touched Zig files, `zig build test`, and `bash scripts/compare_opt.sh` before marking the cycle complete.
-
-## Completed Cycles
 
 ### Documentation Fixture Coverage Slice
 
@@ -164,6 +166,8 @@ Track each reproduced LLVM algorithm here as it lands:
 - ADCE dead-chain subset: documented in [passes/adce.md](passes/adce.md).
 - LICM pure-instruction hoisting subset: documented in [passes/licm.md](passes/licm.md).
 - memory IR subset: documented in [ir_memory.md](ir_memory.md).
+- named pipeline aliases: documented in [pipelines.md](pipelines.md).
+- pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](pass_manager.md).
 
 ## Completed Step Notes
 
