@@ -270,7 +270,7 @@ Suggested slice boundary:
       load/store encodings.
 - [x] Extend `docs/mc/elf_object_writer.md` for `.rela.text` and undefined
       symbols.
-- [ ] Update `docs/inventory/zig_llvm_api_inventory.md` for call lowering,
+- [x] Update `docs/inventory/zig_llvm_api_inventory.md` for call lowering,
       frame lowering, relocation handling, and covered `TargetMachine.emitToFile`
       responsibilities.
 - [x] Update `docs/unsupported_ir.md` with call/frame codegen limitations.

@@ -49,7 +49,7 @@ replacement needs.
 
 | AIR/lowering area | Representative Zig functions | Replacement owner | Current coverage |
 | --- | --- | --- | --- |
-| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | scalar return/parameter ABI classification plus direct call/declaration IR surface; call lowering missing |
+| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | scalar return/parameter ABI classification plus direct call/declaration IR surface; tiny x86_64 i32 direct-call assembly/object lowering with PLT32 relocations and one deterministic spill |
 | Control flow | `lowerBlock`, `airBr`, `airCondBr`, `airSwitchBr`, `airLoop`, `airUnreach` | `src/air_bridge.zig`, `src/ir/`, `src/codegen/control_flow.zig` | AIR-like block/terminator and canonical-loop builder plus partial `br`, `condbr`, `unreachable` text IR |
 | Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/air_bridge.zig`, `src/ir/`, `src/passes/` | AIR-like scalar binary/cast builder plus partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/air_bridge.zig`, `src/ir/`, `src/codegen/memory.zig` | AIR-like scalar stack memory builder plus partial alloca/load/store/GEP and mem2reg |
@@ -73,13 +73,14 @@ The current project covers phase-zero optimizer infrastructure:
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, direct calls, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.
 - Target support for initial target matrix recognition, default pointer/integer DataLayout queries, and scalar ABI classification.
-- Codegen bootstrap support for `--emit=asm` and `--emit=obj` over tiny x86_64 SysV i32 leaf functions and simple conditional returns.
+- Codegen bootstrap support for `--emit=asm` and `--emit=obj` over tiny x86_64 SysV i32 leaf functions, simple conditional returns, direct internal/external calls with PLT32 relocations, one deterministic call spill, and one fixed stack slot.
 - Named `scalar-foundation` and `memory-foundation` pipeline aliases, plus `opt-22` comparison fixtures for the implemented middle-end subset and unit tests for analysis-only behavior.
 
-This is useful groundwork, but it does not yet cover the largest Zig LLVM
-dependencies: AIR lowering, target lowering, ABI rules, instruction selection,
-register allocation, object emission, debug info, bitcode, sanitizer/coverage
-hooks, LTO, target features, or host CPU detection.
+This is useful groundwork, but it does not yet fully cover the largest Zig LLVM
+dependencies: broad AIR lowering, full target lowering, full ABI rules,
+instruction selection, register allocation, complete object emission, debug
+info, bitcode, sanitizer/coverage hooks, LTO, target features, or host CPU
+detection.
 
 ## Required Next Architecture
 
@@ -104,5 +105,7 @@ valid only when it is tied to either:
 
 1. a Zig LLVM API dependency listed here;
 2. a required LLVM default pipeline stage that Zig invokes through
-   `TargetMachine.emitToFile`; or
+   `TargetMachine.emitToFile`, tracked in
+   [zig_llvm_pass_pipeline_inventory.md](zig_llvm_pass_pipeline_inventory.md);
+   or
 3. a comparison fixture needed to validate existing replacement behavior.
