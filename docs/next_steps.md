@@ -4,6 +4,16 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+### Cycle 6: Select and Unreachable Control Flow
+
+- [ ] Add `unreachable` terminator parsing, printing, verification, CFG handling, and upstream LLVM mapping.
+- [ ] Add `select` instruction parsing, printing, verification, def-use tracking, and upstream LLVM mapping.
+- [ ] Extend `instcombine` to fold simple `select` forms: constant condition and identical arms.
+- [ ] Extend value replacement paths across `select` so `instcombine`, `simplifycfg`, and `mem2reg` keep select operands current.
+- [ ] Add `opt-22` comparison fixtures for `select` folding and `unreachable` CFG simplification.
+
+## Completed Cycles
+
 ### Cycle 5: Mem2Reg Completeness and Pointer IR Foundation
 
 - [x] Add `undef` value parsing, printing, verification, normalization, and upstream mapping for LLVM `UndefValue`/poison-adjacent behavior.
@@ -13,8 +23,6 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
 - [x] Extend alias analysis from distinct direct `alloca` pointers to simple `getelementptr`-derived stack objects, documenting the BasicAA mapping and known conservative fallbacks.
 - [x] Add `opt-22` comparison fixtures for rejected mem2reg cases and simple GEP-backed memory IR normalization.
-
-## Completed Cycles
 
 ### Cycle 4: LLVM Comparison and Multi-Block Promotion
 
