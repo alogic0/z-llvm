@@ -9,3 +9,6 @@ mem2reg_if	mem2reg	mem2reg	test/opt/inputs/mem2reg_if.ll	test/opt/expected/z_llv
 mem2reg_loop	mem2reg	mem2reg	test/opt/inputs/mem2reg_loop.ll	test/opt/expected/z_llvm/mem2reg_loop.ll	loop-carried phi placement
 mem2reg_two_slots	mem2reg	mem2reg	test/opt/inputs/mem2reg_two_slots.ll	test/opt/expected/z_llvm/mem2reg_two_slots.ll	multiple independent stack slots promoted in one run
 mem2reg_unreachable	simplifycfg,mem2reg	simplifycfg,mem2reg	test/opt/inputs/mem2reg_unreachable.ll	test/opt/expected/z_llvm/mem2reg_unreachable.ll	unreachable predecessor removed before promotion
+mem2reg_escape	mem2reg	mem2reg	test/opt/inputs/mem2reg_escape.ll	test/opt/expected/z_llvm/mem2reg_escape.ll	escaped stack slot is not promotable
+mem2reg_store_slot	mem2reg	mem2reg	test/opt/inputs/mem2reg_store_slot.ll	test/opt/expected/z_llvm/mem2reg_store_slot.ll	stored stack-slot pointer is not promotable
+gep_memory	mem2reg	mem2reg	test/opt/inputs/gep_memory.ll	test/opt/expected/z_llvm/gep_memory.ll	GEP user keeps stack slot unpromoted

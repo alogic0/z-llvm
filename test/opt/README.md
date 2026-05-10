@@ -23,6 +23,9 @@ zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_if.ll
 zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_loop.ll
 zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_two_slots.ll
 zig build run -- --passes=simplifycfg,mem2reg test/opt/inputs/mem2reg_unreachable.ll
+zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_escape.ll
+zig build run -- --passes=mem2reg test/opt/inputs/mem2reg_store_slot.ll
+zig build run -- --passes=mem2reg test/opt/inputs/gep_memory.ll
 ```
 
 Run LLVM `opt` when available:
@@ -38,6 +41,9 @@ opt -passes=mem2reg test/opt/inputs/mem2reg_if.ll -S -o /tmp/llvm_mem2reg_if.ll
 opt -passes=mem2reg test/opt/inputs/mem2reg_loop.ll -S -o /tmp/llvm_mem2reg_loop.ll
 opt -passes=mem2reg test/opt/inputs/mem2reg_two_slots.ll -S -o /tmp/llvm_mem2reg_two_slots.ll
 opt -passes=simplifycfg,mem2reg test/opt/inputs/mem2reg_unreachable.ll -S -o /tmp/llvm_mem2reg_unreachable.ll
+opt -passes=mem2reg test/opt/inputs/mem2reg_escape.ll -S -o /tmp/llvm_mem2reg_escape.ll
+opt -passes=mem2reg test/opt/inputs/mem2reg_store_slot.ll -S -o /tmp/llvm_mem2reg_store_slot.ll
+opt -passes=mem2reg test/opt/inputs/gep_memory.ll -S -o /tmp/llvm_gep_memory.ll
 ```
 
 Expected `z_llvm` outputs are in `test/opt/expected/z_llvm/`.

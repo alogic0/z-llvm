@@ -12,7 +12,7 @@ Future checklist items must include upstream LLVM mapping before they can be mar
 - [x] Add promotability checks and docs for rejected stack slots: escaped allocas, stores of the slot pointer, non-load/store users, and unsupported alloca forms.
 - [x] Add basic `getelementptr` parsing, printing, verification, and upstream mapping needed for pointer-derived memory operations.
 - [x] Extend alias analysis from distinct direct `alloca` pointers to simple `getelementptr`-derived stack objects, documenting the BasicAA mapping and known conservative fallbacks.
-- [ ] Add `opt-22` comparison fixtures for rejected mem2reg cases and simple GEP-backed memory IR normalization.
+- [x] Add `opt-22` comparison fixtures for rejected mem2reg cases and simple GEP-backed memory IR normalization.
 
 ## Completed Cycles
 
@@ -98,3 +98,4 @@ Track each reproduced LLVM algorithm here as it lands:
 - `mem2reg` promotability rejection is now tested and documented for escaped stack slots and stores of the stack-slot pointer.
 - Memory IR now parses, prints, and verifies a first opaque-pointer `getelementptr` form.
 - Alias analysis now traces simple `getelementptr` values back to stack-slot roots and distinguishes zero-offset must-alias from conservative same-root may-alias.
+- `opt-22` comparison fixtures now cover escaped stack-slot rejection, stored stack-slot pointer rejection, and GEP-backed memory that remains unpromoted.
