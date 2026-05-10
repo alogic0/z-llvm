@@ -3,7 +3,7 @@
 LLVM reference:
 
 ```text
-/home/oleg/prog/llvm-project-22/llvm/lib/Transforms/InstCombine/
+llvm-project-22/llvm/lib/Transforms/InstCombine/
 ```
 
 Upstream entry points to check:
@@ -15,6 +15,7 @@ InstCombinerImpl::visitAdd
 InstCombinerImpl::visitSub
 InstCombinerImpl::visitMul
 InstCombinerImpl::visitICmpInst
+InstCombinerImpl::visitSelectInst
 ```
 
 This pass canonicalizes and folds simple instructions. The first Zig implementation is intentionally small and covers only enough behavior to prove the pass infrastructure and LLVM-compatible IR comparison loop.
@@ -32,12 +33,14 @@ x * 0 -> 0
 integer constant folding for add/sub/mul
 icmp eq/ne constant folding
 icmp eq/ne same-operand folding
+select constant-condition folding
+select identical-arm folding
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces a tiny identity-folding and constant-folding subset of InstCombine.
+This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, and target-specific combines all matter upstream.
 ```
 

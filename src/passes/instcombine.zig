@@ -48,7 +48,8 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .binary => |binary| foldBinary(binary),
         .icmp => |icmp| foldIcmp(icmp),
-        .select, .phi, .alloca, .load, .store, .gep => null,
+        .select => |select| foldSelect(select),
+        .phi, .alloca, .load, .store, .gep => null,
     };
 }
 
@@ -97,6 +98,12 @@ fn foldIcmp(icmp: ir.IcmpInst) ?ir.Value {
         } };
     }
 
+    return null;
+}
+
+fn foldSelect(select: ir.SelectInst) ?ir.Value {
+    if (select.true_value.eql(select.false_value)) return select.true_value;
+    if (select.cond == .int) return if (select.cond.int == 0) select.false_value else select.true_value;
     return null;
 }
 

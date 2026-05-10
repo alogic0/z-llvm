@@ -263,6 +263,42 @@ test "instcombine folds constant icmp" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "instcombine folds simple select instructions" {
+    const input =
+        \\define i32 @select_fold(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  %x = select i1 1, i32 %a, i32 %b
+        \\  %y = select i1 %cond, i32 %x, i32 %x
+        \\  ret i32 %y
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(instcombine.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @select_fold(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser normalizes phi instructions" {
     const input =
         \\define i32 @select(i1 %cond, i32 %a, i32 %b) {
