@@ -36,6 +36,19 @@ This overlaps with the current DCE subset, but it is kept as a separate pass
 because LLVM's ADCE becomes control-dependence aware later. The current slice is
 the data-dependence foundation.
 
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  adce_chain
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  none currently
+```
+
 Known gaps:
 
 ```text

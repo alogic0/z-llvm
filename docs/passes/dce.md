@@ -35,10 +35,22 @@ Upstream mapping:
 ```text
 This reproduces local trivially-dead pure-instruction removal and the first memory side-effect rule through `analysis/memory_effect.zig`: unused nonvolatile loads can be removed, stores and memory barriers cannot.
 LLVM's DCE uses richer side-effect and liveness checks through instruction semantics, memory effects, debug-info salvage, and ADCE for control-flow-sensitive removal.
+```
 
-Fixture coverage includes removing a dead scalar expression and a dead
-nonvolatile load beside a preserved volatile store, plus preserving an unused
-volatile load.
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  dce
+  memory_dce
+  dce_scalar_with_memory
+  dce_volatile_load_reject
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  none currently
 ```
 
 Example:

@@ -40,6 +40,24 @@ This reproduces constant branch folding, same-destination conditional branch fol
 LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
 ```
 
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  simplifycfg
+  simplifycfg_thread_empty
+  unreachable_simplifycfg
+  mem2reg_unreachable
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  phi incoming cleanup after unreachable predecessor removal
+  trivial phi replacement
+  same-target conditional branch folding
+```
+
 Example:
 
 ```text

@@ -34,6 +34,19 @@ run the existing mem2reg promotion after forwarding
 This matches the first useful alloca-forwarding case needed before real slice
 partitioning. It lets a trivial zero-offset GEP stop blocking stack promotion.
 
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  sroa_zero_gep
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  none currently
+```
+
 Known gaps:
 
 ```text

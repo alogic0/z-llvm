@@ -58,6 +58,28 @@ LLVM's PromoteMemToReg promotes many allocas per run and supports precise debug-
 This subset models the basic uninitialized-load result as `undef`, but does not yet implement LLVM's full poison/undef semantics.
 ```
 
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  mem2reg
+  mem2reg_undef
+  mem2reg_if
+  mem2reg_loop
+  mem2reg_two_slots
+  mem2reg_unreachable
+  mem2reg_escape
+  mem2reg_store_slot
+  gep_memory
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  single-block promotion behavior
+  promotability helper edge cases
+```
+
 Example:
 
 ```text

@@ -33,6 +33,19 @@ This reproduces only the available-value lookup idea from EarlyCSE.
 LLVM's implementation walks with dominator/tree scoped tables and also handles memory, loads, calls, and target/library knowledge.
 ```
 
+Fixture coverage:
+
+```text
+opt-22 equivalent:
+  none currently
+
+local-only conservative:
+  none currently
+
+unit-test only:
+  same-block repeated pure expression elimination
+```
+
 Example:
 
 ```text

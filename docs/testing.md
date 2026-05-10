@@ -68,9 +68,18 @@ LICM: pure scalar loop-invariant instruction hoisting subset, including variant-
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.
 
-Memory legality fixtures are split into two groups:
+Pass and analysis docs should classify fixture coverage with these labels:
+
+```text
+opt-22 equivalent: expected z_llvm output is compared with normalized LLVM opt output
+local-only conservative: checked against z_llvm golden output because LLVM currently does more than this project deliberately implements
+unit-test only: covered by Zig unit tests rather than the opt fixture table
+```
+
+Current memory legality examples:
 
 ```text
 opt-22 equivalent: scalar LICM/GVN/DCE behavior beside volatile memory, volatile load preservation
-local-only conservative: aligned load not hoisted, atomic/store barriers preserved, unknown pointer aliasing remains may-alias/ref
+local-only conservative: aligned load not hoisted, atomic/store barriers preserved
+unit-test only: unknown pointer aliasing remains may-alias/ref
 ```
