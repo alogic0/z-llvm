@@ -94,6 +94,7 @@ target triple semantics beyond initial target matrix recognition
 ABI classification beyond void, scalar integer, and pointer signatures
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
+raw Zig-emitted LLVM IR before normalization
 ```
 
 ## Current Parser Errors
@@ -188,6 +189,7 @@ Module IR subset:
   scalar ABI classification for void returns, integer returns/parameters, and pointer returns/parameters
   AIR-like helper lowering for scalar binary/cast functions, basic terminators, stack memory, and canonical loops
   AIR-like pre/post optimization driver using named pipelines
+  normalized Zig-emitted scalar function signature fixture
   function linkage on definitions
   function visibility on definitions
   function calling conventions on definitions: ccc, fastcc, coldcc
@@ -246,6 +248,7 @@ calling convention ABI semantics
 aggregate, floating-point, vector, varargs, byval, sret, register, and stack ABI classification
 full AIR parser and full Zig AIR semantics
 AIR-like non-canonical loops, calls, select, overflow operations, intrinsics, aggregates, comptime, errors, async, and debug info
+raw Zig-emitted aliases, debug metadata, attribute groups, and target-feature strings before normalization
 function declarations
 attribute groups
 module metadata

@@ -63,6 +63,7 @@ AIR-like control-flow builder lowering for conditional branches, returns, and un
 AIR-like stack-memory builder lowering for alloca/load/store/GEP
 AIR-like canonical loop builder verified with LoopInfo
 AIR-like bridge driver pre/post optimization output through `memory-foundation`
+normalized Zig-emitted LLVM IR fixture for tiny scalar functions
 source_filename preservation
 scalar global and constant global preservation
 function linkage and raw function-header attribute preservation
@@ -115,6 +116,7 @@ Target/DataLayout: target triple parsing, initial target matrix recognition, min
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
 AIR-like bridge: tiny scalar binary/cast, control-flow, stack-memory, and canonical-loop function lowering into project IR
 AIR-like bridge driver: pre/post pipeline output for `memory-foundation`
+Zig-emitted IR harness: normalized tiny scalar module records and function signatures
 MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
 ```
 

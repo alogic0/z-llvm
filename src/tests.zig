@@ -691,6 +691,29 @@ test "AIR-like bridge driver prints pre and post optimization IR" {
     try std.testing.expectEqualStrings(expected_post, post.writer.buffered());
 }
 
+test "parser round-trips normalized Zig-emitted scalar LLVM IR" {
+    const input = @embedFile("testdata/zig_tiny_scalar.normalized.ll");
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("tiny_scalar", module.source_filename.?);
+    try std.testing.expectEqualStrings("x86_64-unknown-linux5.10.0-gnu2.31.0", module.target_triple.?);
+    try std.testing.expectEqual(@as(usize, 2), module.functions.items.len);
+    try std.testing.expectEqual(ir.FunctionLinkage.internal, module.functions.items[0].linkage);
+    try std.testing.expect(module.functions.items[0].ret_ty.eql(.void));
+    try std.testing.expectEqual(ir.FunctionLinkage.internal, module.functions.items[1].linkage);
+    try std.testing.expect(module.functions.items[1].ret_ty.eql(.{ .int = 32 }));
+    try std.testing.expectEqual(@as(usize, 2), module.functions.items[1].params.items.len);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"
