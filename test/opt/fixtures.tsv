@@ -4,6 +4,7 @@ instcombine_bitwise	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_
 select_fold	instcombine,dce	instcombine,dce	test/opt/inputs/select_fold.ll	test/opt/expected/z_llvm/select_fold.ll	select constant and identical-arm folding
 dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	generic LLVM headers only
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-22 inferred memory alignment is normalized
+gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.ll	test/opt/expected/z_llvm/gvn_dominating_expr.ll	dominating repeated expression eliminated; LLVM simplifycfg also removes the now-redundant branch
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	generic LLVM headers only
 unreachable_simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/unreachable_simplifycfg.ll	test/opt/expected/z_llvm/unreachable_simplifycfg.ll	constant branch to unreachable is simplified
 mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	generic LLVM headers only
