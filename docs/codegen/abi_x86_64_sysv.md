@@ -20,8 +20,8 @@ Implemented subset:
 
 ```text
 i32 return value in %eax
-first i32 parameter in %edi
-second i32 parameter in %esi
+first six integer/pointer-class register arguments are recognized as %edi, %esi, %edx, %ecx, %r8d, and %r9d for i32 values
+i1 branch conditions use the matching low 8-bit argument registers
 leaf functions only
 no stack frame for register-only leaf functions
 ```
@@ -31,12 +31,13 @@ Upstream mapping:
 ```text
 LLVM models x86_64 SysV calling conventions with target lowering tables and call-lowering code.
 This project only models the register assignments needed by the first straight-line assembly fixtures.
+Stack-passed parameters are rejected explicitly until frame layout and stack access lowering exist.
 ```
 
 Known gaps:
 
 ```text
-no stack parameters
+no stack parameters; functions needing them fail with an unsupported ABI diagnostic
 no callee-saved register saves
 no caller-saved clobber model beyond the tiny leaf subset
 no varargs

@@ -265,17 +265,17 @@ These unlock better comparisons with LLVM `opt` and the next algorithms: richer 
 
 ## Unsupported Codegen Constructs
 
-The `--emit=asm` path is intentionally smaller than the IR parser:
+The `--emit=asm` and `--emit=obj` paths are intentionally smaller than the IR parser:
 
 ```text
 only x86_64-linux target triples
-only one-block leaf functions
+one-block leaf functions, plus a narrow three-block conditional-return shape
 only i32 return values or void returns
-only first and second i32 parameters
-only return constant, return parameter, and add first two parameters
-no branches
+only register-passed i1/i32 parameters
+only return constant, return parameter, add/sub/and/or/xor parameter expressions, and simple conditional returns
+no general branches
 no memory operations
 no calls
 no stack frame
-no object emission
+object emission is ELF64 relocatable only, with .text/.symtab/.strtab/.shstrtab and no relocations
 ```

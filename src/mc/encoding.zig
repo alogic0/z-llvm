@@ -1,0 +1,97 @@
+const std = @import("std");
+const x86_64 = @import("../codegen/x86_64.zig");
+
+pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunction) ![]u8 {
+    try x86_64.verifyFunction(function);
+
+    var offsets = std.StringHashMap(u32).init(allocator);
+    defer offsets.deinit();
+
+    var offset: u32 = 0;
+    for (function.instructions.items) |instruction| {
+        switch (instruction) {
+            .label => |label| try offsets.put(label, offset),
+            else => offset += instructionSize(instruction),
+        }
+    }
+
+    var bytes: std.ArrayList(u8) = .empty;
+    errdefer bytes.deinit(allocator);
+
+    offset = 0;
+    for (function.instructions.items) |instruction| {
+        switch (instruction) {
+            .label => {},
+            .mov_imm_eax => |value| {
+                try bytes.append(allocator, 0xb8);
+                try appendI32(&bytes, allocator, value);
+            },
+            .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
+            .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
+            .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
+            .je => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x84 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
+            .ret => try bytes.append(allocator, 0xc3),
+        }
+        offset += instructionSize(instruction);
+    }
+
+    return try bytes.toOwnedSlice(allocator);
+}
+
+fn instructionSize(instruction: x86_64.Instruction) u32 {
+    return switch (instruction) {
+        .label => 0,
+        .mov_imm_eax => 5,
+        .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
+        .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
+        .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
+        .je => 6,
+        .ret => 1,
+    };
+}
+
+fn binaryOpcode(op: x86_64.MachineBinaryOp) u8 {
+    return switch (op) {
+        .add => 0x01,
+        .sub => 0x29,
+        .@"and" => 0x21,
+        .@"or" => 0x09,
+        .xor => 0x31,
+    };
+}
+
+fn encodeRegToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg) !void {
+    if (reg.rexR()) try bytes.append(allocator, 0x44);
+    try bytes.append(allocator, opcode);
+    try bytes.append(allocator, 0xc0 | (@as(u8, reg.lowCode()) << 3));
+}
+
+fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    if (reg.needsRex8()) {
+        var rex: u8 = 0x40;
+        if (reg.rexR()) rex |= 0x05;
+        try bytes.append(allocator, rex);
+    }
+    const code: u8 = @intCast(reg.lowCode());
+    try bytes.append(allocator, 0x84);
+    try bytes.append(allocator, 0xc0 | (code << 3) | code);
+}
+
+fn appendI32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: i32) !void {
+    const raw: u32 = @bitCast(value);
+    try appendU32(bytes, allocator, raw);
+}
+
+fn appendU32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u32) !void {
+    try bytes.append(allocator, @intCast(value & 0xff));
+    try bytes.append(allocator, @intCast((value >> 8) & 0xff));
+    try bytes.append(allocator, @intCast((value >> 16) & 0xff));
+    try bytes.append(allocator, @intCast((value >> 24) & 0xff));
+}

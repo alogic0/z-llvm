@@ -7,7 +7,7 @@ const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation
@@ -17,6 +17,7 @@ const usage =
 const Emit = enum {
     ir,
     @"asm",
+    obj,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -55,6 +56,8 @@ pub fn main(init: std.process.Init) !void {
                 emit = .ir;
             } else if (std.mem.eql(u8, emit_text, "asm")) {
                 emit = .@"asm";
+            } else if (std.mem.eql(u8, emit_text, "obj")) {
+                emit = .obj;
             } else {
                 return error.UnsupportedEmitMode;
             }
@@ -108,20 +111,32 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    if (emit == .@"asm") {
+    if (emit == .@"asm" or emit == .obj) {
         const triple = target_triple orelse module.target_triple orelse {
-            try fatal(io, "missing target triple for --emit=asm; pass --target=<triple> or include target triple in the input\n", .{});
+            try fatal(io, "missing target triple for codegen emit; pass --target=<triple> or include target triple in the input\n", .{});
         };
         const parsed_triple = target.Triple.parse(triple) catch {
-            try fatal(io, "invalid target triple for --emit=asm: {s}\n", .{triple});
+            try fatal(io, "invalid target triple for codegen emit: {s}\n", .{triple});
         };
         if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) {
-            try fatal(io, "unsupported --emit=asm target: {s}; supported target subset is x86_64-linux\n", .{triple});
+            try fatal(io, "unsupported codegen target: {s}; supported target subset is x86_64-linux\n", .{triple});
+        }
+
+        var machines: std.ArrayList(codegen.x86_64.MachineFunction) = .empty;
+        defer {
+            for (machines.items) |*machine| machine.deinit(allocator);
+            machines.deinit(allocator);
         }
         for (module.functions.items) |function| {
             var machine = try codegen.x86_64.lowerFunction(allocator, triple, function);
-            defer machine.deinit(allocator);
-            try mc.assembly.printFunction(machine, stdout);
+            errdefer machine.deinit(allocator);
+            try machines.append(allocator, machine);
+        }
+
+        if (emit == .@"asm") {
+            for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
+        } else {
+            try mc.elf.writeObject(allocator, machines.items, stdout);
         }
         try stdout.flush();
         return;

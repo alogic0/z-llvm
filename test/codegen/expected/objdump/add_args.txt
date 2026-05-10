@@ -1,0 +1,6 @@
+Disassembly of section .text:
+
+0000000000000000 <add_args>:
+   0:	89 f8                	mov    %edi,%eax
+   2:	01 f0                	add    %esi,%eax
+   4:	c3                   	ret

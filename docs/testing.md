@@ -91,6 +91,7 @@ zig build run -- --passes=scalar-foundation --time test/opt/inputs/instcombine.l
 zig build run -- --passes=scalar-foundation --pass-limit=2 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=zig-scalar-foundation --target=x86_64-unknown-linux-gnu --datalayout=e-m:e-p:64:64-i64:64 test/opt/inputs/instcombine.ll
 zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll
+zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll > /tmp/z_llvm_add_args.o
 ```
 
 Negative target diagnostics checked during development:
@@ -100,15 +101,21 @@ zig build run -- --emit=asm --target=wasm32-wasi test/codegen/inputs/add_args.ll
 zig build run -- --pipeline=zig-scalar-foundation --target=x86_64-unknown-linux-gnu --datalayout=p:bad test/opt/inputs/instcombine.ll
 ```
 
-Assembly bootstrap command:
+Assembly and object bootstrap commands:
 
 ```bash
 zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll
+zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll > /tmp/z_llvm_add_args.o
+bash scripts/compare_codegen_asm.sh
+bash scripts/compare_codegen_objdump.sh
+readelf -h -S -s /tmp/z_llvm_add_args.o
+objdump -d /tmp/z_llvm_add_args.o
 ```
 
-The assembly path currently has unit-test coverage plus a tiny CLI smoke input.
-It covers x86_64 SysV straight-line i32 leaf functions and explicit diagnostics
-for unsupported control flow.
+The assembly/object path currently has unit-test coverage plus tiny CLI smoke
+inputs. It covers x86_64 SysV i32 leaf functions, simple conditional returns,
+minimal instruction encoding, ELF64 relocatable metadata, and explicit
+diagnostics for unsupported control flow.
 
 LLVM algorithms covered so far:
 
@@ -131,7 +138,7 @@ Pipeline integration: `zig-scalar-foundation` alias and CLI target/datalayout re
 Target diagnostics: invalid datalayout and unsupported `--emit=asm` target messages
 Zig-emitted IR harness: normalized tiny scalar module records and function signatures
 Zig fixture pair: project-lowered and optimized outputs compared structurally with normalized Zig-emitted signatures
-MC/CodeGen: tiny x86_64 Machine IR and assembly printer bootstrap
+MC/CodeGen: tiny x86_64 Machine IR, assembly printer, instruction encoder, and ELF64 relocatable object bootstrap
 ```
 
 Exact byte-for-byte matching with LLVM is not the long-term contract. The normalized form should make semantic differences visible while ignoring harmless formatting differences.

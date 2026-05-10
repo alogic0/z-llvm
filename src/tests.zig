@@ -1041,17 +1041,187 @@ test "x86_64 codegen lowers add args to assembly" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
-test "x86_64 codegen rejects unsupported control flow" {
+test "x86_64 codegen lowers return constant and argument" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\define i32 @branch(i1 %cond, i32 %a) {
+        \\define i32 @return_constant() {
+        \\entry:
+        \\  ret i32 42
+        \\}
+        \\
+        \\define i32 @return_arg(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var constant = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer constant.deinit(std.testing.allocator);
+    var arg = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer arg.deinit(std.testing.allocator);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(constant, &output.writer);
+    try mc.assembly.printFunction(arg, &output.writer);
+
+    const expected =
+        "\t.text\n" ++
+        "\t.globl return_constant\n" ++
+        "return_constant:\n" ++
+        "\tmovl $42, %eax\n" ++
+        "\tretq\n" ++
+        "\t.text\n" ++
+        "\t.globl return_arg\n" ++
+        "return_arg:\n" ++
+        "\tmovl %edi, %eax\n" ++
+        "\tretq\n";
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "x86_64 codegen lowers bitwise args to assembly" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @bitwise_args(i32 %a, i32 %b) {
+        \\entry:
+        \\  %v = xor i32 %a, %b
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    const expected =
+        "\t.text\n" ++
+        "\t.globl bitwise_args\n" ++
+        "bitwise_args:\n" ++
+        "\tmovl %edi, %eax\n" ++
+        "\txorl %esi, %eax\n" ++
+        "\tretq\n";
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "x86_64 codegen lowers simple conditional returns to assembly" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @select_return(i1 %cond, i32 %a, i32 %b) {
         \\entry:
         \\  br i1 %cond, label %then, label %else
         \\then:
         \\  ret i32 %a
         \\else:
-        \\  ret i32 0
+        \\  ret i32 %b
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    const expected =
+        "\t.text\n" ++
+        "\t.globl select_return\n" ++
+        "select_return:\n" ++
+        "\ttestb %dil, %dil\n" ++
+        "\tje .Lselect_return_else\n" ++
+        ".Lselect_return_then:\n" ++
+        "\tmovl %esi, %eax\n" ++
+        "\tretq\n" ++
+        ".Lselect_return_else:\n" ++
+        "\tmovl %edx, %eax\n" ++
+        "\tretq\n";
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "x86_64 encoding emits expected add args bytes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @add_args(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0x89, 0xf8, 0x01, 0xf0, 0xc3 }, bytes);
+}
+
+test "x86_64 elf writer emits relocatable object metadata" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @add_args(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    const object = try mc.elf.buildObject(std.testing.allocator, &.{machine});
+    defer std.testing.allocator.free(object);
+
+    try std.testing.expect(object.len >= 64);
+    try std.testing.expectEqualSlices(u8, "\x7fELF", object[0..4]);
+    try std.testing.expectEqual(@as(u8, 2), object[4]);
+    try std.testing.expect(std.mem.indexOf(u8, object, ".text") != null);
+    try std.testing.expect(std.mem.indexOf(u8, object, ".symtab") != null);
+    try std.testing.expect(std.mem.indexOf(u8, object, "add_args") != null);
+}
+
+test "x86_64 codegen rejects unsupported control flow" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch(i32 %a) {
+        \\entry:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %a
         \\}
         \\
     ;
@@ -1062,6 +1232,27 @@ test "x86_64 codegen rejects unsupported control flow" {
 
     try std.testing.expectError(
         error.UnsupportedCodegenControlFlow,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects stack-passed parameters" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @stack_arg(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  ret i32 %g
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
         codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
     );
 }
