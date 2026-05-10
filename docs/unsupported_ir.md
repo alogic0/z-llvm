@@ -19,6 +19,7 @@ ret
 br label %target
 br i1 <value>, label %then, label %else
 integer constants
+undef constants
 named SSA values
 ```
 
@@ -124,6 +125,11 @@ Def-use subset:
 Memory IR subset:
   opaque ptr type
   alloca/load/store parsing, printing, and verification
+
+Value subset:
+  named SSA values
+  integer constants
+  undef constants
 ```
 
 ## Next Unsupported Areas To Remove
@@ -132,7 +138,6 @@ The next useful parser expansions are:
 
 ```text
 icmp predicates beyond eq/ne
-phi
 unreachable terminator
 call
 instruction flags such as nsw/nuw

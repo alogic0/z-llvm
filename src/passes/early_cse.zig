@@ -80,7 +80,7 @@ fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int => value,
+        .int, .undef => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

@@ -25,17 +25,19 @@ pub const Type = union(enum) {
 pub const Value = union(enum) {
     named: []const u8,
     int: i128,
+    undef,
 
     pub fn eql(a: Value, b: Value) bool {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int => false,
+                .int, .undef => false,
             },
             .int => |value| switch (b) {
-                .named => false,
+                .named, .undef => false,
                 .int => |other_value| value == other_value,
             },
+            .undef => b == .undef,
         };
     }
 
@@ -43,6 +45,7 @@ pub const Value = union(enum) {
         switch (value) {
             .named => |name| try writer.print("%{s}", .{name}),
             .int => |int| try writer.print("{}", .{int}),
+            .undef => try writer.writeAll("undef"),
         }
     }
 };
@@ -195,7 +198,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int => value,
+        .int, .undef => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }
@@ -535,7 +538,7 @@ pub const Module = struct {
 
 fn verifyValue(defs: std.StringHashMap(Type), ty: Type, value: Value) !void {
     switch (value) {
-        .int => {},
+        .int, .undef => {},
         .named => |name| {
             const def_ty = defs.get(name) orelse return error.UnknownValue;
             if (!def_ty.eql(ty)) return error.TypeMismatch;
@@ -775,6 +778,7 @@ fn parseType(text: []const u8) !Type {
 
 fn parseValue(text: []const u8) !Value {
     if (text.len == 0) return error.InvalidValue;
+    if (std.mem.eql(u8, text, "undef")) return .undef;
     if (text[0] == '%') {
         if (text.len == 1) return error.InvalidValueName;
         return .{ .named = text[1..] };

@@ -272,6 +272,22 @@ test "parser normalizes memory instructions" {
     try std.testing.expectEqualStrings(input, normalized);
 }
 
+test "parser normalizes undef values" {
+    const input =
+        \\define i32 @undef_value(i1 %cond, i32 %a) {
+        \\entry:
+        \\  %v = phi i32 [ undef, %entry ], [ %a, %entry ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings(input, normalized);
+}
+
 test "normalization strips LLVM comparison noise" {
     const input =
         \\; ModuleID = 'test/opt/inputs/memory_dce.ll'

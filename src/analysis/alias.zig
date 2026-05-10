@@ -18,7 +18,7 @@ pub fn alias(function: ir.Function, a: ir.Value, b: ir.Value) AliasResult {
 
 fn definingAlloca(function: ir.Function, value: ir.Value) ?[]const u8 {
     const name = switch (value) {
-        .int => return null,
+        .int, .undef => return null,
         .named => |name| name,
     };
 
