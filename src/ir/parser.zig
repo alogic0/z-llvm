@@ -127,18 +127,18 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
 
     const head = std.mem.trim(u8, body[0..open_paren], " \t");
     var head_parts = std.mem.tokenizeAny(u8, head, " \t");
-    const first_head_token = head_parts.next() orelse return error.InvalidFunctionHeader;
-    const linkage = core.FunctionLinkage.parse(first_head_token) orelse .default;
-    const after_linkage_token = if (linkage == .default)
-        first_head_token
-    else
-        head_parts.next() orelse return error.InvalidFunctionHeader;
-    const visibility = core.FunctionVisibility.parse(after_linkage_token) orelse .default;
-    const ret_ty_text = if (visibility == .default)
-        after_linkage_token
-    else
-        head_parts.next() orelse return error.InvalidFunctionHeader;
-    const ret_ty = try parseType(ret_ty_text);
+    var token = head_parts.next() orelse return error.InvalidFunctionHeader;
+
+    const linkage = core.FunctionLinkage.parse(token) orelse .default;
+    if (linkage != .default) token = head_parts.next() orelse return error.InvalidFunctionHeader;
+
+    const visibility = core.FunctionVisibility.parse(token) orelse .default;
+    if (visibility != .default) token = head_parts.next() orelse return error.InvalidFunctionHeader;
+
+    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
+    if (calling_conv != null) token = head_parts.next() orelse return error.InvalidFunctionHeader;
+
+    const ret_ty = try parseType(token);
     const name_text = head_parts.next() orelse return error.InvalidFunctionHeader;
     if (head_parts.next() != null) return error.InvalidFunctionHeader;
     if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
@@ -146,11 +146,18 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
     var function = core.Function.init(name_text[1..], ret_ty);
     function.linkage = linkage;
     function.visibility = visibility;
+    function.calling_conv = calling_conv;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
     if (attrs.len != 0) function.attrs = attrs;
     errdefer function.deinit(allocator);
 
-    const params_text = std.mem.trim(u8, body[open_paren + 1 .. close_paren], " \t");
+    try parseFunctionParams(allocator, &function, body[open_paren + 1 .. close_paren]);
+
+    return function;
+}
+
+fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, text: []const u8) !void {
+    const params_text = std.mem.trim(u8, text, " \t");
     if (params_text.len != 0) {
         var params = std.mem.splitScalar(u8, params_text, ',');
         while (params.next()) |raw_param| {
@@ -182,8 +189,6 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
             });
         }
     }
-
-    return function;
 }
 
 fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {

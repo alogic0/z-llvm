@@ -166,6 +166,33 @@ test "parser preserves function visibility and parameter attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves supported calling conventions" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define internal fastcc i32 @callconv(i32 %a) #2 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqual(ir.FunctionLinkage.internal, function.linkage);
+    try std.testing.expectEqualStrings("fastcc", function.calling_conv.?);
+    try std.testing.expectEqualStrings("#2", function.attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser rejects unsupported top-level globals explicitly" {
     const input =
         \\@g = global i32 0

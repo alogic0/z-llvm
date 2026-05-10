@@ -197,6 +197,12 @@ pub const FunctionVisibility = enum {
     }
 };
 
+pub fn isSupportedCallingConvention(text: []const u8) bool {
+    return std.mem.eql(u8, text, "ccc") or
+        std.mem.eql(u8, text, "fastcc") or
+        std.mem.eql(u8, text, "coldcc");
+}
+
 pub const BinaryInst = struct {
     op: BinaryOp,
     flags: BinaryFlags = .{},
@@ -427,6 +433,7 @@ pub const Function = struct {
     ret_ty: Type,
     linkage: FunctionLinkage = .default,
     visibility: FunctionVisibility = .default,
+    calling_conv: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
     params: std.ArrayList(Param),
     blocks: std.ArrayList(BasicBlock),

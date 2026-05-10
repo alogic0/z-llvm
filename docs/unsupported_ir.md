@@ -9,6 +9,7 @@ define iN @name(...)
 define void @name(...)
 function linkage on definitions: internal, private, external, default
 function visibility on definitions: hidden, protected, default
+function calling conventions on definitions: ccc, fastcc, coldcc
 function header attributes preserved as raw text
 parameter attributes preserved as raw text
 source_filename module record
@@ -78,6 +79,7 @@ fast-math flags
 full alignment semantics
 full volatile semantics
 full atomic ordering semantics
+calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope
 debug metadata
@@ -174,6 +176,7 @@ Module IR subset:
   target triple
   function linkage on definitions
   function visibility on definitions
+  function calling conventions on definitions: ccc, fastcc, coldcc
   raw function header attributes
   raw parameter attributes
   void return type
@@ -225,6 +228,7 @@ using instruction flags such as nsw/nuw/exact in transforms
 target triple and datalayout records
 globals
 visibility and attributes with semantic effects
+calling convention ABI semantics
 function declarations
 attribute groups
 module metadata

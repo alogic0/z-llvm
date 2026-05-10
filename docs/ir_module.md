@@ -18,6 +18,7 @@ Module::setTargetTriple
 Module::setDataLayout
 LLParser::parseTargetDefinition
 GlobalValue::getLinkage
+Function::getCallingConv
 Function::getAttributes
 ```
 
@@ -29,6 +30,7 @@ target datalayout = "..."
 target triple = "..."
 function linkage: default, internal, private, external
 function visibility: default, hidden, protected
+function calling conventions preserved: ccc, fastcc, coldcc
 function header attributes preserved as raw text
 parameter attributes preserved as raw text
 void function return type
@@ -43,6 +45,7 @@ LLVM modules carry target identity, datalayout, source file names, globals, alia
 This project now parses and prints the first target records needed before Zig-emitted IR comparison can be honest.
 The records are preserved and lightly validated; transforms do not consume most module-level semantics yet.
 Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
+Calling conventions are preserved in the function signature because they are ABI-relevant in LLVM, but this project does not lower or verify their target ABI effects yet.
 ```
 
 Fixture coverage:
@@ -58,6 +61,7 @@ unit-test only:
   module record round-trip
   function linkage and header attribute round-trip
   function visibility and parameter attribute round-trip
+  function calling convention round-trip
   unsupported global diagnostic
   void function and ret void verification
 ```
@@ -67,6 +71,7 @@ Known gaps:
 ```text
 no globals
 no semantic use of linkage, visibility, or attributes
+no semantic use of calling conventions
 no attribute group parsing
 no module flags
 no metadata

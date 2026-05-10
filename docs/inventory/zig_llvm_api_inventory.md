@@ -49,7 +49,7 @@ replacement needs.
 
 | AIR/lowering area | Representative Zig functions | Replacement owner | Current coverage |
 | --- | --- | --- | --- |
-| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | missing |
+| Calls and returns | `airCall`, `airRet`, `airRetLoad`, `lowerFnRetTy`, `ParamTypeIterator` | `src/codegen/abi.zig`, `src/target/abi.zig` | text IR calling convention preservation only; ABI semantics missing |
 | Control flow | `lowerBlock`, `airBr`, `airCondBr`, `airSwitchBr`, `airLoop`, `airUnreach` | `src/ir/`, `src/codegen/control_flow.zig` | partial `br`, `condbr`, `unreachable` text IR |
 | Arithmetic and comparisons | `airAdd`, `airSub`, `airMul`, `airCmp`, `airOverflow`, `airShl`, `airShr` | `src/ir/`, `src/passes/` | partial integer arithmetic, div/rem, casts, flags, freeze, and icmp |
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/ir/`, `src/codegen/memory.zig` | partial alloca/load/store/GEP and mem2reg |
@@ -65,7 +65,7 @@ replacement needs.
 
 The current project covers phase-zero optimizer infrastructure:
 
-- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, function linkage/visibility, raw function and parameter attribute preservation, and void returns.
+- LLVM-compatible text IR parser/printer/verifier subset, including module-level source filename, target triple, target datalayout, function linkage/visibility, calling convention preservation, raw function and parameter attribute preservation, and void returns.
 - CFG, def-use, dominators, dominance frontiers, LoopInfo, memory-effect classification, stack-slot MemoryLocation and alias/mod-ref scaffolding, and pass-manager instrumentation.
 - `instcombine`, InstSimplify-style local scalar helper, `dce`, `adce`, `simplifycfg`, `early-cse`, `mem2reg`, `sroa`, `gvn`, and `licm` subsets.
 - IR support for `void` returns, `select`, `unreachable`, bitwise operations, shifts, division/remainder spelling, integer `trunc`/`zext`/`sext`, scalar `freeze`, `nsw`/`nuw`/`exact` flag preservation, relational integer `icmp`, `undef`, simple `getelementptr`, and load/store `align`/`volatile` plus narrow atomic barrier spelling.

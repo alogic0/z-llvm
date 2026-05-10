@@ -21,6 +21,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.writeAll("define ");
         try function.linkage.format(writer);
         try function.visibility.format(writer);
+        if (function.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
         try function.ret_ty.format(writer);
         try writer.print(" @{s}(", .{function.name});
         for (function.params.items, 0..) |param, index| {
