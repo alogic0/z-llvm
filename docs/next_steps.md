@@ -4,6 +4,10 @@
 
 Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](development_cycle.md).
 
+No active cycle is currently open.
+
+## Completed Cycles
+
 ### Cycle 12: Memory Legality Foundation
 
 Goal: make memory operations explicit enough that future optimization passes can
@@ -24,8 +28,6 @@ LLVM memory optimization yet.
 - [x] Compare every fixture against `opt-22` where LLVM behavior is expected to match; for deliberate conservative differences, add local fixtures and document the upstream behavior gap.
 - [x] Update docs for `ir_memory.md`, `analysis/alias.md`, `passes/licm.md`, `passes/gvn.md`, `passes/dce.md`, `passes/adce.md`, `testing.md`, `unsupported_ir.md`, and the inventory current-coverage section.
 - [x] Run `zig build test` and `bash scripts/compare_opt.sh` before marking the cycle complete.
-
-## Completed Cycles
 
 ### Cycle 11: Loop Optimization Foundation 2
 
@@ -196,3 +198,10 @@ Track each reproduced LLVM algorithm here as it lands:
 - LICM legality docs now make the scalar-only boundary explicit: binary, `icmp`, and `select` can hoist; memory, calls, atomics, volatile operations, and unknown effects cannot.
 - LICM fixtures now cover variant-operand rejection and dominance-preserving scalar-chain hoisting against `opt-22`.
 - Local LICM tests now cover no-preheader, side-effecting store, memory-load, and multi-latch rejection cases that LLVM's fuller pipeline can transform through preheader creation, sinking, or MemorySSA promotion.
+- Memory IR now parses, prints, verifies, and preserves load/store `align`, `volatile`, and narrow atomic load/store spelling.
+- Unsupported atomic memory operations such as `atomicrmw` and `cmpxchg` now fail with a dedicated parser error.
+- `analysis/memory_effect.zig` now centralizes instruction memory classification for scalar passes.
+- Alias analysis now includes a conservative mod/ref scaffold for load/store instructions and known stack-slot alias facts.
+- LICM, DCE, ADCE, and GVN now use the shared memory-effect classification instead of pass-local side-effect checks.
+- `opt-22` memory legality fixtures now cover scalar LICM/GVN/DCE behavior beside volatile memory and volatile load preservation.
+- Local conservative memory legality tests now cover aligned-load rejection, atomic-barrier preservation, and unknown pointer aliasing.
