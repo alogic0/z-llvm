@@ -88,6 +88,7 @@ Fixture coverage:
   instcombine_safe_scalar
   select_fold
   fp_instcombine_preserve
+  fp_special_literals_preserve
   fp_extended_instcombine_preserve
   fp_fast_math_preserve
   fp_strict_sensitive_preserve

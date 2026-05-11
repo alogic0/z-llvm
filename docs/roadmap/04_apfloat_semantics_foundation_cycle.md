@@ -7,22 +7,29 @@ folds.
 
 ## Plan
 
-- [ ] Define local FP value representation for IEEE zero, signed zero, NaN,
+- [x] Define local FP value representation for IEEE zero, signed zero, NaN,
       infinity, normal, subnormal, and target-sized scalar types already parsed.
-- [ ] Preserve textual literal spellings while exposing semantic queries to
+- [x] Preserve textual literal spellings while exposing semantic queries to
       optimizers.
-- [ ] Add DataLayout-aware type checks for supported FP widths.
-- [ ] Add verifier checks for invalid FP constants and unsupported target
+- [x] Add DataLayout-aware type checks for supported FP widths.
+- [x] Add verifier checks for invalid FP constants and unsupported target
       widths.
-- [ ] Add fixtures for signed zero, quiet NaN, signaling-unknown NaN spelling,
+- [x] Add fixtures for signed zero, quiet NaN, signaling-unknown NaN spelling,
       infinity, and ordinary literals.
-- [ ] Document how this model maps to LLVM `APFloat` behavior and what remains
+- [x] Document how this model maps to LLVM `APFloat` behavior and what remains
       deferred.
-- [ ] Keep all FP transforms disabled unless later cycles opt into specific
+- [x] Keep all FP transforms disabled unless later cycles opt into specific
       legality rules.
 
 ## Exit Criteria
 
-- [ ] FP constants have semantic classification, not only string preservation.
-- [ ] Unsupported FP widths and malformed constants fail closed.
-- [ ] Docs explain the precise subset of `APFloat` being modeled.
+- [x] FP constants have semantic classification, not only string preservation.
+- [x] Unsupported FP widths and malformed constants fail closed.
+- [x] Docs explain the precise subset of `APFloat` being modeled.
+
+## Completed Slice
+
+Cycle 04 adds `src/analysis/fp_semantics.zig` as the local APFloat-shaped
+literal classifier. It classifies zero, negative zero, NaN, infinity, normal,
+and known subnormal spellings while preserving original text in the IR. No FP
+arithmetic fold or value-numbering behavior is enabled by this cycle.

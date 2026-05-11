@@ -62,7 +62,8 @@ named SSA values
 ```text
 fp80/fp128
 floating-point operations beyond scalar `fadd`/`fsub`/`fmul`/`fdiv`/`frem`
-NaN, infinity, signed-zero, and unobserved FP literal semantics
+FP arithmetic semantics for NaN, infinity, signed zero, and subnormals beyond
+literal classification and preservation
 fast-math optimization semantics, constrained FP intrinsics, and FP exception
 semantics
 arrays

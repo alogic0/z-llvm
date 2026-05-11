@@ -1,5 +1,6 @@
 const std = @import("std");
 const core = @import("core.zig");
+const fp_semantics = @import("../analysis/fp_semantics.zig");
 
 pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     var module: core.Module = .{
@@ -1736,18 +1737,10 @@ fn parseValue(text: []const u8) !core.Value {
         if (trimmed.len == 1) return error.InvalidValueName;
         return .{ .named = trimmed };
     }
-    if (isUnsupportedFpLiteral(trimmed)) return error.UnsupportedFloatingPointLiteral;
     if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
     return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
 }
 
 fn isFpLiteral(text: []const u8) bool {
-    return std.mem.indexOfAny(u8, text, ".eE") != null or std.mem.startsWith(u8, text, "0x") or std.mem.startsWith(u8, text, "-0x");
-}
-
-fn isUnsupportedFpLiteral(text: []const u8) bool {
-    if (std.mem.eql(u8, text, "nan") or std.mem.eql(u8, text, "-nan")) return true;
-    if (std.mem.eql(u8, text, "inf") or std.mem.eql(u8, text, "-inf")) return true;
-    if (std.mem.eql(u8, text, "-0.0") or std.mem.eql(u8, text, "-0.000000e+00")) return true;
-    return false;
+    return fp_semantics.looksLikeFpLiteral(text);
 }

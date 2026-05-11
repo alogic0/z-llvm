@@ -1,5 +1,6 @@
 const std = @import("std");
 const core = @import("core.zig");
+const fp_semantics = @import("../analysis/fp_semantics.zig");
 const target = @import("../target.zig");
 
 const InstructionLocation = struct {
@@ -184,7 +185,10 @@ const VerifyContext = struct {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int => return if (ty.isVector()) error.TypeMismatch else {},
-            .fp => return if (ty == .float or ty == .double) {} else error.TypeMismatch,
+            .fp => |text| {
+                _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
+                return;
+            },
             .undef => return,
             .null_value => unreachable,
             .zero_initializer => return,
@@ -201,7 +205,10 @@ const VerifyContext = struct {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int => return if (ty.isVector()) error.TypeMismatch else {},
-            .fp => return if (ty == .float or ty == .double) {} else error.TypeMismatch,
+            .fp => |text| {
+                _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
+                return;
+            },
             .undef => return,
             .null_value => unreachable,
             .zero_initializer => return,

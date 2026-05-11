@@ -6,6 +6,7 @@ const cfg = @import("analysis/cfg.zig");
 const codegen = @import("codegen.zig");
 const dominator = @import("analysis/dominator.zig");
 const function_attrs = @import("analysis/function_attrs.zig");
+const fp_semantics = @import("analysis/fp_semantics.zig");
 const loop_info = @import("analysis/loop_info.zig");
 const memory_effect = @import("analysis/memory_effect.zig");
 const memory_location = @import("analysis/memory_location.zig");
@@ -1811,33 +1812,40 @@ test "parser preserves observed scalar FP literal spellings without folding" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects unsupported FP literal spellings until strict semantics are modeled" {
-    const nan_input =
+test "parser classifies special FP literal spellings without folding" {
+    const input =
         \\define double @nan_literal() {
         \\entry:
         \\  ret double nan
         \\}
         \\
-    ;
-    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, nan_input));
-
-    const inf_input =
         \\define double @inf_literal() {
         \\entry:
         \\  ret double inf
         \\}
         \\
-    ;
-    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, inf_input));
-
-    const signed_zero_input =
         \\define double @negative_zero_literal() {
         \\entry:
         \\  ret double -0.0
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, signed_zero_input));
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const nan_ret = module.functions.items[0].blocks.items[0].terminator.?.ret.value.?.fp;
+    const inf_ret = module.functions.items[1].blocks.items[0].terminator.?.ret.value.?.fp;
+    const neg_zero_ret = module.functions.items[2].blocks.items[0].terminator.?.ret.value.?.fp;
+    try std.testing.expectEqual(fp_semantics.Category.nan, (try fp_semantics.classify(.double, nan_ret)).category);
+    try std.testing.expectEqual(fp_semantics.Category.infinity, (try fp_semantics.classify(.double, inf_ret)).category);
+    try std.testing.expectEqual(fp_semantics.Category.negative_zero, (try fp_semantics.classify(.double, neg_zero_ret)).category);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "parser preserves fixed vector signatures and rejects unsupported vector boundaries" {

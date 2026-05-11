@@ -154,7 +154,7 @@ completed foundation epics
 - [x] [Cycle 01: Debug Intrinsic Variable Location Boundary](roadmap/01_debug_intrinsic_variable_location_boundary_cycle.md)
 - [x] [Cycle 02: Debug Metadata Graph Verification](roadmap/02_debug_metadata_graph_verification_cycle.md)
 - [x] [Cycle 03: Debug Info Salvage Preservation](roadmap/03_debug_info_salvage_preservation_cycle.md)
-- [ ] [Cycle 04: APFloat Semantics Foundation](roadmap/04_apfloat_semantics_foundation_cycle.md)
+- [x] [Cycle 04: APFloat Semantics Foundation](roadmap/04_apfloat_semantics_foundation_cycle.md)
 - [ ] [Cycle 05: Strict FP Fold Legality](roadmap/05_strict_fp_fold_legality_cycle.md)
 - [ ] [Cycle 06: Fast-Math Optimization Enablement](roadmap/06_fast_math_optimization_enablement_cycle.md)
 - [ ] [Cycle 07: FP Lattice and Value Numbering Legality](roadmap/07_fp_lattice_value_numbering_legality_cycle.md)
