@@ -62,6 +62,8 @@ name-anon-globals placeholder exists
 global cleanup placeholders exist
 bitcode writing is not implemented
 ThinLTO and FullLTO are not semantically distinct locally
+ThinLTO summary indexes, combined indexes, import/export, WPD, and post-link
+pipelines are unsupported
 post-link LTO is not represented
 ```
 
@@ -105,6 +107,17 @@ bitcode round-trip only after the bitcode construct inventory is implemented
 ```
 
 Do not add post-link or summary tests until bitcode and summary records exist.
+
+## Unsupported Summary Boundary
+
+```text
+ThinLTO module summaries are not parsed, printed, generated, or consumed.
+FullLTO and ThinLTO share only the local pre-link pipeline descriptor surface.
+No local pass may assume cross-module visibility, import/export decisions,
+whole-program devirtualization, CFI, or post-link inlining facts.
+Any future ThinLTO work must start from a Zig source-backed LTO handoff use
+case and an LLVM bitcode/summary verification command.
+```
 
 ## Activation Criteria
 

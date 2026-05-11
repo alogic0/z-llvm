@@ -31,7 +31,21 @@ no bitcode writer
 no bitcode parser
 text LLVM-compatible IR remains the active comparison format
 bitcode is optional compatibility work, not a blocker for local optimizer slices
+LTO pre-link validation is text-IR and pipeline based; it is not a bitcode
+handoff implementation
 ```
+
+## Requirement Classification
+
+| Zig use case | Classification | Reason |
+| --- | --- | --- |
+| Local optimizer comparison against `opt-22` | needed now, text IR only | The accepted corpus and pass fixtures compare normalized text IR. |
+| `-femit-llvm-ir` style migration output | needed later | Text IR compatibility can be validated before a bitcode writer exists. |
+| `-femit-llvm-bc` / explicit bitcode output | deferred | Requires type/value numbering, metadata policy, use-list order, and LLVM bitcode verification. |
+| LTO handoff to LLD | deferred | Requires bitcode writer output even when pre-link optimization is represented. |
+| ThinLTO import/export and WPD | deferred | Requires module summary index and combined-index behavior. |
+| Bitcode input parsing | out of scope until proven | No current accepted fixture uses bitcode as the only handoff artifact. |
+| Native backend/object validation | no bitcode need | Uses local IR, machine lowering, assembly, or ELF object checks. |
 
 ## Zig Mode Boundary
 

@@ -270,6 +270,8 @@ Module IR subset:
   AIR-like pre/post optimization driver using named pipelines
   zig-scalar-foundation pipeline alias and CLI target/datalayout record injection
   debug-o0, release-o3, release-oz, lto-prelink-o3, and lto-prelink-oz pipeline descriptors with explicit no-op placeholders
+  no LLVM bitcode writer/parser, LTO bitcode handoff, ThinLTO summary index,
+  combined index, import/export, WPD, CFI, or post-link LTO behavior
   explicit CLI diagnostics for invalid target datalayout and unsupported asm targets
   normalized Zig-emitted scalar function signature fixture
   AIR-like project-lowered and project-optimized fixture pair for tiny scalar signatures
