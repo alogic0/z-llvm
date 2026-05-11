@@ -14,7 +14,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.print("target triple = \"{s}\"\n", .{target_triple});
         printed_module_record = true;
     }
-    if (printed_module_record and (module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0 or module.metadata.items.len != 0)) try writer.writeByte('\n');
+    if (printed_module_record and (module.module_asm.items.len != 0 or module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0 or module.metadata.items.len != 0)) try writer.writeByte('\n');
+
+    for (module.module_asm.items) |module_asm| try writer.print("{s}\n", .{module_asm});
+    if (module.module_asm.items.len != 0 and (module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0 or module.metadata.items.len != 0)) try writer.writeByte('\n');
 
     for (module.comdats.items) |comdat| try writer.print("{s}\n", .{comdat});
     if (module.comdats.items.len != 0 and (module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');

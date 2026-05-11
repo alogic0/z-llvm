@@ -28,6 +28,7 @@ declaration parameter attributes preserved as raw text
 source_filename module record
 target datalayout module record
 target triple module record
+opaque module asm records
 scalar global definitions with integer or undef initializers
 scalar constant global definitions with integer or undef initializers
 raw global suffix attributes preserved as text
@@ -194,6 +195,8 @@ AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
 inline asm calls and constraint/memory-clobber semantics
+module-level asm target syntax, symbol alias resolution, MC/object lowering,
+and codegen semantics beyond opaque parser/printer preservation
 exact Zig-emitted scalar instruction flag parity in AIR-like fixtures
 target-aware pipeline integration beyond CLI target/datalayout record injection
 mode pipeline descriptors are dependency-ordered approximations, not full LLVM pipeline-equivalent implementations

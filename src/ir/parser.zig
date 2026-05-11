@@ -7,6 +7,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .allocator = allocator,
         .source = try allocator.dupe(u8, text),
         .owned_strings = .empty,
+        .module_asm = .empty,
         .globals = .empty,
         .aliases = .empty,
         .comdats = .empty,
@@ -22,6 +23,13 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
 
     var lines = std.mem.splitScalar(u8, module.source, '\n');
     while (lines.next()) |raw_line| {
+        const raw_top_level_line = std.mem.trim(u8, raw_line, " \t\r");
+        if (current_function == null and std.mem.startsWith(u8, raw_top_level_line, "module asm ")) {
+            try parseModuleAsm(raw_top_level_line);
+            try module.module_asm.append(allocator, raw_top_level_line);
+            continue;
+        }
+
         const line_without_comment = if (std.mem.indexOfScalar(u8, raw_line, ';')) |index|
             raw_line[0..index]
         else
@@ -145,8 +153,31 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.module_asm.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn parseModuleAsm(line: []const u8) !void {
+    const rest = std.mem.trim(u8, line["module asm".len..], " \t");
+    if (rest.len < 2 or rest[0] != '"') return error.InvalidModuleAsm;
+
+    var escaped = false;
+    for (rest[1..], 1..) |byte, index| {
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (byte == '\\') {
+            escaped = true;
+            continue;
+        }
+        if (byte == '"') {
+            const tail = std.mem.trim(u8, rest[index + 1 ..], " \t");
+            if (tail.len != 0) return error.InvalidModuleAsm;
+            return;
+        }
+    }
+    return error.InvalidModuleAsm;
 }
 
 fn parseComdat(line: []const u8) !void {

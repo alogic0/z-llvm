@@ -126,6 +126,7 @@ pub fn lowerModule(allocator: std.mem.Allocator, spec: Module) !ir.Module {
         .source_filename = spec.source_filename,
         .target_triple = spec.target_triple,
         .target_datalayout = spec.target_datalayout,
+        .module_asm = .empty,
         .globals = .empty,
         .aliases = .empty,
         .comdats = .empty,

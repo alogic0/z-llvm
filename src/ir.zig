@@ -12,6 +12,7 @@ pub const Param = core.Param;
 pub const DeclParam = core.DeclParam;
 pub const FunctionLinkage = core.FunctionLinkage;
 pub const FunctionVisibility = core.FunctionVisibility;
+pub const ModuleAsm = []const u8;
 pub const GlobalKind = core.GlobalKind;
 pub const Global = core.Global;
 pub const GlobalArrayInitializer = core.GlobalArrayInitializer;

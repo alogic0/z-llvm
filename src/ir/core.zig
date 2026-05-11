@@ -903,6 +903,7 @@ pub const Module = struct {
     source_filename: ?[]const u8 = null,
     target_triple: ?[]const u8 = null,
     target_datalayout: ?[]const u8 = null,
+    module_asm: std.ArrayList([]const u8),
     globals: std.ArrayList(Global),
     aliases: std.ArrayList(GlobalAlias),
     comdats: std.ArrayList([]const u8),
@@ -917,6 +918,7 @@ pub const Module = struct {
 
     pub fn deinit(module: *Module) void {
         for (module.globals.items) |*global| global.deinit(module.allocator);
+        module.module_asm.deinit(module.allocator);
         module.globals.deinit(module.allocator);
         module.aliases.deinit(module.allocator);
         module.comdats.deinit(module.allocator);

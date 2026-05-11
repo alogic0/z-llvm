@@ -4426,6 +4426,31 @@ test "parser preserves inline asm calls as side-effecting barriers" {
     try std.testing.expect(source_backed_call.inline_asm.?.has_memory_clobber);
 }
 
+test "parser preserves module-level asm records opaquely" {
+    const input =
+        \\source_filename = "behavior_asm"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\module asm ".globl this_is_my_alias;"
+        \\module asm ".type this_is_my_alias, @function;"
+        \\module asm ".set this_is_my_alias, derp;"
+        \\
+        \\define i32 @derp() {
+        \\entry:
+        \\  ret i32 1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqual(@as(usize, 3), module.module_asm.items.len);
+    try std.testing.expectEqualStrings("module asm \".globl this_is_my_alias;\"", module.module_asm.items[0]);
+    try std.testing.expectEqualStrings("module asm \".type this_is_my_alias, @function;\"", module.module_asm.items[1]);
+    try std.testing.expectEqualStrings("module asm \".set this_is_my_alias, derp;\"", module.module_asm.items[2]);
+}
+
 test "parser rejects unsupported inline asm forms explicitly" {
     const missing_sideeffect =
         \\define void @inline_asm_barrier() {

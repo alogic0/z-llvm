@@ -42,35 +42,35 @@ LLVM source mapping:
 
 ## Plan
 
-- [ ] Add a reduced source-backed fixture for the `behavior/asm.zig` module-asm
+- [x] Add a reduced source-backed fixture for the `behavior/asm.zig` module-asm
       shape.
-- [ ] Extend the IR module model with an ordered collection of opaque
+- [x] Extend the IR module model with an ordered collection of opaque
       module-level assembly records.
-- [ ] Parse top-level `module asm "..."` before the generic top-level fallback
+- [x] Parse top-level `module asm "..."` before the generic top-level fallback
       that currently produces `LineOutsideFunction`.
-- [ ] Preserve escaped string spelling enough to round-trip the current
+- [x] Preserve escaped string spelling enough to round-trip the current
       Zig-emitted records.
-- [ ] Print module-asm records in module scope before globals/functions, matching
+- [x] Print module-asm records in module scope before globals/functions, matching
       the observed Zig-emitted ordering.
-- [ ] Verify module-asm records as opaque module-level records; do not inspect
+- [x] Verify module-asm records as opaque module-level records; do not inspect
       target assembly syntax.
-- [ ] Keep optimizer behavior conservative: passes must preserve module-asm
+- [x] Keep optimizer behavior conservative: passes must preserve module-asm
       records and must not treat their contents as analyzable IR facts.
-- [ ] Add a discovery classification check so this root cause is reported as
+- [x] Add a discovery classification check so this root cause is reported as
       `parse-fail` until closed, then `verify-ok`.
-- [ ] Rerun a focused discovery check for `behavior/asm.zig`.
-- [ ] Rerun the normal corpus/readiness gates.
+- [x] Rerun a focused discovery check for `behavior/asm.zig`.
+- [x] Rerun the normal corpus/readiness gates.
 
 ## Acceptance Criteria
 
-- [ ] The reduced module-asm fixture parses, verifies, and prints without losing
+- [x] The reduced module-asm fixture parses, verifies, and prints without losing
       any `module asm` records.
-- [ ] `zig build run -- --passes=verify --trace <module-asm fixture>` succeeds.
-- [ ] A focused discovery run over `ziglang/test/behavior/asm.zig` or a directory
+- [x] `zig build run -- --passes=verify --trace <module-asm fixture>` succeeds.
+- [x] A focused discovery run over `ziglang/test/behavior/asm.zig` or a directory
       containing it reports `verify-ok` for that row.
-- [ ] No optimizer pass drops module-asm records when run through the accepted
+- [x] No optimizer pass drops module-asm records when run through the accepted
       ReleaseFast subset.
-- [ ] The cycle does not claim support for target assembly validation, alias
+- [x] The cycle does not claim support for target assembly validation, alias
       resolution inside assembly text, MC/object lowering, or codegen semantics.
 
 ## Non-Goals
@@ -85,6 +85,31 @@ LLVM source mapping:
 
 ## Close-Out Notes
 
-- [ ] Record final fixture path and test command.
-- [ ] Record whether the broad discovery failure count changed after the fix.
-- [ ] Move this cycle to historical after implementation and verification.
+- [x] Record final fixture path and test command.
+- [x] Record whether the broad discovery failure count changed after the fix.
+- [x] Move this cycle to historical after implementation and verification.
+
+## Completed Slice
+
+```text
+Final fixture:
+  test/zig/expected/behavior_asm_module_asm.reduced.ll
+
+Opt fixture:
+  behavior_asm_module_asm_verify_preserve
+
+Focused commands:
+  zig build run -- --passes=verify --trace test/zig/expected/behavior_asm_module_asm.reduced.ll
+  zig build run -- --passes=zig-release-fast-accepted test/zig/expected/behavior_asm_module_asm.reduced.ll
+  zig run tools/zig_corpus_discovery.zig -- --test-root=../ziglang/test/behavior --out-dir=tmp/zig_ir/module_asm_focus --mode=ReleaseFast --target=x86_64-linux-gnu --passes=verify --max=7 --progress-every=0
+
+Normal gates:
+  zig build test
+  bash scripts/compare_opt.sh
+  bash scripts/run_readiness_checks.sh
+```
+
+The focused discovery run reports `behavior/asm.zig` as `verify-ok`. The
+original broad discovery artifact was already present under
+`tmp/zig_ir/discovery`; this cycle does not rerun the whole broad discovery set,
+so no broad failure-count delta is claimed.

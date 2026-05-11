@@ -167,7 +167,11 @@ The active work queue is kept short in [next_steps.md](next_steps.md).
 
 ## Active Discovery Cycle
 
-- [ ] [Cycle 01: Module ASM Source-Backed Parser Closure](roadmap/01_module_asm_source_backed_parser_cycle.md)
+No active discovery cycle is selected.
+
+## Completed Discovery Cycles
+
+- [x] [Completed Discovery Cycles](roadmap/historical/completed_discovery_cycles/README.md)
 
 ## Future Backlog
 
