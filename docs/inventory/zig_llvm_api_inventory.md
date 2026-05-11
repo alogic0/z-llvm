@@ -60,7 +60,7 @@ replacement needs.
 | Memory operations | `airAlloc`, `airLoad`, `airStore`, `airMemset`, `airMemcpy`, `airMemmove` | `src/air_bridge.zig`, `src/ir/`, `src/codegen/memory.zig` | AIR-like scalar stack memory builder plus partial alloca/load/store/GEP and mem2reg |
 | Atomics | `airCmpxchg`, `airAtomicRmw`, `airAtomicLoad`, `airAtomicStore` | `src/ir/atomics.zig`, `src/codegen/atomics.zig` | missing |
 | Aggregates and pointers | `airAggregateInit`, `airUnionInit`, `airStructFieldVal`, `airPtrElemPtr`, `ptraddConst` | `src/ir/aggregate.zig`, `src/codegen/layout.zig` | minimal GEP and scalar global preservation only |
-| Optionals and error unions | `airOptionalPayload`, `airErrUnionPayload`, `airWrapErrUnionErr` | `src/codegen/zig_abi.zig` | missing |
+| Optionals and error unions | `airOptionalPayload`, `airErrUnionPayload`, `airWrapErrUnionErr` | `src/codegen/zig_abi.zig` | partial scalar/null-pointer fixtures only |
 | Debug info | `airDbgStmt`, `airDbgVarPtr`, `airDbgVarVal`, `getDebugFile`, `getDebugType` | `src/debug/` | missing |
 | Inline assembly | `airAssembly`, constraint helpers | `src/codegen/inline_asm.zig`, `src/target/` | missing |
 | Intrinsics and target hooks | `airTrap`, `airBreakpoint`, `airPrefetch`, `airWorkItemId` | `src/codegen/intrinsics.zig`, `src/target/` | missing |

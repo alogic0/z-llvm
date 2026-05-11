@@ -41,18 +41,20 @@ pub const Value = union(enum) {
     named: []const u8,
     int: i128,
     undef,
+    null_value,
 
     pub fn eql(a: Value, b: Value) bool {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int, .undef => false,
+                .int, .undef, .null_value => false,
             },
             .int => |value| switch (b) {
-                .named, .undef => false,
+                .named, .undef, .null_value => false,
                 .int => |other_value| value == other_value,
             },
             .undef => b == .undef,
+            .null_value => b == .null_value,
         };
     }
 
@@ -67,6 +69,7 @@ pub const Value = union(enum) {
             },
             .int => |int| try writer.print("{}", .{int}),
             .undef => try writer.writeAll("undef"),
+            .null_value => try writer.writeAll("null"),
         }
     }
 };
@@ -593,7 +596,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int, .undef => value,
+        .int, .undef, .null_value => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

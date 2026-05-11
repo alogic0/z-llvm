@@ -30,6 +30,7 @@ const Lattice = union(enum) {
         return switch (value) {
             .int => |int| .{ .constant = int },
             .undef => .undef,
+            .null_value => .overdefined,
             .named => .overdefined,
         };
     }
@@ -320,6 +321,7 @@ const Solver = struct {
         return switch (value) {
             .int => |int| .{ .constant = int },
             .undef => .undef,
+            .null_value => .overdefined,
             .named => |name| solver.values.get(name) orelse .unknown,
         };
     }
@@ -400,7 +402,7 @@ fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .undef => value,
+        .int, .undef, .null_value => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

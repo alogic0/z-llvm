@@ -209,7 +209,7 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
 fn simplifyFreeze(freeze: ir.FreezeInst) ?ir.Value {
     return switch (freeze.value) {
         .int => freeze.value,
-        .named, .undef => null,
+        .named, .undef, .null_value => null,
     };
 }
 

@@ -293,7 +293,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .undef => .{ .scalar = value },
+        .int, .undef, .null_value => .{ .scalar = value },
         .named => error.UnsupportedGlobalVariable,
     };
 }
@@ -316,7 +316,7 @@ fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text
         const value = try parseValue(item_parts.next() orelse return error.UnsupportedGlobalVariable);
         if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
         switch (value) {
-            .int, .undef => try initializer.values.append(allocator, value),
+            .int, .undef, .null_value => try initializer.values.append(allocator, value),
             .named => return error.UnsupportedGlobalVariable,
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
@@ -1151,6 +1151,7 @@ fn findTopLevelComma(text: []const u8) ?usize {
 fn parseValue(text: []const u8) !core.Value {
     if (text.len == 0) return error.InvalidValue;
     if (std.mem.eql(u8, text, "undef")) return .undef;
+    if (std.mem.eql(u8, text, "null")) return .null_value;
     if (std.mem.eql(u8, text, "true")) return .{ .int = 1 };
     if (std.mem.eql(u8, text, "false")) return .{ .int = 0 };
     if (text[0] == '%') {

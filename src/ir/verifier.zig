@@ -181,8 +181,10 @@ const VerifyContext = struct {
         use_block_index: usize,
         use_instruction_index: ?usize,
     ) !void {
+        if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int, .undef => return,
+            .null_value => unreachable,
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -192,8 +194,10 @@ const VerifyContext = struct {
     }
 
     fn verifyPhiIncomingValue(ctx: VerifyContext, ty: core.Type, value: core.Value, predecessor_index: usize) !void {
+        if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int, .undef => return,
+            .null_value => unreachable,
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -270,10 +274,10 @@ pub fn verify(module: core.Module) !void {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
                     .int, .undef => {},
-                    .named => return error.UnsupportedGlobalVariable,
+                    .named, .null_value => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
-                    .undef => {},
+                    .undef, .null_value => {},
                     .int, .named => return error.UnsupportedGlobalVariable,
                 },
                 .void, .float, .double, .aggregate => return error.UnsupportedGlobalVariable,
@@ -283,7 +287,7 @@ pub fn verify(module: core.Module) !void {
                 if (!array_ty.elem_ty.eql(array.elem_ty)) return error.UnsupportedGlobalVariable;
                 if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
                 for (array.values.items) |value| switch (value) {
-                    .int, .undef => {},
+                    .int, .undef, .null_value => {},
                     .named => return error.UnsupportedGlobalVariable,
                 };
             },

@@ -65,6 +65,8 @@ arrays
 vectors
 structs
 packed structs
+full optional and error-union ABI lowering beyond observed scalar/null-pointer
+fixtures
 function pointer types
 token/metadata types
 ```

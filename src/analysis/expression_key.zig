@@ -223,6 +223,7 @@ const HashState = struct {
                 state.addInt128(int);
             },
             .undef => state.addTag(3),
+            .null_value => state.addTag(4),
         }
     }
 

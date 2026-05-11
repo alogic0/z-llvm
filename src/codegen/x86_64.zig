@@ -204,7 +204,7 @@ fn lowerSingleStackSlotReturn(
     const load_result = load_inst.result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
-        .int, .undef => return false,
+        .int, .undef, .null_value => return false,
     };
     if (!std.mem.eql(u8, load_result, ret_name)) return false;
 
@@ -329,7 +329,7 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
 
     const cond_name = switch (condbr.cond) {
         .named => |name| name,
-        .int, .undef => return error.UnsupportedCodegenValue,
+        .int, .undef, .null_value => return error.UnsupportedCodegenValue,
     };
     const cond_reg = try paramReg(function, cond_name, .{ .int = 1 });
     const then_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
@@ -376,7 +376,7 @@ fn lowerReturnValue(
 ) !void {
     switch (value) {
         .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
-        .undef => return error.UnsupportedCodegenValue,
+        .undef, .null_value => return error.UnsupportedCodegenValue,
         .named => |name| {
             if (try paramRegOrNull(function, name, .{ .int = 32 })) |reg| {
                 try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
@@ -408,7 +408,7 @@ fn lowerReturnValueAfterCalls(
     call_count: usize,
 ) !void {
     switch (value) {
-        .int, .undef => return lowerReturnValue(allocator, machine, function, block, value),
+        .int, .undef, .null_value => return lowerReturnValue(allocator, machine, function, block, value),
         .named => |name| {
             if (call_count == 0) return lowerReturnValue(allocator, machine, function, block, value);
             if (last_eax_value) |eax_name| {
@@ -517,7 +517,7 @@ fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?Ar
 fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
     const name = switch (value) {
         .named => |name| name,
-        .int, .undef => return,
+        .int, .undef, .null_value => return,
     };
     const reg = try paramRegOrNull(function, name, .{ .int = 32 }) orelse return;
     if (live.*) |existing| {
@@ -530,7 +530,7 @@ fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
 fn isNamed(value: ir.Value, name: []const u8) bool {
     return switch (value) {
         .named => |value_name| std.mem.eql(u8, value_name, name),
-        .int, .undef => false,
+        .int, .undef, .null_value => false,
     };
 }
 
@@ -553,7 +553,7 @@ fn findInstruction(block: ir.BasicBlock, result_name: []const u8) ?ir.Instructio
 fn paramValueReg(function: ir.Function, value: ir.Value, ty: ir.Type) !ArgReg {
     return switch (value) {
         .named => |name| try paramReg(function, name, ty),
-        .int, .undef => error.UnsupportedCodegenValue,
+        .int, .undef, .null_value => error.UnsupportedCodegenValue,
     };
 }
 

@@ -61,7 +61,7 @@ fn buildInModule(module: ir.Module, function: ir.Function, layout: ?datalayout.D
 
 fn buildGlobal(module: ir.Module, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
     const raw_name = switch (ptr) {
-        .int, .undef => return null,
+        .int, .undef, .null_value => return null,
         .named => |name| name,
     };
     const name = stripGlobalSigil(raw_name);
@@ -92,7 +92,7 @@ fn resolveGlobalAlias(module: ir.Module, name: []const u8) []const u8 {
 
 fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
     const name = switch (ptr) {
-        .int, .undef => return null,
+        .int, .undef, .null_value => return null,
         .named => |name| name,
     };
 
@@ -146,7 +146,7 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
     for (gep.indices.items, 0..) |index, index_position| {
         const value = switch (index.value) {
             .int => |value| value,
-            .named, .undef => return null,
+            .named, .undef, .null_value => return null,
         };
         if (index_position == 0) {
             const element_size = typeSizeMaybeLayout(layout, current_ty) orelse return null;

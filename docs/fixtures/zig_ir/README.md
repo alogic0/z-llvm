@@ -204,6 +204,7 @@ parser blockers after Cycle 1:
 | `aggregate_abi` | `test/zig/inputs/aggregate_abi.zig` | `test/zig/captured/aggregate_abi.ReleaseFast.x86_64.ll` | small extern-struct ABI values lowered to integer packing | `parse`, `verify`, `optimizer-input` |
 | `packed_bits` | `test/zig/inputs/packed_bits.zig` | `test/zig/captured/packed_bits.ReleaseFast.x86_64.ll` | packed-struct masks, `or disjoint`, sign-bit tests | `parse`, `verify`, `optimizer-input` |
 | `error_switch` | `test/zig/inputs/error_switch.zig` | `test/zig/captured/error_switch.ReleaseFast.x86_64.ll` | error-switch branch/select/phi lowering and branch weights | `parse`, `verify`, `optimizer-input` |
+| `optional_pointer` | `test/zig/inputs/optional_pointer.zig` | `test/zig/captured/optional_pointer.ReleaseFast.x86_64.ll` | optional pointer lowered to `icmp eq ptr ..., null`, branch, phi, and readonly payload load | `parse`, `verify`, `optimizer-input` |
 | `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.unsupported.ll` | vector type, lane arithmetic, vector return | `unsupported`, `future` |
 
 ## Optimizer Epic Coverage
@@ -224,6 +225,7 @@ parser blockers after Cycle 1:
 | Aggregate ABI scalarization checks | `aggregate_abi` |
 | Packed bitfield lowering checks | `packed_bits` |
 | Error switch lowering checks | `error_switch` |
+| Optional pointer null checks | `optional_pointer` |
 | Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements |
 
 Connection to the LLVM pass inventory:

@@ -96,7 +96,7 @@ completed foundation epics
 - [x] [Cycle 7: Debug Metadata Corpus Expansion](roadmap/07_debug_metadata_corpus_expansion_cycle.md)
 - [x] [Cycle 8: AArch64 DataLayout Optimizer-Input Policy](roadmap/08_aarch64_datalayout_optimizer_policy_cycle.md)
 - [x] [Cycle 9: Atomic And Inline-Asm Boundary From Zig Rows](roadmap/09_atomic_inline_asm_boundary_from_zig_rows_cycle.md)
-- [ ] [Cycle 10: Error, Optional, And Aggregate ABI Expansion](roadmap/10_error_optional_aggregate_abi_expansion_cycle.md)
+- [x] [Cycle 10: Error, Optional, And Aggregate ABI Expansion](roadmap/10_error_optional_aggregate_abi_expansion_cycle.md)
 - [ ] [Cycle 11: Alias And Memory Precision For Source-Backed Rows](roadmap/11_alias_memory_precision_source_backed_cycle.md)
 - [ ] [Cycle 12: Corpus Refresh And Readiness Audit](roadmap/12_corpus_refresh_and_readiness_audit_cycle.md)
 

@@ -1497,6 +1497,46 @@ test "parser preserves Debug lexical scope branch metadata opaquely" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser verifies null pointer constants from optional lowering" {
+    const input =
+        \\define i32 @optional_ptr_value(ptr %p) {
+        \\entry:
+        \\  %is_null = icmp eq ptr %p, null
+        \\  br i1 %is_null, label %none, label %some
+        \\some:
+        \\  %v = load i32, ptr %p, align 4
+        \\  ret i32 %v
+        \\none:
+        \\  ret i32 -1
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cmp = module.functions.items[0].blocks.items[0].instructions.items[0].kind.icmp;
+    try std.testing.expect(cmp.rhs == .null_value);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+
+    const invalid =
+        \\define i1 @bad_null_i32(i32 %x) {
+        \\entry:
+        \\  %bad = icmp eq i32 %x, null
+        \\  ret i1 %bad
+        \\}
+        \\
+    ;
+    var invalid_module = try ir.Module.parse(std.testing.allocator, invalid);
+    defer invalid_module.deinit();
+    try std.testing.expectError(error.TypeMismatch, invalid_module.verify());
+}
+
 test "parser rejects vector IR boundary forms deliberately" {
     const vector_add =
         \\define i32 @vector_add() {

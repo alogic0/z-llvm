@@ -202,7 +202,7 @@ fn terminatorUsesValue(terminator: ir.Terminator, result: []const u8) bool {
 
 fn valueMatchesName(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .undef => false,
+        .int, .undef, .null_value => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }
