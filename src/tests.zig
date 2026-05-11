@@ -4047,6 +4047,52 @@ test "loop info checks LCSSA form for outside loop uses" {
     try std.testing.expect(!try rejected_loop.hasLcssaForm(std.testing.allocator, rejected_function, rejected_graph));
 }
 
+test "loop info classifies reduced Zig corpus loop shape" {
+    const input =
+        \\define i32 @corpus_loop(i32 %n) {
+        \\1:
+        \\  %.not = icmp eq i32 %n, 0
+        \\  br i1 %.not, label %._crit_edge, label %.lr.ph.preheader
+        \\.lr.ph.preheader:
+        \\  br label %.lr.ph
+        \\.lr.ph:
+        \\  %.01 = phi i32 [ 0, %.lr.ph.preheader ], [ %next, %.lr.ph ]
+        \\  %next = add nuw i32 %.01, 1
+        \\  %done = icmp eq i32 %next, %n
+        \\  br i1 %done, label %._crit_edge, label %.lr.ph, !llvm.loop !0
+        \\._crit_edge:
+        \\  %.0.lcssa = phi i32 [ 0, %1 ], [ %next, %.lr.ph ]
+        \\  ret i32 %.0.lcssa
+        \\}
+        \\
+        \\!0 = distinct !{!0}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+
+    var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
+    defer loops.deinit();
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
+
+    const natural_loop = loops.loopForHeader(2) orelse return error.MissingLoop;
+    try std.testing.expectEqual(@as(usize, 2), natural_loop.header);
+    try std.testing.expectEqual(@as(usize, 2), natural_loop.latch);
+
+    var exiting = try natural_loop.exitingBlocks(std.testing.allocator, graph);
+    defer exiting.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{ 0, 2 }, exiting.items);
+
+    var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
+    defer exits.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{3}, exits.items);
+    try std.testing.expect(try natural_loop.hasLcssaForm(std.testing.allocator, function, graph));
+}
+
 test "loop info reports nested loop depth and innermost block ownership" {
     const input =
         \\define i32 @nested_loops(i1 %outer_cond, i1 %inner_cond, i32 %a) {

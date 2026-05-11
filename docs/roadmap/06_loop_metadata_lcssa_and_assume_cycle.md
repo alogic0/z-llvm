@@ -21,7 +21,7 @@ LCSSA-adjacent verification, inlined calls, and safer loop pass gating.
 - [x] Model `llvm.assume` conservatively for memory/control side effects.
 - [x] Add verifier checks for LCSSA-adjacent loop exit value shapes where the
       local IR can represent them.
-- [ ] Extend LoopInfo tests from synthetic loops to corpus-derived loops.
+- [x] Extend LoopInfo tests from synthetic loops to corpus-derived loops.
 - [x] Keep loop memory optimizations disabled unless Cycle 3 legality proves
       them.
 - [x] Promote a reduced control-flow/calls fixture to accepted optimizer input.
@@ -30,7 +30,7 @@ LCSSA-adjacent verification, inlined calls, and safer loop pass gating.
 
 - [x] Corpus loop metadata no longer blocks parsing when it can be preserved
       inertly.
-- [ ] Loop analyses classify corpus-derived loops without crashing or
+- [x] Loop analyses classify corpus-derived loops without crashing or
       over-transforming.
 - [x] LICM and loop simplification remain correct-first.
 
@@ -42,4 +42,11 @@ LCSSA-adjacent verification, inlined calls, and safer loop pass gating.
   metadata graph.
 - `llvm.assume` remains a conservative side-effecting call from Cycle 2.
 - Existing LoopInfo LCSSA-adjacent tests cover accepted and rejected synthetic
-  loop exit value shapes; corpus-derived LoopInfo tests remain the open item.
+  loop exit value shapes.
+
+## Completed Slice 2: Corpus-Shaped LoopInfo Test
+
+- Added a reduced `control_flow_calls`-style loop with numeric entry label,
+  `.lr.ph` labels, LCSSA-like exit PHI, and inert `!llvm.loop` metadata.
+- Verified LoopInfo header, latch, preheader, exiting block, exit block, and
+  LCSSA checks on that corpus-derived shape.
