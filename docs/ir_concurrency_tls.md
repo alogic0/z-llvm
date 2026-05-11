@@ -33,6 +33,13 @@ These remain rejected or classified through the atomics/inline-asm boundary in
 ```text
 local-only conservative opt fixture:
   globaldce_tls_root
+  globaldce_tls_concurrency_root
+  gvn_tls_store_clobber_reject
+
+opt-equivalent fixture:
+  dce_tls_store_preserve
+  early_cse_tls_store_clobber_reject
+  dse_tls_load_barrier
 
 unit tests:
   thread-local global preservation through GlobalDCE
@@ -46,3 +53,8 @@ TLS model selection, TLS relocations, thread pointer access sequences, and
 platform-specific lowering are backend/linker work. They are not modeled by the
 optimizer beyond preserving thread-local globals and refusing to optimize across
 atomic/fence-like barriers.
+
+The optimizer treatment in this project is therefore limited to symbol/root
+preservation and conservative memory legality. Native TLS lowering remains
+deferred until backend handoff fixtures require a concrete relocation and access
+sequence.
