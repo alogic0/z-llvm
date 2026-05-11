@@ -90,7 +90,7 @@ completed foundation epics
 - [x] [Cycle 1: Scalar FP Compare And Multiply](roadmap/01_scalar_fp_compare_and_multiply_cycle.md)
 - [x] [Cycle 2: Scalar FP Surface Closure](roadmap/02_scalar_fp_surface_closure_cycle.md)
 - [x] [Cycle 3: FP Conservative Optimizer Pass-Through](roadmap/03_fp_conservative_optimizer_passthrough_cycle.md)
-- [ ] [Cycle 4: Target Features And Function Attributes Normalization](roadmap/04_target_features_and_function_attrs_cycle.md)
+- [x] [Cycle 4: Target Features And Function Attributes Normalization](roadmap/04_target_features_and_function_attrs_cycle.md)
 - [ ] [Cycle 5: ReleaseSmall Corpus Acceptance](roadmap/05_release_small_corpus_acceptance_cycle.md)
 - [ ] [Cycle 6: ReleaseSafe Safety IR Expansion](roadmap/06_release_safe_safety_ir_expansion_cycle.md)
 - [ ] [Cycle 7: Debug Metadata Corpus Expansion](roadmap/07_debug_metadata_corpus_expansion_cycle.md)

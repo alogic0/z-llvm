@@ -10,6 +10,7 @@ profitability or legality decision from it yet.
 ```text
 "target-cpu"="..."
 "target-features"="+feature,-feature,..."
+"frame-pointer"="all"
 ```
 
 `src/target/features.zig` can extract these strings from raw LLVM attribute
@@ -20,6 +21,7 @@ text and query whether an exact feature token is present.
 ```text
 preserve raw attributes in parser/printer
 extract target-cpu and target-features for diagnostics and future target-cost work
+preserve frame-pointer and uwtable textually only
 do not use features in InstCombine, GVN, LICM, vector placeholders, or codegen decisions
 keep non-host target facts visible in corpus rows and target docs
 ```
@@ -45,5 +47,6 @@ no CPU model database
 no feature implication graph
 no target transform information
 no per-function subtarget dispatch
+no frame-pointer or unwind-table lowering decision
 no feature-driven instruction selection or vector legality
 ```

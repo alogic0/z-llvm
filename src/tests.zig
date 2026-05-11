@@ -1800,6 +1800,53 @@ test "function attributes resolve attribute groups for call memory effects" {
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
 }
 
+test "function attributes classify Zig memory effects conservatively" {
+    const input =
+        \\declare i32 @pure(i32) #0
+        \\
+        \\declare i32 @reads(ptr) #1
+        \\
+        \\declare i32 @arg_reads(ptr) #2
+        \\
+        \\declare void @readwrite(ptr) #3
+        \\
+        \\define i32 @caller(ptr %p, i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  %y = call i32 @reads(ptr %p)
+        \\  %z = call i32 @arg_reads(ptr %p)
+        \\  call void @readwrite(ptr %p)
+        \\  ret i32 %z
+        \\}
+        \\
+        \\attributes #0 = { mustprogress memory(none) "target-cpu"="x86-64" "target-features"="+sse2,-avx" }
+        \\attributes #1 = { nounwind memory(read, argmem: none, inaccessiblemem: none, target_mem0: none) "frame-pointer"="all" }
+        \\attributes #2 = { nounwind memory(argmem: read) }
+        \\attributes #3 = { nounwind memory(readwrite, argmem: none, inaccessiblemem: none, target_mem0: none) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const block = module.functions.items[0].blocks.items[0];
+    try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, block.instructions.items[0].kind.call));
+    try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, block.instructions.items[1].kind.call));
+    try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, block.instructions.items[2].kind.call));
+    try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, block.instructions.items[3].kind.call));
+
+    const feature_attrs = target.features.parseAttributeText(module.attribute_groups.items[0]);
+    try std.testing.expectEqualStrings("x86-64", feature_attrs.cpu.?);
+    try std.testing.expect(feature_attrs.hasFeature("+sse2"));
+    try std.testing.expect(feature_attrs.hasFeature("-avx"));
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "instcombine folds integer minmax intrinsics for same operands" {
     const input =
         \\declare i32 @llvm.smin.i32(i32, i32) #0

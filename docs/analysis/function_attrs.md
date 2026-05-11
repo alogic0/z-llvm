@@ -49,8 +49,12 @@ Implemented subset:
 recognize readnone, readonly, argmemonly, nofree, norecurse, nosync, nounwind,
 noinline, alwaysinline, and cold in raw function/declaration attributes
 resolve #N attribute groups for definitions and declarations
+preserve target-cpu, target-features, frame-pointer, uwtable, size, and target
+memory attributes textually without using them as optimization facts
 classify direct calls to readnone callees as no memory effect
 classify direct calls to readonly callees as readonly memory
+classify memory(none), memory(read), and memory(argmem: read) from Zig-emitted
+attribute groups for local mod/ref legality
 classify all other calls as unknown
 ```
 
@@ -61,6 +65,8 @@ no inference pass yet
 no parameter attribute semantics beyond parser/printer preservation
 no call-site attributes
 no CGSCC propagation
+no target feature, CPU model, frame-pointer, unwind-table, or size-attribute
+semantics beyond textual preservation
 ```
 
 Fixture coverage:
@@ -75,4 +81,6 @@ local-only conservative:
 
 unit-test only:
   raw attribute classification and call mod/ref boundary
+  Zig-emitted memory(read, ...), memory(readwrite, ...), target-cpu, and
+  target-features preservation boundary
 ```

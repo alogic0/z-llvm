@@ -88,7 +88,8 @@ inline asm
 ## Unsupported Attributes and Metadata
 
 ```text
-function attributes are preserved but not semantically interpreted
+function attributes are mostly preserved textually; only readnone/readonly and
+memory(none)/memory(read)/memory(argmem: read) affect local call memory effects
 parameter attributes are preserved but not semantically interpreted
 global attributes are preserved but not semantically interpreted
 fast-math flags

@@ -32,9 +32,9 @@ pub const AttributeSet = struct {
     pub fn fromText(text: ?[]const u8) AttributeSet {
         var attrs: AttributeSet = .{};
         const attr_text = text orelse return attrs;
-        if (std.mem.indexOf(u8, attr_text, "memory(none)") != null) attrs.readnone = true;
-        if (std.mem.indexOf(u8, attr_text, "memory(read)") != null) attrs.readonly = true;
-        if (std.mem.indexOf(u8, attr_text, "memory(argmem: read)") != null) attrs.readonly = true;
+        if (hasMemoryEffect(attr_text, "none")) attrs.readnone = true;
+        if (hasMemoryEffect(attr_text, "read")) attrs.readonly = true;
+        if (std.mem.indexOf(u8, attr_text, "argmem: read") != null) attrs.readonly = true;
         var it = std.mem.tokenizeAny(u8, attr_text, " \t,");
         while (it.next()) |token| {
             if (std.mem.eql(u8, token, "readnone")) {
@@ -64,6 +64,21 @@ pub const AttributeSet = struct {
         return attrs;
     }
 };
+
+fn hasMemoryEffect(text: []const u8, effect: []const u8) bool {
+    var search_start: usize = 0;
+    while (std.mem.indexOfPos(u8, text, search_start, "memory(")) |start| {
+        const body_start = start + "memory(".len;
+        const body_end = std.mem.indexOfScalarPos(u8, text, body_start, ')') orelse return false;
+        var fields = std.mem.splitScalar(u8, text[body_start..body_end], ',');
+        while (fields.next()) |raw_field| {
+            const field = std.mem.trim(u8, raw_field, " \t");
+            if (std.mem.eql(u8, field, effect)) return true;
+        }
+        search_start = body_end + 1;
+    }
+    return false;
+}
 
 pub fn functionAttributes(function: ir.Function) AttributeSet {
     return AttributeSet.fromText(function.attrs);
