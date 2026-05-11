@@ -155,7 +155,11 @@ completed foundation epics
 
 ## Current Finish Burn-Down
 
-- [ ] [Cycle 01: Finish Criteria and Gap Burn-Down](roadmap/01_finish_criteria_and_gap_burndown_cycle.md)
+- [x] [Cycle 01: Finish Criteria and Gap Burn-Down](roadmap/01_finish_criteria_and_gap_burndown_cycle.md)
+- [x] [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
+
+The selected active implementation slice is kept short in
+[next_steps.md](next_steps.md).
 
 ## Future Backlog
 

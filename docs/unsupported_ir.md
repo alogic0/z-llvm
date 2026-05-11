@@ -2,6 +2,12 @@
 
 This document tracks LLVM IR syntax and semantics that `z_llvm` does not support yet.
 
+The finish-oriented unsupported/future status is tracked in
+[`roadmap/finish_gap_burndown_table.md`](roadmap/finish_gap_burndown_table.md).
+As of Cycle 01, unsupported constructs must be tied to one of four statuses:
+active next step, later measured blocker, conservative accepted boundary, or
+out of scope.
+
 The current parser is intentionally small. It accepts only the LLVM-compatible subset needed by the reproduced algorithms so far:
 
 ```text
@@ -97,6 +103,32 @@ target-independent identical-arm fold for scalar `i1` conditions. Accepted lane
 operations are parser/verifier-only except for DCE of unused pure lane ops and
 the same-constant-lane extract-after-insert fold documented in
 `docs/ir_vectors.md`.
+
+## Finish Burn-Down Corpus Status
+
+The current manifest has four unsupported or future rows relevant to the finish
+definition:
+
+```text
+tiny_scalar_debug: future
+  Later measured blocker. Reduced Debug metadata rows already define the
+  accepted Debug boundary; the broad raw row is not required for the current
+  finish line.
+
+tiny_scalar_release_safe: future
+  Later measured blocker. Reduced ReleaseSafe safety/runtime-call rows already
+  define the accepted safety boundary.
+
+tiny_scalar_release_small: unsupported
+  Active next step. This old raw row predates the accepted stripped
+  tiny_scalar_release_small_captured row and must be removed, reduced, or
+  explicitly justified.
+
+vector_future_release_fast: parse,verify,future
+  Conservative accepted boundary. Fixed-vector syntax is parsed and verified,
+  but vectorizers and target-cost-driven transforms remain out of scope for the
+  current finish line.
+```
 
 ## Unsupported Instructions
 

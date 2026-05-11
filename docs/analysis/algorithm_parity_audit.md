@@ -14,6 +14,12 @@ fixture-equivalent: output matches LLVM 22 for listed fixtures
 algorithm-parity target: same core LLVM data structures and flow for supported IR
 ```
 
+Cycle 01 finish rule: no pass in the current inventory is an
+`algorithm-parity target`. The implemented pass set is either
+fixture-equivalent for listed fixtures or an LLVM-shaped/local conservative
+subset. Treat stronger LLVM algorithm parity as future quality work selected
+from measured fixture or corpus gaps, not as part of the current finish line.
+
 ## Implemented And Foundation Passes
 
 | Pass | Status | LLVM source | Local source/docs | Fixture proof | Missing analyses | Missing IR surface | Follow-up |
