@@ -21,7 +21,7 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
       retargeting branches.
 - [x] Centralize PHI incoming update/removal after edge deletion.
 - [x] Add verifier checks that catch stale PHI incoming blocks after CFG edits.
-- [ ] Extend postdominator/control-dependence tests to diamonds, nested
+- [x] Extend postdominator/control-dependence tests to diamonds, nested
       diamonds, loops, multiple exits, and unreachable blocks.
 - [ ] Rework ADCE liveness toward an explicit block/instruction worklist for
       the supported CFG surface.
@@ -52,3 +52,13 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 - [x] Documented the helper as a rebuild-and-repair subset of LLVM's CFG update
       utilities.
 - [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
+
+## Completed Analysis Coverage Slice
+
+- [x] Added nested-diamond postdominator and control-dependence coverage.
+- [x] Added loop postdominator coverage for header/body/exit relationships.
+- [x] Added multiple-exit coverage where no single immediate postdominator is
+      available.
+- [x] Added unreachable-block coverage to keep local postdominator behavior
+      explicit for dead regions.
+- [x] Verified with `zig build test`.

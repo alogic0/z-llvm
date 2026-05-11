@@ -3549,6 +3549,109 @@ test "control dependence reports branch-controlled blocks" {
     try std.testing.expect(!dependence.isControlDependentOn(0, 0));
 }
 
+test "postdominator analysis covers nested diamonds loops multiple exits and unreachable blocks" {
+    const nested_diamond =
+        \\define i32 @nested(i1 %a, i1 %b, i32 %v) {
+        \\entry:
+        \\  br i1 %a, label %left, label %right
+        \\left:
+        \\  br i1 %b, label %left_inner, label %left_join
+        \\left_inner:
+        \\  br label %left_join
+        \\left_join:
+        \\  br label %exit
+        \\right:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var nested_module = try ir.Module.parse(std.testing.allocator, nested_diamond);
+    defer nested_module.deinit();
+    const nested_function = nested_module.functions.items[0];
+    var nested_postdom = try postdominator.PostDominators.build(std.testing.allocator, nested_function);
+    defer nested_postdom.deinit();
+    try std.testing.expectEqual(@as(?usize, 5), nested_postdom.immediatePostDominator(0));
+    try std.testing.expectEqual(@as(?usize, 3), nested_postdom.immediatePostDominator(1));
+    try std.testing.expectEqual(@as(?usize, 3), nested_postdom.immediatePostDominator(2));
+    try std.testing.expectEqual(@as(?usize, 5), nested_postdom.immediatePostDominator(3));
+
+    var nested_graph = try cfg.Graph.build(std.testing.allocator, nested_function);
+    defer nested_graph.deinit();
+    const nested_dependence: postdominator.ControlDependence = .{
+        .graph = nested_graph,
+        .postdom = nested_postdom,
+    };
+    try std.testing.expect(nested_dependence.isControlDependentOn(1, 0));
+    try std.testing.expect(nested_dependence.isControlDependentOn(4, 0));
+    try std.testing.expect(nested_dependence.isControlDependentOn(2, 1));
+    try std.testing.expect(!nested_dependence.isControlDependentOn(3, 1));
+
+    const loop_cfg =
+        \\define i32 @loop_postdom(i1 %cond, i32 %v) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  br i1 %cond, label %body, label %exit
+        \\body:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var loop_module = try ir.Module.parse(std.testing.allocator, loop_cfg);
+    defer loop_module.deinit();
+    const loop_function = loop_module.functions.items[0];
+    var loop_postdom = try postdominator.PostDominators.build(std.testing.allocator, loop_function);
+    defer loop_postdom.deinit();
+    try std.testing.expectEqual(@as(?usize, 1), loop_postdom.immediatePostDominator(0));
+    try std.testing.expectEqual(@as(?usize, 3), loop_postdom.immediatePostDominator(1));
+    try std.testing.expectEqual(@as(?usize, 1), loop_postdom.immediatePostDominator(2));
+    try std.testing.expectEqual(@as(?usize, null), loop_postdom.immediatePostDominator(3));
+
+    const multi_exit =
+        \\define i32 @multi_exit(i1 %cond, i32 %v) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  ret i32 %v
+        \\right:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var multi_module = try ir.Module.parse(std.testing.allocator, multi_exit);
+    defer multi_module.deinit();
+    const multi_function = multi_module.functions.items[0];
+    var multi_postdom = try postdominator.PostDominators.build(std.testing.allocator, multi_function);
+    defer multi_postdom.deinit();
+    try std.testing.expectEqual(@as(?usize, null), multi_postdom.immediatePostDominator(0));
+    try std.testing.expectEqual(@as(?usize, null), multi_postdom.immediatePostDominator(1));
+    try std.testing.expectEqual(@as(?usize, null), multi_postdom.immediatePostDominator(2));
+
+    const unreachable_cfg =
+        \\define i32 @unreachable_postdom(i1 %cond, i32 %v) {
+        \\entry:
+        \\  br label %exit
+        \\dead:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var unreachable_module = try ir.Module.parse(std.testing.allocator, unreachable_cfg);
+    defer unreachable_module.deinit();
+    const unreachable_function = unreachable_module.functions.items[0];
+    var unreachable_postdom = try postdominator.PostDominators.build(std.testing.allocator, unreachable_function);
+    defer unreachable_postdom.deinit();
+    try std.testing.expectEqual(@as(?usize, 2), unreachable_postdom.immediatePostDominator(0));
+    try std.testing.expectEqual(@as(?usize, null), unreachable_postdom.immediatePostDominator(1));
+    try std.testing.expectEqual(@as(?usize, null), unreachable_postdom.immediatePostDominator(2));
+}
+
 test "loop info finds a natural loop from a dominator backedge" {
     const input =
         \\define i32 @loop(i1 %cond, i32 %a) {
