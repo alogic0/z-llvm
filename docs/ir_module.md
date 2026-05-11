@@ -33,6 +33,8 @@ target triple = "..."
 $name = comdat <kind>
 scalar global definitions: @name = [linkage] global iN <int-or-undef>
 scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
+thread_local scalar global and constant definitions preserved as raw address
+attributes
 global suffix attributes preserved as raw text
 function linkage: default, internal, private, external
 function visibility: default, hidden, protected
@@ -57,6 +59,8 @@ Calling conventions are preserved in the function signature because they are ABI
 Scalar global definitions are preserved at module level. They are not yet visible to load/store analysis, constant folding, or codegen.
 COMDAT records are preserved and treated conservatively by GlobalDCE when
 referenced from raw global/function attributes.
+Thread-local globals are preserved and treated conservatively by GlobalDCE as
+concurrency-visible roots.
 ```
 
 Fixture coverage:
@@ -83,7 +87,8 @@ unit-test only:
 Known gaps:
 
 ```text
-no aggregate, string, TLS, ifunc, or declaration globals
+no aggregate, string, ifunc, or declaration globals
+no TLS lowering model beyond preservation and conservative GlobalDCE rooting
 no semantic use of globals in optimization or codegen
 no semantic use of linkage, visibility, or attributes
 no interpreted COMDAT selection semantics

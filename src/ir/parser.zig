@@ -256,7 +256,9 @@ fn parseGlobal(line: []const u8) !core.Global {
 }
 
 fn isGlobalAddressAttr(token: []const u8) bool {
-    return std.mem.eql(u8, token, "unnamed_addr") or std.mem.eql(u8, token, "local_unnamed_addr");
+    return std.mem.eql(u8, token, "unnamed_addr") or
+        std.mem.eql(u8, token, "local_unnamed_addr") or
+        std.mem.eql(u8, token, "thread_local");
 }
 
 fn parseGlobalInitializer(text: []const u8) !core.Value {

@@ -1950,6 +1950,35 @@ test "globaldce preserves comdat members conservatively" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "globaldce preserves thread local globals conservatively" {
+    const input =
+        \\@tls = internal thread_local global i32 1
+        \\@dead = internal global i32 2
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "globaldce");
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var trace: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer trace.deinit();
+    _ = try pm.run(&module, &context, &trace.writer, false);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\@tls = internal thread_local global i32 1
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "verifier rejects use before definition in the same block" {
     const input =
         \\define i32 @bad(i32 %a) {

@@ -60,7 +60,7 @@ const GlobalDependencyGraph = struct {
             const ref: NodeRef = .{ .kind = .global, .name = global.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
-            if (!isLocal(global.linkage) or hasComdat(global.attrs)) try graph.roots.append(allocator, ref);
+            if (!isLocal(global.linkage) or hasComdat(global.attrs) or isThreadLocal(global)) try graph.roots.append(allocator, ref);
             switch (global.initializer) {
                 .named => |name| {
                     if (hasFunctionDefinition(module, name)) {
@@ -147,7 +147,7 @@ fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isLocal(global.linkage) or hasComdat(global.attrs) or containsRef(live, .{ .kind = .global, .name = global.name })) {
+        if (!isLocal(global.linkage) or hasComdat(global.attrs) or isThreadLocal(global) or containsRef(live, .{ .kind = .global, .name = global.name })) {
             index += 1;
             continue;
         }
@@ -219,4 +219,8 @@ fn isLocal(linkage: ir.FunctionLinkage) bool {
 
 fn hasComdat(attrs: ?[]const u8) bool {
     return if (attrs) |text| std.mem.indexOf(u8, text, "comdat") != null else false;
+}
+
+fn isThreadLocal(global: ir.Global) bool {
+    return if (global.address_attrs) |text| std.mem.indexOf(u8, text, "thread_local") != null else false;
 }

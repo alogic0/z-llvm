@@ -1,0 +1,48 @@
+# Concurrency And TLS IR
+
+This cycle classifies concurrency-related IR so optimizer passes do not silently
+drop thread-visible state.
+
+## Implemented Surface
+
+```text
+@name = [linkage] thread_local global iN <int-or-undef>
+@name = [linkage] thread_local constant iN <int-or-undef>
+```
+
+The `thread_local` spelling is preserved as a raw global address attribute.
+GlobalDCE treats thread-local globals as conservative roots, even when their
+linkage is local, because TLS allocation and access can be target/linker
+visible.
+
+## Fail-Closed Surface
+
+```text
+fence
+atomicrmw
+cmpxchg
+syncscope
+inline asm
+```
+
+These remain rejected or classified through the atomics/inline-asm boundary in
+`docs/ir_atomics_inline_asm.md`.
+
+## Fixture Coverage
+
+```text
+local-only conservative opt fixture:
+  globaldce_tls_root
+
+unit tests:
+  thread-local global preservation through GlobalDCE
+  fence rejection through the atomic parser boundary
+  volatile/atomic memory-effect barriers
+```
+
+## Backend Boundary
+
+TLS model selection, TLS relocations, thread pointer access sequences, and
+platform-specific lowering are backend/linker work. They are not modeled by the
+optimizer beyond preserving thread-local globals and refusing to optimize across
+atomic/fence-like barriers.
