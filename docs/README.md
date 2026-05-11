@@ -149,41 +149,17 @@ completed foundation epics
 
 - [x] [Completed Finish-Oriented Roadmap Cycles](roadmap/historical/completed_finish_oriented_cycles/README.md)
 
-## Current Finish Roadmap Cycles
+## Finish Cycles 01-25 Archive
 
-- [x] [Cycle 01: Debug Intrinsic Variable Location Boundary](roadmap/01_debug_intrinsic_variable_location_boundary_cycle.md)
-- [x] [Cycle 02: Debug Metadata Graph Verification](roadmap/02_debug_metadata_graph_verification_cycle.md)
-- [x] [Cycle 03: Debug Info Salvage Preservation](roadmap/03_debug_info_salvage_preservation_cycle.md)
-- [x] [Cycle 04: APFloat Semantics Foundation](roadmap/04_apfloat_semantics_foundation_cycle.md)
-- [x] [Cycle 05: Strict FP Fold Legality](roadmap/05_strict_fp_fold_legality_cycle.md)
-- [x] [Cycle 06: Fast-Math Optimization Enablement](roadmap/06_fast_math_optimization_enablement_cycle.md)
-- [x] [Cycle 07: FP Lattice and Value Numbering Legality](roadmap/07_fp_lattice_value_numbering_legality_cycle.md)
-- [x] [Cycle 08: MemorySSA Updater and Phi Precision](roadmap/08_memoryssa_updater_phi_precision_cycle.md)
-- [x] [Cycle 09: Alias Stack Precision Expansion](roadmap/09_alias_stack_precision_expansion_cycle.md)
-- [x] [Cycle 10: GVN PRE and Load Redundancy Parity](roadmap/10_gvn_pre_load_redundancy_parity_cycle.md)
-- [x] [Cycle 11: DSE Partial-Overwrite and MemorySSA Parity](roadmap/11_dse_partial_overwrite_memoryssa_parity_cycle.md)
-- [x] [Cycle 12: LICM Memory Promotion Legality](roadmap/12_licm_memory_promotion_legality_cycle.md)
-- [x] [Cycle 13: ADCE Control-Dependence Parity](roadmap/13_adce_control_dependence_parity_cycle.md)
-- [x] [Cycle 14: SROA Aggregate Slice Parity](roadmap/14_sroa_aggregate_slice_parity_cycle.md)
-- [x] [Cycle 15: InstCombine Integer and Pointer Parity](roadmap/15_instcombine_integer_pointer_parity_cycle.md)
-- [x] [Cycle 16: SimplifyCFG Canonical Shape Parity](roadmap/16_simplifycfg_canonical_shape_parity_cycle.md)
-- [x] [Cycle 17: Vector Target-Cost and Lane Optimization](roadmap/17_vector_target_cost_lane_optimization_cycle.md)
-- [x] [Cycle 18: Vector FP and Select Transform Boundary](roadmap/18_vector_fp_select_transform_boundary_cycle.md)
-- [x] [Cycle 19: Atomic Ordering and SyncScope Semantics](roadmap/19_atomic_ordering_syncscope_semantics_cycle.md)
-- [x] [Cycle 20: TLS and Concurrency IR Acceptance](roadmap/20_tls_concurrency_ir_acceptance_cycle.md)
-- [x] [Cycle 21: EH Pad and Invoke Boundary](roadmap/21_eh_pad_invoke_boundary_cycle.md)
-- [x] [Cycle 22: Module Linkage, COMDAT, and Global Optimization](roadmap/22_module_linkage_comdat_globalopt_cycle.md)
-- [x] [Cycle 23: Bitcode, LTO, and ThinLTO Compatibility Decision](roadmap/23_bitcode_lto_thinlto_compatibility_decision_cycle.md)
-- [x] [Cycle 24: Upstream Readiness Finish Audit](roadmap/24_upstream_readiness_finish_audit_cycle.md)
+- [x] [Finish Cycles 01-25 Archive](roadmap/historical/finish_cycles_01_25_archive/README.md)
 
-## Completed Finish Cycles 01-24 Audit
+## Current Finish Burn-Down
 
-- [x] [Completed Finish Cycles 01-24 Audit](roadmap/historical/completed_finish_cycles_01_24_audit.md)
+- [ ] [Cycle 01: Finish Criteria and Gap Burn-Down](roadmap/01_finish_criteria_and_gap_burndown_cycle.md)
 
 ## Future Backlog
 
 - [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
-- [ ] [Cycle 25: Evidence-Backed Gap Wave](roadmap/25_next_evidence_backed_gap_wave.md)
 
 ## Operating Rule
 

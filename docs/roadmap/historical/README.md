@@ -23,6 +23,8 @@ Completed source-backed corpus expansion cycles live in
 Completed source-backed roadmap cycles live in
 `completed_source_backed_cycles/`.
 
+Finish cycles 01-25 live in `finish_cycles_01_25_archive/`.
+
 ## Archived Files
 
 - `calls_and_stack_frame_codegen_epic.md`

@@ -94,5 +94,5 @@ Archive and next wave:
 
 ```text
 docs/roadmap/historical/completed_finish_cycles_01_24_audit.md
-docs/roadmap/25_next_evidence_backed_gap_wave.md
+docs/roadmap/historical/finish_cycles_01_25_archive/25_next_evidence_backed_gap_wave.md
 ```
