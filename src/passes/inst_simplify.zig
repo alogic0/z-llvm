@@ -210,18 +210,21 @@ fn truncateConstant(value: i128, bits: u16) ?ir.Value {
 }
 
 fn zeroExtendConstant(value: i128, from_bits: u16) ?ir.Value {
-    if (value < 0) return null;
-    const max = (@as(i128, 1) << @intCast(from_bits)) - 1;
-    if (value > max) return null;
-    return .{ .int = value };
+    if (from_bits == 0 or from_bits >= 128) return null;
+    return .{ .int = lowBits(value, from_bits) };
 }
 
 fn signExtendConstant(value: i128, from_bits: u16) ?ir.Value {
     if (from_bits == 0 or from_bits >= 128) return null;
-    const min = -(@as(i128, 1) << @intCast(from_bits - 1));
-    const max = (@as(i128, 1) << @intCast(from_bits - 1)) - 1;
-    if (value < min or value > max) return null;
-    return .{ .int = value };
+    const bits = lowBits(value, from_bits);
+    const sign_bit = @as(i128, 1) << @intCast(from_bits - 1);
+    if ((bits & sign_bit) == 0) return .{ .int = bits };
+    return .{ .int = bits - (@as(i128, 1) << @intCast(from_bits)) };
+}
+
+fn lowBits(value: i128, bits: u16) i128 {
+    const mask = (@as(i128, 1) << @intCast(bits)) - 1;
+    return value & mask;
 }
 
 fn simplifyIcmp(icmp: ir.IcmpInst) ?ir.Value {

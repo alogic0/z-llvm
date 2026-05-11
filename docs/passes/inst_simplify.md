@@ -51,7 +51,7 @@ Local target status:
 Implemented subset:
   Integer identity folds
   Integer constant folds for defined operations
-  Cast folds for integer constants
+  Cast folds for integer constants using source-width bit patterns
   ICmp constant and same-operand folds
   Select constant-condition and identical-arm folds
   Freeze of integer constants
@@ -86,6 +86,8 @@ shared scalar expression equivalence helper used by GVN and EarlyCSE
 commutative binary constant-on-RHS canonicalization helper
 existing arithmetic/bitwise/shift/select/icmp folds moved out of instcombine
 constant trunc/zext/sext folding for integer constants when no target layout is needed
+width-aware zext/sext bitpattern folding for constants such as `zext i8 -1`
+and `sext i8 255`
 constant udiv/sdiv/urem/srem folding only when the operation is defined in the current integer model
 preserve division by zero, signed min / -1, and non-exact exact division cases
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
@@ -105,6 +107,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   instcombine_scalar_simplify
+  instcombine_cast_bitpatterns
 
 local-only conservative:
   unsafe division cases are preserved in unit tests

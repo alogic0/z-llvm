@@ -21,7 +21,7 @@ comparisons, select, and PHI handling.
 - [ ] Expand SCCP lattice tests for undef, overdefined, constant, executable
       blocks, and executable edges.
 - [ ] Add more precise handling for PHI incoming values from unreachable edges.
-- [ ] Add supported integer cast folds with width-aware signed/unsigned rules.
+- [x] Add supported integer cast folds with width-aware signed/unsigned rules.
 - [ ] Expand `icmp` folding for signed/unsigned predicates and known constants.
 - [ ] Add select folding cases that are legal under local undef/freeze rules.
 - [ ] Audit all arithmetic folds involving flags (`nsw`, `nuw`, `exact`) and
@@ -41,3 +41,13 @@ comparisons, select, and PHI handling.
 - [ ] Scalar Zig-originated fixtures exercise the expanded behavior.
 - [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
+## Completed Cast Semantics Slice
+
+- [x] Updated constant `zext` and `sext` folding to interpret the source value
+      through the source integer width instead of rejecting negative or
+      unsigned textual forms.
+- [x] Added `instcombine_cast_bitpatterns` to compare `zext i8 -1` and
+      `sext i8 255` behavior against `opt-22`.
+- [x] Documented the width-aware bitpattern boundary in
+      `docs/passes/inst_simplify.md`.
+- [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
