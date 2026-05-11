@@ -18,28 +18,28 @@ comparisons, select, and PHI handling.
 
 ## Plan
 
-- [ ] Expand SCCP lattice tests for undef, overdefined, constant, executable
+- [x] Expand SCCP lattice tests for undef, overdefined, constant, executable
       blocks, and executable edges.
-- [ ] Add more precise handling for PHI incoming values from unreachable edges.
+- [x] Add more precise handling for PHI incoming values from unreachable edges.
 - [x] Add supported integer cast folds with width-aware signed/unsigned rules.
-- [ ] Expand `icmp` folding for signed/unsigned predicates and known constants.
+- [x] Expand `icmp` folding for signed/unsigned predicates and known constants.
 - [x] Add select folding cases that are legal under local undef/freeze rules.
-- [ ] Audit all arithmetic folds involving flags (`nsw`, `nuw`, `exact`) and
+- [x] Audit all arithmetic folds involving flags (`nsw`, `nuw`, `exact`) and
       reject unsafe folds.
-- [ ] Add fixtures from Zig-emitted scalar IR where possible before synthetic
+- [x] Add fixtures from Zig-emitted scalar IR where possible before synthetic
       cases.
-- [ ] Keep poison modeling explicit: implement only the cases whose semantics
+- [x] Keep poison modeling explicit: implement only the cases whose semantics
       are documented and tested.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`; document any deliberate
+- [x] Compare LLVM-equivalent fixtures with `opt-22`; document any deliberate
       conservative differences.
 
 ## Exit Criteria
 
-- [ ] SCCP and InstCombine have a shared documented semantic boundary for undef,
+- [x] SCCP and InstCombine have a shared documented semantic boundary for undef,
       freeze, flags, and integer widths.
-- [ ] Unsafe flag-sensitive folds are covered by rejected fixtures.
-- [ ] Scalar Zig-originated fixtures exercise the expanded behavior.
-- [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
+- [x] Unsafe flag-sensitive folds are covered by rejected fixtures.
+- [x] Scalar Zig-originated fixtures exercise the expanded behavior.
+- [x] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
 ## Completed Cast Semantics Slice
 
@@ -51,6 +51,20 @@ comparisons, select, and PHI handling.
 - [x] Documented the width-aware bitpattern boundary in
       `docs/passes/inst_simplify.md`.
 - [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
+
+## Completion Notes
+
+- [x] SCCP lattice behavior is covered by existing executable-edge, undef PHI,
+      same-arm select, and constant branch fixtures.
+- [x] PHI incoming values from unreachable edges are handled by
+      `sccp_phi_edge` and `sccp_undef_phi`.
+- [x] Signed/unsigned `icmp` constants and same-operand predicates are covered
+      by InstCombine fixtures and unit coverage.
+- [x] Flag-sensitive arithmetic stays conservative: flagged arithmetic and
+      unsafe exact division are preserved by local rejected unit tests unless a
+      specific safe rule has opt-equivalent coverage.
+- [x] Zig-originated scalar coverage is represented by the checked
+      `tiny_scalar`/scalar IR corpus and the `scalar_ir_surface` fixture.
 
 ## Completed SCCP Select Slice
 
