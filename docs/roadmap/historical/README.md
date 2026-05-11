@@ -25,6 +25,8 @@ Completed source-backed roadmap cycles live in
 
 Finish cycles 01-25 live in `finish_cycles_01_25_archive/`.
 
+Finish burn-down cycles 01-08 live in `finish_burndown_01_08/`.
+
 ## Archived Files
 
 - `calls_and_stack_frame_codegen_epic.md`
