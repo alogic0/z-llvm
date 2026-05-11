@@ -89,6 +89,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   gvn_dominating_expr
+  gvn_nonlocal_scalar
   gvn_scalar_with_memory
   gvn_phi
   gvn_load_call_clobber_reject
@@ -102,6 +103,10 @@ local-only conservative:
   gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
   ignore a side-exit store outside the queried path. `opt-22` preserves this
   shape, so full load-placement parity remains future work.
+  gvn_scalar_pre_reject keeps partially available expressions unchanged because
+  scalar PRE insertion is not implemented.
+  gvn_diamond_load_no_memory_phi is local-conservative because local leader
+  naming differs from opt-22 while MemorySSA proves the same load redundancy.
   readnone call GVN is unit-tested locally. Readonly calls are trusted only as
   non-clobbering memory accesses for repeated loads, matching the local
   `memory(read)` fixture.

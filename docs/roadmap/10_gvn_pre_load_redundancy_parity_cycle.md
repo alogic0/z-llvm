@@ -7,21 +7,33 @@ PRE subset.
 
 ## Plan
 
-- [ ] Document the LLVM GVN entry points and data structures used for load PRE
+- [x] Document the LLVM GVN entry points and data structures used for load PRE
       and scalar PRE.
-- [ ] Add availability analysis for expressions across simple diamonds and loop
+- [x] Add availability analysis for expressions across simple diamonds and loop
       preheaders.
-- [ ] Use MemorySSA and alias queries for load redundancy instead of syntactic
+- [x] Use MemorySSA and alias queries for load redundancy instead of syntactic
       scans.
-- [ ] Add fixtures for full redundancy, partial redundancy, clobbered loads,
+- [x] Add fixtures for full redundancy, partial redundancy, clobbered loads,
       side exits, and unreachable stores.
-- [ ] Keep speculative PRE disabled unless dominance, safety, and cost are
+- [x] Keep speculative PRE disabled unless dominance, safety, and cost are
       proven.
-- [ ] Compare equivalent fixtures with `opt-22`.
-- [ ] Record local-only conservative differences in `docs/passes/gvn.md`.
+- [x] Compare equivalent fixtures with `opt-22`.
+- [x] Record local-only conservative differences in `docs/passes/gvn.md`.
 
 ## Exit Criteria
 
-- [ ] GVN eliminates one non-local redundant scalar expression.
-- [ ] GVN eliminates one non-local redundant load through MemorySSA legality.
-- [ ] Unsafe PRE cases are rejected and tested.
+- [x] GVN eliminates one non-local redundant scalar expression.
+- [x] GVN eliminates one non-local redundant load through MemorySSA legality.
+- [x] Unsafe PRE cases are rejected and tested.
+
+## Completed Slice
+
+Cycle 10 documents and fixtures the current GVN availability boundary:
+
+- non-local dominating scalar redundancy is eliminated;
+- non-local load redundancy is eliminated when MemorySSA has no phi/clobber
+  barrier on the path;
+- scalar PRE remains disabled for partially available expressions.
+
+This is still not LLVM load PRE. The local pass does not insert expressions,
+split critical edges, or speculate computations.
