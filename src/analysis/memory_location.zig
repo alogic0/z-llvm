@@ -209,6 +209,11 @@ pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
         .aggregate => |text| text,
         .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
+    if (arrayInfo(text)) |array| {
+        if (field_index >= array.count) return null;
+        return array.element_ty;
+    }
+
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
     while (nextAggregateField(&fields)) |field_text| : (index += 1) {
@@ -222,6 +227,12 @@ pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
         .aggregate => |text| text,
         .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
+    if (arrayInfo(text)) |array| {
+        if (field_index >= array.count) return null;
+        const element_size = typeSize(array.element_ty) orelse return null;
+        return @as(i128, @intCast(field_index * element_size));
+    }
+
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
     var offset: i128 = 0;

@@ -57,16 +57,20 @@ Implemented subset:
   Zero-offset partition forwarding to the base alloca
   Nested zero-offset partition forwarding to the base alloca
   Textual struct aggregate parsing for the narrow `{ iN, iN, ... }` surface
+  Fixed array aggregate parsing for the narrow `[N x iM]` surface
   Struct-field GEP offset calculation for constant field indices
-  Exact-cover scalar integer field alloca splitting for simple aggregate allocas
+  Array-element GEP offset calculation for constant element indices
+  Exact-cover scalar integer field/element alloca splitting for simple
+  aggregate allocas
   Rewriting of matching scalar field loads/stores to replacement allocas
   mem2reg handoff after forwarding
 
 Intentional divergences:
   The aggregate type model is textual and only accepts the small struct shape
-  needed by the current SROA fixture. It is not a full LLVM type system.
+  and fixed integer array shape needed by the current SROA fixtures. It is not
+  a full LLVM type system.
   Replacement allocas are created only for scalar integer fields reached by
-  constant two-index struct GEPs.
+  constant two-index struct/array GEPs.
   Volatile, atomic, escaped, variable-index, vector, packed, pointer-sized, and
   unknown-size cases are rejected locally for now. LLVM SROA can scalarize some
   volatile field cases more precisely; this project keeps that as a documented
@@ -81,6 +85,11 @@ Fixture coverage:
   sroa_zero_gep
   sroa_nested_zero_gep
   sroa_struct_two_i32
+  sroa_array_three_i32
+  sroa_struct_one_field
+  sroa_struct_escape_reject
+  sroa_debug_declare_reject
+  sroa_byval_param_boundary
 
 Zig-emitted aggregate coverage:
   The checked Zig `aggregates` corpus row captures struct-field GEPs, arrays,
@@ -109,8 +118,10 @@ look up the rewrite partition for each GEP result
 require every GEP index to be integer constant zero
 replace uses of that zero-offset GEP result with the base alloca pointer
 parse small textual struct aggregate types
+parse small textual fixed array aggregate types
 calculate constant struct-field GEP offsets
-split simple integer struct-field partitions into scalar allocas
+calculate constant fixed-array element GEP offsets
+split simple integer struct-field/array-element partitions into scalar allocas
 rewrite exact-cover field loads/stores to those scalar allocas
 run the existing mem2reg promotion after forwarding
 ```
@@ -126,12 +137,18 @@ opt-22 equivalent:
   sroa_zero_gep
   sroa_nested_zero_gep
   sroa_struct_two_i32
+  sroa_array_three_i32
+  sroa_struct_one_field
+  sroa_struct_escape_reject
+  sroa_byval_param_boundary
 
 local-only conservative:
   sroa_struct_volatile_reject
+  sroa_debug_declare_reject
 
 unit-test only:
   sroa rejects volatile aggregate field accesses locally
+  memory location aggregate helpers classify array elements as fields
 ```
 
 Known gaps:
@@ -143,6 +160,8 @@ no partial load/store rewriting
 no memcpy/memmove rewriting
 no padding, integer widening, vector, or packed-aggregate handling
 no pointer-field scalarization until target DataLayout pointer sizes are wired
-no module-level target DataLayout parser; current offset facts use the local
-memory-location type-size subset
+module-level target DataLayout is used for supported aggregate offsets, but
+the local type model still covers only the current integer struct/array subset
+debug declare salvage blocks aggregate rewriting until variable-location update
+semantics are modeled
 ```

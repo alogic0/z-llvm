@@ -7,20 +7,27 @@ reasoning.
 
 ## Plan
 
-- [ ] Inventory aggregate alloca patterns from Zig rows: structs, arrays,
+- [x] Inventory aggregate alloca patterns from Zig rows: structs, arrays,
       optionals, errors, slices, and ABI temporaries.
-- [ ] Add slice construction based on DataLayout offsets and access ranges.
-- [ ] Split simple alloca aggregates into scalar replacements when every use is
+- [x] Add slice construction based on DataLayout offsets and access ranges.
+- [x] Split simple alloca aggregates into scalar replacements when every use is
       understood.
-- [ ] Preserve or reject lifetime, debug, volatile, atomic, byval, and escaping
+- [x] Preserve or reject lifetime, debug, volatile, atomic, byval, and escaping
       uses explicitly.
-- [ ] Add fixtures for scalarizable structs, arrays, partial fields, escaped
+- [x] Add fixtures for scalarizable structs, arrays, partial fields, escaped
       pointers, debug-bearing allocas, and ABI attributes.
-- [ ] Compare supported SROA cases with `opt-22`.
-- [ ] Update SROA and DataLayout docs with the supported slice model.
+- [x] Compare supported SROA cases with `opt-22`.
+- [x] Update SROA and DataLayout docs with the supported slice model.
 
 ## Exit Criteria
 
-- [ ] At least one source-backed aggregate alloca scalarizes.
-- [ ] Unsupported aggregate uses fail conservative checks.
-- [ ] Slice reasoning is shared with alias and DSE where practical.
+- [x] At least one source-backed aggregate alloca scalarizes.
+- [x] Unsupported aggregate uses fail conservative checks.
+- [x] Slice reasoning is shared with alias and DSE where practical.
+
+## Completed Slice
+
+Cycle 14 extends the SROA slice model from struct-only integer fields to simple
+fixed integer arrays. The local pass now scalarizes exact-cover struct
+field/array element accesses, still rejecting escaped pointers, debug-declare
+allocas, volatile/atomic memory, byval parameter boundaries, and unknown uses.

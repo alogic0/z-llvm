@@ -164,7 +164,7 @@ completed foundation epics
 - [x] [Cycle 11: DSE Partial-Overwrite and MemorySSA Parity](roadmap/11_dse_partial_overwrite_memoryssa_parity_cycle.md)
 - [x] [Cycle 12: LICM Memory Promotion Legality](roadmap/12_licm_memory_promotion_legality_cycle.md)
 - [x] [Cycle 13: ADCE Control-Dependence Parity](roadmap/13_adce_control_dependence_parity_cycle.md)
-- [ ] [Cycle 14: SROA Aggregate Slice Parity](roadmap/14_sroa_aggregate_slice_parity_cycle.md)
+- [x] [Cycle 14: SROA Aggregate Slice Parity](roadmap/14_sroa_aggregate_slice_parity_cycle.md)
 - [ ] [Cycle 15: InstCombine Integer and Pointer Parity](roadmap/15_instcombine_integer_pointer_parity_cycle.md)
 - [ ] [Cycle 16: SimplifyCFG Canonical Shape Parity](roadmap/16_simplifycfg_canonical_shape_parity_cycle.md)
 - [ ] [Cycle 17: Vector Target-Cost and Lane Optimization](roadmap/17_vector_target_cost_lane_optimization_cycle.md)

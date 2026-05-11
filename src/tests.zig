@@ -490,6 +490,17 @@ test "datalayout computes ABI padded aggregate layout" {
     try std.testing.expectEqual(@as(u64, 16), try layout.typeStoreSizeBytes(array_ty));
 }
 
+test "memory location aggregate helpers classify array elements as fields" {
+    const array_ty: ir.Type = .{ .aggregate = "[3 x i32]" };
+
+    try std.testing.expect(memory_location.aggregateFieldType(array_ty, 0).?.eql(.{ .int = 32 }));
+    try std.testing.expect(memory_location.aggregateFieldType(array_ty, 2).?.eql(.{ .int = 32 }));
+    try std.testing.expectEqual(@as(?ir.Type, null), memory_location.aggregateFieldType(array_ty, 3));
+    try std.testing.expectEqual(@as(?i128, 0), memory_location.aggregateFieldOffset(array_ty, 0));
+    try std.testing.expectEqual(@as(?i128, 8), memory_location.aggregateFieldOffset(array_ty, 2));
+    try std.testing.expectEqual(@as(?i128, null), memory_location.aggregateFieldOffset(array_ty, 3));
+}
+
 test "memory locations can use module DataLayout for aggregate GEP offsets" {
     const input =
         \\target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
