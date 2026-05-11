@@ -28,6 +28,7 @@ i1 branch conditions use the matching low 8-bit argument registers
 i32 direct-call operands use the same first-six argument register order
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
+one fixed i32 stack slot can be reloaded into %edi before a direct call
 leaf functions only
 no stack frame for register-only leaf functions
 ```
@@ -42,6 +43,8 @@ The current project uses a local-only conservative sequence for tiny call fixtur
   callq callee
   addq $8, %rsp
 For one live caller argument, the 8-byte alignment slot is also used as a deterministic spill slot.
+For the `call_stack_slot` handoff proof, the same fixed slot holds an explicit
+i32 alloca value and is reloaded into `%edi` before the direct call.
 ```
 
 Register preservation boundary:

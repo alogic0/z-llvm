@@ -169,6 +169,7 @@ fn lowerStraightLineReturn(
     switch (terminator) {
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
+            if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
@@ -184,6 +185,79 @@ fn lowerStraightLineReturn(
         },
         .br, .condbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
+}
+
+fn lowerSingleStackSlotCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    const load_inst = block.instructions.items[2];
+    const call_inst = block.instructions.items[3];
+    if (alloca_inst.removed or store_inst.removed or load_inst.removed or call_inst.removed) return false;
+
+    const slot = alloca_inst.result orelse return false;
+    const load_result = load_inst.result orelse return false;
+    const call_result = call_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return false,
+    };
+    if (!std.mem.eql(u8, call_result, ret_name)) return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or !isNamed(store.ptr, slot)) return false;
+    const store_reg = try paramValueReg(function, store.value, .{ .int = 32 });
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or !isNamed(load.ptr, slot)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(call.calling_conv);
+    if (!call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    if (call.args.items.len != 1) return false;
+    const arg = call.args.items[0];
+    if (!arg.ty.eql(.{ .int = 32 }) or !isNamed(arg.value, load_result)) return false;
+
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+        .frame_index = .slot0,
+        .reg = store_reg,
+    } });
+    try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
+        .reg = .rdi,
+        .frame_index = .slot0,
+    } });
+    try machine.instructions.append(allocator, .{ .direct_call = .{
+        .symbol = call.callee,
+        .ret_ty = call.ret_ty,
+    } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerSingleStackSlotReturn(

@@ -28,7 +28,9 @@ which LLVM behavior is deferred.
 Native backend and AIR handoff work is sufficient for this repo when accepted
 optimized IR has at least one scalar, memory, loop, and global handoff proof,
 plus x86_64 text/object smoke coverage for the current backend subset. Broad
-target backend parity is outside this finish definition.
+target backend parity is outside this finish definition. Cycle 07 adds one
+non-trivial x86_64 handoff proof where fixed stack memory feeds a direct scalar
+call; this is still validation-only, not broad backend parity.
 
 Non-goals for this finish line:
 
@@ -108,7 +110,7 @@ Pass status counts from the active pass pipeline inventory:
 | Fixed-vector optimizer participation | conservative accepted boundary | `vector_future_release_fast`, vector opt fixtures | Cycle 04 keeps the row parse/verify/future; activate only with target-cost or native vector-lowering requirements. |
 | Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures, `debug_*_dbg_*` opt fixtures, and debug docs | Cycle 06 documents DCE, InstCombine, EarlyCSE, GVN, and SROA debug-location-only behavior; preserve `llvm.dbg.value`/`llvm.dbg.declare` and do not transform them until salvage exists. |
 | Full ThinLTO/bitcode summary behavior | out of scope for finish | bitcode/LTO docs | Keep compatibility decision and explicit unsupported diagnostics. |
-| Broad MC/Object/backend parity | out of scope for finish | backend handoff docs and readiness checks | Keep current x86_64 scalar smoke proofs only. |
+| Broad MC/Object/backend parity | out of scope for finish | backend handoff docs and readiness checks | Cycle 07 adds `call_stack_slot`; keep the x86_64 smoke proof bounded to scalar return, direct call, stack slot, and stack-memory-to-call shapes. |
 | SROA pointer field scalarization | conservative accepted boundary | `sroa_struct_ptr_field`, `sroa_struct_ptr_field_no_layout_reject` | Closed by Cycle 05 for DataLayout-backed simple aggregate fields. |
 | LLVM algorithm parity for all passes | out of scope for finish | `docs/analysis/algorithm_parity_audit.md` | Continue fixture-equivalent slices only when source-backed evidence requires them. |
 

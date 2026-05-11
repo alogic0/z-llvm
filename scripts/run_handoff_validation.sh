@@ -54,6 +54,7 @@ run_asm_case() {
 run_asm_case return_constant
 run_asm_case call_one_arg
 run_asm_case stack_slot
+run_asm_case call_stack_slot
 
 bash scripts/compare_codegen_asm.sh
 printf 'ok handoff codegen asm smoke\n'

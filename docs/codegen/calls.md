@@ -78,6 +78,7 @@ i32 call return in %eax
 void calls with no result
 one straight-line basic block
 at most one live i32 caller argument across one call
+one fixed i32 stack slot can feed the first direct-call argument
 ```
 
 The local stack-alignment sequence is:
@@ -96,6 +97,17 @@ subq $8, %rsp
 movl %edi, (%rsp)
 callq callee
 movl (%rsp), %edi
+addq $8, %rsp
+```
+
+For the bounded stack-memory-to-call handoff proof, the same slot can hold a
+single i32 alloca value that is loaded into `%edi` before the call:
+
+```asm
+subq $8, %rsp
+movl %edi, (%rsp)
+movl (%rsp), %edi
+callq callee
 addq $8, %rsp
 ```
 
@@ -166,6 +178,7 @@ call_no_args assembly fixture
 call_one_arg assembly fixture
 call_two_args assembly fixture
 call_return_used one-spill assembly fixture
+call_stack_slot stack-memory-to-call assembly, objdump, and readelf fixture
 call_internal assembly and objdump fixture
 unsupported non-default calling convention diagnostic
 unsupported stack-passed call argument diagnostic

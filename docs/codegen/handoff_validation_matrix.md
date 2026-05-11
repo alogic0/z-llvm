@@ -17,6 +17,7 @@ or remain LLVM-compatibility-only.
 | Explicit scalar return handoff | `test/codegen/inputs/return_constant.ll` | `bash scripts/run_handoff_validation.sh` | Can a folded scalar value reach return lowering without extra LLVM-only structure? |
 | Explicit direct-call handoff | `test/codegen/inputs/call_one_arg.ll` | `bash scripts/run_handoff_validation.sh` | Are direct scalar calls represented at the handoff boundary without pulling in register allocation policy? |
 | Explicit stack-slot handoff | `test/codegen/inputs/stack_slot.ll` | `bash scripts/run_handoff_validation.sh` | Can fixed local stack slots be validated independently from LLVM alloca promotion? |
+| Explicit stack-memory-to-call handoff | `test/codegen/inputs/call_stack_slot.ll` | `bash scripts/run_handoff_validation.sh` | Can a fixed local stack slot feed a direct scalar call while preserving SysV call alignment? |
 
 Run all current handoff checks with:
 
