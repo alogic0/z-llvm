@@ -108,6 +108,8 @@ local-only conservative:
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE
   parity.
+  early_cse_diamond_no_memory_phi proves MemorySSA avoids a join phi for pure
+  predecessor diamonds; local leader naming differs from opt-22.
   debug_early_cse_dbg_preserve preserves the leader instruction location and
   drops the removed redundant instruction location. This is a local
   debug-location-only rule, not LLVM debug-info salvage parity.

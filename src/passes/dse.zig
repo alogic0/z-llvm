@@ -17,13 +17,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     const layout = moduleLayout(module.*);
     for (module.functions.items) |*function| {
-        changed = try eliminateFunction(module.allocator, layout, function) or changed;
+        const function_changed = try eliminateFunction(module.allocator, module.*, layout, function);
+        changed = function_changed or changed;
     }
     return if (changed) .changed else .unchanged;
 }
 
-fn eliminateFunction(allocator: std.mem.Allocator, layout: ?target.DataLayout, function: *ir.Function) !bool {
-    _ = allocator;
+fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, layout: ?target.DataLayout, function: *ir.Function) !bool {
     var changed = false;
     for (function.blocks.items) |*block| {
         for (block.instructions.items, 0..) |*instruction, index| {
@@ -45,6 +45,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, layout: ?target.DataLayout, f
             }
         }
     }
+    if (changed) try memory_ssa.verifyFunction(allocator, module, function.*);
     return changed;
 }
 

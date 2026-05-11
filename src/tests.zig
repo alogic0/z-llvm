@@ -4721,6 +4721,75 @@ test "memory ssa records narrow phi facts at joins" {
     try std.testing.expect(memory.hasClobberBetween(.{ .block_index = 1, .instruction_index = 0 }, .{ .block_index = 3, .instruction_index = 0 }, .{ .named = "p" }));
 }
 
+test "memory ssa skips phis for pure predecessor diamonds" {
+    const input =
+        \\define i32 @memory_pure_diamond(i1 %cond, ptr %p) {
+        \\entry:
+        \\  %first = load i32, ptr %p
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %second = load i32, ptr %p
+        \\  ret i32 %second
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function);
+    defer memory.deinit();
+
+    for (memory.accesses.items) |access| {
+        try std.testing.expect(access.kind != .phi);
+    }
+    try std.testing.expect(!memory.hasClobberBetween(
+        .{ .block_index = 0, .instruction_index = 0 },
+        .{ .block_index = 3, .instruction_index = 0 },
+        .{ .named = "p" },
+    ));
+}
+
+test "memory ssa updater deletes accesses and dumps expectations" {
+    const input =
+        \\define i32 @memory_updater(ptr %p, i32 %a, i32 %b) {
+        \\entry:
+        \\  store i32 %a, ptr %p
+        \\  store i32 %b, ptr %p
+        \\  %loaded = load i32, ptr %p
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    var function = &module.functions.items[0];
+
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function.*);
+    defer memory.deinit();
+    try std.testing.expectEqual(@as(usize, 3), memory.accesses.items.len);
+    try memory.verifyConsistent();
+
+    function.blocks.items[0].instructions.items[0].removed = true;
+    try std.testing.expect(memory.deleteAccess(0, 0));
+    try memory.verifyConsistent();
+
+    var dump: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer dump.deinit();
+    try memory.dump(&dump.writer);
+    try std.testing.expectEqualStrings(
+        \\def block=0 inst=1 ptr=%p
+        \\use block=0 inst=2 ptr=%p
+        \\
+    , dump.writer.buffered());
+}
+
 test "mem2reg promotes single-block stack slot" {
     const input =
         \\define i32 @promote(i32 %a) {

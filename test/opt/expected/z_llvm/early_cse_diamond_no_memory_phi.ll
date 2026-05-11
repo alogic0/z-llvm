@@ -1,0 +1,11 @@
+define i32 @early_cse_diamond_no_memory_phi(i1 %cond, ptr %p) {
+entry:
+  %first = load i32, ptr %p
+  br i1 %cond, label %left, label %right
+left:
+  br label %join
+right:
+  br label %join
+join:
+  ret i32 %first
+}

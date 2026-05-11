@@ -97,6 +97,66 @@ pub const MemorySSA = struct {
         return false;
     }
 
+    pub fn deleteAccess(memory: *MemorySSA, block_index: usize, instruction_index: usize) bool {
+        for (memory.accesses.items, 0..) |access, index| {
+            if (access.block_index != block_index) continue;
+            if (access.instruction_index == null or access.instruction_index.? != instruction_index) continue;
+            _ = memory.accesses.orderedRemove(index);
+            return true;
+        }
+        return false;
+    }
+
+    pub fn replaceInstructionAccess(memory: *MemorySSA, block_index: usize, instruction_index: usize, instruction: ir.Instruction) !bool {
+        const new_kind = classifyAccess(memory.module, instruction);
+        const new_ptr = accessPointer(instruction);
+        for (memory.accesses.items) |*access| {
+            if (access.block_index != block_index) continue;
+            if (access.instruction_index == null or access.instruction_index.? != instruction_index) continue;
+            if (new_kind) |kind| {
+                access.kind = kind;
+                access.ptr = new_ptr;
+                return true;
+            }
+            return memory.deleteAccess(block_index, instruction_index);
+        }
+        if (new_kind) |kind| {
+            try memory.accesses.append(memory.allocator, .{
+                .kind = kind,
+                .block_index = block_index,
+                .instruction_index = instruction_index,
+                .ptr = new_ptr,
+            });
+            return true;
+        }
+        return false;
+    }
+
+    pub fn verifyConsistent(memory: MemorySSA) !void {
+        var rebuilt = try MemorySSA.build(memory.allocator, memory.module, memory.function);
+        defer rebuilt.deinit();
+        if (memory.accesses.items.len != rebuilt.accesses.items.len) return error.MemorySSAOutOfDate;
+        for (memory.accesses.items, rebuilt.accesses.items) |actual, expected| {
+            if (!sameAccess(actual, expected)) return error.MemorySSAOutOfDate;
+        }
+    }
+
+    pub fn dump(memory: MemorySSA, writer: anytype) !void {
+        for (memory.accesses.items) |access| {
+            try writer.print("{s} block={} inst=", .{ @tagName(access.kind), access.block_index });
+            if (access.instruction_index) |instruction_index| {
+                try writer.print("{}", .{instruction_index});
+            } else {
+                try writer.writeAll("phi");
+            }
+            if (access.ptr) |ptr| {
+                try writer.writeAll(" ptr=");
+                try ptr.format(writer);
+            }
+            try writer.writeByte('\n');
+        }
+    }
+
     fn isPathAwareBetween(memory: MemorySSA, access: Access, from: InstRef, to: InstRef) bool {
         if (from.block_index == to.block_index) {
             return isConservativelyBetween(access, from, to);
@@ -135,6 +195,23 @@ pub const MemorySSA = struct {
         return false;
     }
 };
+
+pub const VerifyError = error{MemorySSAOutOfDate};
+
+pub fn verifyFunction(allocator: std.mem.Allocator, module: ir.Module, function: ir.Function) !void {
+    var memory = try MemorySSA.build(allocator, module, function);
+    defer memory.deinit();
+    try memory.verifyConsistent();
+}
+
+fn sameAccess(a: Access, b: Access) bool {
+    if (a.kind != b.kind) return false;
+    if (a.block_index != b.block_index) return false;
+    if (a.instruction_index != b.instruction_index) return false;
+    if (a.ptr == null and b.ptr == null) return true;
+    if (a.ptr == null or b.ptr == null) return false;
+    return a.ptr.?.eql(b.ptr.?);
+}
 
 pub fn hasClobberBetween(module: ir.Module, function: ir.Function, from: InstRef, to: InstRef, ptr: ir.Value) bool {
     for (function.blocks.items, 0..) |block, block_index| {
@@ -267,7 +344,6 @@ fn isConservativelyBetween(access: Access, from: InstRef, to: InstRef) bool {
 }
 
 fn blockMayReachMemory(function: ir.Function, graph: cfg.Graph, reachable: []const bool, block_index: usize) bool {
-    if (blockHasMemoryAccess(function.blocks.items[block_index])) return true;
     for (graph.predecessors(block_index)) |predecessor| {
         if (!reachable[predecessor]) continue;
         if (blockHasMemoryAccess(function.blocks.items[predecessor])) return true;

@@ -43,9 +43,11 @@ Implemented subset:
   Require the later store range to fully cover the earlier store range
   Preserve stores when a load, call, volatile/atomic access, unknown pointer, or
   may-alias access intervenes
+  Verify MemorySSA consistency after deleting stores
 
 Intentional divergences:
-  No full MemorySSA walker/updater.
+  No full MemorySSA walker/updater; only simple access deletion/replacement
+  helpers exist in the analysis layer.
   No cross-block DSE.
   Partial-overwrite DSE is rejected; partial overlaps are preservation barriers.
   No memset/memcpy/memmove handling.
@@ -55,12 +57,14 @@ Intentional divergences:
 
 Analysis preservation/invalidation:
   DSE mutates memory instructions and invalidates analyses under the local
-  pass-manager policy. The pass manager verifies after execution.
+  pass-manager policy. The pass manager verifies IR after execution, and DSE
+  verifies rebuilt MemorySSA consistency for changed functions.
 
 Fixture coverage:
   dse_overwrite
   dse_partial_overwrite_reject
   dse_load_barrier
+  dse_volatile_barrier
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh

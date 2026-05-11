@@ -55,10 +55,19 @@ Implemented subset:
   endpoint blocks use instruction order, while interior accesses are considered
   only when CFG reachability places them on a path from the defining access to
   the queried access.
+  MemoryPhi-like join facts are placed only when reachable predecessor paths
+  contain memory accesses; pure predecessor diamonds do not create a phi barrier
+  solely because the join block itself contains a load.
   GVN load availability uses this shared helper.
   EarlyCSE load CSE uses this helper before replacing an available load.
   DSE uses a MemorySSA-owned same-block overwrite query when direction and
   dominance are explicit.
+  deleteAccess and replaceInstructionAccess provide the first local updater
+  operations for simple instruction deletion/replacement.
+  verifyConsistent rebuilds the access list and checks that updater-maintained
+  state still matches the function.
+  dump prints deterministic MemoryUse/MemoryDef/MemoryPhi-style expectations
+  for unit tests.
 
 Intentional divergences:
   MemoryPhi support is conservative: join facts are barriers for accepted
@@ -69,21 +78,25 @@ Intentional divergences:
   paths.
   LICM does not move memory instructions.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
-  The access list is rebuilt per function and does not have a MemorySSAUpdater.
-  No MemorySSAUpdater, optimized access cache, or clobber-walk skipping exists.
+  The access list is still usually rebuilt per function; updater support covers
+  only simple access deletion/replacement.
+  No optimized access cache or clobber-walk skipping exists.
   The path-aware query is still an access-list scan, not LLVM's optimized
   walker.
 
 Analysis preservation/invalidation:
-  The local access list is built per pass invocation. Mutating passes rebuild it
-  before querying and do not preserve it across transformations.
+  The local access list is built per pass invocation. Mutating passes normally
+  rebuild it before querying. DSE verifies MemorySSA consistency after deleting
+  stores; complex CFG rewrites still rebuild rather than update in place.
 
 Fixture coverage:
   unit test: memory ssa clobber helper covers accepted memory-dependence cases
   unit test: memory ssa records narrow phi facts at joins
+  unit test: memory ssa updater deletes accesses and dumps expectations
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixtures: early_cse_load_branch_clobber_reject
   opt fixture: early_cse_unreachable_store_not_clobber
+  local-only opt fixture: early_cse_diamond_no_memory_phi
   local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
