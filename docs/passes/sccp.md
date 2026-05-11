@@ -44,20 +44,23 @@ Local target status:
 Implemented subset:
 
 ```text
-function-local scalar constant propagation using the InstSimplify helper
-phi simplification when all incoming values are the same integer or undef
-conditional branch condition replacement when the condition folds to a constant
+function-local sparse lattice propagation
+unknown, undef, constant, and overdefined lattice states
+executable-block and executable-edge tracking
+edge-sensitive PHI visitation that ignores unreachable incoming values
+undef plus constant PHI resolution for covered scalar cases
+supported scalar instruction visitor using the InstSimplify helper
+conditional branch edge marking and branch folding when the condition is constant
 direct call folding when the callee is a known local function that always returns the same constant
 ```
 
 Intentional divergences:
 
 ```text
-no full lattice yet
-no executable-edge pruning yet
-no overdefined tracking yet
 no interprocedural propagation yet
 no general call semantics yet
+no poison/freeze-sensitive SCCP model beyond current scalar fixtures
+no solver worklist partitioning matching LLVM's exact internal queues
 IPSCCP is an explicit placeholder until call graph support exists
 ```
 
@@ -66,6 +69,8 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   sccp_branch
+  sccp_phi_edge
+  sccp_undef_phi
 
 local-only conservative:
   none currently
@@ -84,9 +89,9 @@ bash scripts/compare_opt.sh
 Known gaps:
 
 ```text
-no edge-sensitive phi filtering
-no executable block worklist
-no undef/poison lattice distinction
-no branch unreachable marking beyond what SimplifyCFG removes after SCCP
+no complete undef/poison lattice distinction
+no constant range lattice
+no IPSCCP argument/return lattice summaries
+no branch unreachable removal beyond what SimplifyCFG removes after SCCP
 no IPSCCP
 ```

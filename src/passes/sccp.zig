@@ -1,4 +1,5 @@
 const std = @import("std");
+const cfg = @import("../analysis/cfg.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -19,40 +20,339 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     return if (changed) .changed else .unchanged;
 }
 
-fn propagateFunction(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
-    var aliases = std.StringHashMap(ir.Value).init(allocator);
-    defer aliases.deinit();
+const Lattice = union(enum) {
+    unknown,
+    undef,
+    constant: i128,
+    overdefined,
 
-    var changed = false;
-    var local_changed = true;
-    while (local_changed) {
-        local_changed = false;
-        for (function.blocks.items) |*block| {
+    fn fromValue(value: ir.Value) Lattice {
+        return switch (value) {
+            .int => |int| .{ .constant = int },
+            .undef => .undef,
+            .named => .overdefined,
+        };
+    }
+
+    fn asValue(lattice: Lattice) ?ir.Value {
+        return switch (lattice) {
+            .constant => |int| .{ .int = int },
+            .undef => .undef,
+            .unknown, .overdefined => null,
+        };
+    }
+
+    fn eql(a: Lattice, b: Lattice) bool {
+        return switch (a) {
+            .unknown => b == .unknown,
+            .undef => b == .undef,
+            .constant => |a_int| switch (b) {
+                .constant => |b_int| a_int == b_int,
+                .unknown, .undef, .overdefined => false,
+            },
+            .overdefined => b == .overdefined,
+        };
+    }
+
+    fn meet(a: Lattice, b: Lattice) Lattice {
+        return switch (a) {
+            .unknown => b,
+            .undef => switch (b) {
+                .unknown, .undef => .undef,
+                .constant => b,
+                .overdefined => .overdefined,
+            },
+            .constant => |a_int| switch (b) {
+                .unknown, .undef => a,
+                .constant => |b_int| if (a_int == b_int) a else .overdefined,
+                .overdefined => .overdefined,
+            },
+            .overdefined => .overdefined,
+        };
+    }
+};
+
+const Solver = struct {
+    allocator: std.mem.Allocator,
+    module: ir.Module,
+    function: *ir.Function,
+    graph: cfg.Graph,
+    executable_blocks: []bool,
+    executable_edges: []bool,
+    values: std.StringHashMap(Lattice),
+
+    fn build(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !Solver {
+        var graph = try cfg.Graph.build(allocator, function.*);
+        errdefer graph.deinit();
+
+        const block_count = function.blocks.items.len;
+        const executable_blocks = try allocator.alloc(bool, block_count);
+        errdefer allocator.free(executable_blocks);
+        @memset(executable_blocks, false);
+
+        const executable_edges = try allocator.alloc(bool, block_count * block_count);
+        errdefer allocator.free(executable_edges);
+        @memset(executable_edges, false);
+
+        var values = std.StringHashMap(Lattice).init(allocator);
+        errdefer values.deinit();
+        for (function.params.items) |param| try values.put(param.name, .overdefined);
+
+        if (block_count != 0) executable_blocks[0] = true;
+
+        return .{
+            .allocator = allocator,
+            .module = module,
+            .function = function,
+            .graph = graph,
+            .executable_blocks = executable_blocks,
+            .executable_edges = executable_edges,
+            .values = values,
+        };
+    }
+
+    fn deinit(solver: *Solver) void {
+        solver.values.deinit();
+        solver.allocator.free(solver.executable_edges);
+        solver.allocator.free(solver.executable_blocks);
+        solver.graph.deinit();
+    }
+
+    fn solve(solver: *Solver) !void {
+        var changed = true;
+        while (changed) {
+            changed = false;
+            for (solver.function.blocks.items, 0..) |block, block_index| {
+                if (!solver.executable_blocks[block_index]) continue;
+                for (block.instructions.items) |instruction| {
+                    if (instruction.removed) continue;
+                    if (instruction.result == null) continue;
+                    const lattice = if (instruction.kind == .phi)
+                        solver.visitPhi(block_index, instruction)
+                    else
+                        solver.visitInstruction(instruction);
+                    changed = try solver.mergeValue(instruction.result.?, lattice) or changed;
+                }
+                if (block.terminator) |terminator| {
+                    changed = try solver.visitTerminator(block_index, terminator) or changed;
+                }
+            }
+        }
+    }
+
+    fn rewrite(solver: *Solver) !bool {
+        var aliases = std.StringHashMap(ir.Value).init(solver.allocator);
+        defer aliases.deinit();
+
+        var changed = false;
+        for (solver.function.blocks.items, 0..) |*block, block_index| {
+            if (solver.executable_blocks[block_index]) {
+                changed = prunePhiIncomingToExecutableEdges(solver, block, block_index) or changed;
+            }
+
             for (block.instructions.items) |*instruction| {
                 if (instruction.removed) continue;
                 instruction.mapOperands(aliases);
-                if (simplifyPhi(instruction.*)) |replacement| {
-                    local_changed = try replaceInstruction(&aliases, instruction, replacement) or local_changed;
-                    changed = true;
-                    continue;
-                }
-                if (simplifyCall(module, instruction.*)) |replacement| {
-                    local_changed = try replaceInstruction(&aliases, instruction, replacement) or local_changed;
-                    changed = true;
-                    continue;
-                }
-                if (inst_simplify.simplify(instruction.*)) |replacement| {
-                    local_changed = try replaceInstruction(&aliases, instruction, replacement) or local_changed;
-                    changed = true;
-                }
+                const result = instruction.result orelse continue;
+                const lattice = if (solver.values.get(result)) |value| value else Lattice.unknown;
+                const replacement = lattice.asValue() orelse continue;
+                instruction.removed = true;
+                instruction.replacement = replacement;
+                try aliases.put(result, replacement);
+                changed = true;
             }
+
             if (block.terminator) |*terminator| switch (terminator.*) {
                 .ret => |*ret| {
                     if (ret.value) |value| ret.value = resolveValue(aliases, value);
                 },
                 .br, .@"unreachable" => {},
-                .condbr => |*condbr| condbr.cond = resolveValue(aliases, condbr.cond),
+                .condbr => |*condbr| {
+                    condbr.cond = resolveValue(aliases, condbr.cond);
+                    if (condbr.cond == .int) {
+                        block.terminator = .{ .br = .{
+                            .target = if (condbr.cond.int == 0) condbr.else_target else condbr.then_target,
+                        } };
+                        changed = true;
+                    }
+                },
             };
+        }
+
+        return changed;
+    }
+
+    fn visitPhi(solver: Solver, block_index: usize, instruction: ir.Instruction) Lattice {
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => unreachable,
+        };
+
+        var result: Lattice = .unknown;
+        var saw_executable_incoming = false;
+        for (phi.incoming.items) |incoming| {
+            const pred_index = solver.function.blockIndex(incoming.block) orelse continue;
+            if (!solver.isExecutableEdge(pred_index, block_index)) continue;
+            saw_executable_incoming = true;
+            result = result.meet(solver.valueLattice(incoming.value));
+        }
+        return if (saw_executable_incoming) result else .unknown;
+    }
+
+    fn visitInstruction(solver: Solver, instruction: ir.Instruction) Lattice {
+        if (simplifyCall(solver.module, instruction)) |replacement| return Lattice.fromValue(replacement);
+
+        const folded = solver.foldInstruction(instruction);
+        return folded orelse instructionFallback(instruction);
+    }
+
+    fn foldInstruction(solver: Solver, instruction: ir.Instruction) ?Lattice {
+        var mapped = instruction;
+        var unresolved = false;
+        var overdefined = false;
+        solver.mapInstructionOperands(&mapped, &unresolved, &overdefined);
+        if (overdefined) return .overdefined;
+        if (unresolved) return null;
+        return if (inst_simplify.simplify(mapped)) |replacement| Lattice.fromValue(replacement) else null;
+    }
+
+    fn mapInstructionOperands(solver: Solver, instruction: *ir.Instruction, unresolved: *bool, overdefined: *bool) void {
+        switch (instruction.kind) {
+            .binary => |*binary| {
+                binary.lhs = solver.materialize(binary.lhs, unresolved, overdefined);
+                binary.rhs = solver.materialize(binary.rhs, unresolved, overdefined);
+            },
+            .cast => |*cast| cast.value = solver.materialize(cast.value, unresolved, overdefined),
+            .freeze => |*freeze| freeze.value = solver.materialize(freeze.value, unresolved, overdefined),
+            .icmp => |*icmp| {
+                icmp.lhs = solver.materialize(icmp.lhs, unresolved, overdefined);
+                icmp.rhs = solver.materialize(icmp.rhs, unresolved, overdefined);
+            },
+            .select => |*select| {
+                const cond = solver.valueLattice(select.cond);
+                switch (cond) {
+                    .constant => |value| {
+                        const chosen = if (value == 0) select.false_value else select.true_value;
+                        select.true_value = solver.materialize(chosen, unresolved, overdefined);
+                        select.false_value = select.true_value;
+                        select.cond = .{ .int = 1 };
+                    },
+                    .unknown, .undef => unresolved.* = true,
+                    .overdefined => overdefined.* = true,
+                }
+            },
+            .phi, .alloca, .load, .store, .gep, .call => {},
+        }
+    }
+
+    fn materialize(solver: Solver, value: ir.Value, unresolved: *bool, overdefined: *bool) ir.Value {
+        switch (solver.valueLattice(value)) {
+            .constant => |int| return .{ .int = int },
+            .undef => return .undef,
+            .unknown => unresolved.* = true,
+            .overdefined => overdefined.* = true,
+        }
+        return value;
+    }
+
+    fn visitTerminator(solver: *Solver, block_index: usize, terminator: ir.Terminator) !bool {
+        switch (terminator) {
+            .br => |br| {
+                const target = solver.function.blockIndex(br.target) orelse return false;
+                return try solver.markEdge(block_index, target);
+            },
+            .condbr => |condbr| {
+                const then_index = solver.function.blockIndex(condbr.then_target) orelse return false;
+                const else_index = solver.function.blockIndex(condbr.else_target) orelse return false;
+                return switch (solver.valueLattice(condbr.cond)) {
+                    .constant => |value| if (value == 0)
+                        try solver.markEdge(block_index, else_index)
+                    else
+                        try solver.markEdge(block_index, then_index),
+                    .unknown, .undef, .overdefined => (try solver.markEdge(block_index, then_index)) or
+                        (try solver.markEdge(block_index, else_index)),
+                };
+            },
+            .ret, .@"unreachable" => return false,
+        }
+    }
+
+    fn markEdge(solver: *Solver, from: usize, to: usize) !bool {
+        if (!containsIndex(solver.graph.successors(from), to)) return false;
+        var changed = false;
+        const edge = solver.edgeIndex(from, to);
+        if (!solver.executable_edges[edge]) {
+            solver.executable_edges[edge] = true;
+            changed = true;
+        }
+        if (!solver.executable_blocks[to]) {
+            solver.executable_blocks[to] = true;
+            changed = true;
+        }
+        return changed;
+    }
+
+    fn mergeValue(solver: *Solver, name: []const u8, incoming: Lattice) !bool {
+        const current = solver.values.get(name) orelse .unknown;
+        const merged = current.meet(incoming);
+        if (current.eql(merged)) return false;
+        try solver.values.put(name, merged);
+        return true;
+    }
+
+    fn valueLattice(solver: Solver, value: ir.Value) Lattice {
+        return switch (value) {
+            .int => |int| .{ .constant = int },
+            .undef => .undef,
+            .named => |name| solver.values.get(name) orelse .unknown,
+        };
+    }
+
+    fn isExecutableEdge(solver: Solver, from: usize, to: usize) bool {
+        return solver.executable_edges[solver.edgeIndex(from, to)];
+    }
+
+    fn edgeIndex(solver: Solver, from: usize, to: usize) usize {
+        return from * solver.function.blocks.items.len + to;
+    }
+};
+
+fn propagateFunction(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
+    var solver = try Solver.build(allocator, module, function);
+    defer solver.deinit();
+
+    try solver.solve();
+    return try solver.rewrite();
+}
+
+fn instructionFallback(instruction: ir.Instruction) Lattice {
+    return switch (instruction.kind) {
+        .alloca, .load, .gep, .call => .overdefined,
+        .store => .unknown,
+        .binary, .cast, .freeze, .icmp, .select, .phi => .unknown,
+    };
+}
+
+fn prunePhiIncomingToExecutableEdges(solver: *Solver, block: *ir.BasicBlock, block_index: usize) bool {
+    var changed = false;
+    for (block.instructions.items) |*instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => |*phi| {
+                var incoming_index = phi.incoming.items.len;
+                while (incoming_index > 0) {
+                    incoming_index -= 1;
+                    const pred_index = solver.function.blockIndex(phi.incoming.items[incoming_index].block) orelse {
+                        _ = phi.incoming.orderedRemove(incoming_index);
+                        changed = true;
+                        continue;
+                    };
+                    if (solver.isExecutableEdge(pred_index, block_index)) continue;
+                    _ = phi.incoming.orderedRemove(incoming_index);
+                    changed = true;
+                }
+            },
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
         }
     }
     return changed;
@@ -82,33 +382,16 @@ fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
     return null;
 }
 
-fn replaceInstruction(aliases: *std.StringHashMap(ir.Value), instruction: *ir.Instruction, replacement: ir.Value) !bool {
-    const result = instruction.result orelse return false;
-    const old = aliases.get(result);
-    if (old != null and old.?.eql(replacement)) return false;
-    instruction.removed = true;
-    instruction.replacement = replacement;
-    try aliases.put(result, replacement);
-    return true;
-}
-
-fn simplifyPhi(instruction: ir.Instruction) ?ir.Value {
-    const phi = switch (instruction.kind) {
-        .phi => |phi| phi,
-        .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => return null,
-    };
-    if (phi.incoming.items.len == 0) return null;
-    const first = phi.incoming.items[0].value;
-    if (first != .int and first != .undef) return null;
-    for (phi.incoming.items[1..]) |incoming| {
-        if (!first.eql(incoming.value)) return null;
-    }
-    return first;
-}
-
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
         .int, .undef => value,
         .named => |name| aliases.get(name) orelse value,
     };
+}
+
+fn containsIndex(values: []const usize, needle: usize) bool {
+    for (values) |value| {
+        if (value == needle) return true;
+    }
+    return false;
 }

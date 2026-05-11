@@ -15,22 +15,21 @@ supported scalar and CFG surface.
 
 ## Plan
 
-- [ ] Add or document the LLVM SCCP algorithm contract.
-- [ ] Implement lattice states:
+- [x] Add or document the LLVM SCCP algorithm contract.
+- [x] Implement lattice states:
       unknown, undef, constant, and overdefined.
-- [ ] Track executable blocks and executable edges.
-- [ ] Add sparse instruction visitor structure for supported instructions.
-- [ ] Fold branches when the condition lattice proves a taken edge.
-- [ ] Fold unreachable blocks and unreachable PHI incoming values.
-- [ ] Add an undef-resolution loop for covered cases.
-- [ ] Keep IPSCCP deferred until call graph and interprocedural summaries are
+- [x] Track executable blocks and executable edges.
+- [x] Add sparse instruction visitor structure for supported instructions.
+- [x] Fold branches when the condition lattice proves a taken edge.
+- [x] Fold unreachable blocks and unreachable PHI incoming values.
+- [x] Add an undef-resolution loop for covered cases.
+- [x] Keep IPSCCP deferred until call graph and interprocedural summaries are
       strong enough.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] SCCP behavior is driven by a documented sparse lattice.
-- [ ] Branch and PHI behavior matches LLVM for listed fixtures.
-- [ ] IPSCCP remains explicitly deferred with prerequisites.
-- [ ] Conservative gaps are documented.
-
+- [x] SCCP behavior is driven by a documented sparse lattice.
+- [x] Branch and PHI behavior matches LLVM for listed fixtures.
+- [x] IPSCCP remains explicitly deferred with prerequisites.
+- [x] Conservative gaps are documented.

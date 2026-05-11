@@ -24,6 +24,8 @@ dce_volatile_load_reject	dce	dce	test/opt/inputs/dce_volatile_load_reject.ll	tes
 dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/dse_overwrite.ll	opt-equivalent	dse	overwritten stack store removed
 dse_load_barrier	dse	dse	test/opt/inputs/dse_load_barrier.ll	test/opt/expected/z_llvm/dse_load_barrier.ll	opt-equivalent	dse	intervening load keeps earlier store alive
 sccp_branch	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_branch.ll	test/opt/expected/z_llvm/sccp_branch.ll	opt-equivalent	sccp,simplifycfg,dce	constant branch folded through SCCP
+sccp_phi_edge	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_phi_edge.ll	test/opt/expected/z_llvm/sccp_phi_edge.ll	opt-equivalent	sccp,simplifycfg,dce	executable-edge PHI filtering keeps the reachable constant
+sccp_undef_phi	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_undef_phi.ll	test/opt/expected/z_llvm/sccp_undef_phi.ll	opt-equivalent	sccp,simplifycfg,dce	undef and constant PHI lattice resolves to the constant
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	opt-equivalent	simplifycfg	generic LLVM headers only
 simplifycfg_thread_empty	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_thread_empty.ll	test/opt/expected/z_llvm/simplifycfg_thread_empty.ll	opt-equivalent	simplifycfg	empty branch block threading
 simplifycfg_common_ret	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_common_ret.ll	test/opt/expected/z_llvm/simplifycfg_common_ret.ll	opt-equivalent	simplifycfg	matching return blocks merged into predecessor
