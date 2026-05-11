@@ -133,13 +133,19 @@ optimizer-input
 ```
 
 Rows marked `unsupported` are skipped even if they are useful future optimizer
-inputs. The runner then runs the configured local pipeline and normalizes the
-result to ensure the local parser/verifier still accept the output. Override the
-pipeline with:
+inputs. By default, the runner reads `local-pipeline=<name>` from each accepted
+row's `inventory_links` field and runs that pipeline before normalizing the
+result. This keeps ReleaseFast, ReleaseSmall, ReleaseSafe, and Debug rows tied
+to explicit local accepted-subset aliases instead of one global pass list.
+
+Override the manifest-selected pipeline for experiments with:
 
 ```sh
 PASSES=verify,instcombine,dce scripts/run_zig_corpus.sh
 ```
+
+The runner prints an execution summary with accepted, unsupported, future, and
+debug-info-only row counts.
 
 ## Tiny Scalar Group
 
@@ -198,8 +204,9 @@ Connection to the LLVM pass inventory:
 | Fixture area | Inventory connection |
 | --- | --- |
 | `Debug` raw mode | `debug-o0`, `verify`, `always-inline`, debug metadata placeholders. |
-| `ReleaseFast` normalized scalar mode | `release-o3`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
+| `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
+| `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |
 | `ReleaseSmall` raw mode | `release-oz`, size attributes, alias/global handling, unsupported-IR discovery. |
 
 ## Current Gaps

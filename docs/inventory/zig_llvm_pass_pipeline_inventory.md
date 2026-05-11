@@ -47,6 +47,13 @@ Primary LLVM entry points:
 - `PassBuilder::buildFunctionSimplificationPipeline`
 - `PassBuilder::buildDefaultAAPipeline`
 
+Refresh note: Cycle 7 rechecked these anchors against the current
+`../ziglang` checkout on 2026-05-11 before adding corpus pipeline aliases. The
+wrapper still maps Debug to O0, ReleaseSmall to Oz, other release modes to O3,
+nonzero release LTO to `buildLTOPreLinkDefaultPipeline`, disables LLVM loop
+vectorization, and inserts Zig verifier/discriminator/sanitizer callbacks
+through PassBuilder extension points.
+
 ## Zig Mode Mapping
 
 | Zig mode/path | LLVM optimization level | PassBuilder entry point | LTO phase | Notes |

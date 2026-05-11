@@ -18,25 +18,37 @@ targets.
 
 ## Plan
 
-- [ ] Refresh the pass inventory against current `../ziglang` before changing
+- [x] Refresh the pass inventory against current `../ziglang` before changing
       pipeline expectations.
-- [ ] Define local pipeline aliases for Debug, ReleaseSafe, ReleaseFast, and
+- [x] Define local pipeline aliases for Debug, ReleaseSafe, ReleaseFast, and
       ReleaseSmall accepted subsets.
-- [ ] Make `scripts/run_zig_corpus.sh` select pipeline aliases from manifest
+- [x] Make `scripts/run_zig_corpus.sh` select pipeline aliases from manifest
       metadata rather than one global `PASSES` value.
-- [ ] Add a summary report of accepted, unsupported, future, and debug-only
+- [x] Add a summary report of accepted, unsupported, future, and debug-only
       corpus rows.
-- [ ] For every placeholder pass in a selected pipeline, require a doc entry
+- [x] For every placeholder pass in a selected pipeline, require a doc entry
       saying why a no-op is currently behavior-preserving for the fixture.
-- [ ] Promote corpus rows from unsupported only after parser, verifier,
+- [x] Promote corpus rows from unsupported only after parser, verifier,
       analyses, and selected pipeline passes all agree.
-- [ ] Keep codegen/object output out of scope unless validating optimizer
+- [x] Keep codegen/object output out of scope unless validating optimizer
       handoff facts.
 
 ## Exit Criteria
 
-- [ ] The corpus runner can execute per-row pipeline aliases.
-- [ ] Every accepted corpus row records the local pipeline used.
-- [ ] Remaining LLVM pass gaps are classified as parser blocker, analysis
+- [x] The corpus runner can execute per-row pipeline aliases.
+- [x] Every accepted corpus row records the local pipeline used.
+- [x] Remaining LLVM pass gaps are classified as parser blocker, analysis
       blocker, pass blocker, optional track, or deliberate conservative gap.
 
+## Completion Notes
+
+- Added `zig-debug-accepted`, `zig-release-safe-accepted`,
+  `zig-release-fast-accepted`, and `zig-release-small-accepted` local pipeline
+  aliases.
+- `scripts/run_zig_corpus.sh` now requires `local-pipeline=<alias>` metadata
+  for each accepted optimizer-input row unless `PASSES=...` is supplied for an
+  experiment.
+- The selected accepted-subset aliases intentionally contain no placeholder
+  passes. Placeholder-heavy full descriptors such as `release-o3`, `release-oz`,
+  and `debug-o0` remain documented inventory surfaces, while accepted corpus
+  rows use only passes that current fixtures can validate.

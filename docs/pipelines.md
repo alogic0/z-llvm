@@ -58,6 +58,8 @@ Implemented subset:
   Named pass registry
   Named development pipelines
   Zig mode pipeline descriptors for Debug/O0, Release/O3, Release/Oz, and LTO
+  Corpus accepted-subset aliases for Zig Debug, ReleaseSafe, ReleaseFast, and
+  ReleaseSmall rows
   Textual nesting placeholders for module(...), function(...), loop(...), and
   cgscc(...)
   Explicit no-op placeholders for discovered passes whose algorithms are not
@@ -170,10 +172,27 @@ release-oz:
   size-oriented release descriptor with the same scalar/memory foundation but
   without local LICM until code-size gates exist
 
+zig-debug-accepted:
+  verify
+
+zig-release-safe-accepted / zig-release-fast-accepted / zig-release-small-accepted:
+  verify
+  simplifycfg
+  instcombine
+  dce
+  verify
+
 lto-prelink-o3 / lto-prelink-oz:
   release descriptors plus canonicalize-aliases and name-anon-globals
   placeholders at the front
 ```
+
+The `zig-*-accepted` aliases are corpus conformance pipelines, not replacements
+for LLVM's full mode pipelines. They run only implemented passes that the
+accepted Zig-emitted fixture rows can validate today. Full descriptors such as
+`release-o3` and `release-oz` remain visible for inventory traceability and
+placeholder classification, but the corpus runner does not use them unless a
+manifest row explicitly asks for them.
 
 Usage:
 
@@ -182,6 +201,7 @@ zig build run -- --passes=scalar-foundation test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
 zig build run -- --pipeline=release-o3 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=debug-o0 test/opt/inputs/instcombine.ll
+zig build run -- --pipeline=zig-release-fast-accepted test/zig/captured/integers.ReleaseFast.x86_64.ll
 zig build run -- --passes='module(verify,function(instcombine,dce))' test/opt/inputs/instcombine.ll
 ```
 
@@ -194,6 +214,7 @@ pipeline aliases can be mixed with explicit pass names
 unit tests check the scalar-foundation pass order
 inventory placeholders are executable documented no-ops
 unit tests check debug-o0 and release-o3 expansion
+unit tests check the accepted ReleaseFast corpus pipeline expansion
 textual nested pipeline placeholders are flattened for now
 selected release descriptors repeat simplifycfg and instcombine to model LLVM's
 canonicalization shape

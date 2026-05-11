@@ -72,7 +72,7 @@ completed foundation epics
 - [x] [Cycle 4: Aggregate And Array IR Expansion](roadmap/04_aggregate_array_ir_expansion_cycle.md)
 - [x] [Cycle 5: Globals, Aliases, And Global Optimization](roadmap/05_globals_aliases_and_globalopt_cycle.md)
 - [x] [Cycle 6: Loop Metadata, LCSSA, And Assume](roadmap/06_loop_metadata_lcssa_and_assume_cycle.md)
-- [ ] [Cycle 7: Release Pipeline Conformance](roadmap/07_release_pipeline_conformance_cycle.md)
+- [x] [Cycle 7: Release Pipeline Conformance](roadmap/07_release_pipeline_conformance_cycle.md)
 - [ ] [Cycle 8: Debug Metadata Preservation](roadmap/08_debug_metadata_preservation_cycle.md)
 - [ ] [Cycle 9: Target DataLayout And ABI Semantics](roadmap/09_target_datalayout_and_abi_semantics_cycle.md)
 - [ ] [Cycle 10: Interprocedural Optimization And Inlining Boundary](roadmap/10_interprocedural_optimization_cycle.md)

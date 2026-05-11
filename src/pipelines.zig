@@ -59,6 +59,18 @@ const debug_o0_passes = [_][]const u8{
     "verify",
 };
 
+const zig_debug_accepted_passes = [_][]const u8{
+    "verify",
+};
+
+const zig_release_accepted_passes = [_][]const u8{
+    "verify",
+    "simplifycfg",
+    "instcombine",
+    "dce",
+    "verify",
+};
+
 const release_o3_passes = [_][]const u8{
     "verify",
     "add-discriminators",
@@ -197,6 +209,38 @@ pub const all = [_]Pipeline{
         .llvm_analogue = "PassBuilder::buildO0DefaultPipeline plus Zig extension points",
         .intended_level = "Zig Debug / LLVM O0",
         .notes = "mandatory and instrumentation passes are explicit placeholders except verifier",
+    },
+    .{
+        .name = "zig-debug-accepted",
+        .passes = &zig_debug_accepted_passes,
+        .mode = "Debug",
+        .llvm_analogue = "Zig Debug / LLVM O0 accepted corpus subset",
+        .intended_level = "raw Zig-emitted IR corpus validation for Debug rows",
+        .notes = "verifier-only until debug metadata and O0 instrumentation rows are accepted",
+    },
+    .{
+        .name = "zig-release-safe-accepted",
+        .passes = &zig_release_accepted_passes,
+        .mode = "ReleaseSafe",
+        .llvm_analogue = "Zig ReleaseSafe / LLVM O3 accepted corpus subset",
+        .intended_level = "accepted ReleaseSafe corpus validation",
+        .notes = "limited to implemented canonicalization and DCE; safety IR rows remain future until parsed",
+    },
+    .{
+        .name = "zig-release-fast-accepted",
+        .passes = &zig_release_accepted_passes,
+        .mode = "ReleaseFast",
+        .llvm_analogue = "Zig ReleaseFast / LLVM O3 accepted corpus subset",
+        .intended_level = "accepted ReleaseFast corpus validation",
+        .notes = "keeps full release-o3 placeholders out of reduced corpus validation until roots and IPO semantics are fixture-ready",
+    },
+    .{
+        .name = "zig-release-small-accepted",
+        .passes = &zig_release_accepted_passes,
+        .mode = "ReleaseSmall",
+        .llvm_analogue = "Zig ReleaseSmall / LLVM Oz accepted corpus subset",
+        .intended_level = "accepted ReleaseSmall corpus validation",
+        .notes = "uses the same implemented subset as ReleaseFast until size-specific cost and global passes are fixture-ready",
     },
     .{
         .name = "release-o3",

@@ -150,6 +150,22 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
     for (release_expected, release_pm.passes.items) |expected_name, pass| {
         try std.testing.expectEqualStrings(expected_name, pass.name);
     }
+
+    var corpus_pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer corpus_pm.deinit();
+    try pipelines.addPasses(&corpus_pm, "zig-release-fast-accepted");
+
+    const corpus_expected = [_][]const u8{
+        "verify",
+        "simplifycfg",
+        "instcombine",
+        "dce",
+        "verify",
+    };
+    try std.testing.expectEqual(corpus_expected.len, corpus_pm.passes.items.len);
+    for (corpus_expected, corpus_pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
 }
 
 test "inventory placeholders run as documented no-op passes" {
