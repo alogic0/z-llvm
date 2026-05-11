@@ -15,16 +15,26 @@ it.
 
 ## Plan
 
-- [ ] Parse atomic load/store syntax as barrier-classified memory operations.
-- [ ] Parse or explicitly reject `atomicrmw` and `cmpxchg`.
-- [ ] Parse inline asm calls as unknown side-effecting calls.
-- [ ] Preserve syncscope/orderings text where parsed.
-- [ ] Add DCE, ADCE, GVN, EarlyCSE, LICM, and DSE rejection fixtures.
-- [ ] Document which atomic transformations are deliberately not implemented.
+- [x] Parse atomic load/store syntax as barrier-classified memory operations.
+- [x] Parse or explicitly reject `atomicrmw` and `cmpxchg`.
+- [x] Parse or explicitly reject inline asm calls before optimization.
+- [x] Preserve parsed atomic ordering text and reject unsupported syncscope.
+- [x] Add DCE, ADCE, GVN, EarlyCSE, LICM, and DSE rejection fixtures.
+- [x] Document which atomic transformations are deliberately not implemented.
 
 ## Exit Criteria
 
-- [ ] Inline asm and atomics cannot be optimized across accidentally.
-- [ ] Corpus atomic/asm blockers are classified.
-- [ ] Unsupported atomic forms fail closed.
+- [x] Inline asm and atomics cannot be optimized across accidentally.
+- [x] Corpus atomic/asm blockers are classified.
+- [x] Unsupported atomic forms fail closed.
 
+## Completion Notes
+
+- Atomic load/store parsing and memory-effect barrier classification already
+  existed; this cycle made the boundary explicit in docs and fixture metadata.
+- Added explicit parser rejection for `fence` and inline asm calls, plus unit
+  coverage for `cmpxchg`.
+- Added `memory_atomic_barrier_reject` to the opt fixture table as a
+  local-conservative DCE barrier fixture.
+- Inline asm remains rejected rather than modeled as an unknown call because
+  constraints and memory clobbers are not represented yet.

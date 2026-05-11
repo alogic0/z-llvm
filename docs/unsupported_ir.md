@@ -150,6 +150,7 @@ InvalidCall
 UnsupportedIndirectCall
 UnsupportedCallAttribute
 UnsupportedInstrumentationCall
+UnsupportedInlineAsm
 UnsupportedCallTerminator
 UnsupportedVarArgs
 UnsupportedAttributeGroup

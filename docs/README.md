@@ -87,7 +87,7 @@ completed foundation epics
 - [x] [Cycle 19: Machine IR Lowering Boundary](roadmap/19_machine_ir_lowering_boundary_cycle.md)
 - [x] [Cycle 20: Object, Debug, And Unwind Boundary](roadmap/20_object_debug_and_unwind_cycle.md)
 - [x] [Cycle 21: Error Handling And EH IR](roadmap/21_error_handling_and_eh_ir_cycle.md)
-- [ ] [Cycle 22: Inline Assembly And Atomics](roadmap/22_inline_asm_and_atomics_cycle.md)
+- [x] [Cycle 22: Inline Assembly And Atomics](roadmap/22_inline_asm_and_atomics_cycle.md)
 - [ ] [Cycle 23: Module Flags, COMDAT, And Linkage](roadmap/23_module_flags_comdat_and_linkage_cycle.md)
 - [ ] [Cycle 24: Concurrency And TLS](roadmap/24_concurrency_and_tls_cycle.md)
 - [ ] [Cycle 25: Profile-Guided And Size Optimization](roadmap/25_profile_guided_and_size_optimization_cycle.md)

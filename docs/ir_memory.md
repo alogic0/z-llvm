@@ -62,6 +62,8 @@ no typed pointer or address-space modeling
 no semantic use of alignment for optimization
 no full volatile or atomic memory model
 no cmpxchg, atomicrmw, fence, syncscope, or atomic ordering semantics
+inline asm and broader atomic semantics are tracked in
+`docs/ir_atomics_inline_asm.md`
 no datalayout-aware getelementptr offset computation beyond scalar integer element sizes
 no lifetime intrinsics
 no datalayout checks

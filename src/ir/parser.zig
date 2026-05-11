@@ -122,6 +122,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
+        if (std.mem.startsWith(u8, line, "fence ")) return error.UnsupportedAtomicMemory;
         if (isUnsupportedEhTerminator(line)) return error.UnsupportedExceptionHandling;
 
         if (std.mem.eql(u8, line, "unreachable")) {
@@ -706,6 +707,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     const close_paren = std.mem.lastIndexOfScalar(u8, rest, ')') orelse return error.InvalidCall;
     if (close_paren < open_paren) return error.InvalidCall;
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
+    if (std.mem.startsWith(u8, callee_text, "asm ")) return error.UnsupportedInlineAsm;
     if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
     if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
     const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");

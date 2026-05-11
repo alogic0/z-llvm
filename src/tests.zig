@@ -3080,6 +3080,38 @@ test "parser rejects unsupported atomic memory operations" {
     ;
 
     try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, input));
+
+    const cmpxchg =
+        \\define i32 @memory_cmpxchg(ptr %p, i32 %old, i32 %new) {
+        \\entry:
+        \\  %v = cmpxchg ptr %p, i32 %old, i32 %new monotonic monotonic
+        \\  ret i32 %old
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, cmpxchg));
+
+    const fence =
+        \\define void @memory_fence() {
+        \\entry:
+        \\  fence seq_cst
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, fence));
+}
+
+test "parser rejects inline asm calls explicitly" {
+    const input =
+        \\define void @inline_asm_barrier() {
+        \\entry:
+        \\  call void asm sideeffect "", "~{memory}"()
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedInlineAsm, ir.Module.parse(std.testing.allocator, input));
 }
 
 test "parser normalizes getelementptr instructions" {

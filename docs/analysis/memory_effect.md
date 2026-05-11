@@ -81,7 +81,8 @@ LICM also rejects locally trapping scalar operations such as division by an unkn
 Known gaps:
 
 ```text
-no call, intrinsic, fence, cmpxchg, or atomicrmw classification
+no inline asm, intrinsic, fence, cmpxchg, or atomicrmw classification beyond
+explicit parser rejection
 no target-library or readonly/readnone call handling
 MemoryLocation size and offset model is limited to scalar stack-slot accesses
 no MemoryLocation metadata model
