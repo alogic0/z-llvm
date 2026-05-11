@@ -30,6 +30,7 @@ Implemented subset:
 source_filename = "..."
 target datalayout = "..."
 target triple = "..."
+$name = comdat <kind>
 scalar global definitions: @name = [linkage] global iN <int-or-undef>
 scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
 global suffix attributes preserved as raw text
@@ -42,6 +43,7 @@ void function return type
 ret void
 explicit parser errors for unsupported globals, declarations, and attribute groups
 raw top-level module metadata preservation
+raw module flag named metadata preservation
 ```
 
 Upstream mapping:
@@ -53,6 +55,8 @@ The records are preserved and lightly validated; transforms do not consume most 
 Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
 Calling conventions are preserved in the function signature because they are ABI-relevant in LLVM, but this project does not lower or verify their target ABI effects yet.
 Scalar global definitions are preserved at module level. They are not yet visible to load/store analysis, constant folding, or codegen.
+COMDAT records are preserved and treated conservatively by GlobalDCE when
+referenced from raw global/function attributes.
 ```
 
 Fixture coverage:
@@ -70,6 +74,7 @@ unit-test only:
   function visibility and parameter attribute round-trip
   function calling convention round-trip
   scalar global and constant global round-trip
+  COMDAT record and module flag metadata round-trip
   raw top-level module metadata round-trip
   unsupported aggregate global diagnostic
   void function and ret void verification
@@ -78,12 +83,12 @@ unit-test only:
 Known gaps:
 
 ```text
-no aggregate, string, TLS, COMDAT, alias, or declaration globals
+no aggregate, string, TLS, ifunc, or declaration globals
 no semantic use of globals in optimization or codegen
 no semantic use of linkage, visibility, or attributes
+no interpreted COMDAT selection semantics
 no semantic use of calling conventions
-no attribute group parsing
+attribute groups are preserved after limited sanitizer rejection
 no interpreted module flags
-no instruction metadata attachments
 no source filename escaping
 ```

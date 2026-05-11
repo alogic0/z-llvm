@@ -8,6 +8,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .owned_strings = .empty,
         .globals = .empty,
         .aliases = .empty,
+        .comdats = .empty,
         .declarations = .empty,
         .functions = .empty,
         .attribute_groups = .empty,
@@ -54,6 +55,11 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             }
             const global = try parseGlobal(line);
             try module.globals.append(allocator, global);
+            continue;
+        }
+        if (current_function == null and std.mem.startsWith(u8, line, "$")) {
+            try parseComdat(line);
+            try module.comdats.append(allocator, line);
             continue;
         }
         if (current_function == null and std.mem.startsWith(u8, line, "declare ")) {
@@ -135,8 +141,28 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn parseComdat(line: []const u8) !void {
+    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidComdat;
+    const name = std.mem.trim(u8, line[0..eq_index], " \t");
+    if (name.len <= 1 or name[0] != '$') return error.InvalidComdat;
+
+    var parts = std.mem.tokenizeAny(u8, std.mem.trim(u8, line[eq_index + 1 ..], " \t"), " \t");
+    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidComdat, "comdat")) return error.InvalidComdat;
+    const kind = parts.next() orelse return error.InvalidComdat;
+    if (!isSupportedComdatKind(kind)) return error.UnsupportedComdat;
+    if (parts.next() != null) return error.InvalidComdat;
+}
+
+fn isSupportedComdatKind(kind: []const u8) bool {
+    return std.mem.eql(u8, kind, "any") or
+        std.mem.eql(u8, kind, "exactmatch") or
+        std.mem.eql(u8, kind, "largest") or
+        std.mem.eql(u8, kind, "nodeduplicate") or
+        std.mem.eql(u8, kind, "samesize");
 }
 
 fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
@@ -268,12 +294,26 @@ fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
     return rest[1 .. rest.len - 1];
 }
 
+fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '(') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '(') {
+            depth += 1;
+        } else if (byte == ')') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
 fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Function {
     if (!std.mem.endsWith(u8, line, "{")) return error.InvalidFunctionHeader;
     const body = std.mem.trim(u8, line["define ".len .. line.len - 1], " \t");
     const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionHeader;
     const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionHeader;
-    const close_paren = std.mem.lastIndexOfScalar(u8, body, ')') orelse return error.InvalidFunctionHeader;
+    const close_paren = findMatchingParen(body, open_paren) orelse return error.InvalidFunctionHeader;
     if (close_paren < open_paren) return error.InvalidFunctionHeader;
 
     const prefix = std.mem.trim(u8, body[0..name_start], " \t");
@@ -299,7 +339,7 @@ fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.Funct
     const body = std.mem.trim(u8, line["declare ".len..], " \t");
     const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionDeclaration;
     const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionDeclaration;
-    const close_paren = std.mem.lastIndexOfScalar(u8, body, ')') orelse return error.InvalidFunctionDeclaration;
+    const close_paren = findMatchingParen(body, open_paren) orelse return error.InvalidFunctionDeclaration;
     if (close_paren < open_paren) return error.InvalidFunctionDeclaration;
 
     const prefix = std.mem.trim(u8, body[0..name_start], " \t");

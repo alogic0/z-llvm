@@ -571,6 +571,7 @@ pub const Module = struct {
     target_datalayout: ?[]const u8 = null,
     globals: std.ArrayList(Global),
     aliases: std.ArrayList(GlobalAlias),
+    comdats: std.ArrayList([]const u8),
     declarations: std.ArrayList(FunctionDecl),
     functions: std.ArrayList(Function),
     attribute_groups: std.ArrayList([]const u8),
@@ -583,6 +584,7 @@ pub const Module = struct {
     pub fn deinit(module: *Module) void {
         module.globals.deinit(module.allocator);
         module.aliases.deinit(module.allocator);
+        module.comdats.deinit(module.allocator);
         for (module.declarations.items) |*decl| decl.deinit(module.allocator);
         module.declarations.deinit(module.allocator);
         for (module.functions.items) |*function| function.deinit(module.allocator);

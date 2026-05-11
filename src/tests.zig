@@ -1902,6 +1902,54 @@ test "globaldce removes unreferenced local functions and globals" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "globaldce preserves comdat members conservatively" {
+    const input =
+        \\$grp = comdat any
+        \\
+        \\@member = internal global i32 1, comdat($grp)
+        \\@dead = internal global i32 2
+        \\
+        \\define internal i32 @helper(i32 %x) comdat($grp) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+        \\define internal i32 @dead_fn(i32 %x) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "globaldce");
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var trace: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer trace.deinit();
+    _ = try pm.run(&module, &context, &trace.writer, false);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\$grp = comdat any
+        \\
+        \\@member = internal global i32 1, comdat($grp)
+        \\
+        \\define internal i32 @helper(i32 %x) comdat($grp) {
+        \\entry:
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "verifier rejects use before definition in the same block" {
     const input =
         \\define i32 @bad(i32 %a) {
@@ -2127,6 +2175,33 @@ test "parser preserves scalar global variables" {
     try std.testing.expectEqual(ir.FunctionLinkage.private, module.globals.items[1].linkage);
     try std.testing.expectEqual(ir.GlobalKind.constant, module.globals.items[1].kind);
     try std.testing.expectEqual(ir.Value.undef, module.globals.items[1].initializer);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves module flags and comdat records" {
+    const input =
+        \\source_filename = "module.zig"
+        \\
+        \\$foo = comdat any
+        \\
+        \\@g = internal global i32 42, comdat($foo)
+        \\
+        \\!llvm.module.flags = !{!0}
+        \\!0 = !{i32 2, !"Debug Info Version", i32 3}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), module.comdats.items.len);
+    try std.testing.expectEqualStrings("$foo = comdat any", module.comdats.items[0]);
+    try std.testing.expectEqual(@as(usize, 2), module.metadata.items.len);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();

@@ -47,7 +47,7 @@ const GlobalDependencyGraph = struct {
             const ref: NodeRef = .{ .kind = .function, .name = function.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
-            if (!isLocal(function.linkage)) try graph.roots.append(allocator, ref);
+            if (!isLocal(function.linkage) or hasComdat(function.attrs)) try graph.roots.append(allocator, ref);
             const callees = calls.calleesOf(function.name) orelse &.{};
             for (callees) |callee| {
                 if (!hasFunctionDefinition(module, callee)) continue;
@@ -60,7 +60,7 @@ const GlobalDependencyGraph = struct {
             const ref: NodeRef = .{ .kind = .global, .name = global.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
-            if (!isLocal(global.linkage)) try graph.roots.append(allocator, ref);
+            if (!isLocal(global.linkage) or hasComdat(global.attrs)) try graph.roots.append(allocator, ref);
             switch (global.initializer) {
                 .named => |name| {
                     if (hasFunctionDefinition(module, name)) {
@@ -130,7 +130,7 @@ fn removeDeadFunctions(module: *ir.Module, live: []const NodeRef) bool {
     var index: usize = 0;
     while (index < module.functions.items.len) {
         const function = module.functions.items[index];
-        if (!isLocal(function.linkage) or containsRef(live, .{ .kind = .function, .name = function.name })) {
+        if (!isLocal(function.linkage) or hasComdat(function.attrs) or containsRef(live, .{ .kind = .function, .name = function.name })) {
             index += 1;
             continue;
         }
@@ -147,7 +147,7 @@ fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isLocal(global.linkage) or containsRef(live, .{ .kind = .global, .name = global.name })) {
+        if (!isLocal(global.linkage) or hasComdat(global.attrs) or containsRef(live, .{ .kind = .global, .name = global.name })) {
             index += 1;
             continue;
         }
@@ -215,4 +215,8 @@ fn hasGlobalDefinition(module: ir.Module, name: []const u8) bool {
 
 fn isLocal(linkage: ir.FunctionLinkage) bool {
     return linkage == .internal or linkage == .private;
+}
+
+fn hasComdat(attrs: ?[]const u8) bool {
+    return if (attrs) |text| std.mem.indexOf(u8, text, "comdat") != null else false;
 }

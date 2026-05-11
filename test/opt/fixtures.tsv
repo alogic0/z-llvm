@@ -65,3 +65,4 @@ sroa_nested_zero_gep	sroa	sroa	test/opt/inputs/sroa_nested_zero_gep.ll	test/opt/
 sroa_struct_two_i32	sroa	sroa	test/opt/inputs/sroa_struct_two_i32.ll	test/opt/expected/z_llvm/sroa_struct_two_i32.ll	opt-equivalent	sroa	simple two-field integer struct split into scalar allocas and promoted
 globaldce_basic	globaldce	globaldce	test/opt/inputs/globaldce_basic.ll	test/opt/expected/z_llvm/globaldce_basic.ll	opt-equivalent	globaldce	global graph keeps called internal helper and removes unreferenced locals
 globaldce_alias_root	globaldce	globaldce	test/opt/inputs/globaldce_alias_root.ll	test/opt/expected/z_llvm/globaldce_alias_root.ll	opt-equivalent	globaldce	exported alias keeps internal target live
+globaldce_comdat_root	globaldce	globaldce	test/opt/inputs/globaldce_comdat_root.ll	test/opt/expected/z_llvm/globaldce_comdat_root.ll	local-conservative	globaldce	COMDAT members are preserved conservatively as linker-visible roots

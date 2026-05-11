@@ -45,6 +45,8 @@ externally visible functions, globals, and aliases are live roots
 non-local function definitions are roots
 direct calls from live functions mark local function definitions live
 exported aliases mark their target functions/globals live
+local functions/globals with raw COMDAT attributes are treated as conservative
+roots
 unreached internal/private functions are removed
 scalar global initializer references are represented in the graph if the parser
 accepts them
@@ -55,7 +57,9 @@ unreached internal/private aliases are removed
 Intentional divergences:
 
 ```text
-no ifuncs, comdats, or metadata dependency graph
+no ifuncs or metadata dependency graph
+COMDAT selection semantics are not interpreted; members are kept
+conservatively instead
 no available_externally handling yet
 the parser still rejects most global-as-value and aggregate initializer forms,
 so global initializer edges are limited to the accepted scalar surface
@@ -69,9 +73,10 @@ opt-22 equivalent:
   globaldce_alias_root
 
 local-only conservative:
-  none currently
+  globaldce_comdat_root
 
 unit-test only:
   globaldce removes unreferenced local functions and globals
   exported alias keeps a private target function live
+  COMDAT members are preserved conservatively
 ```
