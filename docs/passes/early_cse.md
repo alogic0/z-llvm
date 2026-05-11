@@ -53,7 +53,7 @@ Implemented subset:
 scoped dominator-tree traversal with an available-expression stack
 expression identity shared with GVN through `src/analysis/expression_key.zig`
 same-basic-block and dominating-block common subexpression elimination
-pure binary expression matching
+pure integer binary expression matching
 pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
@@ -67,6 +67,8 @@ unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
 scalar, load, and readnone-call expression equivalence shared with GVN
+FP binary ops and fcmp intentionally bypass CSE until NaN, signed-zero, and
+fast-math semantics are modeled
 ```
 
 Upstream mapping:
@@ -93,6 +95,8 @@ local-only conservative:
   readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
   declaration attributes into attribute groups that the current parser rejects,
   so this case is not in `fixtures.tsv` yet.
+  fp_early_cse_no_cse preserves repeated FP expressions locally. LLVM may CSE
+  more FP expressions once exact FP legality is modeled.
 
 unit-test only:
   same-block repeated pure expression elimination
@@ -121,6 +125,7 @@ no full MemorySSA walker/updater
 no full MemorySSA-backed load CSE beyond the accepted access-list query
 no readonly call load-preservation model beyond conservative no-clobber
 no freeze CSE because undef/poison semantics need more modeling first
+no FP CSE because NaN/signed-zero/fast-math legality is not modeled yet
 no commutative operand canonicalization
 no target-library knowledge
 no debug-info salvage

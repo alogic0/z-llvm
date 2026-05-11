@@ -31,7 +31,7 @@ Implemented subset:
 
 ```text
 mark values used by live instructions and terminators
-remove unused pure add/sub/mul, icmp, phi, alloca, and load instructions
+remove unused pure add/sub/mul, fadd/fmul, icmp/fcmp, phi, alloca, and load instructions
 keep store, volatile, atomic, and unknown memory instructions because the shared memory-effect API classifies them as side-effecting
 use the shared `isSafeToDelete` helper rather than pass-local side-effect rules
 iterate until no newly unused instructions remain
@@ -52,6 +52,7 @@ opt-22 equivalent:
   memory_dce
   dce_scalar_with_memory
   dce_volatile_load_reject
+  fp_dce_dead
 
 local-only conservative:
   none currently

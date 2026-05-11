@@ -54,6 +54,8 @@ select simplification where an overdefined condition still permits folding
 identical constant arms
 conditional branch edge marking and branch folding when the condition is constant
 direct call folding when the callee is a known local function that always returns the same constant
+FP instructions are treated as unknown/overdefined and preserved because the
+local lattice has no FP constants or NaN/signed-zero model
 ```
 
 Intentional divergences:
@@ -74,6 +76,7 @@ opt-22 equivalent:
   sccp_phi_edge
   sccp_undef_phi
   sccp_select_same_arms
+  fp_sccp_preserve
 
 local-only conservative:
   none currently
@@ -94,6 +97,7 @@ Known gaps:
 ```text
 no complete undef/poison lattice distinction
 no constant range lattice
+no FP constant lattice
 no IPSCCP argument/return lattice summaries
 no branch unreachable removal beyond what SimplifyCFG removes after SCCP
 no IPSCCP

@@ -65,6 +65,8 @@ remove unused side-effect-free instructions
 repeat until dependent dead instruction chains disappear
 preserve stores, volatile/atomic memory barriers, unknown memory effects, and terminators
 use the shared `isSafeToDelete` helper for the local removal boundary
+remove unused side-effect-free FP instructions through the same liveness path as
+integer scalar instructions
 ```
 
 This now covers a small LLVM-equivalent control-flow slice: if a conditional
@@ -86,6 +88,7 @@ opt-22 equivalent:
   adce_dead_diamond
   adce_nested_dead_diamond
   adce_store_branch_reject
+  fp_adce_dead
 
 local-only conservative:
   none currently

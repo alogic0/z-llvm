@@ -87,6 +87,7 @@ Fixture coverage:
   instcombine_scalar_simplify
   instcombine_safe_scalar
   select_fold
+  fp_instcombine_preserve
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -141,6 +142,8 @@ Upstream mapping:
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
 The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
+Floating-point `fadd`, `fmul`, and `fcmp` are preserved rather than folded
+because fast-math, NaN, signed-zero, and FP constant semantics are not modeled.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 ```
 
@@ -171,5 +174,6 @@ no non-constant cast simplification yet
 no unsafe division/remainder simplification
 no canonical reassociation
 no non-constant operand complexity ordering
+no floating-point folds or reassociation
 no target-specific combines
 ```

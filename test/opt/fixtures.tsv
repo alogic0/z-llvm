@@ -9,14 +9,18 @@ instcombine_safe_scalar	instcombine,dce	instcombine,dce	test/opt/inputs/instcomb
 instcombine_intrinsic_minmax	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_intrinsic_minmax.ll	test/opt/expected/z_llvm/instcombine_intrinsic_minmax.ll	opt-equivalent	instcombine,dce	integer min/max intrinsic same-operand folding
 select_fold	instcombine,dce	instcombine,dce	test/opt/inputs/select_fold.ll	test/opt/expected/z_llvm/select_fold.ll	opt-equivalent	instcombine,dce	select constant and identical-arm folding
 scalar_ir_surface	dce	dce	test/opt/inputs/scalar_ir_surface.ll	test/opt/expected/z_llvm/scalar_ir_surface.ll	opt-equivalent	dce	scalar casts div rem flags and freeze round-trip
+fp_instcombine_preserve	instcombine	instcombine	test/opt/inputs/fp_instcombine_preserve.ll	test/opt/expected/z_llvm/fp_instcombine_preserve.ll	opt-equivalent	instcombine	FP fadd/fmul/fcmp are preserved without fast-math semantics
 dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	opt-equivalent	dce	generic LLVM headers only
+fp_dce_dead	dce	dce	test/opt/inputs/fp_dce_dead.ll	test/opt/expected/z_llvm/fp_dce_dead.ll	opt-equivalent	dce	unused side-effect-free FP instructions are removed
 adce_chain	adce	adce	test/opt/inputs/adce_chain.ll	test/opt/expected/z_llvm/adce_chain.ll	opt-equivalent	adce	unused side-effect-free instruction chain removed
+fp_adce_dead	adce	adce	test/opt/inputs/fp_adce_dead.ll	test/opt/expected/z_llvm/fp_adce_dead.ll	opt-equivalent	adce	unused FP instruction chain is removed
 adce_dead_branch	adce	adce	test/opt/inputs/adce_dead_branch.ll	test/opt/expected/z_llvm/adce_dead_branch.ll	opt-equivalent	adce	dead conditional branch control rewritten to live successor
 adce_dead_diamond	adce	adce	test/opt/inputs/adce_dead_diamond.ll	test/opt/expected/z_llvm/adce_dead_diamond.ll	opt-equivalent	adce	dead diamond branch control rewritten like LLVM ADCE
 adce_nested_dead_diamond	adce	adce	test/opt/inputs/adce_nested_dead_diamond.ll	test/opt/expected/z_llvm/adce_nested_dead_diamond.ll	opt-equivalent	adce	nested acyclic dead branch regions are rewritten through postdominator joins
 adce_store_branch_reject	adce	adce	test/opt/inputs/adce_store_branch_reject.ll	test/opt/expected/z_llvm/adce_store_branch_reject.ll	opt-equivalent	adce	side-effecting store keeps branch control live
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-equivalent	dce	opt-22 inferred memory alignment is normalized
 gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.ll	test/opt/expected/z_llvm/gvn_dominating_expr.ll	opt-equivalent	gvn,simplifycfg,dce	dominating repeated expression eliminated; LLVM simplifycfg also removes the now-redundant branch
+fp_gvn_no_cse	gvn	gvn	test/opt/inputs/fp_gvn_no_cse.ll	test/opt/expected/z_llvm/fp_gvn_no_cse.ll	local-conservative	gvn	FP expressions are not value-numbered until NaN/signed-zero/fast-math semantics are modeled
 licm_invariant	licm	loop-mssa(licm)	test/opt/inputs/licm_invariant.ll	test/opt/expected/z_llvm/licm_invariant.ll	opt-equivalent	licm	pure loop-invariant icmp hoisted to preheader
 licm_variant_operand	licm	loop-mssa(licm)	test/opt/inputs/licm_variant_operand.ll	test/opt/expected/z_llvm/licm_variant_operand.ll	opt-equivalent	licm	loop-variant operand prevents hoisting
 licm_dominates_uses	licm	loop-mssa(licm)	test/opt/inputs/licm_dominates_uses.ll	test/opt/expected/z_llvm/licm_dominates_uses.ll	opt-equivalent	licm	hoisted scalar chain preserves dominance of uses
@@ -41,8 +45,10 @@ sccp_branch	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_branc
 sccp_phi_edge	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_phi_edge.ll	test/opt/expected/z_llvm/sccp_phi_edge.ll	opt-equivalent	sccp,simplifycfg,dce	executable-edge PHI filtering keeps the reachable constant
 sccp_undef_phi	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_undef_phi.ll	test/opt/expected/z_llvm/sccp_undef_phi.ll	opt-equivalent	sccp,simplifycfg,dce	undef and constant PHI lattice resolves to the constant
 sccp_select_same_arms	sccp,dce	sccp,dce	test/opt/inputs/sccp_select_same_arms.ll	test/opt/expected/z_llvm/sccp_select_same_arms.ll	opt-equivalent	sccp,dce	overdefined select condition still folds when both arms are the same constant
+fp_sccp_preserve	sccp	sccp	test/opt/inputs/fp_sccp_preserve.ll	test/opt/expected/z_llvm/fp_sccp_preserve.ll	opt-equivalent	sccp	FP expressions remain overdefined/preserved without constant FP lattice support
 bdce_and_mask	bdce	bdce	test/opt/inputs/bdce_and_mask.ll	test/opt/expected/z_llvm/bdce_and_mask.ll	opt-equivalent	bdce	demanded low bits remove redundant wider and-mask
 early_cse_store_to_load	early-cse	early-cse	test/opt/inputs/early_cse_store_to_load.ll	test/opt/expected/z_llvm/early_cse_store_to_load.ll	opt-equivalent	early-cse	store-to-load forwarding for must-alias stack slot
+fp_early_cse_no_cse	early-cse	early-cse	test/opt/inputs/fp_early_cse_no_cse.ll	test/opt/expected/z_llvm/fp_early_cse_no_cse.ll	local-conservative	early-cse	FP expressions are not CSE candidates until NaN/signed-zero/fast-math semantics are modeled
 early_cse_volatile_load_reject	early-cse	early-cse	test/opt/inputs/early_cse_volatile_load_reject.ll	test/opt/expected/z_llvm/early_cse_volatile_load_reject.ll	opt-equivalent	early-cse	volatile loads are not CSE candidates
 early_cse_load_call_clobber_reject	early-cse	early-cse	test/opt/inputs/early_cse_load_call_clobber_reject.ll	test/opt/expected/z_llvm/early_cse_load_call_clobber_reject.ll	opt-equivalent	early-cse	intervening unknown call blocks load CSE
 early_cse_load_branch_clobber_reject	early-cse	early-cse	test/opt/inputs/early_cse_load_branch_clobber_reject.ll	test/opt/expected/z_llvm/early_cse_load_branch_clobber_reject.ll	opt-equivalent	early-cse	branch-local store blocks load CSE regardless of block order

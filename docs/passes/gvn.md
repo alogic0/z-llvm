@@ -58,7 +58,7 @@ Local target status:
 Implemented subset:
 
 ```text
-local ValueTable for pure binary, integer cast, icmp, select, phi, readnone call, and simple load expressions
+local ValueTable for pure integer binary, integer cast, icmp, select, phi, readnone call, and simple load expressions
 expression identity shared with EarlyCSE through `src/analysis/expression_key.zig`
 leader table scoped by dominator traversal
 shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
@@ -72,6 +72,8 @@ using numeric block order as a path proof
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
+FP binary ops and fcmp intentionally bypass value numbering until NaN,
+signed-zero, and fast-math semantics are modeled
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.
@@ -97,6 +99,9 @@ local-only conservative:
   transform for this shape, so this fixture checks the local safety boundary.
   readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for
   the equivalent fixture, which the current parser rejects.
+  fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
+  more FP expressions when the exact legality conditions are proven; this
+  project keeps them out of GVN for now.
 
 unit-test only:
   phi-aware redundancy
@@ -116,5 +121,5 @@ no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge or partial redundancy handling
-no assume, readonly call, GEP, freeze, vector, or memory value numbering
+no assume, readonly call, GEP, freeze, FP, vector, or memory value numbering
 ```
