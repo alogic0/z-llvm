@@ -79,7 +79,7 @@ inline asm call
 invoke/callbr
 bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
-landingpad/cleanupret/catchret
+landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad
 atomicrmw/cmpxchg/fence
 inline asm
 ```
@@ -318,6 +318,8 @@ aggregate, string, TLS, COMDAT, alias, and declaration globals
 semantic global variable use in optimizations
 visibility and attributes with semantic effects
 calling convention ABI semantics
+LLVM EH IR; Zig error-union control-flow is tracked separately from invoke,
+landingpad, and resume support
 aggregate, floating-point, vector, varargs, byval, sret, register, and stack ABI classification
 full AIR parser and full Zig AIR semantics
 AIR-like non-canonical loops, calls, select, overflow operations, intrinsics, aggregates, comptime, errors, async, and debug info

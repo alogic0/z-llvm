@@ -122,6 +122,8 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
+        if (isUnsupportedEhTerminator(line)) return error.UnsupportedExceptionHandling;
+
         if (std.mem.eql(u8, line, "unreachable")) {
             if (block.terminator != null) return error.MultipleTerminators;
             block.terminator = .{ .@"unreachable" = {} };
@@ -470,6 +472,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     if (std.mem.startsWith(u8, rhs_text, "tail ")) return parseCall(allocator, result_text[1..], rhs_text);
     if (std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return error.UnsupportedCallAttribute;
     if (std.mem.startsWith(u8, rhs_text, "invoke ") or std.mem.startsWith(u8, rhs_text, "callbr ")) return error.UnsupportedCallTerminator;
+    if (isUnsupportedEhInstruction(rhs_text)) return error.UnsupportedExceptionHandling;
     if (std.mem.startsWith(u8, rhs_text, "phi ")) {
         return .{
             .result = result_text[1..],
@@ -596,6 +599,19 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .rhs = rhs,
         } },
     };
+}
+
+fn isUnsupportedEhTerminator(line: []const u8) bool {
+    return std.mem.startsWith(u8, line, "resume ") or
+        std.mem.startsWith(u8, line, "catchswitch ") or
+        std.mem.startsWith(u8, line, "catchret ") or
+        std.mem.startsWith(u8, line, "cleanupret ");
+}
+
+fn isUnsupportedEhInstruction(text: []const u8) bool {
+    return std.mem.startsWith(u8, text, "landingpad ") or
+        std.mem.startsWith(u8, text, "catchpad ") or
+        std.mem.startsWith(u8, text, "cleanuppad ");
 }
 
 fn parseAlloca(text: []const u8) !core.AllocaInst {

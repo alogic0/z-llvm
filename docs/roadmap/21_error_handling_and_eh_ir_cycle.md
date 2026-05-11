@@ -14,18 +14,26 @@ actual LLVM-removal path.
 
 ## Plan
 
-- [ ] Inventory error-union and optional lowering shapes in Zig-emitted IR.
-- [ ] Confirm whether accepted Zig modes emit LLVM EH constructs for target
+- [x] Inventory error-union and optional lowering shapes in Zig-emitted IR.
+- [x] Confirm whether accepted Zig modes emit LLVM EH constructs for target
       fixtures.
-- [ ] Parse non-EH error-union scalar/control-flow shapes where needed.
-- [ ] Keep LLVM EH terminators rejected until CFG, verifier, and optimizer
+- [x] Parse non-EH error-union scalar/control-flow shapes where needed.
+- [x] Keep LLVM EH terminators rejected until CFG, verifier, and optimizer
       rules are designed.
-- [ ] Add rejected fixtures for `invoke`, `landingpad`, and `resume`.
-- [ ] Document the difference between Zig errors and LLVM EH.
+- [x] Add rejected fixtures for `invoke`, `landingpad`, and `resume`.
+- [x] Document the difference between Zig errors and LLVM EH.
 
 ## Exit Criteria
 
-- [ ] Zig error-lowering blockers are not conflated with LLVM EH blockers.
-- [ ] EH IR rejection is explicit and tested.
-- [ ] Accepted error-union-like scalar patterns are owned by parser/pass cycles.
+- [x] Zig error-lowering blockers are not conflated with LLVM EH blockers.
+- [x] EH IR rejection is explicit and tested.
+- [x] Accepted error-union-like scalar patterns are owned by parser/pass cycles.
 
+## Completion Notes
+
+- Added explicit parser rejection for LLVM EH pad/terminator forms such as
+  `landingpad` and `resume`.
+- Existing `invoke` rejection remains classified as an unsupported call
+  terminator.
+- Added `docs/ir_exception_handling.md` to separate Zig error-control-flow
+  handling from LLVM EH semantics.

@@ -2079,6 +2079,26 @@ test "parser rejects unsupported indirect and control-flow call forms" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedCallTerminator, ir.Module.parse(std.testing.allocator, invoke));
+
+    const landingpad =
+        \\define ptr @eh_personality() {
+        \\entry:
+        \\  %lp = landingpad { ptr, i32 }
+        \\          cleanup
+        \\  ret ptr undef
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, landingpad));
+
+    const resume_ir =
+        \\define void @resume_eh() {
+        \\entry:
+        \\  resume ptr undef
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, resume_ir));
 }
 
 test "parser preserves scalar global variables" {

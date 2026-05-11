@@ -41,3 +41,7 @@ no invoke/callbr/indirectbr
 no resume/catchswitch/cleanupret/catchret
 no metadata or profile weights
 ```
+
+LLVM exception-handling IR is tracked separately in
+`docs/ir_exception_handling.md`. These constructs are rejected explicitly rather
+than being normalized into ordinary branches.
