@@ -77,8 +77,8 @@ Pass status counts from the active pass pipeline inventory:
 
 | Manifest row | Status | Evidence | Finish disposition |
 | --- | --- | --- | --- |
-| `tiny_scalar_debug` | `future` | Raw Debug IR is too broad because it pulls in debug and std support. Reduced Debug rows already cover the accepted metadata boundary. | Later measured blocker; reduce only if a new Debug construct becomes required. |
-| `tiny_scalar_release_safe` | `future` | Raw ReleaseSafe IR is broad. Reduced ReleaseSafe safety and runtime-call rows already cover the accepted safety boundary. | Later measured blocker; reduce only if a new safety construct becomes required. |
+| `tiny_scalar_debug` | `future,legacy-bootstrap` | Historical broad raw Debug IR is too large because it pulls in debug and std support. Reduced Debug rows already cover the accepted metadata boundary. | Later measured blocker; activate only by reducing an uncovered Debug construct. |
+| `tiny_scalar_release_safe` | `future,legacy-bootstrap` | Historical broad raw ReleaseSafe IR is broad. Reduced ReleaseSafe safety and runtime-call rows already cover the accepted safety boundary. | Later measured blocker; activate only by reducing an uncovered safety or runtime-call construct. |
 | `tiny_scalar_release_small` | `future,legacy-bootstrap` | Historical unstripped raw ReleaseSmall generation row predates the stripped captured ReleaseSmall row. | Closed by Cycle 02; retained as future evidence only, superseded by `tiny_scalar_release_small_captured`. |
 | `vector_future_release_fast` | `parse,verify,future` | Reduced vector row parses and verifies fixed-vector syntax but is not optimizer-input until target-cost/vector transform policy exists. | Conservative accepted boundary; vectorizers and target-cost-driven transforms remain out of scope for this finish line. |
 
@@ -103,8 +103,8 @@ Pass status counts from the active pass pipeline inventory:
 | Gap | Current status | Evidence owner | Next action |
 | --- | --- | --- | --- |
 | Stale raw ReleaseSmall unsupported row | conservative accepted boundary | `docs/fixtures/zig_ir/manifest.tsv` | Closed by Cycle 02; accepted evidence is `tiny_scalar_release_small_captured`. |
-| Raw Debug whole-program shape | later measured blocker | `tiny_scalar_debug` plus reduced Debug rows | Keep reduced Debug fixtures unless a new source-backed construct is needed. |
-| Raw ReleaseSafe whole-program shape | later measured blocker | `tiny_scalar_release_safe` plus reduced safety rows | Keep reduced safety fixtures unless a new source-backed construct is needed. |
+| Raw Debug whole-program shape | later measured blocker | `tiny_scalar_debug` plus reduced Debug rows | Activation condition: reduce a concrete uncovered Debug construct from raw Zig output. |
+| Raw ReleaseSafe whole-program shape | later measured blocker | `tiny_scalar_release_safe` plus reduced safety rows | Activation condition: reduce a concrete uncovered safety/runtime-call construct from raw Zig output. |
 | Fixed-vector optimizer participation | conservative accepted boundary | `vector_future_release_fast`, vector opt fixtures | Preserve parser/verifier plus narrow lane folds; keep vectorizers out of scope. |
 | Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures and debug docs | Preserve `llvm.dbg.value`/`llvm.dbg.declare`; do not transform them until salvage exists. |
 | Full ThinLTO/bitcode summary behavior | out of scope for finish | bitcode/LTO docs | Keep compatibility decision and explicit unsupported diagnostics. |
@@ -113,6 +113,7 @@ Pass status counts from the active pass pipeline inventory:
 
 ## Selected Next Slice
 
-The stale `tiny_scalar_release_small` unsupported manifest row is closed. The
-active implementation slice is recorded in `docs/next_steps.md`: define the
-future-row policy for broad raw Debug and ReleaseSafe rows.
+The stale `tiny_scalar_release_small` unsupported manifest row is closed. Broad
+raw Debug and ReleaseSafe rows now have explicit future activation conditions.
+The active implementation slice is recorded in `docs/next_steps.md`: close the
+vector future boundary.

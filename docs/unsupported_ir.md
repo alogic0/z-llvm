@@ -112,12 +112,13 @@ definition:
 ```text
 tiny_scalar_debug: future
   Later measured blocker. Reduced Debug metadata rows already define the
-  accepted Debug boundary; the broad raw row is not required for the current
-  finish line.
+  accepted Debug boundary; the broad raw row is activated only by reducing a
+  concrete uncovered Debug construct from source-backed output.
 
 tiny_scalar_release_safe: future
   Later measured blocker. Reduced ReleaseSafe safety/runtime-call rows already
-  define the accepted safety boundary.
+  define the accepted safety boundary; the broad raw row is activated only by
+  reducing a concrete uncovered safety or runtime-call construct.
 
 tiny_scalar_release_small: future,legacy-bootstrap
   Closed by Cycle 02. This historical unstripped raw row predates the accepted

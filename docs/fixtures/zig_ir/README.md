@@ -192,8 +192,8 @@ Current local status:
 
 | Mode | Status |
 | --- | --- |
-| `Debug` | raw IR generated successfully, but it pulls in large debug/std support and is classified as `future`. |
-| `ReleaseSafe` | raw IR generated successfully, but it is still large because safety/std support remains visible; classified as `future`. |
+| `Debug` | raw IR generated successfully, but it pulls in large debug/std support and is classified as historical `future,legacy-bootstrap`; accepted Debug evidence is the reduced metadata rows. |
+| `ReleaseSafe` | raw IR generated successfully, but it is still large because safety/std support remains visible; classified as historical `future,legacy-bootstrap`; accepted ReleaseSafe evidence is the reduced safety/runtime-call rows. |
 | `ReleaseFast` | normalized scalar signature fixture and stripped captured raw fixture are checked in and classified as `parse,verify,optimizer-input`. |
 | `ReleaseSmall` | stripped captured raw fixture is checked in and classified as `parse,verify,optimizer-input`; the old unstripped raw generation row is historical `future,legacy-bootstrap` evidence only. |
 
