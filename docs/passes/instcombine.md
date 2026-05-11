@@ -70,6 +70,7 @@ Implemented subset:
   scalar simplifications delegated to the InstSimplify helper
   Checked `nuw`/`nsw`/`exact` identity and constant folds for the listed
   integer fixtures
+  Same-constant-lane extract-after-insert vector lane fold
   Constant-on-RHS canonicalization for supported commutative binary ops
 
 Intentional divergences:
@@ -96,6 +97,10 @@ Fixture coverage:
   helper preserves an overflowing `nsw` constant expression rather than
   materializing LLVM poison.
   instcombine_pointer_compare
+  vector_extract_insert_fold
+  vector_extract_insert_mismatch_reject is local-conservative: LLVM rewrites to
+  extract from the original vector when lanes differ; the local pass preserves
+  the shape until it can create replacement vector instructions.
   select_fold
   fp_instcombine_preserve
   fp_special_literals_preserve
@@ -164,6 +169,7 @@ constant `trunc`, `zext`, and `sext` folding for integer constants
 defined constant `udiv`, `sdiv`, `urem`, and `srem` folding
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
 pointer null/self ICmp folds through same-operand comparison simplification
+extractelement (insertelement V, X, C), C -> X for fixed vectors and constant C
 freeze of an integer constant -> that same constant
 strict `fcmp false` -> false
 strict `fcmp true` -> true
@@ -212,8 +218,8 @@ no general use of nsw/nuw/exact for folds beyond the listed neutral identities
 and checked constants
 no materialized poison/undef simplification
 no non-constant freeze simplification
-no vector folds; fixed-vector IR is parser/verifier-only and excluded from
-InstCombine equivalence claims
+no vector folds beyond same-constant-lane extract-after-insert; vectorizers and
+target-cost-sensitive vector combines remain placeholders
 no width-aware constant folding for non-zero shifts
 no demanded-bits cleanup in InstCombine; the first source-backed integer mask
 quality case is implemented in the separate `bdce` pass

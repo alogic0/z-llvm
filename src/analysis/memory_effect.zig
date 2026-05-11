@@ -40,8 +40,8 @@ pub fn classify(instruction: ir.Instruction) Effect {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => .volatile_or_atomic_barrier,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .none,
+        .atomicrmw, .cmpxchg, .fence => .volatile_or_atomic_barrier,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .none,
         .call => |call| if (call.inline_asm != null) .volatile_or_atomic_barrier else .unknown,
     };
 }
@@ -50,7 +50,8 @@ pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
     return switch (instruction.kind) {
         .load => |load| memoryBarrierKind(load.attrs),
         .store => |store| memoryBarrierKind(store.attrs),
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => .atomic,
+        .atomicrmw, .cmpxchg, .fence => .atomic,
+        .extractelement, .insertelement, .shufflevector => .none,
         .call => |call| if (call.inline_asm) |inline_asm|
             if (inline_asm.has_memory_clobber) .inline_asm else .none
         else

@@ -968,7 +968,7 @@ fn verifyShuffleMaskLiteral(max_lane: u32, mask_ty: core.Type, text: []const u8)
         const typed = try parseLeadingType(lane);
         if (!typed.ty.eql(mask_vector.elem_ty.toType())) return error.TypeMismatch;
         const value_text = std.mem.trim(u8, typed.after, " \t");
-        if (!std.mem.eql(u8, value_text, "undef")) {
+        if (!std.mem.eql(u8, value_text, "undef") and !std.mem.eql(u8, value_text, "poison")) {
             const value = try std.fmt.parseInt(i128, value_text, 10);
             if (value < 0 or value >= max_lane) return error.TypeMismatch;
         }
@@ -1002,7 +1002,7 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
 
 fn parseValueForLiteral(text: []const u8) !void {
     if (text.len == 0) return error.InvalidValue;
-    if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "zeroinitializer")) return;
+    if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "poison") or std.mem.eql(u8, text, "zeroinitializer")) return;
     if (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false")) return;
     _ = try std.fmt.parseInt(i128, text, 10);
 }

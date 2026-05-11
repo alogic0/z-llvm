@@ -36,6 +36,7 @@ Implemented subset:
 
 ```text
 classify scalar binary, icmp, select, phi, alloca, and getelementptr as no memory access
+classify fixed-vector lane operations as no memory access
 classify nonvolatile nonatomic load as readonly_load
 classify nonvolatile nonatomic store as memory_write
 classify volatile or atomic load/store as volatile_or_atomic_barrier
@@ -59,6 +60,7 @@ opt-22 equivalent:
   dce_volatile_load_reject
   gvn_scalar_with_memory
   licm_scalar_with_memory
+  vector_lane_dead_dce
 
 local-only conservative:
   licm_aligned_load_reject
@@ -67,7 +69,9 @@ local-only conservative:
   atomic_rmw_cmpxchg_fence_barrier
 
 unit-test only:
-  memory effect classification for pure instruction, readonly load, volatile load, store, atomic store, inline asm, atomicrmw, cmpxchg, and fence
+  memory effect classification for pure instruction, vector lane instruction,
+  readonly load, volatile load, store, atomic store, inline asm, atomicrmw,
+  cmpxchg, and fence
   volatile, atomic, and inline asm barrier kind classification
   may-throw call and may-trap division classification
   safe-to-delete and safe-to-speculate predicates
@@ -79,7 +83,7 @@ Upstream mapping:
 ```text
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
-This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly.
+This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly. Fixed-vector lane operations are pure instructions, not memory barriers.
 Direct calls use preserved callee attributes only for the local `memory(none)`,
 `memory(read)`, `memory(write)`, `readnone`, `readonly`, and `writeonly`
 classification boundary.
@@ -101,4 +105,5 @@ load/store/call checks
 no alias-aware instruction reordering
 no distinction between acquire/release/monotonic/etc ordering semantics
 no address spaces, globals, captures, or target DataLayout
+no target-cost interpretation for vector lane operations
 ```

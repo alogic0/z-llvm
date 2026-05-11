@@ -18,7 +18,9 @@ Implemented subset:
 
 ```text
 scalar accepted corpus pipelines exclude vectorizer placeholders
-fixed-vector IR forms parse and verify only
+fixed-vector IR forms parse and verify
+fixed-vector lane operations may participate in target-independent DCE
+same-constant-lane extract-after-insert folds are target-independent
 unsupported scalable vectors and malformed lane operations are rejected by parser tests
 future vector fixture records the parser/verifier boundary
 loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
@@ -38,8 +40,8 @@ codegen/backend validation for generated vector IR
 Unsupported behavior:
 
 ```text
-no optimizer-input vector corpus rows
-no lane-operation cost model
+no optimizer-input vector corpus rows beyond reduced lane-operation fixtures
+no lane-operation profitability model
 no vector optimization or scalar fold reuse
 no loop or SLP vectorization
 no target feature or CPU model cost variation
@@ -47,7 +49,8 @@ no target feature or CPU model cost variation
 
 Target feature extraction is documented in `docs/target/features.md`. Those
 facts are preserved for future TargetTransformInfo work, not consumed by the
-current optimizer.
+current optimizer. The current lane folds are allowed only because they are
+target-independent semantic identities, not profitability decisions.
 
 The transform classification policy is tracked in
 `docs/target/transform_cost_policy.md`.

@@ -23,9 +23,18 @@ insertelement with matching vector element value type
 shufflevector with matching input vector types and integer vector masks
 ```
 
-This is a parser/verifier boundary only. Vector instructions are not
-optimizer-input corpus rows yet, and scalar InstSimplify, GVN, and EarlyCSE do
-not fold or value-number vector binary operations as scalar expressions.
+This is mostly a parser/verifier boundary. Cycle 17 enables a narrow optimizer
+slice for fixed-vector lane operations:
+
+```text
+extractelement, insertelement, and shufflevector are pure, side-effect-free instructions
+unused lane operations may be removed by DCE
+extractelement (insertelement V, X, C), C -> X when C is the same constant lane
+```
+
+Scalar InstSimplify, GVN, and EarlyCSE still do not fold or value-number vector
+binary operations as scalar expressions. Vectorization and profitability remain
+blocked on TargetTransformInfo-style cost modeling.
 
 Unsupported:
 
@@ -33,7 +42,7 @@ Unsupported:
 scalable vectors
 vector element types outside integer, float, double, and ptr
 vector select and vector comparisons beyond current parser boundaries
-TargetTransformInfo-like cost modeling
+TargetTransformInfo-like profitability or vectorizer cost modeling
 loop-vectorize, slp-vectorizer, vector-combine
 native vector lowering
 ```
@@ -55,4 +64,10 @@ source-backed reduced fixture:
 
 opt-22 equivalent:
   vector_lane_preserve
+  vector_lane_dead_dce
+  vector_extract_insert_fold
+
+local-only conservative:
+  vector_extract_insert_mismatch_reject
+  vector_shuffle_undef_mask_preserve
 ```

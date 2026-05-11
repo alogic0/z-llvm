@@ -7,21 +7,29 @@ scalar optimizer participation.
 
 ## Plan
 
-- [ ] Define target-cost policy for vector lane operations on supported target
+- [x] Define target-cost policy for vector lane operations on supported target
       triples.
-- [ ] Reclassify pure vector lane operations so they are not modeled as memory
+- [x] Reclassify pure vector lane operations so they are not modeled as memory
       barriers, while still preventing unsupported transforms.
-- [ ] Add verifier and optimizer helpers for vector element types, lane counts,
+- [x] Add verifier and optimizer helpers for vector element types, lane counts,
       masks, and poison-sensitive behavior.
-- [ ] Enable simple lane simplifications such as extract-after-insert when
+- [x] Enable simple lane simplifications such as extract-after-insert when
       indices and values prove legality.
-- [ ] Add fixtures for extract, insert, shuffle, poison/undef masks, and
+- [x] Add fixtures for extract, insert, shuffle, poison/undef masks, and
       unsupported scalable vectors.
-- [ ] Compare equivalent fixtures with `opt-22`.
-- [ ] Update vector IR, target-cost, and memory-effect docs.
+- [x] Compare equivalent fixtures with `opt-22`.
+- [x] Update vector IR, target-cost, and memory-effect docs.
 
 ## Exit Criteria
 
-- [ ] Dead pure vector lane operations can be removed when unused.
-- [ ] At least one lane simplification matches LLVM for listed fixtures.
-- [ ] Unsupported vector transforms remain explicitly rejected.
+- [x] Dead pure vector lane operations can be removed when unused.
+- [x] At least one lane simplification matches LLVM for listed fixtures.
+- [x] Unsupported vector transforms remain explicitly rejected.
+
+## Completed Slice
+
+Cycle 17 classifies fixed-vector lane operations as pure instructions, allowing
+DCE to remove unused extract/insert/shuffle operations. InstCombine now folds
+`extractelement (insertelement V, X, C), C` to `X` for the same constant lane.
+Vectorizers, scalable vectors, target-cost profitability, and target-dependent
+vector combines remain deferred.

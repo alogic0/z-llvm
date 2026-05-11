@@ -16,6 +16,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     for (module.functions.items) |*function| {
         var aliases = std.StringHashMap(ir.Value).init(module.allocator);
         defer aliases.deinit();
+        var inserted_vectors = std.StringHashMap(ir.InsertElementInst).init(module.allocator);
+        defer inserted_vectors.deinit();
 
         for (function.blocks.items) |*block| {
             for (block.instructions.items) |*instruction| {
@@ -23,12 +25,19 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
                 if (canonicalize(instruction)) changed = true;
 
-                if (fold(instruction.*)) |replacement| {
+                if (foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
                     const result = instruction.result orelse return error.InstructionWithoutResult;
                     try aliases.put(result, replacement);
                     changed = true;
+                    continue;
+                }
+
+                if (instruction.kind == .insertelement) {
+                    if (instruction.result) |result| {
+                        try inserted_vectors.put(result, instruction.kind.insertelement);
+                    }
                 }
             }
 
@@ -61,4 +70,25 @@ fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value 
 
 fn fold(instruction: ir.Instruction) ?ir.Value {
     return inst_simplify.simplify(instruction);
+}
+
+fn foldWithContext(instruction: ir.Instruction, inserted_vectors: std.StringHashMap(ir.InsertElementInst)) ?ir.Value {
+    return switch (instruction.kind) {
+        .extractelement => |extract| foldExtractAfterInsert(extract, inserted_vectors),
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .gep, .call => null,
+    };
+}
+
+fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.StringHashMap(ir.InsertElementInst)) ?ir.Value {
+    if (extract.vector != .named) return null;
+    const insert = inserted_vectors.get(extract.vector.named) orelse return null;
+    if (extract.index != .int or insert.index != .int) return null;
+    if (extract.index.int != insert.index.int) return null;
+    if (!extract.vector_ty.eql(insert.vector_ty)) return null;
+    const vector_ty = switch (extract.vector_ty) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .metadata, .ptr, .aggregate => return null,
+    };
+    if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return null;
+    return insert.value;
 }
