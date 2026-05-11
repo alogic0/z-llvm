@@ -7,7 +7,7 @@ OS: Ubuntu 24.04.4 LTS (noble)
 Local z_llvm build/test Zig: zig on PATH, currently 0.16.0
 LLVM tools: 22.1.3
 LLVM source checkout: llvm-project-22/
-Zig source checkout for inventory work: ../ziglang
+Zig source checkout for inventory work: ../ziglang (currently 9787df9421 for new corpus captures)
 Authoritative Zig fixture emitter: ../ziglang/build/stage4/bin/zig
 Project checkout: z_llvm/
 ```

@@ -14,6 +14,9 @@ Completed fixture-equivalent optimizer cycle slices live in
 
 Completed larger optimizer cycles live in `completed_big_cycles/`.
 
+Completed raw Zig-emitted IR corpus blocker cycles live in
+`completed_corpus_blocker_cycles/`.
+
 ## Archived Files
 
 - `calls_and_stack_frame_codegen_epic.md`
