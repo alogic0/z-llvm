@@ -2,7 +2,13 @@ const std = @import("std");
 const ir = @import("../ir.zig");
 
 pub const Node = struct {
+    pub const Kind = enum {
+        definition,
+        declaration,
+    };
+
     function: []const u8,
+    kind: Kind,
     callees: std.ArrayList([]const u8),
 
     pub fn deinit(node: *Node, allocator: std.mem.Allocator) void {
@@ -24,11 +30,20 @@ pub const CallGraph = struct {
         for (module.functions.items) |function| {
             var node: Node = .{
                 .function = function.name,
+                .kind = .definition,
                 .callees = .empty,
             };
             errdefer node.deinit(allocator);
             try collectDirectCallees(allocator, &node, function);
             try graph.nodes.append(allocator, node);
+        }
+
+        for (module.declarations.items) |decl| {
+            try graph.nodes.append(allocator, .{
+                .function = decl.name,
+                .kind = .declaration,
+                .callees = .empty,
+            });
         }
 
         return graph;
@@ -52,6 +67,55 @@ pub const CallGraph = struct {
             if (std.mem.eql(u8, candidate, callee)) return true;
         }
         return false;
+    }
+
+    pub fn kindOf(graph: CallGraph, function_name: []const u8) ?Node.Kind {
+        for (graph.nodes.items) |node| {
+            if (std.mem.eql(u8, node.function, function_name)) return node.kind;
+        }
+        return null;
+    }
+
+    pub fn hasDefinition(graph: CallGraph, function_name: []const u8) bool {
+        const kind = graph.kindOf(function_name) orelse return false;
+        return kind == .definition;
+    }
+
+    pub fn hasDeclaration(graph: CallGraph, function_name: []const u8) bool {
+        const kind = graph.kindOf(function_name) orelse return false;
+        return kind == .declaration;
+    }
+
+    pub fn isKnownCallee(graph: CallGraph, function_name: []const u8) bool {
+        return graph.kindOf(function_name) != null;
+    }
+
+    pub fn reachableDefinitionsFromRoots(
+        graph: CallGraph,
+        allocator: std.mem.Allocator,
+        roots: []const []const u8,
+    ) !std.ArrayList([]const u8) {
+        var reachable: std.ArrayList([]const u8) = .empty;
+        errdefer reachable.deinit(allocator);
+        var worklist: std.ArrayList([]const u8) = .empty;
+        defer worklist.deinit(allocator);
+
+        for (roots) |root| {
+            if (!graph.hasDefinition(root)) continue;
+            try appendUnique(allocator, &reachable, root);
+            try appendUnique(allocator, &worklist, root);
+        }
+
+        while (worklist.pop()) |caller| {
+            const callees = graph.calleesOf(caller) orelse continue;
+            for (callees) |callee| {
+                if (!graph.hasDefinition(callee)) continue;
+                const before = reachable.items.len;
+                try appendUnique(allocator, &reachable, callee);
+                if (reachable.items.len != before) try appendUnique(allocator, &worklist, callee);
+            }
+        }
+        return reachable;
     }
 };
 

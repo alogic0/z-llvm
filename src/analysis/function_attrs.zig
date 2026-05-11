@@ -6,6 +6,9 @@ pub const AttributeSet = struct {
     readnone: bool = false,
     readonly: bool = false,
     argmemonly: bool = false,
+    nofree: bool = false,
+    norecurse: bool = false,
+    nosync: bool = false,
     nounwind: bool = false,
     willreturn: bool = false,
     @"noinline": bool = false,
@@ -16,6 +19,9 @@ pub const AttributeSet = struct {
         attrs.readnone = attrs.readnone or other.readnone;
         attrs.readonly = attrs.readonly or other.readonly;
         attrs.argmemonly = attrs.argmemonly or other.argmemonly;
+        attrs.nofree = attrs.nofree or other.nofree;
+        attrs.norecurse = attrs.norecurse or other.norecurse;
+        attrs.nosync = attrs.nosync or other.nosync;
         attrs.nounwind = attrs.nounwind or other.nounwind;
         attrs.willreturn = attrs.willreturn or other.willreturn;
         attrs.@"noinline" = attrs.@"noinline" or other.@"noinline";
@@ -37,6 +43,12 @@ pub const AttributeSet = struct {
                 attrs.readonly = true;
             } else if (std.mem.eql(u8, token, "argmemonly")) {
                 attrs.argmemonly = true;
+            } else if (std.mem.eql(u8, token, "nofree")) {
+                attrs.nofree = true;
+            } else if (std.mem.eql(u8, token, "norecurse")) {
+                attrs.norecurse = true;
+            } else if (std.mem.eql(u8, token, "nosync")) {
+                attrs.nosync = true;
             } else if (std.mem.eql(u8, token, "nounwind")) {
                 attrs.nounwind = true;
             } else if (std.mem.eql(u8, token, "willreturn")) {
@@ -57,8 +69,16 @@ pub fn functionAttributes(function: ir.Function) AttributeSet {
     return AttributeSet.fromText(function.attrs);
 }
 
+pub fn resolvedFunctionAttributes(module: ir.Module, function: ir.Function) AttributeSet {
+    return attributesFromModuleText(module, function.attrs);
+}
+
 pub fn declarationAttributes(decl: ir.FunctionDecl) AttributeSet {
     return AttributeSet.fromText(decl.attrs);
+}
+
+pub fn resolvedDeclarationAttributes(module: ir.Module, decl: ir.FunctionDecl) AttributeSet {
+    return attributesFromModuleText(module, decl.attrs);
 }
 
 pub fn callMemoryEffect(module: ir.Module, call: ir.CallInst) memory_effect.Effect {

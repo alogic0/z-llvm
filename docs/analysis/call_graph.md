@@ -46,15 +46,19 @@ Implemented subset:
 
 ```text
 one node per defined function
+one node per declaration with no outgoing body edges
 unique direct-call callee list per function
 queries for calleesOf and hasDirectEdge
+queries for definition/declaration/known-callee status
+definition reachability from explicit root functions while ignoring declaration
+leaves
 ```
 
 Intentional divergences:
 
 ```text
 no indirect-call nodes
-no external calling node
+declarations are represented as leaves, not as LLVM's external calling node
 no SCC construction yet
 no CGSCC pass manager
 ```
@@ -67,7 +71,9 @@ opt-22 equivalent:
 
 local-only conservative:
   direct call graph unit test with duplicate direct calls
+  root-reachability unit test that keeps definitions and excludes declarations
 
 unit-test only:
   call graph construction and edge query
+  declaration/definition classification
 ```

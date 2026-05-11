@@ -58,6 +58,10 @@ Implemented subset:
 ```text
 always-inline, inline, argpromotion, called-value-propagation,
 callsite-splitting, and deadargelim are executable placeholders.
+direct-call graph foundations distinguish definitions from declarations.
+function/declaration attribute helpers resolve #N groups for IPO-relevant
+attributes such as alwaysinline, noinline, nofree, norecurse, nosync, nounwind,
+readnone, readonly, and cold.
 ```
 
 Intentional divergences:
@@ -68,6 +72,9 @@ no call-site cloning
 no argument rewriting
 no dead argument removal
 no CGSCC iteration
+always-inline is a documented no-op until trivial body cloning, SSA repair,
+ABI checks, debug-location handling, and recursive-call rejection are
+implemented
 ```
 
 Fixture coverage:
@@ -77,7 +84,8 @@ opt-22 equivalent:
   none currently
 
 local-only conservative:
-  none currently
+  call graph declaration/definition reachability test
+  IPO attribute group resolution test
 
 unit-test only:
   placeholder pass dispatch

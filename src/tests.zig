@@ -1558,6 +1558,18 @@ test "call graph records direct call edges once" {
     try std.testing.expect(graph.hasDirectEdge("caller", "helper"));
     try std.testing.expect(graph.hasDirectEdge("caller", "extern"));
     try std.testing.expect(!graph.hasDirectEdge("helper", "extern"));
+    try std.testing.expect(graph.hasDefinition("caller"));
+    try std.testing.expect(graph.hasDefinition("helper"));
+    try std.testing.expect(graph.hasDeclaration("extern"));
+    try std.testing.expect(graph.isKnownCallee("extern"));
+
+    const roots = [_][]const u8{"caller"};
+    var reachable = try graph.reachableDefinitionsFromRoots(std.testing.allocator, &roots);
+    defer reachable.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 2), reachable.items.len);
+    try std.testing.expect(containsText(reachable.items, "caller"));
+    try std.testing.expect(containsText(reachable.items, "helper"));
+    try std.testing.expect(!containsText(reachable.items, "extern"));
 }
 
 test "function attributes classify direct call memory effects conservatively" {
@@ -1587,6 +1599,45 @@ test "function attributes classify direct call memory effects conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
     try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
+}
+
+fn containsText(haystack: []const []const u8, needle: []const u8) bool {
+    for (haystack) |item| {
+        if (std.mem.eql(u8, item, needle)) return true;
+    }
+    return false;
+}
+
+test "function attributes resolve IPO attributes through groups" {
+    const input =
+        \\declare i32 @decl(i32) #0
+        \\
+        \\define internal i32 @helper(i32 %a) #1 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\attributes #0 = { nofree nounwind memory(read) }
+        \\attributes #1 = { alwaysinline nofree norecurse nosync nounwind memory(none) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const decl_attrs = function_attrs.resolvedDeclarationAttributes(module, module.declarations.items[0]);
+    try std.testing.expect(decl_attrs.nofree);
+    try std.testing.expect(decl_attrs.nounwind);
+    try std.testing.expect(decl_attrs.readonly);
+
+    const helper_attrs = function_attrs.resolvedFunctionAttributes(module, module.functions.items[0]);
+    try std.testing.expect(helper_attrs.alwaysinline);
+    try std.testing.expect(helper_attrs.nofree);
+    try std.testing.expect(helper_attrs.norecurse);
+    try std.testing.expect(helper_attrs.nosync);
+    try std.testing.expect(helper_attrs.nounwind);
+    try std.testing.expect(helper_attrs.readnone);
 }
 
 test "function attributes resolve attribute groups for call memory effects" {

@@ -40,13 +40,15 @@ Core LLVM algorithm data structures:
   Mod/ref classification for calls.
 
 Local target status:
-  Raw attribute parsing plus conservative call memory classification.
+  Raw and attribute-group parsing plus conservative call memory classification.
 ```
 
 Implemented subset:
 
 ```text
-recognize readnone, readonly, nounwind, noinline, alwaysinline, and cold in raw function/declaration attributes
+recognize readnone, readonly, argmemonly, nofree, norecurse, nosync, nounwind,
+noinline, alwaysinline, and cold in raw function/declaration attributes
+resolve #N attribute groups for definitions and declarations
 classify direct calls to readnone callees as no memory effect
 classify direct calls to readonly callees as readonly memory
 classify all other calls as unknown
@@ -55,7 +57,6 @@ classify all other calls as unknown
 Intentional divergences:
 
 ```text
-no attribute group resolution for #N groups
 no inference pass yet
 no parameter attribute semantics beyond parser/printer preservation
 no call-site attributes
@@ -70,6 +71,7 @@ opt-22 equivalent:
 
 local-only conservative:
   readnone, readonly, and unknown direct-call memory effect unit test
+  function/declaration IPO attribute group resolution test
 
 unit-test only:
   raw attribute classification and call mod/ref boundary

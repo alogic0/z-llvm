@@ -75,7 +75,7 @@ completed foundation epics
 - [x] [Cycle 7: Release Pipeline Conformance](roadmap/07_release_pipeline_conformance_cycle.md)
 - [x] [Cycle 8: Debug Metadata Preservation](roadmap/08_debug_metadata_preservation_cycle.md)
 - [x] [Cycle 9: Target DataLayout And ABI Semantics](roadmap/09_target_datalayout_and_abi_semantics_cycle.md)
-- [ ] [Cycle 10: Interprocedural Optimization And Inlining Boundary](roadmap/10_interprocedural_optimization_cycle.md)
+- [x] [Cycle 10: Interprocedural Optimization And Inlining Boundary](roadmap/10_interprocedural_optimization_cycle.md)
 - [ ] [Cycle 11: Vector IR And Target Cost Boundary](roadmap/11_vector_ir_and_target_cost_cycle.md)
 - [ ] [Cycle 12: Sanitizer, Instrumentation, And Safety IR](roadmap/12_sanitizer_instrumentation_and_safety_cycle.md)
 - [ ] [Cycle 13: Bitcode, LTO, And ThinLTO Boundary](roadmap/13_bitcode_lto_and_thinlto_cycle.md)
