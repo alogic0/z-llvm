@@ -7,8 +7,8 @@ source-backed fixture, opt-22 delta, or readiness-gate failure.
 The current finish state has no active source-backed blocker:
 
 ```text
-manifest rows=39
-optimizer_input=32
+manifest rows=40
+optimizer_input=33
 unsupported=0
 future=4
 debug-info-only=0

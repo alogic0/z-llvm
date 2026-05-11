@@ -301,7 +301,6 @@ fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
     const ty = parsed_ty.ty;
 
     const initializer_and_attrs = std.mem.trim(u8, parsed_ty.rest, " \t");
-    if (initializer_and_attrs.len == 0) return error.UnsupportedGlobalVariable;
     const comma = findTopLevelComma(initializer_and_attrs);
     const initializer_text = std.mem.trim(u8, if (comma) |index|
         initializer_and_attrs[0..index]
@@ -341,7 +340,7 @@ fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
         };
     }
 
-    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
+    const end = std.mem.indexOfAny(u8, trimmed, " \t,") orelse trimmed.len;
     return .{
         .ty = try parseType(trimmed[0..end]),
         .rest = trimmed[end..],
@@ -356,6 +355,10 @@ fn isGlobalAddressAttr(token: []const u8) bool {
 }
 
 fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []const u8) !core.GlobalInitializer {
+    if (text.len == 0) return .none;
+    if (ty == .aggregate and std.mem.startsWith(u8, text, "c\"") and std.mem.endsWith(u8, text, "\"")) {
+        return .{ .c_string = text };
+    }
     if (ty == .aggregate and std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, "]")) {
         return .{ .array = try parseGlobalArrayInitializer(allocator, ty, text) };
     }

@@ -52,8 +52,8 @@ bash scripts/run_readiness_checks.sh
 Latest recorded summary:
 
 ```text
-ok manifest rows=39 optimizer_input=32
-summary accepted=32 unsupported=0 future=4 debug-info-only=0
+ok manifest rows=40 optimizer_input=33
+summary accepted=33 unsupported=0 future=4 debug-info-only=0
 ok readiness checks
 ```
 
@@ -63,8 +63,8 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 | --- | ---: | --- |
 | `opt-equivalent` | 116 | Normalized local output matches `opt-22` for the listed pass pipeline. |
 | `local-conservative` | 44 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
-| `parse-preserve-only` | 9 | Fixture proves parser/verifier/printer preservation without transform parity. |
-| Total | 169 | Current opt fixture table size. |
+| `parse-preserve-only` | 10 | Fixture proves parser/verifier/printer preservation without transform parity. |
+| Total | 170 | Current opt fixture table size. |
 
 Pass status counts from the active pass pipeline inventory:
 

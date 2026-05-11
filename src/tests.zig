@@ -3034,13 +3034,15 @@ test "target feature attributes are extractable but not optimization inputs" {
     try std.testing.expect(!attrs.hasFeature("+avx"));
 }
 
-test "parser rejects unsupported aggregate globals explicitly" {
+test "verifier rejects unsupported aggregate globals explicitly" {
     const input =
-        \\@s = private unnamed_addr constant [4 x i8] c"abc\00"
+        \\@s = private unnamed_addr constant [2 x i16] c"abc\00"
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedGlobalVariable, ir.Module.parse(std.testing.allocator, input));
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expectError(error.UnsupportedGlobalVariable, module.verify());
 }
 
 test "parser preserves scalar array global constants from switch tables" {
@@ -4489,6 +4491,51 @@ test "verifier rejects duplicate named type definitions" {
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try std.testing.expectError(error.DuplicateNamedTypeDefinition, module.verify());
+}
+
+test "parser preserves source-backed global variable forms" {
+    const input =
+        \\source_filename = "global_variables"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\%os.linux.rlimit = type { i64, i64 }
+        \\%os.linux.stack_t__struct_3163 = type { ptr, i32, [4 x i8], i64 }
+        \\
+        \\@__init_array_start = extern_weak constant ptr, align 8
+        \\@__init_array_end = extern_weak constant ptr, align 8
+        \\@os.linux.tls.area_desc.0 = internal unnamed_addr global i64 undef, align 8
+        \\@os.linux.tls.area_desc.4 = internal unnamed_addr global ptr undef, align 8
+        \\@os.linux.tls.main_thread_area_buffer = private unnamed_addr global [4096 x i8] undef, align 4096
+        \\@__anon_3154 = private unnamed_addr constant [13 x i8] c"hello world!\00", align 1
+        \\@Thread.maybeAttachSignalStack.global.signal_stack = private thread_local unnamed_addr global [262144 x i8] undef, align 1
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 7), module.globals.items.len);
+    try std.testing.expectEqual(ir.FunctionLinkage.extern_weak, module.globals.items[0].linkage);
+    try std.testing.expect(module.globals.items[0].initializer == .none);
+    try std.testing.expectEqual(ir.Value.undef, module.globals.items[4].initializer.scalar);
+    try std.testing.expectEqualStrings("c\"hello world!\\00\"", module.globals.items[5].initializer.c_string);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects local initializerless globals" {
+    const input =
+        \\@bad = internal constant ptr, align 8
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expectError(error.UnsupportedGlobalVariable, module.verify());
 }
 
 test "parser rejects unsupported inline asm forms explicitly" {

@@ -20,8 +20,8 @@ Zig-aligned LLVM replacement experiment.
 
 ```text
 bash scripts/run_readiness_checks.sh
-ok manifest rows=39 optimizer_input=32
-summary accepted=32 unsupported=0 future=4 debug-info-only=0
+ok manifest rows=40 optimizer_input=33
+summary accepted=33 unsupported=0 future=4 debug-info-only=0
 ok readiness checks
 ```
 

@@ -422,7 +422,10 @@ call
 bitcast and pointer casts
 unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
-aggregate, string, TLS, COMDAT, alias, and declaration globals
+general aggregate/string globals beyond source-backed declarations, aggregate
+undef, and C string preservation
+TLS, COMDAT, alias, and declaration global semantics beyond conservative parser
+and GlobalDCE roots
 unknown TLS model spellings
 semantic global variable use in optimizations
 visibility and attributes with semantic effects

@@ -31,8 +31,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
         if (global.address_attrs) |address_attrs| try writer.print("{s} ", .{address_attrs});
         try writer.print("{s} ", .{global.kind.name()});
         try global.ty.format(writer);
-        try writer.writeByte(' ');
-        try global.initializer.format(writer);
+        if (global.initializer != .none) {
+            try writer.writeByte(' ');
+            try global.initializer.format(writer);
+        }
         if (global.attrs) |attrs| try writer.print(", {s}", .{attrs});
         try writer.writeByte('\n');
     }

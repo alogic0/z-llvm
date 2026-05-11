@@ -103,6 +103,7 @@ fn addInitializerEdges(
     initializer: ir.GlobalInitializer,
 ) !void {
     switch (initializer) {
+        .none, .c_string => {},
         .scalar => |value| try addValueEdge(allocator, module, edges, value),
         .array => |array| for (array.values.items) |value| try addValueEdge(allocator, module, edges, value),
     }

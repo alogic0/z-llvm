@@ -13,7 +13,7 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 No active cycle is selected.
 
-The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-02 are
+The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-03 are
 archived under [Completed Discovery
 Cycles](roadmap/historical/completed_discovery_cycles/README.md). The durable
 finish table is [Finish Criteria and Gap Burn-Down

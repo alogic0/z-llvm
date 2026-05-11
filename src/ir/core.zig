@@ -292,12 +292,14 @@ pub const FunctionLinkage = enum {
     internal,
     private,
     external,
+    extern_weak,
     weak,
 
     pub fn parse(text: []const u8) ?FunctionLinkage {
         if (std.mem.eql(u8, text, "internal")) return .internal;
         if (std.mem.eql(u8, text, "private")) return .private;
         if (std.mem.eql(u8, text, "external")) return .external;
+        if (std.mem.eql(u8, text, "extern_weak")) return .extern_weak;
         if (std.mem.eql(u8, text, "weak")) return .weak;
         return null;
     }
@@ -308,6 +310,7 @@ pub const FunctionLinkage = enum {
             .internal => try writer.writeAll("internal "),
             .private => try writer.writeAll("private "),
             .external => try writer.writeAll("external "),
+            .extern_weak => try writer.writeAll("extern_weak "),
             .weak => try writer.writeAll("weak "),
         }
     }
@@ -386,19 +389,23 @@ pub const GlobalArrayInitializer = struct {
 };
 
 pub const GlobalInitializer = union(enum) {
+    none,
     scalar: Value,
     array: GlobalArrayInitializer,
+    c_string: []const u8,
 
     pub fn deinit(initializer: *GlobalInitializer, allocator: std.mem.Allocator) void {
         switch (initializer.*) {
-            .scalar => {},
+            .none, .scalar, .c_string => {},
             .array => |*array| array.deinit(allocator),
         }
     }
 
     pub fn format(initializer: GlobalInitializer, writer: anytype) !void {
         switch (initializer) {
+            .none => {},
             .scalar => |value| try value.format(writer),
+            .c_string => |text| try writer.writeAll(text),
             .array => |array| {
                 try writer.writeByte('[');
                 for (array.values.items, 0..) |value, index| {

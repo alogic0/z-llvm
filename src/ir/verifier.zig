@@ -298,6 +298,10 @@ pub fn verify(module: core.Module) !void {
         try verifyGlobalAddressAttrs(global.address_attrs);
         try verifyComdatReference(global.attrs, comdat_defs);
         switch (global.initializer) {
+            .none => switch (global.linkage) {
+                .external, .extern_weak => {},
+                .default, .internal, .private, .weak => return error.UnsupportedGlobalVariable,
+            },
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
                     .int, .undef => {},
@@ -307,7 +311,11 @@ pub fn verify(module: core.Module) !void {
                     .undef, .null_value => {},
                     .int, .fp, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
-                .void, .float, .double, .metadata, .aggregate, .vector => return error.UnsupportedGlobalVariable,
+                .aggregate => switch (value) {
+                    .undef => {},
+                    .int, .fp, .named, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                },
+                .void, .float, .double, .metadata, .vector => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
@@ -317,6 +325,11 @@ pub fn verify(module: core.Module) !void {
                     .int, .undef, .null_value, .zero_initializer, .vector => {},
                     .fp, .named => return error.UnsupportedGlobalVariable,
                 };
+            },
+            .c_string => |text| {
+                const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
+                if (!array_ty.elem_ty.eql(.{ .int = 8 })) return error.UnsupportedGlobalVariable;
+                if (!std.mem.startsWith(u8, text, "c\"") or !std.mem.endsWith(u8, text, "\"")) return error.UnsupportedGlobalVariable;
             },
         }
     }
