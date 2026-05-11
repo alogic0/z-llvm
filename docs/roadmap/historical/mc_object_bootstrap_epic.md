@@ -10,7 +10,7 @@ format, and a deliberately tiny instruction subset with precise ABI behavior.
 
 ## Relationship To Other Epics
 
-Roadmap order:
+Historical roadmap order:
 
 ```text
 Pipeline-Ready Optimizer Epic
@@ -24,6 +24,10 @@ Pipeline-Ready Optimizer Epic
   output for one tiny target subset.
 - Keep this epic separate from target/DataLayout and AIR lowering work; unresolved
   IR or ABI questions should be fixed in the previous epic first.
+- Under the current [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md),
+  this epic is a bounded verification experiment, not the primary replacement
+  path for Zig's native backends. New backend expansion should pause unless it
+  validates optimizer output or clarifies a specific LLVM emission boundary.
 
 Current status:
 
@@ -245,7 +249,8 @@ tested, target-aware, and honest about unsupported codegen cases.
 
 ## Next Epic After This
 
-If this epic succeeds, the next natural epic is **Debug Info and Runtime
-Metadata Bootstrap** or **Calls and Stack Frame Codegen**, depending on whether
-the project wants to prioritize debugger correctness or broader executable code
-coverage.
+Historically, the next backend epic could be **Debug Info and Runtime Metadata
+Bootstrap** or **Calls and Stack Frame Codegen**. Under the current Zig-aligned
+direction, the default next work should return to the verifier, Zig-emitted IR
+corpus, and optimizer slices selected from the LLVM pass-pipeline inventory.
+Continue backend epics only when they are needed as targeted validation.

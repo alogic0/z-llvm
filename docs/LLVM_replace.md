@@ -1,8 +1,34 @@
-Zig and LLVM have a complex, "it's complicated" relationship. While Zig was originally built on top of LLVM, the project is currently in the middle of a "divorce" to gain independence, speed, and better control over the compilation process.
+# Zig And LLVM Replacement Context
+
+Zig and LLVM have a complex, "it's complicated" relationship. While Zig was
+originally built on top of LLVM, the project is moving LLVM out of the core
+compiler path to gain independence, speed, smaller binaries, and better control
+over incremental compilation.
 
 Here is the breakdown of how the Zig compiler interacts with LLVM.
 
 For hands-on notes about tracing `AIR -> LLVM IR -> optimized LLVM IR -> assembly/object code`, see [LLVM_workflow.md](LLVM_workflow.md).
+
+For this repository's current direction, see
+[roadmap/zig_aligned_llvm_removal_plan.md](roadmap/zig_aligned_llvm_removal_plan.md).
+
+## How This Repository Should Help
+
+This repository should not try to become a separate full LLVM clone. Its most
+useful role is to stay on Zig's actual LLVM-removal path:
+
+```text
+inventory the LLVM APIs and pass pipelines Zig actually invokes
+  -> collect real Zig-emitted LLVM IR fixtures
+  -> reproduce required semantic and optimizer subsets
+  -> compare accepted behavior with LLVM 22
+  -> document conservative gaps
+  -> study handoff points to Zig native backends
+```
+
+Backend, MC/object, debug, and LTO experiments are useful only when they clarify
+LLVM responsibilities or validate optimized IR. Zig's existing native backends
+remain the primary direction for final code generation.
 
 ---
 
@@ -80,9 +106,15 @@ The goal is to remove LLVM as a **hard dependency**. In the future, the core `zi
 
 This keeps the core compiler "small and light" for development while keeping the "heavy machinery" available when you're ready to ship production code.
 
-Replacing LLVM is a massive engineering undertaking because LLVM provides three things that are incredibly difficult to replicate: **Target Support** (ARM, x86, RISC-V, etc.), **State-of-the-art Optimization**, and **Industrial-grade Linkers**.
+Replacing LLVM is a massive engineering undertaking because LLVM provides many
+separate services: target support, optimization, object/assembly emission,
+debug metadata, LTO, and linker-adjacent tooling. Zig is not replacing these as
+one monolithic task. It is making LLVM optional while native backends, linkers,
+and selected optimizer work mature independently.
 
-To replace it, you have to rebuild the "Back End" of the compiler from scratch. Here is how that is currently being done, using the "Zig model" as the primary blueprint.
+For this repository, the implication is direct: prioritize inventories,
+Zig-emitted IR fixtures, semantic correctness, and optimizer slices before
+expanding backend subsystems.
 
 ---
 
@@ -114,15 +146,22 @@ If you don't want to write raw machine code but want to avoid LLVM's complexity,
 | **QBE** | A small C-style backend. | Extremely simple (only ~10k lines of code) compared to LLVM's millions. |
 
 ## Current Status (2026)
-As of early 2026, the Zig project has largely succeeded in this "divorce." For **Debug builds**, Zig now defaults to its own native x86_64 and ARM backends, which is why it has become one of the fastest compilers in existence. For **Release builds**, it still uses LLVM as an optional "heavyweight" optimizer to ensure the final code is as fast as possible.
+As of this project's current roadmap, Zig's native backends are already central
+to the LLVM-removal story, especially for fast debug-oriented compilation. LLVM
+still matters for release optimization quality, broad target support, some
+emission paths, and toolchain-adjacent features.
 
-Replacing LLVM is a massive engineering undertaking because LLVM provides three things that are incredibly difficult to replicate: **Target Support** (ARM, x86, RISC-V, etc.), **State-of-the-art Optimization**, and **Industrial-grade Linkers**.
+Replacing LLVM as a hard dependency is a massive engineering undertaking because
+LLVM provides separate capabilities: target support, optimization, object and
+assembly emission, debug metadata, LTO, and linker-adjacent tools.
 
-To replace it, you have to rebuild the "Back End" of the compiler from scratch. Here is how that is currently being done, using the "Zig model" as the primary blueprint.
+This repository should not read that as "rebuild the entire backend here."
+Instead, it should map the dependency, reproduce optimizer-visible behavior
+where useful, and defer to Zig's native backend direction for final codegen
+unless a small local backend experiment is needed for validation.
 
-To have a compiler written entirely in Zig, the development team is systematically replacing three specific "pillars" of LLVM. If you wanted to contribute to this "divorce," you would focus on the **Back End**, which is where the transition from abstract code to physical machine instructions happens.
-
-Here is the specific roadmap of what is being rewritten in Zig to eliminate the LLVM dependency.
+The broad Zig effort includes these areas. This repository should treat them as
+context, not as a mandate to duplicate all of them locally.
 
 ---
 
@@ -164,7 +203,11 @@ Even when the "Zig-only" compiler is finished, LLVM will likely remain as an **o
 [Andrew Kelley: The Road to Zig 1.0 and LLVM Independence](https://www.youtube.com/watch?v=5_mHbSe_f9w)
 This video from the creator of Zig details the architectural decisions and the specific engineering hurdles involved in moving away from LLVM.
 
-Replicating LLVM's optimization suite in Zig is less about copying millions of lines of C++ and more about implementing the "Essential 80/20"—the small number of transformation passes that provide the vast majority of performance gains.
+Replicating useful LLVM optimization behavior in Zig is less about copying
+millions of lines of C++ and more about implementing the exact semantic and
+pipeline subsets Zig actually relies on. In this repository, the pass list must
+come from [inventory/zig_llvm_pass_pipeline_inventory.md](inventory/zig_llvm_pass_pipeline_inventory.md),
+not from a generic LLVM optimizer checklist.
 
 In the LLVM world, these are grouped into **Analysis** (understanding the code) and **Transform** (changing the code). To build this in Zig, you would focus on the `src/arch/[arch]/` directories in the Zig source, where AIR is lowered into MIR.
 
@@ -205,11 +248,14 @@ Since most programs spend 90% of their time in loops, these provide the biggest 
 
 ---
 
-### How to start today in the Zig source
-If you want to experiment with this, look at the **Self-hosted Compiler Pipeline**:
+### How this repository should start
 
-1.  **AIR (Analyzed IR):** This is where high-level, type-checked Zig lives. You can write "Middle-end" optimizations here that are CPU-independent (like Dead Code Elimination).
-2.  **MIR (Machine IR):** This is architecture-specific. This is where you would write **Peephole Optimizers** (looking at 2-3 assembly instructions and replacing them with a faster single instruction).
+1.  Inventory the LLVM API and pass-pipeline surface Zig invokes.
+2.  Capture real Zig-emitted LLVM IR fixtures.
+3.  Strengthen the local IR verifier and semantic docs.
+4.  Reproduce P0/P1 optimizer slices with `opt-22` comparisons.
+5.  Study whether optimized results can be represented in Zig-owned backend
+    inputs instead of growing a parallel backend.
 
 ### The Challenge: The "Phase Shift"
 The reason Zig hasn't fully replicated these yet is **Compile Speed**. LLVM’s optimizations are slow because they run repeatedly until no more changes are found. To do this "The Zig Way," you would need to implement these passes to be **incremental**—only re-optimizing the functions that actually changed.

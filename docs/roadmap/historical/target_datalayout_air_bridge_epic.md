@@ -11,7 +11,7 @@ but the input should become closer to what Zig's LLVM backend actually lowers.
 
 ## Relationship To Other Epics
 
-Roadmap order:
+Historical roadmap order:
 
 ```text
 Pipeline-Ready Optimizer Epic
@@ -21,9 +21,13 @@ Pipeline-Ready Optimizer Epic
 
 - Previous epic: [Pipeline-Ready Optimizer Epic](pipeline_ready_optimizer_epic.md).
 - This epic anchors the optimizer to Zig-like, target-aware IR input.
-- Next epic: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
-- Do not start MC/object emission until this epic can produce verified,
-  target-aware, optimized IR for small scalar functions.
+- Later codegen verification epic: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
+- Current strategic direction is
+  [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md): this epic's
+  most important output is Zig-backed IR evidence for optimizer work, not a
+  requirement to continue into full backend replacement.
+- Do not start or broaden MC/object emission unless it is needed to validate
+  optimized IR or study a specific LLVM `TargetMachine.emitToFile` boundary.
 
 ## Suggestions Before Starting
 
@@ -188,5 +192,8 @@ answer: can we take small Zig-like compiler input, lower it into our IR with
 target-aware semantics, optimize it, and compare it against what Zig currently
 asks LLVM to optimize?
 
-If yes, the next epic after this can be an **MC/Object Bootstrap Epic** for one
-target and a tiny scalar function subset.
+Historically, this enabled the **MC/Object Bootstrap Epic** for one target and a
+tiny scalar function subset. Under the current Zig-aligned direction, the next
+default work after this epic is a stronger Zig-emitted IR corpus, verifier
+foundation, and inventory-selected optimizer slices. MC/object work remains a
+bounded verification track.

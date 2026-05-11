@@ -1,22 +1,41 @@
 # Zig LLVM Replacement Plan
 
-Goal: reproduce in Zig all LLVM functionality that the Zig compiler currently uses, so Zig can eventually remove this LLVM dependency while preserving behavior, target support, debug information, optimization quality where required, and emitted binary correctness.
+Goal: make this project useful to Zig's actual LLVM-removal path. The project
+does this by inventorying the LLVM behavior Zig still relies on, reproducing
+the smallest correct subsets in Zig, and producing fixtures, docs, and
+implementation notes that can guide Zig's self-hosted compiler work.
 
-This is not an educational subset and not a line-for-line C++ port. LLVM remains the reference implementation. The replacement should be implemented as Zig compiler infrastructure, with tests proving equivalence against the current LLVM-backed Zig behavior.
+This is not an educational subset, not a line-for-line C++ port, and not a
+promise to clone all of LLVM before helping Zig. LLVM remains the oracle for
+comparison while Zig's native backends remain the primary direction for final
+code generation. This repository should stay aligned with
+[roadmap/zig_aligned_llvm_removal_plan.md](roadmap/zig_aligned_llvm_removal_plan.md).
 
 ## Scope
 
-The initial scope is the LLVM functionality used by Zig's LLVM backend path:
+The architectural scope is the LLVM functionality Zig still depends on, but the
+implementation order is intentionally narrower:
 
 ```text
-Zig AIR
-  -> Zig LLVM backend lowering
-  -> LLVM IR / bitcode
-  -> LLVM optimization pipeline
-  -> LLVM target code generation
-  -> assembly / object / bitcode / LLVM IR output
-  -> linker input
+inventory Zig's real LLVM dependency
+  -> build a Zig-emitted LLVM IR corpus
+  -> preserve optimizer-visible semantics
+  -> reproduce required optimizer slices
+  -> study native-backend handoff points
+  -> keep backend/MC/object work bounded as verification experiments
 ```
+
+The LLVM-backed path being studied is still:
+
+```text
+Zig AIR -> Zig LLVM lowering -> LLVM IR/bitcode -> LLVM optimization
+  -> LLVM target emission -> assembly/object/IR/bitcode output
+```
+
+However, this project should not assume the final answer is a parallel LLVM-like
+backend. Where Zig already has native backend infrastructure, this project
+should prefer handoff, fixtures, and semantic notes over duplicating that
+backend work.
 
 Concrete Zig source references:
 
@@ -80,31 +99,33 @@ This document must list each Zig binding, the C++/LLVM function it reaches, the 
 
 Status: the first inventory lives in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md). It shows that the current project is phase-zero optimizer infrastructure: useful IR and pass groundwork, but still much narrower than the full Zig LLVM dependency surface. New implementation cycles should start from that inventory before adding more familiar LLVM passes.
 
-## 2. Define the Replacement Architecture
+## 2. Define the Aligned Architecture
 
-The replacement should be split into explicit compiler layers:
+The project is split into explicit compiler layers, but each layer has a
+different role in the Zig-aligned plan:
 
 ```text
 src/ir/
-  core IR used by optimization and codegen
+  LLVM-compatible semantic model for comparison, migration, and optimizer tests
 
 src/passes/
-  module, function, loop, and machine passes
+  Zig-needed optimizer slices selected from Zig's actual LLVM pipeline
 
 src/analysis/
-  dominators, loops, alias analysis, dataflow, call graph
+  shared analyses needed by those optimizer slices
 
 src/target/
-  target descriptions, ABI lowering, instruction selection, register info
+  target triples, DataLayout, ABI facts, and target hooks required by IR semantics
 
 src/codegen/
-  machine IR, register allocation, scheduling, lowering, emission
+  bounded backend experiments and handoff studies; not the primary replacement
+  for Zig native backends
 
 src/mc/
-  assembler, fixups, relocations, object writing
+  bounded MC/object experiments used to understand LLVM responsibilities
 
 src/debug/
-  DWARF / CodeView generation
+  debug metadata/information only when tied to Zig-emitted fixtures
 
 src/bitcode/
   optional LLVM IR/bitcode compatibility layer for comparison and migration
@@ -113,7 +134,8 @@ src/tools/
   optimizer driver, IR dumper, pipeline explorer
 ```
 
-The implementation should not depend on LLVM libraries.
+The implementation should not depend on LLVM libraries. LLVM tools and source
+remain comparison references.
 
 ## 3. Build an IR That Can Replace LLVM IR for Zig
 
@@ -286,87 +308,63 @@ known gaps
 
 Future implementation steps must satisfy the upstream mapping rule in `docs/development_cycle.md` before their checkbox is marked complete.
 
-## 6. Reproduce Target Code Generation
+## 6. Native Backend Handoff and Bounded Codegen
 
-LLVM codegen starts after IR optimization and lowers to target machine code. Replacing LLVM completely means implementing this path in Zig for every Zig target currently relying on LLVM.
+LLVM codegen starts after IR optimization and lowers to target machine code, but
+Zig already has native backend work. This project should not default to
+building a general competing backend. Its first job is to document what optimized
+IR results can be represented in Zig-owned backend inputs and where LLVM
+`TargetMachine.emitToFile` still covers behavior Zig needs.
 
-Required codegen subsystems:
+Backend work in this repo is useful when it is one of:
 
 ```text
-target descriptions
-ABI lowering
-calling convention lowering
-instruction selection
-legalization
-machine IR
-register allocation
-stack frame layout
-prologue / epilogue insertion
-instruction scheduling
-branch relaxation
-constant islands where needed
-literal pools where needed
-inline assembly lowering
-atomic lowering
-vector lowering
-floating-point lowering
+native-backend handoff research
+tiny end-to-end optimizer validation
+LLVM TargetMachine responsibility inventory
+minimal ABI/object experiments
 ```
 
-Target priority should follow Zig's practical needs:
+Full backend subsystems remain deferred unless a Zig-aligned need is documented:
 
 ```text
-1. x86_64
-2. aarch64
-3. riscv64
-4. wasm32/wasm64
-5. arm/thumb
-6. other LLVM-backed targets used by Zig release builds
+general instruction selection
+general register allocation
+scheduling
+multi-target machine code generation
+debug/unwind emission
+full object/linker behavior
 ```
 
 Deliverables:
 
 ```text
-src/target/x86_64/
-src/target/aarch64/
-src/target/riscv64/
-src/codegen/mir.zig
-src/codegen/regalloc.zig
-src/codegen/isel.zig
-docs/codegen.md
+docs/roadmap/zig_native_backend_handoff_epic.md
+docs/codegen/zig_native_backend_handoff.md
+bounded fixtures under test/codegen/
 ```
 
-## 7. Reproduce MC, Assembly, and Object Emission
+## 7. MC, Assembly, and Object Emission as Verification Track
 
-LLVM does not only optimize. Zig also uses LLVM to emit assembly and object files.
+LLVM does not only optimize. Zig also uses LLVM to emit assembly and object
+files. In this project, MC/object work is a secondary verification track unless
+the Zig-aligned roadmap promotes it for a concrete reason.
 
-Replacement requirements:
+Current bounded role:
 
 ```text
-assembly syntax emission
-machine code encoding
-relocations
-fixups
-symbol tables
-sections
-COMDAT / weak / linkonce behavior
-ELF object writing
-Mach-O object writing
-COFF object writing
-Wasm object writing
-DWARF relocation support
-CodeView / PDB-related object records where needed
+prove tiny optimized IR can lower to inspectable assembly/object output
+study ABI, relocation, symbol, and object metadata boundaries
+avoid generalizing into a full backend while optimizer/IR semantics are weaker
 ```
 
 Deliverables:
 
 ```text
-src/mc/encoder.zig
-src/mc/asm.zig
-src/object/elf.zig
-src/object/macho.zig
-src/object/coff.zig
-src/object/wasm.zig
-docs/object_emission.md
+docs/roadmap/historical/mc_object_bootstrap_epic.md
+docs/roadmap/historical/calls_and_stack_frame_codegen_epic.md
+docs/mc/*.md
+test/codegen/
 ```
 
 ## 8. Reproduce Debug Info Support
@@ -451,82 +449,58 @@ docs/testing.md
 
 ## 11. Migration Strategy
 
-The replacement should land as a parallel backend first.
+The useful migration path for this project is a proof and handoff path, not a
+parallel backend by default.
 
 Stages:
 
 ```text
-stage 1: standalone z_llvm optimizer/codegen experiments
-stage 2: compile selected tiny Zig functions
-stage 3: compile Zig behavior tests for one target
-stage 4: replace LLVM for Debug where native backend is missing
-stage 5: replace LLVM for ReleaseFast on one target
-stage 6: expand targets
-stage 7: replace LLVM object/asm emission for supported targets
-stage 8: replace LLVM LTO functionality
-stage 9: remove mandatory libLLVM dependency for these paths
+stage 1: inventory Zig's real LLVM APIs and pass pipelines
+stage 2: build a Zig-emitted IR semantic corpus
+stage 3: strengthen verifier and optimizer-visible semantics
+stage 4: reproduce P0/P1 optimizer slices selected from Zig's pipeline
+stage 5: document native-backend handoff options
+stage 6: use bounded codegen/MC fixtures only as validation
+stage 7: add optional LLVM IR/bitcode compatibility work if needed
+stage 8: provide upstream-useful fixtures, gap tables, and algorithm notes
 ```
 
-The backend must remain selectable while it is incomplete:
-
-```text
--fllvm
--fno-llvm
--fzig-llvm-replacement
-```
+Any future compiler integration must remain optional while incomplete.
 
 ## First Milestone
 
-The first milestone is not the final scope. It is the smallest useful slice of the complete replacement:
+The first milestone is not a backend. It is the smallest useful slice aligned
+with Zig's LLVM removal:
 
 ```text
-parse a tiny internal IR
-run a real pass manager
-implement instcombine and dce
-emit readable IR
-compare against LLVM opt on equivalent examples
+build and maintain inventories
+capture tiny Zig-emitted LLVM IR fixtures
+strengthen verifier correctness
+run named optimizer slices selected from Zig's real LLVM pipeline
+compare LLVM-equivalent fixtures against opt-22
 ```
 
 Deliverables:
 
 ```text
-build.zig
-src/main.zig
-src/ir.zig
-src/pass_manager.zig
-src/passes/instcombine.zig
-src/passes/dce.zig
-test/inputs/instcombine.ir
-docs/passes/instcombine.md
 docs/inventory/zig_llvm_api_inventory.md
-```
-
-Example first transformation:
-
-```text
-input IR:
-  %x = add %a, 0
-  %y = mul %x, 1
-  ret %y
-
-after instcombine + dce:
-  ret %a
+docs/inventory/zig_llvm_pass_pipeline_inventory.md
+docs/inventory/zig_emitted_ir_inventory.md
+docs/roadmap/03_llvm_compatible_ir_verifier_foundation.md
+test/zig/
+test/opt/
 ```
 
 ## Long-Term Milestones
 
 1.  Complete LLVM API inventory for Zig's current usage.
-2.  Build the replacement IR and verifier.
-3.  Build the pass manager and analysis manager.
-4.  Reproduce the O0 pipeline.
-5.  Reproduce the core O3 simplification pipeline.
-6.  Reproduce the core O3 optimization pipeline.
-7.  Implement x86_64 target codegen through object emission.
-8.  Pass selected Zig behavior tests on x86_64.
-9.  Add debug info support.
-10. Add aarch64 target codegen.
-11. Add riscv64 target codegen.
-12. Add Wasm support.
-13. Add LTO-equivalent functionality.
-14. Pass the relevant Zig test matrix without LLVM for supported targets.
-15. Remove or isolate libLLVM dependency for those compiler paths.
+2.  Complete Zig LLVM pass-pipeline inventory.
+3.  Build a Zig-emitted IR corpus.
+4.  Strengthen IR semantics and verifier.
+5.  Reproduce P0 canonicalization and stack-promotion behavior.
+6.  Reproduce P1 scalar, memory, and loop foundations.
+7.  Document native-backend handoff strategy.
+8.  Use bounded codegen/MC experiments to validate optimizer outputs.
+9.  Add debug, sanitizer, LTO, vector, and bitcode tracks only when selected by
+    the Zig-aligned roadmap.
+10. Produce fixtures and algorithm notes that can guide upstream Zig work.

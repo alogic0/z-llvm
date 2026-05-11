@@ -7,7 +7,7 @@ than one development cycle. Pull one bounded slice from this roadmap into
 
 ## Relationship To Other Epics
 
-Roadmap order:
+Historical roadmap order:
 
 ```text
 Pipeline-Ready Optimizer Epic
@@ -17,9 +17,13 @@ Pipeline-Ready Optimizer Epic
 
 - This epic is the current optimizer foundation.
 - Next epic: [Target DataLayout and AIR-to-IR Bridge Epic](target_datalayout_air_bridge_epic.md).
-- Later codegen epic: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
+- Later codegen experiment: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
 - Do not use this optimizer epic to absorb target/DataLayout, AIR lowering, or
   MC/object-emission work; those belong in the later epics.
+- Current strategic direction is
+  [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md): optimizer
+  work should be selected from Zig's real LLVM dependency inventories and
+  Zig-emitted IR fixtures before broadening backend work.
 
 ## 1. Pipeline and Pass Infrastructure
 

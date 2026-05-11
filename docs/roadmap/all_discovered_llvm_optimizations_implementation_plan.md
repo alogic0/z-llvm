@@ -7,6 +7,11 @@ keeping every slice tied to Zig's actual LLVM pipeline use.
 This is not a promise to implement LLVM all at once. It is a staged plan for
 covering the discovered optimizer surface honestly.
 
+This plan sits under the broader
+[Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md). Optimizer
+work here should remain tied to Zig-emitted IR evidence and Zig's actual LLVM
+pass-pipeline inventory.
+
 ## Ground Rules
 
 - [x] Start every implementation slice from

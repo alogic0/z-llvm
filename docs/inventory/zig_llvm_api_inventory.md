@@ -100,8 +100,10 @@ src/bitcode/   LLVM bitcode compatibility for migration and comparison
 
 ## Immediate Consequence
 
-Future cycles should start from this inventory. Adding another optimizer pass is
-valid only when it is tied to either:
+Future cycles should follow the direction in
+[../roadmap/zig_aligned_llvm_removal_plan.md](../roadmap/zig_aligned_llvm_removal_plan.md)
+and start from this inventory. Adding another optimizer pass is valid only when
+it is tied to either:
 
 1. a Zig LLVM API dependency listed here;
 2. a required LLVM default pipeline stage that Zig invokes through
