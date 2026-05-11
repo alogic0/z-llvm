@@ -1,4 +1,4 @@
-# ADCE Foundation
+# ADCE Control-Flow Foundation
 
 LLVM references:
 
@@ -54,6 +54,10 @@ Local target status:
 Implemented foundation subset:
 
 ```text
+build accepted-CFG postdominance and control-dependence facts
+start from dead branch regions whose successors reconverge at an immediate postdominator
+rewrite branch control only when all outgoing regions are linear and side-effect free
+reject phi joins and non-linear regions for now
 start from current def-use counts
 walk instructions backward
 remove unused side-effect-free instructions
@@ -62,19 +66,24 @@ preserve stores, volatile/atomic memory barriers, unknown memory effects, and te
 use the shared `isSafeToDelete` helper for the local removal boundary
 ```
 
-This overlaps with the current DCE subset, but it is kept as a separate pass
-because LLVM's ADCE becomes control-dependence aware later. The current slice is
-the data-dependence foundation.
+This now covers a small LLVM-equivalent control-flow slice: if a conditional
+branch only selects dead, side-effect-free work before reconverging, the branch
+condition is not live. The local pass rewrites the conditional branch to the
+same live successor shape observed from `opt-22 -passes=adce`, then the
+existing instruction cleanup removes the now-dead scalar chain.
 
-Do not treat this as a faithful LLVM ADCE implementation yet. It should keep
-the foundation label until post-dominator analysis, control-dependence liveness,
-and branch rewriting are implemented.
+Do not treat this as full LLVM ADCE yet. The local implementation is still a
+conservative accepted-CFG subset and does not model LLVM's complete optimistic
+worklist, block-info lattice, or CFG update machinery.
 
 Fixture coverage:
 
 ```text
 opt-22 equivalent:
   adce_chain
+  adce_dead_branch
+  adce_dead_diamond
+  adce_store_branch_reject
 
 local-only conservative:
   none currently
@@ -86,9 +95,10 @@ unit-test only:
 Known gaps:
 
 ```text
-no post-dominator tree
-no control-dependence marking
-no branch rewriting
+no full optimistic block/instruction liveness worklist
+no live-terminator propagation through arbitrary control dependence
+no phi update support for dead edge deletion
+no non-linear dead-region rewriting
 no debug info salvage
 no musttail, EH, calls, or volatile/atomic removal
 ```

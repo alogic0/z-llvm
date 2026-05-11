@@ -16,20 +16,20 @@ aggressive dead code elimination for the supported IR surface.
 
 ## Plan
 
-- [ ] Add or document the LLVM ADCE algorithm contract.
+- [x] Add or document the LLVM ADCE algorithm contract.
 - [x] Add a minimal PostDominatorTree or postdom query for accepted CFGs.
 - [x] Add control-dependence queries needed by ADCE.
-- [ ] Rework ADCE liveness around an optimistic worklist.
-- [ ] Mark live terminators required by control dependence.
-- [ ] Remove dead regions when CFG updates are locally safe.
-- [ ] Keep unsupported CFG rewrites explicit and tested as rejected cases.
-- [ ] Add fixtures where LLVM removes dead branches or regions, not only dead
+- [x] Rework ADCE liveness around an optimistic worklist.
+- [x] Mark live terminators required by control dependence.
+- [x] Remove dead regions when CFG updates are locally safe.
+- [x] Keep unsupported CFG rewrites explicit and tested as rejected cases.
+- [x] Add fixtures where LLVM removes dead branches or regions, not only dead
       scalar instructions.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] ADCE has a documented LLVM source mapping.
-- [ ] ADCE can delete covered dead control-flow regions safely.
-- [ ] Postdom/control-dependence limitations are documented.
-- [ ] Fixtures separate LLVM-equivalent behavior from conservative local gaps.
+- [x] ADCE has a documented LLVM source mapping.
+- [x] ADCE can delete covered dead control-flow regions safely.
+- [x] Postdom/control-dependence limitations are documented.
+- [x] Fixtures separate LLVM-equivalent behavior from conservative local gaps.
