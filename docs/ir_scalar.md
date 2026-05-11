@@ -33,9 +33,11 @@ floating-point constants: observed decimal spellings plus `nan`, `inf`, and
 negative zero are parsed, classified by `analysis/fp_semantics.zig`, verified
 against scalar FP types, and printed verbatim
 fast-math flags on supported scalar FP binary ops and `fcmp` are parsed,
-verified, printed, and ignored by optimizers
+verified, printed, and interpreted only through `analysis/fast_math.zig`
 strict `fcmp false`/`true` and constant `fcmp ord`/`uno` can be folded by
 InstSimplify when no arithmetic, rounding, or exception fact is needed
+fast-math `nsz` enables `fadd x, +0.0`, `nnan` enables self-compare
+orderedness folds, and `fast` enables local FP expression CSE/value numbering
 integer casts: trunc, zext, sext
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
@@ -63,6 +65,8 @@ opt-22 equivalent:
   fp_extended_sccp_preserve
   fp_fast_math_preserve
   fp_strict_fcmp_fold
+  fp_fast_math_flags_boundary
+  fp_fast_gvn
 
 local-only conservative:
   flagged arithmetic and division are intentionally not folded by instcombine yet
@@ -72,6 +76,7 @@ local-only conservative:
   fp_strict_sensitive_preserve
   fp_fast_math_sensitive_conservative
   fp_strict_orderedness_fold
+  fp_fast_early_cse
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
@@ -95,7 +100,10 @@ no general FP comparison optimization parity beyond strict false/true and
 constant ord/uno orderedness
 no APFloat-equivalent arithmetic, rounding, exception, or complete bit-pattern
 semantic model
-no fast-math optimization semantics or FP exception behavior model
+no fast-math optimization semantics beyond the listed nsz/nnan/fast legality
+slice or FP exception behavior model
+no reassociation, reciprocal, contraction, approximate-function, target-cost, or
+vector fast-math transforms
 no constrained FP intrinsic semantics
 no poison value
 no use of nsw/nuw/exact as optimization facts

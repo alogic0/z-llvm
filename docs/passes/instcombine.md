@@ -100,6 +100,7 @@ Fixture coverage:
   fp_strict_orderedness_fold is local-conservative: the local APFloat-shaped
   classifier folds only ord/uno constant orderedness and avoids general FP
   comparison arithmetic.
+  fp_fast_math_flags_boundary
   fp_fast_math_sensitive_conservative is local-conservative: LLVM may fold
   fast-math-sensitive identities after proving flag semantics, but the local
   optimizer preserves them until the FP legality model exists.
@@ -151,6 +152,8 @@ freeze of an integer constant -> that same constant
 strict `fcmp false` -> false
 strict `fcmp true` -> true
 strict `fcmp ord` and `fcmp uno` for classified scalar FP constants
+`fadd nsz x, +0.0` -> x
+`fcmp nnan oeq x, x` -> true
 preserve `freeze` instructions
 ```
 
@@ -163,8 +166,9 @@ The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, divi
 Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
 than folded because NaN, signed-zero, rounding, and exception legality are not
 modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
-only enabled strict FP comparison folds. Parsed fast-math flags are preserved,
-not used.
+only enabled strict FP comparison folds. Parsed fast-math flags are interpreted
+only through `docs/analysis/fast_math.md`; the first enabled fast-math folds are
+`fadd nsz x, +0.0` and `fcmp nnan oeq x, x`.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 Debug-location-only folds may remove an instruction carrying `!dbg`; the
 current local behavior drops that location with the removed instruction instead
@@ -201,7 +205,7 @@ no canonical reassociation
 no non-constant operand complexity ordering
 no floating-point arithmetic folds or reassociation
 no general ordered FP comparison folds
-no fast-math-driven FP folds
+no fast-math-driven FP folds beyond the listed nsz/nnan identities
 no debug-info salvage for replaced instructions
 no target-specific combines
 ```

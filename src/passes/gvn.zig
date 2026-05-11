@@ -1,6 +1,7 @@
 const std = @import("std");
 const dominator = @import("../analysis/dominator.zig");
 const expression_key = @import("../analysis/expression_key.zig");
+const fast_math = @import("../analysis/fast_math.zig");
 const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const memory_ssa = @import("../analysis/memory_ssa.zig");
@@ -180,9 +181,10 @@ fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
     return switch (instruction.kind) {
-        .binary => |binary| !isFpBinary(binary.op),
+        .binary => |binary| !isFpBinary(binary.op) or fast_math.allowFpValueNumbering(binary.fp_flags),
         .cast, .icmp, .select, .phi, .load => true,
-        .freeze, .fcmp, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
+        .fcmp => |fcmp| fast_math.allowFpValueNumbering(fcmp.fp_flags),
+        .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
     };
 }
 

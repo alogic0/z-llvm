@@ -7,21 +7,34 @@ subset of FP transforms.
 
 ## Plan
 
-- [ ] Map parsed fast-math flags to local legality predicates matching LLVM's
+- [x] Map parsed fast-math flags to local legality predicates matching LLVM's
       flag meanings.
-- [ ] Enable selected folds only under the exact required flags.
-- [ ] Add fixtures for `nnan`, `ninf`, `nsz`, `reassoc`, `arcp`, `contract`,
+- [x] Enable selected folds only under the exact required flags.
+- [x] Add fixtures for `nnan`, `ninf`, `nsz`, `reassoc`, `arcp`, `contract`,
       `afn`, and `fast` combinations that appear in Zig-emitted rows or
       reduced tests.
-- [ ] Reject or preserve transforms needing target-cost, contraction lowering,
+- [x] Reject or preserve transforms needing target-cost, contraction lowering,
       or exception modeling not yet implemented.
-- [ ] Share fast-math legality between InstSimplify, InstCombine, GVN, and
+- [x] Share fast-math legality between InstSimplify, InstCombine, GVN, and
       EarlyCSE.
-- [ ] Document local differences from LLVM's full `FastMathFlags` users.
-- [ ] Compare equivalent fixtures with `opt-22`.
+- [x] Document local differences from LLVM's full `FastMathFlags` users.
+- [x] Compare equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] At least one fast-math-only fold is implemented and compared.
-- [ ] Missing flags prevent the transform.
-- [ ] Target-cost-sensitive fast-math transforms remain deferred.
+- [x] At least one fast-math-only fold is implemented and compared.
+- [x] Missing flags prevent the transform.
+- [x] Target-cost-sensitive fast-math transforms remain deferred.
+
+## Completed Slice
+
+Cycle 06 adds `src/analysis/fast_math.zig` as the shared legality layer for the
+accepted `FastMathFlags` spelling. The implemented transforms are:
+
+- `fadd nsz x, +0.0 -> x`
+- `fcmp nnan oeq x, x -> true`
+- GVN and EarlyCSE admit repeated FP expressions only under `fast`
+
+The remaining flags are parsed, verified, printed, and covered by fixtures, but
+they do not trigger reassociation, reciprocal, contraction, approximate-function,
+or target-cost-sensitive transforms yet.

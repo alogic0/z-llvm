@@ -4,6 +4,7 @@ pub const Type = core.Type;
 pub const Value = core.Value;
 pub const BinaryOp = core.BinaryOp;
 pub const BinaryFlags = core.BinaryFlags;
+pub const FastMathFlags = core.FastMathFlags;
 pub const CastOp = core.CastOp;
 pub const IcmpPredicate = core.IcmpPredicate;
 pub const FcmpPredicate = core.FcmpPredicate;

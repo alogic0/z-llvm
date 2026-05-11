@@ -67,8 +67,8 @@ unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
 scalar, load, and readnone-call expression equivalence shared with GVN
-FP binary ops and fcmp intentionally bypass CSE until NaN, signed-zero, and
-fast-math semantics are modeled
+FP binary ops and fcmp use the shared fast-math legality helper and are admitted
+only under the local `fast` boundary
 ```
 
 Upstream mapping:
@@ -100,6 +100,8 @@ local-only conservative:
   more FP expressions once exact FP legality is modeled.
   fp_extended_early_cse_no_cse applies the same conservative boundary to scalar
   `fsub`, `fdiv`, and `frem`.
+  fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
+  name differs from opt-22, so the fixture is local-conservative.
   early_cse_unreachable_store_not_clobber proves the path-aware local
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE
@@ -137,7 +139,7 @@ query
 readonly calls are modeled only as non-clobbering memory accesses; no readonly
 call return-value CSE
 no freeze CSE because undef/poison semantics need more modeling first
-no FP CSE because NaN/signed-zero/fast-math legality is not modeled yet
+no strict FP CSE; FP CSE is limited to the local `fast` boundary
 no commutative operand canonicalization
 no target-library knowledge
 no debug-info salvage beyond preserving the leader instruction location

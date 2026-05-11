@@ -72,8 +72,8 @@ CFG path between the leader load and the later load
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
-FP binary ops and fcmp intentionally bypass value numbering until NaN,
-signed-zero, and fast-math semantics are modeled
+FP binary ops and fcmp use the shared fast-math legality helper and are admitted
+only under the local `fast` boundary
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.
@@ -110,6 +110,8 @@ local-only conservative:
   project keeps them out of GVN for now.
   fp_extended_gvn_no_cse applies the same conservative boundary to scalar
   `fsub`, `fdiv`, and `frem`.
+  fp_fast_gvn admits repeated `fadd fast` expressions and matches opt-22 for
+  the accepted dominator-tree value-numbering shape.
   debug_gvn_dbg_preserve preserves the leader instruction location and drops
   the removed redundant instruction location. Variable-location salvage remains
   out of scope.
@@ -133,7 +135,8 @@ no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge or partial redundancy handling
-no assume, readonly call return-value numbering, GEP, freeze, FP, vector, or
-memory value numbering
+no assume, readonly call return-value numbering, GEP, freeze, strict FP, vector,
+or memory value numbering
+FP value numbering is limited to the local `fast` boundary
 no debug-info salvage beyond preserving the leader instruction location
 ```

@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+const fast_math = @import("../analysis/fast_math.zig");
 const fp_semantics = @import("../analysis/fp_semantics.zig");
 
 pub fn canonicalizeCommutativeConstantRhs(binary: *ir.BinaryInst) bool {
@@ -94,9 +95,10 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
         if (simplifyBinaryConstants(binary)) |replacement| return replacement;
     }
 
-    if (binary.flags.any()) return null;
+    if (binary.flags.any() and !isFpBinary(binary.op)) return null;
     return switch (binary.op) {
-        .fadd, .fsub, .fmul, .fdiv, .frem => null,
+        .fadd => simplifyFadd(binary),
+        .fsub, .fmul, .fdiv, .frem => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -171,6 +173,13 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
         .sdiv => foldSignedDivRem(binary, .div),
         .srem => foldSignedDivRem(binary, .rem),
     };
+}
+
+fn simplifyFadd(binary: ir.BinaryInst) ?ir.Value {
+    if (!fast_math.allowAddZeroFold(binary.fp_flags)) return null;
+    if (isFpPositiveZero(binary.rhs)) return binary.lhs;
+    if (isFpPositiveZero(binary.lhs)) return binary.rhs;
+    return null;
 }
 
 const DivRem = enum { div, rem };
@@ -284,6 +293,12 @@ fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
 }
 
 fn simplifyFcmp(fcmp: ir.FcmpInst) ?ir.Value {
+    if (fcmp.lhs.eql(fcmp.rhs) and fast_math.allowSelfOrderedCompareFold(fcmp.fp_flags)) {
+        return switch (fcmp.predicate) {
+            .false, .ogt, .olt, .one, .ugt, .ult, .une, .uno => .{ .int = 0 },
+            .oeq, .oge, .ole, .ord, .ueq, .uge, .ule, .true => .{ .int = 1 },
+        };
+    }
     return switch (fcmp.predicate) {
         .false => .{ .int = 0 },
         .true => .{ .int = 1 },
@@ -390,6 +405,10 @@ fn intBits(ty: ir.Type) ?u16 {
 
 fn isZero(value: ir.Value) bool {
     return value == .int and value.int == 0;
+}
+
+fn isFpPositiveZero(value: ir.Value) bool {
+    return value == .fp and std.mem.eql(u8, value.fp, "0.000000e+00");
 }
 
 fn isOne(value: ir.Value) bool {

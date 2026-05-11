@@ -307,6 +307,8 @@ Scalar IR subset:
   freeze of integer constants folded by InstSimplify/InstCombine
   strict fcmp false/true and constant ord/uno orderedness folding for scalar FP
   constants
+  fast-math `nsz`/`nnan` scalar folds and `fast`-only FP expression CSE/value
+  numbering
 
 InstSimplify subset:
   local scalar simplification helper for InstCombine
@@ -316,6 +318,7 @@ InstSimplify subset:
   freeze-constant folding
   strict fcmp false/true folding
   strict fcmp ord/uno folding only for classified scalar FP constants
+  fast-math `fadd nsz x, +0.0` and `fcmp nnan oeq x, x` folding
   shared scalar expression equivalence for GVN and EarlyCSE
 
 SROA subset:
@@ -338,6 +341,7 @@ SROA subset:
 GVN subset:
   dominating repeated pure-expression elimination
   memory instructions rejected from scalar value numbering
+  FP value numbering only under the local `fast` legality boundary
 
 LoopInfo subset:
   natural-loop discovery from dominator backedges
