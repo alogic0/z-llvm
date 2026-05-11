@@ -18,6 +18,7 @@ adce_dead_branch	adce	adce	test/opt/inputs/adce_dead_branch.ll	test/opt/expected
 adce_dead_diamond	adce	adce	test/opt/inputs/adce_dead_diamond.ll	test/opt/expected/z_llvm/adce_dead_diamond.ll	opt-equivalent	adce	dead diamond branch control rewritten like LLVM ADCE
 adce_nested_dead_diamond	adce	adce	test/opt/inputs/adce_nested_dead_diamond.ll	test/opt/expected/z_llvm/adce_nested_dead_diamond.ll	opt-equivalent	adce	nested acyclic dead branch regions are rewritten through postdominator joins
 adce_store_branch_reject	adce	adce	test/opt/inputs/adce_store_branch_reject.ll	test/opt/expected/z_llvm/adce_store_branch_reject.ll	opt-equivalent	adce	side-effecting store keeps branch control live
+release_safe_adce_runtime_call_reject	adce	adce	test/opt/inputs/release_safe_adce_runtime_call_reject.ll	test/opt/expected/z_llvm/release_safe_adce_runtime_call_reject.ll	opt-equivalent	adce	ReleaseSafe panic/runtime call keeps safety branch live
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-equivalent	dce	opt-22 inferred memory alignment is normalized
 gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.ll	test/opt/expected/z_llvm/gvn_dominating_expr.ll	opt-equivalent	gvn,simplifycfg,dce	dominating repeated expression eliminated; LLVM simplifycfg also removes the now-redundant branch
 fp_gvn_no_cse	gvn	gvn	test/opt/inputs/fp_gvn_no_cse.ll	test/opt/expected/z_llvm/fp_gvn_no_cse.ll	local-conservative	gvn	FP expressions are not value-numbered until NaN/signed-zero/fast-math semantics are modeled
@@ -58,6 +59,7 @@ simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expe
 simplifycfg_thread_empty	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_thread_empty.ll	test/opt/expected/z_llvm/simplifycfg_thread_empty.ll	opt-equivalent	simplifycfg	empty branch block threading
 simplifycfg_common_ret	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_common_ret.ll	test/opt/expected/z_llvm/simplifycfg_common_ret.ll	opt-equivalent	simplifycfg	matching return blocks merged into predecessor
 unreachable_simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/unreachable_simplifycfg.ll	test/opt/expected/z_llvm/unreachable_simplifycfg.ll	opt-equivalent	simplifycfg	constant branch to unreachable is simplified
+release_safe_simplifycfg_runtime_call_reject	simplifycfg	simplifycfg	test/opt/inputs/release_safe_simplifycfg_runtime_call_reject.ll	test/opt/expected/z_llvm/release_safe_simplifycfg_runtime_call_reject.ll	opt-equivalent	simplifycfg	ReleaseSafe runtime-call trap path is preserved under dynamic control
 mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	opt-equivalent	mem2reg	generic LLVM headers only
 mem2reg_single_store	mem2reg	mem2reg	test/opt/inputs/mem2reg_single_store.ll	test/opt/expected/z_llvm/mem2reg_single_store.ll	opt-equivalent	mem2reg	single-store fast path replaces dominated loads
 mem2reg_undef	mem2reg	mem2reg	test/opt/inputs/mem2reg_undef.ll	test/opt/expected/z_llvm/mem2reg_undef.ll	opt-equivalent	mem2reg	uninitialized stack load becomes undef

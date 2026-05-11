@@ -1601,6 +1601,41 @@ test "parser rejects sanitizer and trap instrumentation calls explicitly" {
     try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, trap_call));
 }
 
+test "verifier preserves ReleaseSafe runtime call trap boundary" {
+    const input =
+        \\source_filename = "release_safe_call_boundary"
+        \\
+        \\declare void @zig_panic(ptr)
+        \\
+        \\define void @release_safe_call_boundary(i1 %ok, ptr %msg) {
+        \\entry:
+        \\  br i1 %ok, label %cont, label %panic, !prof !0
+        \\panic:
+        \\  call void @zig_panic(ptr %msg)
+        \\  unreachable
+        \\cont:
+        \\  ret void
+        \\}
+        \\
+        \\!0 = !{!"branch_weights", i32 1000, i32 1}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const panic_block = module.functions.items[0].blocks.items[1];
+    try std.testing.expectEqual(@as(usize, 1), panic_block.instructions.items.len);
+    try std.testing.expect(panic_block.instructions.items[0].kind == .call);
+    try std.testing.expect(panic_block.terminator.? == .@"unreachable");
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier rejects direct call signature mismatch" {
     const input =
         \\declare i32 @callee(i32)

@@ -108,7 +108,10 @@ Implemented Cycle 12 slice:
 
 ```text
 test/zig/expected/release_safe_safety.reduced.ll
+test/zig/expected/release_safe_call_boundary.reduced.ll
 src/ir/parser.zig preserves branch `!prof` attachments as opaque metadata
+declared opaque panic/runtime calls are preserved as call barriers in reduced
+ReleaseSafe safety fixtures
 sanitizer and trap instrumentation calls remain rejected until runtime
 semantics are represented
 ```

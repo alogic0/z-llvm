@@ -101,6 +101,8 @@ TBAA
 noalias / alias.scope
 instruction debug metadata beyond opaque `!dbg` preservation
 branch weights / profile metadata beyond opaque branch attachment preservation
+panic/runtime lowering beyond declared opaque runtime call preservation in
+reduced ReleaseSafe safety fixtures
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition

@@ -66,6 +66,8 @@ Implemented subset:
 parse and print raw top-level module metadata records beginning with !
 parse and print opaque instruction !dbg attachments
 preserve branch metadata attachments such as !prof as opaque text
+preserve declared opaque panic/runtime calls as side-effecting call barriers in
+reduced ReleaseSafe safety fixtures
 reject sanitizer/TSan/UBSan/trap instrumentation calls until runtime semantics
 are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
@@ -78,6 +80,7 @@ Intentional divergences:
 no interpretation of debug location attachment graphs
 no metadata graph interpretation
 no sanitizer runtime declarations or inserted callbacks
+no panic/runtime lowering semantics beyond opaque declared calls
 no TSan memory instrumentation
 no entry/exit call insertion
 no debug value salvage, assignment tracking, or discriminator updates
@@ -88,12 +91,14 @@ Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  ReleaseSafe dynamic safety branch with an opaque runtime call compared for
+  ADCE and SimplifyCFG preservation
 
 local-only conservative:
   raw module metadata round-trip unit test
   reduced Debug metadata round-trip fixture
   reduced ReleaseSafe safety branch fixture with branch-weight metadata
+  reduced ReleaseSafe runtime-call boundary corpus fixture
 
 unit-test only:
   instrumentation placeholder pass dispatch
