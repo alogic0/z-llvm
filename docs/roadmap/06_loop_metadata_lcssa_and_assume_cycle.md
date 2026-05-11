@@ -15,22 +15,31 @@ LCSSA-adjacent verification, inlined calls, and safer loop pass gating.
 
 ## Plan
 
-- [ ] Inventory loop metadata, assume calls, and PHI/LCSSA-like values in the
+- [x] Inventory loop metadata, assume calls, and PHI/LCSSA-like values in the
       control-flow corpus.
-- [ ] Parse and preserve loop metadata attachments as inert metadata first.
-- [ ] Model `llvm.assume` conservatively for memory/control side effects.
-- [ ] Add verifier checks for LCSSA-adjacent loop exit value shapes where the
+- [x] Parse and preserve loop metadata attachments as inert metadata first.
+- [x] Model `llvm.assume` conservatively for memory/control side effects.
+- [x] Add verifier checks for LCSSA-adjacent loop exit value shapes where the
       local IR can represent them.
 - [ ] Extend LoopInfo tests from synthetic loops to corpus-derived loops.
-- [ ] Keep loop memory optimizations disabled unless Cycle 3 legality proves
+- [x] Keep loop memory optimizations disabled unless Cycle 3 legality proves
       them.
-- [ ] Promote a reduced control-flow/calls fixture to accepted optimizer input.
+- [x] Promote a reduced control-flow/calls fixture to accepted optimizer input.
 
 ## Exit Criteria
 
-- [ ] Corpus loop metadata no longer blocks parsing when it can be preserved
+- [x] Corpus loop metadata no longer blocks parsing when it can be preserved
       inertly.
 - [ ] Loop analyses classify corpus-derived loops without crashing or
       over-transforming.
-- [ ] LICM and loop simplification remain correct-first.
+- [x] LICM and loop simplification remain correct-first.
 
+## Completed Slice 1: Inert Loop Metadata Preservation
+
+- `src/ir/parser.zig` now preserves trailing branch metadata attachments such
+  as `!llvm.loop !0` on `br`/conditional `br` terminators.
+- `src/ir/printer.zig` round-trips those attachments without interpreting the
+  metadata graph.
+- `llvm.assume` remains a conservative side-effecting call from Cycle 2.
+- Existing LoopInfo LCSSA-adjacent tests cover accepted and rejected synthetic
+  loop exit value shapes; corpus-derived LoopInfo tests remain the open item.

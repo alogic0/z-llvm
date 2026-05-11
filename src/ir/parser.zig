@@ -864,14 +864,17 @@ fn parseRet(line: []const u8) !core.Terminator {
 }
 
 fn parseBr(line: []const u8) !core.Terminator {
-    var parts = std.mem.tokenizeAny(u8, line, " \t,");
+    const metadata_start = std.mem.indexOf(u8, line, ", !");
+    const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
+    const instruction_text = if (metadata_start) |index| line[0..index] else line;
+    var parts = std.mem.tokenizeAny(u8, instruction_text, " \t,");
     if (!std.mem.eql(u8, parts.next() orelse return error.InvalidBr, "br")) return error.InvalidBr;
     const first_ty = try parseTypeOrLabel(parts.next() orelse return error.InvalidBr);
     switch (first_ty) {
         .label => {
             const target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            try parseTrailingInstructionMetadata(&parts);
-            return .{ .br = .{ .target = target } };
+            if (parts.next() != null) return error.InvalidBr;
+            return .{ .br = .{ .target = target, .metadata = metadata } };
         },
         .ty => |cond_ty| {
             const cond = try parseValue(parts.next() orelse return error.InvalidBr);
@@ -881,22 +884,15 @@ fn parseBr(line: []const u8) !core.Terminator {
             const else_label = parts.next() orelse return error.InvalidBr;
             if (!std.mem.eql(u8, else_label, "label")) return error.InvalidBr;
             const else_target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            try parseTrailingInstructionMetadata(&parts);
+            if (parts.next() != null) return error.InvalidBr;
             return .{ .condbr = .{
                 .cond_ty = cond_ty,
                 .cond = cond,
                 .then_target = then_target,
                 .else_target = else_target,
+                .metadata = metadata,
             } };
         },
-    }
-}
-
-fn parseTrailingInstructionMetadata(parts: *std.mem.TokenIterator(u8, .any)) !void {
-    while (parts.next()) |token| {
-        if (!std.mem.startsWith(u8, token, "!")) return error.InvalidInstructionMetadata;
-        const value = parts.next() orelse return error.InvalidInstructionMetadata;
-        if (!std.mem.startsWith(u8, value, "!")) return error.InvalidInstructionMetadata;
     }
 }
 

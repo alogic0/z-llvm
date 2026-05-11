@@ -1278,6 +1278,31 @@ test "parser preserves raw module metadata records" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves inert branch metadata attachments" {
+    const input =
+        \\define void @loop_metadata(i1 %cond) {
+        \\entry:
+        \\  br i1 %cond, label %loop, label %exit
+        \\loop:
+        \\  br i1 %cond, label %loop, label %exit, !llvm.loop !0
+        \\exit:
+        \\  ret void
+        \\}
+        \\
+        \\!0 = distinct !{!0}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves Zig raw aliases and attribute groups" {
     const input =
         \\source_filename = "tiny_scalar"

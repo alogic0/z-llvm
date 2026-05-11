@@ -213,13 +213,19 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     }
                     try writer.writeByte('\n');
                 },
-                .br => |br| try writer.print("  br label %{s}\n", .{br.target}),
+                .br => |br| {
+                    try writer.print("  br label %{s}", .{br.target});
+                    if (br.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    try writer.writeByte('\n');
+                },
                 .condbr => |condbr| {
                     try writer.writeAll("  br ");
                     try condbr.cond_ty.format(writer);
                     try writer.writeByte(' ');
                     try condbr.cond.format(writer);
-                    try writer.print(", label %{s}, label %{s}\n", .{ condbr.then_target, condbr.else_target });
+                    try writer.print(", label %{s}, label %{s}", .{ condbr.then_target, condbr.else_target });
+                    if (condbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    try writer.writeByte('\n');
                 },
                 .@"unreachable" => try writer.writeAll("  unreachable\n"),
             };

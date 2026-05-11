@@ -497,12 +497,14 @@ pub const Terminator = union(enum) {
     },
     br: struct {
         target: []const u8,
+        metadata: ?[]const u8 = null,
     },
     condbr: struct {
         cond_ty: Type,
         cond: Value,
         then_target: []const u8,
         else_target: []const u8,
+        metadata: ?[]const u8 = null,
     },
     @"unreachable",
 };
