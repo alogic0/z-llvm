@@ -43,6 +43,9 @@ while IFS= read -r line; do
   if [[ -z "$line" ]]; then
     continue
   fi
+  if [[ "$line" == \#* ]]; then
+    continue
+  fi
 
   actual_fields="$(field_count "$line")"
   if [[ "$actual_fields" -ne "$expected_fields" ]]; then
@@ -54,7 +57,7 @@ while IFS= read -r line; do
   split_tsv_line "$line" fields
 
   id="${fields[0]}"
-  if [[ -z "${id:-}" || "$id" == \#* ]]; then
+  if [[ -z "${id:-}" ]]; then
     continue
   fi
 
