@@ -82,7 +82,7 @@ fn collectDefinitionBlocks(def_blocks: *std.StringHashMap(usize), function: ir.F
 }
 
 fn isHoistable(instruction: ir.Instruction) bool {
-    if (instruction.removed or memory_effect.classify(instruction) != .none) return false;
+    if (instruction.removed or !memory_effect.isSafeToSpeculativelyExecute(instruction)) return false;
     if (instruction.result == null) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp, .select => true,

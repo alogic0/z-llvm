@@ -36,7 +36,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
             while (instruction_index > 0) {
                 instruction_index -= 1;
                 const instruction = &block.instructions.items[instruction_index];
-                if (instruction.removed or memory_effect.hasSideEffects(instruction.*)) continue;
+                if (instruction.removed or !memory_effect.isSafeToDelete(instruction.*)) continue;
                 const result = instruction.result orelse continue;
                 if (uses.isUsed(result)) continue;
 

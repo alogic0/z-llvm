@@ -25,7 +25,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             for (function.blocks.items) |*block| {
                 for (block.instructions.items) |*instruction| {
                     if (instruction.removed) continue;
-                    if (memory_effect.hasSideEffects(instruction.*)) continue;
+                    if (!memory_effect.isSafeToDelete(instruction.*)) continue;
                     const result = instruction.result orelse continue;
                     if (uses.isUsed(result)) continue;
 

@@ -2747,6 +2747,11 @@ test "memory effect and mod-ref classify memory instructions conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(block.instructions.items[5]));
     try std.testing.expectEqual(memory_effect.Effect.memory_write, memory_effect.classify(block.instructions.items[6]));
     try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(block.instructions.items[7]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.@"volatile", memory_effect.barrierKind(block.instructions.items[5]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.atomic, memory_effect.barrierKind(block.instructions.items[7]));
+    try std.testing.expect(memory_effect.mayReadMemory(block.instructions.items[4]));
+    try std.testing.expect(memory_effect.mayReadOrWriteMemory(block.instructions.items[7]));
+    try std.testing.expect(!memory_effect.isSafeToDelete(block.instructions.items[7]));
 
     try std.testing.expectEqual(
         alias.ModRefInfo.no_mod_ref,
@@ -2772,6 +2777,31 @@ test "memory effect and mod-ref classify memory instructions conservatively" {
         alias.ModRefInfo.unknown,
         alias.modRef(function, block.instructions.items[7], .{ .named = "arg" }),
     );
+}
+
+test "memory effect marks calls and trapping division conservatively" {
+    const input =
+        \\declare void @touch()
+        \\
+        \\define i32 @trap(i32 %a, i32 %b) {
+        \\entry:
+        \\  %q = sdiv i32 %a, %b
+        \\  %safe = udiv i32 %a, 2
+        \\  call void @touch()
+        \\  ret i32 %q
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const block = module.functions.items[0].blocks.items[0];
+
+    try std.testing.expect(memory_effect.mayTrap(block.instructions.items[0]));
+    try std.testing.expect(!memory_effect.isSafeToSpeculativelyExecute(block.instructions.items[0]));
+    try std.testing.expect(!memory_effect.mayTrap(block.instructions.items[1]));
+    try std.testing.expect(memory_effect.mayThrow(block.instructions.items[2]));
+    try std.testing.expect(!memory_effect.isSafeToDelete(block.instructions.items[2]));
 }
 
 test "mem2reg promotes single-block stack slot" {
@@ -3531,6 +3561,40 @@ test "licm leaves aligned loads in the loop until memory LICM is implemented" {
         \\  %v = load i32, ptr %p, align 4
         \\  %c = icmp sgt i32 %v, 0
         \\  br i1 %c, label %body, label %exit
+        \\body:
+        \\  br label %latch
+        \\latch:
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(licm.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "licm leaves trapping divisions in the loop" {
+    const input =
+        \\define i32 @licm_trap_reject(i32 %a, i32 %b) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  %q = sdiv i32 %a, %b
+        \\  br i1 1, label %body, label %exit
         \\body:
         \\  br label %latch
         \\latch:

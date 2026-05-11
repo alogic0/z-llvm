@@ -104,7 +104,10 @@ Current users:
 src/tests.zig
 src/analysis/memory_location.zig
 src/analysis/memory_effect.zig
-future src/passes/mem2reg.zig
+src/passes/dse.zig
+src/passes/early_cse.zig
+src/passes/gvn.zig
+future memory-aware LICM and MemorySSA-backed passes
 ```
 
 Known gaps:

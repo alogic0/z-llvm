@@ -1,6 +1,7 @@
 const std = @import("std");
 const alias = @import("../analysis/alias.zig");
 const dominator = @import("../analysis/dominator.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -140,7 +141,7 @@ fn hasClobber(function: ir.Function, candidate: AvailableInstruction, block_inde
 }
 
 fn isCseCandidate(instruction: ir.Instruction) bool {
-    if (instruction.hasSideEffects()) return false;
+    if (!memory_effect.isSafeToDelete(instruction)) return false;
     return switch (instruction.kind) {
         .binary, .cast, .icmp, .load => true,
         .freeze, .select, .phi, .alloca, .store, .gep, .call => false,

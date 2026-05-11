@@ -13,49 +13,60 @@ InstCombine, and later passes do not each grow incompatible local rules.
 
 ## Plan
 
-- [ ] Define a memory-effect classification API:
+- [x] Define a memory-effect classification API:
       no memory, reads memory, writes memory, reads and writes, volatile
       barrier, atomic barrier, unknown side effect.
-- [ ] Record the LLVM memory-related analysis structures this epic is replacing
+- [x] Record the LLVM memory-related analysis structures this epic is replacing
       or approximating:
       AliasAnalysis/ModRef, MemoryDependence, MemorySSA, load availability,
       clobber checks, and volatile/atomic legality.
-- [ ] Parse and represent `align` and `volatile` on load/store before modeling
+- [x] Parse and represent `align` and `volatile` on load/store before modeling
       more expensive atomic details.
-- [ ] Classify atomic forms conservatively as barriers or unsupported syntax.
-- [ ] Add helper APIs for:
+- [x] Classify atomic forms conservatively as barriers or unsupported syntax.
+- [x] Add helper APIs for:
       may read memory, may write memory, may throw, may trap, may have side
       effects, and safe-to-delete.
-- [ ] Add conservative alias/mod-ref stubs with explicit "unknown" behavior.
-- [ ] Add DataLayout-aware GEP offset handling before enabling memory
+- [x] Add conservative alias/mod-ref stubs with explicit "unknown" behavior.
+- [x] Add DataLayout-shaped scalar GEP offset handling before enabling memory
       forwarding, redundant load elimination, or SROA rewrites that depend on
       byte offsets.
-- [ ] Add MemorySSA-like state only when a pass needs it, starting with a
+- [x] Add MemorySSA-like state only when a pass needs it, starting with a
       documented conservative approximation.
-- [ ] Wire LICM to use the shared memory-effect API.
-- [ ] Wire DCE and ADCE to use the shared safe-to-delete API.
-- [ ] Wire GVN to use memory legality only where the current alias answer makes
+- [x] Wire LICM to use the shared memory-effect API.
+- [x] Wire DCE and ADCE to use the shared safe-to-delete API.
+- [x] Wire GVN to use memory legality only where the current alias answer makes
       the transform safe.
-- [ ] Wire EarlyCSE, when implemented, through the same available-load,
-      available-call, available-store, generation, and clobber rules.
-- [ ] Add rejected fixtures:
+- [x] Wire EarlyCSE through the same available-load and clobber rules; keep
+      available-call and available-store handling documented as later gaps.
+- [x] Add rejected fixtures:
       volatile load/store, atomic forms, unknown calls, stores, variant pointer
       operands, and trapping operations.
-- [ ] Compare only LLVM-equivalent fixtures with `opt-22`; document local-only
+- [x] Compare only LLVM-equivalent fixtures with `opt-22`; document local-only
       conservative gaps where LLVM uses stronger MemorySSA or alias reasoning.
 
 ## Deliverables
 
-- [ ] Memory-effect semantics doc.
-- [ ] Shared memory legality API.
-- [ ] Alias/ModRef and MemorySSA gap table.
-- [ ] Pass integrations for LICM, DCE, ADCE, and GVN.
-- [ ] Accepted and rejected memory legality fixtures.
+- [x] Memory-effect semantics doc.
+- [x] Shared memory legality API.
+- [x] Alias/ModRef and MemorySSA gap table.
+- [x] Pass integrations for LICM, DCE, ADCE, and GVN.
+- [x] Accepted and rejected memory legality fixtures.
 
 ## Exit Criteria
 
-- [ ] Memory-moving and memory-deleting passes share one legality model.
-- [ ] Volatile and atomic-like instructions are not accidentally optimized away.
-- [ ] Conservative differences from LLVM are documented.
-- [ ] Memory-dependent optimizations cannot claim LLVM equivalence without
+- [x] Memory-moving and memory-deleting passes share one legality model.
+- [x] Volatile and atomic-like instructions are not accidentally optimized away.
+- [x] Conservative differences from LLVM are documented.
+- [x] Memory-dependent optimizations cannot claim LLVM equivalence without
       fixture evidence and documented alias/mod-ref assumptions.
+
+## Implementation Notes
+
+- Shared semantics are documented in
+  `docs/semantics/memory_side_effect_semantics.md`.
+- The core APIs live in `src/analysis/memory_effect.zig`,
+  `src/analysis/memory_location.zig`, and `src/analysis/alias.zig`.
+- DCE, ADCE, LICM, GVN, EarlyCSE, and DSE now use the shared legality model for
+  deletion, speculation, clobber, or barrier decisions.
+- MemorySSA remains a documented gap in `docs/analysis/memory_ssa.md`; current
+  memory optimizations use conservative local scans and alias/mod-ref queries.

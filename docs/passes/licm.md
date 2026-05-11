@@ -67,6 +67,7 @@ use LoopInfo natural loops
 require an existing unique unconditional preheader
 require the loop header to map to one current NaturalLoop record
 use shared memory-effect classification for legality
+use shared safe-to-speculate checks so trapping scalar instructions are not hoisted
 hoist pure binary, integer cast, icmp, and select instructions
 require every operand to be constant, undef, a function parameter, or defined outside the loop
 move hoisted instructions to the preheader instruction list
@@ -77,7 +78,7 @@ Current legality boundary:
 
 ```text
 hoistable: side-effect-free scalar binary, integer cast, icmp, and select instructions
-not hoistable: freeze, phi, alloca, load, store, getelementptr, volatile or atomic barriers
+not hoistable: freeze, phi, alloca, load, store, getelementptr, volatile or atomic barriers, trapping division
 not represented yet and therefore not hoistable: calls and unknown memory effects
 ```
 
@@ -91,7 +92,7 @@ Fixture coverage:
 ```text
 opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist
 opt-22 compared memory legality: scalar hoisting beside volatile memory
-local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, atomic barrier rejection, multi-latch rejection
+local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, atomic barrier rejection, multi-latch rejection
 ```
 
 The local-only cases are intentional current-scope boundaries. LLVM's LICM
@@ -106,7 +107,7 @@ Known gaps:
 ```text
 no load/store/call hoisting or sinking
 no MemorySSA or alias analysis integration
-no trapping, poison, freeze, or speculation safety checks
+no poison or freeze speculation safety checks beyond the current trapping-division guard
 no loop nest ordering beyond current natural-loop list
 no multi-latch loop hoisting
 no preheader creation

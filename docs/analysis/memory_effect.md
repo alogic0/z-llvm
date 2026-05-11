@@ -40,7 +40,10 @@ classify nonvolatile nonatomic load as readonly_load
 classify nonvolatile nonatomic store as memory_write
 classify volatile or atomic load/store as volatile_or_atomic_barrier
 expose mayReadMemory, mayWriteMemory, and hasSideEffects helpers over that classification
+expose mayReadOrWriteMemory, mayThrow, mayTrap, isSafeToDelete, and isSafeToSpeculativelyExecute helpers
+split volatile and atomic spelling through barrierKind while keeping both as hard barriers
 feed DCE, ADCE, GVN, and LICM legality through the shared classification
+feed EarlyCSE candidate legality through the shared safe-to-delete helper
 pair with alias.modRef for conservative load/store mod-ref answers
 ```
 
@@ -59,6 +62,9 @@ local-only conservative:
 
 unit-test only:
   memory effect classification for pure instruction, readonly load, volatile load, store, and atomic store
+  volatile versus atomic barrier kind classification
+  may-throw call and may-trap division classification
+  safe-to-delete and safe-to-speculate predicates
   conservative unknown-pointer mod/ref behavior
 ```
 
@@ -68,6 +74,7 @@ Upstream mapping:
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, fences, atomics, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
 This project currently treats volatile/atomic memory as a hard barrier and leaves all memory motion disabled unless a later pass proves safety explicitly.
+LICM also rejects locally trapping scalar operations such as division by an unknown denominator through the shared speculation helper.
 ```
 
 Known gaps:

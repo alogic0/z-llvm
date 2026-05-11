@@ -54,6 +54,7 @@ pure binary expression matching
 pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
+candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
 scalar expression equivalence shared with the InstSimplify helper
 ```
@@ -99,6 +100,8 @@ Known gaps:
 
 ```text
 no full MemorySSA-backed load CSE
+no available-call CSE
+no available-store forwarding
 no freeze CSE because undef/poison semantics need more modeling first
 no commutative operand canonicalization
 no target-library knowledge

@@ -41,11 +41,14 @@ Local target status:
 
 Implemented subset:
   None. Current memory passes use local MemoryLocation and alias/mod-ref
-  queries directly.
+  queries directly. The shared memory-effect API also provides safe-to-delete
+  and safe-to-speculate predicates so passes have one conservative legality
+  gate before MemorySSA exists.
 
 Intentional divergences:
   DSE uses a single-block reverse scan instead of MemorySSA.
   LICM does not move memory instructions.
+  GVN and EarlyCSE use alias/mod-ref clobber scans instead of MemorySSA walkers.
 
 Analysis preservation/invalidation:
   No local MemorySSA analysis exists yet.

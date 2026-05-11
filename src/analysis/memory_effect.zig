@@ -29,6 +29,12 @@ pub const Effect = enum {
     }
 };
 
+pub const BarrierKind = enum {
+    none,
+    @"volatile",
+    atomic,
+};
+
 pub fn classify(instruction: ir.Instruction) Effect {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
@@ -38,8 +44,27 @@ pub fn classify(instruction: ir.Instruction) Effect {
     };
 }
 
+pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
+    return switch (instruction.kind) {
+        .load => |load| memoryBarrierKind(load.attrs),
+        .store => |store| memoryBarrierKind(store.attrs),
+        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => .none,
+    };
+}
+
+fn memoryBarrierKind(attrs: ir.MemoryAttrs) BarrierKind {
+    if (attrs.is_volatile) return .@"volatile";
+    if (attrs.isAtomic()) return .atomic;
+    return .none;
+}
+
 pub fn hasSideEffects(instruction: ir.Instruction) bool {
     return classify(instruction).hasSideEffects();
+}
+
+pub fn mayReadOrWriteMemory(instruction: ir.Instruction) bool {
+    const effect = classify(instruction);
+    return effect.mayReadMemory() or effect.mayWriteMemory();
 }
 
 pub fn mayReadMemory(instruction: ir.Instruction) bool {
@@ -48,4 +73,41 @@ pub fn mayReadMemory(instruction: ir.Instruction) bool {
 
 pub fn mayWriteMemory(instruction: ir.Instruction) bool {
     return classify(instruction).mayWriteMemory();
+}
+
+pub fn mayThrow(instruction: ir.Instruction) bool {
+    return instruction.kind == .call;
+}
+
+pub fn mayTrap(instruction: ir.Instruction) bool {
+    return switch (instruction.kind) {
+        .binary => |binary| binaryMayTrap(binary),
+        .load, .store, .call => false,
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => false,
+    };
+}
+
+pub fn isSafeToDelete(instruction: ir.Instruction) bool {
+    return !hasSideEffects(instruction) and !mayThrow(instruction);
+}
+
+pub fn isSafeToSpeculativelyExecute(instruction: ir.Instruction) bool {
+    return !mayReadOrWriteMemory(instruction) and
+        !hasSideEffects(instruction) and
+        !mayThrow(instruction) and
+        !mayTrap(instruction);
+}
+
+fn binaryMayTrap(binary: ir.BinaryInst) bool {
+    return switch (binary.op) {
+        .udiv, .urem => switch (binary.rhs) {
+            .int => |rhs| rhs == 0,
+            .named, .undef => true,
+        },
+        .sdiv, .srem => switch (binary.rhs) {
+            .int => |rhs| rhs == 0 or rhs == -1,
+            .named, .undef => true,
+        },
+        .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
+    };
 }

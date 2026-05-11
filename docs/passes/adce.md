@@ -59,6 +59,7 @@ walk instructions backward
 remove unused side-effect-free instructions
 repeat until dependent dead instruction chains disappear
 preserve stores, volatile/atomic memory barriers, unknown memory effects, and terminators
+use the shared `isSafeToDelete` helper for the local removal boundary
 ```
 
 This overlaps with the current DCE subset, but it is kept as a separate pass
