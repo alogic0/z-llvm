@@ -238,6 +238,8 @@ Status meanings:
 | `require<globals-aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `invalidate<aa>` | analysis plumbing | P2 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
 | `require<profile-summary>` | analysis plumbing | P3 | placeholder | `llvm/include/llvm/IR/PassManager.h` |
+| `require<branch-probability>` | analysis plumbing | P3 | placeholder | `llvm/lib/Analysis/BranchProbabilityInfo.cpp` |
+| `require<block-frequency>` | analysis plumbing | P3 | placeholder | `llvm/lib/Analysis/BlockFrequencyInfo.cpp` |
 | `require<should-not-run-function-passes>` | pipeline guard | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `openmp-opt`, `openmp-opt-cgscc` | OpenMP IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/OpenMPOpt.cpp` |
 | `libcalls-shrinkwrap` | library-call optimization | P3 | placeholder | `llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp` |

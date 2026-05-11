@@ -1,0 +1,62 @@
+# Profile-Guided And Size Optimization Boundary
+
+This project preserves profile and size-related IR facts, but does not yet use
+them for profitability or target-cost decisions.
+
+## ReleaseSmall Boundary
+
+Zig's `ReleaseSmall` LLVM path maps to an Oz-style pipeline. The local project
+keeps two separate concepts:
+
+```text
+release-oz: inventory descriptor with placeholders for the discovered LLVM Oz pipeline
+zig-release-small-accepted: corpus conformance pipeline over accepted stripped IR
+```
+
+The accepted ReleaseSmall corpus currently validates parser, verifier, aliases,
+raw function attributes, and size attributes such as `minsize` and `optsize`.
+It intentionally uses only implemented passes.
+
+## Preserved Surface
+
+```text
+function prefix attributes: minsize, optsize
+raw attribute groups containing minsize/optsize
+branch profile metadata attachments such as !prof
+opaque metadata records such as branch_weights
+module flag records when present
+target-cpu and target-features attribute strings for later target cycles
+```
+
+## Placeholder Surface
+
+```text
+require<profile-summary>
+require<branch-probability>
+require<block-frequency>
+cg-profile
+chr
+mergefunc
+```
+
+These entries make the LLVM pipeline surface visible. They are no-op
+placeholders until profile summaries, BranchProbabilityInfo,
+BlockFrequencyInfo, and size-aware profitability rules are represented.
+
+## Non-Goals
+
+```text
+no PGO instrumentation insertion
+no profile-summary interpretation
+no BFI/BPI computation
+no branch probability updates in CFG transforms
+no size-cost model for inlining, loops, vectorization, or codegen
+```
+
+## Tests
+
+```text
+unit test: size attributes and branch profile metadata round-trip opaquely
+corpus: tiny_scalar_release_small_captured
+pipeline placeholder test: require<branch-probability> and require<block-frequency>
+```

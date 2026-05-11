@@ -449,6 +449,8 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "require<globals-aa>")) return placeholder.make("require<globals-aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
     if (std.mem.eql(u8, name, "invalidate<aa>")) return placeholder.make("invalidate<aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
     if (std.mem.eql(u8, name, "require<profile-summary>")) return placeholder.make("require<profile-summary>", .analysis, "llvm/include/llvm/IR/PassManager.h");
+    if (std.mem.eql(u8, name, "require<branch-probability>")) return placeholder.make("require<branch-probability>", .analysis, "llvm/lib/Analysis/BranchProbabilityInfo.cpp");
+    if (std.mem.eql(u8, name, "require<block-frequency>")) return placeholder.make("require<block-frequency>", .analysis, "llvm/lib/Analysis/BlockFrequencyInfo.cpp");
     if (std.mem.eql(u8, name, "require<should-not-run-function-passes>")) return placeholder.make("require<should-not-run-function-passes>", .pipeline_guard, "llvm/lib/Passes/PassBuilderPipelines.cpp");
     return null;
 }

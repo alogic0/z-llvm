@@ -14,16 +14,26 @@ without implementing broad PGO machinery prematurely.
 
 ## Plan
 
-- [ ] Inventory ReleaseSmall pipeline differences from Zig's LLVM backend.
-- [ ] Parse size-related function attributes and metadata where emitted.
-- [ ] Keep PGO metadata preserved but not interpreted until fixtures require it.
-- [ ] Add ReleaseSmall corpus acceptance criteria separate from ReleaseFast.
-- [ ] Document no-op placeholders for BFI/BPI-dependent passes.
-- [ ] Add fixtures where size mode changes pass selection or legality.
+- [x] Inventory ReleaseSmall pipeline differences from Zig's LLVM backend.
+- [x] Parse size-related function attributes and metadata where emitted.
+- [x] Keep PGO metadata preserved but not interpreted until fixtures require it.
+- [x] Add ReleaseSmall corpus acceptance criteria separate from ReleaseFast.
+- [x] Document no-op placeholders for BFI/BPI-dependent passes.
+- [x] Add fixtures where size mode changes pass selection or legality.
 
 ## Exit Criteria
 
-- [ ] ReleaseSmall blockers are classified independently.
-- [ ] Size/PGO metadata does not get dropped accidentally.
-- [ ] PGO-dependent optimizations remain honest placeholders.
+- [x] ReleaseSmall blockers are classified independently.
+- [x] Size/PGO metadata does not get dropped accidentally.
+- [x] PGO-dependent optimizations remain honest placeholders.
 
+## Completion Notes
+
+- Added `docs/pgo_size_optimization.md` to separate ReleaseSmall corpus
+  acceptance from full Oz/PGO behavior.
+- Added no-op pipeline placeholders for BranchProbabilityInfo and
+  BlockFrequencyInfo requirements.
+- Added unit coverage for opaque `minsize`/`optsize` and branch profile
+  metadata preservation.
+- PGO instrumentation, profile-summary interpretation, BFI/BPI computation,
+  and size-aware profitability remain unimplemented.

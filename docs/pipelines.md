@@ -171,6 +171,8 @@ release-o3:
 release-oz:
   size-oriented release descriptor with the same scalar/memory foundation but
   without local LICM until code-size gates exist
+  size and profile facts are preserved only; BFI/BPI and profile-summary
+  entries are placeholders
 
 zig-debug-accepted:
   verify
@@ -181,6 +183,9 @@ zig-release-safe-accepted / zig-release-fast-accepted / zig-release-small-accept
   instcombine
   dce
   verify
+
+zig-release-small-accepted is tracked separately so ReleaseSmall size
+attributes and aliases do not get conflated with ReleaseFast output quality.
 
 lto-prelink-o3 / lto-prelink-oz:
   release descriptors plus canonicalize-aliases and name-anon-globals
