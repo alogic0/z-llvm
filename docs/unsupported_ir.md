@@ -118,8 +118,10 @@ atomic ordering interpretation and atomic-specific optimization
 calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope
-instruction and simple branch debug metadata beyond opaque `!dbg` preservation
+debug metadata beyond opaque `!dbg` preservation for instructions, simple
+branches, call sites, loop PHIs, and reduced lexical-block fixtures
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation
+debug value and debug declare intrinsics
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in
 reduced ReleaseSafe safety fixtures
