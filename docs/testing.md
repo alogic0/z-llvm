@@ -151,6 +151,11 @@ Native handoff validation is intentionally narrower than codegen completeness:
 and global optimizer facts, then runs assembly, objdump, and readelf smoke
 checks to keep local backend experiments validation-only.
 
+`scripts/run_generated_scalar_diff.sh` generates accepted scalar IR cases in a
+temporary directory, compares local output with `opt-22`, checks generated
+unsupported cases fail closed, and runs an optional `lli-22` execution smoke
+when available.
+
 LLVM algorithms covered so far:
 
 ```text
