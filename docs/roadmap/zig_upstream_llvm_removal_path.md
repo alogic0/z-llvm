@@ -136,9 +136,16 @@ The implementable epic split starts at:
 
 ## What This Means For Roadmap Priority
 
-- Primary next work: verifier foundation and Zig-emitted IR inventory.
-- Optimizer work must come from
-      `docs/inventory/zig_llvm_pass_pipeline_inventory.md`.
-- Codegen/MC/object work stays paused unless needed for validation.
-- Broad backend, linker, debug, sanitizer, vector, and LTO work must have a
-      source-backed Zig need before becoming active.
+The initial inventory, fixture, verifier, optimizer-foundation,
+native-handoff, and optional-track epics are complete. Current roadmap priority
+is therefore:
+
+- Pull optimizer work from `docs/inventory/zig_llvm_pass_pipeline_inventory.md`
+      and `docs/roadmap/llvm_algorithm_parity_gap_closure_plan.md`.
+- Prefer improving LLVM algorithm parity for already implemented pass names
+      before adding unrelated optimizer surface.
+- Extend Zig-emitted fixtures when a new source-backed construct is needed.
+- Keep codegen/MC/object work validation-only unless a handoff slice activates
+      it.
+- Broad backend, linker, debug, sanitizer, vector, bitcode, and LTO work must
+      have a source-backed Zig need before becoming active.

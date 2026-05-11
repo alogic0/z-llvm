@@ -127,6 +127,6 @@ item into an active epic or next-steps slice before implementing it.
 - `Open`: `SCCP`
 - `Open`: `EarlyCSE`
 - `Open`: `GVN`
-- `Open`: `mem2reg`
+- `Open`: `mem2reg` deeper parity after accepted-surface fixture coverage
 - `Open`: `SROA`
 - `Open`: `GlobalDCE`

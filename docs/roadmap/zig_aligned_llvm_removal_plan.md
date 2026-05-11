@@ -228,14 +228,18 @@ Deliverables:
 - gap tables
 - minimal reproducer docs
 
-## Immediate Next Work
+## Current Post-Epic Focus
 
-- Promote the verifier-only first slice from
-      `docs/roadmap/all_discovered_llvm_optimizations_implementation_plan.md`.
-- Implement from `docs/roadmap/03_llvm_compatible_ir_verifier_foundation.md`.
-- Add `docs/inventory/zig_emitted_ir_inventory.md`.
-- Add more real Zig-emitted IR fixtures before broadening optimizer passes.
-- Keep codegen epics paused unless they are needed for optimizer validation.
+The numbered foundation epics in `docs/README.md` are complete. New work should
+now come from a bounded source-backed slice, usually one of these:
+
+- Close an `Open` item from
+      `docs/roadmap/llvm_algorithm_parity_gap_closure_plan.md`.
+- Extend the Zig-emitted IR corpus only when a new parser, verifier, optimizer,
+      metadata, or target slice needs that construct.
+- Improve fixture parity for existing passes before adding unrelated pass names.
+- Activate backend, bitcode, debug, sanitizer, vector, or LTO work only through
+      the criteria in the corresponding optional-track doc.
 
 ## Success Criteria
 
