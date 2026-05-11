@@ -17,9 +17,9 @@ debug-info-only=0
 The four future rows are explicit boundaries, not unowned blockers:
 
 ```text
-tiny_scalar_debug: future,legacy-bootstrap
-tiny_scalar_release_safe: future,legacy-bootstrap
-tiny_scalar_release_small: future,legacy-bootstrap
+tiny_scalar_debug: future
+tiny_scalar_release_safe: future
+tiny_scalar_release_small: future
 vector_future_release_fast: parse,verify,future
 ```
 

@@ -165,6 +165,10 @@ work should be selected from the backlog or a new source-backed blocker.
 
 The active work queue is kept short in [next_steps.md](next_steps.md).
 
+## Active Discovery Cycle
+
+- [ ] [Cycle 01: Module ASM Source-Backed Parser Closure](roadmap/01_module_asm_source_backed_parser_cycle.md)
+
 ## Future Backlog
 
 - [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)

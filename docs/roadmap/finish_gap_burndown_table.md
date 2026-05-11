@@ -79,17 +79,17 @@ Pass status counts from the active pass pipeline inventory:
 
 | Manifest row | Status | Evidence | Finish disposition |
 | --- | --- | --- | --- |
-| `tiny_scalar_debug` | `future,legacy-bootstrap` | Historical broad raw Debug IR is too large because it pulls in debug and std support. Reduced Debug rows already cover the accepted metadata boundary. | Later measured blocker; activate only by reducing an uncovered Debug construct. |
-| `tiny_scalar_release_safe` | `future,legacy-bootstrap` | Historical broad raw ReleaseSafe IR is broad. Reduced ReleaseSafe safety and runtime-call rows already cover the accepted safety boundary. | Later measured blocker; activate only by reducing an uncovered safety or runtime-call construct. |
-| `tiny_scalar_release_small` | `future,legacy-bootstrap` | Historical unstripped raw ReleaseSmall generation row predates the stripped captured ReleaseSmall row. | Closed by Cycle 02; retained as future evidence only, superseded by `tiny_scalar_release_small_captured`. |
+| `tiny_scalar_debug` | `future` | Broad raw Debug IR is too large because it pulls in debug and std support. Reduced Debug rows already cover the accepted metadata boundary. | Later measured blocker; activate only by reducing an uncovered Debug construct. |
+| `tiny_scalar_release_safe` | `future` | Broad raw ReleaseSafe IR is broad. Reduced ReleaseSafe safety and runtime-call rows already cover the accepted safety boundary. | Later measured blocker; activate only by reducing an uncovered safety or runtime-call construct. |
+| `tiny_scalar_release_small` | `future` | Unstripped raw ReleaseSmall generation is superseded by the stripped captured ReleaseSmall row. | Closed by Cycle 02; retained as future evidence only, superseded by `tiny_scalar_release_small_captured`. |
 | `vector_future_release_fast` | `parse,verify,future` | Reduced vector row parses and verifies fixed-vector syntax but is not optimizer-input until vector FP semantics, vector-condition legality, scalable-vector policy, TTI-style costs, and native vector lowering are selected. | Conservative accepted boundary; vectorizers and target-cost-driven transforms remain out of scope for this finish line. |
 
 ## Burn-Down Result
 
 Cycles 02-08 closed the measured finish burn-down wave:
 
-1. Corpus closure: the stale raw ReleaseSmall row is a future legacy-bootstrap
-   row, and the broad raw Debug/ReleaseSafe rows have explicit activation
+1. Corpus closure: the stale raw ReleaseSmall row is a future row, and the
+   broad raw Debug/ReleaseSafe rows have explicit activation
    conditions.
 2. Vector boundary: the reduced vector row is parse/verify/future and not an
    optimizer-input row for this finish line.
