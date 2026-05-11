@@ -112,7 +112,7 @@ fn addInitializerEdges(
 fn addValueEdge(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), value: ir.Value) !void {
     const raw_name = switch (value) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return,
     };
     const name = if (std.mem.startsWith(u8, raw_name, "@")) raw_name[1..] else raw_name;
     if (hasFunctionDefinition(module, name)) {
@@ -172,6 +172,10 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
         if (block.terminator) |terminator| switch (terminator) {
             .ret => |ret| if (ret.value) |value| try addValueEdge(allocator, module, edges, value),
             .condbr => |condbr| try addValueEdge(allocator, module, edges, condbr.cond),
+            .@"switch" => |switch_term| {
+                try addValueEdge(allocator, module, edges, switch_term.cond);
+                for (switch_term.cases.items) |case| try addValueEdge(allocator, module, edges, case.value);
+            },
             .br, .@"unreachable" => {},
         };
     }

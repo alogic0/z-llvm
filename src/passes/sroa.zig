@@ -245,7 +245,7 @@ fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_us
 fn gepUseForPointer(gep_uses: []const AggregateGepUse, ptr: ir.Value) ?AggregateGepUse {
     const name = switch (ptr) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return null,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     for (gep_uses) |gep_use| {
         if (std.mem.eql(u8, gep_use.gep_name, name)) return gep_use;
@@ -359,7 +359,7 @@ fn gepAllocaRoot(function: ir.Function, gep: ir.GepInst) ?[]const u8 {
 fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
     const base_name = switch (ptr) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return null,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
 
     for (function.blocks.items) |block| {
@@ -380,7 +380,7 @@ fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
 fn zeroOffsetAllocaBase(function: ir.Function, ptr: ir.Value) ?[]const u8 {
     const base_name = switch (ptr) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return null,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
 
     for (function.blocks.items) |block| {
@@ -467,13 +467,19 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .@"switch" => |*switch_term| {
+                switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
+                for (switch_term.cases.items) |*case| {
+                    case.value = replaceOperand(case.value, name, replacement);
+                }
+            },
         };
     }
 }
 
 fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
 }
@@ -516,7 +522,7 @@ fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
 
 fn isNamed(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

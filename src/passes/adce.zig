@@ -112,7 +112,7 @@ const LiveInstructions = struct {
 
     fn markValue(liveness: *LiveInstructions, value: ir.Value) !void {
         switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector => {},
+            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
             .named => |name| if (liveness.defs.get(name)) |index| try liveness.mark(index),
         }
     }
@@ -173,6 +173,10 @@ const LiveInstructions = struct {
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| try liveness.markValue(condbr.cond),
+            .@"switch" => |switch_term| {
+                try liveness.markValue(switch_term.cond);
+                for (switch_term.cases.items) |case| try liveness.markValue(case.value);
+            },
         }
     }
 
@@ -213,7 +217,7 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
     for (function.blocks.items, 0..) |*block, block_index| {
         const condbr = switch (block.terminator orelse continue) {
             .condbr => |condbr| condbr,
-            .ret, .br, .@"unreachable" => continue,
+            .ret, .br, .@"switch", .@"unreachable" => continue,
         };
 
         const ipdom_index = postdom.immediatePostDominator(block_index) orelse continue;
@@ -277,7 +281,7 @@ fn regionPathReachesJoin(function: ir.Function, graph: cfg.Graph, block_index: u
             return regionPathReachesJoin(function, graph, then_index, join_index, visiting) and
                 regionPathReachesJoin(function, graph, else_index, join_index, visiting);
         },
-        .ret, .@"unreachable" => return false,
+        .ret, .@"switch", .@"unreachable" => return false,
     }
 }
 

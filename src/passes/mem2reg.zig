@@ -151,6 +151,12 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
+            .@"switch" => |switch_term| {
+                if (isNamed(switch_term.cond, slot)) return false;
+                for (switch_term.cases.items) |case| {
+                    if (isNamed(case.value, slot)) return false;
+                }
+            },
         };
     }
     return true;
@@ -517,6 +523,12 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
+            .@"switch" => |switch_term| {
+                if (isNamed(switch_term.cond, slot)) return false;
+                for (switch_term.cases.items) |case| {
+                    if (isNamed(case.value, slot)) return false;
+                }
+            },
         };
     }
 
@@ -635,20 +647,26 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .@"switch" => |*switch_term| {
+                switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
+                for (switch_term.cases.items) |*case| {
+                    case.value = replaceOperand(case.value, name, replacement);
+                }
+            },
         };
     }
 }
 
 fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
 }
 
 fn isNamed(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

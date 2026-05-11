@@ -110,27 +110,32 @@ pub const Value = union(enum) {
     null_value,
     zero_initializer,
     vector: []const u8,
+    constant_expr: []const u8,
 
     pub fn eql(a: Value, b: Value) bool {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
             },
             .int => |value| switch (b) {
-                .named, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+                .named, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
                 .int => |other_value| value == other_value,
             },
             .fp => |text| switch (b) {
                 .fp => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .undef, .null_value, .zero_initializer, .vector => false,
+                .named, .int, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
             },
             .undef => b == .undef,
             .null_value => b == .null_value,
             .zero_initializer => b == .zero_initializer,
             .vector => |text| switch (b) {
                 .vector => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .fp, .undef, .null_value, .zero_initializer => false,
+                .named, .int, .fp, .undef, .null_value, .zero_initializer, .constant_expr => false,
+            },
+            .constant_expr => |text| switch (b) {
+                .constant_expr => |other_text| std.mem.eql(u8, text, other_text),
+                .named, .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
             },
         };
     }
@@ -150,6 +155,7 @@ pub const Value = union(enum) {
             .null_value => try writer.writeAll("null"),
             .zero_initializer => try writer.writeAll("zeroinitializer"),
             .vector => |text| try writer.writeAll(text),
+            .constant_expr => |text| try writer.writeAll(text),
         }
     }
 };
@@ -232,11 +238,15 @@ pub const CastOp = enum {
     trunc,
     zext,
     sext,
+    ptrtoint,
+    inttoptr,
 
     pub fn parse(text: []const u8) ?CastOp {
         if (std.mem.eql(u8, text, "trunc")) return .trunc;
         if (std.mem.eql(u8, text, "zext")) return .zext;
         if (std.mem.eql(u8, text, "sext")) return .sext;
+        if (std.mem.eql(u8, text, "ptrtoint")) return .ptrtoint;
+        if (std.mem.eql(u8, text, "inttoptr")) return .inttoptr;
         return null;
     }
 
@@ -466,6 +476,7 @@ pub const FreezeInst = struct {
 
 pub const IcmpInst = struct {
     predicate: IcmpPredicate,
+    samesign: bool = false,
     operand_ty: Type,
     lhs: Value,
     rhs: Value,
@@ -648,6 +659,7 @@ pub const GepInst = struct {
 
 pub const CallArg = struct {
     ty: Type,
+    attrs: ?[]const u8 = null,
     value: Value,
 };
 
@@ -828,7 +840,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }
@@ -849,7 +861,29 @@ pub const Terminator = union(enum) {
         else_target: []const u8,
         metadata: ?[]const u8 = null,
     },
+    @"switch": SwitchTerminator,
     @"unreachable",
+
+    pub fn deinit(terminator: *Terminator, allocator: std.mem.Allocator) void {
+        switch (terminator.*) {
+            .@"switch" => |*switch_term| switch_term.cases.deinit(allocator),
+            .ret, .br, .condbr, .@"unreachable" => {},
+        }
+    }
+};
+
+pub const SwitchCase = struct {
+    value_ty: Type,
+    value: Value,
+    target: []const u8,
+};
+
+pub const SwitchTerminator = struct {
+    cond_ty: Type,
+    cond: Value,
+    default_target: []const u8,
+    cases: std.ArrayList(SwitchCase),
+    metadata: ?[]const u8 = null,
 };
 
 pub const BasicBlock = struct {
@@ -866,6 +900,7 @@ pub const BasicBlock = struct {
 
     pub fn deinit(block: *BasicBlock, allocator: std.mem.Allocator) void {
         for (block.instructions.items) |*instruction| instruction.deinit(allocator);
+        if (block.terminator) |*terminator| terminator.deinit(allocator);
         block.instructions.deinit(allocator);
     }
 };

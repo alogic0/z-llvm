@@ -55,6 +55,12 @@ fn simplifyFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool 
             },
             .br, .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = resolveValue(aliases, condbr.cond),
+            .@"switch" => |*switch_term| {
+                switch_term.cond = resolveValue(aliases, switch_term.cond);
+                for (switch_term.cases.items) |*case| {
+                    case.value = resolveValue(aliases, case.value);
+                }
+            },
         };
     }
     return changed;
@@ -62,7 +68,7 @@ fn simplifyFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool 
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

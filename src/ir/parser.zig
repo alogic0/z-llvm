@@ -144,6 +144,12 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
+        if (std.mem.startsWith(u8, line, "switch ")) {
+            if (block.terminator != null) return error.MultipleTerminators;
+            block.terminator = try parseSwitch(allocator, line, &lines);
+            continue;
+        }
+
         if (std.mem.startsWith(u8, line, "fence ")) {
             try block.instructions.append(allocator, try parseFence(line));
             continue;
@@ -366,7 +372,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => .{ .scalar = value },
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => .{ .scalar = value },
         .named => error.UnsupportedGlobalVariable,
     };
 }
@@ -390,7 +396,7 @@ fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text
         if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
         switch (value) {
             .int, .undef, .null_value => try initializer.values.append(allocator, value),
-            .named, .fp, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+            .named, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
@@ -780,7 +786,12 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "icmp")) {
-        const predicate = core.IcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
+        var predicate_text = parts.next() orelse return error.InvalidInstruction;
+        const samesign = if (std.mem.eql(u8, predicate_text, "samesign")) blk: {
+            predicate_text = parts.next() orelse return error.InvalidInstruction;
+            break :blk true;
+        } else false;
+        const predicate = core.IcmpPredicate.parse(predicate_text) orelse return error.UnsupportedPredicate;
         const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
         const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
@@ -789,6 +800,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .result = result_text[1..],
             .kind = .{ .icmp = .{
                 .predicate = predicate,
+                .samesign = samesign,
                 .operand_ty = operand_ty,
                 .lhs = lhs,
                 .rhs = rhs,
@@ -1192,16 +1204,53 @@ fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []con
         const raw_arg = if (comma) |index| rest[0..index] else rest;
         const arg_text = std.mem.trim(u8, raw_arg, " \t");
         if (std.mem.eql(u8, arg_text, "...")) return error.UnsupportedVarArgs;
-        var parts = std.mem.tokenizeAny(u8, arg_text, " \t");
-        const ty = try parseType(parts.next() orelse return error.InvalidCall);
-        const value = try parseValue(parts.next() orelse return error.InvalidCall);
-        if (parts.next() != null) return error.UnsupportedCallAttribute;
-        try call.args.append(allocator, .{
-            .ty = ty,
-            .value = value,
-        });
+        try call.args.append(allocator, try parseCallArg(arg_text));
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
+}
+
+fn parseCallArg(text: []const u8) !core.CallArg {
+    const typed = try parseLeadingType(text);
+    if (typed.after.len == 0) return error.InvalidCall;
+    if (!callArgMayContainAttrs(typed.after)) {
+        if (parseValue(typed.after)) |value| {
+            return .{
+                .ty = typed.ty,
+                .value = value,
+            };
+        } else |_| {}
+    }
+
+    const value_start = findTrailingValueStart(typed.after) orelse return error.InvalidCall;
+    if (value_start == 0) return error.InvalidCall;
+    const attrs = std.mem.trim(u8, typed.after[0..value_start], " \t");
+    const value_text = std.mem.trim(u8, typed.after[value_start..], " \t");
+    if (attrs.len == 0 or value_text.len == 0) return error.InvalidCall;
+    if (std.mem.indexOfAny(u8, value_text, " \t") != null) return error.UnsupportedCallAttribute;
+    return .{
+        .ty = typed.ty,
+        .attrs = attrs,
+        .value = try parseValue(value_text),
+    };
+}
+
+fn callArgMayContainAttrs(text: []const u8) bool {
+    if (text.len >= 2 and text[0] == '<' and text[text.len - 1] == '>') return false;
+    return std.mem.indexOfAny(u8, text, " \t") != null;
+}
+
+fn findTrailingValueStart(text: []const u8) ?usize {
+    var end = text.len;
+    while (end > 0 and (text[end - 1] == ' ' or text[end - 1] == '\t')) end -= 1;
+    if (end == 0) return null;
+
+    var index = end;
+    while (index > 0) {
+        const byte = text[index - 1];
+        if (byte == ' ' or byte == '\t') return index;
+        index -= 1;
+    }
+    return 0;
 }
 
 fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {
@@ -1665,6 +1714,72 @@ fn parseBr(line: []const u8) !core.Terminator {
     }
 }
 
+fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std.mem.SplitIterator(u8, .scalar)) !core.Terminator {
+    const open = std.mem.indexOfScalar(u8, first_line, '[') orelse return error.InvalidSwitch;
+    const header = std.mem.trim(u8, first_line["switch ".len..open], " \t");
+    const comma = findTopLevelComma(header) orelse return error.InvalidSwitch;
+    const cond_arg = try parseTypedValue(std.mem.trim(u8, header[0..comma], " \t"));
+    const default_text = std.mem.trim(u8, header[comma + 1 ..], " \t");
+    var default_parts = std.mem.tokenizeAny(u8, default_text, " \t");
+    if (!std.mem.eql(u8, default_parts.next() orelse return error.InvalidSwitch, "label")) return error.InvalidSwitch;
+    const default_target = try parseLabel(default_parts.next() orelse return error.InvalidSwitch);
+    if (default_parts.next() != null) return error.InvalidSwitch;
+
+    var switch_term: core.SwitchTerminator = .{
+        .cond_ty = cond_arg.ty,
+        .cond = cond_arg.value,
+        .default_target = default_target,
+        .cases = .empty,
+    };
+    errdefer switch_term.cases.deinit(allocator);
+
+    var rest = std.mem.trim(u8, first_line[open + 1 ..], " \t");
+    while (true) {
+        if (try parseSwitchCasesLine(allocator, &switch_term, rest)) |metadata| {
+            if (metadata.len != 0) switch_term.metadata = metadata;
+            return .{ .@"switch" = switch_term };
+        }
+
+        const raw_line = lines.next() orelse return error.InvalidSwitch;
+        const line_without_comment = if (std.mem.indexOfScalar(u8, raw_line, ';')) |index|
+            raw_line[0..index]
+        else
+            raw_line;
+        rest = std.mem.trim(u8, line_without_comment, " \t\r");
+    }
+}
+
+fn parseSwitchCasesLine(allocator: std.mem.Allocator, switch_term: *core.SwitchTerminator, line: []const u8) !?[]const u8 {
+    const close = std.mem.indexOfScalar(u8, line, ']');
+    const cases_text = std.mem.trim(u8, if (close) |index| line[0..index] else line, " \t");
+    if (cases_text.len != 0) try parseSwitchCase(allocator, switch_term, cases_text);
+    if (close) |index| {
+        const trailing = std.mem.trim(u8, line[index + 1 ..], " \t");
+        if (trailing.len == 0) return "";
+        if (!std.mem.startsWith(u8, trailing, ",")) return error.InvalidSwitch;
+        const metadata = std.mem.trim(u8, trailing[1..], " \t");
+        if (metadata.len == 0) return error.InvalidSwitch;
+        try validateInstructionMetadata(metadata);
+        return metadata;
+    }
+    return null;
+}
+
+fn parseSwitchCase(allocator: std.mem.Allocator, switch_term: *core.SwitchTerminator, text: []const u8) !void {
+    const comma = findTopLevelComma(text) orelse return error.InvalidSwitch;
+    const typed = try parseTypedValue(std.mem.trim(u8, text[0..comma], " \t"));
+    const label_text = std.mem.trim(u8, text[comma + 1 ..], " \t");
+    var parts = std.mem.tokenizeAny(u8, label_text, " \t");
+    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidSwitch, "label")) return error.InvalidSwitch;
+    const target = try parseLabel(parts.next() orelse return error.InvalidSwitch);
+    if (parts.next() != null) return error.InvalidSwitch;
+    try switch_term.cases.append(allocator, .{
+        .value_ty = typed.ty,
+        .value = typed.value,
+        .target = target,
+    });
+}
+
 const TypeOrLabel = union(enum) {
     ty: core.Type,
     label,
@@ -1846,6 +1961,7 @@ fn parseValue(text: []const u8) !core.Value {
     if (std.mem.eql(u8, trimmed, "true")) return .{ .int = 1 };
     if (std.mem.eql(u8, trimmed, "false")) return .{ .int = 0 };
     if (trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = trimmed };
+    if (isSupportedConstantExpr(trimmed)) return .{ .constant_expr = trimmed };
     if (trimmed[0] == '%') {
         if (trimmed.len == 1) return error.InvalidValueName;
         return .{ .named = trimmed[1..] };
@@ -1856,6 +1972,11 @@ fn parseValue(text: []const u8) !core.Value {
     }
     if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
     return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
+}
+
+fn isSupportedConstantExpr(text: []const u8) bool {
+    return (std.mem.startsWith(u8, text, "inttoptr (") or std.mem.startsWith(u8, text, "ptrtoint (")) and
+        std.mem.endsWith(u8, text, ")");
 }
 
 fn isFpLiteral(text: []const u8) bool {

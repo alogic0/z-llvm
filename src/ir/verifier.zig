@@ -78,6 +78,10 @@ const VerifyContext = struct {
                     try ctx.addEdge(block_index, condbr.then_target);
                     try ctx.addEdge(block_index, condbr.else_target);
                 },
+                .@"switch" => |switch_term| {
+                    try ctx.addEdge(block_index, switch_term.default_target);
+                    for (switch_term.cases.items) |case| try ctx.addEdge(block_index, case.target);
+                },
             }
         }
     }
@@ -193,6 +197,7 @@ const VerifyContext = struct {
             .null_value => unreachable,
             .zero_initializer => return,
             .vector => |text| return verifyVectorLiteral(ty, text),
+            .constant_expr => |text| return verifyConstantExprValue(ty, text),
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -213,6 +218,7 @@ const VerifyContext = struct {
             .null_value => unreachable,
             .zero_initializer => return,
             .vector => |text| return verifyVectorLiteral(ty, text),
+            .constant_expr => |text| return verifyConstantExprValue(ty, text),
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -305,15 +311,15 @@ pub fn verify(module: core.Module) !void {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
                     .int, .undef => {},
-                    .named, .fp, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                    .named, .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
                     .undef, .null_value => {},
-                    .int, .fp, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                    .int, .fp, .named, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .aggregate => switch (value) {
                     .undef => {},
-                    .int, .fp, .named, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                    .int, .fp, .named, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .void, .float, .double, .metadata, .vector => return error.UnsupportedGlobalVariable,
             },
@@ -322,7 +328,7 @@ pub fn verify(module: core.Module) !void {
                 if (!array_ty.elem_ty.eql(array.elem_ty)) return error.UnsupportedGlobalVariable;
                 if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
                 for (array.values.items) |value| switch (value) {
-                    .int, .undef, .null_value, .zero_initializer, .vector => {},
+                    .int, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
                     .fp, .named => return error.UnsupportedGlobalVariable,
                 };
             },
@@ -537,6 +543,22 @@ pub fn verify(module: core.Module) !void {
                     try verifyBlockTarget(function, condbr.then_target);
                     try verifyBlockTarget(function, condbr.else_target);
                 },
+                .@"switch" => |switch_term| {
+                    switch (switch_term.cond_ty) {
+                        .int => {},
+                        else => return error.SwitchConditionTypeMismatch,
+                    }
+                    try ctx.verifyValue(switch_term.cond_ty, switch_term.cond, block_index, block.instructions.items.len);
+                    try verifyBlockTarget(function, switch_term.default_target);
+                    for (switch_term.cases.items) |case| {
+                        if (!case.value_ty.eql(switch_term.cond_ty)) return error.SwitchCaseTypeMismatch;
+                        switch (case.value) {
+                            .int => {},
+                            else => return error.InvalidSwitch,
+                        }
+                        try verifyBlockTarget(function, case.target);
+                    }
+                },
                 .@"unreachable" => {},
             }
         }
@@ -572,6 +594,7 @@ fn verifyMetadataGraph(module: core.Module) !void {
             if (block.terminator) |terminator| switch (terminator) {
                 .br => |br| if (br.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
                 .condbr => |condbr| if (condbr.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
+                .@"switch" => |switch_term| if (switch_term.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
                 .ret, .@"unreachable" => {},
             };
         }
@@ -865,6 +888,48 @@ fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !vo
     }
 }
 
+fn verifyConstantExprValue(ty: core.Type, text: []const u8) !void {
+    if (std.mem.startsWith(u8, text, "inttoptr (")) {
+        if (ty != .ptr) return error.TypeMismatch;
+        const body = text["inttoptr (".len .. text.len - 1];
+        const cast = try parseConstantExprCastBody(body);
+        switch (cast.from_ty) {
+            .int => {},
+            else => return error.InvalidCast,
+        }
+        if (cast.to_ty != .ptr) return error.InvalidCast;
+        return;
+    }
+    if (std.mem.startsWith(u8, text, "ptrtoint (")) {
+        switch (ty) {
+            .int => {},
+            else => return error.TypeMismatch,
+        }
+        const body = text["ptrtoint (".len .. text.len - 1];
+        const cast = try parseConstantExprCastBody(body);
+        if (cast.from_ty != .ptr) return error.InvalidCast;
+        if (!cast.to_ty.eql(ty)) return error.InvalidCast;
+        return;
+    }
+    return error.UnsupportedConstantExpr;
+}
+
+const ConstantExprCastBody = struct {
+    from_ty: core.Type,
+    to_ty: core.Type,
+};
+
+fn parseConstantExprCastBody(body: []const u8) !ConstantExprCastBody {
+    const to_index = std.mem.lastIndexOf(u8, body, " to ") orelse return error.InvalidCast;
+    const source_text = std.mem.trim(u8, body[0..to_index], " \t");
+    const to_ty = try parseType(std.mem.trim(u8, body[to_index + " to ".len ..], " \t"));
+    const from_ty_end = std.mem.indexOfAny(u8, source_text, " \t") orelse return error.InvalidCast;
+    return .{
+        .from_ty = try parseType(source_text[0..from_ty_end]),
+        .to_ty = to_ty,
+    };
+}
+
 fn findDeclaration(module: core.Module, name: []const u8) ?core.FunctionDecl {
     for (module.declarations.items) |decl| {
         if (std.mem.eql(u8, decl.name, name)) return decl;
@@ -978,7 +1043,7 @@ fn verifyLaneIndex(vector_ty: core.Type, index_ty: core.Type, index: core.Value)
     switch (index) {
         .int => |lane| if (lane < 0 or lane >= vector_ty.vector.len) return error.TypeMismatch,
         .named, .undef => {},
-        .fp, .null_value, .zero_initializer, .vector => return error.TypeMismatch,
+        .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.TypeMismatch,
     }
 }
 
@@ -991,7 +1056,7 @@ fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value)
     switch (mask) {
         .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
         .undef, .zero_initializer => {},
-        .named, .int, .fp, .null_value => return error.TypeMismatch,
+        .named, .int, .fp, .null_value, .constant_expr => return error.TypeMismatch,
     }
 }
 
@@ -1123,6 +1188,26 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
 }
 
 fn verifyCast(cast: core.CastInst) !void {
+    switch (cast.op) {
+        .ptrtoint => {
+            if (cast.from_ty != .ptr) return error.InvalidCast;
+            switch (cast.to_ty) {
+                .int => {},
+                else => return error.InvalidCast,
+            }
+            return;
+        },
+        .inttoptr => {
+            switch (cast.from_ty) {
+                .int => {},
+                else => return error.InvalidCast,
+            }
+            if (cast.to_ty != .ptr) return error.InvalidCast;
+            return;
+        },
+        .trunc, .zext, .sext => {},
+    }
+
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
         .void, .float, .double, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
@@ -1134,6 +1219,7 @@ fn verifyCast(cast: core.CastInst) !void {
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
+        .ptrtoint, .inttoptr => unreachable,
     }
 }
 

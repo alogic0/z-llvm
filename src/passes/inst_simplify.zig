@@ -53,6 +53,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
+                a_icmp.samesign == b_icmp.samesign and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
@@ -236,13 +237,14 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
         .trunc => truncateConstant(cast.value.int, to_bits),
         .zext => zeroExtendConstant(cast.value.int, from_bits),
         .sext => signExtendConstant(cast.value.int, from_bits),
+        .ptrtoint, .inttoptr => null,
     };
 }
 
 fn simplifyFreeze(freeze: ir.FreezeInst) ?ir.Value {
     return switch (freeze.value) {
         .int => freeze.value,
-        .named, .fp, .undef, .null_value, .zero_initializer, .vector => null,
+        .named, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
 }
 
@@ -271,6 +273,7 @@ fn lowBits(value: i128, bits: u16) i128 {
 }
 
 fn simplifyIcmp(icmp: ir.IcmpInst) ?ir.Value {
+    if (icmp.samesign) return null;
     if (icmp.lhs == .int and icmp.rhs == .int) {
         return simplifyIcmpConstants(icmp);
     }

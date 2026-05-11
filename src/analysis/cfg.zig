@@ -34,6 +34,10 @@ pub const Graph = struct {
                     try graph.addEdge(function, block_index, condbr.then_target);
                     try graph.addEdge(function, block_index, condbr.else_target);
                 },
+                .@"switch" => |switch_term| {
+                    try graph.addEdge(function, block_index, switch_term.default_target);
+                    for (switch_term.cases.items) |case| try graph.addEdge(function, block_index, case.target);
+                },
             }
         }
 

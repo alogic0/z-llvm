@@ -33,7 +33,7 @@ const Lattice = union(enum) {
             .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
             .null_value => .overdefined,
-            .zero_initializer, .vector => .overdefined,
+            .zero_initializer, .vector, .constant_expr => .overdefined,
             .named => .overdefined,
         };
     }
@@ -192,6 +192,12 @@ const Solver = struct {
                         changed = true;
                     }
                 },
+                .@"switch" => |*switch_term| {
+                    switch_term.cond = resolveValue(aliases, switch_term.cond);
+                    for (switch_term.cases.items) |*case| {
+                        case.value = resolveValue(aliases, case.value);
+                    }
+                },
             };
         }
 
@@ -306,6 +312,13 @@ const Solver = struct {
                         (try solver.markEdge(block_index, else_index)),
                 };
             },
+            .@"switch" => |switch_term| {
+                var changed = try solver.markEdge(block_index, solver.function.blockIndex(switch_term.default_target) orelse return false);
+                for (switch_term.cases.items) |case| {
+                    changed = (try solver.markEdge(block_index, solver.function.blockIndex(case.target) orelse return false)) or changed;
+                }
+                return changed;
+            },
             .ret, .@"unreachable" => return false,
         }
     }
@@ -339,7 +352,7 @@ const Solver = struct {
             .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
             .null_value => .overdefined,
-            .zero_initializer, .vector => .overdefined,
+            .zero_initializer, .vector, .constant_expr => .overdefined,
             .named => |name| solver.values.get(name) orelse .unknown,
         };
     }
@@ -407,7 +420,7 @@ fn simplifyCall(module: ir.Module, instruction: ir.Instruction) ?ir.Value {
     if (block.instructions.items.len != 0) return null;
     return switch (block.terminator orelse return null) {
         .ret => |ret| ret.value,
-        .br, .condbr, .@"unreachable" => null,
+        .br, .condbr, .@"switch", .@"unreachable" => null,
     };
 }
 
@@ -420,7 +433,7 @@ fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

@@ -146,8 +146,7 @@ indirect call
 call attributes beyond the supported calling convention spelling
 inline asm lowering and constraint validation
 invoke/callbr
-bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
-switch
+bitcast/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad and
 personality functions
 atomic optimization semantics
@@ -238,6 +237,7 @@ UnsupportedGlobalVariable
 InvalidGlobalVariable
 InvalidFunctionDeclaration
 InvalidCall
+InvalidSwitch
 UnsupportedIndirectCall
 UnsupportedCallAttribute
 UnsupportedInstrumentationCall

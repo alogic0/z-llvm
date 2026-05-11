@@ -29,6 +29,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
         .icmp => |icmp| {
             state.addTag(3);
             state.addTag(@intFromEnum(icmp.predicate));
+            state.addBool(icmp.samesign);
             state.addType(icmp.operand_ty);
             state.addValue(icmp.lhs);
             state.addValue(icmp.rhs);
@@ -70,6 +71,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
             if (call.tail_kind) |tail_kind| state.addBytes(tail_kind);
             for (call.args.items) |arg| {
                 state.addType(arg.ty);
+                if (arg.attrs) |attrs| state.addBytes(attrs);
                 state.addValue(arg.value);
             }
         },
@@ -99,6 +101,7 @@ pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
+                a_icmp.samesign == b_icmp.samesign and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
@@ -179,6 +182,7 @@ pub fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction)
     if (a_call.args.items.len != b_call.args.items.len) return false;
     for (a_call.args.items, b_call.args.items) |a_arg, b_arg| {
         if (!a_arg.ty.eql(b_arg.ty)) return false;
+        if (!sameOptionalText(a_arg.attrs, b_arg.attrs)) return false;
         if (!a_arg.value.eql(b_arg.value)) return false;
     }
     return true;
@@ -279,6 +283,10 @@ const HashState = struct {
             .zero_initializer => state.addTag(6),
             .vector => |text| {
                 state.addTag(7);
+                state.addBytes(text);
+            },
+            .constant_expr => |text| {
+                state.addTag(8);
                 state.addBytes(text);
             },
         }

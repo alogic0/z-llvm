@@ -217,12 +217,19 @@ fn terminatorUsesValue(terminator: ir.Terminator, result: []const u8) bool {
         .ret => |ret| if (ret.value) |value| valueMatchesName(value, result) else false,
         .br, .@"unreachable" => false,
         .condbr => |condbr| valueMatchesName(condbr.cond, result),
+        .@"switch" => |switch_term| {
+            if (valueMatchesName(switch_term.cond, result)) return true;
+            for (switch_term.cases.items) |case| {
+                if (valueMatchesName(case.value, result)) return true;
+            }
+            return false;
+        },
     };
 }
 
 fn valueMatchesName(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

@@ -29,6 +29,18 @@ pub fn retargetBlockTerminator(block: *ir.BasicBlock, old_target: []const u8, ne
                 changed = true;
             }
         },
+        .@"switch" => |*switch_term| {
+            if (std.mem.eql(u8, switch_term.default_target, old_target)) {
+                switch_term.default_target = new_target;
+                changed = true;
+            }
+            for (switch_term.cases.items) |*case| {
+                if (std.mem.eql(u8, case.target, old_target)) {
+                    case.target = new_target;
+                    changed = true;
+                }
+            }
+        },
         .ret => {},
         .@"unreachable" => {},
     };

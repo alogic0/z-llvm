@@ -183,7 +183,7 @@ fn lowerStraightLineReturn(
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);
         },
-        .br, .condbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+        .br, .condbr, .@"switch", .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
 }
 
@@ -208,7 +208,7 @@ fn lowerSingleStackSlotCallReturn(
     const call_result = call_inst.result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     if (!std.mem.eql(u8, call_result, ret_name)) return false;
 
@@ -278,7 +278,7 @@ fn lowerSingleStackSlotReturn(
     const load_result = load_inst.result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     if (!std.mem.eql(u8, load_result, ret_name)) return false;
 
@@ -404,7 +404,7 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
 
     const cond_name = switch (condbr.cond) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
     const cond_reg = try paramReg(function, cond_name, .{ .int = 1 });
     const then_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
@@ -451,7 +451,7 @@ fn lowerReturnValue(
 ) !void {
     switch (value) {
         .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
-        .fp, .undef, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         .named => |name| {
             if (try paramRegOrNull(function, name, .{ .int = 32 })) |reg| {
                 try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
@@ -483,7 +483,7 @@ fn lowerReturnValueAfterCalls(
     call_count: usize,
 ) !void {
     switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return lowerReturnValue(allocator, machine, function, block, value),
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return lowerReturnValue(allocator, machine, function, block, value),
         .named => |name| {
             if (call_count == 0) return lowerReturnValue(allocator, machine, function, block, value);
             if (last_eax_value) |eax_name| {
@@ -548,7 +548,7 @@ fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction
     }
     if (block.terminator) |terminator| switch (terminator) {
         .ret => |ret| if (ret.value) |value| try noteLiveValue(function, value, &live),
-        .br, .condbr, .@"unreachable" => {},
+        .br, .condbr, .@"switch", .@"unreachable" => {},
     };
     return live;
 }
@@ -602,7 +602,7 @@ fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?Ar
 fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
     const name = switch (value) {
         .named => |name| name,
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => return,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return,
     };
     const reg = try paramRegOrNull(function, name, .{ .int = 32 }) orelse return;
     if (live.*) |existing| {
@@ -615,7 +615,7 @@ fn noteLiveValue(function: ir.Function, value: ir.Value, live: *?ArgReg) !void {
 fn isNamed(value: ir.Value, name: []const u8) bool {
     return switch (value) {
         .named => |value_name| std.mem.eql(u8, value_name, name),
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }
 
@@ -638,7 +638,7 @@ fn findInstruction(block: ir.BasicBlock, result_name: []const u8) ?ir.Instructio
 fn paramValueReg(function: ir.Function, value: ir.Value, ty: ir.Type) !ArgReg {
     return switch (value) {
         .named => |name| try paramReg(function, name, ty),
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => error.UnsupportedCodegenValue,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
     };
 }
 

@@ -90,7 +90,7 @@ pub const NaturalLoop = struct {
                 const target = function.blockIndex(br.target) orelse return null;
                 return if (target == loop.header) preheader_index else null;
             },
-            .ret, .condbr, .@"unreachable" => return null,
+            .ret, .condbr, .@"switch", .@"unreachable" => return null,
         }
     }
 
@@ -167,7 +167,7 @@ pub const NaturalLoop = struct {
 
     pub fn isLoopInvariantValue(loop: NaturalLoop, value: ir.Value, def_blocks: std.StringHashMap(usize)) bool {
         return switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector => true,
+            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => true,
             .named => |name| {
                 const block = def_blocks.get(name) orelse return false;
                 if (block == std.math.maxInt(usize)) return true;
@@ -389,6 +389,13 @@ fn terminatorUsesValue(terminator: ir.Terminator, value_name: []const u8) bool {
         .ret => |ret| if (ret.value) |value| valueMatchesName(value, value_name) else false,
         .br, .@"unreachable" => false,
         .condbr => |condbr| valueMatchesName(condbr.cond, value_name),
+        .@"switch" => |switch_term| {
+            if (valueMatchesName(switch_term.cond, value_name)) return true;
+            for (switch_term.cases.items) |case| {
+                if (valueMatchesName(case.value, value_name)) return true;
+            }
+            return false;
+        },
     };
 }
 
@@ -449,6 +456,12 @@ fn replaceTerminatorUse(terminator: *ir.Terminator, value_name: []const u8, repl
         },
         .br, .@"unreachable" => {},
         .condbr => |*condbr| condbr.cond = replaceValue(condbr.cond, value_name, replacement),
+        .@"switch" => |*switch_term| {
+            switch_term.cond = replaceValue(switch_term.cond, value_name, replacement);
+            for (switch_term.cases.items) |*case| {
+                case.value = replaceValue(case.value, value_name, replacement);
+            }
+        },
     }
 }
 
@@ -470,7 +483,7 @@ fn classifyInductionIncoming(loop: NaturalLoop, function: ir.Function, phi: ir.P
         if (incoming_block == loop.latch) {
             latch_value = switch (incoming.value) {
                 .named => |name| name,
-                .int, .fp, .undef, .null_value, .zero_initializer, .vector => return null,
+                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             };
         } else if (incoming_block != loop.latch) {
             if (initial_value != null) return null;
@@ -504,7 +517,7 @@ fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, ne
 
 fn valueMatchesName(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }
@@ -560,6 +573,13 @@ fn terminatorUsesLoopDefinition(terminator: ir.Terminator, loop_defs: std.String
         .ret => |ret| if (ret.value) |value| valueNamesLoopDefinition(value, loop_defs) else false,
         .br, .@"unreachable" => false,
         .condbr => |condbr| valueNamesLoopDefinition(condbr.cond, loop_defs),
+        .@"switch" => |switch_term| {
+            if (valueNamesLoopDefinition(switch_term.cond, loop_defs)) return true;
+            for (switch_term.cases.items) |case| {
+                if (valueNamesLoopDefinition(case.value, loop_defs)) return true;
+            }
+            return false;
+        },
     };
 }
 
@@ -572,7 +592,7 @@ fn valuesUseLoopDefinition(loop_defs: std.StringHashMap(void), values: []const i
 
 fn valueNamesLoopDefinition(value: ir.Value, loop_defs: std.StringHashMap(void)) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |name| loop_defs.contains(name),
     };
 }

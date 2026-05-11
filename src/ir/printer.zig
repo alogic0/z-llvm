@@ -126,7 +126,9 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .icmp => |icmp| {
-                        try writer.print("icmp {s} ", .{icmp.predicate.name()});
+                        try writer.writeAll("icmp ");
+                        if (icmp.samesign) try writer.writeAll("samesign ");
+                        try writer.print("{s} ", .{icmp.predicate.name()});
                         try icmp.operand_ty.format(writer);
                         try writer.writeByte(' ');
                         try icmp.lhs.format(writer);
@@ -309,6 +311,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             for (call.args.items, 0..) |arg, index| {
                                 if (index != 0) try writer.writeAll(", ");
                                 try arg.ty.format(writer);
+                                if (arg.attrs) |attrs| try writer.print(" {s}", .{attrs});
                                 try writer.writeByte(' ');
                                 try arg.value.format(writer);
                             }
@@ -341,6 +344,23 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     try condbr.cond.format(writer);
                     try writer.print(", label %{s}, label %{s}", .{ condbr.then_target, condbr.else_target });
                     if (condbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    try writer.writeByte('\n');
+                },
+                .@"switch" => |switch_term| {
+                    try writer.writeAll("  switch ");
+                    try switch_term.cond_ty.format(writer);
+                    try writer.writeByte(' ');
+                    try switch_term.cond.format(writer);
+                    try writer.print(", label %{s} [\n", .{switch_term.default_target});
+                    for (switch_term.cases.items) |case| {
+                        try writer.writeAll("    ");
+                        try case.value_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try case.value.format(writer);
+                        try writer.print(", label %{s}\n", .{case.target});
+                    }
+                    try writer.writeAll("  ]");
+                    if (switch_term.metadata) |metadata| try writer.print(", {s}", .{metadata});
                     try writer.writeByte('\n');
                 },
                 .@"unreachable" => try writer.writeAll("  unreachable\n"),

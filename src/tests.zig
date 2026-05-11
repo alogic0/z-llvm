@@ -1341,6 +1341,182 @@ test "parser preserves pointer ABI parameter attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves call argument attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_ptrs(ptr, ptr)
+        \\
+        \\define void @caller(ptr %p, ptr %q) {
+        \\entry:
+        \\  call void @takes_ptrs(ptr nonnull %p, ptr nonnull readonly align 1 dereferenceable(1) %q)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("nonnull", call.args.items[0].attrs.?);
+    try std.testing.expectEqualStrings("nonnull readonly align 1 dereferenceable(1)", call.args.items[1].attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves inline asm call argument attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @target() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\define void @caller() {
+        \\entry:
+        \\  tail call void asm sideeffect "", "X,X,~{dirflag},~{fpsr},~{flags}"(ptr nonnull @caller, ptr nonnull @target) #0
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[1].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("nonnull", call.args.items[0].attrs.?);
+    try std.testing.expectEqualStrings("nonnull", call.args.items[1].attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves switch terminators" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @select_switch(i32 %tag) {
+        \\entry:
+        \\  switch i32 %tag, label %default [
+        \\    i32 0, label %zero
+        \\    i32 7, label %seven
+        \\  ]
+        \\zero:
+        \\  ret i32 10
+        \\seven:
+        \\  ret i32 17
+        \\default:
+        \\  ret i32 99
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const switch_term = module.functions.items[0].blocks.items[0].terminator.?.@"switch";
+    try std.testing.expectEqualStrings("default", switch_term.default_target);
+    try std.testing.expectEqual(@as(usize, 2), switch_term.cases.items.len);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser and verifier accept pointer integer casts" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define ptr @as_ptr(i64 %addr) {
+        \\entry:
+        \\  %p = inttoptr i64 %addr to ptr
+        \\  ret ptr %p
+        \\}
+        \\
+        \\define i64 @as_int(ptr %p) {
+        \\entry:
+        \\  %addr = ptrtoint ptr %p to i64
+        \\  ret i64 %addr
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves pointer cast constant expressions in phis" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define ptr @constant_expr_phi(i1 %cond) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %merge
+        \\then:
+        \\  br label %merge
+        \\merge:
+        \\  %p = phi ptr [ inttoptr (i64 1 to ptr), %entry ], [ null, %then ]
+        \\  ret ptr %p
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves icmp samesign flag" {
+    const input =
+        \\define i1 @cmp(i64 %a, i64 %b) {
+        \\entry:
+        \\  %r = icmp samesign ult i64 %a, %b
+        \\  ret i1 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cmp = module.functions.items[0].blocks.items[0].instructions.items[0].kind.icmp;
+    try std.testing.expect(cmp.samesign);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier rejects invalid ABI parameter attributes" {
     const byval_non_pointer =
         \\declare void @bad(i32 byval({ i32 }))
