@@ -36,7 +36,8 @@ it.
 - Added explicit parser rejection for `fence` and inline asm calls, plus unit
   coverage for `cmpxchg`.
 - Added `memory_atomic_barrier_reject` to the opt fixture table as a
-  local-conservative DCE barrier fixture. Other pass coverage remains unit-level
-  or policy-level until dedicated pass-specific atomic fixtures are needed.
+  local-conservative DCE barrier fixture. The later atomic fixture closure cycle
+  added pass-specific local-conservative fixtures for ADCE, GVN, EarlyCSE,
+  LICM, and DSE.
 - Inline asm remains rejected rather than modeled as an unknown call because
   constraints and memory clobbers are not represented yet.

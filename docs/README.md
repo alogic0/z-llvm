@@ -81,7 +81,7 @@ completed foundation epics
 - [x] [Cycle 1: TLS Concurrency Acceptance](roadmap/01_tls_concurrency_acceptance_cycle.md)
 - [x] [Cycle 2: Switch Table Global Constants](roadmap/02_switch_table_global_constants_cycle.md)
 - [x] [Cycle 3: Float IR Surface](roadmap/03_float_ir_surface_cycle.md)
-- [ ] [Cycle 4: Atomic And Inline-Asm Fixture Closure](roadmap/04_atomic_inline_asm_fixture_closure_cycle.md)
+- [x] [Cycle 4: Atomic And Inline-Asm Fixture Closure](roadmap/04_atomic_inline_asm_fixture_closure_cycle.md)
 - [ ] [Cycle 5: Corpus Capture Automation](roadmap/05_corpus_capture_automation_cycle.md)
 - [ ] [Cycle 6: Next Source-Backed Fixture Wave](roadmap/06_next_source_backed_fixture_wave_cycle.md)
 

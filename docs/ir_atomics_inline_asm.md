@@ -44,14 +44,23 @@ Mem2Reg/SROA: local atomic alloca users are rejected conservatively.
 ```text
 local-only conservative opt fixture:
   memory_atomic_barrier_reject
+  adce_atomic_barrier_reject
+  gvn_atomic_load_barrier_reject
+  early_cse_atomic_load_barrier_reject
+  licm_atomic_store_barrier_reject
+  dse_atomic_store_barrier_reject
 
 unit tests:
   atomic load/store parse/print preservation
   atomicrmw, cmpxchg, fence, and inline asm rejection
   memory-effect barrier classification
-  DCE atomic barrier preservation
+  DCE/ADCE/GVN/EarlyCSE/LICM/DSE atomic barrier preservation
   Mem2Reg atomic alloca-user rejection
 ```
+
+Inline asm has no opt fixture because the parser rejects `call asm` before any
+optimizer pass can see it. That is intentional until constraints, side-effect
+flags, and memory clobbers are represented.
 
 ## Upstream Mapping
 
