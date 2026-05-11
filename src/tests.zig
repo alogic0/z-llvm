@@ -1201,6 +1201,34 @@ test "parser preserves function declarations and direct calls" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves tail direct calls" {
+    const input =
+        \\declare i32 @llvm.smin.i32(i32, i32) #0
+        \\
+        \\define i32 @caller(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = tail call i32 @llvm.smin.i32(i32 %a, i32 %b)
+        \\  ret i32 %r
+        \\}
+        \\
+        \\attributes #0 = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("tail", call.tail_kind.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves raw module metadata records" {
     const input =
         \\define i32 @with_metadata(i32 %a) {
@@ -1390,6 +1418,77 @@ test "function attributes classify direct call memory effects conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
     try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
+}
+
+test "function attributes resolve attribute groups for call memory effects" {
+    const input =
+        \\declare i32 @pure(i32) #0
+        \\declare i32 @reads(ptr) #1
+        \\
+        \\define i32 @caller(ptr %p, i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  %y = call i32 @reads(ptr %p)
+        \\  ret i32 %x
+        \\}
+        \\
+        \\attributes #0 = { nofree nosync nounwind willreturn memory(none) }
+        \\attributes #1 = { nofree nosync nounwind willreturn memory(read) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const block = module.functions.items[0].blocks.items[0];
+
+    const pure_call = block.instructions.items[0].kind.call;
+    const readonly_call = block.instructions.items[1].kind.call;
+
+    try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
+    try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
+}
+
+test "instcombine folds integer minmax intrinsics for same operands" {
+    const input =
+        \\declare i32 @llvm.smin.i32(i32, i32) #0
+        \\
+        \\define i32 @same_min(i32 %a) {
+        \\entry:
+        \\  %r = tail call i32 @llvm.smin.i32(i32 %a, i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+        \\attributes #0 = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "instcombine,dce");
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var trace_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer trace_output.deinit();
+    _ = try pm.run(&module, &context, &trace_output.writer, false);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\declare i32 @llvm.smin.i32(i32, i32) #0
+        \\
+        \\define i32 @same_min(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\attributes #0 = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
 test "globaldce removes unreferenced local functions and globals" {
@@ -1592,7 +1691,7 @@ test "verifier rejects invalid memory alignment" {
     try std.testing.expectError(error.InvalidAlignment, module.verify());
 }
 
-test "parser rejects unsupported indirect and control-flow calls" {
+test "parser rejects unsupported indirect and control-flow call forms" {
     const indirect =
         \\define i32 @caller(ptr %fn, i32 %a) {
         \\entry:
@@ -1603,15 +1702,15 @@ test "parser rejects unsupported indirect and control-flow calls" {
     ;
     try std.testing.expectError(error.UnsupportedIndirectCall, ir.Module.parse(std.testing.allocator, indirect));
 
-    const tail =
+    const musttail =
         \\define i32 @caller(i32 %a) {
         \\entry:
-        \\  %r = tail call i32 @callee(i32 %a)
+        \\  %r = musttail call i32 @callee(i32 %a)
         \\  ret i32 %r
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedCallAttribute, ir.Module.parse(std.testing.allocator, tail));
+    try std.testing.expectError(error.UnsupportedCallAttribute, ir.Module.parse(std.testing.allocator, musttail));
 
     const invoke =
         \\define i32 @caller(i32 %a) {

@@ -17,25 +17,38 @@ unsupported intrinsics conservative.
 
 ## Plan
 
-- [ ] Inventory Zig-emitted `llvm.*` calls in captured corpus files.
-- [ ] Add direct parsing/classification for `llvm.smin.*` and neighboring
+- [x] Inventory Zig-emitted `llvm.*` calls in captured corpus files.
+- [x] Add direct parsing/classification for `llvm.smin.*` and neighboring
       integer min/max intrinsics needed by integer fixtures.
 - [ ] Add conservative parsing for `llvm.assume` as a side-effect boundary or
       documented no-op only where legal.
-- [ ] Classify readnone, readonly, argmemonly, nounwind, willreturn, and
+- [x] Classify readnone, readonly, argmemonly, nounwind, willreturn, and
       similar attrs through one call-effect API.
-- [ ] Add InstCombine/SCCP folds only for intrinsic cases with source-backed
+- [x] Add InstCombine/SCCP folds only for intrinsic cases with source-backed
       tests and `opt-22` comparisons.
 - [ ] Preserve unsupported intrinsics as calls when possible; reject only when
       syntax cannot be represented.
-- [ ] Promote the integer corpus row from unsupported to accepted when parser
+- [x] Promote the integer corpus row from unsupported to accepted when parser
       and intrinsic semantics are sufficient.
 
 ## Exit Criteria
 
-- [ ] Integer captured IR has an accepted reduced or raw corpus path.
-- [ ] Intrinsic side effects are documented and tested.
-- [ ] Unknown intrinsics remain conservative.
-- [ ] `zig build test`, `bash scripts/compare_opt.sh`, and
+- [x] Integer captured IR has an accepted reduced or raw corpus path.
+- [x] Intrinsic side effects are documented and tested.
+- [x] Unknown intrinsics remain conservative.
+- [x] `zig build test`, `bash scripts/compare_opt.sh`, and
       `bash scripts/run_zig_corpus.sh` pass.
 
+## Completed Slice 1: Integer Min/Max Intrinsics
+
+- Preserved `tail call` for direct calls while keeping `musttail` and `notail`
+  rejected.
+- Resolved attribute group references for call memory-effect classification.
+- Added conservative no-memory/read-only classification for `memory(none)`,
+  `memory(read)`, `readnone`, and `readonly`.
+- Added `llvm.smin.*`, `llvm.smax.*`, `llvm.umin.*`, and `llvm.umax.*`
+  same-operand and constant folds through `inst_simplify`, shared by
+  InstCombine and SCCP.
+- Promoted `integers_release_fast` to `parse,verify,optimizer-input`.
+- Documented the slice in
+  `docs/semantics/intrinsics_and_call_semantics.md`.

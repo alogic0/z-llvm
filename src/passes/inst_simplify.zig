@@ -1,3 +1,4 @@
+const std = @import("std");
 const ir = @import("../ir.zig");
 
 pub fn canonicalizeCommutativeConstantRhs(binary: *ir.BinaryInst) bool {
@@ -17,7 +18,8 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .freeze => |freeze| simplifyFreeze(freeze),
         .icmp => |icmp| simplifyIcmp(icmp),
         .select => |select| simplifySelect(select),
-        .phi, .alloca, .load, .store, .gep, .call => null,
+        .call => |call| simplifyCall(call),
+        .phi, .alloca, .load, .store, .gep => null,
     };
 }
 
@@ -272,6 +274,52 @@ fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
 fn simplifySelect(select: ir.SelectInst) ?ir.Value {
     if (select.true_value.eql(select.false_value)) return select.true_value;
     if (select.cond == .int) return if (select.cond.int == 0) select.false_value else select.true_value;
+    return null;
+}
+
+fn simplifyCall(call: ir.CallInst) ?ir.Value {
+    if (call.args.items.len != 2) return null;
+    if (!isIntegerMinMaxIntrinsic(call.callee)) return null;
+    if (!call.ret_ty.eql(call.args.items[0].ty)) return null;
+    if (!call.ret_ty.eql(call.args.items[1].ty)) return null;
+
+    const lhs = call.args.items[0].value;
+    const rhs = call.args.items[1].value;
+    if (lhs.eql(rhs)) return lhs;
+    if (lhs != .int or rhs != .int) return null;
+
+    return switch (intrinsicMinMaxKind(call.callee) orelse return null) {
+        .smin => .{ .int = @min(lhs.int, rhs.int) },
+        .smax => .{ .int = @max(lhs.int, rhs.int) },
+        .umin => blk: {
+            const lhs_unsigned = unsignedInt(lhs.int, call.ret_ty) orelse return null;
+            const rhs_unsigned = unsignedInt(rhs.int, call.ret_ty) orelse return null;
+            break :blk if (lhs_unsigned <= rhs_unsigned) lhs else rhs;
+        },
+        .umax => blk: {
+            const lhs_unsigned = unsignedInt(lhs.int, call.ret_ty) orelse return null;
+            const rhs_unsigned = unsignedInt(rhs.int, call.ret_ty) orelse return null;
+            break :blk if (lhs_unsigned >= rhs_unsigned) lhs else rhs;
+        },
+    };
+}
+
+const MinMaxKind = enum {
+    smin,
+    smax,
+    umin,
+    umax,
+};
+
+fn isIntegerMinMaxIntrinsic(callee: []const u8) bool {
+    return intrinsicMinMaxKind(callee) != null;
+}
+
+fn intrinsicMinMaxKind(callee: []const u8) ?MinMaxKind {
+    if (std.mem.startsWith(u8, callee, "llvm.smin.")) return .smin;
+    if (std.mem.startsWith(u8, callee, "llvm.smax.")) return .smax;
+    if (std.mem.startsWith(u8, callee, "llvm.umin.")) return .umin;
+    if (std.mem.startsWith(u8, callee, "llvm.umax.")) return .umax;
     return null;
 }
 

@@ -248,7 +248,12 @@ const Solver = struct {
                     },
                 }
             },
-            .phi, .alloca, .load, .store, .gep, .call => {},
+            .call => |*call| {
+                for (call.args.items) |*arg| {
+                    arg.value = solver.materialize(arg.value, unresolved, overdefined);
+                }
+            },
+            .phi, .alloca, .load, .store, .gep => {},
         }
     }
 

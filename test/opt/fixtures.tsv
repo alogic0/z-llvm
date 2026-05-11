@@ -6,6 +6,7 @@ instcombine_commute	instcombine	instcombine	test/opt/inputs/instcombine_commute.
 instcombine_scalar_simplify	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_scalar_simplify.ll	test/opt/expected/z_llvm/instcombine_scalar_simplify.ll	opt-equivalent	instcombine,dce	scalar cast and defined div-rem constant folding
 instcombine_cast_bitpatterns	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_cast_bitpatterns.ll	test/opt/expected/z_llvm/instcombine_cast_bitpatterns.ll	opt-equivalent	instcombine,dce	width-aware zext and sext constant bitpattern folding
 instcombine_safe_scalar	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_safe_scalar.ll	test/opt/expected/z_llvm/instcombine_safe_scalar.ll	opt-equivalent	instcombine,dce	safe variable div-rem identities and freeze constant folding
+instcombine_intrinsic_minmax	instcombine,dce	instcombine,dce	test/opt/inputs/instcombine_intrinsic_minmax.ll	test/opt/expected/z_llvm/instcombine_intrinsic_minmax.ll	opt-equivalent	instcombine,dce	integer min/max intrinsic same-operand folding
 select_fold	instcombine,dce	instcombine,dce	test/opt/inputs/select_fold.ll	test/opt/expected/z_llvm/select_fold.ll	opt-equivalent	instcombine,dce	select constant and identical-arm folding
 scalar_ir_surface	dce	dce	test/opt/inputs/scalar_ir_surface.ll	test/opt/expected/z_llvm/scalar_ir_surface.ll	opt-equivalent	dce	scalar casts div rem flags and freeze round-trip
 dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	opt-equivalent	dce	generic LLVM headers only

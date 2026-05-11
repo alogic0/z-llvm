@@ -384,7 +384,8 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
 fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
     if (std.mem.startsWith(u8, line, "store ")) return parseStore(line);
     if (std.mem.startsWith(u8, line, "call ")) return parseCall(allocator, null, line);
-    if (std.mem.startsWith(u8, line, "tail ") or std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, line, "tail ")) return parseCall(allocator, null, line);
+    if (std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return error.UnsupportedCallAttribute;
     if (std.mem.startsWith(u8, line, "invoke ") or std.mem.startsWith(u8, line, "callbr ")) return error.UnsupportedCallTerminator;
 
     const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidInstruction;
@@ -393,7 +394,8 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
     if (std.mem.startsWith(u8, rhs_text, "call ")) return parseCall(allocator, result_text[1..], rhs_text);
-    if (std.mem.startsWith(u8, rhs_text, "tail ") or std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, rhs_text, "tail ")) return parseCall(allocator, result_text[1..], rhs_text);
+    if (std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return error.UnsupportedCallAttribute;
     if (std.mem.startsWith(u8, rhs_text, "invoke ") or std.mem.startsWith(u8, rhs_text, "callbr ")) return error.UnsupportedCallTerminator;
     if (std.mem.startsWith(u8, rhs_text, "phi ")) {
         return .{
@@ -573,7 +575,14 @@ fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
 }
 
 fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8) !core.Instruction {
-    var rest = std.mem.trim(u8, text["call ".len..], " \t");
+    var call_text = std.mem.trim(u8, text, " \t");
+    const tail_kind: ?[]const u8 = if (std.mem.startsWith(u8, call_text, "tail ")) blk: {
+        call_text = std.mem.trim(u8, call_text["tail ".len..], " \t");
+        break :blk "tail";
+    } else null;
+    if (!std.mem.startsWith(u8, call_text, "call ")) return error.InvalidCall;
+
+    var rest = std.mem.trim(u8, call_text["call ".len..], " \t");
     var prefix_parts = std.mem.tokenizeAny(u8, rest, " \t");
     var token = prefix_parts.next() orelse return error.InvalidCall;
 
@@ -600,6 +609,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .ret_ty = ret_ty,
         .callee = callee_text[1..],
         .calling_conv = calling_conv,
+        .tail_kind = tail_kind,
         .args = .empty,
     };
     errdefer call.deinit(allocator);

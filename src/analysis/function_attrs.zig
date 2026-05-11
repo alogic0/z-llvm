@@ -5,22 +5,42 @@ const memory_effect = @import("memory_effect.zig");
 pub const AttributeSet = struct {
     readnone: bool = false,
     readonly: bool = false,
+    argmemonly: bool = false,
     nounwind: bool = false,
+    willreturn: bool = false,
     @"noinline": bool = false,
     alwaysinline: bool = false,
     cold: bool = false,
 
+    pub fn merge(attrs: *AttributeSet, other: AttributeSet) void {
+        attrs.readnone = attrs.readnone or other.readnone;
+        attrs.readonly = attrs.readonly or other.readonly;
+        attrs.argmemonly = attrs.argmemonly or other.argmemonly;
+        attrs.nounwind = attrs.nounwind or other.nounwind;
+        attrs.willreturn = attrs.willreturn or other.willreturn;
+        attrs.@"noinline" = attrs.@"noinline" or other.@"noinline";
+        attrs.alwaysinline = attrs.alwaysinline or other.alwaysinline;
+        attrs.cold = attrs.cold or other.cold;
+    }
+
     pub fn fromText(text: ?[]const u8) AttributeSet {
         var attrs: AttributeSet = .{};
         const attr_text = text orelse return attrs;
+        if (std.mem.indexOf(u8, attr_text, "memory(none)") != null) attrs.readnone = true;
+        if (std.mem.indexOf(u8, attr_text, "memory(read)") != null) attrs.readonly = true;
+        if (std.mem.indexOf(u8, attr_text, "memory(argmem: read)") != null) attrs.readonly = true;
         var it = std.mem.tokenizeAny(u8, attr_text, " \t,");
         while (it.next()) |token| {
             if (std.mem.eql(u8, token, "readnone")) {
                 attrs.readnone = true;
             } else if (std.mem.eql(u8, token, "readonly")) {
                 attrs.readonly = true;
+            } else if (std.mem.eql(u8, token, "argmemonly")) {
+                attrs.argmemonly = true;
             } else if (std.mem.eql(u8, token, "nounwind")) {
                 attrs.nounwind = true;
+            } else if (std.mem.eql(u8, token, "willreturn")) {
+                attrs.willreturn = true;
             } else if (std.mem.eql(u8, token, "noinline")) {
                 attrs.@"noinline" = true;
             } else if (std.mem.eql(u8, token, "alwaysinline")) {
@@ -50,10 +70,34 @@ pub fn callMemoryEffect(module: ir.Module, call: ir.CallInst) memory_effect.Effe
 
 fn calleeAttributes(module: ir.Module, name: []const u8) ?AttributeSet {
     for (module.functions.items) |function| {
-        if (std.mem.eql(u8, function.name, name)) return functionAttributes(function);
+        if (std.mem.eql(u8, function.name, name)) return attributesFromModuleText(module, function.attrs);
     }
     for (module.declarations.items) |decl| {
-        if (std.mem.eql(u8, decl.name, name)) return declarationAttributes(decl);
+        if (std.mem.eql(u8, decl.name, name)) return attributesFromModuleText(module, decl.attrs);
+    }
+    return null;
+}
+
+fn attributesFromModuleText(module: ir.Module, text: ?[]const u8) AttributeSet {
+    var attrs = AttributeSet.fromText(text);
+    const attr_text = text orelse return attrs;
+
+    var it = std.mem.tokenizeAny(u8, attr_text, " \t,");
+    while (it.next()) |token| {
+        if (!std.mem.startsWith(u8, token, "#")) continue;
+        const group_text = findAttributeGroup(module, token[1..]) orelse continue;
+        attrs.merge(AttributeSet.fromText(group_text));
+    }
+    return attrs;
+}
+
+fn findAttributeGroup(module: ir.Module, group_id: []const u8) ?[]const u8 {
+    for (module.attribute_groups.items) |group| {
+        var rest = std.mem.trim(u8, group["attributes ".len..], " \t");
+        if (!std.mem.startsWith(u8, rest, "#")) continue;
+        rest = rest[1..];
+        const id_end = std.mem.indexOfAny(u8, rest, " \t") orelse continue;
+        if (std.mem.eql(u8, rest[0..id_end], group_id)) return group;
     }
     return null;
 }

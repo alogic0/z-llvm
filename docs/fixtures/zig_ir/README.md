@@ -167,8 +167,6 @@ parser blockers after Cycle 1:
 
 | Fixture | First local rejection |
 | --- | --- |
-| `integers_release_fast` | `UnsupportedCallAttribute` for intrinsic call attributes. |
-| `integers_release_fast_aarch64` | `UnsupportedCallAttribute` for intrinsic call attributes. |
 | `pointers_memory_release_fast` | `UnsupportedType` for pointer/memory IR types outside the scalar subset. |
 | `aggregates_release_fast` | `UnsupportedType` for aggregate and array IR surface. |
 | `control_flow_calls_release_fast` | `UnsupportedType` for loop/control-flow corpus surface. |
@@ -180,7 +178,7 @@ parser blockers after Cycle 1:
 | Group | Source | Checked IR | Main IR features | Classification |
 | --- | --- | --- | --- | --- |
 | `tiny_scalar` | `test/zig/inputs/tiny_scalar.zig` | `test/zig/expected/tiny_scalar.normalized.ll`; `test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll`; `test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll` | module records, exported aliases, scalar add, mode-specific attrs | `parse`, `verify`, `optimizer-input`, `unsupported` |
-| `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference | `unsupported`, `optimizer-input`, `future` |
+| `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference | `parse`, `verify`, `optimizer-input`, `future` |
 | `pointers_memory` | `test/zig/inputs/pointers_memory.zig` | `test/zig/captured/pointers_memory.ReleaseFast.x86_64.ll` | pointer attrs, load/store, volatile load/store | `unsupported`, `optimizer-input` |
 | `aggregates` | `test/zig/inputs/aggregates.zig` | `test/zig/captured/aggregates.ReleaseFast.x86_64.ll` | arrays, struct field GEP, slice iteration, optionals, error unions | `unsupported`, `optimizer-input` |
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `unsupported`, `optimizer-input` |

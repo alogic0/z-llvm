@@ -185,6 +185,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeByte('\n');
                     },
                     .call => |call| {
+                        if (call.tail_kind) |tail_kind| try writer.print("{s} ", .{tail_kind});
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
                         try call.ret_ty.format(writer);
