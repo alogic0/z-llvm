@@ -8,6 +8,7 @@ drop thread-visible state.
 ```text
 @name = [linkage] thread_local global iN <int-or-undef>
 @name = [linkage] thread_local constant iN <int-or-undef>
+@name = [linkage] thread_local(<known-model>) [unnamed_addr] global iN <int-or-undef>
 ```
 
 The `thread_local` spelling is preserved as a raw global address attribute.
@@ -15,11 +16,21 @@ GlobalDCE treats thread-local globals as conservative roots, even when their
 linkage is local, because TLS allocation and access can be target/linker
 visible.
 
+Known TLS model spellings are preserved textually:
+
+```text
+localexec
+initialexec
+localdynamic
+generaldynamic
+```
+
 ## Fail-Closed Surface
 
 ```text
-syncscope
 non-sideeffect or malformed inline asm
+unknown TLS model spellings
+target-specific TLS lowering and relocation selection
 ```
 
 Narrow `fence`, `atomicrmw`, `cmpxchg`, and side-effecting inline asm forms are
@@ -32,6 +43,7 @@ classified through the conservative atomics/inline-asm barrier boundary in
 local-only conservative opt fixture:
   globaldce_tls_root
   globaldce_tls_concurrency_root
+  globaldce_tls_model_root
   gvn_tls_store_clobber_reject
 
 opt-equivalent fixture:
@@ -41,8 +53,9 @@ opt-equivalent fixture:
 
 unit tests:
   thread-local global preservation through GlobalDCE
+  known TLS model preservation and unknown TLS model rejection
   fence, atomicrmw, cmpxchg, and inline asm barrier preservation
-  syncscope rejection through the atomic parser boundary
+  atomic syncscope preservation through the atomic parser boundary
   volatile/atomic memory-effect barriers
 ```
 

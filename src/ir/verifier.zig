@@ -286,6 +286,7 @@ pub fn verify(module: core.Module) !void {
     for (module.globals.items) |global| {
         if (global_defs.contains(global.name)) return error.DuplicateDefinition;
         try global_defs.put(global.name, {});
+        try verifyGlobalAddressAttrs(global.address_attrs);
         switch (global.initializer) {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
@@ -1106,6 +1107,38 @@ fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {
     }
     try verifySyncScope(attrs.syncscope);
     if (attrs.syncscope != null and attrs.atomic_ordering == null) return error.InvalidAtomicMemory;
+}
+
+fn verifyGlobalAddressAttrs(address_attrs: ?[]const u8) !void {
+    var saw_thread_local = false;
+    var saw_unnamed_addr = false;
+    var saw_local_unnamed_addr = false;
+    var parts = std.mem.tokenizeAny(u8, address_attrs orelse "", " \t");
+    while (parts.next()) |token| {
+        if (std.mem.eql(u8, token, "thread_local") or isKnownTlsModelToken(token)) {
+            if (saw_thread_local) return error.UnsupportedGlobalVariable;
+            saw_thread_local = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "unnamed_addr")) {
+            if (saw_unnamed_addr or saw_local_unnamed_addr) return error.UnsupportedGlobalVariable;
+            saw_unnamed_addr = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "local_unnamed_addr")) {
+            if (saw_unnamed_addr or saw_local_unnamed_addr) return error.UnsupportedGlobalVariable;
+            saw_local_unnamed_addr = true;
+            continue;
+        }
+        return error.UnsupportedGlobalVariable;
+    }
+}
+
+fn isKnownTlsModelToken(token: []const u8) bool {
+    inline for (.{ "thread_local(localexec)", "thread_local(initialexec)", "thread_local(localdynamic)", "thread_local(generaldynamic)" }) |candidate| {
+        if (std.mem.eql(u8, token, candidate)) return true;
+    }
+    return false;
 }
 
 fn verifyLoadMemoryAttrs(attrs: core.MemoryAttrs) !void {

@@ -7,20 +7,29 @@ lowering them prematurely.
 
 ## Plan
 
-- [ ] Inventory TLS globals, thread-local modes, synchronization intrinsics,
+- [x] Inventory TLS globals, thread-local modes, synchronization intrinsics,
       and concurrency-related attributes from Zig rows.
-- [ ] Parse and preserve supported TLS global declarations and attributes.
-- [ ] Add verifier checks for TLS address-space, linkage, initializer, and
+- [x] Parse and preserve supported TLS global declarations and attributes.
+- [x] Add verifier checks for TLS model spelling, linkage, initializer, and
       target restrictions where known.
-- [ ] Treat TLS and concurrency intrinsics as optimizer barriers unless local
+- [x] Treat TLS and concurrency intrinsics as optimizer barriers unless local
       semantics are implemented.
-- [ ] Add source-backed fixtures for TLS globals and concurrency runtime calls.
-- [ ] Update `docs/ir_concurrency_tls.md`, globals docs, and unsupported IR
+- [x] Add source-backed fixtures for TLS globals and concurrency runtime calls.
+- [x] Update `docs/ir_concurrency_tls.md`, globals docs, and unsupported IR
       docs.
-- [ ] Keep object lowering and platform TLS ABI decisions deferred.
+- [x] Keep object lowering and platform TLS ABI decisions deferred.
 
 ## Exit Criteria
 
-- [ ] At least one TLS source-backed row is accepted through parse and verify.
-- [ ] Unsupported TLS models or concurrency intrinsics fail closed.
-- [ ] Optimizers do not erase required TLS or synchronization behavior.
+- [x] At least one TLS source-backed row is accepted through parse and verify.
+- [x] Unsupported TLS models or concurrency intrinsics fail closed.
+- [x] Optimizers do not erase required TLS or synchronization behavior.
+
+## Completed Slice
+
+- Preserved known LLVM TLS model spellings on globals and rejected unknown TLS
+  model text in the verifier.
+- Added `globaldce_tls_model_root` to keep modeled TLS globals as conservative
+  GlobalDCE roots.
+- Documented that TLS model selection, relocations, thread-pointer lowering,
+  and platform ABI behavior remain backend work.

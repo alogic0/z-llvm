@@ -48,6 +48,8 @@ exported aliases mark their target functions/globals live
 local functions/globals with raw COMDAT attributes are treated as conservative
 roots
 thread-local globals are treated as conservative roots
+thread-local globals with known TLS model spellings are preserved as
+conservative roots
 unreached internal/private functions are removed
 scalar global initializer references are represented in the graph if the parser
 accepts them
@@ -76,10 +78,13 @@ opt-22 equivalent:
 local-only conservative:
   globaldce_comdat_root
   globaldce_tls_root
+  globaldce_tls_concurrency_root
+  globaldce_tls_model_root
 
 unit-test only:
   globaldce removes unreferenced local functions and globals
   exported alias keeps a private target function live
   COMDAT members are preserved conservatively
   thread-local globals are preserved conservatively
+  known TLS model spellings are preserved and unknown models fail verifier checks
 ```

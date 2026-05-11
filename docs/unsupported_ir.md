@@ -377,6 +377,7 @@ bitcast and pointer casts
 unsafe or poison-sensitive division/remainder simplification
 using instruction flags such as nsw/nuw/exact in transforms
 aggregate, string, TLS, COMDAT, alias, and declaration globals
+unknown TLS model spellings
 semantic global variable use in optimizations
 visibility and attributes with semantic effects
 calling convention ABI semantics

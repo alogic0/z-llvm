@@ -4156,6 +4156,43 @@ test "parser accepts narrow atomic load and store spelling as barriers" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves known thread local models and rejects unknown TLS models" {
+    const input =
+        \\@tls = internal thread_local(localexec) unnamed_addr global i32 1, align 4
+        \\
+        \\define i32 @read_tls_model() {
+        \\entry:
+        \\  %v = load i32, ptr @tls, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+
+    const invalid =
+        \\@tls = internal thread_local(unsupported) global i32 1
+        \\
+        \\define i32 @read_bad_tls_model() {
+        \\entry:
+        \\  %v = load i32, ptr @tls, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var invalid_module = try ir.Module.parse(std.testing.allocator, invalid);
+    defer invalid_module.deinit();
+    try std.testing.expectError(error.UnsupportedGlobalVariable, invalid_module.verify());
+}
+
 test "parser preserves atomicrmw cmpxchg and fence barriers" {
     const input =
         \\define i32 @memory_atomicrmw(ptr %p) {

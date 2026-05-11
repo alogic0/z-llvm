@@ -33,8 +33,8 @@ target triple = "..."
 $name = comdat <kind>
 scalar global definitions: @name = [linkage] global iN <int-or-undef>
 scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
-thread_local scalar global and constant definitions preserved as raw address
-attributes
+thread_local scalar global and constant definitions preserved as raw address attributes
+known TLS model spellings preserved as raw address attributes
 global suffix attributes preserved as raw text
 function linkage: default, internal, private, external
 function visibility: default, hidden, protected
@@ -89,6 +89,7 @@ Known gaps:
 ```text
 no aggregate, string, ifunc, or declaration globals
 no TLS lowering model beyond preservation and conservative GlobalDCE rooting
+no target-specific interpretation of TLS model spellings
 no semantic use of globals in optimization or codegen
 no semantic use of linkage, visibility, or attributes
 no interpreted COMDAT selection semantics

@@ -286,7 +286,8 @@ fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
 fn isGlobalAddressAttr(token: []const u8) bool {
     return std.mem.eql(u8, token, "unnamed_addr") or
         std.mem.eql(u8, token, "local_unnamed_addr") or
-        std.mem.eql(u8, token, "thread_local");
+        std.mem.eql(u8, token, "thread_local") or
+        std.mem.startsWith(u8, token, "thread_local(");
 }
 
 fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []const u8) !core.GlobalInitializer {
