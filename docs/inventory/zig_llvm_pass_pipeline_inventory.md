@@ -6,6 +6,11 @@ through its LLVM backend. Paths are relative to `prog`.
 The purpose is to choose optimizer work from Zig's actual LLVM use, not from a
 generic list of familiar LLVM passes.
 
+This inventory is indexed by
+[`zig_llvm_dependency_inventory_index.md`](zig_llvm_dependency_inventory_index.md).
+Use the index to keep optimizer work separate from target, codegen, linker,
+debug, sanitizer, C frontend, bitcode, and LTO handoff paths.
+
 ## Source Anchors
 
 Zig entry points:

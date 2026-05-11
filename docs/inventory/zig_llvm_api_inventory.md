@@ -3,6 +3,11 @@
 This inventory anchors the replacement project to the LLVM surface that Zig
 actually uses today. Paths are relative to `prog`.
 
+The top-level dependency index is
+[`zig_llvm_dependency_inventory_index.md`](zig_llvm_dependency_inventory_index.md).
+Use that file to classify each dependency by category, hard/optional status, and
+local action before promoting roadmap work.
+
 ## Zig Entry Points
 
 | Zig source | Role | Replacement owner |
