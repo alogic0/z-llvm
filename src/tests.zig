@@ -1495,7 +1495,7 @@ test "parser rejects debug value intrinsics until salvage is represented" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+    try std.testing.expectError(error.UnsupportedDebugIntrinsic, ir.Module.parse(std.testing.allocator, input));
 }
 
 test "parser rejects debug declare intrinsics until variable locations are represented" {
@@ -1521,7 +1521,7 @@ test "parser rejects debug declare intrinsics until variable locations are repre
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+    try std.testing.expectError(error.UnsupportedDebugIntrinsic, ir.Module.parse(std.testing.allocator, input));
 }
 
 test "parser preserves Debug lexical scope branch metadata opaquely" {

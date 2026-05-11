@@ -121,7 +121,8 @@ noalias / alias.scope
 debug metadata beyond opaque `!dbg` preservation for instructions, simple
 branches, call sites, loop PHIs, and reduced lexical-block fixtures
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation
-debug value and debug declare intrinsics
+debug value, debug declare, and debug assign intrinsics; parser reports
+`UnsupportedDebugIntrinsic`
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in
 reduced ReleaseSafe safety fixtures

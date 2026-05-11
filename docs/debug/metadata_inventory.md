@@ -56,7 +56,7 @@ broken-debug-info diagnostics are not implemented locally
 | Subprograms | `DISubprogram` attached to function definitions | preserved as function attrs plus opaque raw metadata |
 | Lexical scopes | `DILexicalBlock`, inline scopes, namespace scopes | `DILexicalBlock` preserved opaquely; inline and namespace scopes missing |
 | Locations | `DILocation` attached to instructions and simple branch terminators | opaque `!dbg` attachment preservation |
-| Local variables | `DILocalVariable`, `dbg.declare`, `dbg.value`, `dbg.assign` | missing |
+| Local variables | `DILocalVariable`, `dbg.declare`, `dbg.value`, `dbg.assign` | fail closed with `UnsupportedDebugIntrinsic` |
 | Global variables | `DIGlobalVariableExpression` and global metadata attachments | missing |
 | Types | base, pointer, array, vector, struct, union, enum, optional/error union representations | missing |
 | Module flags | `Debug Info Version`, DWARF version, CodeView mode, PIC/PIE flags where relevant | raw records only |
@@ -109,9 +109,28 @@ src/ir/parser.zig and src/ir/printer.zig preserve branch !dbg attachments and
 opaque DILexicalBlock records in reduced Debug fixtures
 debug call-site and loop PHI locations are preserved opaquely through the
 verifier-only Debug corpus pipeline
-debug value and declare intrinsics remain rejected because metadata operands,
-variable locations, and salvage are not represented
+debug value and declare intrinsics remain rejected with
+`UnsupportedDebugIntrinsic` because metadata operands, variable locations, and
+salvage are not represented
+test/zig/expected/debug_value_intrinsic.unsupported.ll
+test/zig/expected/debug_declare_intrinsic.unsupported.ll
 ```
+
+## Debug Intrinsic Policy
+
+```text
+llvm.dbg.value: reject with UnsupportedDebugIntrinsic
+llvm.dbg.declare: reject with UnsupportedDebugIntrinsic
+llvm.dbg.assign: reject with UnsupportedDebugIntrinsic
+DIExpression: preserved only inside opaque metadata records; not interpreted
+DILocalVariable: preserved only as opaque metadata in unsupported fixtures; no
+local variable tracking is represented
+```
+
+The local optimizer must not count debug intrinsics as semantic memory effects
+or program side effects because they are not represented as instructions in
+accepted IR. Rows containing them are classified as `unsupported,future` until
+the project can model debug-value salvage explicitly.
 
 Implemented Cycle 12 slice:
 

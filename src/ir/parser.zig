@@ -440,6 +440,7 @@ fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.Funct
     const parsed_prefix = try parseFunctionPrefix(prefix, error.InvalidFunctionDeclaration);
     const name_text = std.mem.trim(u8, body[name_start..open_paren], " \t");
     if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
+    if (isUnsupportedDebugIntrinsicCallee(name_text[1..])) return error.UnsupportedDebugIntrinsic;
 
     var decl = core.FunctionDecl.init(name_text[1..], parsed_prefix.ret_ty);
     decl.linkage = parsed_prefix.linkage;
@@ -919,6 +920,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     if (inline_asm == null) {
         if (std.mem.startsWith(u8, callee_text, "asm")) return error.UnsupportedInlineAsm;
         if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
+        if (isUnsupportedDebugIntrinsicCallee(callee_text[1..])) return error.UnsupportedDebugIntrinsic;
         if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
     }
     const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
@@ -998,6 +1000,10 @@ fn isUnsupportedInstrumentationCallee(name: []const u8) bool {
         std.mem.startsWith(u8, name, "__ubsan_") or
         std.mem.startsWith(u8, name, "llvm.ubsan.") or
         std.mem.startsWith(u8, name, "llvm.trap");
+}
+
+fn isUnsupportedDebugIntrinsicCallee(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "llvm.dbg.");
 }
 
 fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []const u8) !void {

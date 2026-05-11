@@ -68,6 +68,8 @@ parse and print opaque instruction !dbg attachments
 preserve branch metadata attachments such as !prof as opaque text
 preserve declared opaque panic/runtime calls as side-effecting call barriers in
 reduced ReleaseSafe safety fixtures
+reject llvm.dbg.value, llvm.dbg.declare, and llvm.dbg.assign with
+UnsupportedDebugIntrinsic until debug-value salvage is represented
 reject sanitizer/TSan/UBSan/trap instrumentation calls until runtime semantics
 are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
