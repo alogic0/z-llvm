@@ -64,6 +64,7 @@ Implemented subset:
 
 ```text
 parse and print raw top-level module metadata records beginning with !
+parse and print opaque instruction !dbg attachments
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
 module-tsan, tsan, alloc-token, and ee-instrument are executable placeholders
 ```
@@ -71,11 +72,12 @@ module-tsan, tsan, alloc-token, and ee-instrument are executable placeholders
 Intentional divergences:
 
 ```text
-no debug location attachment to instructions
+no interpretation of debug location attachment graphs
 no metadata graph interpretation
 no sanitizer runtime declarations or inserted callbacks
 no TSan memory instrumentation
 no entry/exit call insertion
+no debug value salvage, assignment tracking, or discriminator updates
 ```
 
 Fixture coverage:
@@ -86,7 +88,9 @@ opt-22 equivalent:
 
 local-only conservative:
   raw module metadata round-trip unit test
+  reduced Debug metadata round-trip fixture
 
 unit-test only:
   instrumentation placeholder pass dispatch
+  debug value intrinsic rejection until metadata operands and salvage exist
 ```

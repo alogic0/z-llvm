@@ -1294,6 +1294,66 @@ test "parser preserves raw module metadata records" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves instruction debug metadata attachments" {
+    const input =
+        \\source_filename = "debug_metadata"
+        \\
+        \\define i32 @debug_add(i32 %a) !dbg !4 {
+        \\entry:
+        \\  %sum = add i32 %a, 1, !dbg !8
+        \\  ret i32 %sum
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!llvm.module.flags = !{!1}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!1 = !{i32 2, !"Debug Info Version", i32 3}
+        \\!2 = !DIFile(filename: "debug_metadata.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "debug_add", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocation(line: 2, column: 12, scope: !4)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instruction = module.functions.items[0].blocks.items[0].instructions.items[0];
+    try std.testing.expectEqualStrings("!dbg !8", instruction.metadata.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects debug value intrinsics until salvage is represented" {
+    const input =
+        \\declare void @llvm.dbg.value(metadata, metadata, metadata)
+        \\
+        \\define i32 @debug_value(i32 %a) !dbg !4 {
+        \\entry:
+        \\  call void @llvm.dbg.value(metadata i32 %a, metadata !9, metadata !DIExpression()), !dbg !8
+        \\  ret i32 %a
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!2 = !DIFile(filename: "debug_value.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "debug_value", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocation(line: 2, column: 5, scope: !4)
+        \\!9 = !DILocalVariable(name: "a", arg: 1, scope: !4, file: !2, line: 1, type: !10)
+        \\!10 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "parser preserves inert branch metadata attachments" {
     const input =
         \\define void @loop_metadata(i1 %cond) {

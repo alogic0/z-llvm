@@ -442,6 +442,19 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
 }
 
 fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
+    const metadata_start = std.mem.indexOf(u8, line, ", !");
+    const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
+    const instruction_text = if (metadata_start) |index| std.mem.trim(u8, line[0..index], " \t") else line;
+    if (metadata) |attachment| {
+        if (!std.mem.startsWith(u8, attachment, "!dbg ")) return error.UnsupportedInstructionMetadata;
+    }
+
+    var instruction = try parseInstructionBody(allocator, instruction_text);
+    instruction.metadata = metadata;
+    return instruction;
+}
+
+fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
     if (std.mem.startsWith(u8, line, "store ")) return parseStore(line);
     if (std.mem.startsWith(u8, line, "call ")) return parseCall(allocator, null, line);
     if (std.mem.startsWith(u8, line, "tail ")) return parseCall(allocator, null, line);

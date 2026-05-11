@@ -203,7 +203,8 @@ Connection to the LLVM pass inventory:
 
 | Fixture area | Inventory connection |
 | --- | --- |
-| `Debug` raw mode | `debug-o0`, `verify`, `always-inline`, debug metadata placeholders. |
+| `Debug` raw mode | `debug-o0`, `local-pipeline=zig-debug-accepted`, `verify`, `always-inline`, debug metadata placeholders. |
+| `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, and instruction `DILocation` preservation without optimizer-input status. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
 | `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |

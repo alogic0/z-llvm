@@ -18,23 +18,35 @@ being honest about debug-info gaps.
 
 ## Plan
 
-- [ ] Inventory debug metadata records emitted by Zig Debug and ReleaseSafe
+- [x] Inventory debug metadata records emitted by Zig Debug and ReleaseSafe
       corpus rows.
-- [ ] Parse and preserve top-level `DICompileUnit`, `DISubprogram`, `DILocation`,
+- [x] Parse and preserve top-level `DICompileUnit`, `DISubprogram`, `DILocation`,
       and type metadata records as opaque metadata first.
-- [ ] Add instruction-level metadata attachment parsing for `!dbg` without using
+- [x] Add instruction-level metadata attachment parsing for `!dbg` without using
       it for optimization decisions.
-- [ ] Preserve or drop debug attachments according to documented local pass
+- [x] Preserve or drop debug attachments according to documented local pass
       policy when instructions are removed or replaced.
-- [ ] Add rejected fixtures for debug metadata forms that imply value salvage
+- [x] Add rejected fixtures for debug metadata forms that imply value salvage
       the local optimizer cannot perform.
-- [ ] Promote a reduced Debug corpus fixture to parse/verify status.
-- [ ] Document the gap from LLVM debug value salvage and assignment tracking.
+- [x] Promote a reduced Debug corpus fixture to parse/verify status.
+- [x] Document the gap from LLVM debug value salvage and assignment tracking.
 
 ## Exit Criteria
 
-- [ ] Debug metadata can be round-tripped for at least one reduced Zig Debug
+- [x] Debug metadata can be round-tripped for at least one reduced Zig Debug
       fixture.
-- [ ] Optimizer passes have a documented debug attachment policy.
-- [ ] Unsupported debug-info behavior is explicitly classified.
+- [x] Optimizer passes have a documented debug attachment policy.
+- [x] Unsupported debug-info behavior is explicitly classified.
 
+## Completion Notes
+
+- Added `test/zig/expected/debug_metadata.reduced.ll` as a reduced Debug
+  parse/verify fixture that preserves `DICompileUnit`, `DISubprogram`,
+  `DILocation`, `llvm.dbg.cu`, module flags, function `!dbg`, and instruction
+  `!dbg` attachment syntax.
+- Instruction `!dbg` metadata is stored and printed as opaque text. Passes do
+  not inspect it for optimization decisions.
+- Current pass policy is preservation-only for unchanged instructions and
+  drop-on-delete/drop-on-replace for transformed instructions. LLVM debug value
+  salvage, assignment tracking, discriminator updates, and inline scopes remain
+  unsupported.

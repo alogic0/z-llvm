@@ -404,6 +404,7 @@ pub const Instruction = struct {
         gep: GepInst,
         call: CallInst,
     },
+    metadata: ?[]const u8 = null,
     removed: bool = false,
     replacement: ?Value = null,
 

@@ -95,7 +95,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try binary.lhs.format(writer);
                         try writer.writeAll(", ");
                         try binary.rhs.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .cast => |cast| {
                         try writer.print("{s} ", .{cast.op.name()});
@@ -104,14 +104,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try cast.value.format(writer);
                         try writer.writeAll(" to ");
                         try cast.to_ty.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .freeze => |freeze| {
                         try writer.writeAll("freeze ");
                         try freeze.ty.format(writer);
                         try writer.writeByte(' ');
                         try freeze.value.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .icmp => |icmp| {
                         try writer.print("icmp {s} ", .{icmp.predicate.name()});
@@ -120,7 +120,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try icmp.lhs.format(writer);
                         try writer.writeAll(", ");
                         try icmp.rhs.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .select => |select| {
                         try writer.writeAll("select ");
@@ -135,7 +135,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try select.ty.format(writer);
                         try writer.writeByte(' ');
                         try select.false_value.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .phi => |phi| {
                         try writer.writeAll("phi ");
@@ -147,12 +147,12 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try incoming.value.format(writer);
                             try writer.print(", %{s} ]", .{incoming.block});
                         }
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .alloca => |alloca| {
                         try writer.writeAll("alloca ");
                         try alloca.allocated_ty.format(writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .load => |load| {
                         try writer.writeAll("load ");
@@ -161,7 +161,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll(", ptr ");
                         try load.ptr.format(writer);
                         try printMemorySuffix(load.attrs, writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .store => |store| {
                         try writer.writeAll("store ");
@@ -172,7 +172,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll(", ptr ");
                         try store.ptr.format(writer);
                         try printMemorySuffix(store.attrs, writer);
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
@@ -185,7 +185,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try writer.writeByte(' ');
                             try index.value.format(writer);
                         }
-                        try writer.writeByte('\n');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .call => |call| {
                         if (call.tail_kind) |tail_kind| try writer.print("{s} ", .{tail_kind});
@@ -199,7 +199,8 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try writer.writeByte(' ');
                             try arg.value.format(writer);
                         }
-                        try writer.writeAll(")\n");
+                        try writer.writeByte(')');
+                        try printInstructionMetadata(instruction.metadata, writer);
                     },
                 }
             }
@@ -260,4 +261,9 @@ fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {
 fn printMemorySuffix(attrs: core.MemoryAttrs, writer: anytype) !void {
     if (attrs.atomic_ordering) |ordering| try writer.print(", {s}", .{ordering});
     if (attrs.@"align") |alignment| try writer.print(", align {}", .{alignment});
+}
+
+fn printInstructionMetadata(metadata: ?[]const u8, writer: anytype) !void {
+    if (metadata) |attachment| try writer.print(", {s}", .{attachment});
+    try writer.writeByte('\n');
 }
