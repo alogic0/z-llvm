@@ -1140,6 +1140,33 @@ test "parser preserves function visibility and parameter attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves return attributes before function return type" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define private range(i32 0, -2147483648) i32 @bounded(i32 %a) #0 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\attributes #0 = { nounwind memory(none) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqualStrings("range(i32 0, -2147483648)", function.ret_attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves supported calling conventions" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -2391,7 +2418,8 @@ test "parser preserves scalar casts div rem flags and freeze" {
         \\  %sum1 = add nuw i32 %sum0, %s
         \\  %sum2 = add i32 %sum1, %d
         \\  %sum3 = add i32 %sum2, %r
-        \\  %f = freeze i32 %sum3
+        \\  %sum4 = or disjoint i32 %sum3, 1
+        \\  %f = freeze i32 %sum4
         \\  ret i32 %f
         \\}
         \\

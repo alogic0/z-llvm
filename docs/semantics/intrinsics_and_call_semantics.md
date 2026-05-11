@@ -17,11 +17,18 @@ semantics needed by Zig-emitted IR corpus rows.
 
 - Preserve `tail call` on direct calls. `musttail` and `notail` remain
   unsupported because their verifier and lowering semantics are stricter.
+- Preserve return attributes before the return type, such as Zig-emitted
+  `range(i32 ...)`, without interpreting them in optimizer legality yet.
+- Preserve `or disjoint` as a poison-affecting binary flag and avoid folding
+  flagged operations unless the local fold explicitly models the flag.
 - Resolve function and declaration attribute group references such as `#0`
   for call memory-effect classification.
 - Treat `memory(none)` and `readnone` calls as no-memory-effect.
 - Treat `memory(read)` and `readonly` calls as read-only memory effects.
 - Keep unknown calls and unknown intrinsics conservative.
+- Parse `llvm.assume` as a direct void call. Its Zig-emitted
+  `memory(inaccessiblemem: write)` attribute keeps it side-effecting in the
+  local optimizer, so it is preserved rather than treated as a free no-op.
 - Fold integer min/max intrinsics only for source-backed scalar cases:
   `llvm.smin.*`, `llvm.smax.*`, `llvm.umin.*`, and `llvm.umax.*`.
 
@@ -32,6 +39,10 @@ semantics needed by Zig-emitted IR corpus rows.
 - `integers_release_fast_aarch64` now parses and verifies the same intrinsic
   shape for the non-host target fixture, but stays future-only for optimizer
   runner selection.
+- `control_flow_calls_release_fast` now parses and verifies raw Zig-emitted
+  `llvm.assume`, return `range` attributes, `or disjoint`, unnamed entry-block
+  references, and loop backedge metadata. Loop metadata is accepted and dropped
+  until the dedicated loop metadata cycle.
 
 ## Fixture Coverage
 
@@ -47,10 +58,11 @@ bash scripts/compare_opt.sh
 
 ## Remaining Gaps
 
-- `llvm.assume` is not represented with operand attributes such as
-  `i1 noundef` yet.
+- `llvm.assume` is represented conservatively as a side-effecting call, not as
+  an assumption cache input.
 - Indirect calls, `invoke`, `callbr`, `musttail`, operand bundles, and inline
   asm remain unsupported.
 - Attribute groups are parsed only as preserved IR records with conservative
   memory-effect extraction, not as a full LLVM attribute model.
-
+- Loop instruction metadata is accepted only as parser input and is not
+  preserved by the printer yet.

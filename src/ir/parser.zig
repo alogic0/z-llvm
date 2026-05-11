@@ -105,7 +105,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         }
 
         if (current_block == null) {
-            try function.blocks.append(allocator, core.BasicBlock.init("entry"));
+            try function.blocks.append(allocator, core.BasicBlock.init(try implicitEntryBlockName(&module, function.*)));
             current_block = function.blocks.items.len - 1;
         }
         const block = &function.blocks.items[current_block.?];
@@ -251,32 +251,21 @@ fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
 fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Function {
     if (!std.mem.endsWith(u8, line, "{")) return error.InvalidFunctionHeader;
     const body = std.mem.trim(u8, line["define ".len .. line.len - 1], " \t");
-    const open_paren = std.mem.indexOfScalar(u8, body, '(') orelse return error.InvalidFunctionHeader;
+    const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionHeader;
+    const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionHeader;
     const close_paren = std.mem.lastIndexOfScalar(u8, body, ')') orelse return error.InvalidFunctionHeader;
     if (close_paren < open_paren) return error.InvalidFunctionHeader;
 
-    const head = std.mem.trim(u8, body[0..open_paren], " \t");
-    var head_parts = std.mem.tokenizeAny(u8, head, " \t");
-    var token = head_parts.next() orelse return error.InvalidFunctionHeader;
-
-    const linkage = core.FunctionLinkage.parse(token) orelse .default;
-    if (linkage != .default) token = head_parts.next() orelse return error.InvalidFunctionHeader;
-
-    const visibility = core.FunctionVisibility.parse(token) orelse .default;
-    if (visibility != .default) token = head_parts.next() orelse return error.InvalidFunctionHeader;
-
-    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
-    if (calling_conv != null) token = head_parts.next() orelse return error.InvalidFunctionHeader;
-
-    const ret_ty = try parseType(token);
-    const name_text = head_parts.next() orelse return error.InvalidFunctionHeader;
-    if (head_parts.next() != null) return error.InvalidFunctionHeader;
+    const prefix = std.mem.trim(u8, body[0..name_start], " \t");
+    const parsed_prefix = try parseFunctionPrefix(prefix, error.InvalidFunctionHeader);
+    const name_text = std.mem.trim(u8, body[name_start..open_paren], " \t");
     if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
 
-    var function = core.Function.init(name_text[1..], ret_ty);
-    function.linkage = linkage;
-    function.visibility = visibility;
-    function.calling_conv = calling_conv;
+    var function = core.Function.init(name_text[1..], parsed_prefix.ret_ty);
+    function.linkage = parsed_prefix.linkage;
+    function.visibility = parsed_prefix.visibility;
+    function.calling_conv = parsed_prefix.calling_conv;
+    function.ret_attrs = parsed_prefix.ret_attrs;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
     if (attrs.len != 0) function.attrs = attrs;
     errdefer function.deinit(allocator);
@@ -288,32 +277,21 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
 
 fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.FunctionDecl {
     const body = std.mem.trim(u8, line["declare ".len..], " \t");
-    const open_paren = std.mem.indexOfScalar(u8, body, '(') orelse return error.InvalidFunctionDeclaration;
+    const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionDeclaration;
+    const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionDeclaration;
     const close_paren = std.mem.lastIndexOfScalar(u8, body, ')') orelse return error.InvalidFunctionDeclaration;
     if (close_paren < open_paren) return error.InvalidFunctionDeclaration;
 
-    const head = std.mem.trim(u8, body[0..open_paren], " \t");
-    var head_parts = std.mem.tokenizeAny(u8, head, " \t");
-    var token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
-
-    const linkage = core.FunctionLinkage.parse(token) orelse .default;
-    if (linkage != .default) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
-
-    const visibility = core.FunctionVisibility.parse(token) orelse .default;
-    if (visibility != .default) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
-
-    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
-    if (calling_conv != null) token = head_parts.next() orelse return error.InvalidFunctionDeclaration;
-
-    const ret_ty = try parseType(token);
-    const name_text = head_parts.next() orelse return error.InvalidFunctionDeclaration;
-    if (head_parts.next() != null) return error.InvalidFunctionDeclaration;
+    const prefix = std.mem.trim(u8, body[0..name_start], " \t");
+    const parsed_prefix = try parseFunctionPrefix(prefix, error.InvalidFunctionDeclaration);
+    const name_text = std.mem.trim(u8, body[name_start..open_paren], " \t");
     if (!std.mem.startsWith(u8, name_text, "@")) return error.InvalidFunctionName;
 
-    var decl = core.FunctionDecl.init(name_text[1..], ret_ty);
-    decl.linkage = linkage;
-    decl.visibility = visibility;
-    decl.calling_conv = calling_conv;
+    var decl = core.FunctionDecl.init(name_text[1..], parsed_prefix.ret_ty);
+    decl.linkage = parsed_prefix.linkage;
+    decl.visibility = parsed_prefix.visibility;
+    decl.calling_conv = parsed_prefix.calling_conv;
+    decl.ret_attrs = parsed_prefix.ret_attrs;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
     if (attrs.len != 0) decl.attrs = attrs;
     errdefer decl.deinit(allocator);
@@ -321,6 +299,55 @@ fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.Funct
     try parseDeclParams(allocator, &decl, body[open_paren + 1 .. close_paren]);
 
     return decl;
+}
+
+const FunctionPrefix = struct {
+    linkage: core.FunctionLinkage = .default,
+    visibility: core.FunctionVisibility = .default,
+    calling_conv: ?[]const u8 = null,
+    ret_attrs: ?[]const u8 = null,
+    ret_ty: core.Type,
+};
+
+fn parseFunctionPrefix(prefix: []const u8, comptime invalid_error: anyerror) !FunctionPrefix {
+    const ret_ty_start = std.mem.lastIndexOfAny(u8, prefix, " \t");
+    const ret_ty_text = if (ret_ty_start) |start| std.mem.trim(u8, prefix[start + 1 ..], " \t") else prefix;
+    var rest = if (ret_ty_start) |start| std.mem.trim(u8, prefix[0..start], " \t") else "";
+
+    var parsed: FunctionPrefix = .{ .ret_ty = parseType(ret_ty_text) catch return invalid_error };
+    if (firstToken(rest)) |token| {
+        if (core.FunctionLinkage.parse(token)) |linkage| {
+            parsed.linkage = linkage;
+            rest = trimFirstToken(rest);
+        }
+    }
+    if (firstToken(rest)) |token| {
+        if (core.FunctionVisibility.parse(token)) |visibility| {
+            parsed.visibility = visibility;
+            rest = trimFirstToken(rest);
+        }
+    }
+    if (firstToken(rest)) |token| {
+        if (core.isSupportedCallingConvention(token)) {
+            parsed.calling_conv = token;
+            rest = trimFirstToken(rest);
+        }
+    }
+    if (rest.len != 0) parsed.ret_attrs = rest;
+    return parsed;
+}
+
+fn firstToken(text: []const u8) ?[]const u8 {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return null;
+    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
+    return trimmed[0..end];
+}
+
+fn trimFirstToken(text: []const u8) []const u8 {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse return "";
+    return std.mem.trim(u8, trimmed[end..], " \t");
 }
 
 fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text: []const u8) !void {
@@ -344,6 +371,16 @@ fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text:
             try decl.params.append(allocator, .{ .ty = param_ty });
         }
     }
+}
+
+fn implicitEntryBlockName(module: *core.Module, function: core.Function) ![]const u8 {
+    var max_numeric_param: ?usize = null;
+    for (function.params.items) |param| {
+        const number = std.fmt.parseInt(usize, param.name, 10) catch continue;
+        if (max_numeric_param == null or number > max_numeric_param.?) max_numeric_param = number;
+    }
+    const max_param = max_numeric_param orelse return "entry";
+    return try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{max_param + 1}));
 }
 
 fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, text: []const u8) !void {
@@ -662,6 +699,12 @@ fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {
             flags.exact = true;
             continue;
         }
+        if (std.mem.eql(u8, token, "disjoint")) {
+            if (flags.disjoint) return error.InvalidInstruction;
+            _ = parts.next();
+            flags.disjoint = true;
+            continue;
+        }
         return flags;
     }
     return flags;
@@ -785,7 +828,7 @@ fn parseBr(line: []const u8) !core.Terminator {
     switch (first_ty) {
         .label => {
             const target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            if (parts.next() != null) return error.InvalidBr;
+            try parseTrailingInstructionMetadata(&parts);
             return .{ .br = .{ .target = target } };
         },
         .ty => |cond_ty| {
@@ -796,7 +839,7 @@ fn parseBr(line: []const u8) !core.Terminator {
             const else_label = parts.next() orelse return error.InvalidBr;
             if (!std.mem.eql(u8, else_label, "label")) return error.InvalidBr;
             const else_target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            if (parts.next() != null) return error.InvalidBr;
+            try parseTrailingInstructionMetadata(&parts);
             return .{ .condbr = .{
                 .cond_ty = cond_ty,
                 .cond = cond,
@@ -804,6 +847,14 @@ fn parseBr(line: []const u8) !core.Terminator {
                 .else_target = else_target,
             } };
         },
+    }
+}
+
+fn parseTrailingInstructionMetadata(parts: *std.mem.TokenIterator(u8, .any)) !void {
+    while (parts.next()) |token| {
+        if (!std.mem.startsWith(u8, token, "!")) return error.InvalidInstructionMetadata;
+        const value = parts.next() orelse return error.InvalidInstructionMetadata;
+        if (!std.mem.startsWith(u8, value, "!")) return error.InvalidInstructionMetadata;
     }
 }
 

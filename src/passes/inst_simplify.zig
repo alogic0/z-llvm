@@ -30,6 +30,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.flags.nsw == b_binary.flags.nsw and
                 a_binary.flags.nuw == b_binary.flags.nuw and
                 a_binary.flags.exact == b_binary.flags.exact and
+                a_binary.flags.disjoint == b_binary.flags.disjoint and
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),

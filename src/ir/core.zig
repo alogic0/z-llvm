@@ -100,9 +100,10 @@ pub const BinaryFlags = struct {
     nsw: bool = false,
     nuw: bool = false,
     exact: bool = false,
+    disjoint: bool = false,
 
     pub fn any(flags: BinaryFlags) bool {
-        return flags.nsw or flags.nuw or flags.exact;
+        return flags.nsw or flags.nuw or flags.exact or flags.disjoint;
     }
 };
 
@@ -252,6 +253,7 @@ pub const FunctionDecl = struct {
     linkage: FunctionLinkage = .default,
     visibility: FunctionVisibility = .default,
     calling_conv: ?[]const u8 = null,
+    ret_attrs: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
     params: std.ArrayList(DeclParam),
 
@@ -522,6 +524,7 @@ pub const Function = struct {
     linkage: FunctionLinkage = .default,
     visibility: FunctionVisibility = .default,
     calling_conv: ?[]const u8 = null,
+    ret_attrs: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
     params: std.ArrayList(Param),
     blocks: std.ArrayList(BasicBlock),

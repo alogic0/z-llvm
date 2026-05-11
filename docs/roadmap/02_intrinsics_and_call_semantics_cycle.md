@@ -20,13 +20,13 @@ unsupported intrinsics conservative.
 - [x] Inventory Zig-emitted `llvm.*` calls in captured corpus files.
 - [x] Add direct parsing/classification for `llvm.smin.*` and neighboring
       integer min/max intrinsics needed by integer fixtures.
-- [ ] Add conservative parsing for `llvm.assume` as a side-effect boundary or
+- [x] Add conservative parsing for `llvm.assume` as a side-effect boundary or
       documented no-op only where legal.
 - [x] Classify readnone, readonly, argmemonly, nounwind, willreturn, and
       similar attrs through one call-effect API.
 - [x] Add InstCombine/SCCP folds only for intrinsic cases with source-backed
       tests and `opt-22` comparisons.
-- [ ] Preserve unsupported intrinsics as calls when possible; reject only when
+- [x] Preserve unsupported intrinsics as calls when possible; reject only when
       syntax cannot be represented.
 - [x] Promote the integer corpus row from unsupported to accepted when parser
       and intrinsic semantics are sufficient.
@@ -52,3 +52,17 @@ unsupported intrinsics conservative.
 - Promoted `integers_release_fast` to `parse,verify,optimizer-input`.
 - Documented the slice in
   `docs/semantics/intrinsics_and_call_semantics.md`.
+
+## Completed Slice 2: Assume And Control-Flow Call Surface
+
+- Parsed Zig-emitted `llvm.assume` as a conservative side-effecting void call.
+- Preserved return attributes such as `range(i32 ...)` before function return
+  types.
+- Preserved `or disjoint` as a binary flag and kept flagged folds
+  conservative.
+- Accepted loop-branch metadata syntax as parser input while deferring metadata
+  preservation to the loop metadata cycle.
+- Derived implicit entry-block names from numeric LLVM parameter names so raw
+  PHI incoming blocks such as `%1` verify.
+- Promoted `control_flow_calls_release_fast` to
+  `parse,verify,optimizer-input`.

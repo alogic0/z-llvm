@@ -499,6 +499,12 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
             .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
+    if (binary.flags.disjoint) {
+        switch (binary.op) {
+            .@"or" => {},
+            .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+        }
+    }
     switch (binary.ty) {
         .int => {},
         .void, .ptr, .aggregate => return error.TypeMismatch,

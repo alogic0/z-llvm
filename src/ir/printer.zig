@@ -43,6 +43,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try decl.linkage.format(writer);
         try decl.visibility.format(writer);
         if (decl.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
+        if (decl.ret_attrs) |ret_attrs| try writer.print("{s} ", .{ret_attrs});
         try decl.ret_ty.format(writer);
         try writer.print(" @{s}(", .{decl.name});
         for (decl.params.items, 0..) |param, index| {
@@ -62,6 +63,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try function.linkage.format(writer);
         try function.visibility.format(writer);
         if (function.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
+        if (function.ret_attrs) |ret_attrs| try writer.print("{s} ", .{ret_attrs});
         try function.ret_ty.format(writer);
         try writer.print(" @{s}(", .{function.name});
         for (function.params.items, 0..) |param, index| {
@@ -240,6 +242,7 @@ fn printBinaryFlags(flags: core.BinaryFlags, writer: anytype) !void {
     if (flags.nsw) try writer.writeAll("nsw ");
     if (flags.nuw) try writer.writeAll("nuw ");
     if (flags.exact) try writer.writeAll("exact ");
+    if (flags.disjoint) try writer.writeAll("disjoint ");
 }
 
 fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {
