@@ -62,7 +62,7 @@ named SSA values
 fp80/fp128
 floating-point operations beyond scalar `fadd`/`fmul`
 arrays
-vectors
+scalable vectors and unsupported vector element types
 structs
 packed structs
 full optional and error-union ABI lowering beyond observed scalar/null-pointer
@@ -70,6 +70,18 @@ fixtures
 function pointer types
 token/metadata types
 ```
+
+Fixed vectors are accepted only for a narrow parser/verifier surface:
+
+```text
+<N x iM>, <N x float>, <N x double>, and <N x ptr> types
+vector function signatures and returns
+undef, zeroinitializer, named values, and typed vector constants
+integer/FP binary instructions with matching vector operand types
+```
+
+Vector lane operations, vectorizer passes, target-cost decisions, native
+lowering, scalable vectors, and vector optimization remain unsupported.
 
 ## Unsupported Instructions
 

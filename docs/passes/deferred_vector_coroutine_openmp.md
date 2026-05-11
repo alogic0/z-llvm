@@ -63,13 +63,14 @@ loop-vectorize, slp-vectorizer, vector-combine, coro-early, coro-split,
 coro-elide, coro-cleanup, coro-annotation-elide, openmp-opt, and
 openmp-opt-cgscc are executable placeholders.
 accepted Zig corpus pipelines intentionally exclude loop-vectorize,
-slp-vectorizer, and vector-combine until vector IR and target costs exist.
+slp-vectorizer, and vector-combine until vector lane semantics and target costs
+exist.
 ```
 
 Intentional divergences:
 
 ```text
-no vector IR
+fixed-vector parser/verifier support only; no vector optimizer input
 no target vector cost model
 no coroutine IR or lowering
 no OpenMP representation
@@ -84,10 +85,10 @@ opt-22 equivalent:
   none currently
 
 local-only conservative:
-  future vector fixture classified as unsupported/future
+  future vector fixture classified as parse/verify/future
   accepted corpus pipeline test excludes vector placeholders
 
 unit-test only:
   placeholder pass dispatch
-  parser rejection tests for vector boundary forms
+  parser rejection tests for scalable vectors and lane-operation boundary forms
 ```

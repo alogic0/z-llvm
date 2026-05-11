@@ -209,6 +209,19 @@ const HashState = struct {
                 state.addTag(6);
                 state.addBytes(text);
             },
+            .vector => |vector| {
+                state.addTag(7);
+                state.addInt(vector.len);
+                switch (vector.elem_ty) {
+                    .int => |bits| {
+                        state.addTag(1);
+                        state.addInt(bits);
+                    },
+                    .float => state.addTag(2),
+                    .double => state.addTag(3),
+                    .ptr => state.addTag(4),
+                }
+            },
         }
     }
 
@@ -224,6 +237,11 @@ const HashState = struct {
             },
             .undef => state.addTag(3),
             .null_value => state.addTag(4),
+            .zero_initializer => state.addTag(5),
+            .vector => |text| {
+                state.addTag(6);
+                state.addBytes(text);
+            },
         }
     }
 

@@ -49,9 +49,9 @@ for id in gen_add_zero gen_sub_zero gen_mul_one gen_and_allones gen_or_zero gen_
 done
 
 cat > "$tmp_dir/unsupported_vector.ll" <<'CASE'
-define <2 x i32> @bad(<2 x i32> %x) {
+define <vscale x 2 x i32> @bad(<vscale x 2 x i32> %x) {
 entry:
-  ret <2 x i32> %x
+  ret <vscale x 2 x i32> %x
 }
 CASE
 

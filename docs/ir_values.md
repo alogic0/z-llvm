@@ -45,7 +45,9 @@ Known gaps:
 ```text
 no poison value
 no typed constant objects
-no aggregate/vector constants
+no aggregate constants
+narrow typed vector constants parse and verify only for the fixed-vector
+boundary in `docs/ir_vectors.md`
 no constant expressions
 no undef-specific instruction folding rules beyond preserving `freeze`
 ```

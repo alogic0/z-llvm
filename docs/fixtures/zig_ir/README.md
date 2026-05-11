@@ -214,7 +214,7 @@ parser blockers after Cycle 1:
 | `packed_bits` | `test/zig/inputs/packed_bits.zig` | `test/zig/captured/packed_bits.ReleaseFast.x86_64.ll` | packed-struct masks, `or disjoint`, sign-bit tests | `parse`, `verify`, `optimizer-input` |
 | `error_switch` | `test/zig/inputs/error_switch.zig` | `test/zig/captured/error_switch.ReleaseFast.x86_64.ll` | error-switch branch/select/phi lowering and branch weights | `parse`, `verify`, `optimizer-input` |
 | `optional_pointer` | `test/zig/inputs/optional_pointer.zig` | `test/zig/captured/optional_pointer.ReleaseFast.x86_64.ll` | optional pointer lowered to `icmp eq ptr ..., null`, branch, phi, and readonly payload load | `parse`, `verify`, `optimizer-input` |
-| `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.unsupported.ll` | vector type, lane arithmetic, vector return | `unsupported`, `future` |
+| `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.reduced.ll` | fixed vector type, lane arithmetic, vector return | `parse`, `verify`, `future`; not optimizer input |
 
 ## Optimizer Epic Coverage
 
@@ -246,7 +246,7 @@ Connection to the LLVM pass inventory:
 | `ReleaseSafe` reduced safety mode | `release-o3`, `local-pipeline=zig-release-safe-accepted`, safety branch preservation, and opaque branch-weight metadata. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, future optimizer comparison policy. |
-| `ReleaseFast` future vector mode | `vector-ir`, `target-cost`, `loop-vectorize`, `slp-vectorizer`, and `vector-combine` remain unsupported/future. |
+| `ReleaseFast` future vector mode | Fixed vector parser/verifier support exists; `target-cost`, `loop-vectorize`, `slp-vectorizer`, and `vector-combine` remain unsupported/future. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
 | `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |
 | `ReleaseSmall` raw mode | `release-oz`, size attributes, alias/global handling, unsupported-IR discovery. |
@@ -258,5 +258,6 @@ Connection to the LLVM pass inventory:
   safety-control subsets.
 - Sanitizer and trap instrumentation calls are rejected explicitly until their
   runtime ABI and lowering semantics are modeled.
-- Inline asm, atomics, vector IR, COMDAT/module flag semantics, and full debug
-  metadata graph interpretation remain source-backed future inputs.
+- COMDAT/module flag semantics, full debug metadata graph interpretation,
+  vector optimizer input, and native vector lowering remain source-backed
+  future inputs.

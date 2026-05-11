@@ -62,7 +62,8 @@ unit-test only:
 Known gaps:
 
 ```text
-no vectors
+no scalar optimization over vector instructions; fixed vectors are parsed and
+verified only as described in `docs/ir_vectors.md`
 no pointer casts
 no bitcast/ptrtoint/inttoptr
 no floating-point optimization parity

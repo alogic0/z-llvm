@@ -165,7 +165,8 @@ Known gaps:
 no use of nsw/nuw/exact for folds
 no poison/undef simplification
 no non-constant freeze simplification
-no vectors
+no vector folds; fixed-vector IR is parser/verifier-only and excluded from
+InstCombine equivalence claims
 no width-aware constant folding for non-zero shifts
 no demanded-bits cleanup in InstCombine; the first source-backed integer mask
 quality case is implemented in the separate `bdce` pass

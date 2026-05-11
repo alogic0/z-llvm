@@ -183,8 +183,11 @@ const VerifyContext = struct {
     ) !void {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
-            .int, .undef => return,
+            .int => return if (ty.isVector()) error.TypeMismatch else {},
+            .undef => return,
             .null_value => unreachable,
+            .zero_initializer => return,
+            .vector => |text| return verifyVectorLiteral(ty, text),
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -196,8 +199,11 @@ const VerifyContext = struct {
     fn verifyPhiIncomingValue(ctx: VerifyContext, ty: core.Type, value: core.Value, predecessor_index: usize) !void {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
-            .int, .undef => return,
+            .int => return if (ty.isVector()) error.TypeMismatch else {},
+            .undef => return,
             .null_value => unreachable,
+            .zero_initializer => return,
+            .vector => |text| return verifyVectorLiteral(ty, text),
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
@@ -274,20 +280,20 @@ pub fn verify(module: core.Module) !void {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
                     .int, .undef => {},
-                    .named, .null_value => return error.UnsupportedGlobalVariable,
+                    .named, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
                     .undef, .null_value => {},
-                    .int, .named => return error.UnsupportedGlobalVariable,
+                    .int, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
-                .void, .float, .double, .aggregate => return error.UnsupportedGlobalVariable,
+                .void, .float, .double, .aggregate, .vector => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
                 if (!array_ty.elem_ty.eql(array.elem_ty)) return error.UnsupportedGlobalVariable;
                 if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
                 for (array.values.items) |value| switch (value) {
-                    .int, .undef, .null_value => {},
+                    .int, .undef, .null_value, .zero_initializer, .vector => {},
                     .named => return error.UnsupportedGlobalVariable,
                 };
             },
@@ -354,7 +360,7 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         switch (fcmp.operand_ty) {
                             .float, .double => {},
-                            .void, .int, .ptr, .aggregate => return error.TypeMismatch,
+                            .void, .int, .ptr, .aggregate, .vector => return error.TypeMismatch,
                         }
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.lhs, block_index, instruction_index);
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.rhs, block_index, instruction_index);
@@ -554,7 +560,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .ptr => return null,
+        .void, .int, .float, .double, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -570,12 +576,110 @@ fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;
     return .{ .int = bits };
+}
+
+fn parseVectorType(text: []const u8) !core.VectorType {
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    if (std.mem.startsWith(u8, body, "vscale")) return error.UnsupportedType;
+    const x_index = std.mem.indexOf(u8, body, " x ") orelse return error.UnsupportedType;
+    const len = try std.fmt.parseInt(u32, std.mem.trim(u8, body[0..x_index], " \t"), 10);
+    if (len == 0) return error.UnsupportedType;
+    const elem_ty = try parseVectorElementType(std.mem.trim(u8, body[x_index + 3 ..], " \t"));
+    return .{ .len = len, .elem_ty = elem_ty };
+}
+
+fn parseVectorElementType(text: []const u8) !core.VectorElementType {
+    if (std.mem.eql(u8, text, "ptr")) return .ptr;
+    if (std.mem.eql(u8, text, "float")) return .float;
+    if (std.mem.eql(u8, text, "double")) return .double;
+    if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
+    const bits = try std.fmt.parseInt(u16, text[1..], 10);
+    if (bits == 0) return error.UnsupportedType;
+    return .{ .int = bits };
+}
+
+fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
+    if (ty != .vector) return error.TypeMismatch;
+    const vector = ty.vector;
+    if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return error.InvalidValue;
+    var rest = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    var lane_count: u32 = 0;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const raw_lane = if (comma) |index| rest[0..index] else rest;
+        const lane = std.mem.trim(u8, raw_lane, " \t");
+        const typed = try parseLeadingType(lane);
+        if (!typed.ty.eql(vector.elem_ty.toType())) return error.TypeMismatch;
+        _ = try parseValueForLiteral(std.mem.trim(u8, typed.after, " \t"));
+        lane_count += 1;
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+    if (lane_count != vector.len) return error.TypeMismatch;
+}
+
+const ParsedLeadingType = struct {
+    ty: core.Type,
+    after: []const u8,
+};
+
+fn parseLeadingType(text: []const u8) !ParsedLeadingType {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return error.UnsupportedType;
+    if (trimmed[0] == '<') {
+        const close = findMatchingAngle(trimmed, 0) orelse return error.UnsupportedType;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
+        };
+    }
+    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
+    return .{
+        .ty = try parseType(trimmed[0..end]),
+        .after = std.mem.trim(u8, trimmed[end..], " \t"),
+    };
+}
+
+fn parseValueForLiteral(text: []const u8) !void {
+    if (text.len == 0) return error.InvalidValue;
+    if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "zeroinitializer")) return;
+    if (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false")) return;
+    _ = try std.fmt.parseInt(i128, text, 10);
+}
+
+fn findMatchingAngle(text: []const u8, open_index: usize) ?usize {
+    if (text[open_index] != '<') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '<') depth += 1;
+        if (byte == '>') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
+fn findTopLevelComma(text: []const u8) ?usize {
+    var angle_depth: usize = 0;
+    for (text, 0..) |byte, index| {
+        switch (byte) {
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            ',' => if (angle_depth == 0) return index,
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn verifyBinaryFlags(binary: core.BinaryInst) !void {
@@ -600,10 +704,18 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     switch (binary.op) {
         .fadd, .fmul => switch (binary.ty) {
             .float, .double => {},
+            .vector => |vector| switch (vector.elem_ty) {
+                .float, .double => {},
+                .int, .ptr => return error.TypeMismatch,
+            },
             .void, .int, .ptr, .aggregate => return error.TypeMismatch,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => switch (binary.ty) {
             .int => {},
+            .vector => |vector| switch (vector.elem_ty) {
+                .int => {},
+                .float, .double, .ptr => return error.TypeMismatch,
+            },
             .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
         },
     }
@@ -612,11 +724,11 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
 fn verifyCast(cast: core.CastInst) !void {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
+        .void, .float, .double, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
+        .void, .float, .double, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,

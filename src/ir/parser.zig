@@ -296,7 +296,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .undef, .null_value => .{ .scalar = value },
+        .int, .undef, .null_value, .zero_initializer, .vector => .{ .scalar = value },
         .named => error.UnsupportedGlobalVariable,
     };
 }
@@ -320,7 +320,7 @@ fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text
         if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
         switch (value) {
             .int, .undef, .null_value => try initializer.values.append(allocator, value),
-            .named => return error.UnsupportedGlobalVariable,
+            .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
@@ -337,7 +337,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .ptr => return null,
+        .void, .int, .float, .double, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -464,11 +464,10 @@ const FunctionPrefix = struct {
 };
 
 fn parseFunctionPrefix(prefix: []const u8, comptime invalid_error: anyerror) !FunctionPrefix {
-    const ret_ty_start = std.mem.lastIndexOfAny(u8, prefix, " \t");
-    const ret_ty_text = if (ret_ty_start) |start| std.mem.trim(u8, prefix[start + 1 ..], " \t") else prefix;
-    var rest = if (ret_ty_start) |start| std.mem.trim(u8, prefix[0..start], " \t") else "";
+    const typed_prefix = parseTrailingType(prefix) catch return invalid_error;
+    var rest = typed_prefix.before;
 
-    var parsed: FunctionPrefix = .{ .ret_ty = parseType(ret_ty_text) catch return invalid_error };
+    var parsed: FunctionPrefix = .{ .ret_ty = typed_prefix.ty };
     if (firstToken(rest)) |token| {
         if (core.FunctionLinkage.parse(token)) |linkage| {
             parsed.linkage = linkage;
@@ -515,16 +514,16 @@ fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text:
         const raw_param = if (comma) |index| rest[0..index] else rest;
         const param_text = std.mem.trim(u8, raw_param, " \t");
         if (std.mem.eql(u8, param_text, "...")) return error.UnsupportedVarArgs;
-        var parts = std.mem.tokenizeAny(u8, param_text, " \t");
-        const param_ty = try parseType(parts.next() orelse return error.InvalidParameter);
+        const parsed_ty = try parseLeadingType(param_text);
+        var parts = std.mem.tokenizeAny(u8, parsed_ty.after, " \t");
         const attrs_start = if (parts.next()) |part| @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr) else null;
         if (attrs_start) |start| {
             try decl.params.append(allocator, .{
-                .ty = param_ty,
+                .ty = parsed_ty.ty,
                 .attrs = std.mem.trim(u8, param_text[start..], " \t"),
             });
         } else {
-            try decl.params.append(allocator, .{ .ty = param_ty });
+            try decl.params.append(allocator, .{ .ty = parsed_ty.ty });
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
@@ -548,8 +547,8 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
             const comma = findTopLevelComma(rest);
             const raw_param = if (comma) |index| rest[0..index] else rest;
             const param_text = std.mem.trim(u8, raw_param, " \t");
-            var parts = std.mem.tokenizeAny(u8, param_text, " \t");
-            const param_ty = try parseType(parts.next() orelse return error.InvalidParameter);
+            const parsed_ty = try parseLeadingType(param_text);
+            var parts = std.mem.tokenizeAny(u8, parsed_ty.after, " \t");
             var param_attrs_start: ?usize = null;
             var param_name_token: ?[]const u8 = null;
             while (parts.next()) |part| {
@@ -569,7 +568,7 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
             else
                 "";
             try function.params.append(allocator, .{
-                .ty = param_ty,
+                .ty = parsed_ty.ty,
                 .attrs = if (param_attrs.len == 0) null else param_attrs,
                 .name = param_name[1..],
             });
@@ -662,14 +661,12 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "freeze")) {
-        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
+        const typed = try parseLeadingType(std.mem.trim(u8, rhs_text["freeze".len..], " \t"));
         return .{
             .result = result_text[1..],
             .kind = .{ .freeze = .{
-                .ty = ty,
-                .value = value,
+                .ty = typed.ty,
+                .value = try parseValue(typed.after),
             } },
         };
     }
@@ -747,21 +744,48 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     const op = core.BinaryOp.parse(op_text) orelse return error.UnsupportedInstruction;
-    const flags = try parseBinaryFlags(&parts);
-    const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-    const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-    const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-    if (parts.next() != null) return error.InvalidInstruction;
+    const binary = try parseBinaryInst(op, std.mem.trim(u8, rhs_text[op_text.len..], " \t"));
 
     return .{
         .result = result_text[1..],
-        .kind = .{ .binary = .{
-            .op = op,
-            .flags = flags,
-            .ty = ty,
-            .lhs = lhs,
-            .rhs = rhs,
-        } },
+        .kind = .{ .binary = binary },
+    };
+}
+
+fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
+    var rest = std.mem.trim(u8, text, " \t");
+    var flags: core.BinaryFlags = .{};
+    while (firstToken(rest)) |token| {
+        if (std.mem.eql(u8, token, "nsw")) {
+            if (flags.nsw) return error.InvalidInstruction;
+            flags.nsw = true;
+        } else if (std.mem.eql(u8, token, "nuw")) {
+            if (flags.nuw) return error.InvalidInstruction;
+            flags.nuw = true;
+        } else if (std.mem.eql(u8, token, "exact")) {
+            if (flags.exact) return error.InvalidInstruction;
+            flags.exact = true;
+        } else if (std.mem.eql(u8, token, "disjoint")) {
+            if (flags.disjoint) return error.InvalidInstruction;
+            flags.disjoint = true;
+        } else {
+            break;
+        }
+        rest = trimFirstToken(rest);
+    }
+
+    const typed = try parseLeadingType(rest);
+    rest = std.mem.trim(u8, typed.after, " \t");
+    const comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const lhs = try parseValue(std.mem.trim(u8, rest[0..comma], " \t"));
+    const rhs = try parseValue(std.mem.trim(u8, rest[comma + 1 ..], " \t"));
+
+    return .{
+        .op = op,
+        .flags = flags,
+        .ty = typed.ty,
+        .lhs = lhs,
+        .rhs = rhs,
     };
 }
 
@@ -1241,15 +1265,14 @@ fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !core.PhiInst {
 }
 
 fn parseRet(line: []const u8) !core.Terminator {
-    var parts = std.mem.tokenizeAny(u8, line, " \t");
-    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidRet, "ret")) return error.InvalidRet;
-    const ty = try parseType(parts.next() orelse return error.InvalidRet);
+    if (!std.mem.startsWith(u8, line, "ret ")) return error.InvalidRet;
+    const typed = try parseLeadingType(line["ret ".len..]);
+    const ty = typed.ty;
     if (ty == .void) {
-        if (parts.next() != null) return error.InvalidRet;
+        if (std.mem.trim(u8, typed.after, " \t").len != 0) return error.InvalidRet;
         return .{ .ret = .{ .ty = ty } };
     }
-    const value = try parseValue(parts.next() orelse return error.InvalidRet);
-    if (parts.next() != null) return error.InvalidRet;
+    const value = try parseValue(std.mem.trim(u8, typed.after, " \t"));
     return .{ .ret = .{ .ty = ty, .value = value } };
 }
 
@@ -1307,12 +1330,106 @@ fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;
     return .{ .int = bits };
+}
+
+const ParsedLeadingType = struct {
+    ty: core.Type,
+    after: []const u8,
+};
+
+const ParsedTrailingType = struct {
+    before: []const u8,
+    ty: core.Type,
+};
+
+fn parseLeadingType(text: []const u8) !ParsedLeadingType {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return error.UnsupportedType;
+    if (trimmed[0] == '<') {
+        const close = findMatchingAngle(trimmed, 0) orelse return error.UnsupportedType;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
+        };
+    }
+    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
+    return .{
+        .ty = try parseType(trimmed[0..end]),
+        .after = std.mem.trim(u8, trimmed[end..], " \t"),
+    };
+}
+
+fn parseTrailingType(text: []const u8) !ParsedTrailingType {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return error.UnsupportedType;
+    if (trimmed[trimmed.len - 1] == '>') {
+        const open = findMatchingAngleOpen(trimmed, trimmed.len - 1) orelse return error.UnsupportedType;
+        return .{
+            .before = std.mem.trim(u8, trimmed[0..open], " \t"),
+            .ty = try parseType(trimmed[open..]),
+        };
+    }
+    const start = std.mem.lastIndexOfAny(u8, trimmed, " \t");
+    return .{
+        .before = if (start) |index| std.mem.trim(u8, trimmed[0..index], " \t") else "",
+        .ty = try parseType(if (start) |index| trimmed[index + 1 ..] else trimmed),
+    };
+}
+
+fn parseVectorType(text: []const u8) !core.VectorType {
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    if (std.mem.startsWith(u8, body, "vscale")) return error.UnsupportedType;
+    const x_index = std.mem.indexOf(u8, body, " x ") orelse return error.UnsupportedType;
+    const len = try std.fmt.parseInt(u32, std.mem.trim(u8, body[0..x_index], " \t"), 10);
+    if (len == 0) return error.UnsupportedType;
+    const elem_ty = try parseVectorElementType(std.mem.trim(u8, body[x_index + 3 ..], " \t"));
+    return .{ .len = len, .elem_ty = elem_ty };
+}
+
+fn parseVectorElementType(text: []const u8) !core.VectorElementType {
+    if (std.mem.eql(u8, text, "ptr")) return .ptr;
+    if (std.mem.eql(u8, text, "float")) return .float;
+    if (std.mem.eql(u8, text, "double")) return .double;
+    if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
+    const bits = try std.fmt.parseInt(u16, text[1..], 10);
+    if (bits == 0) return error.UnsupportedType;
+    return .{ .int = bits };
+}
+
+fn findMatchingAngle(text: []const u8, open_index: usize) ?usize {
+    if (text[open_index] != '<') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '<') depth += 1;
+        if (byte == '>') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
+fn findMatchingAngleOpen(text: []const u8, close_index: usize) ?usize {
+    if (text[close_index] != '>') return null;
+    var depth: usize = 0;
+    var index = close_index + 1;
+    while (index > 0) {
+        index -= 1;
+        const byte = text[index];
+        if (byte == '>') depth += 1;
+        if (byte == '<') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
 }
 
 fn findTopLevelComma(text: []const u8) ?usize {
@@ -1350,18 +1467,21 @@ fn findTopLevelComma(text: []const u8) ?usize {
 }
 
 fn parseValue(text: []const u8) !core.Value {
-    if (text.len == 0) return error.InvalidValue;
-    if (std.mem.eql(u8, text, "undef")) return .undef;
-    if (std.mem.eql(u8, text, "null")) return .null_value;
-    if (std.mem.eql(u8, text, "true")) return .{ .int = 1 };
-    if (std.mem.eql(u8, text, "false")) return .{ .int = 0 };
-    if (text[0] == '%') {
-        if (text.len == 1) return error.InvalidValueName;
-        return .{ .named = text[1..] };
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return error.InvalidValue;
+    if (std.mem.eql(u8, trimmed, "undef")) return .undef;
+    if (std.mem.eql(u8, trimmed, "null")) return .null_value;
+    if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .zero_initializer;
+    if (std.mem.eql(u8, trimmed, "true")) return .{ .int = 1 };
+    if (std.mem.eql(u8, trimmed, "false")) return .{ .int = 0 };
+    if (trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = trimmed };
+    if (trimmed[0] == '%') {
+        if (trimmed.len == 1) return error.InvalidValueName;
+        return .{ .named = trimmed[1..] };
     }
-    if (text[0] == '@') {
-        if (text.len == 1) return error.InvalidValueName;
-        return .{ .named = text };
+    if (trimmed[0] == '@') {
+        if (trimmed.len == 1) return error.InvalidValueName;
+        return .{ .named = trimmed };
     }
-    return .{ .int = try std.fmt.parseInt(i128, text, 10) };
+    return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
 }

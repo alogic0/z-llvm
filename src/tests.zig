@@ -1537,7 +1537,7 @@ test "parser verifies null pointer constants from optional lowering" {
     try std.testing.expectError(error.TypeMismatch, invalid_module.verify());
 }
 
-test "parser rejects vector IR boundary forms deliberately" {
+test "parser preserves fixed vector signatures and rejects unsupported vector boundaries" {
     const vector_add =
         \\define i32 @vector_add() {
         \\entry:
@@ -1546,7 +1546,18 @@ test "parser rejects vector IR boundary forms deliberately" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_add));
+    var vector_module = try ir.Module.parse(std.testing.allocator, vector_add);
+    defer vector_module.deinit();
+    try vector_module.verify();
+    try std.testing.expect(vector_module.functions.items[0].blocks.items[0].instructions.items[0].kind.binary.ty.eql(.{ .vector = .{
+        .len = 2,
+        .elem_ty = .{ .int = 32 },
+    } }));
+
+    var printed: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer printed.deinit();
+    try vector_module.print(&printed.writer);
+    try std.testing.expectEqualStrings(vector_add, printed.writer.buffered());
 
     const shuffle =
         \\define i32 @shuffle() {
@@ -1579,14 +1590,45 @@ test "parser rejects vector IR boundary forms deliberately" {
     try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, extract));
 
     const vector_constant =
-        \\define i32 @vector_constant() {
+        \\define <2 x i32> @vector_constant() {
         \\entry:
         \\  %v = freeze <2 x i32> <i32 1, i32 2>
-        \\  ret i32 0
+        \\  ret <2 x i32> %v
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_constant));
+    var constant_module = try ir.Module.parse(std.testing.allocator, vector_constant);
+    defer constant_module.deinit();
+    try constant_module.verify();
+
+    const scalable =
+        \\define <vscale x 2 x i32> @scalable(<vscale x 2 x i32> %a) {
+        \\entry:
+        \\  ret <vscale x 2 x i32> %a
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.InvalidFunctionHeader, ir.Module.parse(std.testing.allocator, scalable));
+
+    const unsupported_element =
+        \\define <2 x { i32 }> @bad_elem(<2 x { i32 }> %a) {
+        \\entry:
+        \\  ret <2 x { i32 }> %a
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.InvalidFunctionHeader, ir.Module.parse(std.testing.allocator, unsupported_element));
+
+    const mismatch =
+        \\define <2 x i32> @mismatch() {
+        \\entry:
+        \\  ret <2 x i32> 0
+        \\}
+        \\
+    ;
+    var mismatch_module = try ir.Module.parse(std.testing.allocator, mismatch);
+    defer mismatch_module.deinit();
+    try std.testing.expectError(error.TypeMismatch, mismatch_module.verify());
 }
 
 test "parser preserves inert branch metadata attachments" {

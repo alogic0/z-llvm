@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../ir.zig");
 
 pub fn canonicalizeCommutativeConstantRhs(binary: *ir.BinaryInst) bool {
+    if (binary.ty.isVector()) return false;
     if (binary.flags.any()) return false;
     if (!isCommutative(binary.op)) return false;
     if (binary.lhs != .int or binary.rhs == .int) return false;
@@ -28,6 +29,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
     return switch (a.kind) {
         .binary => |a_binary| switch (b.kind) {
             .binary => |b_binary| a_binary.op != .fadd and
+                !a_binary.ty.isVector() and
                 !isFpBinary(a_binary.op) and
                 !isFpBinary(b_binary.op) and
                 a_binary.op == b_binary.op and
@@ -86,6 +88,7 @@ fn samePhi(a: ir.PhiInst, b: ir.PhiInst) bool {
 }
 
 fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.ty.isVector()) return null;
     if (binary.lhs == .int and binary.rhs == .int) {
         if (simplifyBinaryConstants(binary)) |replacement| return replacement;
     }
@@ -209,7 +212,7 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
 fn simplifyFreeze(freeze: ir.FreezeInst) ?ir.Value {
     return switch (freeze.value) {
         .int => freeze.value,
-        .named, .undef, .null_value => null,
+        .named, .undef, .null_value, .zero_initializer, .vector => null,
     };
 }
 
@@ -359,7 +362,7 @@ fn isSignedMin(value: i128, ty: ir.Type) bool {
 fn intBits(ty: ir.Type) ?u16 {
     return switch (ty) {
         .int => |bits| bits,
-        .void, .float, .double, .ptr, .aggregate => null,
+        .void, .float, .double, .ptr, .aggregate, .vector => null,
     };
 }
 

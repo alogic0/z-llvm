@@ -111,7 +111,7 @@ fn addInitializerEdges(
 fn addValueEdge(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), value: ir.Value) !void {
     const raw_name = switch (value) {
         .named => |name| name,
-        .int, .undef, .null_value => return,
+        .int, .undef, .null_value, .zero_initializer, .vector => return,
     };
     const name = if (std.mem.startsWith(u8, raw_name, "@")) raw_name[1..] else raw_name;
     if (hasFunctionDefinition(module, name)) {

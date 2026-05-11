@@ -31,7 +31,7 @@ Parser:
 
 Verifier:
 
-- Full atomic ordering, inline asm constraints, and vector lane/type invariants have
+- Full atomic ordering, inline asm constraints, and vector lane-operation invariants have
       no verifier contract yet.
 - Debug metadata is preserved for reduced fixtures, but large Debug-mode Zig IR
       still needs smaller source-backed reductions before verifier policy can be
@@ -79,7 +79,7 @@ Backend handoff:
 The next wave should stay source-backed and pull only one bounded blocker at a
 time:
 
-1. Vector IR parser/verifier bootstrap plus target-cost policy boundaries.
+1. Vector lane operation boundaries plus target-cost policy decisions.
 2. AArch64 optimizer-input separation for target-independent passes.
 3. Debug-mode reduction work for large source-backed Debug rows.
 4. Path-aware MemorySSA only after a source-backed fixture demonstrates that the

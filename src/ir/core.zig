@@ -7,22 +7,31 @@ pub const Type = union(enum) {
     double,
     ptr,
     aggregate: []const u8,
+    vector: VectorType,
 
     pub fn eql(a: Type, b: Type) bool {
         return switch (a) {
             .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .void, .float, .double, .ptr, .aggregate => false,
+                .void, .float, .double, .ptr, .aggregate, .vector => false,
             },
             .float => b == .float,
             .double => b == .double,
             .ptr => b == .ptr,
             .aggregate => |text| switch (b) {
                 .aggregate => |other_text| std.mem.eql(u8, text, other_text),
-                .void, .int, .float, .double, .ptr => false,
+                .void, .int, .float, .double, .ptr, .vector => false,
+            },
+            .vector => |vector| switch (b) {
+                .vector => |other_vector| vector.eql(other_vector),
+                .void, .int, .float, .double, .ptr, .aggregate => false,
             },
         };
+    }
+
+    pub fn isVector(ty: Type) bool {
+        return ty == .vector;
     }
 
     pub fn format(ty: Type, writer: anytype) !void {
@@ -33,7 +42,60 @@ pub const Type = union(enum) {
             .double => try writer.writeAll("double"),
             .ptr => try writer.writeAll("ptr"),
             .aggregate => |text| try writer.writeAll(text),
+            .vector => |vector| try vector.format(writer),
         }
+    }
+};
+
+pub const VectorElementType = union(enum) {
+    int: u16,
+    float,
+    double,
+    ptr,
+
+    pub fn eql(a: VectorElementType, b: VectorElementType) bool {
+        return switch (a) {
+            .int => |bits| switch (b) {
+                .int => |other_bits| bits == other_bits,
+                .float, .double, .ptr => false,
+            },
+            .float => b == .float,
+            .double => b == .double,
+            .ptr => b == .ptr,
+        };
+    }
+
+    pub fn toType(elem_ty: VectorElementType) Type {
+        return switch (elem_ty) {
+            .int => |bits| .{ .int = bits },
+            .float => .float,
+            .double => .double,
+            .ptr => .ptr,
+        };
+    }
+
+    pub fn format(elem_ty: VectorElementType, writer: anytype) !void {
+        switch (elem_ty) {
+            .int => |bits| try writer.print("i{}", .{bits}),
+            .float => try writer.writeAll("float"),
+            .double => try writer.writeAll("double"),
+            .ptr => try writer.writeAll("ptr"),
+        }
+    }
+};
+
+pub const VectorType = struct {
+    len: u32,
+    elem_ty: VectorElementType,
+
+    pub fn eql(a: VectorType, b: VectorType) bool {
+        return a.len == b.len and a.elem_ty.eql(b.elem_ty);
+    }
+
+    pub fn format(vector: VectorType, writer: anytype) !void {
+        try writer.print("<{} x ", .{vector.len});
+        try vector.elem_ty.format(writer);
+        try writer.writeAll(">");
     }
 };
 
@@ -42,19 +104,26 @@ pub const Value = union(enum) {
     int: i128,
     undef,
     null_value,
+    zero_initializer,
+    vector: []const u8,
 
     pub fn eql(a: Value, b: Value) bool {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int, .undef, .null_value => false,
+                .int, .undef, .null_value, .zero_initializer, .vector => false,
             },
             .int => |value| switch (b) {
-                .named, .undef, .null_value => false,
+                .named, .undef, .null_value, .zero_initializer, .vector => false,
                 .int => |other_value| value == other_value,
             },
             .undef => b == .undef,
             .null_value => b == .null_value,
+            .zero_initializer => b == .zero_initializer,
+            .vector => |text| switch (b) {
+                .vector => |other_text| std.mem.eql(u8, text, other_text),
+                .named, .int, .undef, .null_value, .zero_initializer => false,
+            },
         };
     }
 
@@ -70,6 +139,8 @@ pub const Value = union(enum) {
             .int => |int| try writer.print("{}", .{int}),
             .undef => try writer.writeAll("undef"),
             .null_value => try writer.writeAll("null"),
+            .zero_initializer => try writer.writeAll("zeroinitializer"),
+            .vector => |text| try writer.writeAll(text),
         }
     }
 };
@@ -645,7 +716,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int, .undef, .null_value => value,
+        .int, .undef, .null_value, .zero_initializer, .vector => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }
