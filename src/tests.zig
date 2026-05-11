@@ -2267,6 +2267,18 @@ test "parser preserves size attributes and profile metadata opaquely" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "target feature attributes are extractable but not optimization inputs" {
+    const attrs = target.features.parseAttributeText(
+        \\attributes #0 = { minsize "target-cpu"="x86-64" "target-features"="+sse,+sse2,-avx" }
+    );
+
+    try std.testing.expectEqualStrings("x86-64", attrs.cpu.?);
+    try std.testing.expectEqualStrings("+sse,+sse2,-avx", attrs.features.?);
+    try std.testing.expect(attrs.hasFeature("+sse2"));
+    try std.testing.expect(attrs.hasFeature("-avx"));
+    try std.testing.expect(!attrs.hasFeature("+avx"));
+}
+
 test "parser rejects unsupported aggregate globals explicitly" {
     const input =
         \\@s = private unnamed_addr constant [4 x i8] c"abc\00"

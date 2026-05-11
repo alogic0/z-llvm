@@ -91,7 +91,7 @@ completed foundation epics
 - [x] [Cycle 23: Module Flags, COMDAT, And Linkage](roadmap/23_module_flags_comdat_and_linkage_cycle.md)
 - [x] [Cycle 24: Concurrency And TLS](roadmap/24_concurrency_and_tls_cycle.md)
 - [x] [Cycle 25: Profile-Guided And Size Optimization](roadmap/25_profile_guided_and_size_optimization_cycle.md)
-- [ ] [Cycle 26: Target Feature And CPU Model](roadmap/26_target_feature_and_cpu_model_cycle.md)
+- [x] [Cycle 26: Target Feature And CPU Model](roadmap/26_target_feature_and_cpu_model_cycle.md)
 - [ ] [Cycle 27: Correctness Fuzzing And Differential Testing](roadmap/27_correctness_fuzzing_and_differential_cycle.md)
 - [ ] [Cycle 28: Upstream Integration Readiness](roadmap/28_upstream_integration_readiness_cycle.md)
 

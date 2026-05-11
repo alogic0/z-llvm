@@ -45,3 +45,7 @@ no vector constants
 no loop or SLP vectorization
 no target feature or CPU model cost variation
 ```
+
+Target feature extraction is documented in `docs/target/features.md`. Those
+facts are preserved for future TargetTransformInfo work, not consumed by the
+current optimizer.
