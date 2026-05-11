@@ -20,12 +20,12 @@ legality are fully proven.
 
 ## Plan
 
-- [ ] Extract shared expression-key construction for EarlyCSE and GVN.
+- [x] Extract shared expression-key construction for EarlyCSE and GVN.
 - [ ] Add stable hashing/equality for supported expression keys instead of
       linear scans where practical.
-- [ ] Include flags, predicates, types, operands, call attributes, and memory
+- [x] Include flags, predicates, types, operands, call attributes, and memory
       location facts in expression keys.
-- [ ] Keep load keys gated by the memory-dependence cycle's shared clobber
+- [x] Keep load keys gated by the memory-dependence cycle's shared clobber
       helper.
 - [ ] Add readnone and readonly call fixtures only when parser and attribute
       support can represent the case honestly.
@@ -38,9 +38,21 @@ legality are fully proven.
 
 ## Exit Criteria
 
-- [ ] EarlyCSE and GVN use compatible expression identity rules.
+- [x] EarlyCSE and GVN use compatible expression identity rules.
 - [ ] GVN has documented dominance and insertion-point checks for any PRE it
       performs.
 - [ ] Memory value numbering remains conservative and tested.
 - [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
+## Completed Shared Expression-Key Slice
+
+- [x] Added `src/analysis/expression_key.zig` as the shared identity helper for
+      EarlyCSE and GVN.
+- [x] Centralized scalar expression, exact PHI, non-barrier must-alias load, and
+      readnone direct-call equivalence rules.
+- [x] Routed both `src/passes/early_cse.zig` and `src/passes/gvn.zig` through
+      the shared helper while preserving MemorySSA-like clobber checks for load
+      availability.
+- [x] Documented the helper and its LLVM mapping in
+      `docs/analysis/expression_key.md`.
+- [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.

@@ -59,6 +59,7 @@ Implemented subset:
 
 ```text
 local ValueTable for pure binary, integer cast, icmp, select, phi, readnone call, and simple load expressions
+expression identity shared with EarlyCSE through `src/analysis/expression_key.zig`
 leader table scoped by dominator traversal
 shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
 equivalence by opcode, flags where present, type, and operands
@@ -66,7 +67,7 @@ simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
-scalar expression equivalence shared with the InstSimplify helper
+scalar, load, and readnone-call expression equivalence shared with EarlyCSE
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.

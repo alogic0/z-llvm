@@ -1,12 +1,12 @@
 const std = @import("std");
 const alias = @import("../analysis/alias.zig");
 const dominator = @import("../analysis/dominator.zig");
+const expression_key = @import("../analysis/expression_key.zig");
 const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const memory_ssa = @import("../analysis/memory_ssa.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
-const inst_simplify = @import("inst_simplify.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "early-cse",
@@ -209,34 +209,7 @@ fn sameAvailableExpression(
         if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
         return !hasClobber(module, function, candidate, block_index, instruction_index, load.ptr);
     }
-    if (sameReadnoneCall(module, candidate.instruction, instruction)) return true;
-    return inst_simplify.sameExpression(candidate.instruction, instruction);
-}
-
-fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) bool {
-    const a_call = switch (a.kind) {
-        .call => |call| call,
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return false,
-    };
-    const b_call = switch (b.kind) {
-        .call => |call| call,
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return false,
-    };
-    if (function_attrs.callMemoryEffect(module, a_call) != .none) return false;
-    if (function_attrs.callMemoryEffect(module, b_call) != .none) return false;
-    if (!a_call.ret_ty.eql(b_call.ret_ty)) return false;
-    if (!std.mem.eql(u8, a_call.callee, b_call.callee)) return false;
-    if (a_call.calling_conv == null and b_call.calling_conv != null) return false;
-    if (a_call.calling_conv != null and b_call.calling_conv == null) return false;
-    if (a_call.calling_conv) |calling_conv| {
-        if (!std.mem.eql(u8, calling_conv, b_call.calling_conv.?)) return false;
-    }
-    if (a_call.args.items.len != b_call.args.items.len) return false;
-    for (a_call.args.items, b_call.args.items) |a_arg, b_arg| {
-        if (!a_arg.ty.eql(b_arg.ty)) return false;
-        if (!a_arg.value.eql(b_arg.value)) return false;
-    }
-    return true;
+    return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
 }
 
 fn hasClobber(module: ir.Module, function: ir.Function, candidate: AvailableInstruction, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {

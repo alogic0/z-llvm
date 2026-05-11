@@ -51,6 +51,7 @@ Implemented subset:
 
 ```text
 scoped dominator-tree traversal with an available-expression stack
+expression identity shared with GVN through `src/analysis/expression_key.zig`
 same-basic-block and dominating-block common subexpression elimination
 pure binary expression matching
 pure integer cast expression matching
@@ -62,7 +63,7 @@ readnone call CSE when callee attributes prove no memory effects
 unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
-scalar expression equivalence shared with the InstSimplify helper
+scalar, load, and readnone-call expression equivalence shared with GVN
 ```
 
 Upstream mapping:
