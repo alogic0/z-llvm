@@ -85,7 +85,7 @@ completed foundation epics
 - [x] [Cycle 17: Loop Optimization Parity](roadmap/17_loop_optimization_parity_cycle.md)
 - [x] [Cycle 18: Scalar Optimization Quality](roadmap/18_scalar_optimization_quality_cycle.md)
 - [x] [Cycle 19: Machine IR Lowering Boundary](roadmap/19_machine_ir_lowering_boundary_cycle.md)
-- [ ] [Cycle 20: Object, Debug, And Unwind Boundary](roadmap/20_object_debug_and_unwind_cycle.md)
+- [x] [Cycle 20: Object, Debug, And Unwind Boundary](roadmap/20_object_debug_and_unwind_cycle.md)
 - [ ] [Cycle 21: Error Handling And EH IR](roadmap/21_error_handling_and_eh_ir_cycle.md)
 - [ ] [Cycle 22: Inline Assembly And Atomics](roadmap/22_inline_asm_and_atomics_cycle.md)
 - [ ] [Cycle 23: Module Flags, COMDAT, And Linkage](roadmap/23_module_flags_comdat_and_linkage_cycle.md)

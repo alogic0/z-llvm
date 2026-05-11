@@ -57,3 +57,9 @@ run_asm_case stack_slot
 
 bash scripts/compare_codegen_asm.sh
 printf 'ok handoff codegen asm smoke\n'
+
+bash scripts/compare_codegen_objdump.sh
+printf 'ok handoff codegen objdump smoke\n'
+
+bash scripts/compare_codegen_readelf.sh
+printf 'ok handoff codegen readelf smoke\n'

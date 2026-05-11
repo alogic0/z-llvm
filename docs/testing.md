@@ -148,8 +148,8 @@ arguments, and unsupported call live pressure.
 
 Native handoff validation is intentionally narrower than codegen completeness:
 `scripts/run_handoff_validation.sh` checks representative scalar, memory, loop,
-and global optimizer facts, then runs assembly smoke checks to keep local
-backend experiments validation-only.
+and global optimizer facts, then runs assembly, objdump, and readelf smoke
+checks to keep local backend experiments validation-only.
 
 LLVM algorithms covered so far:
 

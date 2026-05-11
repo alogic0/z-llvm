@@ -50,6 +50,7 @@ validation-only: ELF output validates symbol, relocation, and target-layout assu
 handoff study: object/debug/linker boundaries can be studied here only when optimizer work needs them
 out of scope: broad ELF, Mach-O, COFF, archives, linker integration, unwind, and debug sections
 handoff doc: docs/codegen/zig_native_backend_handoff.md
+boundary doc: docs/mc/object_debug_unwind_boundary.md
 ```
 
 Fixture coverage:
@@ -66,6 +67,7 @@ unit-test only:
   .text/.symtab section names
   global function symbol string
   objdump -dr fixtures for R_X86_64_PLT32 direct call relocations
+  readelf -r -s direct-call symbol and relocation smoke checks
 ```
 
 Known gaps:
