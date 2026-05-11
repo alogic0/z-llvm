@@ -65,7 +65,13 @@ ThinLTO and FullLTO are not semantically distinct locally
 ThinLTO summary indexes, combined indexes, import/export, WPD, and post-link
 pipelines are unsupported
 post-link LTO is not represented
+Cycle 23 decision: keep bitcode/LTO compatibility deferred and continue
+text-IR/native-handoff validation until a source-backed bitcode or LTO handoff
+use case activates the track
 ```
+
+Decision details are recorded in
+`docs/bitcode/lto_compatibility_decision.md`.
 
 ## Mode-Specific Boundary
 

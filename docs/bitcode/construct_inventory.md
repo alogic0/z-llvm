@@ -33,6 +33,8 @@ text LLVM-compatible IR remains the active comparison format
 bitcode is optional compatibility work, not a blocker for local optimizer slices
 LTO pre-link validation is text-IR and pipeline based; it is not a bitcode
 handoff implementation
+Cycle 23 decision: defer bitcode/LTO compatibility until an activation
+criterion in docs/bitcode/lto_compatibility_decision.md is met
 ```
 
 ## Requirement Classification
@@ -69,7 +71,7 @@ handoff implementation
 | Function bodies | blocks, instructions, terminators, phi incoming edges | accepted scalar/control-flow/memory/call/global subset only |
 | Attributes | function, parameter, return, call-site attributes | raw function/parameter attributes preserved; call attributes mostly rejected |
 | Metadata | named metadata, DI nodes, debug locations, TBAA, prof, range, loop metadata | raw top-level records, opaque instruction `!dbg`, and opaque branch `!prof`/loop attachments |
-| Comdat and aliases | COMDAT groups, aliases, ifuncs, unnamed addr | aliases accepted; COMDAT, ifuncs, and unnamed addr semantics missing |
+| Comdat and aliases | COMDAT groups, aliases, ifuncs, unnamed addr | aliases accepted; COMDAT records and references preserved conservatively; ifuncs and full unnamed_addr semantics missing |
 | Operand bundles | deopt, funclet, clang.arc, ptrauth, custom bundles | missing |
 | Use-list order | deterministic use-list preservation for bitcode round-trip | missing |
 | Summary index | ThinLTO module summary and combined index records | missing |

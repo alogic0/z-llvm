@@ -173,7 +173,7 @@ completed foundation epics
 - [x] [Cycle 20: TLS and Concurrency IR Acceptance](roadmap/20_tls_concurrency_ir_acceptance_cycle.md)
 - [x] [Cycle 21: EH Pad and Invoke Boundary](roadmap/21_eh_pad_invoke_boundary_cycle.md)
 - [x] [Cycle 22: Module Linkage, COMDAT, and Global Optimization](roadmap/22_module_linkage_comdat_globalopt_cycle.md)
-- [ ] [Cycle 23: Bitcode, LTO, and ThinLTO Compatibility Decision](roadmap/23_bitcode_lto_thinlto_compatibility_decision_cycle.md)
+- [x] [Cycle 23: Bitcode, LTO, and ThinLTO Compatibility Decision](roadmap/23_bitcode_lto_thinlto_compatibility_decision_cycle.md)
 - [ ] [Cycle 24: Upstream Readiness Finish Audit](roadmap/24_upstream_readiness_finish_audit_cycle.md)
 
 ## Future Backlog

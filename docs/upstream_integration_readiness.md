@@ -41,7 +41,9 @@ DWARF/CodeView/unwind emission
 TLS lowering and linker integration
 PGO, BFI/BPI, TTI, and size-cost decisions
 EH pads, inline asm semantics, and full atomic memory model
-bitcode writer, LTO, and ThinLTO summary behavior
+bitcode writer, LTO, and ThinLTO summary behavior; Cycle 23 keeps these
+deferred unless a concrete bitcode or linker-LTO handoff use case activates
+that compatibility track
 ```
 
 ## Upstreamable Design Input

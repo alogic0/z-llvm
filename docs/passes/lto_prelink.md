@@ -17,6 +17,7 @@ Optional-track docs:
 ```text
 docs/semantics/optional_bitcode_debug_lto_tracks.md
 docs/bitcode/construct_inventory.md
+docs/bitcode/lto_compatibility_decision.md
 docs/lto/behavior_gaps.md
 ```
 
@@ -74,6 +75,8 @@ No alias canonicalization runs until aliases are represented.
 No anonymous global naming runs until anonymous global identity is represented.
 No summary index, import/export, post-link inlining, WPD, CFI, or bitcode
 summary emission.
+Cycle 23 keeps this as a pipeline-surface track only; bitcode/LTO compatibility
+work starts only from the activation criteria in the decision doc.
 ```
 
 Fixture coverage:
