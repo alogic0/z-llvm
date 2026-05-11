@@ -33,3 +33,13 @@ DCE to remove unused extract/insert/shuffle operations. InstCombine now folds
 `extractelement (insertelement V, X, C), C` to `X` for the same constant lane.
 Vectorizers, scalable vectors, target-cost profitability, and target-dependent
 vector combines remain deferred.
+
+Post-audit closure:
+
+- MemorySSA classifies fixed-vector `extractelement`, `insertelement`, and
+  `shufflevector` as non-accesses rather than barriers.
+- Alias ModRef reports fixed-vector lane operations as `NoModRef`.
+- EarlyCSE local store availability no longer treats fixed-vector lane
+  operations as store clobbers.
+- GVN, EarlyCSE, and DSE fixtures cover the no-clobber behavior across vector
+  lane operations.

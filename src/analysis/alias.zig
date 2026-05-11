@@ -74,8 +74,8 @@ pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Va
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesPointer(function, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .no_mod_ref,
+        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
     };
 }
 
@@ -90,8 +90,8 @@ pub fn modRefInModule(module: ir.Module, function: ir.Function, instruction: ir.
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesPointerInModule(module, function, layout, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .no_mod_ref,
+        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
     };
 }
 
@@ -105,8 +105,8 @@ pub fn modRefForAccess(function: ir.Function, instruction: ir.Instruction, point
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesAccess(function, store.ptr, store.ty, pointer, access_ty)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .no_mod_ref,
+        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
     };
 }
 
@@ -121,8 +121,8 @@ pub fn modRefInModuleForAccess(module: ir.Module, function: ir.Function, instruc
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesAccessInModule(module, function, layout, store.ptr, store.ty, pointer, access_ty)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .no_mod_ref,
+        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
     };
 }
 

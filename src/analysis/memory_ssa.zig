@@ -279,8 +279,8 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 const later = accessLocation(function, layout, load.ptr, load.ty) orelse return false;
                 if (alias.aliasLocations(later, location) != .no_alias) return false;
             },
-            .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => return false,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
+            .atomicrmw, .cmpxchg, .fence, .call => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => {},
         }
     }
     return false;
@@ -298,13 +298,13 @@ fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .barrier else .use,
         .store => |store| if (store.attrs.isBarrier()) .barrier else .def,
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => .barrier,
+        .atomicrmw, .cmpxchg, .fence => .barrier,
         .call => |call| switch (function_attrs.callMemoryEffect(module, call)) {
             .none => null,
             .readonly_load => .use,
             .memory_write, .volatile_or_atomic_barrier, .unknown => .barrier,
         },
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => null,
     };
 }
 

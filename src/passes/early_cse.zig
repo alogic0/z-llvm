@@ -168,9 +168,9 @@ fn updateMemoryAvailability(
             .none, .readonly_load => {},
             .memory_write, .volatile_or_atomic_barrier, .unknown => stores.clearRetainingCapacity(),
         },
-        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => stores.clearRetainingCapacity(),
+        .atomicrmw, .cmpxchg, .fence => stores.clearRetainingCapacity(),
         .load => |load| if (load.attrs.isBarrier()) stores.clearRetainingCapacity(),
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => {},
     }
 }
 

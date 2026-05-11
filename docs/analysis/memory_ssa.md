@@ -49,6 +49,9 @@ Implemented subset:
   def/barrier for the queried pointer using module DataLayout and globals.
   readnone and readonly direct calls are treated as non-clobbering for load
   availability through function attribute classification.
+  Fixed-vector extractelement, insertelement, and shufflevector instructions are
+  pure non-accesses, so they do not create MemoryUse, MemoryDef, or barrier
+  entries.
   unknown calls, volatile memory, atomic memory, may-alias stores, and
   same-pointer stores are clobbers.
   Cross-block clobber queries are path-aware for the accepted access-list slice:
@@ -96,6 +99,8 @@ Fixture coverage:
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixtures: early_cse_load_branch_clobber_reject
   opt fixture: early_cse_unreachable_store_not_clobber
+  opt fixtures: gvn_vector_lane_not_clobber,
+    early_cse_vector_lane_store_forward, dse_vector_lane_not_barrier
   local-only opt fixture: early_cse_diamond_no_memory_phi
   local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
