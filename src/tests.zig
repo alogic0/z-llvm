@@ -1238,6 +1238,24 @@ test "verifier rejects direct call signature mismatch" {
     try std.testing.expectError(error.CallSignatureMismatch, module.verify());
 }
 
+test "verifier rejects direct call calling convention mismatch" {
+    const input =
+        \\declare fastcc i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.CallSignatureMismatch, module.verify());
+}
+
 test "verifier accepts matching declaration and definition" {
     const input =
         \\declare i32 @callee(i32)
@@ -1489,6 +1507,37 @@ test "verifier rejects phi after non-phi instructions" {
     defer module.deinit();
 
     try std.testing.expectError(error.PhiAfterNonPhi, module.verify());
+}
+
+test "verifier rejects entry block predecessors" {
+    const input =
+        \\define void @bad() {
+        \\entry:
+        \\  br label %entry
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.EntryBlockHasPredecessors, module.verify());
+}
+
+test "verifier rejects invalid memory alignment" {
+    const input =
+        \\define i32 @bad(ptr %p) {
+        \\entry:
+        \\  %v = load i32, ptr %p, align 3
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.InvalidAlignment, module.verify());
 }
 
 test "parser rejects unsupported indirect and control-flow calls" {

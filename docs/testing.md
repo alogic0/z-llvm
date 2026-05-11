@@ -85,7 +85,7 @@ function visibility and raw parameter attribute preservation
 calling convention preservation for ccc/fastcc/coldcc-compatible header parsing
 function declaration and direct call round-tripping
 direct call verifier mismatch and unsupported-call diagnostics
-verifier dominance, use-before-def, exact phi predecessor, and phi ordering diagnostics
+verifier dominance, use-before-def, exact phi predecessor, phi ordering, entry-block predecessor, calling-convention mismatch, and memory-alignment diagnostics
 Zig mode pipeline expansion for debug-o0 and release-o3, including executable placeholders
 void function and ret void round-tripping
 explicit unsupported global diagnostics
@@ -147,7 +147,7 @@ arguments, and unsupported call live pressure.
 LLVM algorithms covered so far:
 
 ```text
-Verifier: accepted-IR subset for terminators, call signatures, memory attributes, SSA dominance, use-before-def, and phi predecessor validation
+Verifier: accepted-IR subset for target records, function/block shape, terminators, call signatures and calling conventions, memory attributes, SSA dominance, use-before-def, entry-block predecessor rejection, and phi predecessor validation
 PassBuilder pipeline surface: named pass registry, Zig mode pipeline descriptors, and no-op placeholders for not-yet-implemented inventory passes
 PassBuilder nesting surface: textual module/function/loop/CGSCC group placeholders flattened to module pass execution
 InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scalar cast/div-rem folding, safe variable div/rem identities, freeze-constant folding, conservative scalar flag/division preservation, and commutative canonicalization subsets

@@ -15,40 +15,54 @@ This epic is the safety gate for all later optimizer work.
 
 ## Plan
 
-- [ ] Document verifier scope for the first milestone:
+- [x] Document verifier scope for the first milestone:
       CFG shape, terminators, PHI placement, type consistency, dominance,
       attributes, globals, function declarations, and data layout basics.
-- [ ] Add analysis inventory hooks needed by later optimizer parity work:
+- [x] Add analysis inventory hooks needed by later optimizer parity work:
       DominatorTree, PostDominatorTree, control-dependence queries,
       executable CFG block/edge tracking, sparse value lattice, scoped hash
       tables, MemorySSA-like memory state, AliasAnalysis/ModRef, and global-use
       graph.
-- [ ] Add block and instruction indexing helpers used by verifier diagnostics.
-- [ ] Implement CFG validity checks:
+- [x] Add block and instruction indexing helpers used by verifier diagnostics.
+- [x] Implement CFG validity checks:
       entry block, terminators, predecessor/successor agreement, unreachable
       block handling, and malformed branch targets.
-- [ ] Implement PHI checks:
+- [x] Implement PHI checks:
       incoming block count, incoming block identity, incoming value type, and
       placement before non-PHI instructions.
-- [ ] Implement SSA dominance checks for instruction and PHI uses.
-- [ ] Implement basic type checks for arithmetic, casts, loads, stores, calls,
+- [x] Implement SSA dominance checks for instruction and PHI uses.
+- [x] Implement basic type checks for arithmetic, casts, loads, stores, calls,
       returns, comparisons, GEP, and select.
-- [ ] Implement function declaration and call signature checks.
-- [ ] Implement data-layout and target-triple validation hooks without trying
+- [x] Implement function declaration and call signature checks.
+- [x] Implement data-layout and target-triple validation hooks without trying
       to model every target detail in the first slice.
-- [ ] Add diagnostic tests that compare accepted/rejected cases with LLVM 22
+- [x] Add diagnostic tests that compare accepted/rejected cases with LLVM 22
       where behavior should match.
 
 ## Deliverables
 
-- [ ] Verifier design doc under `../semantics`.
-- [ ] Verifier implementation in the local IR layer.
-- [ ] Analysis prerequisite inventory for optimizer epics.
-- [ ] Zig-emitted verifier fixture coverage.
-- [ ] LLVM 22 comparison notes.
+- [x] Verifier design doc under `../semantics`.
+- [x] Verifier implementation in the local IR layer.
+- [x] Analysis prerequisite inventory for optimizer epics.
+- [x] Zig-emitted verifier fixture coverage.
+- [x] LLVM 22 comparison notes.
 
 ## Exit Criteria
 
-- [ ] Optimizer passes can require verified IR as input.
-- [ ] Invalid SSA, PHI, CFG, and obvious type errors are rejected.
-- [ ] Known verifier gaps are listed with examples.
+- [x] Optimizer passes can require verified IR as input.
+- [x] Invalid SSA, PHI, CFG, and obvious type errors are rejected.
+- [x] Known verifier gaps are listed with examples.
+
+## Implementation Notes
+
+- Verifier scope and known gaps are documented in
+  `docs/semantics/ir_verifier_foundation.md` and `docs/ir_verifier.md`.
+- Shared optimizer analysis prerequisites are documented in
+  `docs/analysis/optimizer_analysis_prerequisites.md`.
+- The local verifier now rejects empty function bodies, duplicate block labels,
+  entry-block predecessors, malformed branch targets, PHI/CFG mismatches,
+  invalid SSA dominance, call signature and calling-convention mismatches,
+  invalid non-power-of-two memory alignment, unknown atomic orderings, and
+  malformed target records for the accepted IR subset.
+- The first Zig-originated verifier fixture remains the normalized tiny scalar
+  corpus from `docs/fixtures/zig_ir/README.md`.

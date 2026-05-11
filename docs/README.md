@@ -23,7 +23,7 @@ inventory
 
 - [x] [Epic 1: Zig LLVM Dependency Inventory](roadmap/01_zig_llvm_dependency_inventory.md)
 - [x] [Epic 2: Zig-Emitted IR Corpus](roadmap/02_zig_emitted_ir_corpus.md)
-- [ ] [Epic 3: LLVM-Compatible IR Verifier Foundation](roadmap/03_llvm_compatible_ir_verifier_foundation.md)
+- [x] [Epic 3: LLVM-Compatible IR Verifier Foundation](roadmap/03_llvm_compatible_ir_verifier_foundation.md)
 - [ ] [Epic 4: Mandatory Canonicalization Passes](roadmap/04_mandatory_canonicalization_passes.md)
 - [ ] [Epic 5: Memory And Side-Effect Semantics](roadmap/05_memory_and_side_effect_semantics.md)
 - [ ] [Epic 6: Scalar Optimization Pipeline](roadmap/06_scalar_optimization_pipeline.md)

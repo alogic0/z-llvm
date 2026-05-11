@@ -1,10 +1,15 @@
 const std = @import("std");
 const core = @import("core.zig");
+const target = @import("../target.zig");
+
+const InstructionLocation = struct {
+    block_index: usize,
+    instruction_index: usize,
+};
 
 const Definition = struct {
     ty: core.Type,
-    block_index: ?usize = null,
-    instruction_index: ?usize = null,
+    location: ?InstructionLocation = null,
 };
 
 const VerifyContext = struct {
@@ -18,6 +23,8 @@ const VerifyContext = struct {
 
     fn init(allocator: std.mem.Allocator, function: core.Function) !VerifyContext {
         const block_count = function.blocks.items.len;
+        if (block_count == 0) return error.FunctionWithoutBlocks;
+
         var ctx: VerifyContext = .{
             .allocator = allocator,
             .function = function,
@@ -33,7 +40,9 @@ const VerifyContext = struct {
         @memset(ctx.reachable, false);
         @memset(ctx.dominators, false);
 
+        try ctx.verifyBlockNames();
         try ctx.buildPredecessors();
+        try ctx.verifyEntryBlock();
         try ctx.buildReachability();
         ctx.buildDominators();
         try ctx.collectDefinitions();
@@ -46,6 +55,16 @@ const VerifyContext = struct {
         ctx.allocator.free(ctx.predecessors);
         ctx.allocator.free(ctx.reachable);
         ctx.allocator.free(ctx.dominators);
+    }
+
+    fn verifyBlockNames(ctx: *VerifyContext) !void {
+        var block_defs = std.StringHashMap(void).init(ctx.allocator);
+        defer block_defs.deinit();
+
+        for (ctx.function.blocks.items) |block| {
+            if (block_defs.contains(block.name)) return error.DuplicateBlock;
+            try block_defs.put(block.name, {});
+        }
     }
 
     fn buildPredecessors(ctx: *VerifyContext) !void {
@@ -67,9 +86,13 @@ const VerifyContext = struct {
         ctx.predecessors[ctx.edgeIndex(from, to)] = true;
     }
 
-    fn buildReachability(ctx: *VerifyContext) !void {
-        if (ctx.block_count == 0) return;
+    fn verifyEntryBlock(ctx: *VerifyContext) !void {
+        for (0..ctx.block_count) |predecessor| {
+            if (ctx.hasEdge(predecessor, 0)) return error.EntryBlockHasPredecessors;
+        }
+    }
 
+    fn buildReachability(ctx: *VerifyContext) !void {
         var worklist: std.ArrayList(usize) = .empty;
         defer worklist.deinit(ctx.allocator);
 
@@ -142,8 +165,10 @@ const VerifyContext = struct {
                 const result_ty = instruction.resultType() orelse return error.InstructionWithoutResultType;
                 try ctx.defs.put(result, .{
                     .ty = result_ty,
-                    .block_index = block_index,
-                    .instruction_index = instruction_index,
+                    .location = .{
+                        .block_index = block_index,
+                        .instruction_index = instruction_index,
+                    },
                 });
             }
         }
@@ -174,16 +199,18 @@ const VerifyContext = struct {
         if (!def.ty.eql(ty)) return error.TypeMismatch;
         if (!ctx.reachable[predecessor_index]) return;
 
-        const def_block = def.block_index orelse return;
+        const location = def.location orelse return;
+        const def_block = location.block_index;
         if (def_block == predecessor_index) return;
         if (!ctx.dominates(def_block, predecessor_index)) return error.ValueDoesNotDominateUse;
     }
 
     fn verifyDominatesUse(ctx: VerifyContext, def: Definition, use_block_index: usize, use_instruction_index: ?usize) !void {
-        const def_block = def.block_index orelse return;
+        const location = def.location orelse return;
+        const def_block = location.block_index;
         if (!ctx.reachable[use_block_index]) return;
         if (def_block == use_block_index) {
-            const def_instruction = def.instruction_index orelse return;
+            const def_instruction = location.instruction_index;
             const use_instruction = use_instruction_index orelse return;
             if (def_instruction >= use_instruction) return error.ValueDoesNotDominateUse;
             return;
@@ -227,6 +254,8 @@ const VerifyContext = struct {
 };
 
 pub fn verify(module: core.Module) !void {
+    try verifyTargetRecords(module);
+
     var global_defs = std.StringHashMap(void).init(module.allocator);
     defer global_defs.deinit();
     var decl_defs = std.StringHashMap(void).init(module.allocator);
@@ -374,13 +403,7 @@ pub fn verify(module: core.Module) !void {
 
 fn verifyDeclMatchesFunction(decl: core.FunctionDecl, function: core.Function) !void {
     if (!decl.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
-    if (decl.calling_conv) |decl_cc| {
-        if (function.calling_conv) |function_cc| {
-            if (!std.mem.eql(u8, decl_cc, function_cc)) return error.CallSignatureMismatch;
-        } else {
-            return error.CallSignatureMismatch;
-        }
-    }
+    if (!callingConventionsMatch(decl.calling_conv, function.calling_conv)) return error.CallSignatureMismatch;
     if (decl.params.items.len != function.params.items.len) return error.CallSignatureMismatch;
     for (decl.params.items, 0..) |param, index| {
         if (!param.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
@@ -394,11 +417,7 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
 
     if (findDeclaration(module, call.callee)) |decl| {
         if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
-        if (call.calling_conv) |calling_conv| {
-            if (decl.calling_conv) |decl_cc| {
-                if (!std.mem.eql(u8, calling_conv, decl_cc)) return error.CallSignatureMismatch;
-            }
-        }
+        if (!callingConventionsMatch(call.calling_conv, decl.calling_conv)) return error.CallSignatureMismatch;
         if (call.args.items.len != decl.params.items.len) return error.CallSignatureMismatch;
         for (call.args.items, 0..) |arg, index| {
             if (!arg.ty.eql(decl.params.items[index].ty)) return error.CallSignatureMismatch;
@@ -409,11 +428,7 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
 
     if (findFunction(module, call.callee)) |function| {
         if (!call.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
-        if (call.calling_conv) |calling_conv| {
-            if (function.calling_conv) |function_cc| {
-                if (!std.mem.eql(u8, calling_conv, function_cc)) return error.CallSignatureMismatch;
-            }
-        }
+        if (!callingConventionsMatch(call.calling_conv, function.calling_conv)) return error.CallSignatureMismatch;
         if (call.args.items.len != function.params.items.len) return error.CallSignatureMismatch;
         for (call.args.items, 0..) |arg, index| {
             if (!arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
@@ -423,6 +438,16 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     }
 
     return error.UnknownFunction;
+}
+
+fn verifyTargetRecords(module: core.Module) !void {
+    if (module.target_triple) |triple_text| {
+        _ = try target.Triple.parse(triple_text);
+    }
+    if (module.target_datalayout) |layout_text| {
+        const layout = try target.DataLayout.parse(layout_text);
+        if (try layout.pointerSizeBits() == 0) return error.InvalidDataLayout;
+    }
 }
 
 fn findDeclaration(module: core.Module, name: []const u8) ?core.FunctionDecl {
@@ -476,12 +501,36 @@ fn verifyCast(cast: core.CastInst) !void {
 fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {
     if (attrs.@"align") |alignment| {
         if (alignment == 0) return error.InvalidAlignment;
+        if (!std.math.isPowerOfTwo(alignment)) return error.InvalidAlignment;
     }
     if (attrs.atomic_ordering) |ordering| {
-        if (ordering.len == 0) return error.InvalidAtomicMemory;
+        if (!isKnownAtomicOrdering(ordering)) return error.InvalidAtomicMemory;
     }
 }
 
-fn verifyBlockTarget(function: core.Function, target: []const u8) !void {
-    if (function.blockIndex(target) == null) return error.UnknownBlock;
+fn verifyBlockTarget(function: core.Function, block_name: []const u8) !void {
+    if (function.blockIndex(block_name) == null) return error.UnknownBlock;
+}
+
+fn callingConventionsMatch(lhs: ?[]const u8, rhs: ?[]const u8) bool {
+    return std.mem.eql(u8, canonicalCallingConvention(lhs), canonicalCallingConvention(rhs));
+}
+
+fn canonicalCallingConvention(calling_conv: ?[]const u8) []const u8 {
+    return calling_conv orelse "ccc";
+}
+
+fn isKnownAtomicOrdering(ordering: []const u8) bool {
+    const known = [_][]const u8{
+        "unordered",
+        "monotonic",
+        "acquire",
+        "release",
+        "acq_rel",
+        "seq_cst",
+    };
+    for (known) |candidate| {
+        if (std.mem.eql(u8, ordering, candidate)) return true;
+    }
+    return false;
 }

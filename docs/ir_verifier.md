@@ -29,8 +29,11 @@ Required analyses:
   Local dominator relation for the accepted SSA subset
 
 Required IR invariants:
+  Function definitions contain at least one block
+  The function entry block has no predecessors
   Every basic block has one terminator
   Branch targets reference existing blocks
+  Basic block labels are unique
   Non-phi instructions cannot appear before phi instructions in a block
   Phi incoming blocks are exact CFG predecessors
   Phi incoming blocks are unique
@@ -39,8 +42,10 @@ Required IR invariants:
   Same-block named SSA definitions appear before ordinary uses
   Phi incoming values are valid on the corresponding predecessor edge
   Direct calls reference known declarations or function definitions
-  Direct call signatures match callee declarations or definitions
-  Load/store memory attributes are syntactically valid for the local subset
+  Direct call signatures and calling conventions match callee declarations or
+  definitions
+  Load/store memory attributes are valid for the local subset
+  Target triples and DataLayout strings are syntactically valid
 
 Core LLVM algorithm data structures:
   Verifier work over Module, Function, BasicBlock, Instruction, PHINode, and
@@ -66,9 +71,10 @@ Intentional divergences:
   using LLVM's DominatorTree infrastructure.
   It ignores pass-internal removed instruction tombstones because the local
   printer and pass pipeline treat them as deleted instructions.
-  It does not verify LLVM metadata, debug records, attributes, full DataLayout
-  semantics, target ABI semantics, poison semantics, or the full LLVM type
-  system.
+  It validates target triple and DataLayout syntax, but does not verify full
+  target ABI semantics, address-space-specific layouts, or GEP offset legality.
+  It does not verify LLVM metadata, debug records, attributes, poison semantics,
+  or the full LLVM type system.
   It accepts only the parser-supported IR surface and rejects or never parses
   many LLVM constructs that LLVM's verifier can handle.
 
@@ -78,13 +84,17 @@ Analysis preservation/invalidation:
   of preserving analysis instances across passes.
 
 Fixture coverage:
+  The normalized Zig-emitted tiny scalar fixture verifies.
   Unit tests cover accepted direct calls and declaration/function matching.
   Unit tests reject direct call signature mismatches.
+  Unit tests reject direct call calling-convention mismatches.
   Unit tests reject use-before-def in one block.
   Unit tests reject SSA values that do not dominate merge-block uses.
   Unit tests reject phi incoming blocks that are not exact predecessors.
   Unit tests reject missing phi incoming predecessors.
   Unit tests reject phi nodes after non-phi instructions.
+  Unit tests reject entry-block predecessors.
+  Unit tests reject invalid non-power-of-two load/store alignment.
   Existing opt comparison fixtures exercise accepted verified IR before and
   after optimizer passes.
 
