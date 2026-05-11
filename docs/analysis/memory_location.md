@@ -79,6 +79,8 @@ optional byte offset
 optional byte size
 direct alloca locations when the allocated integer type has byte size
 simple getelementptr offsets computed as constant index * scalar integer element size
+pointer-typed function parameters as conservative root objects only for
+same-parameter aggregate pointer GEP offsets
 load/store access locations using the load/store value type as the access size
 ```
 
@@ -91,7 +93,8 @@ Upstream mapping:
 ```text
 LLVM MemoryLocation represents a memory access by pointer, size, and metadata-like tags.
 BasicAA combines MemoryLocation with GEP decomposition, object identity, DataLayout, captures, globals, and recursive AA queries.
-This project only models stack-slot roots plus byte offsets/sizes for scalar integer allocas and simple constant GEPs.
+This project only models stack-slot and pointer-parameter roots plus byte
+offsets/sizes for scalar integer allocas and simple constant GEPs.
 Anything needing structured aggregate layout, nested element types, target
 alignment, or DataLayout-driven offset decomposition must currently remain
 unknown/conservative.
@@ -111,6 +114,7 @@ unit-test only:
   distinct stack slots
   zero-offset GEP must-alias
   known disjoint GEP offset no-alias
+  known disjoint same-parameter GEP access range no_mod_ref
   unknown GEP offset may-alias
   mod/ref no_mod_ref for known disjoint stack location
   volatile/atomic barrier remains unknown
@@ -122,7 +126,8 @@ Known gaps:
 no target DataLayout
 no address spaces
 no globals
-no calls or captures
+no capture-sensitive disambiguation between distinct parameters
+no calls
 no partial_alias result
 no aggregate, struct, or vector layout
 no LLVM-equivalent structured GEP decomposition

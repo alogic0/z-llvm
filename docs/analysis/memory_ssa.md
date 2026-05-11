@@ -80,6 +80,7 @@ Fixture coverage:
   unit test: memory ssa records narrow phi facts at joins
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixtures: early_cse_load_branch_clobber_reject
+  local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
 

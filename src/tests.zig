@@ -3869,6 +3869,37 @@ test "alias analysis classifies gep-derived stack slots" {
     try std.testing.expectEqual(@as(u64, 4), left1.size.?);
 }
 
+test "alias analysis classifies source-backed parameter gep offsets" {
+    const input =
+        \\define i32 @aggregate_param(ptr %p) {
+        \\entry:
+        \\  %field = getelementptr i8, ptr %p, i64 4
+        \\  %a = load i32, ptr %p, align 4
+        \\  %b = load i32, ptr %field, align 4
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expectEqual(
+        alias.AliasResult.may_alias,
+        alias.alias(function, .{ .named = "p" }, .{ .named = "field" }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.no_mod_ref,
+        alias.modRefForAccess(function, function.blocks.items[0].instructions.items[2], .{ .named = "p" }, .{ .int = 32 }),
+    );
+
+    const field_location = memory_location.forPointer(function, .{ .named = "field" }) orelse return error.TestExpectedMemoryLocation;
+    try std.testing.expectEqualStrings("p", field_location.root);
+    try std.testing.expectEqual(@as(i128, 4), field_location.offset.?);
+}
+
 test "alias analysis classifies globals and aliases with module context" {
     const input =
         \\@global_a = internal global i32 0

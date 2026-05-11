@@ -73,6 +73,10 @@ pub const MemorySSA = struct {
     }
 
     pub fn hasClobberBetween(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value) bool {
+        return memory.hasClobberBetweenAccess(from, to, ptr, null);
+    }
+
+    pub fn hasClobberBetweenAccess(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value, access_ty: ?ir.Type) bool {
         for (memory.accesses.items) |access| {
             if (!isConservativelyBetween(access, from, to)) continue;
             switch (access.kind) {
@@ -80,7 +84,7 @@ pub const MemorySSA = struct {
                 .def, .barrier => {
                     const instruction_index = access.instruction_index orelse return true;
                     const instruction = memory.function.blocks.items[access.block_index].instructions.items[instruction_index];
-                    if (isBarrier(memory.module, memory.function, instruction, ptr)) return true;
+                    if (isBarrierForAccess(memory.module, memory.function, instruction, ptr, access_ty)) return true;
                 },
                 .phi => return true,
             }
@@ -107,13 +111,21 @@ pub fn hasClobberBetween(module: ir.Module, function: ir.Function, from: InstRef
 }
 
 pub fn isBarrier(module: ir.Module, function: ir.Function, instruction: ir.Instruction, ptr: ir.Value) bool {
+    return isBarrierForAccess(module, function, instruction, ptr, null);
+}
+
+pub fn isBarrierForAccess(module: ir.Module, function: ir.Function, instruction: ir.Instruction, ptr: ir.Value, access_ty: ?ir.Type) bool {
     if (instruction.kind == .call) {
         return switch (function_attrs.callMemoryEffect(module, instruction.kind.call)) {
             .none, .readonly_load => false,
             .memory_write, .volatile_or_atomic_barrier, .unknown => true,
         };
     }
-    return switch (alias.modRefInModule(module, function, instruction, ptr)) {
+    const mod_ref = if (access_ty) |ty|
+        alias.modRefInModuleForAccess(module, function, instruction, ptr, ty)
+    else
+        alias.modRefInModule(module, function, instruction, ptr);
+    return switch (mod_ref) {
         .mod, .mod_ref, .unknown => true,
         .no_mod_ref, .ref => false,
     };

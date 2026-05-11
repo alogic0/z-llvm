@@ -194,10 +194,11 @@ fn isMemoryAvailable(module: ir.Module, function: ir.Function, memory: memory_ss
     if (instruction.kind != .load) return true;
     _ = module;
     _ = function;
-    return !memory.hasClobberBetween(
+    return !memory.hasClobberBetweenAccess(
         .{ .block_index = leader.block_index, .instruction_index = leader.instruction_index },
         .{ .block_index = block_index, .instruction_index = instruction_index },
         instruction.kind.load.ptr,
+        instruction.kind.load.ty,
     );
 }
 

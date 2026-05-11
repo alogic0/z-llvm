@@ -3,8 +3,15 @@ const ir = @import("../ir.zig");
 const datalayout = @import("../target/datalayout.zig");
 
 pub const MemoryLocation = struct {
+    pub const RootKind = enum {
+        stack,
+        global,
+        parameter,
+    };
+
     ptr: ir.Value,
     root: []const u8,
+    root_kind: RootKind,
     offset: ?i128,
     size: ?u64,
 
@@ -71,6 +78,7 @@ fn buildGlobal(module: ir.Module, layout: ?datalayout.DataLayout, ptr: ir.Value,
         return .{
             .ptr = ptr,
             .root = global.name,
+            .root_kind = .global,
             .offset = 0,
             .size = access_size orelse typeSizeMaybeLayout(layout, global.ty),
         };
@@ -106,6 +114,7 @@ fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.
                 .alloca => |alloca| return .{
                     .ptr = ptr,
                     .root = result,
+                    .root_kind = .stack,
                     .offset = 0,
                     .size = access_size orelse typeSizeMaybeLayout(layout, alloca.allocated_ty),
                 },
@@ -119,6 +128,17 @@ fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .call => return null,
             }
         }
+    }
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.ptr)) continue;
+        if (!std.mem.eql(u8, param.name, name)) continue;
+        return .{
+            .ptr = ptr,
+            .root = param.name,
+            .root_kind = .parameter,
+            .offset = 0,
+            .size = access_size,
+        };
     }
     return null;
 }

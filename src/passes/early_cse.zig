@@ -78,7 +78,7 @@ fn visitBlock(
         instruction.mapOperands(aliases.*);
         if (instruction.removed) continue;
 
-        if (forwardStoreToLoad(function.*, stores.items, instruction)) |replacement| {
+        if (forwardStoreToLoad(module, function.*, stores.items, instruction)) |replacement| {
             instruction.removed = true;
             instruction.replacement = replacement;
             const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -125,7 +125,7 @@ fn visitBlock(
     return changed;
 }
 
-fn forwardStoreToLoad(function: ir.Function, stores: []const AvailableStore, instruction: *ir.Instruction) ?ir.Value {
+fn forwardStoreToLoad(module: ir.Module, function: ir.Function, stores: []const AvailableStore, instruction: *ir.Instruction) ?ir.Value {
     const load = switch (instruction.kind) {
         .load => |load| load,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => return null,
@@ -137,7 +137,7 @@ fn forwardStoreToLoad(function: ir.Function, stores: []const AvailableStore, ins
         index -= 1;
         const store = stores[index];
         if (!store.ty.eql(load.ty)) continue;
-        if (alias.alias(function, store.ptr, load.ptr) != .must_alias) continue;
+        if (alias.accessAliasInModule(module, function, store.ptr, store.ty, load.ptr, load.ty) != .must_alias) continue;
         return store.value;
     }
     return null;
@@ -156,7 +156,7 @@ fn updateMemoryAvailability(
                 stores.clearRetainingCapacity();
                 return;
             }
-            pruneMayAliasStores(function, stores, store.ptr);
+            pruneMayAliasStores(module, function, stores, store.ptr, store.ty);
             try stores.append(allocator, .{
                 .ptr = store.ptr,
                 .ty = store.ty,
@@ -172,11 +172,12 @@ fn updateMemoryAvailability(
     }
 }
 
-fn pruneMayAliasStores(function: ir.Function, stores: *std.ArrayList(AvailableStore), ptr: ir.Value) void {
+fn pruneMayAliasStores(module: ir.Module, function: ir.Function, stores: *std.ArrayList(AvailableStore), ptr: ir.Value, ty: ir.Type) void {
     var index = stores.items.len;
     while (index > 0) {
         index -= 1;
-        if (alias.alias(function, stores.items[index].ptr, ptr) == .no_alias) continue;
+        const store = stores.items[index];
+        if (alias.accessAliasInModule(module, function, store.ptr, store.ty, ptr, ty) == .no_alias) continue;
         _ = stores.orderedRemove(index);
     }
 }
@@ -216,10 +217,11 @@ fn sameAvailableExpression(
         const load = instruction.kind.load;
         if (!candidate_load.ty.eql(load.ty)) return false;
         if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
-        return !memory.hasClobberBetween(
+        return !memory.hasClobberBetweenAccess(
             .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
             .{ .block_index = block_index, .instruction_index = instruction_index },
             load.ptr,
+            load.ty,
         );
     }
     return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
