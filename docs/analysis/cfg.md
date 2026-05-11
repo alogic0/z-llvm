@@ -26,29 +26,36 @@ per-function successor lists
 per-function predecessor lists
 entry-block reachability
 duplicate edge suppression
+shared CFG update helpers for retargeting branches
+shared PHI incoming block replacement
+shared PHI pruning after edge deletion or unreachable block deletion
+shared unreachable-block deletion helper
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces explicit successor/predecessor collection for the current terminator subset.
-LLVM computes these views directly from full IR terminators and also supports incremental CFG updates.
+This reproduces explicit successor/predecessor collection for the current
+terminator subset and a small shared CFG mutation layer shaped after LLVM's
+CFG update utilities.
+LLVM computes these views directly from full IR terminators and supports richer
+incremental updates than the local rebuild-and-repair approach.
 ```
 
 Current user:
 
 ```text
 src/passes/simplifycfg.zig
+src/passes/adce.zig
 src/analysis/postdominator.zig
 ```
 
 Known gaps:
 
 ```text
-no incremental CFG updates
+no full incremental CFG updates or analysis preservation
 no critical-edge splitting
 no exceptional control flow
 no switch terminators
-no unreachable terminators
-no edge-specific phi helper APIs
+no edge-specific PHI translation
 ```

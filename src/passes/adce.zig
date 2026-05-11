@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const cfg_update = @import("../analysis/cfg_update.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const postdominator = @import("../analysis/postdominator.zig");
 const ir = @import("../ir.zig");
@@ -216,7 +217,9 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
             condbr.then_target;
 
         block.terminator = .{ .br = .{ .target = target } };
+        _ = try cfg_update.prunePhiIncomingToPredecessors(allocator, function);
         changed = true;
+        break;
     }
 
     return changed;

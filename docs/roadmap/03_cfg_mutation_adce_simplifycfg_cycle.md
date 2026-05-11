@@ -17,10 +17,10 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 
 ## Plan
 
-- [ ] Add a small CFG update helper for deleting edges, deleting blocks, and
+- [x] Add a small CFG update helper for deleting edges, deleting blocks, and
       retargeting branches.
-- [ ] Centralize PHI incoming update/removal after edge deletion.
-- [ ] Add verifier checks that catch stale PHI incoming blocks after CFG edits.
+- [x] Centralize PHI incoming update/removal after edge deletion.
+- [x] Add verifier checks that catch stale PHI incoming blocks after CFG edits.
 - [ ] Extend postdominator/control-dependence tests to diamonds, nested
       diamonds, loops, multiple exits, and unreachable blocks.
 - [ ] Rework ADCE liveness toward an explicit block/instruction worklist for
@@ -35,9 +35,20 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 
 ## Exit Criteria
 
-- [ ] ADCE and SimplifyCFG use shared CFG/PHI mutation helpers.
+- [x] ADCE and SimplifyCFG use shared CFG/PHI mutation helpers.
 - [ ] Rewritten CFGs pass verifier checks for PHIs, terminators, and block
       reachability.
 - [ ] Unsupported CFG shapes are rejected or left unchanged with fixtures.
 - [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
+## Completed Slice
+
+- [x] Added `src/analysis/cfg_update.zig` for branch retargeting, PHI incoming
+      block replacement, PHI pruning, and unreachable block deletion.
+- [x] Routed SimplifyCFG empty-block threading, trivial branch-block merging,
+      PHI pruning, and unreachable deletion through the shared helper.
+- [x] Routed ADCE's supported branch rewrite through shared PHI pruning after
+      edge deletion.
+- [x] Documented the helper as a rebuild-and-repair subset of LLVM's CFG update
+      utilities.
+- [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.

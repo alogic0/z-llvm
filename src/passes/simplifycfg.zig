@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const cfg_update = @import("../analysis/cfg_update.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -17,13 +18,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         changed = simplifyTerminators(function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTerminators(function) or changed;
-        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
-        changed = try removeUnreachableBlocks(module.allocator, function) or changed;
+        changed = try cfg_update.prunePhiIncomingToPredecessors(module.allocator, function) or changed;
+        changed = try cfg_update.removeUnreachableBlocks(module.allocator, function) or changed;
         changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
-        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
+        changed = try cfg_update.prunePhiIncomingToPredecessors(module.allocator, function) or changed;
         changed = simplifyTrivialPhis(function) or changed;
         changed = try mergeTrivialBranchBlocks(module.allocator, function) or changed;
-        changed = try prunePhiIncomingToPredecessors(module.allocator, function) or changed;
+        changed = try cfg_update.prunePhiIncomingToPredecessors(module.allocator, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
@@ -103,29 +104,13 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
             if (hasPhi(function.blocks.items[target_index])) continue;
             if (graph.predecessors(block_index).len == 0) continue;
 
-            replaceBranchTarget(function, block.name, br.target);
+            _ = cfg_update.retargetBranches(function, block.name, br.target);
             changed = true;
             local_changed = true;
             break;
         }
     }
     return changed;
-}
-
-fn replaceBranchTarget(function: *ir.Function, old_target: []const u8, new_target: []const u8) void {
-    for (function.blocks.items) |*block| {
-        if (block.terminator) |*terminator| switch (terminator.*) {
-            .br => |*br| {
-                if (std.mem.eql(u8, br.target, old_target)) br.target = new_target;
-            },
-            .condbr => |*condbr| {
-                if (std.mem.eql(u8, condbr.then_target, old_target)) condbr.then_target = new_target;
-                if (std.mem.eql(u8, condbr.else_target, old_target)) condbr.else_target = new_target;
-            },
-            .ret => {},
-            .@"unreachable" => {},
-        };
-    }
 }
 
 fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
@@ -156,7 +141,7 @@ fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function
             target.instructions = .empty;
             block.terminator = target.terminator;
             target.terminator = null;
-            replacePhiIncomingBlock(function, target.name, block.name);
+            _ = cfg_update.replacePhiIncomingBlock(function, target.name, block.name);
 
             var removed = function.blocks.orderedRemove(target_index);
             removed.deinit(allocator);
@@ -168,113 +153,10 @@ fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function
     return changed;
 }
 
-fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new_name: []const u8) void {
-    for (function.blocks.items) |*block| {
-        for (block.instructions.items) |*instruction| {
-            if (instruction.removed) continue;
-            switch (instruction.kind) {
-                .phi => |*phi| for (phi.incoming.items) |*incoming| {
-                    if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
-                },
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
-            }
-        }
-    }
-}
-
 fn hasPhi(block: ir.BasicBlock) bool {
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
         if (instruction.kind == .phi) return true;
-    }
-    return false;
-}
-
-fn removeUnreachableBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {
-    if (function.blocks.items.len == 0) return false;
-
-    var graph = try cfg.Graph.build(allocator, function.*);
-    defer graph.deinit();
-
-    const reachable = try graph.reachableFromEntry(allocator);
-    defer allocator.free(reachable);
-
-    var changed = false;
-    changed = prunePhiIncoming(function, reachable) or changed;
-
-    var index = function.blocks.items.len;
-    while (index > 0) {
-        index -= 1;
-        if (reachable[index]) continue;
-
-        var removed = function.blocks.orderedRemove(index);
-        removed.deinit(allocator);
-        changed = true;
-    }
-    return changed;
-}
-
-fn prunePhiIncoming(function: *ir.Function, reachable: []const bool) bool {
-    var changed = false;
-    for (function.blocks.items) |*block| {
-        for (block.instructions.items) |*instruction| {
-            if (instruction.removed) continue;
-            switch (instruction.kind) {
-                .phi => |*phi| {
-                    var index = phi.incoming.items.len;
-                    while (index > 0) {
-                        index -= 1;
-                        const incoming_block_index = function.blockIndex(phi.incoming.items[index].block) orelse {
-                            _ = phi.incoming.orderedRemove(index);
-                            changed = true;
-                            continue;
-                        };
-                        if (reachable[incoming_block_index]) continue;
-                        _ = phi.incoming.orderedRemove(index);
-                        changed = true;
-                    }
-                },
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
-            }
-        }
-    }
-    return changed;
-}
-
-fn prunePhiIncomingToPredecessors(allocator: std.mem.Allocator, function: *ir.Function) !bool {
-    var graph = try cfg.Graph.build(allocator, function.*);
-    defer graph.deinit();
-
-    var changed = false;
-    for (function.blocks.items, 0..) |*block, block_index| {
-        const predecessors = graph.predecessors(block_index);
-        for (block.instructions.items) |*instruction| {
-            if (instruction.removed) continue;
-            switch (instruction.kind) {
-                .phi => |*phi| {
-                    var index = phi.incoming.items.len;
-                    while (index > 0) {
-                        index -= 1;
-                        const incoming_block_index = function.blockIndex(phi.incoming.items[index].block) orelse {
-                            _ = phi.incoming.orderedRemove(index);
-                            changed = true;
-                            continue;
-                        };
-                        if (containsIndex(predecessors, incoming_block_index)) continue;
-                        _ = phi.incoming.orderedRemove(index);
-                        changed = true;
-                    }
-                },
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => {},
-            }
-        }
-    }
-    return changed;
-}
-
-fn containsIndex(values: []const usize, needle: usize) bool {
-    for (values) |value| {
-        if (value == needle) return true;
     }
     return false;
 }

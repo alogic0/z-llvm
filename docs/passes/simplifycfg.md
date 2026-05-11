@@ -35,6 +35,8 @@ LLVM entry points/classes:
 
 Required analyses:
   Local CFG predecessor and reachability graph rebuilt inside the pass.
+  Shared CFG update helper for branch retargeting, PHI repair, and unreachable
+  block deletion.
 
 Required IR invariants:
   Verified terminators, branch targets, phi incoming predecessor validity, and
@@ -42,6 +44,7 @@ Required IR invariants:
 
 Core LLVM algorithm data structures:
   CFG predecessor/successor graph
+  CFG update helper
   Reachability set from function entry
   Phi incoming lists
   Terminator rewrite decisions
@@ -102,6 +105,8 @@ Upstream mapping:
 ```text
 This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, a simple unconditional branch block merge, and a phi-free empty-block threading subset.
 LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
+The local implementation rebuilds graph facts around mutations and centralizes
+branch/PHI repair in `src/analysis/cfg_update.zig`.
 ```
 
 Fixture coverage:

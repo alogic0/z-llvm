@@ -58,6 +58,7 @@ build accepted-CFG postdominance and control-dependence facts
 start from dead branch regions whose successors reconverge at an immediate postdominator
 rewrite branch control only when all outgoing regions are linear and side-effect free
 reject phi joins and non-linear regions for now
+repair PHI incoming lists through the shared CFG update helper after supported edge deletion
 start from current def-use counts
 walk instructions backward
 remove unused side-effect-free instructions
@@ -74,7 +75,7 @@ existing instruction cleanup removes the now-dead scalar chain.
 
 Do not treat this as full LLVM ADCE yet. The local implementation is still a
 conservative accepted-CFG subset and does not model LLVM's complete optimistic
-worklist, block-info lattice, or CFG update machinery.
+worklist, block-info lattice, or full CFG update machinery.
 
 Fixture coverage:
 
@@ -97,7 +98,7 @@ Known gaps:
 ```text
 no full optimistic block/instruction liveness worklist
 no live-terminator propagation through arbitrary control dependence
-no phi update support for dead edge deletion
+no PHI-aware deletion beyond shared stale-incoming pruning after supported edge deletion
 no non-linear dead-region rewriting
 no debug info salvage
 no musttail, EH, calls, or volatile/atomic removal
