@@ -68,6 +68,9 @@ No pass currently advertises preserved analyses.
 This is deliberately conservative until an analysis manager lands.
 Placeholder passes preserve the IR by behavior, but the pass manager still
 treats analysis state conservatively.
+Pipelines that run SimplifyCFG before InstCombine/DCE rely on this conservative
+verification-after-each-pass contract: CFG rewrites are checked before later
+scalar cleanup consumes the simplified shape.
 ```
 
 Upstream mapping:

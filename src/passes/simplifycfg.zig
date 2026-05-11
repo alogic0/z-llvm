@@ -16,6 +16,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
+        changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTerminators(function) or changed;
         changed = try cfg_update.prunePhiIncomingToPredecessors(module.allocator, function) or changed;
@@ -54,6 +55,146 @@ fn simplifyTerminators(function: *ir.Function) bool {
         }
     }
     return changed;
+}
+
+fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !bool {
+    const allocator = module.allocator;
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(allocator, function.*);
+        defer graph.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"unreachable" => continue,
+            };
+            const shape = simpleDiamondSelectReturn(function.*, graph, block_index, condbr) orelse continue;
+
+            const select_name_text = try diamondSelectName(allocator, shape);
+            const select_name = try module.ownString(select_name_text);
+            try block.instructions.append(allocator, .{
+                .result = select_name,
+                .kind = .{ .select = .{
+                    .cond_ty = .{ .int = 1 },
+                    .cond = condbr.cond,
+                    .ty = shape.ty,
+                    .true_value = shape.true_value,
+                    .false_value = shape.false_value,
+                } },
+            });
+            block.terminator = .{ .ret = .{
+                .ty = shape.ty,
+                .value = .{ .named = select_name },
+            } };
+
+            removeBlocksDescending(allocator, function, &.{ shape.merge_index, shape.else_index, shape.then_index });
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+fn diamondSelectName(allocator: std.mem.Allocator, shape: DiamondSelectReturn) ![]u8 {
+    if (shape.true_value == .named and shape.false_value == .named) {
+        return std.fmt.allocPrint(allocator, "{s}.{s}", .{ shape.true_value.named, shape.false_value.named });
+    }
+    return std.fmt.allocPrint(allocator, "{s}.select", .{shape.phi_name});
+}
+
+const DiamondSelectReturn = struct {
+    then_index: usize,
+    else_index: usize,
+    merge_index: usize,
+    phi_name: []const u8,
+    ty: ir.Type,
+    true_value: ir.Value,
+    false_value: ir.Value,
+};
+
+fn simpleDiamondSelectReturn(function: ir.Function, graph: cfg.Graph, block_index: usize, condbr: anytype) ?DiamondSelectReturn {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+
+    const then_target = emptyBranchTarget(function.blocks.items[then_index]) orelse return null;
+    const else_target = emptyBranchTarget(function.blocks.items[else_index]) orelse return null;
+    if (!std.mem.eql(u8, then_target, else_target)) return null;
+
+    const merge_index = function.blockIndex(then_target) orelse return null;
+    if (merge_index == block_index or merge_index == then_index or merge_index == else_index) return null;
+    const merge_preds = graph.predecessors(merge_index);
+    if (merge_preds.len != 2) return null;
+    if (!containsIndex(merge_preds, then_index) or !containsIndex(merge_preds, else_index)) return null;
+
+    const merge = function.blocks.items[merge_index];
+    if (merge.instructions.items.len != 1) return null;
+    const phi_inst = merge.instructions.items[0];
+    if (phi_inst.removed or phi_inst.kind != .phi) return null;
+    const phi_name = phi_inst.result orelse return null;
+    const phi = phi_inst.kind.phi;
+    if (phi.incoming.items.len != 2) return null;
+
+    const true_value = phiValueForBlock(phi, condbr.then_target) orelse return null;
+    const false_value = phiValueForBlock(phi, condbr.else_target) orelse return null;
+    const ret = switch (merge.terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"unreachable" => return null,
+    };
+    const ret_value = ret.value orelse return null;
+    if (!ret.ty.eql(phi.ty) or !ret_value.eql(.{ .named = phi_name })) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .merge_index = merge_index,
+        .phi_name = phi_name,
+        .ty = phi.ty,
+        .true_value = true_value,
+        .false_value = false_value,
+    };
+}
+
+fn emptyBranchTarget(block: ir.BasicBlock) ?[]const u8 {
+    if (block.instructions.items.len != 0) return null;
+    return switch (block.terminator orelse return null) {
+        .br => |br| br.target,
+        .ret, .condbr, .@"unreachable" => null,
+    };
+}
+
+fn phiValueForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block_name)) return incoming.value;
+    }
+    return null;
+}
+
+fn containsIndex(indices: []const usize, needle: usize) bool {
+    for (indices) |index| {
+        if (index == needle) return true;
+    }
+    return false;
+}
+
+fn removeBlocksDescending(allocator: std.mem.Allocator, function: *ir.Function, indices: []const usize) void {
+    var sorted = [_]usize{ 0, 0, 0 };
+    for (indices, 0..) |index, i| sorted[i] = index;
+    std.sort.heap(usize, &sorted, {}, comptime std.sort.desc(usize));
+    var last: ?usize = null;
+    for (sorted) |index| {
+        if (last) |last_index| {
+            if (last_index == index) continue;
+        }
+        last = index;
+        var removed = function.blocks.orderedRemove(index);
+        removed.deinit(allocator);
+    }
 }
 
 const RetInfo = struct {
@@ -101,8 +242,12 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
             };
             const target_index = function.blockIndex(br.target) orelse continue;
             if (target_index == block_index) continue;
-            if (hasPhi(function.blocks.items[target_index])) continue;
-            if (graph.predecessors(block_index).len == 0) continue;
+            const predecessors = graph.predecessors(block_index);
+            if (predecessors.len == 0) continue;
+            if (hasPhi(function.blocks.items[target_index])) {
+                if (predecessors.len != 1) continue;
+                _ = cfg_update.replacePhiIncomingBlock(function, block.name, function.blocks.items[predecessors[0]].name);
+            }
 
             _ = cfg_update.retargetBranches(function, block.name, br.target);
             changed = true;

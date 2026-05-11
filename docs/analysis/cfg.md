@@ -30,6 +30,7 @@ shared CFG update helpers for retargeting branches
 shared PHI incoming block replacement
 shared PHI pruning after edge deletion or unreachable block deletion
 shared unreachable-block deletion helper
+strict empty-diamond shape checks for SimplifyCFG select formation
 ```
 
 Upstream mapping:
@@ -58,4 +59,5 @@ no critical-edge splitting
 no exceptional control flow
 no switch terminators
 no edge-specific PHI translation
+no speculative CFG rewrites; side-effecting blocks must remain explicit
 ```

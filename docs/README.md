@@ -166,7 +166,7 @@ completed foundation epics
 - [x] [Cycle 13: ADCE Control-Dependence Parity](roadmap/13_adce_control_dependence_parity_cycle.md)
 - [x] [Cycle 14: SROA Aggregate Slice Parity](roadmap/14_sroa_aggregate_slice_parity_cycle.md)
 - [x] [Cycle 15: InstCombine Integer and Pointer Parity](roadmap/15_instcombine_integer_pointer_parity_cycle.md)
-- [ ] [Cycle 16: SimplifyCFG Canonical Shape Parity](roadmap/16_simplifycfg_canonical_shape_parity_cycle.md)
+- [x] [Cycle 16: SimplifyCFG Canonical Shape Parity](roadmap/16_simplifycfg_canonical_shape_parity_cycle.md)
 - [ ] [Cycle 17: Vector Target-Cost and Lane Optimization](roadmap/17_vector_target_cost_lane_optimization_cycle.md)
 - [ ] [Cycle 18: Vector FP and Select Transform Boundary](roadmap/18_vector_fp_select_transform_boundary_cycle.md)
 - [ ] [Cycle 19: Atomic Ordering and SyncScope Semantics](roadmap/19_atomic_ordering_syncscope_semantics_cycle.md)

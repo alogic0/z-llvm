@@ -16,6 +16,8 @@ simplifyCFG
 removeUnreachableBlocks
 FoldBranchToCommonDest
 TryToSimplifyUncondBranchFromEmptyBlock
+FoldTwoEntryPHINode
+SpeculativelyExecuteBB
 ```
 
 ## LLVM Algorithm Contract
@@ -55,10 +57,12 @@ Local target status:
 Implemented subset:
   Constant and same-target conditional branch folding
   Empty branch block threading
+  Single-predecessor empty branch block threading through phi nodes
   Unreachable block removal
   Phi incoming pruning and trivial phi replacement
   Single-predecessor branch block merge
   Matching return block merge
+  Strict empty diamond `phi`/`ret` folding to `select`/`ret`
 
 Intentional divergences:
   No speculation, sinking, hoisting, switch lowering, invoke/EH handling,
@@ -74,6 +78,10 @@ Fixture coverage:
   simplifycfg
   simplifycfg_thread_empty
   simplifycfg_common_ret
+  simplifycfg_diamond_select
+  simplifycfg_loop_shape_reject
+  simplifycfg_side_effect_diamond_reject
+  simplifycfg_unlock_instcombine
   unreachable_simplifycfg
   mem2reg_unreachable
 
@@ -96,14 +104,18 @@ remove blocks unreachable from the entry block
 remove phi incoming values from unreachable predecessor blocks
 replace trivial phi nodes whose remaining incoming values are all identical
 merge a block ending in an unconditional branch into its single-predecessor successor when the successor has no live phi nodes
-thread an empty unconditional branch block to its successor when the successor has no live phi nodes
+thread an empty unconditional branch block to its successor when the successor
+has no live phi nodes, or when the empty block has one predecessor and phi
+incoming labels can be rewritten to that predecessor
 merge matching return blocks into the predecessor conditional block
+fold an empty two-arm diamond with a single merge phi returned immediately into
+a select returned from the branch block
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, a simple unconditional branch block merge, and a phi-free empty-block threading subset.
+This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, a simple unconditional branch block merge, a phi-free empty-block threading subset, and a strict empty-diamond select formation subset.
 LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
 The local implementation rebuilds graph facts around mutations and centralizes
 branch/PHI repair in `src/analysis/cfg_update.zig`.
@@ -115,6 +127,10 @@ Fixture coverage:
 opt-22 equivalent:
   simplifycfg
   simplifycfg_thread_empty
+  simplifycfg_diamond_select
+  simplifycfg_loop_shape_reject
+  simplifycfg_side_effect_diamond_reject
+  simplifycfg_unlock_instcombine
   unreachable_simplifycfg
   mem2reg_unreachable
 
@@ -152,4 +168,6 @@ no general block merging
 no switch support
 no invoke/landingpad support
 no metadata/profile preservation
+no speculative diamond folding when either arm has instructions
+no select formation for merge blocks with multiple live instructions
 ```
