@@ -1049,6 +1049,7 @@ fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []con
         const comma = findTopLevelComma(rest);
         const raw_arg = if (comma) |index| rest[0..index] else rest;
         const arg_text = std.mem.trim(u8, raw_arg, " \t");
+        if (std.mem.eql(u8, arg_text, "...")) return error.UnsupportedVarArgs;
         var parts = std.mem.tokenizeAny(u8, arg_text, " \t");
         const ty = try parseType(parts.next() orelse return error.InvalidCall);
         const value = try parseValue(parts.next() orelse return error.InvalidCall);

@@ -311,12 +311,14 @@ pub fn verify(module: core.Module) !void {
     for (module.declarations.items) |decl| {
         if (global_defs.contains(decl.name)) return error.DuplicateDefinition;
         if (decl_defs.contains(decl.name)) return error.DuplicateDefinition;
+        try verifyDeclAbiAttrs(decl);
         try decl_defs.put(decl.name, {});
     }
 
     for (module.functions.items) |function| {
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
         if (findDeclaration(module, function.name)) |decl| try verifyDeclMatchesFunction(decl, function);
+        try verifyFunctionAbiAttrs(function);
         try global_defs.put(function.name, {});
     }
 
@@ -513,6 +515,47 @@ fn verifyDeclMatchesFunction(decl: core.FunctionDecl, function: core.Function) !
     for (decl.params.items, 0..) |param, index| {
         if (!param.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
     }
+}
+
+fn verifyDeclAbiAttrs(decl: core.FunctionDecl) !void {
+    for (decl.params.items) |param| try verifyParamAbiAttrs(param.ty, param.attrs);
+}
+
+fn verifyFunctionAbiAttrs(function: core.Function) !void {
+    for (function.params.items) |param| try verifyParamAbiAttrs(param.ty, param.attrs);
+}
+
+fn verifyParamAbiAttrs(ty: core.Type, attrs: ?[]const u8) !void {
+    const text = attrs orelse return;
+    if ((hasAbiAttr(text, "byval") or hasAbiAttr(text, "sret")) and ty != .ptr) {
+        return error.UnsupportedAbiType;
+    }
+}
+
+fn hasAbiAttr(attrs: []const u8, name: []const u8) bool {
+    var rest = std.mem.trim(u8, attrs, " \t");
+    while (rest.len != 0) {
+        const token = firstAttrToken(rest);
+        if (std.mem.eql(u8, token, name)) return true;
+        if (std.mem.startsWith(u8, token, name) and token.len > name.len and token[name.len] == '(') return true;
+        rest = std.mem.trim(u8, rest[token.len..], " \t");
+    }
+    return false;
+}
+
+fn firstAttrToken(attrs: []const u8) []const u8 {
+    var paren_depth: usize = 0;
+    for (attrs, 0..) |byte, index| {
+        switch (byte) {
+            '(' => paren_depth += 1,
+            ')' => if (paren_depth > 0) {
+                paren_depth -= 1;
+            },
+            ' ', '\t' => if (paren_depth == 0) return attrs[0..index],
+            else => {},
+        }
+    }
+    return attrs;
 }
 
 fn isGlobalValueName(name: []const u8) bool {

@@ -1300,6 +1300,78 @@ test "parser preserves function visibility and parameter attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves pointer ABI parameter attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_byval(ptr byval({ i32, i32 }), ptr sret({ i32, i32 }))
+        \\
+        \\define void @abi_attrs(ptr byval({ i32, i32 }) %src, ptr sret({ i32, i32 }) %dst) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("byval({ i32, i32 })", module.declarations.items[0].params.items[0].attrs.?);
+    try std.testing.expectEqualStrings("sret({ i32, i32 })", module.declarations.items[0].params.items[1].attrs.?);
+    try std.testing.expectEqualStrings("byval({ i32, i32 })", module.functions.items[0].params.items[0].attrs.?);
+    try std.testing.expectEqualStrings("sret({ i32, i32 })", module.functions.items[0].params.items[1].attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects invalid ABI parameter attributes" {
+    const byval_non_pointer =
+        \\declare void @bad(i32 byval({ i32 }))
+        \\
+    ;
+
+    var byval_module = try ir.Module.parse(std.testing.allocator, byval_non_pointer);
+    defer byval_module.deinit();
+    try std.testing.expectError(error.UnsupportedAbiType, byval_module.verify());
+
+    const sret_non_pointer =
+        \\define void @bad(i32 sret({ i32 }) %result) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var sret_module = try ir.Module.parse(std.testing.allocator, sret_non_pointer);
+    defer sret_module.deinit();
+    try std.testing.expectError(error.UnsupportedAbiType, sret_module.verify());
+}
+
+test "parser rejects varargs at declarations and calls" {
+    const vararg_decl =
+        \\declare void @printf(ptr, ...)
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedVarArgs, ir.Module.parse(std.testing.allocator, vararg_decl));
+
+    const vararg_call =
+        \\declare void @sink(ptr)
+        \\
+        \\define void @caller(ptr %p) {
+        \\entry:
+        \\  call void @sink(ptr %p, ...)
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedVarArgs, ir.Module.parse(std.testing.allocator, vararg_call));
+}
+
 test "parser preserves return attributes before function return type" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

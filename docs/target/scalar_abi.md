@@ -28,6 +28,8 @@ classify void returns as ignored
 classify integer returns and parameters as integer values with their IR bit width
 classify pointer returns and parameters as pointer values using DataLayout pointer size
 classify whole project IR function signatures into return and parameter ABI slots
+preserve `byval(...)` and `sret(...)` parameter attributes textually on pointer
+parameters and reject those attributes on non-pointer parameters
 reject void parameters
 require one of the initial supported targets:
   x86_64-linux-gnu
@@ -41,7 +43,9 @@ Upstream mapping:
 ```text
 LLVM ABI lowering is target-specific and assigns values to registers, stack slots, or indirect ABI locations.
 This project currently implements only the first target-aware classification layer needed before AIR-like lowering and codegen can share the same signature facts.
-It does not assign physical registers, stack offsets, byval/sret storage, or aggregate layouts yet.
+`byval` and `sret` are accepted only as pointer parameter annotations for
+parser/verifier preservation; no storage assignment or indirect-result lowering
+is implemented.
 ```
 
 Fixture coverage:
@@ -58,6 +62,9 @@ unit-test only:
   i32 return classification
   pointer parameter classification for the initial target matrix
   whole-function signature classification for pointer, integer, and void signatures
+  pointer-only byval/sret parser and verifier preservation
+  byval/sret non-pointer rejection
+  varargs declaration/call rejection
   void parameter rejection
 ```
 
@@ -67,7 +74,8 @@ Known gaps:
 no aggregate ABI classification
 no floating-point or vector classes
 no varargs
-no byval, sret, inreg, noalias, nocapture, or alignment attribute effects
+no byval or sret storage semantics; textual pointer-parameter preservation only
+no inreg, noalias, nocapture, or alignment attribute effects
 no register assignment
 no stack argument layout
 no target feature or calling-convention-specific variation

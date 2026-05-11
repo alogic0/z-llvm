@@ -112,6 +112,16 @@ out of scope: general calling conventions, varargs, stack-passed arguments, tail
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
 
+ABI-shaped attributes:
+
+```text
+byval(...) and sret(...) are preserved only on pointer parameters and verified
+as pointer-only annotations
+varargs remain rejected at declarations and call sites
+aggregate return lowering, hidden sret storage, stack-passed byval copies, and
+multi-target ABI parity are not implemented
+```
+
 ## Rejected Surface
 
 The first slice rejects:
@@ -120,6 +130,7 @@ The first slice rejects:
 indirect calls
 inline assembly calls
 varargs
+byval/sret lowering beyond pointer-parameter textual preservation
 operand bundles
 invoke
 callbr
