@@ -747,22 +747,15 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "select")) {
-        const cond_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const cond = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const true_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        const false_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        if (!ty.eql(false_ty)) return error.TypeMismatch;
-        const false_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
+        const select = try parseSelect(rhs_text);
         return .{
             .result = result_text[1..],
             .kind = .{ .select = .{
-                .cond_ty = cond_ty,
-                .cond = cond,
-                .ty = ty,
-                .true_value = true_value,
-                .false_value = false_value,
+                .cond_ty = select.cond_ty,
+                .cond = select.cond,
+                .ty = select.ty,
+                .true_value = select.true_value,
+                .false_value = select.false_value,
             } },
         };
     }
@@ -1445,6 +1438,25 @@ fn parseShuffleVector(text: []const u8) !core.ShuffleVectorInst {
         .rhs = rhs_arg.value,
         .mask_ty = mask_arg.ty,
         .mask = mask_arg.value,
+    };
+}
+
+fn parseSelect(text: []const u8) !core.SelectInst {
+    var rest = std.mem.trim(u8, text["select".len..], " \t");
+    const cond_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const cond_arg = try parseTypedValue(std.mem.trim(u8, rest[0..cond_comma], " \t"));
+    rest = std.mem.trim(u8, rest[cond_comma + 1 ..], " \t");
+    const true_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const true_arg = try parseTypedValue(std.mem.trim(u8, rest[0..true_comma], " \t"));
+    rest = std.mem.trim(u8, rest[true_comma + 1 ..], " \t");
+    const false_arg = try parseTypedValue(rest);
+    if (!true_arg.ty.eql(false_arg.ty)) return error.TypeMismatch;
+    return .{
+        .cond_ty = cond_arg.ty,
+        .cond = cond_arg.value,
+        .ty = true_arg.ty,
+        .true_value = true_arg.value,
+        .false_value = false_arg.value,
     };
 }
 

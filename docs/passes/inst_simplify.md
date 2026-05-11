@@ -56,6 +56,8 @@ Implemented subset:
   Cast folds for integer constants using source-width bit patterns
   ICmp constant and same-operand folds
   Select constant-condition and identical-arm folds
+  Target-independent identical-arm folding for vector-valued selects with a
+  scalar `i1` condition
   Freeze of integer constants
   Strict `fcmp false`/`fcmp true` folds
   Strict `fcmp ord`/`fcmp uno` folds for classified scalar FP constants
@@ -76,6 +78,7 @@ Fixture coverage:
   instcombine_scalar_simplify
   instcombine_safe_scalar
   select_fold
+  vector_select_same_arms
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -146,7 +149,7 @@ Known gaps:
 no DataLayout
 no KnownBits
 no poison-aware reasoning
-no vector simplification
+no vector simplification beyond scalar-condition identical-arm vector selects
 no pointer cast simplification
 no general FP arithmetic folding
 no fast-math-driven FP simplification beyond the listed nsz/nnan folds

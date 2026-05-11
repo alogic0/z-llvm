@@ -91,9 +91,12 @@ extractelement, insertelement, and shufflevector parser/verifier preservation
 ```
 
 Vectorizer passes, target-cost decisions, native lowering, scalable vectors,
-vector select/comparison forms, and vector optimization remain unsupported.
-Accepted lane operations are parser/verifier-only and are not canonicalized or
-folded.
+vector-condition select forms, vector comparisons, and vector optimization
+remain unsupported. The only current vector-valued select transform is the
+target-independent identical-arm fold for scalar `i1` conditions. Accepted lane
+operations are parser/verifier-only except for DCE of unused pure lane ops and
+the same-constant-lane extract-after-insert fold documented in
+`docs/ir_vectors.md`.
 
 ## Unsupported Instructions
 

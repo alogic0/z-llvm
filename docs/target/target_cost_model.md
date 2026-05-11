@@ -21,6 +21,7 @@ scalar accepted corpus pipelines exclude vectorizer placeholders
 fixed-vector IR forms parse and verify
 fixed-vector lane operations may participate in target-independent DCE
 same-constant-lane extract-after-insert folds are target-independent
+scalar-condition vector selects with identical arms fold target-independently
 unsupported scalable vectors and malformed lane operations are rejected by parser tests
 future vector fixture records the parser/verifier boundary
 loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
@@ -42,7 +43,8 @@ Unsupported behavior:
 ```text
 no optimizer-input vector corpus rows beyond reduced lane-operation fixtures
 no lane-operation profitability model
-no vector optimization or scalar fold reuse
+no vector optimization or scalar fold reuse beyond target-independent
+same-value identities
 no loop or SLP vectorization
 no target feature or CPU model cost variation
 ```

@@ -168,7 +168,7 @@ completed foundation epics
 - [x] [Cycle 15: InstCombine Integer and Pointer Parity](roadmap/15_instcombine_integer_pointer_parity_cycle.md)
 - [x] [Cycle 16: SimplifyCFG Canonical Shape Parity](roadmap/16_simplifycfg_canonical_shape_parity_cycle.md)
 - [x] [Cycle 17: Vector Target-Cost and Lane Optimization](roadmap/17_vector_target_cost_lane_optimization_cycle.md)
-- [ ] [Cycle 18: Vector FP and Select Transform Boundary](roadmap/18_vector_fp_select_transform_boundary_cycle.md)
+- [x] [Cycle 18: Vector FP and Select Transform Boundary](roadmap/18_vector_fp_select_transform_boundary_cycle.md)
 - [ ] [Cycle 19: Atomic Ordering and SyncScope Semantics](roadmap/19_atomic_ordering_syncscope_semantics_cycle.md)
 - [ ] [Cycle 20: TLS and Concurrency IR Acceptance](roadmap/20_tls_concurrency_ir_acceptance_cycle.md)
 - [ ] [Cycle 21: EH Pad and Invoke Boundary](roadmap/21_eh_pad_invoke_boundary_cycle.md)

@@ -83,6 +83,8 @@ local-only conservative:
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
   parser/printer/verifier round-trip for scalar float/double fadd/fsub/fmul/fdiv/frem, fcmp predicates, and select
+  scalar-condition vector select with identical arms folds through the same
+  select simplification rule
   parser/printer/verifier round-trip for observed decimal FP literals
   parser/printer/verifier round-trip and classification for NaN, infinity, and
   signed-zero literal spellings
@@ -93,7 +95,8 @@ unit-test only:
 Known gaps:
 
 ```text
-no scalar optimization over vector instructions; fixed vectors are parsed and
+no scalar optimization over vector instructions except target-independent
+identical-arm vector-valued selects; fixed vectors are otherwise parsed and
 verified only as described in `docs/ir_vectors.md`
 no pointer casts
 no bitcast/ptrtoint/inttoptr

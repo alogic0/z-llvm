@@ -32,16 +32,26 @@ unused lane operations may be removed by DCE
 extractelement (insertelement V, X, C), C -> X when C is the same constant lane
 ```
 
-Scalar InstSimplify, GVN, and EarlyCSE still do not fold or value-number vector
-binary operations as scalar expressions. Vectorization and profitability remain
-blocked on TargetTransformInfo-style cost modeling.
+Cycle 18 enables one target-independent select simplification for vector-valued
+selects with a scalar `i1` condition:
+
+```text
+select i1 C, <N x T> V, <N x T> V -> V
+```
+
+This uses the same identical-arm rule as scalar `select`. It does not require a
+vector cost model because it removes an instruction without changing lane
+semantics. Scalar InstSimplify, GVN, and EarlyCSE still do not fold or
+value-number vector binary operations as scalar expressions. Vectorization and
+profitability remain blocked on TargetTransformInfo-style cost modeling.
 
 Unsupported:
 
 ```text
 scalable vectors
 vector element types outside integer, float, double, and ptr
-vector select and vector comparisons beyond current parser boundaries
+vector-condition select and vector comparisons beyond current parser boundaries
+vector FP transforms beyond parse/verify preservation for supported binary ops
 TargetTransformInfo-like profitability or vectorizer cost modeling
 loop-vectorize, slp-vectorizer, vector-combine
 native vector lowering
@@ -66,6 +76,7 @@ opt-22 equivalent:
   vector_lane_preserve
   vector_lane_dead_dce
   vector_extract_insert_fold
+  vector_select_same_arms
 
 local-only conservative:
   vector_extract_insert_mismatch_reject

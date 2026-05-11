@@ -71,6 +71,8 @@ Implemented subset:
   Checked `nuw`/`nsw`/`exact` identity and constant folds for the listed
   integer fixtures
   Same-constant-lane extract-after-insert vector lane fold
+  Target-independent identical-arm vector-valued select fold with scalar `i1`
+  condition
   Constant-on-RHS canonicalization for supported commutative binary ops
 
 Intentional divergences:
@@ -101,6 +103,7 @@ Fixture coverage:
   vector_extract_insert_mismatch_reject is local-conservative: LLVM rewrites to
   extract from the original vector when lanes differ; the local pass preserves
   the shape until it can create replacement vector instructions.
+  vector_select_same_arms
   select_fold
   fp_instcombine_preserve
   fp_special_literals_preserve
@@ -159,6 +162,7 @@ icmp signed and unsigned relational constant folding
 icmp signed and unsigned relational same-operand folding
 select constant-condition folding
 select identical-arm folding
+select identical-vector-arm folding for scalar `i1` conditions
 fold selected `nsw`, `nuw`, and `exact` neutral identities when the flag cannot
 change overflow behavior
 fold selected flagged integer constants only after checking signed/unsigned
