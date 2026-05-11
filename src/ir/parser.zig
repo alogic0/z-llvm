@@ -856,17 +856,30 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     const close_paren = std.mem.lastIndexOfScalar(u8, rest, ')') orelse return error.InvalidCall;
     if (close_paren < open_paren) return error.InvalidCall;
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
-    if (std.mem.startsWith(u8, callee_text, "asm ")) return error.UnsupportedInlineAsm;
-    if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
-    if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
+    const inline_asm = if (std.mem.startsWith(u8, callee_text, "asm "))
+        try parseInlineAsm(callee_text)
+    else
+        null;
+    if (inline_asm == null) {
+        if (std.mem.startsWith(u8, callee_text, "asm")) return error.UnsupportedInlineAsm;
+        if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
+        if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
+    }
     const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
-    if (trailing.len != 0) return error.UnsupportedCallAttribute;
+    const attrs = if (trailing.len == 0)
+        null
+    else if (isSupportedCallAttributeRef(trailing))
+        trailing
+    else
+        return error.UnsupportedCallAttribute;
 
     var call: core.CallInst = .{
         .ret_ty = ret_ty,
-        .callee = callee_text[1..],
+        .callee = if (inline_asm == null) callee_text[1..] else "",
         .calling_conv = calling_conv,
         .tail_kind = tail_kind,
+        .inline_asm = inline_asm,
+        .attrs = attrs,
         .args = .empty,
     };
     errdefer call.deinit(allocator);
@@ -877,6 +890,50 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .result = result,
         .kind = .{ .call = call },
     };
+}
+
+fn isSupportedCallAttributeRef(text: []const u8) bool {
+    if (text.len < 2 or text[0] != '#') return false;
+    for (text[1..]) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
+}
+
+fn parseInlineAsm(text: []const u8) !core.InlineAsm {
+    var rest = std.mem.trim(u8, text["asm".len..], " \t");
+    var sideeffect = false;
+    if (std.mem.startsWith(u8, rest, "sideeffect")) {
+        sideeffect = true;
+        rest = std.mem.trim(u8, rest["sideeffect".len..], " \t");
+    }
+
+    const template = parseQuotedPrefix(&rest) orelse return error.UnsupportedInlineAsm;
+    rest = std.mem.trim(u8, rest, " \t");
+    if (rest.len == 0 or rest[0] != ',') return error.UnsupportedInlineAsm;
+    rest = std.mem.trim(u8, rest[1..], " \t");
+    const constraints = parseQuotedPrefix(&rest) orelse return error.UnsupportedInlineAsm;
+    if (std.mem.trim(u8, rest, " \t").len != 0) return error.UnsupportedInlineAsm;
+
+    return .{
+        .template = template,
+        .constraints = constraints,
+        .sideeffect = sideeffect,
+        .has_memory_clobber = std.mem.indexOf(u8, constraints, "~{memory}") != null,
+    };
+}
+
+fn parseQuotedPrefix(rest: *[]const u8) ?[]const u8 {
+    const text = std.mem.trim(u8, rest.*, " \t");
+    if (text.len == 0 or text[0] != '"') return null;
+    var index: usize = 1;
+    while (index < text.len) : (index += 1) {
+        if (text[index] == '"' and text[index - 1] != '\\') {
+            rest.* = text[index + 1 ..];
+            return text[1..index];
+        }
+    }
+    return null;
 }
 
 fn isUnsupportedInstrumentationCallee(name: []const u8) bool {

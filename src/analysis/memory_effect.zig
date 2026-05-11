@@ -33,6 +33,7 @@ pub const BarrierKind = enum {
     none,
     @"volatile",
     atomic,
+    inline_asm,
 };
 
 pub fn classify(instruction: ir.Instruction) Effect {
@@ -40,7 +41,7 @@ pub fn classify(instruction: ir.Instruction) Effect {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .none,
-        .call => .unknown,
+        .call => |call| if (call.inline_asm != null) .volatile_or_atomic_barrier else .unknown,
     };
 }
 
@@ -48,7 +49,11 @@ pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
     return switch (instruction.kind) {
         .load => |load| memoryBarrierKind(load.attrs),
         .store => |store| memoryBarrierKind(store.attrs),
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => .none,
+        .call => |call| if (call.inline_asm) |inline_asm|
+            if (inline_asm.has_memory_clobber) .inline_asm else .none
+        else
+            .none,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .none,
     };
 }
 
@@ -76,7 +81,10 @@ pub fn mayWriteMemory(instruction: ir.Instruction) bool {
 }
 
 pub fn mayThrow(instruction: ir.Instruction) bool {
-    return instruction.kind == .call;
+    return switch (instruction.kind) {
+        .call => |call| call.inline_asm == null,
+        else => false,
+    };
 }
 
 pub fn mayTrap(instruction: ir.Instruction) bool {

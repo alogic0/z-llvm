@@ -481,11 +481,20 @@ pub const CallArg = struct {
     value: Value,
 };
 
+pub const InlineAsm = struct {
+    template: []const u8,
+    constraints: []const u8,
+    sideeffect: bool = false,
+    has_memory_clobber: bool = false,
+};
+
 pub const CallInst = struct {
     ret_ty: Type,
     callee: []const u8,
     calling_conv: ?[]const u8 = null,
     tail_kind: ?[]const u8 = null,
+    inline_asm: ?InlineAsm = null,
+    attrs: ?[]const u8 = null,
     args: std.ArrayList(CallArg),
 
     pub fn deinit(call: *CallInst, allocator: std.mem.Allocator) void {

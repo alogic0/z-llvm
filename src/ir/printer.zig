@@ -204,7 +204,13 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
                         try call.ret_ty.format(writer);
-                        try writer.print(" @{s}(", .{call.callee});
+                        if (call.inline_asm) |inline_asm| {
+                            try writer.writeAll(" asm ");
+                            if (inline_asm.sideeffect) try writer.writeAll("sideeffect ");
+                            try writer.print("\"{s}\", \"{s}\"(", .{ inline_asm.template, inline_asm.constraints });
+                        } else {
+                            try writer.print(" @{s}(", .{call.callee});
+                        }
                         for (call.args.items, 0..) |arg, index| {
                             if (index != 0) try writer.writeAll(", ");
                             try arg.ty.format(writer);
@@ -212,6 +218,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try arg.value.format(writer);
                         }
                         try writer.writeByte(')');
+                        if (call.attrs) |attrs| try writer.print(" {s}", .{attrs});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                 }

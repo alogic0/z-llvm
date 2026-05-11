@@ -22,25 +22,28 @@ atomicrmw
 cmpxchg
 fence
 syncscope
-inline asm calls
+inline asm lowering and constraint validation
 ```
 
-Inline asm is rejected explicitly as `UnsupportedInlineAsm` instead of being
-treated as an indirect call. This keeps memory clobbers, constraints, and
-side-effect flags from being ignored accidentally.
+Inline asm is represented only for the observed source-backed barrier shape:
+`call void asm sideeffect "...", "...~{memory}..."()`. The parser preserves the
+template and constraint strings, records `sideeffect`, and marks `~{memory}` as
+a memory clobber. It does not validate registers, constraints, outputs, native
+lowering, or target-specific behavior.
 
 The current source-backed captured row
-`atomics_inline_asm_debug_release_fast` now reaches the inline-asm barrier and
-fails with `UnsupportedInlineAsm`. A reduced `atomicrmw` fixture documents the
-second blocker in the same Zig source group.
+`atomics_inline_asm_debug_release_fast` remains future-only because the full row
+also contains call-site attributes and `atomicrmw`. The reduced inline-asm
+barrier is accepted as optimizer input; a reduced `atomicrmw` fixture documents
+the next blocker in the same Zig source group.
 
 ## Optimizer Policy
 
 ```text
-DCE/ADCE: volatile and atomic memory are live side-effecting barriers.
-GVN/EarlyCSE: volatile and atomic memory block memory value reuse.
+DCE/ADCE: volatile, atomic, and inline asm memory are live side-effecting barriers.
+GVN/EarlyCSE: volatile, atomic, and inline asm memory block memory value reuse.
 LICM: volatile, atomic, loads, stores, calls, and inline asm are not hoisted.
-DSE: volatile and atomic memory are barriers for store elimination.
+DSE: volatile, atomic, and inline asm memory are barriers for store elimination.
 Mem2Reg/SROA: local atomic alloca users are rejected conservatively.
 ```
 
@@ -57,22 +60,28 @@ local-only conservative opt fixture:
 
 unit tests:
   atomic load/store parse/print preservation
-  atomicrmw, cmpxchg, fence, and inline asm rejection
-  source-backed reduced inline-asm and atomicrmw rejection fixtures from
+  reduced inline asm parse/print preservation as a side-effecting memory barrier
+  atomicrmw, cmpxchg, and fence rejection
+  source-backed reduced inline-asm and atomicrmw fixtures from
   `atomics_inline_asm_debug_release_fast`
   memory-effect barrier classification
   DCE/ADCE/GVN/EarlyCSE/LICM/DSE atomic barrier preservation
   Mem2Reg atomic alloca-user rejection
 ```
 
-Inline asm has no opt fixture because the parser rejects `call asm` before any
-optimizer pass can see it. That is intentional until constraints, side-effect
-flags, and memory clobbers are represented.
+Inline asm has an opt fixture for preservation only:
+
+```text
+inline_asm_barrier_preserve
+```
+
+It proves the local optimizer can remove unrelated dead scalar code while
+preserving the side-effecting memory-clobber asm call.
 
 Source-backed reduced rejection fixtures:
 
 ```text
-test/zig/expected/atomics_inline_asm_inline_asm.unsupported.ll
+test/zig/expected/atomics_inline_asm_inline_asm.reduced.ll
 test/zig/expected/atomics_inline_asm_atomicrmw.unsupported.ll
 ```
 

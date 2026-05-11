@@ -456,6 +456,12 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         if (!core.isSupportedCallingConvention(calling_conv)) return error.UnsupportedCallingConvention;
     }
 
+    if (call.inline_asm) |inline_asm| {
+        if (!inline_asm.sideeffect) return error.UnsupportedInlineAsm;
+        for (call.args.items) |arg| try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+        return;
+    }
+
     if (findDeclaration(module, call.callee)) |decl| {
         if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, decl.calling_conv)) return error.CallSignatureMismatch;

@@ -3628,7 +3628,7 @@ test "parser rejects unsupported atomic memory operations" {
     try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, source_backed_atomicrmw));
 }
 
-test "parser rejects inline asm calls explicitly" {
+test "parser preserves inline asm calls as side-effecting barriers" {
     const input =
         \\define void @inline_asm_barrier() {
         \\entry:
@@ -3638,7 +3638,16 @@ test "parser rejects inline asm calls explicitly" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedInlineAsm, ir.Module.parse(std.testing.allocator, input));
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(call.inline_asm != null);
+    try std.testing.expect(call.inline_asm.?.sideeffect);
+    try std.testing.expect(call.inline_asm.?.has_memory_clobber);
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(module.functions.items[0].blocks.items[0].instructions.items[0]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.inline_asm, memory_effect.barrierKind(module.functions.items[0].blocks.items[0].instructions.items[0]));
 
     const source_backed_inline_asm =
         \\source_filename = "atomics_inline_asm_debug"
@@ -3650,7 +3659,27 @@ test "parser rejects inline asm calls explicitly" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedInlineAsm, ir.Module.parse(std.testing.allocator, source_backed_inline_asm));
+    var source_backed_module = try ir.Module.parse(std.testing.allocator, source_backed_inline_asm);
+    defer source_backed_module.deinit();
+    try source_backed_module.verify();
+    const source_backed_call = source_backed_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(source_backed_call.inline_asm != null);
+    try std.testing.expect(source_backed_call.inline_asm.?.has_memory_clobber);
+}
+
+test "parser rejects unsupported inline asm forms explicitly" {
+    const missing_sideeffect =
+        \\define void @inline_asm_barrier() {
+        \\entry:
+        \\  call void asm "", "~{memory}"()
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, missing_sideeffect);
+    defer module.deinit();
+    try std.testing.expectError(error.UnsupportedInlineAsm, module.verify());
 }
 
 test "parser normalizes getelementptr instructions" {

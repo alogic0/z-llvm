@@ -286,6 +286,7 @@ fn lowerCall(
     result: ?[]const u8,
     call: ir.CallInst,
 ) !void {
+    if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     try validateDefaultCallConv(call.calling_conv);
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;

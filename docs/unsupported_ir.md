@@ -78,7 +78,7 @@ vector/constrained `fcmp`; scalar `fcmp` predicates parse and verify only
 phi token/blockaddress values
 indirect call
 call attributes beyond the supported calling convention spelling
-inline asm call
+inline asm lowering and constraint validation
 invoke/callbr
 bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
@@ -160,7 +160,7 @@ InvalidCall
 UnsupportedIndirectCall
 UnsupportedCallAttribute
 UnsupportedInstrumentationCall
-UnsupportedInlineAsm
+UnsupportedInlineAsm for non-sideeffect or malformed inline asm
 UnsupportedCallTerminator
 UnsupportedVarArgs
 UnsupportedAttributeGroup
