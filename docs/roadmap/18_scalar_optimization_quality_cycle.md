@@ -15,16 +15,26 @@ validate against LLVM.
 
 ## Plan
 
-- [ ] Add scalar fold gaps from integer corpus to InstCombine docs.
-- [ ] Expand known-bits or demanded-bits only for tested integer cases.
-- [ ] Improve SCCP undef/poison-adjacent behavior where local IR can model it.
-- [ ] Add BDCE-style bit-demanded cleanup as a separate conservative pass.
-- [ ] Add CVP only after assumptions and branch facts are represented.
-- [ ] Compare quality-sensitive fixtures with `opt-22`.
+- [x] Add scalar fold gaps from integer corpus to InstCombine docs.
+- [x] Expand known-bits or demanded-bits only for tested integer cases.
+- [x] Improve SCCP undef/poison-adjacent behavior where local IR can model it.
+- [x] Add BDCE-style bit-demanded cleanup as a separate conservative pass.
+- [x] Add CVP only after assumptions and branch facts are represented.
+- [x] Compare quality-sensitive fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] Scalar corpus output moves closer to LLVM without unsafe folds.
-- [ ] Flag-sensitive arithmetic remains conservative.
-- [ ] Quality improvements have direct fixtures.
+- [x] Scalar corpus output moves closer to LLVM without unsafe folds.
+- [x] Flag-sensitive arithmetic remains conservative.
+- [x] Quality improvements have direct fixtures.
 
+## Completion Notes
+
+- Added a real `bdce` pass for the narrow demanded-low-bits case reproduced
+  from LLVM BDCE: a single-use wider integer `and` mask feeding a narrower
+  integer `and` mask.
+- Added `bdce_and_mask` as an `opt-22` equivalent fixture.
+- Kept CVP as a placeholder because local assumptions and branch range facts
+  are not represented beyond existing SCCP CFG facts.
+- Kept flag-sensitive arithmetic conservative; the new BDCE rule rejects
+  flagged binary operators and only handles integer `and` masks up to 64 bits.

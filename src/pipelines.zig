@@ -1,6 +1,7 @@
 const std = @import("std");
 const pass_manager = @import("pass_manager.zig");
 const adce = @import("passes/adce.zig");
+const bdce = @import("passes/bdce.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
@@ -343,6 +344,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(dse.pass);
     } else if (std.mem.eql(u8, name, "adce")) {
         try pm.add(adce.pass);
+    } else if (std.mem.eql(u8, name, "bdce")) {
+        try pm.add(bdce.pass);
     } else if (std.mem.eql(u8, name, "early-cse")) {
         try pm.add(early_cse.pass);
     } else if (std.mem.eql(u8, name, "sccp")) {
@@ -388,7 +391,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "alignment-from-assumptions")) return placeholder.make("alignment-from-assumptions", .memory, "llvm/lib/Transforms/Scalar/AlignmentFromAssumptions.cpp");
     if (std.mem.eql(u8, name, "move-auto-init")) return placeholder.make("move-auto-init", .memory, "llvm/lib/Transforms/Scalar/MoveAutoInit.cpp");
     if (std.mem.eql(u8, name, "ipsccp")) return placeholder.make("ipsccp", .ipo, "llvm/lib/Transforms/IPO/SCCP.cpp");
-    if (std.mem.eql(u8, name, "bdce")) return placeholder.make("bdce", .scalar, "llvm/lib/Transforms/Scalar/BDCE.cpp");
     if (std.mem.eql(u8, name, "reassociate")) return placeholder.make("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp");
     if (std.mem.eql(u8, name, "constraint-elimination")) return placeholder.make("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp");
     if (std.mem.eql(u8, name, "speculative-execution")) return placeholder.make("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp");

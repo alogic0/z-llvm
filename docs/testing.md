@@ -161,6 +161,7 @@ InstCombine: arithmetic, bitwise, shift, select, relational icmp, constant scala
 DCE: unused pure instruction removal subset
 DSE: single-block overwritten stack-store removal with intervening read/barrier rejection
 ADCE: unused side-effect-free instruction chain removal subset
+BDCE: demanded low-bit cleanup for a single-use integer and-mask chain
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, empty-block threading, and matching return-block merge subsets
 EarlyCSE: dominator-scoped available-value foundation with unit-test coverage for pure expression and safe-load CSE
 Mem2Reg: entry-block alloca discovery plus single-store, single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets

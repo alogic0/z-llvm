@@ -185,7 +185,7 @@ Status meanings:
 | `early-cse` | canonicalization / scalar | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
 | `dse` | memory optimization | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
-| `bdce` | scalar DCE | P2 | placeholder | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
+| `bdce` | scalar DCE | P2 | fixture-equivalent for listed demanded-bit fixture | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
 | `sccp` / `ipsccp` | scalar / IPO | P1 | fixture-equivalent for listed SCCP fixtures / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
 | `gvn` | scalar / memory | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/GVN.cpp` |
 | `licm` | loop / memory | P1 | fixture-equivalent for listed scalar fixtures | `llvm/lib/Transforms/Scalar/LICM.cpp` |

@@ -164,6 +164,8 @@ no poison/undef simplification
 no non-constant freeze simplification
 no vectors
 no width-aware constant folding for non-zero shifts
+no demanded-bits cleanup in InstCombine; the first source-backed integer mask
+quality case is implemented in the separate `bdce` pass
 unsigned constant folding is limited to integer widths below 128 bits
 no non-constant cast simplification yet
 no unsafe division/remainder simplification

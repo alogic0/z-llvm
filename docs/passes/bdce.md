@@ -32,31 +32,39 @@ Core LLVM algorithm data structures:
   output bits.
 
 Local target status:
-  Placeholder.
+  fixture-equivalent for listed demanded-bit fixtures.
 ```
 
 Implemented subset:
 
 ```text
-none
+Demanded low-bit cleanup for a narrow integer `and` mask chain:
+  %wide = and iN %x, C1
+  %narrow = and iN %wide, C2
+
+When C2 demands only bits already preserved by C1 and `%wide` has one use, the
+local pass rewrites `%narrow` to use `%x` directly and removes `%wide`.
 ```
 
 Intentional divergences:
 
 ```text
-The local pipeline exposes a BDCE placeholder only. A real implementation waits
-for known-bits or demanded-bits analysis.
+No general demanded-bits lattice yet.
+No KnownBits analysis, AssumptionCache, vector handling, poison-sensitive
+reasoning, or multi-user propagation.
+Only integer widths up to 64 bits are accepted in the current fixture-backed
+rule.
 ```
 
 Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  bdce_and_mask
 
 local-only conservative:
   none currently
 
 unit-test only:
-  placeholder pass dispatch through named pipelines
+  none currently
 ```
