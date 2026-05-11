@@ -16,7 +16,7 @@ All paths are relative to `prog`.
 | --- | --- | --- | --- |
 | `z_llvm/docs/inventory/zig_llvm_api_inventory.md` | API, IR, target, codegen, debug, bitcode, linker | Maps Zig's direct LLVM/ZigLLVM/LLD binding surface to local replacement owners. | Source-backed foundation; needs periodic refresh when Zig changes bindings. |
 | `z_llvm/docs/inventory/zig_llvm_pass_pipeline_inventory.md` | optimizer pipeline | Maps the LLVM pass pipeline Zig invokes through `TargetMachine.emitToFile`. | Source-backed foundation with priorities and local status. |
-| `z_llvm/docs/fixtures/zig_emitted_ir.md` | Zig-emitted IR corpus | Records fixture strategy for real Zig-emitted LLVM IR. | Foundation; needs more real Zig-mode coverage. |
+| `z_llvm/docs/fixtures/zig_emitted_ir.md` | Zig-emitted IR corpus | Records fixture strategy for real Zig-emitted LLVM IR. | Bootstrap corpus complete for initial source-backed parser/verifier/optimizer slices. |
 | `z_llvm/docs/unsupported_ir.md` | gap tracking | Lists IR constructs this project rejects, defers, or supports narrowly. | Must be updated whenever parser/verifier/pass behavior changes. |
 | `z_llvm/docs/roadmap/llvm_algorithm_parity_gap_closure_plan.md` | optimizer parity rubric | Tracks gaps between local optimizer passes and original LLVM algorithms. | Rubric for optimizer epics, not a global blocker. |
 
@@ -130,7 +130,7 @@ Use these categories consistently in inventories and roadmap slices:
 
 | Gap | Category | Why it matters | Current action |
 | --- | --- | --- | --- |
-| Real Zig-emitted IR corpus is still small. | IR semantics | Optimizer work can drift toward generic LLVM instead of Zig inputs. | Build Epic 2 before broadening optimizer behavior. |
+| Real Zig-emitted IR corpus is intentionally small. | IR semantics | Optimizer work can still drift if future passes are not tied to a source-backed fixture. | Extend the Epic 2 corpus only when a new parser, verifier, optimizer, target, or metadata slice needs that IR construct. |
 | API inventory is grouped, not mechanically exhaustive by every builder call in `FuncGen.zig`. | IR semantics, target/data-layout | Missing builder operations can hide required IR constructs. | Add source-generated or manually audited AIR-to-IR rows as fixtures are added. |
 | Pass inventory records pass names and priorities, but many local passes are subsets/placeholders. | optimizer | Same-named local passes can be mistaken for LLVM algorithm parity. | Use `llvm_algorithm_parity_gap_closure_plan.md` before claiming reproduction. |
 | Target features and host CPU detection are inventoried but not implemented. | target/data-layout | LLVM legality and cost decisions depend on features. | Defer until accepted fixtures require target feature checks. |

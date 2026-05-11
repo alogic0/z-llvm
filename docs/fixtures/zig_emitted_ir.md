@@ -21,6 +21,8 @@ test/zig/inputs/tiny_scalar.zig
 test/zig/expected/tiny_scalar.normalized.ll
 test/zig/expected/tiny_scalar.project_lowered.ll
 test/zig/expected/tiny_scalar.project_optimized.ll
+test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll
+test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll
 src/testdata/zig_tiny_scalar.normalized.ll
 src/testdata/zig_tiny_scalar.project_lowered.ll
 src/testdata/zig_tiny_scalar.project_optimized.ll

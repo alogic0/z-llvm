@@ -19,18 +19,18 @@ instead of hand-written LLVM examples alone.
 - [x] Add a fixture manifest format that records:
       Zig version, target, optimization mode, command used, IR file, expected
       parser/verifier status, and comparison notes.
-- [ ] Add initial source groups:
+- [x] Add initial source groups:
       integers, pointers, arrays, structs, optionals, error unions, slices,
       loops, calls, comptime constants, globals, atomics, volatile, inline asm,
       and debug-info examples.
-- [ ] Capture IR for Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall where
+- [x] Capture IR for Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall where
       supported.
-- [ ] Add target coverage starting with the native host target, then one extra
+- [x] Add target coverage starting with the native host target, then one extra
       non-host target used by Zig's LLVM path.
-- [ ] Classify each fixture as:
-      `must parse`, `must verify`, `optimizer input`, `debug-info only`,
-      `unsupported but documented`, or `future`.
-- [ ] Keep synthetic LLVM fixtures only when they isolate a behavior not easily
+- [x] Classify each fixture as:
+      `parse`, `verify`, `optimizer-input`, `debug-info-only`, `unsupported`,
+      or `future`.
+- [x] Keep synthetic LLVM fixtures only when they isolate a behavior not easily
       emitted from Zig.
 
 ## Deliverables
@@ -38,14 +38,14 @@ instead of hand-written LLVM examples alone.
 - [x] `../fixtures/zig_ir/README.md`
 - [x] Fixture manifest files.
 - [x] Initial Zig source fixture set.
-- [ ] Captured LLVM IR files.
+- [x] Captured LLVM IR files.
 - [x] Corpus coverage table.
 
 ## Exit Criteria
 
-- [ ] Parser/verifier work can be driven from real Zig-emitted IR.
-- [ ] Each optimizer epic has at least one Zig-originated fixture family.
-- [ ] Unsupported IR forms are documented instead of silently ignored.
+- [x] Parser/verifier work can be driven from real Zig-emitted IR.
+- [x] Each optimizer epic has at least one Zig-originated fixture family.
+- [x] Unsupported IR forms are documented instead of silently ignored.
 
 ## Completed Slices
 
@@ -61,9 +61,21 @@ instead of hand-written LLVM examples alone.
       `unsupported`, or `future`.
 - [x] Added notes connecting each fixture row back to the LLVM pass inventory.
 
-Remaining broad-epic work:
+### Slice 2: Initial Corpus Completion
 
-- [ ] Add more source groups beyond `tiny_scalar`.
-- [ ] Check in captured raw or sanitized LLVM IR files where they do not contain
+- [x] Added source groups beyond `tiny_scalar`:
+      `integers`, `pointers_memory`, `aggregates`, `control_flow_calls`,
+      `globals_comptime`, and `atomics_inline_asm_debug`.
+- [x] Checked in captured stripped LLVM IR files where they do not contain
       machine-local paths or excessive unrelated std/debug support.
-- [ ] Add enough Zig-originated fixture families for every optimizer epic.
+- [x] Added enough Zig-originated fixture families for every active optimizer
+      epic to have at least one source-backed input family.
+- [x] Added non-host target coverage with `integers.ReleaseFast.aarch64.ll`.
+- [x] Left Debug and ReleaseSafe raw IR as generated-but-untracked when the
+      emitted files were too broad for a checked fixture.
+
+## Completion Notes
+
+Epic 2 is complete as a corpus bootstrap, not as exhaustive Zig language
+coverage. Future epics should extend this corpus when they need a new
+source-backed IR construct.
