@@ -65,6 +65,17 @@ floats_math ReleaseSmall stripped capture: byte-identical to current stage4
 tiny_scalar ReleaseSafe raw capture: still too broad for checked corpus use
 ```
 
+Cycle 24 refreshed representative rows under `tmp/zig_ir/cycle24/`:
+
+```text
+tiny_scalar Debug raw capture: generated successfully, still future-only and not checked in
+tiny_scalar ReleaseSafe raw capture: generated successfully, still future-only and not checked in
+tiny_scalar ReleaseFast stripped capture: byte-identical to checked capture
+tiny_scalar ReleaseSmall stripped capture: byte-identical to checked capture
+integers ReleaseFast AArch64 stripped capture: byte-identical to checked capture
+readiness gate: scripts/check_zig_stage4_emitter.sh and bash scripts/run_readiness_checks.sh passed
+```
+
 When adding or refreshing fixtures:
 
 - [ ] Record the Zig executable version or revision used to emit the IR.

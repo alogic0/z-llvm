@@ -65,6 +65,30 @@ completed foundation epics
   -> error, optional, and aggregate ABI expansion
   -> alias and memory precision for source-backed rows
   -> corpus refresh and readiness audit
+  -> inline asm IR representation
+  -> atomic RMW, cmpxchg, and fence representation
+  -> vector IR parser and verifier bootstrap
+  -> vector lane operation boundary
+  -> target-cost policy for vector and FP transforms
+  -> AArch64 optimizer-input promotion
+  -> Debug-mode source-backed reduction expansion
+  -> debug intrinsics and debug-value boundary
+  -> FP constants, literals, and strict semantics
+  -> extended scalar FP operations
+  -> fast-math flags parser and verifier
+  -> conservative FP optimization comparison
+  -> path-aware MemorySSA foundation
+  -> DSE with MemorySSA and partial-overwrite boundaries
+  -> GVN load and PRE expansion with MemorySSA
+  -> LICM memory-hoisting legality
+  -> alias metadata policy
+  -> function and call ModRef precision
+  -> exception and EH IR boundary
+  -> sanitizer, safety, and instrumentation boundary
+  -> bitcode, LTO, and ThinLTO boundary
+  -> ABI expansion for byval, sret, varargs, and aggregate returns
+  -> native backend and AIR handoff mapping
+  -> full corpus refresh and differential audit
 ```
 
 ## Completed Foundation Epics
@@ -94,6 +118,33 @@ completed foundation epics
 ## Current Readiness Audit
 
 - [x] [Source-Backed Readiness Audit](roadmap/source_backed_readiness_audit.md)
+
+## Completed Finish-Oriented Roadmap Cycles
+
+- [x] [Cycle 1: Inline Asm IR Representation](roadmap/01_inline_asm_ir_representation_cycle.md)
+- [x] [Cycle 2: Atomic RMW, Cmpxchg, And Fence Representation](roadmap/02_atomic_rmw_cmpxchg_fence_cycle.md)
+- [x] [Cycle 3: Vector IR Parser And Verifier Bootstrap](roadmap/03_vector_ir_parser_verifier_bootstrap_cycle.md)
+- [x] [Cycle 4: Vector Lane Operation Boundary](roadmap/04_vector_lane_operation_boundary_cycle.md)
+- [x] [Cycle 5: Target-Cost Policy For Vector And FP Transforms](roadmap/05_target_cost_policy_cycle.md)
+- [x] [Cycle 6: AArch64 Optimizer-Input Promotion](roadmap/06_aarch64_optimizer_input_promotion_cycle.md)
+- [x] [Cycle 7: Debug-Mode Source-Backed Reduction Expansion](roadmap/07_debug_mode_reduction_expansion_cycle.md)
+- [x] [Cycle 8: Debug Intrinsics And Debug-Value Boundary](roadmap/08_debug_intrinsics_value_boundary_cycle.md)
+- [x] [Cycle 9: FP Constants, Literals, And Strict Semantics](roadmap/09_fp_constants_literals_semantics_cycle.md)
+- [x] [Cycle 10: Extended Scalar FP Operations](roadmap/10_scalar_fp_ops_extended_cycle.md)
+- [x] [Cycle 11: Fast-Math Flags Parser And Verifier](roadmap/11_fast_math_flags_parser_verifier_cycle.md)
+- [x] [Cycle 12: Conservative FP Optimization Comparison](roadmap/12_conservative_fp_optimization_comparison_cycle.md)
+- [x] [Cycle 13: Path-Aware MemorySSA Foundation](roadmap/13_path_aware_memoryssa_foundation_cycle.md)
+- [x] [Cycle 14: DSE With MemorySSA And Partial Overwrite Boundaries](roadmap/14_dse_memoryssa_partial_overwrite_cycle.md)
+- [x] [Cycle 15: GVN Load And PRE Expansion With MemorySSA](roadmap/15_gvn_load_pre_memoryssa_cycle.md)
+- [x] [Cycle 16: LICM Memory-Hoisting Legality](roadmap/16_licm_memory_hoisting_legality_cycle.md)
+- [x] [Cycle 17: Alias Metadata Policy](roadmap/17_alias_metadata_policy_cycle.md)
+- [x] [Cycle 18: Function And Call ModRef Precision](roadmap/18_call_modref_attribute_precision_cycle.md)
+- [x] [Cycle 19: Exception And EH IR Boundary](roadmap/19_exception_eh_ir_boundary_cycle.md)
+- [x] [Cycle 20: Sanitizer, Safety, And Instrumentation Boundary](roadmap/20_sanitizer_safety_instrumentation_boundary_cycle.md)
+- [x] [Cycle 21: Bitcode, LTO, And ThinLTO Boundary](roadmap/21_bitcode_lto_thinlto_boundary_cycle.md)
+- [x] [Cycle 22: ABI Expansion For Byval, Sret, Varargs, And Aggregate Returns](roadmap/22_abi_byval_sret_varargs_cycle.md)
+- [x] [Cycle 23: Native Backend And AIR Handoff Mapping](roadmap/23_native_backend_air_handoff_mapping_cycle.md)
+- [x] [Cycle 24: Full Corpus Refresh And Differential Audit](roadmap/24_full_corpus_refresh_differential_audit_cycle.md)
 
 ## Future Backlog
 
