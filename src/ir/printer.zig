@@ -302,6 +302,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
                             try writer.writeAll(" asm ");
                             if (inline_asm.sideeffect) try writer.writeAll("sideeffect ");
                             try writer.print("\"{s}\", \"{s}\"(", .{ inline_asm.template, inline_asm.constraints });
+                        } else if (call.callee_value) |callee_value| {
+                            try writer.writeByte(' ');
+                            try callee_value.format(writer);
+                            try writer.writeByte('(');
                         } else {
                             try writer.print(" @{s}(", .{call.callee});
                         }

@@ -673,6 +673,7 @@ pub const InlineAsm = struct {
 pub const CallInst = struct {
     ret_ty: Type,
     callee: []const u8,
+    callee_value: ?Value = null,
     calling_conv: ?[]const u8 = null,
     tail_kind: ?[]const u8 = null,
     inline_asm: ?InlineAsm = null,
@@ -822,8 +823,11 @@ pub const Instruction = struct {
                     index.value = resolveValue(aliases, index.value);
                 }
             },
-            .call => |*call| for (call.args.items) |*arg| {
-                arg.value = resolveValue(aliases, arg.value);
+            .call => |*call| {
+                if (call.callee_value) |value| call.callee_value = resolveValue(aliases, value);
+                for (call.args.items) |*arg| {
+                    arg.value = resolveValue(aliases, arg.value);
+                }
             },
         }
     }

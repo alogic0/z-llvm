@@ -235,6 +235,7 @@ fn lowerSingleStackSlotCallReturn(
         .call => |call| call,
         else => return false,
     };
+    if (call.callee_value != null) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -360,6 +361,7 @@ fn lowerCall(
     result: ?[]const u8,
     call: ir.CallInst,
 ) !void {
+    if (call.callee_value != null) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     try validateDefaultCallConv(call.calling_conv);
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;

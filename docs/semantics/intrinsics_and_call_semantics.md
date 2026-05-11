@@ -29,6 +29,12 @@ semantics needed by Zig-emitted IR corpus rows.
 - Parse `llvm.assume` as a direct void call. Its Zig-emitted
   `memory(inaccessiblemem: write)` attribute keeps it side-effecting in the
   local optimizer, so it is preserved rather than treated as a free no-op.
+- Parse `llvm.trap` as a direct void call. It remains a side-effecting
+  intrinsic boundary and is preserved before `unreachable`; no trap lowering is
+  modeled in the optimizer.
+- Parse indirect calls through pointer SSA values conservatively. The verifier
+  checks only the callee pointer and argument values because opaque pointers do
+  not carry a full callable signature locally.
 - Fold integer min/max intrinsics only for source-backed scalar cases:
   `llvm.smin.*`, `llvm.smax.*`, `llvm.umin.*`, and `llvm.umax.*`.
 
@@ -60,8 +66,13 @@ bash scripts/compare_opt.sh
 
 - `llvm.assume` is represented conservatively as a side-effecting call, not as
   an assumption cache input.
-- Indirect calls, `invoke`, `callbr`, `musttail`, operand bundles, and inline
-  asm remain unsupported.
+- `llvm.trap` is represented conservatively as a side-effecting noreturn
+  intrinsic-shaped call, not as a target trap instruction.
+- Indirect calls are represented only as conservative call boundaries; no
+  devirtualization, signature refinement, inlining, or native lowering is
+  modeled.
+- `invoke`, `callbr`, `musttail`, operand bundles, and inline asm lowering
+  remain unsupported.
 - Attribute groups are parsed only as preserved IR records with conservative
   memory-effect extraction, not as a full LLVM attribute model.
 - Loop instruction metadata is accepted only as parser input and is not

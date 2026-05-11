@@ -1517,6 +1517,37 @@ test "parser preserves icmp samesign flag" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves integer constant expressions in icmp and binary operands" {
+    const input =
+        \\@start = external global i8
+        \\@end = external global i8
+        \\
+        \\define i1 @constant_expr_cmp() {
+        \\entry:
+        \\  %cmp = icmp eq i64 sub (i64 ptrtoint (ptr @end to i64), i64 ptrtoint (ptr @start to i64)), 0
+        \\  %shift = lshr exact i64 sub (i64 ptrtoint (ptr @end to i64), i64 ptrtoint (ptr @start to i64)), 3
+        \\  ret i1 %cmp
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cmp = module.functions.items[0].blocks.items[0].instructions.items[0].kind.icmp;
+    try std.testing.expect(cmp.lhs == .constant_expr);
+
+    const shift = module.functions.items[0].blocks.items[0].instructions.items[1].kind.binary;
+    try std.testing.expect(shift.lhs == .constant_expr);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier rejects invalid ABI parameter attributes" {
     const byval_non_pointer =
         \\declare void @bad(i32 byval({ i32 }))
@@ -2282,7 +2313,29 @@ test "parser rejects unsupported sanitizer attribute groups explicitly" {
     try std.testing.expectError(error.UnsupportedAttributeGroup, ir.Module.parse(std.testing.allocator, input));
 }
 
-test "parser rejects sanitizer and trap instrumentation calls explicitly" {
+test "parser preserves nosanitize coverage attribute group" {
+    const input =
+        \\define void @without_coverage() #0 {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\attributes #0 = { nosanitize_coverage nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects sanitizer instrumentation calls explicitly" {
     const sanitizer_call =
         \\declare void @__sanitizer_cov_trace_pc_guard(ptr)
         \\
@@ -2318,7 +2371,9 @@ test "parser rejects sanitizer and trap instrumentation calls explicitly" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, ubsan_call));
+}
 
+test "parser preserves llvm trap intrinsic call" {
     const trap_call =
         \\declare void @llvm.trap()
         \\
@@ -2329,7 +2384,19 @@ test "parser rejects sanitizer and trap instrumentation calls explicitly" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, trap_call));
+
+    var module = try ir.Module.parse(std.testing.allocator, trap_call);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("llvm.trap", call.callee);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(trap_call, output.writer.buffered());
 }
 
 test "verifier preserves ReleaseSafe runtime call trap boundary" {
@@ -2945,7 +3012,7 @@ test "verifier rejects invalid memory alignment" {
     try std.testing.expectError(error.InvalidAlignment, module.verify());
 }
 
-test "parser rejects unsupported indirect and control-flow call forms" {
+test "parser preserves indirect call form conservatively" {
     const indirect =
         \\define i32 @caller(ptr %fn, i32 %a) {
         \\entry:
@@ -2954,8 +3021,22 @@ test "parser rejects unsupported indirect and control-flow call forms" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedIndirectCall, ir.Module.parse(std.testing.allocator, indirect));
 
+    var module = try ir.Module.parse(std.testing.allocator, indirect);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(call.callee_value != null);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(indirect, output.writer.buffered());
+}
+
+test "parser rejects unsupported control-flow call forms" {
     const musttail =
         \\define i32 @caller(i32 %a) {
         \\entry:

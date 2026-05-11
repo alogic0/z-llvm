@@ -67,6 +67,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
             state.addTag(6);
             state.addType(call.ret_ty);
             state.addBytes(call.callee);
+            if (call.callee_value) |value| state.addValue(value);
             if (call.calling_conv) |calling_conv| state.addBytes(calling_conv);
             if (call.tail_kind) |tail_kind| state.addBytes(tail_kind);
             for (call.args.items) |arg| {
@@ -175,6 +176,7 @@ pub fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction)
     };
     if (function_attrs.callMemoryEffect(module, a_call) != .none) return false;
     if (function_attrs.callMemoryEffect(module, b_call) != .none) return false;
+    if (a_call.callee_value != null or b_call.callee_value != null) return false;
     if (!a_call.ret_ty.eql(b_call.ret_ty)) return false;
     if (!std.mem.eql(u8, a_call.callee, b_call.callee)) return false;
     if (!sameOptionalText(a_call.calling_conv, b_call.calling_conv)) return false;

@@ -142,7 +142,7 @@ vector_future_release_fast: parse,verify,future
 ```text
 vector/constrained `fcmp`; scalar `fcmp` predicates parse and verify only
 phi token/blockaddress values
-indirect call
+indirect call signature refinement/lowering
 call attributes beyond the supported calling convention spelling
 inline asm lowering and constraint validation
 invoke/callbr
@@ -181,8 +181,7 @@ report `UnsupportedDebugIntrinsic`
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in
 reduced ReleaseSafe safety fixtures
-sanitizer coverage, TSan, UBSan, `llvm.ubsan.*`, and `llvm.trap`
-instrumentation calls
+sanitizer coverage, TSan, UBSan, and `llvm.ubsan.*` instrumentation calls
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition

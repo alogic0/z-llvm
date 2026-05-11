@@ -73,8 +73,8 @@ when they are part of accepted ReleaseSafe safety-control fixtures
 preserve llvm.dbg.value and llvm.dbg.declare raw operands as verifier-only
 debug variable-location intrinsics; reject llvm.dbg.assign with
 UnsupportedDebugIntrinsic until assignment tracking is represented
-reject sanitizer coverage, TSan, UBSan, llvm.ubsan.*, and llvm.trap
-instrumentation calls until runtime semantics are modeled
+reject sanitizer coverage, TSan, UBSan, and llvm.ubsan.* instrumentation calls
+until runtime semantics are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
 module-tsan, tsan, alloc-token, and ee-instrument are executable placeholders
 ```

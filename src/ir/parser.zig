@@ -436,9 +436,18 @@ fn parseAttributeGroup(line: []const u8) !void {
     if (rest.len < 2 or rest[0] != '{' or rest[rest.len - 1] != '}') return error.InvalidAttributeGroup;
 
     const body = rest[1 .. rest.len - 1];
-    if (std.mem.indexOf(u8, body, "sanitize_") != null) return error.UnsupportedAttributeGroup;
+    if (hasUnsupportedSanitizerAttribute(body)) return error.UnsupportedAttributeGroup;
     if (std.mem.indexOf(u8, body, "safestack") != null) return error.UnsupportedAttributeGroup;
     if (std.mem.indexOf(u8, body, "shadowcallstack") != null) return error.UnsupportedAttributeGroup;
+}
+
+fn hasUnsupportedSanitizerAttribute(body: []const u8) bool {
+    var it = std.mem.tokenizeAny(u8, body, " \t,{}");
+    while (it.next()) |token| {
+        if (std.mem.eql(u8, token, "nosanitize_coverage")) continue;
+        if (std.mem.startsWith(u8, token, "sanitize_")) return true;
+    }
+    return false;
 }
 
 fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
@@ -786,25 +795,9 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "icmp")) {
-        var predicate_text = parts.next() orelse return error.InvalidInstruction;
-        const samesign = if (std.mem.eql(u8, predicate_text, "samesign")) blk: {
-            predicate_text = parts.next() orelse return error.InvalidInstruction;
-            break :blk true;
-        } else false;
-        const predicate = core.IcmpPredicate.parse(predicate_text) orelse return error.UnsupportedPredicate;
-        const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
         return .{
             .result = result_text[1..],
-            .kind = .{ .icmp = .{
-                .predicate = predicate,
-                .samesign = samesign,
-                .operand_ty = operand_ty,
-                .lhs = lhs,
-                .rhs = rhs,
-            } },
+            .kind = .{ .icmp = try parseIcmp(rhs_text) },
         };
     }
 
@@ -905,6 +898,30 @@ fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
         .ty = typed.ty,
         .lhs = lhs,
         .rhs = rhs,
+    };
+}
+
+fn parseIcmp(text: []const u8) !core.IcmpInst {
+    var rest = std.mem.trim(u8, text["icmp".len..], " \t");
+    const samesign = if (firstToken(rest)) |token| blk: {
+        if (!std.mem.eql(u8, token, "samesign")) break :blk false;
+        rest = trimFirstToken(rest);
+        break :blk true;
+    } else return error.InvalidInstruction;
+
+    const predicate_text = firstToken(rest) orelse return error.InvalidInstruction;
+    const predicate = core.IcmpPredicate.parse(predicate_text) orelse return error.UnsupportedPredicate;
+    rest = trimFirstToken(rest);
+
+    const typed = try parseLeadingType(rest);
+    rest = std.mem.trim(u8, typed.after, " \t");
+    const comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    return .{
+        .predicate = predicate,
+        .samesign = samesign,
+        .operand_ty = typed.ty,
+        .lhs = try parseValue(std.mem.trim(u8, rest[0..comma], " \t")),
+        .rhs = try parseValue(std.mem.trim(u8, rest[comma + 1 ..], " \t")),
     };
 }
 
@@ -1029,11 +1046,16 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         try parseInlineAsm(callee_text)
     else
         null;
+    const callee_value: ?core.Value = if (inline_asm == null and !std.mem.startsWith(u8, callee_text, "@"))
+        try parseValue(callee_text)
+    else
+        null;
     if (inline_asm == null) {
         if (std.mem.startsWith(u8, callee_text, "asm")) return error.UnsupportedInlineAsm;
-        if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
-        if (isUnsupportedDebugIntrinsicCallee(callee_text[1..])) return error.UnsupportedDebugIntrinsic;
-        if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
+        if (callee_value == null) {
+            if (isUnsupportedDebugIntrinsicCallee(callee_text[1..])) return error.UnsupportedDebugIntrinsic;
+            if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
+        }
     }
     const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
     const attrs = if (trailing.len == 0)
@@ -1045,7 +1067,8 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
 
     var call: core.CallInst = .{
         .ret_ty = ret_ty,
-        .callee = if (inline_asm == null) callee_text[1..] else "",
+        .callee = if (inline_asm == null and callee_value == null) callee_text[1..] else "",
+        .callee_value = callee_value,
         .calling_conv = calling_conv,
         .tail_kind = tail_kind,
         .inline_asm = inline_asm,
@@ -1120,8 +1143,7 @@ fn isUnsupportedInstrumentationCallee(name: []const u8) bool {
     return std.mem.startsWith(u8, name, "__sanitizer_") or
         std.mem.startsWith(u8, name, "__tsan_") or
         std.mem.startsWith(u8, name, "__ubsan_") or
-        std.mem.startsWith(u8, name, "llvm.ubsan.") or
-        std.mem.startsWith(u8, name, "llvm.trap");
+        std.mem.startsWith(u8, name, "llvm.ubsan.");
 }
 
 fn isUnsupportedDebugIntrinsicCallee(name: []const u8) bool {
@@ -1975,7 +1997,9 @@ fn parseValue(text: []const u8) !core.Value {
 }
 
 fn isSupportedConstantExpr(text: []const u8) bool {
-    return (std.mem.startsWith(u8, text, "inttoptr (") or std.mem.startsWith(u8, text, "ptrtoint (")) and
+    return (std.mem.startsWith(u8, text, "inttoptr (") or
+        std.mem.startsWith(u8, text, "ptrtoint (") or
+        std.mem.startsWith(u8, text, "sub (")) and
         std.mem.endsWith(u8, text, ")");
 }
 

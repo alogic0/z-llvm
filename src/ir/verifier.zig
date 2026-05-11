@@ -824,6 +824,12 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         return;
     }
 
+    if (call.callee_value) |callee_value| {
+        try ctx.verifyValue(.ptr, callee_value, block_index, instruction_index);
+        for (call.args.items) |arg| try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+        return;
+    }
+
     if (call.isDebugVariableLocation()) {
         try verifyDebugVariableLocationCall(module, call);
         return;
@@ -888,7 +894,21 @@ fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !vo
     }
 }
 
-fn verifyConstantExprValue(ty: core.Type, text: []const u8) !void {
+fn verifyConstantExprValue(ty: core.Type, text: []const u8) anyerror!void {
+    if (std.mem.startsWith(u8, text, "sub (")) {
+        switch (ty) {
+            .int => {},
+            else => return error.TypeMismatch,
+        }
+        const body = text["sub (".len .. text.len - 1];
+        const comma = findConstantExprTopLevelComma(body) orelse return error.UnsupportedConstantExpr;
+        const lhs = try parseConstantExprTypedValue(std.mem.trim(u8, body[0..comma], " \t"));
+        const rhs = try parseConstantExprTypedValue(std.mem.trim(u8, body[comma + 1 ..], " \t"));
+        if (!lhs.ty.eql(ty) or !rhs.ty.eql(ty)) return error.TypeMismatch;
+        try verifyConstantExprOperand(lhs.ty, lhs.value_text);
+        try verifyConstantExprOperand(rhs.ty, rhs.value_text);
+        return;
+    }
     if (std.mem.startsWith(u8, text, "inttoptr (")) {
         if (ty != .ptr) return error.TypeMismatch;
         const body = text["inttoptr (".len .. text.len - 1];
@@ -914,10 +934,36 @@ fn verifyConstantExprValue(ty: core.Type, text: []const u8) !void {
     return error.UnsupportedConstantExpr;
 }
 
+fn verifyConstantExprOperand(ty: core.Type, value_text: []const u8) anyerror!void {
+    if (std.mem.startsWith(u8, value_text, "inttoptr (") or
+        std.mem.startsWith(u8, value_text, "ptrtoint (") or
+        std.mem.startsWith(u8, value_text, "sub ("))
+    {
+        try verifyConstantExprValue(ty, value_text);
+        return;
+    }
+    if (std.mem.eql(u8, value_text, "null")) return if (ty == .ptr) {} else error.TypeMismatch;
+    if (std.mem.startsWith(u8, value_text, "@")) return if (ty == .ptr) {} else error.TypeMismatch;
+    _ = std.fmt.parseInt(i128, value_text, 10) catch return error.UnsupportedConstantExpr;
+}
+
 const ConstantExprCastBody = struct {
     from_ty: core.Type,
     to_ty: core.Type,
 };
+
+const ConstantExprTypedValue = struct {
+    ty: core.Type,
+    value_text: []const u8,
+};
+
+fn parseConstantExprTypedValue(text: []const u8) !ConstantExprTypedValue {
+    const ty_end = std.mem.indexOfAny(u8, text, " \t") orelse return error.UnsupportedConstantExpr;
+    return .{
+        .ty = try parseType(text[0..ty_end]),
+        .value_text = std.mem.trim(u8, text[ty_end..], " \t"),
+    };
+}
 
 fn parseConstantExprCastBody(body: []const u8) !ConstantExprCastBody {
     const to_index = std.mem.lastIndexOf(u8, body, " to ") orelse return error.InvalidCast;
@@ -928,6 +974,22 @@ fn parseConstantExprCastBody(body: []const u8) !ConstantExprCastBody {
         .from_ty = try parseType(source_text[0..from_ty_end]),
         .to_ty = to_ty,
     };
+}
+
+fn findConstantExprTopLevelComma(text: []const u8) ?usize {
+    var paren_depth: usize = 0;
+    for (text, 0..) |byte, index| {
+        switch (byte) {
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+            },
+            ',' => if (paren_depth == 0) return index,
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn findDeclaration(module: core.Module, name: []const u8) ?core.FunctionDecl {

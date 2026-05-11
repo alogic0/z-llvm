@@ -349,6 +349,7 @@ fn simplifySelect(select: ir.SelectInst) ?ir.Value {
 }
 
 fn simplifyCall(call: ir.CallInst) ?ir.Value {
+    if (call.callee_value != null) return null;
     if (call.args.items.len != 2) return null;
     if (!isIntegerMinMaxIntrinsic(call.callee)) return null;
     if (!call.ret_ty.eql(call.args.items[0].ty)) return null;
