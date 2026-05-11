@@ -2436,6 +2436,27 @@ test "parser preserves scalar casts div rem flags and freeze" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser accepts array types and GEP prefixes from Zig aggregate IR" {
+    const input =
+        \\define i32 @array_gep(ptr %p, i64 %i) {
+        \\entry:
+        \\  %q = getelementptr inbounds [4 x i8], ptr %p, i64 %i
+        \\  %r = getelementptr inbounds nuw i8, ptr %q, i64 4
+        \\  %v = load i32, ptr %r, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const block = module.functions.items[0].blocks.items[0];
+    try std.testing.expectEqualStrings("[4 x i8]", block.instructions.items[0].kind.gep.source_ty.aggregate);
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, block.instructions.items[1].kind.gep.source_ty);
+}
+
 test "instcombine preserves flagged arithmetic and division" {
     const input =
         \\define i32 @conservative(i32 %a) {

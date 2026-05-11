@@ -577,6 +577,7 @@ fn parseAlloca(text: []const u8) !core.AllocaInst {
 
 fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
     var rest = std.mem.trim(u8, text["getelementptr ".len..], " \t");
+    rest = stripGepPrefixes(rest);
     const source_end = findTopLevelComma(rest) orelse return error.InvalidGetElementPtr;
     var gep: core.GepInst = .{
         .source_ty = try parseType(std.mem.trim(u8, rest[0..source_end], " \t")),
@@ -615,6 +616,21 @@ fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
     }
     if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
     return gep;
+}
+
+fn stripGepPrefixes(text: []const u8) []const u8 {
+    var rest = std.mem.trim(u8, text, " \t");
+    while (true) {
+        const token = firstToken(rest) orelse return rest;
+        if (std.mem.eql(u8, token, "inbounds") or
+            std.mem.eql(u8, token, "nuw") or
+            std.mem.eql(u8, token, "nusw"))
+        {
+            rest = trimFirstToken(rest);
+            continue;
+        }
+        return rest;
+    }
 }
 
 fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8) !core.Instruction {
@@ -886,7 +902,8 @@ fn parseType(text: []const u8) !core.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
-    if (trimmed.len >= 2 and trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') return .{ .aggregate = trimmed };
+    if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
+        (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;

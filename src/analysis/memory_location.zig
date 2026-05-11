@@ -127,6 +127,7 @@ fn aggregateSize(ty: ir.Type) ?u64 {
         .aggregate => |text| text,
         .void, .int, .ptr => return null,
     };
+    if (arrayInfo(text)) |array| return array.count * (typeSize(array.element_ty) orelse return null);
     var fields = aggregateFields(text) orelse return null;
     var size: u64 = 0;
     while (nextAggregateField(&fields)) |field_text| {
@@ -147,6 +148,21 @@ fn aggregateFields(text: []const u8) ?AggregateFields {
     return .{ .text = std.mem.trim(u8, trimmed[1 .. trimmed.len - 1], " \t") };
 }
 
+const ArrayInfo = struct {
+    count: u64,
+    element_ty: ir.Type,
+};
+
+fn arrayInfo(text: []const u8) ?ArrayInfo {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len < 5 or trimmed[0] != '[' or trimmed[trimmed.len - 1] != ']') return null;
+    const body = std.mem.trim(u8, trimmed[1 .. trimmed.len - 1], " \t");
+    const x_index = std.mem.indexOf(u8, body, " x ") orelse return null;
+    const count = std.fmt.parseInt(u64, std.mem.trim(u8, body[0..x_index], " \t"), 10) catch return null;
+    const element_ty = parseTypeLiteral(std.mem.trim(u8, body[x_index + " x ".len ..], " \t")) orelse return null;
+    return .{ .count = count, .element_ty = element_ty };
+}
+
 fn nextAggregateField(fields: *AggregateFields) ?[]const u8 {
     if (fields.cursor >= fields.text.len) return null;
     const rest = fields.text[fields.cursor..];
@@ -160,7 +176,8 @@ fn parseTypeLiteral(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
-    if (trimmed.len >= 2 and trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') return .{ .aggregate = trimmed };
+    if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
+        (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return null;
     const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
     if (bits == 0) return null;
