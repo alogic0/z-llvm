@@ -49,7 +49,8 @@ unit tests:
   atomic load/store parse/print preservation
   atomicrmw, cmpxchg, fence, and inline asm rejection
   memory-effect barrier classification
-  DCE and LICM atomic barrier preservation
+  DCE atomic barrier preservation
+  Mem2Reg atomic alloca-user rejection
 ```
 
 ## Upstream Mapping

@@ -19,7 +19,8 @@ it.
 - [x] Parse or explicitly reject `atomicrmw` and `cmpxchg`.
 - [x] Parse or explicitly reject inline asm calls before optimization.
 - [x] Preserve parsed atomic ordering text and reject unsupported syncscope.
-- [x] Add DCE, ADCE, GVN, EarlyCSE, LICM, and DSE rejection fixtures.
+- [x] Add a DCE opt fixture plus parser, memory-effect, and unit coverage for
+      atomic/inline-asm barriers.
 - [x] Document which atomic transformations are deliberately not implemented.
 
 ## Exit Criteria
@@ -35,6 +36,7 @@ it.
 - Added explicit parser rejection for `fence` and inline asm calls, plus unit
   coverage for `cmpxchg`.
 - Added `memory_atomic_barrier_reject` to the opt fixture table as a
-  local-conservative DCE barrier fixture.
+  local-conservative DCE barrier fixture. Other pass coverage remains unit-level
+  or policy-level until dedicated pass-specific atomic fixtures are needed.
 - Inline asm remains rejected rather than modeled as an unknown call because
   constraints and memory clobbers are not represented yet.
