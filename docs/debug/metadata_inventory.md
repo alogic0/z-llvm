@@ -111,6 +111,22 @@ unchanged instructions keep their opaque `!dbg` attachments, removed or replaced
 instructions drop them, and no pass attempts LLVM's debug value salvage,
 assignment tracking, discriminator update, or inline-scope construction.
 
+Cycle 03 makes that boundary executable for selected scalar passes:
+
+```text
+DCE may delete dead instructions with `!dbg`; the deleted location is dropped
+InstCombine may replace folded instructions with existing values; the removed
+instruction's location is dropped
+EarlyCSE and GVN preserve the leader instruction location and drop the removed
+redundant instruction location
+modules containing `llvm.dbg.value` or `llvm.dbg.declare` still skip transform
+passes until variable-location salvage exists
+```
+
+This is intentionally weaker than LLVM's `salvageDebugInfo` and
+`replaceAllDbgUsesWith` behavior. It is valid only for debug-location-only
+fixtures that do not contain variable-location intrinsics.
+
 ## First Implementation Slice Criteria
 
 The first debug-info implementation slice should be preservation, not emission:

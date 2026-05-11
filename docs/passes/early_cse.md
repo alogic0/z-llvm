@@ -104,6 +104,9 @@ local-only conservative:
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE
   parity.
+  debug_early_cse_dbg_preserve preserves the leader instruction location and
+  drops the removed redundant instruction location. This is a local
+  debug-location-only rule, not LLVM debug-info salvage parity.
 
 unit-test only:
   same-block repeated pure expression elimination
@@ -137,5 +140,5 @@ no freeze CSE because undef/poison semantics need more modeling first
 no FP CSE because NaN/signed-zero/fast-math legality is not modeled yet
 no commutative operand canonicalization
 no target-library knowledge
-no debug-info salvage
+no debug-info salvage beyond preserving the leader instruction location
 ```

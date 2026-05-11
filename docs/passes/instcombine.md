@@ -152,6 +152,9 @@ Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, `frem`, and `fcmp` are preserved 
 because NaN, signed-zero, FP constant semantics, and fast-math optimization
 legality are not modeled. Parsed fast-math flags are preserved, not used.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
+Debug-location-only folds may remove an instruction carrying `!dbg`; the
+current local behavior drops that location with the removed instruction instead
+of attempting LLVM-style debug-info salvage.
 ```
 
 Example:
@@ -183,5 +186,6 @@ no unsafe division/remainder simplification
 no canonical reassociation
 no non-constant operand complexity ordering
 no floating-point folds or reassociation
+no debug-info salvage for replaced instructions
 no target-specific combines
 ```

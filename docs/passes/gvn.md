@@ -110,6 +110,9 @@ local-only conservative:
   project keeps them out of GVN for now.
   fp_extended_gvn_no_cse applies the same conservative boundary to scalar
   `fsub`, `fdiv`, and `frem`.
+  debug_gvn_dbg_preserve preserves the leader instruction location and drops
+  the removed redundant instruction location. Variable-location salvage remains
+  out of scope.
 
 unit-test only:
   phi-aware redundancy
@@ -132,4 +135,5 @@ linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge or partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, FP, vector, or
 memory value numbering
+no debug-info salvage beyond preserving the leader instruction location
 ```

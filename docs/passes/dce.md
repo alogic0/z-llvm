@@ -60,6 +60,9 @@ opt-22 equivalent:
 local-only conservative:
   fp_fast_math_sensitive_conservative is preserved as part of the local
   fast-math legality boundary.
+  debug_dce_dbg_drop documents that a dead instruction with only `!dbg` may be
+  deleted and its location dropped with the removed instruction; this is not
+  LLVM debug-info salvage parity.
 
 unit-test only:
   none currently
@@ -85,6 +88,6 @@ no control-flow-sensitive liveness
 no MemorySSA or alias-aware memory liveness
 no volatile or atomic memory removal
 no calls
-no debug-info salvage
+no debug-info salvage beyond dropping locations with removed instructions
 no aggressive DCE for unreachable control-flow
 ```

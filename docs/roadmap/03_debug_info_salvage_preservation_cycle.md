@@ -7,22 +7,30 @@ debug locations deliberately instead of disabling all useful optimization.
 
 ## Plan
 
-- [ ] Identify the first accepted Debug fixtures where scalar optimization is
+- [x] Identify the first accepted Debug fixtures where scalar optimization is
       otherwise safe.
-- [ ] Add debug-location attachment preservation for instructions cloned,
+- [x] Add debug-location attachment preservation for instructions cloned,
       simplified, or removed by existing scalar passes.
-- [ ] Add a conservative rule for dropping stale variable-location intrinsics
+- [x] Add a conservative rule for dropping stale variable-location intrinsics
       only when the referenced value is removed and cannot be salvaged.
-- [ ] Keep complex salvage expressions deferred unless a source-backed fixture
+- [x] Keep complex salvage expressions deferred unless a source-backed fixture
       requires them.
-- [ ] Add fixtures for DCE, InstSimplify, EarlyCSE, and GVN with debug
+- [x] Add fixtures for DCE, InstSimplify, EarlyCSE, and GVN with debug
       locations.
-- [ ] Record differences from LLVM debug salvage behavior in pass docs.
-- [ ] Run opt-22 comparisons for cases expected to match and local-only checks
+- [x] Record differences from LLVM debug salvage behavior in pass docs.
+- [x] Run opt-22 comparisons for cases expected to match and local-only checks
       for conservative differences.
 
 ## Exit Criteria
 
-- [ ] Scalar passes can run on selected debug-bearing fixtures.
-- [ ] No accepted transform leaves a dangling debug value reference.
-- [ ] Every conservative debug-info divergence is documented and tested.
+- [x] Scalar passes can run on selected debug-bearing fixtures.
+- [x] No accepted transform leaves a dangling debug value reference.
+- [x] Every conservative debug-info divergence is documented and tested.
+
+## Completed Slice
+
+Cycle 03 enables debug-location-only scalar fixtures for DCE, InstCombine,
+EarlyCSE, and GVN. The local rule is conservative: unchanged or leader
+instructions keep their `!dbg` attachment, removed instructions drop their
+location, and modules containing `llvm.dbg.value` or `llvm.dbg.declare` still
+skip transform passes until variable-location salvage exists.
