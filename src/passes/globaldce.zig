@@ -53,6 +53,7 @@ const GlobalDependencyGraph = struct {
                 if (!hasFunctionDefinition(module, callee)) continue;
                 try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = callee });
             }
+            try addFunctionGlobalEdges(allocator, module, &node.edges, function);
             try graph.nodes.append(allocator, node);
         }
 
@@ -61,16 +62,7 @@ const GlobalDependencyGraph = struct {
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
             if (!isLocal(global.linkage) or hasComdat(global.attrs) or isThreadLocal(global)) try graph.roots.append(allocator, ref);
-            switch (global.initializer) {
-                .named => |name| {
-                    if (hasFunctionDefinition(module, name)) {
-                        try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = name });
-                    } else if (hasGlobalDefinition(module, name)) {
-                        try appendUniqueEdge(allocator, &node.edges, .{ .kind = .global, .name = name });
-                    }
-                },
-                .int, .undef => {},
-            }
+            try addInitializerEdges(allocator, module, &node.edges, global.initializer);
             try graph.nodes.append(allocator, node);
         }
 
@@ -103,6 +95,72 @@ const GlobalDependencyGraph = struct {
         return &.{};
     }
 };
+
+fn addInitializerEdges(
+    allocator: std.mem.Allocator,
+    module: ir.Module,
+    edges: *std.ArrayList(NodeRef),
+    initializer: ir.GlobalInitializer,
+) !void {
+    switch (initializer) {
+        .scalar => |value| try addValueEdge(allocator, module, edges, value),
+        .array => |array| for (array.values.items) |value| try addValueEdge(allocator, module, edges, value),
+    }
+}
+
+fn addValueEdge(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), value: ir.Value) !void {
+    const raw_name = switch (value) {
+        .named => |name| name,
+        .int, .undef => return,
+    };
+    const name = if (std.mem.startsWith(u8, raw_name, "@")) raw_name[1..] else raw_name;
+    if (hasFunctionDefinition(module, name)) {
+        try appendUniqueEdge(allocator, edges, .{ .kind = .function, .name = name });
+    } else if (hasGlobalDefinition(module, name)) {
+        try appendUniqueEdge(allocator, edges, .{ .kind = .global, .name = name });
+    }
+}
+
+fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges: *std.ArrayList(NodeRef), function: ir.Function) !void {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            switch (instruction.kind) {
+                .binary => |binary| {
+                    try addValueEdge(allocator, module, edges, binary.lhs);
+                    try addValueEdge(allocator, module, edges, binary.rhs);
+                },
+                .cast => |cast| try addValueEdge(allocator, module, edges, cast.value),
+                .freeze => |freeze| try addValueEdge(allocator, module, edges, freeze.value),
+                .icmp => |icmp| {
+                    try addValueEdge(allocator, module, edges, icmp.lhs);
+                    try addValueEdge(allocator, module, edges, icmp.rhs);
+                },
+                .select => |select| {
+                    try addValueEdge(allocator, module, edges, select.cond);
+                    try addValueEdge(allocator, module, edges, select.true_value);
+                    try addValueEdge(allocator, module, edges, select.false_value);
+                },
+                .phi => |phi| for (phi.incoming.items) |incoming| try addValueEdge(allocator, module, edges, incoming.value),
+                .alloca => {},
+                .load => |load| try addValueEdge(allocator, module, edges, load.ptr),
+                .store => |store| {
+                    try addValueEdge(allocator, module, edges, store.value);
+                    try addValueEdge(allocator, module, edges, store.ptr);
+                },
+                .gep => |gep| {
+                    try addValueEdge(allocator, module, edges, gep.ptr);
+                    for (gep.indices.items) |index| try addValueEdge(allocator, module, edges, index.value);
+                },
+                .call => |call| for (call.args.items) |arg| try addValueEdge(allocator, module, edges, arg.value),
+            }
+        }
+        if (block.terminator) |terminator| switch (terminator) {
+            .ret => |ret| if (ret.value) |value| try addValueEdge(allocator, module, edges, value),
+            .condbr => |condbr| try addValueEdge(allocator, module, edges, condbr.cond),
+            .br, .@"unreachable" => {},
+        };
+    }
+}
 
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     var graph = try GlobalDependencyGraph.build(context.allocator, module.*);
@@ -151,7 +209,8 @@ fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
             index += 1;
             continue;
         }
-        _ = module.globals.orderedRemove(index);
+        var removed = module.globals.orderedRemove(index);
+        removed.deinit(module.allocator);
         changed = true;
     }
     return changed;

@@ -2199,11 +2199,11 @@ test "parser preserves scalar global variables" {
     try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
     try std.testing.expectEqual(ir.FunctionLinkage.internal, module.globals.items[0].linkage);
     try std.testing.expectEqual(ir.GlobalKind.global, module.globals.items[0].kind);
-    try std.testing.expectEqual(@as(i128, 42), module.globals.items[0].initializer.int);
+    try std.testing.expectEqual(@as(i128, 42), module.globals.items[0].initializer.scalar.int);
     try std.testing.expectEqualStrings("align 4", module.globals.items[0].attrs.?);
     try std.testing.expectEqual(ir.FunctionLinkage.private, module.globals.items[1].linkage);
     try std.testing.expectEqual(ir.GlobalKind.constant, module.globals.items[1].kind);
-    try std.testing.expectEqual(ir.Value.undef, module.globals.items[1].initializer);
+    try std.testing.expectEqual(ir.Value.undef, module.globals.items[1].initializer.scalar);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -2286,6 +2286,48 @@ test "parser rejects unsupported aggregate globals explicitly" {
     ;
 
     try std.testing.expectError(error.UnsupportedGlobalVariable, ir.Module.parse(std.testing.allocator, input));
+}
+
+test "parser preserves scalar array global constants from switch tables" {
+    const input =
+        \\@switch.table = private unnamed_addr constant [3 x i32] [i32 11, i32 13, i32 17], align 4
+        \\
+        \\define i32 @lookup(i8 %idx) {
+        \\entry:
+        \\  %wide = zext nneg i8 %idx to i64
+        \\  %gep = getelementptr inbounds nuw i32, ptr @switch.table, i64 %wide
+        \\  %value = load i32, ptr %gep, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 1), module.globals.items.len);
+    const initializer = module.globals.items[0].initializer.array;
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, initializer.elem_ty);
+    try std.testing.expectEqual(@as(usize, 3), initializer.values.items.len);
+    try std.testing.expectEqual(@as(i128, 13), initializer.values.items[1].int);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(
+        \\@switch.table = private unnamed_addr constant [3 x i32] [i32 11, i32 13, i32 17], align 4
+        \\
+        \\define i32 @lookup(i8 %idx) {
+        \\entry:
+        \\  %wide = zext i8 %idx to i64
+        \\  %gep = getelementptr i32, ptr @switch.table, i64 %wide
+        \\  %value = load i32, ptr %gep, align 4
+        \\  ret i32 %value
+        \\}
+        \\
+    , output.writer.buffered());
 }
 
 test "x86_64 codegen lowers add args to assembly" {

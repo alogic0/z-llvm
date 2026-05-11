@@ -266,16 +266,27 @@ pub fn verify(module: core.Module) !void {
     for (module.globals.items) |global| {
         if (global_defs.contains(global.name)) return error.DuplicateDefinition;
         try global_defs.put(global.name, {});
-        switch (global.ty) {
-            .int => switch (global.initializer) {
-                .int, .undef => {},
-                .named => return error.UnsupportedGlobalVariable,
+        switch (global.initializer) {
+            .scalar => |value| switch (global.ty) {
+                .int => switch (value) {
+                    .int, .undef => {},
+                    .named => return error.UnsupportedGlobalVariable,
+                },
+                .ptr => switch (value) {
+                    .undef => {},
+                    .int, .named => return error.UnsupportedGlobalVariable,
+                },
+                .void, .aggregate => return error.UnsupportedGlobalVariable,
             },
-            .ptr => switch (global.initializer) {
-                .undef => {},
-                .int, .named => return error.UnsupportedGlobalVariable,
+            .array => |array| {
+                const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
+                if (!array_ty.elem_ty.eql(array.elem_ty)) return error.UnsupportedGlobalVariable;
+                if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
+                for (array.values.items) |value| switch (value) {
+                    .int, .undef => {},
+                    .named => return error.UnsupportedGlobalVariable,
+                };
             },
-            .void, .aggregate => return error.UnsupportedGlobalVariable,
         }
     }
 
@@ -490,6 +501,36 @@ fn hasGlobalValue(module: core.Module, name: []const u8) bool {
     if (findDeclaration(module, name) != null) return true;
     if (findFunction(module, name) != null) return true;
     return false;
+}
+
+const ParsedArrayType = struct {
+    len: usize,
+    elem_ty: core.Type,
+};
+
+fn parseArrayType(ty: core.Type) ?ParsedArrayType {
+    const text = switch (ty) {
+        .aggregate => |aggregate| aggregate,
+        .void, .int, .ptr => return null,
+    };
+    if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    const x_index = std.mem.indexOf(u8, body, " x ") orelse return null;
+    const len = std.fmt.parseInt(usize, std.mem.trim(u8, body[0..x_index], " \t"), 10) catch return null;
+    const elem_ty = parseType(std.mem.trim(u8, body[x_index + 3 ..], " \t")) catch return null;
+    return .{ .len = len, .elem_ty = elem_ty };
+}
+
+fn parseType(text: []const u8) !core.Type {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (std.mem.eql(u8, trimmed, "void")) return .void;
+    if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
+        (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
+    if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
+    const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
+    if (bits == 0) return error.UnsupportedType;
+    return .{ .int = bits };
 }
 
 fn verifyBinaryFlags(binary: core.BinaryInst) !void {

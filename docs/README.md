@@ -79,7 +79,7 @@ completed foundation epics
 ## Active Corpus Expansion Cycles
 
 - [x] [Cycle 1: TLS Concurrency Acceptance](roadmap/01_tls_concurrency_acceptance_cycle.md)
-- [ ] [Cycle 2: Switch Table Global Constants](roadmap/02_switch_table_global_constants_cycle.md)
+- [x] [Cycle 2: Switch Table Global Constants](roadmap/02_switch_table_global_constants_cycle.md)
 - [ ] [Cycle 3: Float IR Surface](roadmap/03_float_ir_surface_cycle.md)
 - [ ] [Cycle 4: Atomic And Inline-Asm Fixture Closure](roadmap/04_atomic_inline_asm_fixture_closure_cycle.md)
 - [ ] [Cycle 5: Corpus Capture Automation](roadmap/05_corpus_capture_automation_cycle.md)

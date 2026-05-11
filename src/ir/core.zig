@@ -242,8 +242,12 @@ pub const Global = struct {
     address_attrs: ?[]const u8 = null,
     kind: GlobalKind,
     ty: Type,
-    initializer: Value,
+    initializer: GlobalInitializer,
     attrs: ?[]const u8 = null,
+
+    pub fn deinit(global: *Global, allocator: std.mem.Allocator) void {
+        global.initializer.deinit(allocator);
+    }
 };
 
 pub const GlobalAlias = struct {
@@ -252,6 +256,43 @@ pub const GlobalAlias = struct {
     aliased_ty: []const u8,
     target_ty: Type,
     target: []const u8,
+};
+
+pub const GlobalArrayInitializer = struct {
+    elem_ty: Type,
+    values: std.ArrayList(Value),
+
+    pub fn deinit(initializer: *GlobalArrayInitializer, allocator: std.mem.Allocator) void {
+        initializer.values.deinit(allocator);
+    }
+};
+
+pub const GlobalInitializer = union(enum) {
+    scalar: Value,
+    array: GlobalArrayInitializer,
+
+    pub fn deinit(initializer: *GlobalInitializer, allocator: std.mem.Allocator) void {
+        switch (initializer.*) {
+            .scalar => {},
+            .array => |*array| array.deinit(allocator),
+        }
+    }
+
+    pub fn format(initializer: GlobalInitializer, writer: anytype) !void {
+        switch (initializer) {
+            .scalar => |value| try value.format(writer),
+            .array => |array| {
+                try writer.writeByte('[');
+                for (array.values.items, 0..) |value, index| {
+                    if (index != 0) try writer.writeAll(", ");
+                    try array.elem_ty.format(writer);
+                    try writer.writeByte(' ');
+                    try value.format(writer);
+                }
+                try writer.writeByte(']');
+            },
+        }
+    }
 };
 
 pub const FunctionDecl = struct {
@@ -582,6 +623,7 @@ pub const Module = struct {
     }
 
     pub fn deinit(module: *Module) void {
+        for (module.globals.items) |*global| global.deinit(module.allocator);
         module.globals.deinit(module.allocator);
         module.aliases.deinit(module.allocator);
         module.comdats.deinit(module.allocator);

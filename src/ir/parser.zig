@@ -53,7 +53,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
                 error.NotGlobalAlias => {},
                 else => return err,
             }
-            const global = try parseGlobal(line);
+            const global = try parseGlobal(&module, line);
             try module.globals.append(allocator, global);
             continue;
         }
@@ -201,7 +201,7 @@ fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
     };
 }
 
-fn parseGlobal(line: []const u8) !core.Global {
+fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
     const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.UnsupportedGlobalVariable;
     const name_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, name_text, "@") or name_text.len == 1) return error.InvalidGlobalVariable;
@@ -226,13 +226,14 @@ fn parseGlobal(line: []const u8) !core.Global {
         "";
 
     const kind = core.GlobalKind.parse(token) orelse return error.UnsupportedGlobalVariable;
-    const ty_text = parts.next() orelse return error.UnsupportedGlobalVariable;
-    const ty = parseType(ty_text) catch return error.UnsupportedGlobalVariable;
+    const kind_end = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
+    const after_kind = std.mem.trim(u8, rest[kind_end..], " \t");
+    const parsed_ty = parseGlobalTypePrefix(after_kind) catch return error.UnsupportedGlobalVariable;
+    const ty = parsed_ty.ty;
 
-    const initializer_start = @intFromPtr(ty_text.ptr) - @intFromPtr(rest.ptr) + ty_text.len;
-    const initializer_and_attrs = std.mem.trim(u8, rest[initializer_start..], " \t");
+    const initializer_and_attrs = std.mem.trim(u8, parsed_ty.rest, " \t");
     if (initializer_and_attrs.len == 0) return error.UnsupportedGlobalVariable;
-    const comma = std.mem.indexOfScalar(u8, initializer_and_attrs, ',');
+    const comma = findTopLevelComma(initializer_and_attrs);
     const initializer_text = std.mem.trim(u8, if (comma) |index|
         initializer_and_attrs[0..index]
     else
@@ -241,9 +242,9 @@ fn parseGlobal(line: []const u8) !core.Global {
         std.mem.trim(u8, initializer_and_attrs[index + 1 ..], " \t")
     else
         "";
-    if (std.mem.indexOfAny(u8, initializer_text, " \t") != null) return error.UnsupportedGlobalVariable;
 
-    const initializer = parseGlobalInitializer(initializer_text) catch return error.UnsupportedGlobalVariable;
+    var initializer = parseGlobalInitializer(module.allocator, ty, initializer_text) catch return error.UnsupportedGlobalVariable;
+    errdefer initializer.deinit(module.allocator);
     return .{
         .name = name_text[1..],
         .linkage = linkage,
@@ -255,18 +256,92 @@ fn parseGlobal(line: []const u8) !core.Global {
     };
 }
 
+const ParsedGlobalType = struct {
+    ty: core.Type,
+    rest: []const u8,
+};
+
+fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return error.UnsupportedGlobalVariable;
+    if (trimmed[0] == '[') {
+        const close = findMatchingBracket(trimmed, 0) orelse return error.UnsupportedGlobalVariable;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .rest = trimmed[close + 1 ..],
+        };
+    }
+
+    const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
+    return .{
+        .ty = try parseType(trimmed[0..end]),
+        .rest = trimmed[end..],
+    };
+}
+
 fn isGlobalAddressAttr(token: []const u8) bool {
     return std.mem.eql(u8, token, "unnamed_addr") or
         std.mem.eql(u8, token, "local_unnamed_addr") or
         std.mem.eql(u8, token, "thread_local");
 }
 
-fn parseGlobalInitializer(text: []const u8) !core.Value {
+fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []const u8) !core.GlobalInitializer {
+    if (ty == .aggregate and std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, "]")) {
+        return .{ .array = try parseGlobalArrayInitializer(allocator, ty, text) };
+    }
+
+    if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .undef => value,
+        .int, .undef => .{ .scalar = value },
         .named => error.UnsupportedGlobalVariable,
     };
+}
+
+fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []const u8) !core.GlobalArrayInitializer {
+    const array_ty = parseArrayType(ty) orelse return error.UnsupportedGlobalVariable;
+    var initializer: core.GlobalArrayInitializer = .{
+        .elem_ty = array_ty.elem_ty,
+        .values = .empty,
+    };
+    errdefer initializer.deinit(allocator);
+
+    var rest = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const item = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        var item_parts = std.mem.tokenizeAny(u8, item, " \t");
+        const elem_ty = try parseType(item_parts.next() orelse return error.UnsupportedGlobalVariable);
+        if (!elem_ty.eql(array_ty.elem_ty)) return error.UnsupportedGlobalVariable;
+        const value = try parseValue(item_parts.next() orelse return error.UnsupportedGlobalVariable);
+        if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
+        switch (value) {
+            .int, .undef => try initializer.values.append(allocator, value),
+            .named => return error.UnsupportedGlobalVariable,
+        }
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+
+    if (initializer.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
+    return initializer;
+}
+
+const ParsedArrayType = struct {
+    len: usize,
+    elem_ty: core.Type,
+};
+
+fn parseArrayType(ty: core.Type) ?ParsedArrayType {
+    const text = switch (ty) {
+        .aggregate => |aggregate| aggregate,
+        .void, .int, .ptr => return null,
+    };
+    if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    const x_index = std.mem.indexOf(u8, body, " x ") orelse return null;
+    const len = std.fmt.parseInt(usize, std.mem.trim(u8, body[0..x_index], " \t"), 10) catch return null;
+    const elem_ty = parseType(std.mem.trim(u8, body[x_index + 3 ..], " \t")) catch return null;
+    return .{ .len = len, .elem_ty = elem_ty };
 }
 
 fn parseAttributeGroup(line: []const u8) !void {
@@ -303,6 +378,20 @@ fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
         if (byte == '(') {
             depth += 1;
         } else if (byte == ')') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
+fn findMatchingBracket(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '[') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '[') {
+            depth += 1;
+        } else if (byte == ']') {
             depth -= 1;
             if (depth == 0) return index;
         }
@@ -541,6 +630,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     if (std.mem.eql(u8, op_text, "atomicrmw") or std.mem.eql(u8, op_text, "cmpxchg")) return error.UnsupportedAtomicMemory;
 
     if (core.CastOp.parse(op_text)) |op| {
+        if (std.mem.eql(u8, parts.peek() orelse return error.InvalidInstruction, "nneg")) _ = parts.next();
         const from_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
         if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "to")) return error.InvalidInstruction;
