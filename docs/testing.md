@@ -133,6 +133,7 @@ zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/input
 bash scripts/compare_codegen_asm.sh
 bash scripts/compare_codegen_objdump.sh
 bash scripts/compare_codegen_readelf.sh
+bash scripts/run_handoff_validation.sh
 readelf -h -S -s /tmp/z_llvm_add_args.o
 objdump -dr /tmp/z_llvm_add_args.o
 ```
@@ -144,6 +145,11 @@ fixed stack-slot load/store lowering, instruction encoding, ELF64 relocatable
 metadata, direct-call PLT32 relocation records, and explicit diagnostics for
 unsupported control flow, unsupported call conventions, stack-passed call
 arguments, and unsupported call live pressure.
+
+Native handoff validation is intentionally narrower than codegen completeness:
+`scripts/run_handoff_validation.sh` checks representative scalar, memory, loop,
+and global optimizer facts, then runs assembly smoke checks to keep local
+backend experiments validation-only.
 
 LLVM algorithms covered so far:
 

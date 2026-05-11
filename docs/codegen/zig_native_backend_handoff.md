@@ -64,6 +64,10 @@ do not move linker, archive, Clang, or C frontend replacement into optimizer epi
 | Target triple, DataLayout, and scalar ABI facts | Native backend ABI lowering and linker object format decisions | Keep as hard preconditions for both LLVM-compatible IR and codegen validation fixtures. |
 | Memory-effect classification | Native backend side-effect barriers for calls, volatile, atomic, and stores | Use as a legality contract for optimizer rewrites before backend handoff. |
 
+Detailed validation fixtures live in
+`docs/codegen/handoff_validation_matrix.md`. That file is the active checklist
+for mapping optimizer outputs to Zig-native handoff questions.
+
 ## Backend Experiment Classification
 
 | Local area | Classification | Reason |
@@ -101,6 +105,18 @@ it provides a tiny regression fixture for a source-backed Zig LLVM dependency
 ```
 
 Otherwise, add a doc row or inventory row instead of implementing backend code.
+
+## Current Validation Gate
+
+Run the bounded handoff regression set with:
+
+```sh
+bash scripts/run_handoff_validation.sh
+```
+
+The gate covers representative scalar, memory, loop, and global optimizer
+outputs plus tiny x86_64 assembly smoke checks. It does not claim full native
+backend or object/codegen completeness.
 
 ## Out Of Scope
 

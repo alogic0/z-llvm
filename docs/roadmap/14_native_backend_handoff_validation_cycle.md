@@ -18,25 +18,34 @@ behavior is deferred, or provide corpus-backed correctness comparisons.
 
 ## Plan
 
-- [ ] Map each accepted optimizer output fact to a possible Zig AIR/native
+- [x] Map each accepted optimizer output fact to a possible Zig AIR/native
       backend consumer.
-- [ ] Identify optimizer facts that are LLVM-IR-specific and should not be
+- [x] Identify optimizer facts that are LLVM-IR-specific and should not be
       ported into Zig's native path.
-- [ ] Add handoff validation fixtures for scalar, memory, loop, and global
+- [x] Add handoff validation fixtures for scalar, memory, loop, and global
       optimized IR shapes.
-- [ ] Keep object emission experiments validation-only unless they answer a
+- [x] Keep object emission experiments validation-only unless they answer a
       concrete handoff question.
-- [ ] Compare optimized local IR against Zig native backend expectations where
+- [x] Compare optimized local IR against Zig native backend expectations where
       the same source shape exists.
-- [ ] Document target/ABI blockers that must be solved before backend handoff.
-- [ ] Decide the next roadmap wave based on measured handoff gaps, not generic
+- [x] Document target/ABI blockers that must be solved before backend handoff.
+- [x] Decide the next roadmap wave based on measured handoff gaps, not generic
       LLVM subsystem names.
 
 ## Exit Criteria
 
-- [ ] Every major local optimizer subsystem has a documented Zig-native handoff
+- [x] Every major local optimizer subsystem has a documented Zig-native handoff
       story or a reason it remains LLVM-compatibility-only.
-- [ ] Handoff validation distinguishes optimizer correctness from object/codegen
+- [x] Handoff validation distinguishes optimizer correctness from object/codegen
       completeness.
-- [ ] The next roadmap wave is driven by concrete Zig backend gaps.
+- [x] The next roadmap wave is driven by concrete Zig backend gaps.
 
+## Completion Notes
+
+- Added `docs/codegen/handoff_validation_matrix.md` as the source-backed map
+  from accepted optimizer facts to Zig AIR/native-backend questions.
+- Added `scripts/run_handoff_validation.sh` for representative scalar, memory,
+  loop, global, and tiny x86_64 assembly handoff checks.
+- Kept codegen and object work validation-only; stronger backend claims remain
+  blocked on target/ABI, debug/unwind, atomics/inline-asm, and object/linker
+  ownership slices.
