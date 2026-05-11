@@ -110,7 +110,7 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                 .cmpxchg => |cmpxchg| {
                     if (isNamed(cmpxchg.ptr, slot) or isNamed(cmpxchg.expected, slot) or isNamed(cmpxchg.replacement, slot)) return false;
                 },
-                .fence => {},
+                .fence, .extractelement, .insertelement, .shufflevector => {},
                 .binary => |binary| {
                     if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
                 },
@@ -225,7 +225,7 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .store => |store| if (isNamed(store.ptr, slot)) return true,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
         }
     }
     return false;
@@ -262,7 +262,7 @@ fn blockLoadsSlotBeforeStore(block: ir.BasicBlock, slot: []const u8) bool {
         switch (instruction.kind) {
             .load => |load| if (isNamed(load.ptr, slot)) return true,
             .store => |store| if (isNamed(store.ptr, slot)) return false,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
         }
     }
     return false;
@@ -285,7 +285,7 @@ fn findSingleStore(function: ir.Function, slot: []const u8) ?SingleStore {
                         .value = store.value,
                     };
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
             }
         }
     }
@@ -305,7 +305,7 @@ fn singleStoreDominatesLoads(function: ir.Function, dom: dominator.Dominators, s
                         return false;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
             }
         }
     }
@@ -327,7 +327,7 @@ fn promoteSingleStoreSlot(function: *ir.Function, alloca_block_index: usize, all
                     instruction.replacement = single_store.value;
                     replaceValue(function, result, single_store.value);
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
             }
         }
     }
@@ -415,7 +415,7 @@ fn renameSlot(
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -445,7 +445,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
                 });
                 return;
             },
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => return,
         }
     }
 }
@@ -476,7 +476,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                 .cmpxchg => |cmpxchg| {
                     if (isNamed(cmpxchg.ptr, slot) or isNamed(cmpxchg.expected, slot) or isNamed(cmpxchg.replacement, slot)) return false;
                 },
-                .fence => {},
+                .fence, .extractelement, .insertelement, .shufflevector => {},
                 .binary => |binary| {
                     if (isNamed(binary.lhs, slot) or isNamed(binary.rhs, slot)) return false;
                 },
@@ -530,7 +530,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .load => |load| {
                 if (isNamed(load.ptr, slot) and !has_current_value) return false;
             },
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
         }
     }
     return true;
@@ -567,7 +567,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -616,7 +616,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
                     cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
                 },
-                .fence => {},
+                .fence, .extractelement, .insertelement, .shufflevector => {},
                 .gep => |*gep| {
                     gep.ptr = replaceOperand(gep.ptr, name, replacement);
                     for (gep.indices.items) |*index| {

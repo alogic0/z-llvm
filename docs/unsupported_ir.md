@@ -78,10 +78,13 @@ Fixed vectors are accepted only for a narrow parser/verifier surface:
 vector function signatures and returns
 undef, zeroinitializer, named values, and typed vector constants
 integer/FP binary instructions with matching vector operand types
+extractelement, insertelement, and shufflevector parser/verifier preservation
 ```
 
-Vector lane operations, vectorizer passes, target-cost decisions, native
-lowering, scalable vectors, and vector optimization remain unsupported.
+Vectorizer passes, target-cost decisions, native lowering, scalable vectors,
+vector select/comparison forms, and vector optimization remain unsupported.
+Accepted lane operations are parser/verifier-only and are not canonicalized or
+folded.
 
 ## Unsupported Instructions
 

@@ -160,7 +160,7 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
                     try addValueEdge(allocator, module, edges, cmpxchg.expected);
                     try addValueEdge(allocator, module, edges, cmpxchg.replacement);
                 },
-                .fence => {},
+                .fence, .extractelement, .insertelement, .shufflevector => {},
                 .gep => |gep| {
                     try addValueEdge(allocator, module, edges, gep.ptr);
                     for (gep.indices.items) |index| try addValueEdge(allocator, module, edges, index.value);

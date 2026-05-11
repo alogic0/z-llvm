@@ -18,6 +18,9 @@ Implemented subset:
 vector function parameters and returns
 undef, zeroinitializer, named vector values, and typed vector constants
 integer and FP binary instructions with matching fixed-vector operand types
+extractelement with scalar integer lane indices
+insertelement with matching vector element value type
+shufflevector with matching input vector types and integer vector masks
 ```
 
 This is a parser/verifier boundary only. Vector instructions are not
@@ -29,7 +32,6 @@ Unsupported:
 ```text
 scalable vectors
 vector element types outside integer, float, double, and ptr
-shufflevector, insertelement, extractelement
 vector select and vector comparisons beyond current parser boundaries
 TargetTransformInfo-like cost modeling
 loop-vectorize, slp-vectorizer, vector-combine
@@ -45,8 +47,12 @@ unit tests:
   scalar value rejected for vector return
   scalable vector rejected
   unsupported vector element rejected
-  lane operations rejected
+  extractelement, insertelement, and shufflevector accepted
+  constant lane index and shuffle mask range rejected when out of bounds
 
 source-backed reduced fixture:
   test/zig/expected/vector_future.reduced.ll
+
+opt-22 equivalent:
+  vector_lane_preserve
 ```

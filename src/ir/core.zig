@@ -557,6 +557,31 @@ pub const FenceInst = struct {
     ordering: []const u8,
 };
 
+pub const ExtractElementInst = struct {
+    vector_ty: Type,
+    vector: Value,
+    index_ty: Type,
+    index: Value,
+};
+
+pub const InsertElementInst = struct {
+    vector_ty: Type,
+    vector: Value,
+    value_ty: Type,
+    value: Value,
+    index_ty: Type,
+    index: Value,
+};
+
+pub const ShuffleVectorInst = struct {
+    lhs_ty: Type,
+    lhs: Value,
+    rhs_ty: Type,
+    rhs: Value,
+    mask_ty: Type,
+    mask: Value,
+};
+
 pub const GepIndex = struct {
     ty: Type,
     value: Value,
@@ -614,6 +639,9 @@ pub const Instruction = struct {
         atomicrmw: AtomicRmwInst,
         cmpxchg: CmpxchgInst,
         fence: FenceInst,
+        extractelement: ExtractElementInst,
+        insertelement: InsertElementInst,
+        shufflevector: ShuffleVectorInst,
         gep: GepInst,
         call: CallInst,
     },
@@ -646,6 +674,21 @@ pub const Instruction = struct {
             .load => |load| load.ty,
             .atomicrmw => |atomicrmw| atomicrmw.ty,
             .cmpxchg => .{ .aggregate = "{ i32, i1 }" },
+            .extractelement => |extract| switch (extract.vector_ty) {
+                .vector => |vector| vector.elem_ty.toType(),
+                else => null,
+            },
+            .insertelement => |insert| insert.vector_ty,
+            .shufflevector => |shuffle| switch (shuffle.lhs_ty) {
+                .vector => |lhs_vector| switch (shuffle.mask_ty) {
+                    .vector => |mask_vector| .{ .vector = .{
+                        .len = mask_vector.len,
+                        .elem_ty = lhs_vector.elem_ty,
+                    } },
+                    else => null,
+                },
+                else => null,
+            },
             .gep => .ptr,
             .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
             .store, .fence => null,
@@ -692,6 +735,20 @@ pub const Instruction = struct {
                 cmpxchg.replacement = resolveValue(aliases, cmpxchg.replacement);
             },
             .fence => {},
+            .extractelement => |*extract| {
+                extract.vector = resolveValue(aliases, extract.vector);
+                extract.index = resolveValue(aliases, extract.index);
+            },
+            .insertelement => |*insert| {
+                insert.vector = resolveValue(aliases, insert.vector);
+                insert.value = resolveValue(aliases, insert.value);
+                insert.index = resolveValue(aliases, insert.index);
+            },
+            .shufflevector => |*shuffle| {
+                shuffle.lhs = resolveValue(aliases, shuffle.lhs);
+                shuffle.rhs = resolveValue(aliases, shuffle.rhs);
+                shuffle.mask = resolveValue(aliases, shuffle.mask);
+            },
             .gep => |*gep| {
                 gep.ptr = resolveValue(aliases, gep.ptr);
                 for (gep.indices.items) |*index| {
@@ -706,7 +763,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),

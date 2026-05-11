@@ -220,6 +220,47 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.print("fence {s}", .{fence.ordering});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
+                    .extractelement => |extract| {
+                        try writer.writeAll("extractelement ");
+                        try extract.vector_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try extract.vector.format(writer);
+                        try writer.writeAll(", ");
+                        try extract.index_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try extract.index.format(writer);
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
+                    .insertelement => |insert| {
+                        try writer.writeAll("insertelement ");
+                        try insert.vector_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try insert.vector.format(writer);
+                        try writer.writeAll(", ");
+                        try insert.value_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try insert.value.format(writer);
+                        try writer.writeAll(", ");
+                        try insert.index_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try insert.index.format(writer);
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
+                    .shufflevector => |shuffle| {
+                        try writer.writeAll("shufflevector ");
+                        try shuffle.lhs_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try shuffle.lhs.format(writer);
+                        try writer.writeAll(", ");
+                        try shuffle.rhs_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try shuffle.rhs.format(writer);
+                        try writer.writeAll(", ");
+                        try shuffle.mask_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try shuffle.mask.format(writer);
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
                         try gep.source_ty.format(writer);

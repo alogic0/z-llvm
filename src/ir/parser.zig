@@ -641,6 +641,24 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .kind = .{ .cmpxchg = try parseCmpxchg(rhs_text) },
         };
     }
+    if (std.mem.eql(u8, op_text, "extractelement")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .extractelement = try parseExtractElement(rhs_text) },
+        };
+    }
+    if (std.mem.eql(u8, op_text, "insertelement")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .insertelement = try parseInsertElement(rhs_text) },
+        };
+    }
+    if (std.mem.eql(u8, op_text, "shufflevector")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .shufflevector = try parseShuffleVector(rhs_text) },
+        };
+    }
 
     if (core.CastOp.parse(op_text)) |op| {
         if (std.mem.eql(u8, parts.peek() orelse return error.InvalidInstruction, "nneg")) _ = parts.next();
@@ -1208,6 +1226,58 @@ fn parseMemoryPrefix(parts: *std.mem.TokenIterator(u8, .any)) !core.MemoryAttrs 
     }
 }
 
+fn parseExtractElement(text: []const u8) !core.ExtractElementInst {
+    var rest = std.mem.trim(u8, text["extractelement".len..], " \t");
+    const vector_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const vector_arg = try parseTypedValue(std.mem.trim(u8, rest[0..vector_comma], " \t"));
+    rest = std.mem.trim(u8, rest[vector_comma + 1 ..], " \t");
+    const index_arg = try parseTypedValue(rest);
+    return .{
+        .vector_ty = vector_arg.ty,
+        .vector = vector_arg.value,
+        .index_ty = index_arg.ty,
+        .index = index_arg.value,
+    };
+}
+
+fn parseInsertElement(text: []const u8) !core.InsertElementInst {
+    var rest = std.mem.trim(u8, text["insertelement".len..], " \t");
+    const vector_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const vector_arg = try parseTypedValue(std.mem.trim(u8, rest[0..vector_comma], " \t"));
+    rest = std.mem.trim(u8, rest[vector_comma + 1 ..], " \t");
+    const value_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const value_arg = try parseTypedValue(std.mem.trim(u8, rest[0..value_comma], " \t"));
+    rest = std.mem.trim(u8, rest[value_comma + 1 ..], " \t");
+    const index_arg = try parseTypedValue(rest);
+    return .{
+        .vector_ty = vector_arg.ty,
+        .vector = vector_arg.value,
+        .value_ty = value_arg.ty,
+        .value = value_arg.value,
+        .index_ty = index_arg.ty,
+        .index = index_arg.value,
+    };
+}
+
+fn parseShuffleVector(text: []const u8) !core.ShuffleVectorInst {
+    var rest = std.mem.trim(u8, text["shufflevector".len..], " \t");
+    const lhs_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const lhs_arg = try parseTypedValue(std.mem.trim(u8, rest[0..lhs_comma], " \t"));
+    rest = std.mem.trim(u8, rest[lhs_comma + 1 ..], " \t");
+    const rhs_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const rhs_arg = try parseTypedValue(std.mem.trim(u8, rest[0..rhs_comma], " \t"));
+    rest = std.mem.trim(u8, rest[rhs_comma + 1 ..], " \t");
+    const mask_arg = try parseTypedValue(rest);
+    return .{
+        .lhs_ty = lhs_arg.ty,
+        .lhs = lhs_arg.value,
+        .rhs_ty = rhs_arg.ty,
+        .rhs = rhs_arg.value,
+        .mask_ty = mask_arg.ty,
+        .mask = mask_arg.value,
+    };
+}
+
 fn parseMemorySuffix(parts: *std.mem.TokenIterator(u8, .any), attrs: *core.MemoryAttrs) !void {
     while (parts.next()) |token| {
         if (std.mem.eql(u8, token, "align")) {
@@ -1343,6 +1413,19 @@ const ParsedLeadingType = struct {
     ty: core.Type,
     after: []const u8,
 };
+
+const ParsedTypedValue = struct {
+    ty: core.Type,
+    value: core.Value,
+};
+
+fn parseTypedValue(text: []const u8) !ParsedTypedValue {
+    const typed = try parseLeadingType(text);
+    return .{
+        .ty = typed.ty,
+        .value = try parseValue(typed.after),
+    };
+}
 
 const ParsedTrailingType = struct {
     before: []const u8,

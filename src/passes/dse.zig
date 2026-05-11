@@ -40,7 +40,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, layout: ?target.DataLayout, f
                         changed = true;
                     }
                 },
-                .load, .atomicrmw, .cmpxchg, .fence, .call => {},
+                .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => {},
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
             }
         }

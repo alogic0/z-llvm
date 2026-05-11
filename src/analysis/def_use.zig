@@ -75,6 +75,20 @@ pub const UseCounts = struct {
                 try uses.addValue(cmpxchg.replacement);
             },
             .fence => {},
+            .extractelement => |extract| {
+                try uses.addValue(extract.vector);
+                try uses.addValue(extract.index);
+            },
+            .insertelement => |insert| {
+                try uses.addValue(insert.vector);
+                try uses.addValue(insert.value);
+                try uses.addValue(insert.index);
+            },
+            .shufflevector => |shuffle| {
+                try uses.addValue(shuffle.lhs);
+                try uses.addValue(shuffle.rhs);
+                try uses.addValue(shuffle.mask);
+            },
             .gep => |gep| {
                 try uses.addValue(gep.ptr);
                 for (gep.indices.items) |index| try uses.addValue(index.value);
@@ -125,6 +139,20 @@ pub const UseCounts = struct {
                 uses.removeValue(cmpxchg.replacement);
             },
             .fence => {},
+            .extractelement => |extract| {
+                uses.removeValue(extract.vector);
+                uses.removeValue(extract.index);
+            },
+            .insertelement => |insert| {
+                uses.removeValue(insert.vector);
+                uses.removeValue(insert.value);
+                uses.removeValue(insert.index);
+            },
+            .shufflevector => |shuffle| {
+                uses.removeValue(shuffle.lhs);
+                uses.removeValue(shuffle.rhs);
+                uses.removeValue(shuffle.mask);
+            },
             .gep => |gep| {
                 uses.removeValue(gep.ptr);
                 for (gep.indices.items) |index| uses.removeValue(index.value);

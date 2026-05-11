@@ -187,7 +187,7 @@ pub const NaturalLoop = struct {
         for (header.instructions.items) |instruction| {
             const phi = switch (instruction.kind) {
                 .phi => |phi| phi,
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => continue,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => continue,
             };
             const phi_result = instruction.result orelse continue;
             const incoming = classifyInductionIncoming(loop, function, phi) orelse continue;
@@ -230,7 +230,7 @@ pub const NaturalLoop = struct {
                 if (instruction.removed) continue;
                 switch (instruction.kind) {
                     .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .gep => {},
-                    .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .call => return false,
+                    .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => return false,
                 }
             }
         }
@@ -312,7 +312,7 @@ fn alreadyHasExitPhi(function: ir.Function, exit_block: usize, value_name: []con
     for (function.blocks.items[exit_block].instructions.items) |instruction| {
         const phi = switch (instruction.kind) {
             .phi => |phi| phi,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => break,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => break,
         };
         for (phi.incoming.items) |incoming| {
             if (valueMatchesName(incoming.value, value_name)) return true;
@@ -367,7 +367,7 @@ fn instructionUsesValue(instruction: ir.Instruction, value_name: []const u8) boo
         .store => |store| valueMatchesName(store.value, value_name) or valueMatchesName(store.ptr, value_name),
         .atomicrmw => |atomicrmw| valueMatchesName(atomicrmw.ptr, value_name) or valueMatchesName(atomicrmw.value, value_name),
         .cmpxchg => |cmpxchg| valueMatchesName(cmpxchg.ptr, value_name) or valueMatchesName(cmpxchg.expected, value_name) or valueMatchesName(cmpxchg.replacement, value_name),
-        .fence => false,
+        .fence, .extractelement, .insertelement, .shufflevector => false,
         .gep => |gep| {
             if (valueMatchesName(gep.ptr, value_name)) return true;
             for (gep.indices.items) |index| {
@@ -431,7 +431,7 @@ fn replaceInstructionUse(instruction: *ir.Instruction, value_name: []const u8, r
             cmpxchg.expected = replaceValue(cmpxchg.expected, value_name, replacement);
             cmpxchg.replacement = replaceValue(cmpxchg.replacement, value_name, replacement);
         },
-        .fence => {},
+        .fence, .extractelement, .insertelement, .shufflevector => {},
         .gep => |*gep| {
             gep.ptr = replaceValue(gep.ptr, value_name, replacement);
             for (gep.indices.items) |*index| index.value = replaceValue(index.value, value_name, replacement);
@@ -492,7 +492,7 @@ fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, ne
         if (!std.mem.eql(u8, result, next_value)) continue;
         const binary = switch (instruction.kind) {
             .binary => |binary| binary,
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return null,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => return null,
         };
         if (binary.op != .add or !binary.ty.eql(ty)) return null;
         if (valueMatchesName(binary.lhs, phi_result)) return binary.rhs;
@@ -538,7 +538,7 @@ fn outsideInstructionUsesAreLcssa(
         .store => |store| !valuesUseLoopDefinition(loop_defs, &.{ store.value, store.ptr }),
         .atomicrmw => |atomicrmw| !valuesUseLoopDefinition(loop_defs, &.{ atomicrmw.ptr, atomicrmw.value }),
         .cmpxchg => |cmpxchg| !valuesUseLoopDefinition(loop_defs, &.{ cmpxchg.ptr, cmpxchg.expected, cmpxchg.replacement }),
-        .fence => true,
+        .fence, .extractelement, .insertelement, .shufflevector => true,
         .gep => |gep| {
             if (valueNamesLoopDefinition(gep.ptr, loop_defs)) return false;
             for (gep.indices.items) |index| {

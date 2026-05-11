@@ -19,7 +19,7 @@ Implemented subset:
 ```text
 scalar accepted corpus pipelines exclude vectorizer placeholders
 fixed-vector IR forms parse and verify only
-unsupported scalable vectors and lane operations are rejected by parser tests
+unsupported scalable vectors and malformed lane operations are rejected by parser tests
 future vector fixture records the parser/verifier boundary
 loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
 placeholders only in full inventory pipeline descriptors
@@ -28,7 +28,6 @@ placeholders only in full inventory pipeline descriptors
 Required before enabling vector transforms:
 
 ```text
-lane operation representation and verifier rules
 target vector register and legal type facts
 operation cost queries for scalar and vector arithmetic
 memory access cost and alignment facts
@@ -40,7 +39,7 @@ Unsupported behavior:
 
 ```text
 no optimizer-input vector corpus rows
-no shufflevector, insertelement, or extractelement
+no lane-operation cost model
 no vector optimization or scalar fold reuse
 no loop or SLP vectorization
 no target feature or CPU model cost variation

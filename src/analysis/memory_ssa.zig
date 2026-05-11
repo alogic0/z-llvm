@@ -136,7 +136,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
     const store_instruction = block.instructions.items[store_index];
     const store = switch (store_instruction.kind) {
         .store => |store| store,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .atomicrmw, .cmpxchg, .fence, .call => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => return false,
     };
     if (memory_effect.classify(store_instruction) == .volatile_or_atomic_barrier) return false;
 
@@ -159,7 +159,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 const later = accessLocation(function, layout, load.ptr, load.ty) orelse return false;
                 if (alias.aliasLocations(later, location) != .no_alias) return false;
             },
-            .atomicrmw, .cmpxchg, .fence, .call => return false,
+            .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => return false,
             .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
         }
     }
@@ -170,7 +170,7 @@ fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .barrier else .use,
         .store => |store| if (store.attrs.isBarrier()) .barrier else .def,
-        .atomicrmw, .cmpxchg, .fence => .barrier,
+        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => .barrier,
         .call => |call| switch (function_attrs.callMemoryEffect(module, call)) {
             .none => null,
             .readonly_load => .use,
@@ -186,7 +186,7 @@ fn accessPointer(instruction: ir.Instruction) ?ir.Value {
         .store => |store| store.ptr,
         .atomicrmw => |atomicrmw| atomicrmw.ptr,
         .cmpxchg => |cmpxchg| cmpxchg.ptr,
-        .fence => null,
+        .fence, .extractelement, .insertelement, .shufflevector => null,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => null,
     };
 }

@@ -70,7 +70,7 @@ pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Va
             return if (accessAliasesPointer(function, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
     };
 }
 
@@ -86,7 +86,7 @@ pub fn modRefInModule(module: ir.Module, function: ir.Function, instruction: ir.
             return if (accessAliasesPointerInModule(module, function, layout, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
     };
 }
 
@@ -101,7 +101,7 @@ pub fn modRefForAccess(function: ir.Function, instruction: ir.Instruction, point
             return if (accessAliasesAccess(function, store.ptr, store.ty, pointer, access_ty)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
     };
 }
 
@@ -117,7 +117,7 @@ pub fn modRefInModuleForAccess(module: ir.Module, function: ir.Function, instruc
             return if (accessAliasesAccessInModule(module, function, layout, store.ptr, store.ty, pointer, access_ty)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => .unknown,
     };
 }
 

@@ -175,14 +175,14 @@ fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
     if (effect != .none and effect != .readonly_load) {
         const call = switch (instruction.kind) {
             .call => |call| call,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => return false,
         };
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
     return switch (instruction.kind) {
         .binary => |binary| !isFpBinary(binary.op),
         .cast, .icmp, .select, .phi, .load => true,
-        .freeze, .fcmp, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
+        .freeze, .fcmp, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
     };
 }
 
@@ -244,7 +244,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
                     cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
                 },
-                .fence => {},
+                .fence, .extractelement, .insertelement, .shufflevector => {},
                 .gep => |*gep| {
                     gep.ptr = replaceOperand(gep.ptr, name, replacement);
                     for (gep.indices.items) |*index| {

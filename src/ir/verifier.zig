@@ -423,6 +423,36 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result != null) return error.StoreHasResult;
                         try verifyAtomicOrdering(fence.ordering);
                     },
+                    .extractelement => |extract| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyVectorType(extract.vector_ty);
+                        try ctx.verifyValue(extract.vector_ty, extract.vector, block_index, instruction_index);
+                        try verifyLaneIndex(extract.vector_ty, extract.index_ty, extract.index);
+                        try ctx.verifyValue(extract.index_ty, extract.index, block_index, instruction_index);
+                    },
+                    .insertelement => |insert| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyVectorType(insert.vector_ty);
+                        const elem_ty = vectorElementType(insert.vector_ty);
+                        if (!insert.value_ty.eql(elem_ty)) return error.TypeMismatch;
+                        try ctx.verifyValue(insert.vector_ty, insert.vector, block_index, instruction_index);
+                        try ctx.verifyValue(insert.value_ty, insert.value, block_index, instruction_index);
+                        try verifyLaneIndex(insert.vector_ty, insert.index_ty, insert.index);
+                        try ctx.verifyValue(insert.index_ty, insert.index, block_index, instruction_index);
+                    },
+                    .shufflevector => |shuffle| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try verifyVectorType(shuffle.lhs_ty);
+                        try verifyVectorType(shuffle.rhs_ty);
+                        if (!shuffle.lhs_ty.eql(shuffle.rhs_ty)) return error.TypeMismatch;
+                        try verifyShuffleMask(shuffle.lhs_ty, shuffle.mask_ty, shuffle.mask);
+                        try ctx.verifyValue(shuffle.lhs_ty, shuffle.lhs, block_index, instruction_index);
+                        try ctx.verifyValue(shuffle.rhs_ty, shuffle.rhs, block_index, instruction_index);
+                        try ctx.verifyValue(shuffle.mask_ty, shuffle.mask, block_index, instruction_index);
+                    },
                     .gep => |gep| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
@@ -622,6 +652,59 @@ fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
     if (lane_count != vector.len) return error.TypeMismatch;
+}
+
+fn verifyVectorType(ty: core.Type) !void {
+    if (ty != .vector) return error.TypeMismatch;
+}
+
+fn vectorElementType(ty: core.Type) core.Type {
+    return ty.vector.elem_ty.toType();
+}
+
+fn verifyLaneIndex(vector_ty: core.Type, index_ty: core.Type, index: core.Value) !void {
+    if (vector_ty != .vector) return error.TypeMismatch;
+    if (index_ty != .int) return error.TypeMismatch;
+    switch (index) {
+        .int => |lane| if (lane < 0 or lane >= vector_ty.vector.len) return error.TypeMismatch,
+        .named, .undef => {},
+        .null_value, .zero_initializer, .vector => return error.TypeMismatch,
+    }
+}
+
+fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value) !void {
+    if (vector_ty != .vector or mask_ty != .vector) return error.TypeMismatch;
+    switch (mask_ty.vector.elem_ty) {
+        .int => {},
+        .float, .double, .ptr => return error.TypeMismatch,
+    }
+    switch (mask) {
+        .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
+        .undef, .zero_initializer => {},
+        .named, .int, .null_value => return error.TypeMismatch,
+    }
+}
+
+fn verifyShuffleMaskLiteral(max_lane: u32, mask_ty: core.Type, text: []const u8) !void {
+    const mask_vector = mask_ty.vector;
+    if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return error.InvalidValue;
+    var rest = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    var lane_count: u32 = 0;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const raw_lane = if (comma) |index| rest[0..index] else rest;
+        const lane = std.mem.trim(u8, raw_lane, " \t");
+        const typed = try parseLeadingType(lane);
+        if (!typed.ty.eql(mask_vector.elem_ty.toType())) return error.TypeMismatch;
+        const value_text = std.mem.trim(u8, typed.after, " \t");
+        if (!std.mem.eql(u8, value_text, "undef")) {
+            const value = try std.fmt.parseInt(i128, value_text, 10);
+            if (value < 0 or value >= max_lane) return error.TypeMismatch;
+        }
+        lane_count += 1;
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+    if (lane_count != mask_vector.len) return error.TypeMismatch;
 }
 
 const ParsedLeadingType = struct {

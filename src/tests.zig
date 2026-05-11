@@ -1567,7 +1567,9 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, shuffle));
+    var shuffle_module = try ir.Module.parse(std.testing.allocator, shuffle);
+    defer shuffle_module.deinit();
+    try shuffle_module.verify();
 
     const insert =
         \\define i32 @insert_lane(i32 %a) {
@@ -1577,7 +1579,9 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, insert));
+    var insert_module = try ir.Module.parse(std.testing.allocator, insert);
+    defer insert_module.deinit();
+    try insert_module.verify();
 
     const extract =
         \\define i32 @extract_lane() {
@@ -1587,7 +1591,9 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, extract));
+    var extract_module = try ir.Module.parse(std.testing.allocator, extract);
+    defer extract_module.deinit();
+    try extract_module.verify();
 
     const vector_constant =
         \\define <2 x i32> @vector_constant() {
@@ -1629,6 +1635,30 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
     var mismatch_module = try ir.Module.parse(std.testing.allocator, mismatch);
     defer mismatch_module.deinit();
     try std.testing.expectError(error.TypeMismatch, mismatch_module.verify());
+
+    const bad_lane =
+        \\define i32 @bad_lane(<2 x i32> %a) {
+        \\entry:
+        \\  %v = extractelement <2 x i32> %a, i32 2
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var bad_lane_module = try ir.Module.parse(std.testing.allocator, bad_lane);
+    defer bad_lane_module.deinit();
+    try std.testing.expectError(error.TypeMismatch, bad_lane_module.verify());
+
+    const bad_shuffle =
+        \\define <2 x i32> @bad_shuffle(<2 x i32> %a, <2 x i32> %b) {
+        \\entry:
+        \\  %v = shufflevector <2 x i32> %a, <2 x i32> %b, <2 x i32> <i32 0, i32 4>
+        \\  ret <2 x i32> %v
+        \\}
+        \\
+    ;
+    var bad_shuffle_module = try ir.Module.parse(std.testing.allocator, bad_shuffle);
+    defer bad_shuffle_module.deinit();
+    try std.testing.expectError(error.TypeMismatch, bad_shuffle_module.verify());
 }
 
 test "parser preserves inert branch metadata attachments" {
