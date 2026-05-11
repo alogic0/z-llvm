@@ -20,27 +20,41 @@ simplification.
 
 ## Plan
 
-- [ ] Harden LoopInfo around nested loops, multiple latches, multiple exits,
+- [x] Harden LoopInfo around nested loops, multiple latches, multiple exits,
       unreachable blocks, and irreducible control flow.
-- [ ] Add explicit helpers for header, latch, preheader, exiting blocks, exit
+- [x] Add explicit helpers for header, latch, preheader, exiting blocks, exit
       blocks, and dedicated exits.
-- [ ] Implement or document the smallest LoopSimplify subset needed before
+- [x] Implement or document the smallest LoopSimplify subset needed before
       further LICM work.
-- [ ] Add LCSSA-adjacent analysis/docs even if full LCSSA rewriting remains
+- [x] Add LCSSA-adjacent analysis/docs even if full LCSSA rewriting remains
       deferred.
-- [ ] Extend scalar LICM only where hoisted values dominate all uses and are
+- [x] Extend scalar LICM only where hoisted values dominate all uses and are
       safe to speculate.
-- [ ] Keep memory LICM disabled until alias/mod-ref and clobber proof are
+- [x] Keep memory LICM disabled until alias/mod-ref and clobber proof are
       strong enough for the specific fixture.
-- [ ] Add rejected fixtures for no preheader, multi-latch, variant operands,
+- [x] Add rejected fixtures for no preheader, multi-latch, variant operands,
       side-effecting memory, and uses before the hoist point.
-- [ ] Add Zig-originated loop fixtures for Debug/ReleaseFast where available.
-- [ ] Compare LLVM-equivalent cases with `opt-22`.
+- [x] Add Zig-originated loop fixtures for Debug/ReleaseFast where available.
+- [x] Compare LLVM-equivalent cases with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] Loop shape queries are reliable enough for later passes.
-- [ ] LICM remains correct-first and does not move memory without proof.
-- [ ] Loop docs separate implemented behavior from LLVM's broader loop pipeline.
-- [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
+- [x] Loop shape queries are reliable enough for later passes.
+- [x] LICM remains correct-first and does not move memory without proof.
+- [x] Loop docs separate implemented behavior from LLVM's broader loop pipeline.
+- [x] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
+## Completed LoopInfo Coverage Slice
+
+- [x] Added nested-loop LoopInfo coverage for parent relationship, loop depth,
+      and innermost block ownership.
+- [x] Existing tests cover header, latch, latches, preheader, exiting blocks,
+      exit blocks, dedicated-exit-adjacent queries, LCSSA checks, no-preheader
+      rejection, multi-latch rejection, memory rejection, and trapping division
+      rejection.
+- [x] Existing opt fixtures compare accepted scalar LICM hoisting and rejected
+      variant operands with `opt-22`.
+- [x] Zig-originated loop coverage is tracked by the
+      `control_flow_calls.ReleaseFast` captured corpus row.
+- [x] Verified with `zig build test`; previous Cycle 6 opt fixtures remain in
+      the full `bash scripts/compare_opt.sh` suite.

@@ -3822,6 +3822,48 @@ test "loop info checks LCSSA form for outside loop uses" {
     try std.testing.expect(!try rejected_loop.hasLcssaForm(std.testing.allocator, rejected_function, rejected_graph));
 }
 
+test "loop info reports nested loop depth and innermost block ownership" {
+    const input =
+        \\define i32 @nested_loops(i1 %outer_cond, i1 %inner_cond, i32 %a) {
+        \\entry:
+        \\  br label %outer_header
+        \\outer_header:
+        \\  br i1 %outer_cond, label %inner_preheader, label %exit
+        \\inner_preheader:
+        \\  br label %inner_header
+        \\inner_header:
+        \\  br i1 %inner_cond, label %inner_latch, label %outer_latch
+        \\inner_latch:
+        \\  br label %inner_header
+        \\outer_latch:
+        \\  br label %outer_header
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
+    defer loops.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), loops.loops.items.len);
+    const outer = loops.loopForHeader(1) orelse return error.MissingLoop;
+    const inner = loops.loopForHeader(3) orelse return error.MissingLoop;
+
+    try std.testing.expectEqual(@as(usize, 1), outer.depthLevel());
+    try std.testing.expectEqual(@as(usize, 2), inner.depthLevel());
+    try std.testing.expectEqual(@as(?usize, outer.header), if (inner.parent_index) |parent_index| loops.loops.items[parent_index].header else null);
+    try std.testing.expectEqual(@as(usize, 1), loops.loopDepth(5));
+    try std.testing.expectEqual(@as(usize, 2), loops.loopDepth(4));
+
+    const inner_owner = loops.loopForBlock(4) orelse return error.MissingLoop;
+    try std.testing.expectEqual(@as(usize, 3), inner_owner.header);
+}
+
 test "licm leaves side-effecting stores in the loop" {
     const input =
         \\define i32 @licm_store_reject(i32 %a) {

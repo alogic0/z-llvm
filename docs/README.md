@@ -44,7 +44,7 @@ completed foundation epics
 - [x] [Cycle 3: CFG Mutation, ADCE, And SimplifyCFG](roadmap/03_cfg_mutation_adce_simplifycfg_cycle.md)
 - [x] [Cycle 4: SCCP And InstCombine Semantics Expansion](roadmap/04_sccp_instcombine_semantics_cycle.md)
 - [x] [Cycle 5: Value Numbering And PRE Foundation](roadmap/05_value_numbering_and_pre_cycle.md)
-- [ ] [Cycle 6: Loop Pipeline Quality](roadmap/06_loop_pipeline_quality_cycle.md)
+- [x] [Cycle 6: Loop Pipeline Quality](roadmap/06_loop_pipeline_quality_cycle.md)
 - [ ] [Cycle 7: Zig Pipeline Corpus Parity](roadmap/07_zig_pipeline_corpus_parity_cycle.md)
 
 ## Operating Rule
