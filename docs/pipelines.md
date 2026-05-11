@@ -187,6 +187,12 @@ zig-release-safe-accepted / zig-release-fast-accepted / zig-release-small-accept
 zig-release-small-accepted is tracked separately so ReleaseSmall size
 attributes and aliases do not get conflated with ReleaseFast output quality.
 
+aarch64-target-independent:
+  verify
+  instcombine
+  dce
+  verify
+
 lto-prelink-o3 / lto-prelink-oz:
   release descriptors plus canonicalize-aliases and name-anon-globals
   placeholders at the front
@@ -199,6 +205,11 @@ accepted Zig-emitted fixture rows can validate today. Full descriptors such as
 placeholder classification, but the corpus runner does not use them unless a
 manifest row explicitly asks for them.
 
+`aarch64-target-independent` is an even narrower corpus alias for the non-host
+AArch64 integer row. It admits only target-independent scalar cleanup and keeps
+ABI, codegen, TTI/TLI, vector, and DataLayout-sensitive memory transforms out of
+scope.
+
 Usage:
 
 ```bash
@@ -207,6 +218,7 @@ zig build run -- --pipeline=memory-foundation test/opt/inputs/mem2reg.ll
 zig build run -- --pipeline=release-o3 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=debug-o0 test/opt/inputs/instcombine.ll
 zig build run -- --pipeline=zig-release-fast-accepted test/zig/captured/integers.ReleaseFast.x86_64.ll
+zig build run -- --pipeline=aarch64-target-independent test/zig/captured/integers.ReleaseFast.aarch64.ll
 zig build run -- --passes='module(verify,function(instcombine,dce))' test/opt/inputs/instcombine.ll
 ```
 
@@ -220,6 +232,7 @@ unit tests check the scalar-foundation pass order
 inventory placeholders are executable documented no-ops
 unit tests check debug-o0 and release-o3 expansion
 unit tests check the accepted ReleaseFast corpus pipeline expansion
+unit tests check the AArch64 target-independent pass gate
 textual nested pipeline placeholders are flattened for now
 selected release descriptors repeat simplifycfg and instcombine to model LLVM's
 canonicalization shape

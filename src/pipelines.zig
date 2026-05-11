@@ -72,6 +72,13 @@ const zig_release_accepted_passes = [_][]const u8{
     "verify",
 };
 
+const aarch64_target_independent_passes = [_][]const u8{
+    "verify",
+    "instcombine",
+    "dce",
+    "verify",
+};
+
 const release_o3_passes = [_][]const u8{
     "verify",
     "add-discriminators",
@@ -242,6 +249,14 @@ pub const all = [_]Pipeline{
         .llvm_analogue = "Zig ReleaseSmall / LLVM Oz accepted corpus subset",
         .intended_level = "accepted ReleaseSmall corpus validation",
         .notes = "uses the same implemented subset as ReleaseFast until size-specific cost, TTI, and global passes are fixture-ready",
+    },
+    .{
+        .name = "aarch64-target-independent",
+        .passes = &aarch64_target_independent_passes,
+        .mode = "ReleaseFast AArch64",
+        .llvm_analogue = "AArch64 Zig ReleaseFast target-independent scalar subset",
+        .intended_level = "accepted non-host AArch64 corpus validation",
+        .notes = "runs only verifier, integer InstCombine, and DCE; excludes ABI, codegen, TTI, vector, and DataLayout-sensitive memory transforms",
     },
     .{
         .name = "release-o3",

@@ -256,6 +256,45 @@ test "accepted release pipeline notes keep target cost out of scope" {
     try std.testing.expect(std.mem.indexOf(u8, release_small.notes, "TTI") != null);
 }
 
+test "AArch64 accepted pipeline keeps target-sensitive passes out of scope" {
+    const descriptor = pipelines.find("aarch64-target-independent").?;
+    try std.testing.expect(std.mem.indexOf(u8, descriptor.notes, "TTI") != null);
+    try std.testing.expect(std.mem.indexOf(u8, descriptor.notes, "DataLayout-sensitive memory") != null);
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "aarch64-target-independent");
+
+    const expected = [_][]const u8{
+        "verify",
+        "instcombine",
+        "dce",
+        "verify",
+    };
+    try std.testing.expectEqual(expected.len, pm.passes.items.len);
+    for (expected, pm.passes.items) |expected_name, pass| {
+        try std.testing.expectEqualStrings(expected_name, pass.name);
+    }
+
+    const blocked = [_][]const u8{
+        "simplifycfg",
+        "sroa",
+        "mem2reg",
+        "early-cse",
+        "gvn",
+        "dse",
+        "licm",
+        "loop-vectorize",
+        "slp-vectorizer",
+        "vector-combine",
+        "div-rem-pairs",
+        "libcalls-shrinkwrap",
+    };
+    for (blocked) |pass_name| {
+        try std.testing.expect(!pipelineContainsPass(pm, pass_name));
+    }
+}
+
 test "lto prelink pipelines expose prelink placeholders without bitcode semantics" {
     const aliases = [_][]const u8{
         "lto-prelink-o3",

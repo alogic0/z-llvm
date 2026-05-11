@@ -26,6 +26,7 @@ ReleaseFast and ReleaseSmall accepted corpus pipelines exclude vectorizer passes
 Fixed-vector and lane-operation IR is parser/verifier-only, not optimizer-input.
 FP transforms are preserve-only unless they are target-independent and have opt-22 fixture coverage.
 AArch64 target records may appear on target-independent scalar fixtures.
+The source-backed AArch64 integer row uses only `aarch64-target-independent`.
 DataLayout is not a substitute for TargetTransformInfo.
 Target feature strings are preserved for future cost modeling but not consumed by transforms.
 ```
@@ -42,4 +43,5 @@ opt-22 equivalent:
 unit tests:
   accepted Zig corpus pipelines exclude loop-vectorize, slp-vectorizer, and vector-combine
   ReleaseFast and ReleaseSmall accepted pipeline notes document target-cost gaps
+  AArch64 accepted pipeline excludes ABI, memory-motion, vector, TTI, and TLI transforms
 ```

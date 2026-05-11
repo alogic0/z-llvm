@@ -115,7 +115,9 @@ consume yet. Use `future` when the mode or feature is documented but not yet a
 driver for implementation. Use `legacy-bootstrap` when the fixture was emitted
 by a Zig executable that does not match the `../ziglang` source checkout used by
 the inventories. Use `target-layout` when a non-host or target-sensitive row is
-accepted for triple/DataLayout validation but is not yet an optimizer-input row.
+accepted for triple/DataLayout validation. A row may combine `target-layout`
+with `optimizer-input` only when its local pipeline is explicitly restricted to
+target-independent or proven DataLayout-aware passes.
 
 ## Regeneration Commands
 
@@ -200,7 +202,7 @@ parser blockers after Cycle 1:
 | `tiny_scalar` | `test/zig/inputs/tiny_scalar.zig` | `test/zig/expected/tiny_scalar.normalized.ll`; `test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll`; `test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll` | module records, exported aliases, scalar add, mode-specific attrs | `parse`, `verify`, `optimizer-input`, `unsupported` |
 | `debug_metadata` | reduced from `test/zig/inputs/tiny_scalar.zig` Debug metadata shapes | `test/zig/expected/debug_metadata.reduced.ll`; `test/zig/expected/debug_scope_branch.reduced.ll` | compile-unit, subprogram, lexical block, branch and instruction location metadata | `parse`, `verify`, `optimizer-input` |
 | `release_safe_safety` | reduced from `test/zig/inputs/tiny_scalar.zig` ReleaseSafe control-flow shape | `test/zig/expected/release_safe_safety.reduced.ll`; `test/zig/expected/release_safe_call_boundary.reduced.ll` | safety trap branch, declared opaque runtime call, `unreachable`, branch-weight metadata | `parse`, `verify`, `optimizer-input` |
-| `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseSmall.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference; AArch64 kept parse/verify until the non-host optimizer policy is satisfied | `parse`, `verify`, `optimizer-input`, `target-layout`, `future` |
+| `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseSmall.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference; AArch64 accepted only through the target-independent scalar pipeline | `parse`, `verify`, `optimizer-input`, `target-layout` |
 | `pointers_memory` | `test/zig/inputs/pointers_memory.zig` | `test/zig/captured/pointers_memory.ReleaseFast.x86_64.ll` | pointer attrs, load/store, volatile load/store | `parse`, `verify`, `optimizer-input` |
 | `aggregates` | `test/zig/inputs/aggregates.zig` | `test/zig/captured/aggregates.ReleaseFast.x86_64.ll` | arrays, struct field GEP, slice iteration, optionals, error unions | `parse`, `verify`, `optimizer-input` |
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `parse`, `verify`, `optimizer-input` |
@@ -245,7 +247,7 @@ Connection to the LLVM pass inventory:
 | `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, and instruction `DILocation` preservation without optimizer-input status. |
 | `ReleaseSafe` reduced safety mode | `release-o3`, `local-pipeline=zig-release-safe-accepted`, safety branch preservation, and opaque branch-weight metadata. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
-| `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, future optimizer comparison policy. |
+| `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, and `aarch64-target-independent` optimizer-input coverage for verifier, integer InstCombine, and DCE only. |
 | `ReleaseFast` future vector mode | Fixed vector parser/verifier support exists; `target-cost`, `loop-vectorize`, `slp-vectorizer`, and `vector-combine` remain unsupported/future. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
 | `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |

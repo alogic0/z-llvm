@@ -43,14 +43,15 @@ Optimizer:
       local scans in load CSE/GVN/DSE when source-backed rows require it.
 - FP optimizations remain conservative without fast-math, NaN, signed-zero, and
       target-cost modeling.
-- AArch64 rows are parse/verify target-layout evidence, not optimizer input,
-      until target-independent pass gates are separated from DataLayout-sensitive
-      transforms.
+- AArch64 rows now have a narrow target-independent optimizer-input gate, while
+      DataLayout-sensitive memory, ABI, target-cost, and non-host codegen
+      transforms remain blocked.
 
 Target:
 
-- AArch64 DataLayout is parsed, but optimizer-input policy still blocks broad
-      non-host target rows.
+- AArch64 DataLayout is parsed, and optimizer-input policy blocks broad
+      non-host target rows except for the explicit `aarch64-target-independent`
+      scalar cleanup alias.
 - Target feature and CPU model strings are normalized/preserved, not interpreted
       by pass cost models.
 
@@ -80,7 +81,8 @@ The next wave should stay source-backed and pull only one bounded blocker at a
 time:
 
 1. Vector lane operation boundaries plus target-cost policy decisions.
-2. AArch64 optimizer-input separation for target-independent passes.
+2. Broader AArch64 promotion after DataLayout-sensitive, ABI, and target-cost
+      gates are independently proven.
 3. Debug-mode reduction work for large source-backed Debug rows.
 4. Path-aware MemorySSA only after a source-backed fixture demonstrates that the
       current conservative scan blocks a needed transform.

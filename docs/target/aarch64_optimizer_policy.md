@@ -1,7 +1,8 @@
 # AArch64 Optimizer-Input Policy
 
 This policy controls when non-host Zig LLVM IR captures can move from
-`parse,verify,target-layout,future` to `optimizer-input`.
+`parse,verify,target-layout,future` to a narrowly scoped
+`optimizer-input` classification.
 
 ## Current AArch64 Corpus Shape
 
@@ -37,10 +38,25 @@ DataLayout-aware with AArch64 fixture coverage
 disabled for the row's local-pipeline alias
 ```
 
-The current `integers_release_fast_aarch64` row stays
-`parse,verify,target-layout,future`. It proves parser/verifier/DataLayout
-acceptance, but it must not run the broad release pipeline until all selected
-passes are audited for AArch64 target facts.
+The current `integers_release_fast_aarch64` row is accepted as
+`parse,verify,target-layout,optimizer-input` only under:
+
+```text
+local-pipeline=aarch64-target-independent
+```
+
+That alias runs:
+
+```text
+verify
+instcombine
+dce
+verify
+```
+
+It proves parser/verifier/DataLayout acceptance and target-independent scalar
+cleanup. It must not run the broad release pipeline until all selected passes
+are audited for AArch64 target facts.
 
 ## Current Pass Classification
 
@@ -58,11 +74,13 @@ sccp integer lattice cases that do not query type allocation size
 Target/DataLayout-sensitive:
 
 ```text
+the broad zig-release-fast-accepted pipeline until its passes are audited for this row
 sroa
 dse
 gvn and early-cse when loads/stores or MemoryLocation are involved
 licm when memory, speculation, or target-cost legality is involved
 any ABI, codegen, object, or native backend handoff behavior
+loop-vectorize, slp-vectorizer, vector-combine, div-rem-pairs, libcalls-shrinkwrap, and other TTI/TLI users
 ```
 
 ## Fixture Coverage
@@ -75,3 +93,21 @@ test/opt/expected/z_llvm/aarch64_instcombine_target_independent.ll
 The fixture carries the AArch64 target triple and DataLayout but only exercises
 target-independent scalar integer InstCombine/DCE behavior. It is compared with
 `opt-22`.
+
+## Corpus Runner Coverage
+
+The source-backed AArch64 integer row now records
+`local-pipeline=aarch64-target-independent` in the manifest. The corpus runner
+executes only that alias for the row, so target-cost, ABI, memory-motion, and
+non-host codegen behavior remain blocked until they receive separate fixtures
+and upstream mapping.
+
+Remaining blockers:
+
+```text
+no TargetMachine or ABI lowering
+no AArch64 TTI/TLI queries
+no target-aware vector or FP profitability decisions
+no non-host native codegen/object emission validation
+no memory transform promotion beyond target-independent scalar cleanup
+```

@@ -64,7 +64,7 @@ The next wave should be selected from Zig's actual LLVM-removal blockers:
 ```text
 inline asm and atomicrmw IR representation with verifier fail-closed rules
 vector lane-operation boundaries plus target-cost policy decisions
-AArch64 optimizer-input separation for target-independent passes
+broader AArch64 promotion after target-independent scalar cleanup
 Debug-mode reduction work for large source-backed Debug rows
 path-aware MemorySSA only after a source-backed fixture requires it
 ```

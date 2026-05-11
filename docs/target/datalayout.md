@@ -75,12 +75,14 @@ unit-test only:
 ## AArch64 Optimizer-Input Policy
 
 `docs/target/aarch64_optimizer_policy.md` records the current non-host target
-policy. The source-backed `integers_release_fast_aarch64` row remains
-`parse,verify,target-layout,future`: it proves parser/verifier/DataLayout
-acceptance but does not run the broad accepted release pipeline yet.
+policy. The source-backed `integers_release_fast_aarch64` row is promoted to
+`parse,verify,target-layout,optimizer-input` only through the
+`aarch64-target-independent` alias: it proves parser/verifier/DataLayout
+acceptance and scalar InstCombine/DCE behavior, but it still does not run the
+broad accepted release pipeline.
 
 Only target-independent scalar transforms may be compared with AArch64 target
-records before promotion. The current fixture is:
+records before broader promotion. The current fixture is:
 
 ```text
 test/opt/inputs/aarch64_instcombine_target_independent.ll
