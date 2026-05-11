@@ -80,13 +80,18 @@ new induction-variable recognition is reserved for later loop passes and is not
 used to justify LICM movement
 hoist selected memory-free scalar chains out through nested loop preheaders when
 dominance and invariant operands allow it
+hoist nonvolatile loads in the loop header when the pointer is loop-invariant,
+the loop has no clobber for that access, and an existing preheader dominates
+the header
 ```
 
 Current legality boundary:
 
 ```text
-hoistable: side-effect-free scalar binary, integer cast, icmp, and select instructions
-not hoistable: freeze, phi, alloca, load, store, getelementptr, volatile or atomic barriers, trapping division
+hoistable: side-effect-free scalar binary, integer cast, icmp, select, and the
+narrow header-load case described above
+not hoistable: freeze, phi, alloca, store, getelementptr, volatile or atomic
+barriers, trapping division, non-header loads, and loads with loop clobbers
 not represented yet and therefore not hoistable: calls and unknown memory effects
 ```
 
@@ -98,7 +103,9 @@ or MemorySSA foundation exists.
 Fixture coverage:
 
 ```text
-opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist
+opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist, header load hoist
+local only: may-alias store rejection for memory LICM because opt-22 may still
+perform other loop rewrites around that shape
 opt-22 compared memory legality: scalar hoisting beside volatile memory
 local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, atomic barrier rejection, multi-latch rejection
 ```
@@ -113,8 +120,8 @@ memory LICM slices.
 Known gaps:
 
 ```text
-no load/store/call hoisting or sinking
-no MemorySSA or alias analysis integration
+no store/call hoisting or sinking
+no MemorySSA updater or memory promotion
 no poison or freeze speculation safety checks beyond the current trapping-division guard
 no multi-latch loop hoisting
 no preheader creation

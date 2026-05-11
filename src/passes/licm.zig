@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const memory_ssa = @import("../analysis/memory_ssa.zig");
 const dominator = @import("../analysis/dominator.zig");
 const loop_info = @import("../analysis/loop_info.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
@@ -17,12 +18,12 @@ pub const pass: pass_manager.ModulePass = .{
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        changed = try hoistFunction(module.allocator, function) or changed;
+        changed = try hoistFunction(module.allocator, module.*, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
 
-fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+fn hoistFunction(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
     var graph = try cfg.Graph.build(allocator, function.*);
     defer graph.deinit();
 
@@ -50,7 +51,7 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
                 var instruction_index: usize = 0;
                 while (instruction_index < function.blocks.items[block_index].instructions.items.len) {
                     const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
-                    if (!isHoistable(instruction) or
+                    if (!isHoistable(module, function.*, natural_loop, block_index, instruction) or
                         !isLoopInvariant(instruction, natural_loop, def_blocks) or
                         !hoistDestinationDominatesUses(function.*, dom, instruction.result.?, preheader))
                     {
@@ -90,14 +91,29 @@ fn collectDefinitionBlocks(def_blocks: *std.StringHashMap(usize), function: ir.F
     }
 }
 
-fn isHoistable(instruction: ir.Instruction) bool {
-    if (instruction.removed or !memory_effect.isSafeToSpeculativelyExecute(instruction)) return false;
+fn isHoistable(module: ir.Module, function: ir.Function, natural_loop: loop_info.NaturalLoop, block_index: usize, instruction: ir.Instruction) bool {
+    if (instruction.removed) return false;
     if (instruction.result == null) return false;
     return switch (instruction.kind) {
-        .binary => |binary| !isFpBinary(binary.op),
-        .cast, .icmp, .select => true,
-        .freeze, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
+        .binary => |binary| memory_effect.isSafeToSpeculativelyExecute(instruction) and !isFpBinary(binary.op),
+        .cast, .icmp, .select => memory_effect.isSafeToSpeculativelyExecute(instruction),
+        .load => |load| isHoistableLoad(module, function, natural_loop, block_index, instruction, load),
+        .freeze, .fcmp, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
     };
+}
+
+fn isHoistableLoad(module: ir.Module, function: ir.Function, natural_loop: loop_info.NaturalLoop, block_index: usize, instruction: ir.Instruction, load: ir.LoadInst) bool {
+    if (block_index != natural_loop.header) return false;
+    if (load.attrs.isBarrier()) return false;
+    for (natural_loop.blocks.items) |loop_block_index| {
+        const block = function.blocks.items[loop_block_index];
+        for (block.instructions.items) |candidate| {
+            if (candidate.removed) continue;
+            if (candidate.result != null and instruction.result != null and std.mem.eql(u8, candidate.result.?, instruction.result.?)) continue;
+            if (memory_ssa.isBarrierForAccess(module, function, candidate, load.ptr, load.ty)) return false;
+        }
+    }
+    return true;
 }
 
 fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalLoop, def_blocks: std.StringHashMap(usize)) bool {
@@ -111,7 +127,8 @@ fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalL
         .select => |select| natural_loop.isLoopInvariantValue(select.cond, def_blocks) and
             natural_loop.isLoopInvariantValue(select.true_value, def_blocks) and
             natural_loop.isLoopInvariantValue(select.false_value, def_blocks),
-        .freeze, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
+        .load => |load| natural_loop.isLoopInvariantValue(load.ptr, def_blocks),
+        .freeze, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
     };
 }
 
