@@ -51,6 +51,8 @@ Local target status:
 Implemented subset:
   Integer identity folds
   Integer constant folds for defined operations
+  Checked flagged integer identity and constant folds for local `nuw`/`nsw`
+  legality
   Cast folds for integer constants using source-width bit patterns
   ICmp constant and same-operand folds
   Select constant-condition and identical-arm folds
@@ -95,6 +97,11 @@ and `sext i8 255`
 constant udiv/sdiv/urem/srem folding only when the operation is defined in the current integer model
 preserve division by zero, signed min / -1, and non-exact exact division cases
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
+selected flagged integer identities when `nuw`, `nsw`, or `exact` does not
+change overflow behavior
+checked flagged add/sub/mul constants when signed and unsigned overflow cannot
+occur in the local bit-width model
+preserve flagged integer constants when overflow would be required
 freeze of an integer constant -> that same constant
 strict fcmp false -> false
 strict fcmp true -> true
@@ -117,15 +124,19 @@ Fixture coverage:
 opt-22 equivalent:
   instcombine_scalar_simplify
   instcombine_cast_bitpatterns
+  instcombine_flagged_identities
+  instcombine_flagged_constants
+  instcombine_pointer_compare
   fp_strict_fcmp_fold
   fp_fast_math_flags_boundary
 
 local-only conservative:
+  instcombine_flagged_overflow_reject preserves a case where LLVM can reason in
+  terms of poison, which the local IR does not yet materialize.
   unsafe division cases are preserved in unit tests
   fp_strict_orderedness_fold covers local APFloat-shaped orderedness folds
 
 unit-test only:
-  flagged arithmetic remains unfused unless a specific safe rule is added later
   unsafe strict FP identities remain unfused unless a specific safe rule is added later
 ```
 

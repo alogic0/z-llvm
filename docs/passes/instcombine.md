@@ -30,6 +30,8 @@ InstCombinerImpl::visitZExt
 InstCombinerImpl::visitSExt
 InstCombinerImpl::visitICmpInst
 InstCombinerImpl::visitSelectInst
+InstCombinerImpl::foldOpIntoPhi
+InstCombinerImpl::simplifyDemandedInstructionBits
 InstructionSimplify helpers used by InstCombine
 ```
 
@@ -66,6 +68,8 @@ Implemented subset:
   Local instruction scan with alias replacement
   Arithmetic, bitwise, shift, cast, ICmp, select, div/rem, and freeze-constant
   scalar simplifications delegated to the InstSimplify helper
+  Checked `nuw`/`nsw`/`exact` identity and constant folds for the listed
+  integer fixtures
   Constant-on-RHS canonicalization for supported commutative binary ops
 
 Intentional divergences:
@@ -86,6 +90,12 @@ Fixture coverage:
   instcombine_commute
   instcombine_scalar_simplify
   instcombine_safe_scalar
+  instcombine_flagged_identities
+  instcombine_flagged_constants
+  instcombine_flagged_overflow_reject is local-conservative: the local legality
+  helper preserves an overflowing `nsw` constant expression rather than
+  materializing LLVM poison.
+  instcombine_pointer_compare
   select_fold
   fp_instcombine_preserve
   fp_special_literals_preserve
@@ -144,10 +154,16 @@ icmp signed and unsigned relational constant folding
 icmp signed and unsigned relational same-operand folding
 select constant-condition folding
 select identical-arm folding
-preserve `nsw`, `nuw`, and `exact` flags without using them for folds
+fold selected `nsw`, `nuw`, and `exact` neutral identities when the flag cannot
+change overflow behavior
+fold selected flagged integer constants only after checking signed/unsigned
+overflow in the local bit-width model
+preserve flagged integer constant expressions whose overflow legality is not
+proved
 constant `trunc`, `zext`, and `sext` folding for integer constants
 defined constant `udiv`, `sdiv`, `urem`, and `srem` folding
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
+pointer null/self ICmp folds through same-operand comparison simplification
 freeze of an integer constant -> that same constant
 strict `fcmp false` -> false
 strict `fcmp true` -> true
@@ -162,7 +178,9 @@ Upstream mapping:
 ```text
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
-The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
+The current implementation uses `nsw`, `nuw`, and `exact` only for explicitly
+listed neutral identities and checked constant folds. Overflow-sensitive cases
+remain preserved rather than producing poison.
 Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
 than folded because NaN, signed-zero, rounding, and exception legality are not
 modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
@@ -190,8 +208,9 @@ after instcombine + dce:
 Known gaps:
 
 ```text
-no use of nsw/nuw/exact for folds
-no poison/undef simplification
+no general use of nsw/nuw/exact for folds beyond the listed neutral identities
+and checked constants
+no materialized poison/undef simplification
 no non-constant freeze simplification
 no vector folds; fixed-vector IR is parser/verifier-only and excluded from
 InstCombine equivalence claims

@@ -7,20 +7,28 @@ ReleaseFast and ReleaseSmall rows.
 
 ## Plan
 
-- [ ] Inventory missed integer, compare, select, cast, and GEP combines from
+- [x] Inventory missed integer, compare, select, cast, and GEP combines from
       current opt-22 diffs.
-- [ ] Prioritize combines that reduce mandatory canonicalization gaps, not
+- [x] Prioritize combines that reduce mandatory canonicalization gaps, not
       target-cost-sensitive strength reductions.
-- [ ] Add poison, `nuw`, `nsw`, `exact`, and `inbounds` legality helpers before
+- [x] Add poison, `nuw`, `nsw`, `exact`, and `inbounds` legality helpers before
       enabling each transform.
-- [ ] Add fixtures for accepted and rejected overflow-sensitive combines.
-- [ ] Share simplification predicates with InstSimplify when possible.
-- [ ] Compare each enabled combine against `opt-22`.
-- [ ] Update InstCombine docs with LLVM source references and local gaps.
+- [x] Add fixtures for accepted and rejected overflow-sensitive combines.
+- [x] Share simplification predicates with InstSimplify when possible.
+- [x] Compare each enabled combine against `opt-22`.
+- [x] Update InstCombine docs with LLVM source references and local gaps.
 
 ## Exit Criteria
 
-- [ ] Several high-frequency Zig integer or pointer combines match LLVM for
+- [x] Several high-frequency Zig integer or pointer combines match LLVM for
       listed fixtures.
-- [ ] Overflow and poison-sensitive rejects are covered.
-- [ ] No transform depends on unstated target cost.
+- [x] Overflow and poison-sensitive rejects are covered.
+- [x] No transform depends on unstated target cost.
+
+## Completed Slice
+
+Cycle 15 adds checked InstSimplify legality for flagged integer neutral
+identities and constant add/sub/mul folds. It also adds a pointer null/self
+comparison fixture through the shared ICmp simplifier. Overflow-sensitive
+flagged constants remain local-conservative because the local IR does not yet
+materialize LLVM poison.

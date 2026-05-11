@@ -95,7 +95,7 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
         if (simplifyBinaryConstants(binary)) |replacement| return replacement;
     }
 
-    if (binary.flags.any() and !isFpBinary(binary.op)) return null;
+    if (binary.flags.any() and !isFpBinary(binary.op) and !canSimplifyFlaggedBinary(binary)) return null;
     return switch (binary.op) {
         .fadd => simplifyFadd(binary),
         .fsub, .fmul, .fdiv, .frem => null,
@@ -156,9 +156,9 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
     const rhs = binary.rhs.int;
     return switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => null,
-        .add => if (!binary.flags.any()) .{ .int = lhs + rhs } else null,
-        .sub => if (!binary.flags.any()) .{ .int = lhs - rhs } else null,
-        .mul => if (!binary.flags.any()) .{ .int = lhs * rhs } else null,
+        .add => foldCheckedAddSubMul(binary, lhs + rhs),
+        .sub => foldCheckedAddSubMul(binary, lhs - rhs),
+        .mul => foldCheckedAddSubMul(binary, lhs * rhs),
         .@"and" => if (!binary.flags.any()) .{ .int = lhs & rhs } else null,
         .@"or" => if (!binary.flags.any()) .{ .int = lhs | rhs } else null,
         .xor => if (!binary.flags.any()) .{ .int = lhs ^ rhs } else null,
@@ -172,6 +172,26 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
         .urem => foldUnsignedDivRem(binary, .rem),
         .sdiv => foldSignedDivRem(binary, .div),
         .srem => foldSignedDivRem(binary, .rem),
+    };
+}
+
+fn foldCheckedAddSubMul(binary: ir.BinaryInst, result: i128) ?ir.Value {
+    if (!binary.flags.any()) return .{ .int = result };
+    if (binary.flags.exact or binary.flags.disjoint) return null;
+    if (binary.flags.nuw and !unsignedOperationInRange(binary)) return null;
+    if (binary.flags.nsw and !signedOperationInRange(binary, result)) return null;
+    return .{ .int = result };
+}
+
+fn canSimplifyFlaggedBinary(binary: ir.BinaryInst) bool {
+    return switch (binary.op) {
+        .add => isZero(binary.lhs) or isZero(binary.rhs),
+        .sub => isZero(binary.rhs),
+        .mul => isOne(binary.lhs) or isOne(binary.rhs),
+        .shl, .lshr, .ashr => isZero(binary.rhs),
+        .udiv, .sdiv => isOne(binary.rhs),
+        .urem, .srem => isOne(binary.rhs),
+        .fadd, .fsub, .fmul, .fdiv, .frem, .@"and", .@"or", .xor => false,
     };
 }
 
@@ -388,6 +408,50 @@ fn unsignedInt(value: i128, ty: ir.Type) ?u128 {
     if (value >= 0) return @intCast(value);
     const modulus: i128 = @as(i128, 1) << @intCast(bits);
     return @intCast(modulus + value);
+}
+
+fn unsignedOperationInRange(binary: ir.BinaryInst) bool {
+    const max = unsignedMax(binary.ty) orelse return false;
+    const lhs = unsignedInt(binary.lhs.int, binary.ty) orelse return false;
+    const rhs = unsignedInt(binary.rhs.int, binary.ty) orelse return false;
+    return switch (binary.op) {
+        .add => lhs <= max - rhs,
+        .sub => lhs >= rhs,
+        .mul => rhs == 0 or lhs <= max / rhs,
+        .fadd, .fsub, .fmul, .fdiv, .frem, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+    };
+}
+
+fn signedOperationInRange(binary: ir.BinaryInst, result: i128) bool {
+    _ = signedRange(binary.ty) orelse return false;
+    if (!signedResultInRange(binary.ty, binary.lhs.int)) return false;
+    if (!signedResultInRange(binary.ty, binary.rhs.int)) return false;
+    return signedResultInRange(binary.ty, result);
+}
+
+fn unsignedMax(ty: ir.Type) ?u128 {
+    const bits = intBits(ty) orelse return null;
+    if (bits == 0 or bits >= 128) return null;
+    return (@as(u128, 1) << @intCast(bits)) - 1;
+}
+
+fn signedResultInRange(ty: ir.Type, result: i128) bool {
+    const range = signedRange(ty) orelse return false;
+    return result >= range.min and result <= range.max;
+}
+
+const SignedRange = struct {
+    min: i128,
+    max: i128,
+};
+
+fn signedRange(ty: ir.Type) ?SignedRange {
+    const bits = intBits(ty) orelse return null;
+    if (bits == 0 or bits >= 128) return null;
+    return .{
+        .min = -(@as(i128, 1) << @intCast(bits - 1)),
+        .max = (@as(i128, 1) << @intCast(bits - 1)) - 1,
+    };
 }
 
 fn isSignedMin(value: i128, ty: ir.Type) bool {

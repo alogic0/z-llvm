@@ -3892,12 +3892,12 @@ test "parser accepts array types and GEP prefixes from Zig aggregate IR" {
     try std.testing.expectEqual(ir.Type{ .int = 8 }, block.instructions.items[1].kind.gep.source_ty);
 }
 
-test "instcombine preserves flagged arithmetic and division" {
+test "instcombine preserves non-neutral flagged arithmetic and division" {
     const input =
         \\define i32 @conservative(i32 %a) {
         \\entry:
-        \\  %x = add nsw i32 %a, 0
-        \\  %y = add i32 %x, 1
+        \\  %x = add nsw i32 %a, 1
+        \\  %y = udiv exact i32 %x, 2
         \\  ret i32 %y
         \\}
         \\
