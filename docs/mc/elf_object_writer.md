@@ -43,6 +43,15 @@ call fixup subset. External direct calls map to the same relocation kind LLVM's
 x86_64 ELF object writer selects for PLT-style direct calls.
 ```
 
+Native backend handoff classification:
+
+```text
+validation-only: ELF output validates symbol, relocation, and target-layout assumptions for tiny fixtures
+handoff study: object/debug/linker boundaries can be studied here only when optimizer work needs them
+out of scope: broad ELF, Mach-O, COFF, archives, linker integration, unwind, and debug sections
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 Fixture coverage:
 
 ```text

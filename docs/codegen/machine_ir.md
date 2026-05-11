@@ -50,6 +50,15 @@ This project currently uses a deterministic hand-lowered Machine IR only to prov
 The local lowering is closer to a tiny SelectionDAG/GlobalISel result after instruction selection than to LLVM's full pre-register-allocation Machine IR.
 ```
 
+Native backend handoff classification:
+
+```text
+validation-only: this Machine IR proves tiny optimized IR fixtures can lower to target-specific assembly/object output
+handoff study: target ABI, branch, stack, and call assumptions can be compared against Zig's native backend boundaries
+out of scope: broad instruction selection, register allocation, scheduling, multi-target lowering, debug info, and linker integration
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 Fixture coverage:
 
 ```text

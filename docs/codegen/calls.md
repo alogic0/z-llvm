@@ -103,6 +103,15 @@ LLVM `llc-22 -O0` commonly emits `pushq %rax` / `popq` for the same tiny
 alignment need. This project uses `subq` / `addq` so the spill slot is explicit
 and easy to inspect.
 
+Native backend handoff classification:
+
+```text
+validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
+handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
+out of scope: general calling conventions, varargs, stack-passed arguments, tail calls, unwind, and debug-info call-site handling
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 ## Rejected Surface
 
 The first slice rejects:

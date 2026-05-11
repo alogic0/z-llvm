@@ -72,6 +72,14 @@ The bridge is deliberately synthetic so optimizer and target tests can reduce fa
 The helper driver reuses the existing pass manager and pipeline registry; it is not a second optimizer path.
 ```
 
+Native backend handoff classification:
+
+```text
+handoff study: this bridge models AIR-shaped inputs enough to connect local optimizer facts to Zig-owned AIR/native-backend concepts
+not a backend replacement: the bridge does not parse real Zig AIR, own Liveness, or produce Zig MIR
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 Fixture coverage:
 
 ```text

@@ -40,6 +40,14 @@ selected Machine IR instruction set directly and resolves local labels before
 ELF writing.
 ```
 
+Native backend handoff classification:
+
+```text
+validation-only: direct encoding checks ABI, branch, call, and stack assumptions for tiny fixtures
+out of scope: target-table-driven encoding, relaxation, scheduling, and broad instruction coverage
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 Fixture coverage:
 
 ```text

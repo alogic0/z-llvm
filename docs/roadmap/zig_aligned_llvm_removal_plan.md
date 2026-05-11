@@ -146,43 +146,43 @@ Deliverables:
 Goal: avoid duplicating Zig's native backends unnecessarily. Prove where this
 project can hand optimized IR or semantic results back toward Zig-owned codegen.
 
-- [ ] Document the boundary between Zig AIR, this project's LLVM-compatible IR,
+- [x] Document the boundary between Zig AIR, this project's LLVM-compatible IR,
       and Zig native backend inputs.
-- [ ] Identify which optimizer results can be represented in a Zig-owned IR
+- [x] Identify which optimizer results can be represented in a Zig-owned IR
       form without round-tripping through LLVM IR text.
-- [ ] Add a `Zig Native Backend Handoff` roadmap doc before expanding MC/object
+- [x] Add a `Zig Native Backend Handoff` roadmap doc before expanding MC/object
       work.
-- [ ] Treat this repo's codegen/MC/object path as a verification aid and
+- [x] Treat this repo's codegen/MC/object path as a verification aid and
       subsystem study, not the primary replacement for Zig native backends.
-- [ ] Prefer adding optimizer fixtures that can be validated either against
+- [x] Prefer adding optimizer fixtures that can be validated either against
       LLVM `opt-22` or against Zig native backend behavior where practical.
 
 Deliverables:
 
-- [ ] `docs/roadmap/zig_native_backend_handoff_epic.md`
-- [ ] `docs/codegen/zig_native_backend_handoff.md`
-- [ ] a list of optimizer outputs that are AIR/MIR-compatible in principle
+- [x] `docs/roadmap/08_native_backend_handoff_study.md`
+- [x] `docs/codegen/zig_native_backend_handoff.md`
+- [x] a list of optimizer outputs that are AIR/MIR-compatible in principle
 
 ## Phase 6: Backend Boundary Experiments Only Where Useful
 
 Goal: use backend experiments to understand LLVM responsibilities, but keep them
 secondary to Zig-aligned optimizer and IR work.
 
-- [ ] Keep MC/Object Bootstrap and Calls/Stack Frame Codegen scoped to tiny
+- [x] Keep MC/Object Bootstrap and Calls/Stack Frame Codegen scoped to tiny
       x86_64 SysV fixtures.
-- [ ] Use those backend fixtures to validate that optimized IR still lowers to
+- [x] Use those backend fixtures to validate that optimized IR still lowers to
       real assembly/object output.
-- [ ] Do not generalize register allocation, scheduling, debug info, linking,
+- [x] Do not generalize register allocation, scheduling, debug info, linking,
       multiple object formats, or multiple architectures until a Zig-aligned
       need is documented.
-- [ ] Prefer studying Zig native backend code before implementing overlapping
+- [x] Prefer studying Zig native backend code before implementing overlapping
       backend features locally.
 
 Deliverables:
 
-- [ ] tiny codegen fixtures as regression checks
-- [ ] docs mapping LLVM `TargetMachine.emitToFile` responsibilities
-- [ ] explicit deferred list for full backend replacement work
+- [x] tiny codegen fixtures as regression checks
+- [x] docs mapping LLVM `TargetMachine.emitToFile` responsibilities
+- [x] explicit deferred list for full backend replacement work
 
 ## Phase 7: Optional LLVM IR/Bitcode Compatibility Track
 

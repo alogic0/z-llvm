@@ -339,7 +339,7 @@ full object/linker behavior
 Deliverables:
 
 ```text
-docs/roadmap/zig_native_backend_handoff_epic.md
+docs/roadmap/08_native_backend_handoff_study.md
 docs/codegen/zig_native_backend_handoff.md
 bounded fixtures under test/codegen/
 ```

@@ -14,31 +14,31 @@ Zig's native backends without becoming a competing full backend project.
 
 ## Plan
 
-- [ ] Identify Zig-owned backend boundaries relevant to this project:
+- [x] Identify Zig-owned backend boundaries relevant to this project:
       LLVM IR emission, AIR, Liveness, codegen, object emission, debug info,
       and linker handoff.
-- [ ] Document which local IR facts are useful before handoff:
+- [x] Document which local IR facts are useful before handoff:
       verified CFG, dominance, canonical allocas, simplified branches, memory
       effects, loop structure, and target data layout.
-- [ ] Map each local optimizer output to a possible Zig-native consumer or
+- [x] Map each local optimizer output to a possible Zig-native consumer or
       validation use.
-- [ ] Mark codegen/MC/object work as:
+- [x] Mark codegen/MC/object work as:
       validation-only, handoff study, debug-info study, or out of scope.
-- [ ] Add comparison examples where optimized IR changes would need equivalent
+- [x] Add comparison examples where optimized IR changes would need equivalent
       AIR/native-backend behavior.
-- [ ] Define when a local backend experiment is justified:
+- [x] Define when a local backend experiment is justified:
       it validates semantics, object/debug boundaries, or target layout
       assumptions needed by optimizer work.
 
 ## Deliverables
 
-- [ ] Native backend handoff doc.
-- [ ] Table mapping local IR facts to Zig backend responsibilities.
-- [ ] Updated links from existing codegen/MC epics.
-- [ ] Out-of-scope table for full backend replacement work.
+- [x] Native backend handoff doc.
+- [x] Table mapping local IR facts to Zig backend responsibilities.
+- [x] Updated links from existing codegen/MC epics.
+- [x] Out-of-scope table for full backend replacement work.
 
 ## Exit Criteria
 
-- [ ] The repo has a clear role beside Zig's native backends.
-- [ ] Backend experiments are bounded and justified.
-- [ ] Optimizer work can explain how it helps Zig's LLVM-removal path.
+- [x] The repo has a clear role beside Zig's native backends.
+- [x] Backend experiments are bounded and justified.
+- [x] Optimizer work can explain how it helps Zig's LLVM-removal path.

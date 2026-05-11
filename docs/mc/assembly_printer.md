@@ -38,6 +38,14 @@ This project only prints normalized assembly text for the first tiny Machine IR 
 The local printer is intentionally a text backend over the local Machine IR; the binary path uses a separate minimal encoder instead of an LLVM-like MCStreamer graph.
 ```
 
+Native backend handoff classification:
+
+```text
+validation-only: assembly output is a readable regression artifact for tiny backend-boundary fixtures
+not a general AsmPrinter replacement: Zig native backends and linkers own real target emission
+handoff doc: docs/codegen/zig_native_backend_handoff.md
+```
+
 Fixture coverage:
 
 ```text
