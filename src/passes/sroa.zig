@@ -1,4 +1,5 @@
 const std = @import("std");
+const memory_location = @import("../analysis/memory_location.zig");
 const ir = @import("../ir.zig");
 const mem2reg = @import("mem2reg.zig");
 const pass_manager = @import("../pass_manager.zig");
@@ -14,7 +15,7 @@ pub const pass: pass_manager.ModulePass = .{
 fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        changed = try forwardZeroOffsetGeps(function) or changed;
+        changed = try forwardZeroOffsetGeps(module.allocator, function) or changed;
     }
 
     const promotion_result = try mem2reg.pass.run(module, context);
@@ -22,14 +23,18 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
     return if (changed) .changed else .unchanged;
 }
 
-fn forwardZeroOffsetGeps(function: *ir.Function) !bool {
+fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var slices = try AllocaSlices.collect(allocator, function.*);
+    defer slices.deinit();
+
     var changed = false;
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*instruction| {
             if (instruction.removed or instruction.kind != .gep) continue;
             const result = instruction.result orelse continue;
-            const gep = instruction.kind.gep;
-            const base = allocaBase(function.*, gep) orelse continue;
+            const partition = slices.partitionFor(result) orelse continue;
+            if (partition.offset != 0 or !partition.zero_offset_compatible) continue;
+            const base = partition.alloca_root;
 
             replaceValue(function, result, .{ .named = base });
             instruction.removed = true;
@@ -40,9 +45,98 @@ fn forwardZeroOffsetGeps(function: *ir.Function) !bool {
     return changed;
 }
 
+const AllocaSlice = struct {
+    alloca_root: []const u8,
+    value: []const u8,
+    offset: i128,
+    size: ?u64,
+    zero_offset_compatible: bool,
+};
+
+const SlicePartition = struct {
+    alloca_root: []const u8,
+    offset: i128,
+    size: ?u64,
+    zero_offset_compatible: bool,
+};
+
+const AllocaSlices = struct {
+    allocator: std.mem.Allocator,
+    slices: std.ArrayList(AllocaSlice),
+
+    fn collect(allocator: std.mem.Allocator, function: ir.Function) !AllocaSlices {
+        var slices: std.ArrayList(AllocaSlice) = .empty;
+        errdefer slices.deinit(allocator);
+
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed or instruction.kind != .gep) continue;
+                const result = instruction.result orelse continue;
+                const gep = instruction.kind.gep;
+                const base = gepAllocaRoot(function, gep) orelse continue;
+                const location = memory_location.forPointer(function, .{ .named = result }) orelse continue;
+                try slices.append(allocator, .{
+                    .alloca_root = base,
+                    .value = result,
+                    .offset = location.offset orelse continue,
+                    .size = location.size,
+                    .zero_offset_compatible = allIndicesAreZero(gep),
+                });
+            }
+        }
+
+        return .{
+            .allocator = allocator,
+            .slices = slices,
+        };
+    }
+
+    fn deinit(alloca_slices: *AllocaSlices) void {
+        alloca_slices.slices.deinit(alloca_slices.allocator);
+    }
+
+    fn partitionFor(alloca_slices: AllocaSlices, value: []const u8) ?SlicePartition {
+        for (alloca_slices.slices.items) |slice| {
+            if (!std.mem.eql(u8, slice.value, value)) continue;
+            return .{
+                .alloca_root = slice.alloca_root,
+                .offset = slice.offset,
+                .size = slice.size,
+                .zero_offset_compatible = slice.zero_offset_compatible,
+            };
+        }
+        return null;
+    }
+};
+
 fn allocaBase(function: ir.Function, gep: ir.GepInst) ?[]const u8 {
     if (!allIndicesAreZero(gep)) return null;
     return zeroOffsetAllocaBase(function, gep.ptr);
+}
+
+fn gepAllocaRoot(function: ir.Function, gep: ir.GepInst) ?[]const u8 {
+    return pointerAllocaRoot(function, gep.ptr);
+}
+
+fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
+    const base_name = switch (ptr) {
+        .named => |name| name,
+        .int, .undef => return null,
+    };
+
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const result = instruction.result orelse continue;
+            if (!std.mem.eql(u8, result, base_name)) continue;
+            return switch (instruction.kind) {
+                .alloca => base_name,
+                .gep => |gep| pointerAllocaRoot(function, gep.ptr),
+                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => null,
+            };
+        }
+    }
+    return null;
 }
 
 fn zeroOffsetAllocaBase(function: ir.Function, ptr: ir.Value) ?[]const u8 {

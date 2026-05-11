@@ -15,21 +15,27 @@ surface, instead of growing ad hoc aggregate rewrites.
 
 ## Plan
 
-- [ ] Add or document the LLVM SROA algorithm contract.
-- [ ] Represent alloca slices for supported scalar and aggregate uses.
-- [ ] Partition compatible slices.
-- [ ] Use DataLayout offset and size reasoning for GEP and aggregate accesses.
-- [ ] Add rewrite decisions for simple scalar replacement cases.
-- [ ] Preserve explicit rejection for unsupported vector, packed aggregate,
+- [x] Add or document the LLVM SROA algorithm contract.
+- [x] Represent alloca slices for supported scalar and aggregate uses.
+- [x] Partition compatible slices.
+- [x] Use DataLayout offset and size reasoning for GEP and aggregate accesses.
+- [x] Add rewrite decisions for simple scalar replacement cases.
+- [x] Preserve explicit rejection for unsupported vector, packed aggregate,
       overlapping, and non-integral pointer cases.
-- [ ] Add mem2reg hardening checks if SROA output exposes gaps.
-- [ ] Add Zig-emitted aggregate fixtures as primary inputs.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Add mem2reg hardening checks if SROA output exposes gaps.
+- [x] Add Zig-emitted aggregate fixtures as primary inputs.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] SROA is slice/partition based for accepted cases.
-- [ ] DataLayout-backed offset reasoning is documented and tested.
-- [ ] Unsupported aggregate/vector behavior is explicit.
-- [ ] Downstream mem2reg and canonicalization still pass fixtures.
+- [x] SROA is slice/partition based for accepted cases.
+- [x] DataLayout-backed offset reasoning is documented and tested.
+- [x] Unsupported aggregate/vector behavior is explicit.
+- [x] Downstream mem2reg and canonicalization still pass fixtures.
 
+## Notes
+
+Zig-emitted aggregate fixtures are explicitly blocked on aggregate IR parsing
+and printing. This cycle closes the accepted local SROA surface by adding
+slice/partition scaffolding around alloca-rooted GEPs and documenting the
+unsupported aggregate/vector cases instead of pretending they are implemented.

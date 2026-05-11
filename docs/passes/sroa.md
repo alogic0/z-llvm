@@ -51,8 +51,11 @@ Local target status:
   fixture-equivalent for listed fixtures
 
 Implemented subset:
-  Zero-offset GEP forwarding to the base alloca
-  Nested zero-offset GEP forwarding to the base alloca
+  AllocaSlice records for GEP users rooted in an alloca
+  SlicePartition lookup by GEP result
+  DataLayout-like offset/size facts through `src/analysis/memory_location.zig`
+  Zero-offset partition forwarding to the base alloca
+  Nested zero-offset partition forwarding to the base alloca
   mem2reg handoff after forwarding
 
 Intentional divergences:
@@ -70,6 +73,11 @@ Fixture coverage:
   sroa_zero_gep
   sroa_nested_zero_gep
 
+Zig-emitted aggregate coverage:
+  The current accepted parser surface does not yet include LLVM aggregate types,
+  insertvalue/extractvalue, or aggregate allocas from the Zig corpus. Those
+  inputs remain explicit unsupported SROA cases until the IR surface lands.
+
 opt-22 comparison command:
   bash scripts/compare_opt.sh
 
@@ -85,6 +93,8 @@ Implemented subset:
 ```text
 recognize getelementptr instructions whose base pointer is an alloca
 recognize nested zero-offset getelementptr chains whose root is an alloca
+collect alloca-rooted GEPs as slices with offset, size, and compatibility state
+look up the rewrite partition for each GEP result
 require every GEP index to be integer constant zero
 replace uses of that zero-offset GEP result with the base alloca pointer
 run the existing mem2reg promotion after forwarding
@@ -116,5 +126,6 @@ no splitting into new allocas
 no partial load/store rewriting
 no memcpy/memmove rewriting
 no padding, integer widening, vector, or packed-aggregate handling
-no target DataLayout use
+no module-level target DataLayout parser; current offset facts use the local
+memory-location type-size subset
 ```
