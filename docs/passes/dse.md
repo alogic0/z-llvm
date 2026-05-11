@@ -41,6 +41,7 @@ Implemented subset:
   Single-block overwrite query through the local MemorySSA helper
   Remove a stack store overwritten by a later must-alias store
   Require the later store range to fully cover the earlier store range
+  Skip disjoint byte-range stores while searching for a later killing store
   Preserve stores when a load, call, volatile/atomic access, unknown pointer, or
   may-alias access intervenes
   Verify MemorySSA consistency after deleting stores
@@ -65,6 +66,8 @@ Fixture coverage:
   dse_partial_overwrite_reject
   dse_load_barrier
   dse_volatile_barrier
+  dse_disjoint_field_overwrite
+  dse_unknown_call_barrier
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -80,5 +83,6 @@ no full MemorySSA walker/updater
 no post-dominator or cross-block reasoning
 no partial-overlap elimination
 no target-library memory intrinsic handling
+no lifetime marker handling
 no debug-info salvage
 ```

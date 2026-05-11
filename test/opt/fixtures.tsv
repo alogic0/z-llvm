@@ -80,6 +80,8 @@ dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/
 dse_partial_overwrite_reject	dse	dse	test/opt/inputs/dse_partial_overwrite_reject.ll	test/opt/expected/z_llvm/dse_partial_overwrite_reject.ll	opt-equivalent	dse	partial overwrite at the same offset does not remove the wider earlier store
 dse_load_barrier	dse	dse	test/opt/inputs/dse_load_barrier.ll	test/opt/expected/z_llvm/dse_load_barrier.ll	opt-equivalent	dse	intervening load keeps earlier store alive
 dse_volatile_barrier	dse	dse	test/opt/inputs/dse_volatile_barrier.ll	test/opt/expected/z_llvm/dse_volatile_barrier.ll	opt-equivalent	dse	volatile load is a DSE barrier
+dse_disjoint_field_overwrite	dse	dse	test/opt/inputs/dse_disjoint_field_overwrite.ll	test/opt/expected/z_llvm/dse_disjoint_field_overwrite.ll	opt-equivalent	dse	Disjoint field store does not block same-field complete overwrite elimination
+dse_unknown_call_barrier	dse	dse	test/opt/inputs/dse_unknown_call_barrier.ll	test/opt/expected/z_llvm/dse_unknown_call_barrier.ll	opt-equivalent	dse	Unknown call remains a DSE barrier
 sccp_branch	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_branch.ll	test/opt/expected/z_llvm/sccp_branch.ll	opt-equivalent	sccp,simplifycfg,dce	constant branch folded through SCCP
 sccp_phi_edge	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_phi_edge.ll	test/opt/expected/z_llvm/sccp_phi_edge.ll	opt-equivalent	sccp,simplifycfg,dce	executable-edge PHI filtering keeps the reachable constant
 sccp_undef_phi	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_undef_phi.ll	test/opt/expected/z_llvm/sccp_undef_phi.ll	opt-equivalent	sccp,simplifycfg,dce	undef and constant PHI lattice resolves to the constant
