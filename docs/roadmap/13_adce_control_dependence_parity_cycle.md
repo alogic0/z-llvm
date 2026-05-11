@@ -7,20 +7,27 @@ LLVM for the supported CFG surface.
 
 ## Plan
 
-- [ ] Document LLVM ADCE roots, post-dominator usage, and control-dependence
+- [x] Document LLVM ADCE roots, post-dominator usage, and control-dependence
       rules.
-- [ ] Ensure terminators needed for live side effects are retained through
+- [x] Ensure terminators needed for live side effects are retained through
       post-dominator reasoning.
-- [ ] Add branch-to-branch simplification only when it preserves required
+- [x] Add branch-to-branch simplification only when it preserves required
       control dependence.
-- [ ] Add fixtures for live calls, stores, unreachable blocks, infinite loops,
+- [x] Add fixtures for live calls, stores, unreachable blocks, infinite loops,
       debug-bearing instructions, and branches guarding side effects.
-- [ ] Share side-effect classification with DCE, GVN, EarlyCSE, and LICM.
-- [ ] Compare equivalent ADCE fixtures with `opt-22`.
-- [ ] Update ADCE, postdominator, and memory-effect docs.
+- [x] Share side-effect classification with DCE, GVN, EarlyCSE, and LICM.
+- [x] Compare equivalent ADCE fixtures with `opt-22`.
+- [x] Update ADCE, postdominator, and memory-effect docs.
 
 ## Exit Criteria
 
-- [ ] ADCE deletes one non-trivial dead control region.
-- [ ] ADCE preserves branches required for observable side effects.
-- [ ] Infinite-loop and debug-bearing boundaries are documented.
+- [x] ADCE deletes one non-trivial dead control region.
+- [x] ADCE preserves branches required for observable side effects.
+- [x] Infinite-loop and debug-bearing boundaries are documented.
+
+## Completed Slice
+
+Cycle 13 extends ADCE control-dependence coverage with side-effecting call and
+infinite-loop rejection fixtures. The local pass continues to rewrite only
+acyclic, side-effect-free dead control regions that reconverge at an immediate
+postdominator.

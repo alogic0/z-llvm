@@ -88,11 +88,13 @@ opt-22 equivalent:
   adce_dead_diamond
   adce_nested_dead_diamond
   adce_store_branch_reject
+  adce_live_call_branch_reject
   fp_adce_dead
   fp_extended_adce_preserve
 
 local-only conservative:
-  none currently
+  adce_infinite_loop_reject keeps cyclic dead regions unchanged until full
+  LLVM-style block liveness and control-dependence rewriting exists.
 
 unit-test only:
   none currently
