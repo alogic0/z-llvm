@@ -12,6 +12,8 @@ Completed numbered epics from the first Zig LLVM removal roadmap live in
 Completed fixture-equivalent optimizer cycle slices live in
 `completed_cycle_slices/`.
 
+Completed larger optimizer cycles live in `completed_big_cycles/`.
+
 ## Archived Files
 
 - `calls_and_stack_frame_codegen_epic.md`

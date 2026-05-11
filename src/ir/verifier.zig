@@ -277,6 +277,12 @@ pub fn verify(module: core.Module) !void {
         }
     }
 
+    for (module.aliases.items) |alias| {
+        if (global_defs.contains(alias.name)) return error.DuplicateDefinition;
+        try global_defs.put(alias.name, {});
+        if (alias.target_ty != .ptr) return error.UnsupportedGlobalAlias;
+    }
+
     for (module.declarations.items) |decl| {
         if (global_defs.contains(decl.name)) return error.DuplicateDefinition;
         if (decl_defs.contains(decl.name)) return error.DuplicateDefinition;
@@ -287,6 +293,10 @@ pub fn verify(module: core.Module) !void {
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
         if (findDeclaration(module, function.name)) |decl| try verifyDeclMatchesFunction(decl, function);
         try global_defs.put(function.name, {});
+    }
+
+    for (module.aliases.items) |alias| {
+        if (!hasGlobalValue(module, alias.target)) return error.UnknownGlobalAliasTarget;
     }
 
     for (module.functions.items) |function| {
@@ -462,6 +472,18 @@ fn findFunction(module: core.Module, name: []const u8) ?core.Function {
         if (std.mem.eql(u8, function.name, name)) return function;
     }
     return null;
+}
+
+fn hasGlobalValue(module: core.Module, name: []const u8) bool {
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, name)) return true;
+    }
+    for (module.aliases.items) |alias| {
+        if (std.mem.eql(u8, alias.name, name)) return true;
+    }
+    if (findDeclaration(module, name) != null) return true;
+    if (findFunction(module, name) != null) return true;
+    return false;
 }
 
 fn verifyBinaryFlags(binary: core.BinaryInst) !void {

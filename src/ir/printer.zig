@@ -14,7 +14,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.print("target triple = \"{s}\"\n", .{target_triple});
         printed_module_record = true;
     }
-    if (printed_module_record and (module.globals.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.metadata.items.len != 0)) try writer.writeByte('\n');
+    if (printed_module_record and (module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0 or module.metadata.items.len != 0)) try writer.writeByte('\n');
 
     for (module.globals.items) |global| {
         try writer.print("@{s} = ", .{global.name});
@@ -26,7 +26,16 @@ pub fn print(module: core.Module, writer: anytype) !void {
         if (global.attrs) |attrs| try writer.print(", {s}", .{attrs});
         try writer.writeByte('\n');
     }
-    if (module.globals.items.len != 0 and (module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
+    if (module.globals.items.len != 0 and (module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
+
+    for (module.aliases.items) |alias| {
+        try writer.print("@{s} = ", .{alias.name});
+        try alias.linkage.format(writer);
+        try writer.print("alias {s}, ", .{alias.aliased_ty});
+        try alias.target_ty.format(writer);
+        try writer.print(" @{s}\n", .{alias.target});
+    }
+    if (module.aliases.items.len != 0 and (module.declarations.items.len != 0 or module.functions.items.len != 0)) try writer.writeByte('\n');
 
     for (module.declarations.items, 0..) |decl, decl_index| {
         if (decl_index != 0) try writer.writeByte('\n');
@@ -215,8 +224,13 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try writer.writeAll("}\n");
     }
 
+    if (module.attribute_groups.items.len != 0) {
+        if (module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0) try writer.writeByte('\n');
+        for (module.attribute_groups.items) |attribute_group| try writer.print("{s}\n", .{attribute_group});
+    }
+
     if (module.metadata.items.len != 0) {
-        if (module.globals.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0) try writer.writeByte('\n');
+        if (module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0) try writer.writeByte('\n');
         for (module.metadata.items) |metadata| try writer.print("{s}\n", .{metadata});
     }
 }

@@ -7,8 +7,10 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .source = try allocator.dupe(u8, text),
         .owned_strings = .empty,
         .globals = .empty,
+        .aliases = .empty,
         .declarations = .empty,
         .functions = .empty,
+        .attribute_groups = .empty,
         .metadata = .empty,
     };
     errdefer module.deinit();
@@ -43,6 +45,13 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         }
 
         if (current_function == null and std.mem.startsWith(u8, line, "@")) {
+            if (parseGlobalAlias(line)) |alias| {
+                try module.aliases.append(allocator, alias);
+                continue;
+            } else |err| switch (err) {
+                error.NotGlobalAlias => {},
+                else => return err,
+            }
             const global = try parseGlobal(line);
             try module.globals.append(allocator, global);
             continue;
@@ -52,7 +61,11 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             try module.declarations.append(allocator, decl);
             continue;
         }
-        if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) return error.UnsupportedAttributeGroup;
+        if (current_function == null and std.mem.startsWith(u8, line, "attributes ")) {
+            try parseAttributeGroup(line);
+            try module.attribute_groups.append(allocator, line);
+            continue;
+        }
         if (current_function == null and std.mem.startsWith(u8, line, "!")) {
             try module.metadata.append(allocator, line);
             continue;
@@ -119,8 +132,44 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
+    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.NotGlobalAlias;
+    const name_text = std.mem.trim(u8, line[0..eq_index], " \t");
+    if (!std.mem.startsWith(u8, name_text, "@") or name_text.len == 1) return error.InvalidGlobalAlias;
+
+    const rest = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    var parts = std.mem.tokenizeAny(u8, rest, " \t");
+    var token = parts.next() orelse return error.NotGlobalAlias;
+
+    const linkage = core.FunctionLinkage.parse(token) orelse .default;
+    if (linkage != .default) token = parts.next() orelse return error.InvalidGlobalAlias;
+    if (!std.mem.eql(u8, token, "alias")) return error.NotGlobalAlias;
+
+    const alias_token_offset = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
+    const alias_body = std.mem.trim(u8, rest[alias_token_offset..], " \t");
+    const comma = findTopLevelComma(alias_body) orelse return error.InvalidGlobalAlias;
+    const aliased_ty = std.mem.trim(u8, alias_body[0..comma], " \t");
+    if (aliased_ty.len == 0) return error.InvalidGlobalAlias;
+
+    const target_text = std.mem.trim(u8, alias_body[comma + 1 ..], " \t");
+    var target_parts = std.mem.tokenizeAny(u8, target_text, " \t");
+    const target_ty = try parseType(target_parts.next() orelse return error.InvalidGlobalAlias);
+    if (target_ty != .ptr) return error.UnsupportedGlobalAlias;
+    const target_name = target_parts.next() orelse return error.InvalidGlobalAlias;
+    if (target_parts.next() != null) return error.UnsupportedGlobalAlias;
+    if (!std.mem.startsWith(u8, target_name, "@") or target_name.len == 1) return error.UnsupportedGlobalAlias;
+
+    return .{
+        .name = name_text[1..],
+        .linkage = linkage,
+        .aliased_ty = aliased_ty,
+        .target_ty = target_ty,
+        .target = target_name[1..],
+    };
 }
 
 fn parseGlobal(line: []const u8) !core.Global {
@@ -170,6 +219,24 @@ fn parseGlobalInitializer(text: []const u8) !core.Value {
         .int, .undef => value,
         .named => error.UnsupportedGlobalVariable,
     };
+}
+
+fn parseAttributeGroup(line: []const u8) !void {
+    var rest = std.mem.trim(u8, line["attributes ".len..], " \t");
+    if (!std.mem.startsWith(u8, rest, "#")) return error.InvalidAttributeGroup;
+    rest = rest[1..];
+
+    const group_end = std.mem.indexOfAny(u8, rest, " \t") orelse return error.InvalidAttributeGroup;
+    _ = try std.fmt.parseInt(u32, rest[0..group_end], 10);
+    rest = std.mem.trim(u8, rest[group_end..], " \t");
+    if (!std.mem.startsWith(u8, rest, "=")) return error.InvalidAttributeGroup;
+    rest = std.mem.trim(u8, rest[1..], " \t");
+    if (rest.len < 2 or rest[0] != '{' or rest[rest.len - 1] != '}') return error.InvalidAttributeGroup;
+
+    const body = rest[1 .. rest.len - 1];
+    if (std.mem.indexOf(u8, body, "sanitize_") != null) return error.UnsupportedAttributeGroup;
+    if (std.mem.indexOf(u8, body, "safestack") != null) return error.UnsupportedAttributeGroup;
+    if (std.mem.indexOf(u8, body, "shadowcallstack") != null) return error.UnsupportedAttributeGroup;
 }
 
 fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
@@ -760,6 +827,7 @@ fn findTopLevelComma(text: []const u8) ?usize {
     var brace_depth: usize = 0;
     var bracket_depth: usize = 0;
     var angle_depth: usize = 0;
+    var paren_depth: usize = 0;
     for (text, 0..) |byte, index| {
         switch (byte) {
             '{' => brace_depth += 1,
@@ -777,7 +845,12 @@ fn findTopLevelComma(text: []const u8) ?usize {
                 if (angle_depth == 0) return null;
                 angle_depth -= 1;
             },
-            ',' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) return index,
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+            },
+            ',' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0 and paren_depth == 0) return index,
             else => {},
         }
     }

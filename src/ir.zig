@@ -12,6 +12,7 @@ pub const FunctionLinkage = core.FunctionLinkage;
 pub const FunctionVisibility = core.FunctionVisibility;
 pub const GlobalKind = core.GlobalKind;
 pub const Global = core.Global;
+pub const GlobalAlias = core.GlobalAlias;
 pub const FunctionDecl = core.FunctionDecl;
 pub const BinaryInst = core.BinaryInst;
 pub const CastInst = core.CastInst;

@@ -157,8 +157,23 @@ Current local status:
 | --- | --- |
 | `Debug` | raw IR generated successfully, but it pulls in large debug/std support and is classified as `future`. |
 | `ReleaseSafe` | raw IR generated successfully, but it is still large because safety/std support remains visible; classified as `future`. |
-| `ReleaseFast` | normalized scalar signature fixture is checked in and classified as `parse,verify,optimizer-input`. |
-| `ReleaseSmall` | raw IR is small, but aliases, size attrs, and raw function attrs are not yet accepted by the local parser; classified as `unsupported`. |
+| `ReleaseFast` | normalized scalar signature fixture and stripped captured raw fixture are checked in and classified as `parse,verify,optimizer-input`. |
+| `ReleaseSmall` | stripped captured raw fixture is checked in and classified as `parse,verify,optimizer-input`; generated `tmp/` raw output remains future-only. |
+
+Cycle 1 moved the stripped `ReleaseFast` and `ReleaseSmall` captures out of
+`unsupported` by preserving exported aliases, raw function header attributes,
+attribute groups, and module metadata records. Remaining checked raw corpus
+parser blockers after Cycle 1:
+
+| Fixture | First local rejection |
+| --- | --- |
+| `integers_release_fast` | `UnsupportedCallAttribute` for intrinsic call attributes. |
+| `integers_release_fast_aarch64` | `UnsupportedCallAttribute` for intrinsic call attributes. |
+| `pointers_memory_release_fast` | `UnsupportedType` for pointer/memory IR types outside the scalar subset. |
+| `aggregates_release_fast` | `UnsupportedType` for aggregate and array IR surface. |
+| `control_flow_calls_release_fast` | `UnsupportedType` for loop/control-flow corpus surface. |
+| `globals_comptime_release_fast` | `UnsupportedGlobalVariable` for richer globals and initializers. |
+| `atomics_inline_asm_debug_release_fast` | `UnsupportedGlobalVariable` before atomic and inline-asm parsing is reached. |
 
 ## Source Group Coverage
 

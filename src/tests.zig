@@ -1223,6 +1223,55 @@ test "parser preserves raw module metadata records" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves Zig raw aliases and attribute groups" {
+    const input =
+        \\source_filename = "tiny_scalar"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@add = alias i32 (i32, i32), ptr @tiny_scalar.add
+        \\
+        \\define private i32 @tiny_scalar.add(i32 %0, i32 %1) unnamed_addr #0 align 1 {
+        \\entry:
+        \\  %2 = add nsw i32 %1, %0
+        \\  ret i32 %2
+        \\}
+        \\
+        \\attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) uwtable "frame-pointer"="all" }
+        \\
+        \\!llvm.module.flags = !{}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 1), module.aliases.items.len);
+    try std.testing.expectEqualStrings("add", module.aliases.items[0].name);
+    try std.testing.expectEqualStrings("i32 (i32, i32)", module.aliases.items[0].aliased_ty);
+    try std.testing.expectEqualStrings("tiny_scalar.add", module.aliases.items[0].target);
+    try std.testing.expectEqual(@as(usize, 1), module.attribute_groups.items.len);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported sanitizer attribute groups explicitly" {
+    const input =
+        \\define void @with_sanitizer() #0 {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\attributes #0 = { sanitize_address }
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedAttributeGroup, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "verifier rejects direct call signature mismatch" {
     const input =
         \\declare i32 @callee(i32)
