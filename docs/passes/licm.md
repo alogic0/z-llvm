@@ -75,6 +75,9 @@ require every operand to be constant, undef, a function parameter, or defined ou
 require the preheader definition to dominate every use after the move
 move hoisted instructions to the preheader instruction list
 preserve SSA validity by moving only to the preheader, which dominates the loop header in the supported canonical shape
+nested loop legality is still driven by LoopInfo membership and dominance; the
+new induction-variable recognition is reserved for later loop passes and is not
+used to justify LICM movement
 ```
 
 Current legality boundary:

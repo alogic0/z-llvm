@@ -4462,6 +4462,41 @@ test "loop info classifies reduced Zig corpus loop shape" {
     defer exits.deinit(std.testing.allocator);
     try std.testing.expectEqualSlices(usize, &.{3}, exits.items);
     try std.testing.expect(try natural_loop.hasLcssaForm(std.testing.allocator, function, graph));
+
+    var inductions = try natural_loop.simpleInductionVariables(std.testing.allocator, function);
+    defer inductions.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 1), inductions.items.len);
+    try std.testing.expectEqualStrings(".01", inductions.items[0].phi_result);
+    try std.testing.expectEqual(ir.Value{ .int = 0 }, inductions.items[0].initial_value);
+    try std.testing.expectEqual(ir.Value{ .int = 1 }, inductions.items[0].step_value);
+    try std.testing.expectEqualStrings("next", inductions.items[0].next_value);
+    try std.testing.expect(natural_loop.isSideEffectFreeDeletionCandidate(function));
+}
+
+test "loop info rejects side-effecting loop deletion candidates" {
+    const input =
+        \\define void @loop_store(i1 %cond, ptr %p, i32 %v) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  br i1 %cond, label %body, label %exit
+        \\body:
+        \\  store i32 %v, ptr %p
+        \\  br label %header
+        \\exit:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
+    defer loops.deinit();
+    const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expect(!natural_loop.isSideEffectFreeDeletionCandidate(function));
 }
 
 test "loop info reports nested loop depth and innermost block ownership" {

@@ -67,6 +67,9 @@ record parent loop index and nesting depth for natural loops
 query loop depth for a block
 lookup the innermost known loop for a block index
 classify a value as loop invariant from definition-block ownership
+recognize simple integer induction PHIs with an add step in source-backed loop
+fixtures
+classify side-effect-free loop-deletion candidates without deleting them
 ```
 
 Canonical-form boundary:
@@ -78,6 +81,8 @@ queried but not created: dedicated exits
 checked but not formed: LCSSA
 not canonicalized yet: multi-latch loops, irreducible loops, split exits,
 inserted preheaders, rotated loops
+recognized but not transformed yet: simple induction variables and
+side-effect-free deletion candidates
 ```
 
 Fixture coverage:
@@ -88,6 +93,8 @@ unit-test only:
   header/latch/latches/preheader/exiting/exit/dedicated-exit queries
   backedge, loop-depth, contains-block, and loop-invariant value helpers
   LCSSA-form check for loop-defined values used outside the loop
+  simple induction variable recognition for the reduced Zig corpus loop shape
+  side-effecting loop deletion candidate rejection
 
 opt-22 compared indirectly:
   LICM fixtures exercise the currently accepted loop shape
@@ -99,5 +106,6 @@ Known gaps:
 no full LLVM loop forest mutation API
 no loop verification
 no LoopSimplify mutation or LCSSA phi insertion
+no LoopRotate, IndVarSimplify rewrite, or LoopDeletion mutation
 no irreducible control-flow handling beyond natural-loop backedges
 ```

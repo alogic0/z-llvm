@@ -61,6 +61,9 @@ LoopInfo exposes headers, latches, preheaders, exiting blocks, exit blocks,
 dedicated-exit checks, containment, backedges, parent indexes, loop depth, and
 loop-invariant value classification.
 loop-simplifycfg, loop-rotate, and loop-deletion are executable placeholders.
+Cycle 17 added LoopInfo-side recognition for simple induction variables and
+side-effect-free loop-deletion candidates, but it still does not rotate loops,
+insert LCSSA PHIs, or delete loop blocks.
 LCSSA form can be checked for existing exit phis but is not formed yet.
 ```
 

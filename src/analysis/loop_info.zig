@@ -8,6 +8,13 @@ pub const Backedge = struct {
     header: usize,
 };
 
+pub const InductionVariable = struct {
+    phi_result: []const u8,
+    initial_value: ir.Value,
+    step_value: ir.Value,
+    next_value: []const u8,
+};
+
 pub const NaturalLoop = struct {
     header: usize,
     latch: usize,
@@ -155,7 +162,101 @@ pub const NaturalLoop = struct {
             },
         };
     }
+
+    pub fn simpleInductionVariables(loop: NaturalLoop, allocator: std.mem.Allocator, function: ir.Function) !std.ArrayList(InductionVariable) {
+        var inductions: std.ArrayList(InductionVariable) = .empty;
+        errdefer inductions.deinit(allocator);
+
+        if (loop.header >= function.blocks.items.len or loop.latch >= function.blocks.items.len) return inductions;
+        const header = function.blocks.items[loop.header];
+        const latch = function.blocks.items[loop.latch];
+
+        for (header.instructions.items) |instruction| {
+            const phi = switch (instruction.kind) {
+                .phi => |phi| phi,
+                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => continue,
+            };
+            const phi_result = instruction.result orelse continue;
+            const incoming = classifyInductionIncoming(loop, function, phi) orelse continue;
+            const step = findIntegerStep(latch, phi.ty, phi_result, incoming.latch_value) orelse continue;
+            try inductions.append(allocator, .{
+                .phi_result = phi_result,
+                .initial_value = incoming.initial_value,
+                .step_value = step,
+                .next_value = incoming.latch_value,
+            });
+        }
+
+        return inductions;
+    }
+
+    pub fn isSideEffectFreeDeletionCandidate(loop: NaturalLoop, function: ir.Function) bool {
+        for (loop.blocks.items) |block_index| {
+            if (block_index >= function.blocks.items.len) return false;
+            for (function.blocks.items[block_index].instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                switch (instruction.kind) {
+                    .binary, .cast, .freeze, .icmp, .select, .phi, .gep => {},
+                    .alloca, .load, .store, .call => return false,
+                }
+            }
+        }
+        return true;
+    }
 };
+
+const InductionIncoming = struct {
+    initial_value: ir.Value,
+    latch_value: []const u8,
+};
+
+fn classifyInductionIncoming(loop: NaturalLoop, function: ir.Function, phi: ir.PhiInst) ?InductionIncoming {
+    var initial_value: ?ir.Value = null;
+    var latch_value: ?[]const u8 = null;
+
+    for (phi.incoming.items) |incoming| {
+        const incoming_block = function.blockIndex(incoming.block) orelse return null;
+        if (incoming_block == loop.latch) {
+            latch_value = switch (incoming.value) {
+                .named => |name| name,
+                .int, .undef => return null,
+            };
+        } else if (incoming_block != loop.latch) {
+            if (initial_value != null) return null;
+            initial_value = incoming.value;
+        } else {
+            return null;
+        }
+    }
+
+    return .{
+        .initial_value = initial_value orelse return null,
+        .latch_value = latch_value orelse return null,
+    };
+}
+
+fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, next_value: []const u8) ?ir.Value {
+    for (latch.instructions.items) |instruction| {
+        const result = instruction.result orelse continue;
+        if (!std.mem.eql(u8, result, next_value)) continue;
+        const binary = switch (instruction.kind) {
+            .binary => |binary| binary,
+            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => return null,
+        };
+        if (binary.op != .add or !binary.ty.eql(ty)) return null;
+        if (valueMatchesName(binary.lhs, phi_result)) return binary.rhs;
+        if (valueMatchesName(binary.rhs, phi_result)) return binary.lhs;
+        return null;
+    }
+    return null;
+}
+
+fn valueMatchesName(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .int, .undef => false,
+        .named => |value_name| std.mem.eql(u8, value_name, name),
+    };
+}
 
 fn outsideInstructionUsesAreLcssa(
     function: ir.Function,

@@ -18,7 +18,7 @@ LLVM-compatible loop optimization foundations for accepted Zig-emitted loops.
 - [ ] Implement or explicitly reject LoopRotate cases in accepted IR.
 - [ ] Add LCSSA rewriting for simple scalar loop exits.
 - [ ] Extend LICM to selected memory-free scalar chains across nested loops.
-- [ ] Add induction-variable recognition only for source-backed loop fixtures.
+- [x] Add induction-variable recognition only for source-backed loop fixtures.
 - [ ] Add loop deletion for side-effect-free proven-dead loops if safe.
 - [ ] Keep unswitching and vectorization deferred unless fixtures demand them.
 - [ ] Compare accepted loop cases with `opt-22`.
@@ -29,3 +29,11 @@ LLVM-compatible loop optimization foundations for accepted Zig-emitted loops.
 - [ ] Loop transforms maintain verifier, dominance, and LCSSA invariants.
 - [ ] Unsupported loop optimizations are explicitly blocked.
 
+## Slice 1 Notes
+
+- `src/analysis/loop_info.zig` now recognizes simple integer induction PHIs in
+  the reduced Zig corpus loop shape.
+- LoopInfo can classify side-effect-free loop-deletion candidates, but no
+  deletion transform runs yet.
+- LoopRotate, LCSSA insertion, IndVarSimplify rewrites, and LoopDeletion remain
+  explicit future slices for this cycle.
