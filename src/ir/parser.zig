@@ -421,6 +421,7 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
     function.calling_conv = parsed_prefix.calling_conv;
     function.ret_attrs = parsed_prefix.ret_attrs;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
+    if (containsUnsupportedEhFunctionAttr(attrs)) return error.UnsupportedExceptionHandling;
     if (attrs.len != 0) function.attrs = attrs;
     errdefer function.deinit(allocator);
 
@@ -448,6 +449,7 @@ fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.Funct
     decl.calling_conv = parsed_prefix.calling_conv;
     decl.ret_attrs = parsed_prefix.ret_attrs;
     const attrs = std.mem.trim(u8, body[close_paren + 1 ..], " \t");
+    if (containsUnsupportedEhFunctionAttr(attrs)) return error.UnsupportedExceptionHandling;
     if (attrs.len != 0) decl.attrs = attrs;
     errdefer decl.deinit(allocator);
 
@@ -842,6 +844,14 @@ fn isUnsupportedEhInstruction(text: []const u8) bool {
     return std.mem.startsWith(u8, text, "landingpad ") or
         std.mem.startsWith(u8, text, "catchpad ") or
         std.mem.startsWith(u8, text, "cleanuppad ");
+}
+
+fn containsUnsupportedEhFunctionAttr(attrs: []const u8) bool {
+    var it = std.mem.tokenizeAny(u8, attrs, " \t");
+    while (it.next()) |token| {
+        if (std.mem.eql(u8, token, "personality")) return true;
+    }
+    return false;
 }
 
 fn parseAlloca(text: []const u8) !core.AllocaInst {

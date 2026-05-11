@@ -2609,6 +2609,55 @@ test "parser rejects unsupported indirect and control-flow call forms" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, resume_ir));
+
+    const catchswitch =
+        \\define void @catchswitch_eh() {
+        \\entry:
+        \\  catchswitch within none [label %handler] unwind to caller
+        \\handler:
+        \\  unreachable
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, catchswitch));
+
+    const cleanupret =
+        \\define void @cleanupret_eh() {
+        \\entry:
+        \\  cleanupret from none unwind to caller
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, cleanupret));
+
+    const catchpad =
+        \\define ptr @catchpad_eh(ptr %tok) {
+        \\entry:
+        \\  %cp = catchpad within %tok []
+        \\  ret ptr undef
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, catchpad));
+
+    const cleanuppad =
+        \\define ptr @cleanuppad_eh(ptr %tok) {
+        \\entry:
+        \\  %cp = cleanuppad within %tok []
+        \\  ret ptr undef
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, cleanuppad));
+
+    const personality =
+        \\define void @personality_eh() personality ptr @__gxx_personality_v0 {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, personality));
 }
 
 test "parser preserves scalar global variables" {

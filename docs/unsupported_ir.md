@@ -103,7 +103,8 @@ inline asm lowering and constraint validation
 invoke/callbr
 bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
-landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad
+landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad and
+personality functions
 atomic syncscope and atomic optimization semantics
 inline asm
 ```

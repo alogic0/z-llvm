@@ -41,6 +41,20 @@ designed for EH edges.
 unit test: invoke returns UnsupportedCallTerminator
 unit test: landingpad returns UnsupportedExceptionHandling
 unit test: resume returns UnsupportedExceptionHandling
+unit test: catchswitch returns UnsupportedExceptionHandling
+unit test: cleanupret returns UnsupportedExceptionHandling
+unit test: catchpad returns UnsupportedExceptionHandling
+unit test: cleanuppad returns UnsupportedExceptionHandling
+unit test: personality function attributes return UnsupportedExceptionHandling
+```
+
+Current source-backed classification:
+
+```text
+accepted Zig error-union shapes lower as ordinary scalar/control-flow IR
+current accepted Zig corpus rows do not require LLVM EH pad CFG semantics
+future rows that contain invoke, landingpad, resume, catch/cleanup pads, or
+personality functions must stay unsupported until EH CFG/verifier support exists
 ```
 
 ## Upstream Mapping
