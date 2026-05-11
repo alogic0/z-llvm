@@ -54,9 +54,9 @@ Upstream mapping:
 ```text
 This reproduces the basic IR shape and verifier checks needed before memory optimization passes can run, plus a first opaque-pointer GEP form for pointer-derived memory operands.
 LLVM's memory instructions carry much more state: alignment, volatile and atomic ordering, address spaces, metadata, attributes, and target datalayout-sensitive rules.
-This subset preserves align and volatile spelling on load/store and recognizes narrow atomic load/store, atomicrmw, cmpxchg, and fence spelling only as conservative memory barriers.
+This subset preserves align and volatile spelling on load/store and recognizes narrow atomic load/store, atomicrmw, cmpxchg, fence, and supported syncscope spelling only as conservative memory barriers.
 The analysis layer computes simple byte offsets for scalar integer GEPs when the index is constant and the element type has a byte size.
-It deliberately rejects unsupported atomic features such as syncscope instead of modeling LLVM's full atomic ordering rules.
+It deliberately rejects invalid atomic ordering combinations instead of modeling LLVM's full atomic ordering rules.
 ```
 
 Known gaps:

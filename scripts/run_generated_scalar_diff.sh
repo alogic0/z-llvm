@@ -61,19 +61,19 @@ if zig build run -- "$tmp_dir/unsupported_vector.ll" > "$tmp_dir/unsupported_vec
 fi
 printf 'ok generated negative unsupported_vector\n'
 
-cat > "$tmp_dir/unsupported_atomic_syncscope.ll" <<'CASE'
+cat > "$tmp_dir/unsupported_atomic_ordering.ll" <<'CASE'
 define i32 @bad(ptr %p) {
 entry:
-  %v = atomicrmw add ptr %p, i32 1 syncscope("singlethread") monotonic
+  %v = atomicrmw add ptr %p, i32 1 unordered
   ret i32 %v
 }
 CASE
 
-if zig build run -- "$tmp_dir/unsupported_atomic_syncscope.ll" > "$tmp_dir/unsupported_atomic_syncscope.out" 2> "$tmp_dir/unsupported_atomic_syncscope.err"; then
-  printf 'expected unsupported atomic syncscope case to fail\n' >&2
+if zig build run -- "$tmp_dir/unsupported_atomic_ordering.ll" > "$tmp_dir/unsupported_atomic_ordering.out" 2> "$tmp_dir/unsupported_atomic_ordering.err"; then
+  printf 'expected unsupported atomic ordering case to fail\n' >&2
   exit 1
 fi
-printf 'ok generated negative unsupported_atomic_syncscope\n'
+printf 'ok generated negative unsupported_atomic_ordering\n'
 
 if command -v lli-22 >/dev/null 2>&1; then
   cat > "$tmp_dir/execute_main.ll" <<'CASE'

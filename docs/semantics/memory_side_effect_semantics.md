@@ -150,8 +150,8 @@ These are intentional Epic 5 boundaries, not accidental mismatches:
 - no readonly/readnone call deletion in DCE yet, even though call attributes are
   parsed for function-attribute analysis;
 - no target-library call mod/ref modeling;
-- no full atomic ordering semantics; narrow `fence`, `cmpxchg`, and
-  `atomicrmw` forms are accepted only as hard barriers;
+- no full atomic ordering or syncscope semantics; narrow `fence`, `cmpxchg`,
+  `atomicrmw`, and syncscope forms are accepted only as hard barriers;
 - no address spaces, globals, captures, TBAA, alias scopes, noalias, invariant
   metadata, or target-specific DataLayout facts;
 - no partial alias result or partial-overwrite DSE.
