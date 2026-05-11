@@ -40,5 +40,20 @@ run_opt_case \
   test/opt/inputs/globaldce_basic.ll \
   test/opt/expected/z_llvm/globaldce_basic.ll
 
+run_asm_case() {
+  local id="$1"
+  local input="test/codegen/inputs/$id.ll"
+  local expected="test/codegen/expected/asm/$id.s"
+  local actual="$tmp_dir/$id.s"
+
+  zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu "$input" > "$actual"
+  diff -u "$expected" "$actual"
+  printf 'ok handoff asm %s\n' "$id"
+}
+
+run_asm_case return_constant
+run_asm_case call_one_arg
+run_asm_case stack_slot
+
 bash scripts/compare_codegen_asm.sh
 printf 'ok handoff codegen asm smoke\n'

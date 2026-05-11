@@ -14,6 +14,9 @@ or remain LLVM-compatibility-only.
 | Loop scalar motion | `test/opt/inputs/licm_invariant.ll` | `zig build run -- --passes=licm ...` | Can AIR loop lowering or native MIR represent pure invariants without unsafe live-range growth? |
 | Global cleanup | `test/opt/inputs/globaldce_basic.ll` | `zig build run -- --passes=globaldce ...` | Which global liveness facts belong in Zig-owned global analysis instead of backend lowering? |
 | Tiny x86_64 backend smoke | `test/codegen/inputs/add_args.ll` and related codegen inputs | `bash scripts/compare_codegen_asm.sh` | Do target/ABI and Machine IR assumptions still produce inspectable assembly for tiny accepted shapes? |
+| Explicit scalar return handoff | `test/codegen/inputs/return_constant.ll` | `bash scripts/run_handoff_validation.sh` | Can a folded scalar value reach return lowering without extra LLVM-only structure? |
+| Explicit direct-call handoff | `test/codegen/inputs/call_one_arg.ll` | `bash scripts/run_handoff_validation.sh` | Are direct scalar calls represented at the handoff boundary without pulling in register allocation policy? |
+| Explicit stack-slot handoff | `test/codegen/inputs/stack_slot.ll` | `bash scripts/run_handoff_validation.sh` | Can fixed local stack slots be validated independently from LLVM alloca promotion? |
 
 Run all current handoff checks with:
 
@@ -49,6 +52,7 @@ LLVM alloca promotion mechanics as the native stack model
 LLVM GEP slicing as the native aggregate model
 LLVM metadata graphs as optimizer legality unless a Zig mode requires them
 LLVM pass pipeline names as the native optimizer architecture
+LLVM call-site metadata as the native call representation
 ```
 
 ## Target And ABI Blockers

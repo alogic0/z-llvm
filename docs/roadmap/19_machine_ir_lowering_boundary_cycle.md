@@ -15,17 +15,26 @@ validate optimizer handoff facts.
 
 ## Plan
 
-- [ ] Map accepted optimized IR shapes to AIR/liveness concepts.
-- [ ] Add handoff tests for scalar returns, direct calls, and simple stack slots.
-- [ ] Keep register allocation and scheduling out of scope unless required by
+- [x] Map accepted optimized IR shapes to AIR/liveness concepts.
+- [x] Add handoff tests for scalar returns, direct calls, and simple stack slots.
+- [x] Keep register allocation and scheduling out of scope unless required by
       a handoff validation test.
-- [ ] Document which local IR facts should disappear in a true Zig-native path.
-- [ ] Add comparison notes between local MC experiments and Zig native backend
+- [x] Document which local IR facts should disappear in a true Zig-native path.
+- [x] Add comparison notes between local MC experiments and Zig native backend
       responsibilities.
 
 ## Exit Criteria
 
-- [ ] Handoff tests explain what optimizer facts are useful to Zig.
-- [ ] MC/codegen experiments remain validation-only.
-- [ ] Backend work does not derail optimizer parity tracking.
+- [x] Handoff tests explain what optimizer facts are useful to Zig.
+- [x] MC/codegen experiments remain validation-only.
+- [x] Backend work does not derail optimizer parity tracking.
 
+## Completion Notes
+
+- Added `docs/codegen/air_liveness_handoff.md` to map accepted optimized IR
+  facts to Zig AIR, Liveness, and backend lowering concepts.
+- Extended `scripts/run_handoff_validation.sh` with explicit scalar return,
+  direct-call, and stack-slot assembly checks while keeping the full assembly
+  matrix as validation-only smoke coverage.
+- Register allocation, scheduling, target costs, debug/unwind, and linker
+  behavior remain out of scope for this cycle.
