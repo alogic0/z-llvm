@@ -356,10 +356,40 @@ pub const IcmpInst = struct {
 };
 
 pub const FcmpPredicate = enum {
+    false,
+    oeq,
+    ogt,
+    oge,
     olt,
+    ole,
+    one,
+    ord,
+    uno,
+    ueq,
+    ugt,
+    uge,
+    ult,
+    ule,
+    une,
+    true,
 
     pub fn parse(text: []const u8) ?FcmpPredicate {
+        if (std.mem.eql(u8, text, "false")) return .false;
+        if (std.mem.eql(u8, text, "oeq")) return .oeq;
+        if (std.mem.eql(u8, text, "ogt")) return .ogt;
+        if (std.mem.eql(u8, text, "oge")) return .oge;
         if (std.mem.eql(u8, text, "olt")) return .olt;
+        if (std.mem.eql(u8, text, "ole")) return .ole;
+        if (std.mem.eql(u8, text, "one")) return .one;
+        if (std.mem.eql(u8, text, "ord")) return .ord;
+        if (std.mem.eql(u8, text, "uno")) return .uno;
+        if (std.mem.eql(u8, text, "ueq")) return .ueq;
+        if (std.mem.eql(u8, text, "ugt")) return .ugt;
+        if (std.mem.eql(u8, text, "uge")) return .uge;
+        if (std.mem.eql(u8, text, "ult")) return .ult;
+        if (std.mem.eql(u8, text, "ule")) return .ule;
+        if (std.mem.eql(u8, text, "une")) return .une;
+        if (std.mem.eql(u8, text, "true")) return .true;
         return null;
     }
 

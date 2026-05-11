@@ -28,7 +28,7 @@ Implemented subset:
 ```text
 integer binary ops: add/sub/mul/and/or/xor/shl/lshr/ashr/udiv/sdiv/urem/srem
 floating-point binary ops: fadd/fmul for scalar float/double parse/verify only
-floating-point compare: fcmp olt for scalar float/double parse/verify only
+floating-point compare: fcmp false/oeq/ogt/oge/olt/ole/one/ord/uno/ueq/ugt/uge/ult/ule/une/true for scalar float/double parse/verify only
 integer casts: trunc, zext, sext
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
@@ -54,8 +54,8 @@ local-only conservative:
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
-  parser/printer/verifier round-trip for scalar float/double fadd/fmul, fcmp olt, and select
-  parser/verifier rejection for unsupported fcmp predicates and operand types
+  parser/printer/verifier round-trip for scalar float/double fadd/fmul, fcmp predicates, and select
+  parser/verifier rejection for unsupported fcmp predicates, vector FP, fast-math fcmp, constrained FP calls, and unsupported fsub/fdiv
   instcombine no-fold behavior for flagged add and division
 ```
 
@@ -66,7 +66,8 @@ no vectors
 no pointer casts
 no bitcast/ptrtoint/inttoptr
 no floating-point optimization parity
-no fsub/fdiv/frem, fcmp predicates beyond olt, or fast-math flag surface
+no fsub/fdiv/frem or fast-math flag surface
+no constrained FP intrinsic semantics
 no poison value
 no use of nsw/nuw/exact as optimization facts
 no division/remainder constant folding

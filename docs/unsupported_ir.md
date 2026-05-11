@@ -72,7 +72,7 @@ token/metadata types
 ## Unsupported Instructions
 
 ```text
-fcmp predicates beyond scalar `olt`
+vector/constrained `fcmp`; scalar `fcmp` predicates parse and verify only
 phi token/blockaddress values
 indirect call
 call attributes beyond the supported calling convention spelling

@@ -2378,7 +2378,7 @@ test "parser rejects unsupported floating point compare forms" {
     const fcmp_predicate_input =
         \\define i1 @cmp(float %a, float %b) {
         \\entry:
-        \\  %r = fcmp oeq float %a, %b
+        \\  %r = fcmp bad float %a, %b
         \\  ret i1 %r
         \\}
         \\
@@ -2397,6 +2397,94 @@ test "parser rejects unsupported floating point compare forms" {
     var module = try ir.Module.parse(std.testing.allocator, fcmp_type_input);
     defer module.deinit();
     try std.testing.expectError(error.TypeMismatch, module.verify());
+}
+
+test "parser preserves scalar fcmp predicate surface" {
+    const input =
+        \\define i1 @float_predicates(float %a, float %b) {
+        \\entry:
+        \\  %p0 = fcmp false float %a, %b
+        \\  %p1 = fcmp oeq float %a, %b
+        \\  %p2 = fcmp ogt float %a, %b
+        \\  %p3 = fcmp oge float %a, %b
+        \\  %p4 = fcmp olt float %a, %b
+        \\  %p5 = fcmp ole float %a, %b
+        \\  %p6 = fcmp one float %a, %b
+        \\  %p7 = fcmp ord float %a, %b
+        \\  %p8 = fcmp uno float %a, %b
+        \\  %p9 = fcmp ueq float %a, %b
+        \\  %p10 = fcmp ugt float %a, %b
+        \\  %p11 = fcmp uge float %a, %b
+        \\  %p12 = fcmp ult float %a, %b
+        \\  %p13 = fcmp ule float %a, %b
+        \\  %p14 = fcmp une float %a, %b
+        \\  %p15 = fcmp true float %a, %b
+        \\  ret i1 %p15
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser keeps unsupported FP surface closed" {
+    const fsub_input =
+        \\define float @sub(float %a, float %b) {
+        \\entry:
+        \\  %r = fsub float %a, %b
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    const fdiv_input =
+        \\define float @div(float %a, float %b) {
+        \\entry:
+        \\  %r = fdiv float %a, %b
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    const fast_fcmp_input =
+        \\define i1 @fast_cmp(float %a, float %b) {
+        \\entry:
+        \\  %r = fcmp fast olt float %a, %b
+        \\  ret i1 %r
+        \\}
+        \\
+    ;
+    const vector_fcmp_input =
+        \\define i1 @vector_cmp(float %a, float %b) {
+        \\entry:
+        \\  %r = fcmp olt <4 x float> %a, %b
+        \\  ret i1 %r
+        \\}
+        \\
+    ;
+    const constrained_input =
+        \\define float @constrained(float %a, float %b) {
+        \\entry:
+        \\  %r = call float @llvm.experimental.constrained.fadd.f32(float %a, float %b)
+        \\  ret float %r
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fsub_input));
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fdiv_input));
+    try std.testing.expectError(error.UnsupportedPredicate, ir.Module.parse(std.testing.allocator, fast_fcmp_input));
+    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_fcmp_input));
+
+    var constrained = try ir.Module.parse(std.testing.allocator, constrained_input);
+    defer constrained.deinit();
+    try std.testing.expectError(error.UnknownFunction, constrained.verify());
 }
 
 test "x86_64 codegen lowers add args to assembly" {
