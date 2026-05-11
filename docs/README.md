@@ -68,7 +68,7 @@ completed foundation epics
 
 - [x] [Cycle 1: Raw Zig IR Parser Surface](roadmap/01_raw_zig_ir_parser_surface_cycle.md)
 - [x] [Cycle 2: Intrinsics And Call Semantics](roadmap/02_intrinsics_and_call_semantics_cycle.md)
-- [ ] [Cycle 3: Pointer And Memory Corpus](roadmap/03_pointer_memory_corpus_cycle.md)
+- [x] [Cycle 3: Pointer And Memory Corpus](roadmap/03_pointer_memory_corpus_cycle.md)
 - [ ] [Cycle 4: Aggregate And Array IR Expansion](roadmap/04_aggregate_array_ir_expansion_cycle.md)
 - [ ] [Cycle 5: Globals, Aliases, And Global Optimization](roadmap/05_globals_aliases_and_globalopt_cycle.md)
 - [ ] [Cycle 6: Loop Metadata, LCSSA, And Assume](roadmap/06_loop_metadata_lcssa_and_assume_cycle.md)

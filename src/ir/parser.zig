@@ -355,8 +355,10 @@ fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text:
     if (params_text.len == 0) return;
     if (std.mem.eql(u8, params_text, "...")) return error.UnsupportedVarArgs;
 
-    var params = std.mem.splitScalar(u8, params_text, ',');
-    while (params.next()) |raw_param| {
+    var rest = params_text;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const raw_param = if (comma) |index| rest[0..index] else rest;
         const param_text = std.mem.trim(u8, raw_param, " \t");
         if (std.mem.eql(u8, param_text, "...")) return error.UnsupportedVarArgs;
         var parts = std.mem.tokenizeAny(u8, param_text, " \t");
@@ -370,6 +372,7 @@ fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text:
         } else {
             try decl.params.append(allocator, .{ .ty = param_ty });
         }
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
 }
 
@@ -386,8 +389,10 @@ fn implicitEntryBlockName(module: *core.Module, function: core.Function) ![]cons
 fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, text: []const u8) !void {
     const params_text = std.mem.trim(u8, text, " \t");
     if (params_text.len != 0) {
-        var params = std.mem.splitScalar(u8, params_text, ',');
-        while (params.next()) |raw_param| {
+        var rest = params_text;
+        while (rest.len != 0) {
+            const comma = findTopLevelComma(rest);
+            const raw_param = if (comma) |index| rest[0..index] else rest;
             const param_text = std.mem.trim(u8, raw_param, " \t");
             var parts = std.mem.tokenizeAny(u8, param_text, " \t");
             const param_ty = try parseType(parts.next() orelse return error.InvalidParameter);
@@ -414,6 +419,7 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
                 .attrs = if (param_attrs.len == 0) null else param_attrs,
                 .name = param_name[1..],
             });
+            rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
         }
     }
 }
@@ -664,8 +670,10 @@ fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []con
     if (args_text.len == 0) return;
     if (std.mem.eql(u8, args_text, "...")) return error.UnsupportedVarArgs;
 
-    var args = std.mem.splitScalar(u8, args_text, ',');
-    while (args.next()) |raw_arg| {
+    var rest = args_text;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const raw_arg = if (comma) |index| rest[0..index] else rest;
         const arg_text = std.mem.trim(u8, raw_arg, " \t");
         var parts = std.mem.tokenizeAny(u8, arg_text, " \t");
         const ty = try parseType(parts.next() orelse return error.InvalidCall);
@@ -675,6 +683,7 @@ fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []con
             .ty = ty,
             .value = value,
         });
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
 }
 
