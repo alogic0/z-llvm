@@ -190,6 +190,9 @@ parser blockers after Cycle 1:
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `parse`, `verify`, `optimizer-input` |
 | `globals_comptime` | `test/zig/inputs/globals_comptime.zig` | `test/zig/captured/globals_comptime.ReleaseFast.x86_64.ll` | internal globals, exported aliases, global load/store, comptime folding | `parse`, `verify`, `optimizer-input` |
 | `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll` | `atomicrmw`, inline asm side effects, debug-oriented source shape | `unsupported`, `debug-info-only`, `future` |
+| `tls_concurrency` | `test/zig/inputs/tls_concurrency.zig` | `test/zig/captured/tls_concurrency.ReleaseFast.x86_64.ll` | `thread_local` global, TLS load/store accessors, target-memory attributes | `parse`, `verify`, `optimizer-input` |
+| `switch_control` | `test/zig/inputs/switch_control.zig` | `test/zig/captured/switch_control.ReleaseFast.x86_64.ll` | switch lookup table, private array constant, branch/select lowering | `unsupported`, `future` |
+| `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll` | float/double signatures, `select`, `fadd` | `unsupported`, `future` |
 | `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.unsupported.ll` | vector type, lane arithmetic, vector return | `unsupported`, `future` |
 
 ## Optimizer Epic Coverage
@@ -202,8 +205,11 @@ parser blockers after Cycle 1:
 | Loop optimization pipeline | `control_flow_calls` |
 | IPO/global cleanup | `globals_comptime`, `control_flow_calls` |
 | Target/DataLayout handoff | `integers` on x86_64 and aarch64 |
+| Concurrency/TLS boundary | `tls_concurrency`, `atomics_inline_asm_debug` |
 | Optional debug/instrumentation/LTO tracks | `atomics_inline_asm_debug`, `tiny_scalar` Debug rows |
 | ReleaseSafe safety IR | `release_safe_safety` |
+| Switch/table lowering blockers | `switch_control` |
+| Floating-point IR blockers | `floats_math` |
 | Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements |
 
 Connection to the LLVM pass inventory:

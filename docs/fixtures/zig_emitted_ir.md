@@ -25,6 +25,9 @@ test/zig/expected/tiny_scalar.project_lowered.ll
 test/zig/expected/tiny_scalar.project_optimized.ll
 test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll
 test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll
+test/zig/captured/tls_concurrency.ReleaseFast.x86_64.ll
+test/zig/captured/switch_control.ReleaseFast.x86_64.ll
+test/zig/captured/floats_math.ReleaseFast.x86_64.ll
 src/testdata/zig_tiny_scalar.normalized.ll
 src/testdata/zig_tiny_scalar.project_lowered.ll
 src/testdata/zig_tiny_scalar.project_optimized.ll
@@ -62,6 +65,8 @@ Known raw Zig IR constructs not represented yet:
 module aliases such as @add = alias ...
 debug metadata and llvm.module.flags
 attribute groups with target features
+floating-point types and operations
+aggregate global initializers used by switch lookup tables
 raw target triples with versioned OS/ABI components are parsed but not treated as supported target identities
 stdlib/support functions pulled into Debug builds
 ```
