@@ -4,7 +4,7 @@ Current environment used for `z_llvm` development and LLVM comparison testing:
 
 ```text
 OS: Ubuntu 24.04.4 LTS (noble)
-Zig: 0.16.0
+Local z_llvm build/test Zig: zig on PATH, currently 0.16.0
 LLVM tools: 22.1.3
 LLVM source checkout: llvm-project-22/
 Zig source checkout for inventory work: ../ziglang
@@ -12,10 +12,31 @@ Authoritative Zig fixture emitter: ../ziglang/build/stage4/bin/zig
 Project checkout: z_llvm/
 ```
 
-The `Zig: 0.16.0` entry is the local default executable. Authoritative
-Zig-emitted IR fixtures use `../ziglang/build/stage4/bin/zig`, which is built
-from the same `../ziglang` source checkout used by the roadmap and inventory
-source anchors.
+## Zig Compiler Selection Policy
+
+Use different Zig executables for different jobs:
+
+| Task | Compiler | Reason |
+| --- | --- | --- |
+| Build and test `z_llvm` itself | `zig` on `PATH` | This project is currently developed against the local stable/dev toolchain recorded above. |
+| Emit authoritative Zig LLVM IR fixtures | `../ziglang/build/stage4/bin/zig` | Fixtures must come from the same `../ziglang` source checkout used by inventory and roadmap source anchors. |
+| Inspect current upstream Zig behavior | `../ziglang/build/stage4/bin/zig` plus `../ziglang` sources | Stage4 currently matches the checked-out Zig source revision. |
+| Bootstrap/debug the Zig compiler build | `../ziglang/build/stage3/bin/zig` only when explicitly needed | Stage3 can lag behind the source checkout and must not be used for authoritative fixture generation. |
+
+Before regenerating Zig-emitted IR fixtures, verify the source/compiler pair:
+
+```bash
+git -C ../ziglang rev-parse --short HEAD
+../ziglang/build/stage4/bin/zig version
+```
+
+The stage4 version string must include the same commit prefix as
+`../ziglang` HEAD. If it does not, rebuild `../ziglang` before regenerating
+fixtures.
+
+Do not use the `zig` on `PATH` to regenerate authoritative Zig-emitted IR
+fixtures unless `zig version` is intentionally pinned to the same source
+revision as `../ziglang` and the manifest records that fact.
 
 LLVM command names in this environment are versioned:
 

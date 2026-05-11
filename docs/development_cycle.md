@@ -4,6 +4,20 @@ Each implementation cycle uses `docs/next_steps.md` as the active checklist.
 
 For every future step that reproduces LLVM behavior, completion requires an upstream mapping before the step is committed.
 
+## Compiler Selection
+
+Follow the compiler policy in [environment.md](environment.md):
+
+- use `zig` on `PATH` for building and testing `z_llvm` itself;
+- use `../ziglang/build/stage4/bin/zig` for authoritative Zig-emitted LLVM IR
+  fixtures;
+- do not use `../ziglang/build/stage3/bin/zig` for fixture generation unless a
+  step explicitly says it is testing bootstrap behavior.
+
+When a step updates Zig-emitted IR fixtures, record the emitter version and
+`../ziglang` source revision in the fixture manifest before marking the step
+complete.
+
 ## Required Upstream Mapping
 
 Each pass, analysis, IR feature, or codegen feature must document:
