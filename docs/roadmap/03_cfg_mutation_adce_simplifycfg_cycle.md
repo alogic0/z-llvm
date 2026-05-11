@@ -23,11 +23,11 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 - [x] Add verifier checks that catch stale PHI incoming blocks after CFG edits.
 - [x] Extend postdominator/control-dependence tests to diamonds, nested
       diamonds, loops, multiple exits, and unreachable blocks.
-- [ ] Rework ADCE liveness toward an explicit block/instruction worklist for
+- [x] Rework ADCE liveness toward an explicit block/instruction worklist for
       the supported CFG surface.
 - [ ] Mark live branch terminators from control dependence where the local
       postdominator model proves it.
-- [ ] Let ADCE delete more dead branch regions when PHI repair is locally safe.
+- [x] Let ADCE delete more dead branch regions when PHI repair is locally safe.
 - [ ] Extend SimplifyCFG empty-block threading and branch folding with the same
       CFG update helper.
 - [ ] Keep EH, invoke, switch, indirectbr, musttail, and debug salvage deferred.
@@ -62,3 +62,15 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 - [x] Added unreachable-block coverage to keep local postdominator behavior
       explicit for dead regions.
 - [x] Verified with `zig build test`.
+
+## Completed ADCE Acyclic Region Slice
+
+- [x] Replaced the linear-only ADCE dead-region check with an acyclic recursive
+      region check that accepts nested branch regions only when every path
+      reaches the proven postdominating join.
+- [x] Kept PHIs, side effects, loops, `ret`, and `unreachable` inside candidate
+      regions as conservative blockers.
+- [x] Repeated supported ADCE CFG rewrites until the local fixpoint so nested
+      dead branch regions can be simplified in one pass run.
+- [x] Added `adce_nested_dead_diamond` as an opt-22-equivalent fixture.
+- [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.

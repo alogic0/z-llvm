@@ -56,7 +56,7 @@ Implemented foundation subset:
 ```text
 build accepted-CFG postdominance and control-dependence facts
 start from dead branch regions whose successors reconverge at an immediate postdominator
-rewrite branch control only when all outgoing regions are linear and side-effect free
+rewrite branch control when all outgoing regions are acyclic and side-effect free
 reject phi joins and non-linear regions for now
 repair PHI incoming lists through the shared CFG update helper after supported edge deletion
 start from current def-use counts
@@ -84,6 +84,7 @@ opt-22 equivalent:
   adce_chain
   adce_dead_branch
   adce_dead_diamond
+  adce_nested_dead_diamond
   adce_store_branch_reject
 
 local-only conservative:
@@ -99,7 +100,7 @@ Known gaps:
 no full optimistic block/instruction liveness worklist
 no live-terminator propagation through arbitrary control dependence
 no PHI-aware deletion beyond shared stale-incoming pruning after supported edge deletion
-no non-linear dead-region rewriting
+no loop/cyclic dead-region rewriting
 no debug info salvage
 no musttail, EH, calls, or volatile/atomic removal
 ```

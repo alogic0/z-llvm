@@ -23,7 +23,10 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 }
 
 fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
-    var changed = try removeDeadControlFlow(allocator, function);
+    var changed = false;
+    while (try removeDeadControlFlow(allocator, function)) {
+        changed = true;
+    }
     changed = try removeDeadInstructions(allocator, function) or changed;
     return changed;
 }
@@ -205,8 +208,8 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
         const then_index = function.blockIndex(condbr.then_target) orelse continue;
         const else_index = function.blockIndex(condbr.else_target) orelse continue;
 
-        const then_safe = regionIsLinearAndDead(function.*, graph, then_index, ipdom_index);
-        const else_safe = regionIsLinearAndDead(function.*, graph, else_index, ipdom_index);
+        const then_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, then_index, ipdom_index);
+        const else_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, else_index, ipdom_index);
         if (!then_safe or !else_safe) continue;
 
         const target = if (then_index == ipdom_index)
@@ -225,33 +228,43 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
     return changed;
 }
 
-fn regionIsLinearAndDead(function: ir.Function, graph: cfg.Graph, start_index: usize, join_index: usize) bool {
-    if (start_index == join_index) return true;
+fn regionIsDeadAndAcyclic(allocator: std.mem.Allocator, function: ir.Function, graph: cfg.Graph, start_index: usize, join_index: usize) !bool {
+    const visiting = try allocator.alloc(bool, function.blocks.items.len);
+    defer allocator.free(visiting);
+    @memset(visiting, false);
+    return regionPathReachesJoin(function, graph, start_index, join_index, visiting);
+}
 
-    var current = start_index;
-    var steps: usize = 0;
-    while (current != join_index) {
-        if (steps >= function.blocks.items.len) return false;
-        steps += 1;
+fn regionPathReachesJoin(function: ir.Function, graph: cfg.Graph, block_index: usize, join_index: usize, visiting: []bool) bool {
+    if (block_index == join_index) return true;
+    if (visiting[block_index]) return false;
+    visiting[block_index] = true;
+    defer visiting[block_index] = false;
 
-        const block = function.blocks.items[current];
-        if (hasPhi(block)) return false;
-        for (block.instructions.items) |instruction| {
-            if (instruction.removed) continue;
-            if (!memory_effect.isSafeToDelete(instruction)) return false;
-        }
-
-        const terminator = block.terminator orelse return false;
-        const successor_name = switch (terminator) {
-            .br => |br| br.target,
-            .ret, .condbr, .@"unreachable" => return false,
-        };
-        const successor_index = function.blockIndex(successor_name) orelse return false;
-        if (!containsIndex(graph.successors(current), successor_index)) return false;
-        current = successor_index;
+    const block = function.blocks.items[block_index];
+    if (hasPhi(block)) return false;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        if (!memory_effect.isSafeToDelete(instruction)) return false;
     }
 
-    return true;
+    const terminator = block.terminator orelse return false;
+    switch (terminator) {
+        .br => |br| {
+            const successor_index = function.blockIndex(br.target) orelse return false;
+            if (!containsIndex(graph.successors(block_index), successor_index)) return false;
+            return regionPathReachesJoin(function, graph, successor_index, join_index, visiting);
+        },
+        .condbr => |condbr| {
+            const then_index = function.blockIndex(condbr.then_target) orelse return false;
+            const else_index = function.blockIndex(condbr.else_target) orelse return false;
+            if (!containsIndex(graph.successors(block_index), then_index)) return false;
+            if (!containsIndex(graph.successors(block_index), else_index)) return false;
+            return regionPathReachesJoin(function, graph, then_index, join_index, visiting) and
+                regionPathReachesJoin(function, graph, else_index, join_index, visiting);
+        },
+        .ret, .@"unreachable" => return false,
+    }
 }
 
 fn hasPhi(block: ir.BasicBlock) bool {

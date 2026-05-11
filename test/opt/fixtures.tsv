@@ -11,6 +11,7 @@ dce	dce	dce	test/opt/inputs/dce.ll	test/opt/expected/z_llvm/dce.ll	opt-equivalen
 adce_chain	adce	adce	test/opt/inputs/adce_chain.ll	test/opt/expected/z_llvm/adce_chain.ll	opt-equivalent	adce	unused side-effect-free instruction chain removed
 adce_dead_branch	adce	adce	test/opt/inputs/adce_dead_branch.ll	test/opt/expected/z_llvm/adce_dead_branch.ll	opt-equivalent	adce	dead conditional branch control rewritten to live successor
 adce_dead_diamond	adce	adce	test/opt/inputs/adce_dead_diamond.ll	test/opt/expected/z_llvm/adce_dead_diamond.ll	opt-equivalent	adce	dead diamond branch control rewritten like LLVM ADCE
+adce_nested_dead_diamond	adce	adce	test/opt/inputs/adce_nested_dead_diamond.ll	test/opt/expected/z_llvm/adce_nested_dead_diamond.ll	opt-equivalent	adce	nested acyclic dead branch regions are rewritten through postdominator joins
 adce_store_branch_reject	adce	adce	test/opt/inputs/adce_store_branch_reject.ll	test/opt/expected/z_llvm/adce_store_branch_reject.ll	opt-equivalent	adce	side-effecting store keeps branch control live
 memory_dce	dce	dce	test/opt/inputs/memory_dce.ll	test/opt/expected/z_llvm/memory_dce.ll	opt-equivalent	dce	opt-22 inferred memory alignment is normalized
 gvn_dominating_expr	gvn,simplifycfg,dce	gvn	test/opt/inputs/gvn_dominating_expr.ll	test/opt/expected/z_llvm/gvn_dominating_expr.ll	opt-equivalent	gvn,simplifycfg,dce	dominating repeated expression eliminated; LLVM simplifycfg also removes the now-redundant branch
