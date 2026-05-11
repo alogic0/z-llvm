@@ -189,16 +189,20 @@ Deliverables:
 Goal: support Zig's possible path of emitting LLVM IR/bitcode without linking
 libLLVM, while keeping this separate from native optimization work.
 
-- [ ] Track what it would take to write LLVM-compatible bitcode or textual IR
+- [x] Track what it would take to write LLVM-compatible bitcode or textual IR
       directly.
-- [ ] Keep text IR parsing/printing useful for comparison and migration.
-- [ ] Do not block native optimizer work on full bitcode compatibility.
-- [ ] Add bitcode work only when a concrete Zig use case is selected.
+- [x] Keep text IR parsing/printing useful for comparison and migration.
+- [x] Do not block native optimizer work on full bitcode compatibility.
+- [x] Add bitcode work only when a concrete Zig use case is selected.
 
 Deliverables:
 
-- [ ] `docs/roadmap/llvm_ir_bitcode_compatibility_epic.md`
-- [ ] bitcode inventory entry in `docs/inventory/zig_llvm_api_inventory.md`
+- [x] `docs/roadmap/09_optional_bitcode_debug_lto_tracks.md`
+- [x] `docs/semantics/optional_bitcode_debug_lto_tracks.md`
+- [x] `docs/bitcode/construct_inventory.md`
+- [x] `docs/debug/metadata_inventory.md`
+- [x] `docs/lto/behavior_gaps.md`
+- [x] bitcode inventory entry in `docs/inventory/zig_llvm_api_inventory.md`
 
 ## Phase 8: Upstream-Useful Artifacts
 

@@ -14,6 +14,13 @@ These passes attach, preserve, or consume optimizer-visible debug/profile and
 instrumentation metadata. They are separate from scalar optimization because
 they have runtime, debug-info, and sanitizer ABI consequences.
 
+Optional-track docs:
+
+```text
+docs/semantics/optional_bitcode_debug_lto_tracks.md
+docs/debug/metadata_inventory.md
+```
+
 ## LLVM Algorithm Contract
 
 ```text

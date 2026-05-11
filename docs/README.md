@@ -29,7 +29,7 @@ inventory
 - [x] [Epic 6: Scalar Optimization Pipeline](roadmap/06_scalar_optimization_pipeline.md)
 - [x] [Epic 7: Loop Optimization Pipeline](roadmap/07_loop_optimization_pipeline.md)
 - [x] [Epic 8: Native Backend Handoff Study](roadmap/08_native_backend_handoff_study.md)
-- [ ] [Epic 9: Optional LLVM Bitcode, Debug, And LTO Tracks](roadmap/09_optional_bitcode_debug_lto_tracks.md)
+- [x] [Epic 9: Optional LLVM Bitcode, Debug, And LTO Tracks](roadmap/09_optional_bitcode_debug_lto_tracks.md)
 
 ## Operating Rule
 

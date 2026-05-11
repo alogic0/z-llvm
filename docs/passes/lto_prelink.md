@@ -12,6 +12,14 @@ Zig's LLVM path uses LLVM's LTO pre-link pipeline for LTO modes. The local
 replacement currently models the pre-link pipeline surface without implementing
 post-link summary, import/export, WPD, CFI, or bitcode-summary behavior.
 
+Optional-track docs:
+
+```text
+docs/semantics/optional_bitcode_debug_lto_tracks.md
+docs/bitcode/construct_inventory.md
+docs/lto/behavior_gaps.md
+```
+
 ## LLVM Algorithm Contract
 
 ```text
