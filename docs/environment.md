@@ -26,8 +26,7 @@ Use different Zig executables for different jobs:
 Before regenerating Zig-emitted IR fixtures, verify the source/compiler pair:
 
 ```bash
-git -C ../ziglang rev-parse --short HEAD
-../ziglang/build/stage4/bin/zig version
+scripts/check_zig_stage4_emitter.sh
 ```
 
 The stage4 version string must include the same commit prefix as
@@ -37,6 +36,17 @@ fixtures.
 Do not use the `zig` on `PATH` to regenerate authoritative Zig-emitted IR
 fixtures unless `zig version` is intentionally pinned to the same source
 revision as `../ziglang` and the manifest records that fact.
+
+Use the checked capture helper for new source-backed rows:
+
+```bash
+scripts/capture_zig_ir.sh test/zig/inputs/tiny_scalar.zig ReleaseFast
+scripts/capture_zig_ir.sh test/zig/inputs/tiny_scalar.zig Debug
+```
+
+By default, `ReleaseFast` and `ReleaseSmall` captures write to
+`test/zig/captured/`. Broad `Debug` and `ReleaseSafe` captures write to
+`tmp/zig_ir/raw/` unless a reduced checked fixture path is passed explicitly.
 
 LLVM command names in this environment are versioned:
 

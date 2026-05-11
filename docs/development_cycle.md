@@ -18,6 +18,16 @@ When a step updates Zig-emitted IR fixtures, record the emitter version and
 `../ziglang` source revision in the fixture manifest before marking the step
 complete.
 
+Use these scripts for fixture work:
+
+```bash
+scripts/check_zig_stage4_emitter.sh
+scripts/capture_zig_ir.sh test/zig/inputs/<group>.zig ReleaseFast
+scripts/lint_zig_ir_manifest.sh
+```
+
+Readiness checks run manifest linting but do not regenerate fixtures.
+
 ## Required Upstream Mapping
 
 Each pass, analysis, IR feature, or codegen feature must document:
