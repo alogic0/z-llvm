@@ -37,34 +37,42 @@ Core LLVM algorithm data structures:
   Walker queries for clobbering memory accesses
 
 Local target status:
-  LLVM-shaped clobber-query subset
+  LLVM-shaped access-list and clobber-query subset
 
 Implemented subset:
   InstRef identifies a memory access by block and instruction index.
-  hasClobberBetween scans the accepted IR region between two accesses.
-  alias.modRef decides whether an intervening instruction is a def/barrier for
-  the queried pointer.
+  MemorySSA.build records accepted MemoryUse, MemoryDef, barrier, and narrow
+  MemoryPhi-like join facts in deterministic function order.
+  hasClobberBetween queries the persisted access list for GVN and EarlyCSE load
+  availability.
+  alias.modRefInModule decides whether an intervening instruction is a
+  def/barrier for the queried pointer using module DataLayout and globals.
   readnone and readonly direct calls are treated as non-clobbering for load
   availability through function attribute classification.
   unknown calls, volatile memory, atomic memory, may-alias stores, and
   same-pointer stores are clobbers.
   GVN load availability uses this shared helper.
   EarlyCSE load CSE uses this helper before replacing an available load.
+  DSE uses a MemorySSA-owned same-block overwrite query when direction and
+  dominance are explicit.
 
 Intentional divergences:
-  DSE uses a single-block reverse scan instead of MemorySSA.
+  MemoryPhi support is conservative: join facts are barriers for accepted
+  queries, not full per-location phi operands.
   LICM does not move memory instructions.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
-  The helper is a linear conservative scan, not a MemorySSA def/use graph with
-  MemoryPhi placement.
+  The access list is rebuilt per function and does not have a MemorySSAUpdater.
+  No MemorySSA walker, optimized access cache, or clobber-walk skipping exists.
 
 Analysis preservation/invalidation:
-  No persisted local MemorySSA analysis exists yet; callers rebuild/query the
-  accepted function directly.
+  The local access list is built per pass invocation. Mutating passes rebuild it
+  before querying and do not preserve it across transformations.
 
 Fixture coverage:
   unit test: memory ssa clobber helper covers accepted memory-dependence cases
+  unit test: memory ssa records narrow phi facts at joins
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
+  opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
 
 opt-22 comparison command:
   covered indirectly through GVN and EarlyCSE memory fixtures in

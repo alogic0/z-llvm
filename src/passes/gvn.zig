@@ -85,10 +85,13 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     var table = ValueTable.init(allocator, module, function.*);
     defer table.deinit();
 
+    var memory = try memory_ssa.MemorySSA.build(allocator, module, function.*);
+    defer memory.deinit();
+
     var leaders: std.ArrayList(Leader) = .empty;
     defer leaders.deinit(allocator);
 
-    return try visitBlock(allocator, function, dom, &aliases, &table, &leaders, 0);
+    return try visitBlock(allocator, function, dom, &aliases, &table, memory, &leaders, 0);
 }
 
 fn visitBlock(
@@ -97,6 +100,7 @@ fn visitBlock(
     dom: dominator.Dominators,
     aliases: *std.StringHashMap(ir.Value),
     table: *ValueTable,
+    memory: memory_ssa.MemorySSA,
     leaders: *std.ArrayList(Leader),
     block_index: usize,
 ) !bool {
@@ -110,7 +114,7 @@ fn visitBlock(
         if (instruction.removed or !isCandidate(table.module, instruction.*)) continue;
 
         const number = try table.numberFor(instruction.*);
-        if (findLeader(table.module, function.*, leaders.items, number, block_index, instruction_index, instruction.*)) |replacement| {
+        if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |replacement| {
             instruction.removed = true;
             instruction.replacement = replacement;
             const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -139,7 +143,7 @@ fn visitBlock(
 
     for (0..function.blocks.items.len) |child_index| {
         if (dom.immediateDominator(child_index) != block_index) continue;
-        changed = try visitBlock(allocator, function, dom, aliases, table, leaders, child_index) or changed;
+        changed = try visitBlock(allocator, function, dom, aliases, table, memory, leaders, child_index) or changed;
     }
 
     return changed;
@@ -148,6 +152,7 @@ fn visitBlock(
 fn findLeader(
     module: ir.Module,
     function: ir.Function,
+    memory: memory_ssa.MemorySSA,
     leaders: []const Leader,
     number: ValueNumber,
     block_index: usize,
@@ -159,7 +164,7 @@ fn findLeader(
         index -= 1;
         const leader = leaders[index];
         if (leader.number != number) continue;
-        if (!isMemoryAvailable(module, function, leader, block_index, instruction_index, instruction)) continue;
+        if (!isMemoryAvailable(module, function, memory, leader, block_index, instruction_index, instruction)) continue;
         return .{ .named = leader.instruction.result orelse return null };
     }
     return null;
@@ -184,18 +189,14 @@ fn sameValueExpression(module: ir.Module, function: ir.Function, candidate: ir.I
     return expression_key.sameValueExpression(module, function, candidate, instruction);
 }
 
-fn isMemoryAvailable(module: ir.Module, function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, instruction: ir.Instruction) bool {
+fn isMemoryAvailable(module: ir.Module, function: ir.Function, memory: memory_ssa.MemorySSA, leader: Leader, block_index: usize, instruction_index: usize, instruction: ir.Instruction) bool {
     if (instruction.kind != .load) return true;
-    return !hasClobber(module, function, leader, block_index, instruction_index, instruction.kind.load.ptr);
-}
-
-fn hasClobber(module: ir.Module, function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
-    return memory_ssa.hasClobberBetween(
-        module,
-        function,
+    _ = module;
+    _ = function;
+    return !memory.hasClobberBetween(
         .{ .block_index = leader.block_index, .instruction_index = leader.instruction_index },
         .{ .block_index = block_index, .instruction_index = instruction_index },
-        ptr,
+        instruction.kind.load.ptr,
     );
 }
 

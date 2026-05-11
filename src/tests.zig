@@ -3278,6 +3278,39 @@ test "alias analysis classifies gep-derived stack slots" {
     try std.testing.expectEqual(@as(u64, 4), left1.size.?);
 }
 
+test "alias analysis classifies globals and aliases with module context" {
+    const input =
+        \\@global_a = internal global i32 0
+        \\@global_b = internal global i32 0
+        \\@alias_a = alias ptr, ptr @global_a
+        \\
+        \\define i32 @global_alias() {
+        \\entry:
+        \\  %v = load i32, ptr @global_a
+        \\  store i32 %v, ptr @global_b
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expectEqual(
+        alias.AliasResult.must_alias,
+        alias.aliasInModule(module, function, .{ .named = "global_a" }, .{ .named = "alias_a" }),
+    );
+    try std.testing.expectEqual(
+        alias.AliasResult.no_alias,
+        alias.aliasInModule(module, function, .{ .named = "global_a" }, .{ .named = "global_b" }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.no_mod_ref,
+        alias.modRefInModule(module, function, function.blocks.items[0].instructions.items[1], .{ .named = "global_a" }),
+    );
+}
+
 test "memory effect and mod-ref classify memory instructions conservatively" {
     const input =
         \\define i32 @memory_effects(i32 %a, ptr %arg) {
@@ -3400,8 +3433,14 @@ test "memory ssa clobber helper covers accepted memory-dependence cases" {
     defer module.deinit();
     const function = module.functions.items[0];
 
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function);
+    defer memory.deinit();
+    try std.testing.expect(memory.accesses.items.len >= 9);
+
     try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 0 }, .{ .block_index = 0, .instruction_index = 1 }, .{ .named = "p" }));
+    try std.testing.expect(!memory.hasClobberBetween(.{ .block_index = 0, .instruction_index = 0 }, .{ .block_index = 0, .instruction_index = 1 }, .{ .named = "p" }));
     try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 1 }, .{ .block_index = 0, .instruction_index = 3 }, .{ .named = "p" }));
+    try std.testing.expect(memory.hasClobberBetween(.{ .block_index = 0, .instruction_index = 1 }, .{ .block_index = 0, .instruction_index = 3 }, .{ .named = "p" }));
     try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 3 }, .{ .block_index = 0, .instruction_index = 5 }, .{ .named = "p" }));
     try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 8 }, .{ .block_index = 0, .instruction_index = 10 }, .{ .named = "left" }));
     try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 10 }, .{ .block_index = 0, .instruction_index = 12 }, .{ .named = "p" }));
@@ -3409,6 +3448,38 @@ test "memory ssa clobber helper covers accepted memory-dependence cases" {
     try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 14 }, .{ .block_index = 0, .instruction_index = 16 }, .{ .named = "p" }));
     try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 16 }, .{ .block_index = 0, .instruction_index = 18 }, .{ .named = "p" }));
     try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 18 }, .{ .block_index = 0, .instruction_index = 20 }, .{ .named = "p" }));
+}
+
+test "memory ssa records narrow phi facts at joins" {
+    const input =
+        \\define i32 @memory_join(i1 %cond, ptr %p, i32 %v) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  store i32 %v, ptr %p
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %loaded = load i32, ptr %p
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function);
+    defer memory.deinit();
+
+    var saw_phi = false;
+    for (memory.accesses.items) |access| {
+        if (access.kind == .phi and access.block_index == 3) saw_phi = true;
+    }
+    try std.testing.expect(saw_phi);
+    try std.testing.expect(memory.hasClobberBetween(.{ .block_index = 1, .instruction_index = 0 }, .{ .block_index = 3, .instruction_index = 0 }, .{ .named = "p" }));
 }
 
 test "mem2reg promotes single-block stack slot" {

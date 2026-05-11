@@ -38,20 +38,19 @@ Local target status:
   fixture-equivalent for listed fixtures
 
 Implemented subset:
-  Single-block reverse scan
+  Single-block overwrite query through the local MemorySSA helper
   Remove a stack store overwritten by a later must-alias store
   Preserve stores when a load, call, volatile/atomic access, unknown pointer, or
   may-alias access intervenes
 
 Intentional divergences:
-  No MemorySSA graph yet.
+  No full MemorySSA walker/updater.
   No cross-block DSE.
   No partial-overwrite DSE.
   No memset/memcpy/memmove handling.
-  DSE deliberately keeps its single-block reverse scan for this cycle. Moving
-  it to the shared clobber helper waits until the helper can model overwrite
-  direction and MemoryPhi-like joins rather than only answering load
-  availability.
+  DSE deliberately keeps the query same-block only. Cross-block DSE waits until
+  the MemorySSA helper can model overwrite direction across MemoryPhi-like
+  joins.
 
 Analysis preservation/invalidation:
   DSE mutates memory instructions and invalidates analyses under the local
@@ -71,7 +70,7 @@ Local-only fixture command:
 Known gaps:
 
 ```text
-no MemorySSA
+no full MemorySSA walker/updater
 no post-dominator or cross-block reasoning
 no partial-overlap handling
 no target-library memory intrinsic handling

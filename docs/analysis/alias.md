@@ -54,13 +54,15 @@ Local target status:
 Implemented subset:
   Stack-slot identity
   Simple GEP-derived stack locations
+  Module-aware global and alias roots for accepted scalar globals
+  DataLayout-aware access ranges when the module records a target datalayout
   Known disjoint byte ranges
   Load/store mod-ref queries
   Volatile/atomic/call unknown barriers
 
 Intentional divergences:
-  No target DataLayout, captures, globals, recursive AA stack, metadata, or
-  partial-alias result.
+  No address spaces, captures, recursive AA stack, metadata, or partial-alias
+  result.
 
 Analysis preservation/invalidation:
   Alias analysis is rebuilt on demand and has no preserved state.
@@ -113,10 +115,10 @@ future memory-aware LICM and MemorySSA-backed passes
 Known gaps:
 
 ```text
-no target DataLayout
 no address spaces
 no capture analysis
-no globals or calls
+globals are limited to accepted scalar global definitions and aliases
+calls are limited to function-attribute memory-effect classification
 no partial_alias result
 no aggregate, struct, or vector layout
 no precise mod_ref result for calls or unknown instructions

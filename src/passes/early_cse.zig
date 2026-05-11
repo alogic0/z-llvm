@@ -50,7 +50,10 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     var stores: std.ArrayList(AvailableStore) = .empty;
     defer stores.deinit(allocator);
 
-    return try visitBlock(allocator, module, function, dom, &aliases, &available, &stores, 0);
+    var memory = try memory_ssa.MemorySSA.build(allocator, module, function.*);
+    defer memory.deinit();
+
+    return try visitBlock(allocator, module, function, dom, memory, &aliases, &available, &stores, 0);
 }
 
 fn visitBlock(
@@ -58,6 +61,7 @@ fn visitBlock(
     module: ir.Module,
     function: *ir.Function,
     dom: dominator.Dominators,
+    memory: memory_ssa.MemorySSA,
     aliases: *std.StringHashMap(ir.Value),
     available: *std.ArrayList(AvailableInstruction),
     stores: *std.ArrayList(AvailableStore),
@@ -84,7 +88,7 @@ fn visitBlock(
         }
 
         if (isCseCandidate(module, instruction.*)) {
-            if (findAvailableEquivalent(module, function.*, available.items, block_index, instruction_index, instruction.*)) |replacement| {
+            if (findAvailableEquivalent(module, function.*, memory, available.items, block_index, instruction_index, instruction.*)) |replacement| {
                 instruction.removed = true;
                 instruction.replacement = replacement;
                 const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -115,7 +119,7 @@ fn visitBlock(
 
     for (0..function.blocks.items.len) |child_index| {
         if (dom.immediateDominator(child_index) != block_index) continue;
-        changed = try visitBlock(allocator, module, function, dom, aliases, available, stores, child_index) or changed;
+        changed = try visitBlock(allocator, module, function, dom, memory, aliases, available, stores, child_index) or changed;
     }
 
     return changed;
@@ -180,6 +184,7 @@ fn pruneMayAliasStores(function: ir.Function, stores: *std.ArrayList(AvailableSt
 fn findAvailableEquivalent(
     module: ir.Module,
     function: ir.Function,
+    memory: memory_ssa.MemorySSA,
     available: []const AvailableInstruction,
     block_index: usize,
     instruction_index: usize,
@@ -190,7 +195,7 @@ fn findAvailableEquivalent(
         index -= 1;
         const candidate = available[index];
         if (candidate.hash != expression_key.hash(instruction)) continue;
-        if (!sameAvailableExpression(module, function, candidate, block_index, instruction_index, instruction)) continue;
+        if (!sameAvailableExpression(module, function, memory, candidate, block_index, instruction_index, instruction)) continue;
         return .{ .named = candidate.instruction.result orelse return null };
     }
     return null;
@@ -199,6 +204,7 @@ fn findAvailableEquivalent(
 fn sameAvailableExpression(
     module: ir.Module,
     function: ir.Function,
+    memory: memory_ssa.MemorySSA,
     candidate: AvailableInstruction,
     block_index: usize,
     instruction_index: usize,
@@ -210,19 +216,13 @@ fn sameAvailableExpression(
         const load = instruction.kind.load;
         if (!candidate_load.ty.eql(load.ty)) return false;
         if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
-        return !hasClobber(module, function, candidate, block_index, instruction_index, load.ptr);
+        return !memory.hasClobberBetween(
+            .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
+            .{ .block_index = block_index, .instruction_index = instruction_index },
+            load.ptr,
+        );
     }
     return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
-}
-
-fn hasClobber(module: ir.Module, function: ir.Function, candidate: AvailableInstruction, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
-    return memory_ssa.hasClobberBetween(
-        module,
-        function,
-        .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
-        .{ .block_index = block_index, .instruction_index = instruction_index },
-        ptr,
-    );
 }
 
 fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {

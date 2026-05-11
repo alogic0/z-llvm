@@ -58,6 +58,7 @@ pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
 load equality always runs through the shared MemorySSA-like clobber helper
+load availability queries use the persisted local MemorySSA access list
 store-to-load forwarding for must-alias non-volatile stack/pointer locations
 readnone call CSE when callee attributes prove no memory effects
 unknown calls and volatile/atomic accesses clear local memory availability
@@ -113,8 +114,8 @@ after early-cse:
 Known gaps:
 
 ```text
-no full MemorySSA-backed load CSE
 no full MemorySSA walker/updater
+no full MemorySSA-backed load CSE beyond the accepted access-list query
 no readonly call load-preservation model beyond conservative no-clobber
 no freeze CSE because undef/poison semantics need more modeling first
 no commutative operand canonicalization

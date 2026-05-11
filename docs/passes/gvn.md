@@ -65,6 +65,7 @@ shared memory-effect API rejects memory-writing, volatile/atomic, and unknown in
 equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
+load availability queries use the persisted local MemorySSA access list
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
@@ -103,8 +104,8 @@ only checks that unrelated scalar expressions still use the normal GVN path.
 Known gaps:
 
 ```text
-no load PRE or MemorySSA
-no MemorySSA-backed memory value numbering
+no load PRE
+no MemorySSA-backed memory value numbering beyond the accepted access-list query
 no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing

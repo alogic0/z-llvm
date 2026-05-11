@@ -19,16 +19,32 @@ pub fn forPointer(function: ir.Function, ptr: ir.Value) ?MemoryLocation {
     return build(function, ptr, null);
 }
 
+pub fn forPointerInModule(module: ir.Module, function: ir.Function, ptr: ir.Value) ?MemoryLocation {
+    return buildInModule(module, function, null, ptr, null);
+}
+
 pub fn forPointerWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value) ?MemoryLocation {
     return buildWithLayout(function, layout, ptr, null);
+}
+
+pub fn forPointerInModuleWithLayout(module: ir.Module, function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value) ?MemoryLocation {
+    return buildInModule(module, function, layout, ptr, null);
 }
 
 pub fn forAccess(function: ir.Function, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
     return build(function, ptr, typeSize(access_ty));
 }
 
+pub fn forAccessInModule(module: ir.Module, function: ir.Function, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
+    return buildInModule(module, function, null, ptr, typeSize(access_ty));
+}
+
 pub fn forAccessWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
     return buildWithLayout(function, layout, ptr, typeSizeWithLayout(layout, access_ty));
+}
+
+pub fn forAccessInModuleWithLayout(module: ir.Module, function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
+    return buildInModule(module, function, layout, ptr, typeSizeWithLayout(layout, access_ty));
 }
 
 fn build(function: ir.Function, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
@@ -37,6 +53,41 @@ fn build(function: ir.Function, ptr: ir.Value, access_size: ?u64) ?MemoryLocatio
 
 fn buildWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
     return buildInternal(function, layout, ptr, access_size);
+}
+
+fn buildInModule(module: ir.Module, function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
+    return buildInternal(function, layout, ptr, access_size) orelse buildGlobal(module, layout, ptr, access_size);
+}
+
+fn buildGlobal(module: ir.Module, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
+    const raw_name = switch (ptr) {
+        .int, .undef => return null,
+        .named => |name| name,
+    };
+    const name = stripGlobalSigil(raw_name);
+    const root = resolveGlobalAlias(module, name);
+    for (module.globals.items) |global| {
+        if (!std.mem.eql(u8, global.name, root)) continue;
+        return .{
+            .ptr = ptr,
+            .root = global.name,
+            .offset = 0,
+            .size = access_size orelse typeSizeMaybeLayout(layout, global.ty),
+        };
+    }
+    return null;
+}
+
+fn stripGlobalSigil(name: []const u8) []const u8 {
+    if (name.len > 0 and name[0] == '@') return name[1..];
+    return name;
+}
+
+fn resolveGlobalAlias(module: ir.Module, name: []const u8) []const u8 {
+    for (module.aliases.items) |global_alias| {
+        if (std.mem.eql(u8, global_alias.name, name)) return global_alias.target;
+    }
+    return name;
 }
 
 fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
