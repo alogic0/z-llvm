@@ -292,11 +292,13 @@ pub const FunctionLinkage = enum {
     internal,
     private,
     external,
+    weak,
 
     pub fn parse(text: []const u8) ?FunctionLinkage {
         if (std.mem.eql(u8, text, "internal")) return .internal;
         if (std.mem.eql(u8, text, "private")) return .private;
         if (std.mem.eql(u8, text, "external")) return .external;
+        if (std.mem.eql(u8, text, "weak")) return .weak;
         return null;
     }
 
@@ -306,6 +308,7 @@ pub const FunctionLinkage = enum {
             .internal => try writer.writeAll("internal "),
             .private => try writer.writeAll("private "),
             .external => try writer.writeAll("external "),
+            .weak => try writer.writeAll("weak "),
         }
     }
 };

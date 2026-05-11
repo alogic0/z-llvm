@@ -2958,6 +2958,42 @@ test "parser preserves module flags and comdat records" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves weak linkage and verifier rejects unknown comdat references" {
+    const weak_ir =
+        \\@weak_global = weak global i32 1
+        \\
+        \\define weak i32 @weak_function() {
+        \\entry:
+        \\  ret i32 1
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, weak_ir);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqual(ir.FunctionLinkage.weak, module.globals.items[0].linkage);
+    try std.testing.expectEqual(ir.FunctionLinkage.weak, module.functions.items[0].linkage);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(weak_ir, output.writer.buffered());
+
+    const bad_comdat =
+        \\@member = internal global i32 1, comdat($missing)
+        \\
+        \\define i32 @read_member() {
+        \\entry:
+        \\  %v = load i32, ptr @member, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var bad_module = try ir.Module.parse(std.testing.allocator, bad_comdat);
+    defer bad_module.deinit();
+    try std.testing.expectError(error.InvalidComdat, bad_module.verify());
+}
+
 test "parser preserves size attributes and profile metadata opaquely" {
     const input =
         \\define minsize optsize i32 @small(i1 %cond, i32 %a) #0 {

@@ -282,11 +282,20 @@ pub fn verify(module: core.Module) !void {
     defer global_defs.deinit();
     var decl_defs = std.StringHashMap(void).init(module.allocator);
     defer decl_defs.deinit();
+    var comdat_defs = std.StringHashMap(void).init(module.allocator);
+    defer comdat_defs.deinit();
+
+    for (module.comdats.items) |comdat| {
+        const name = parseComdatRecordName(comdat) orelse return error.InvalidComdat;
+        if (comdat_defs.contains(name)) return error.InvalidComdat;
+        try comdat_defs.put(name, {});
+    }
 
     for (module.globals.items) |global| {
         if (global_defs.contains(global.name)) return error.DuplicateDefinition;
         try global_defs.put(global.name, {});
         try verifyGlobalAddressAttrs(global.address_attrs);
+        try verifyComdatReference(global.attrs, comdat_defs);
         switch (global.initializer) {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
@@ -328,6 +337,7 @@ pub fn verify(module: core.Module) !void {
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
         if (findDeclaration(module, function.name)) |decl| try verifyDeclMatchesFunction(decl, function);
         try verifyFunctionAbiAttrs(function);
+        try verifyComdatReference(function.attrs, comdat_defs);
         try global_defs.put(function.name, {});
     }
 
@@ -1131,6 +1141,28 @@ fn verifyGlobalAddressAttrs(address_attrs: ?[]const u8) !void {
             continue;
         }
         return error.UnsupportedGlobalVariable;
+    }
+}
+
+fn parseComdatRecordName(comdat: []const u8) ?[]const u8 {
+    var parts = std.mem.tokenizeAny(u8, comdat, " \t");
+    const name = parts.next() orelse return null;
+    if (!std.mem.startsWith(u8, name, "$") or name.len == 1) return null;
+    if (!std.mem.eql(u8, parts.next() orelse return null, "=")) return null;
+    if (!std.mem.eql(u8, parts.next() orelse return null, "comdat")) return null;
+    return name;
+}
+
+fn verifyComdatReference(attrs: ?[]const u8, comdat_defs: std.StringHashMap(void)) !void {
+    const text = attrs orelse return;
+    var rest = text;
+    while (std.mem.indexOf(u8, rest, "comdat(")) |relative_start| {
+        const start = relative_start + "comdat(".len;
+        const after_start = rest[start..];
+        const close = std.mem.indexOfScalar(u8, after_start, ')') orelse return error.InvalidComdat;
+        const name = after_start[0..close];
+        if (!std.mem.startsWith(u8, name, "$") or !comdat_defs.contains(name)) return error.InvalidComdat;
+        rest = after_start[close + 1 ..];
     }
 }
 

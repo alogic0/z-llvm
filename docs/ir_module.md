@@ -36,7 +36,7 @@ scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
 thread_local scalar global and constant definitions preserved as raw address attributes
 known TLS model spellings preserved as raw address attributes
 global suffix attributes preserved as raw text
-function linkage: default, internal, private, external
+function/global linkage: default, internal, private, external, weak
 function visibility: default, hidden, protected
 function calling conventions preserved: ccc, fastcc, coldcc
 function header attributes preserved as raw text
@@ -57,8 +57,9 @@ The records are preserved and lightly validated; transforms do not consume most 
 Function linkage and visibility are preserved for the first definition forms. Function and parameter attributes are parse-preserve-only metadata today.
 Calling conventions are preserved in the function signature because they are ABI-relevant in LLVM, but this project does not lower or verify their target ABI effects yet.
 Scalar global definitions are preserved at module level. They are not yet visible to load/store analysis, constant folding, or codegen.
-COMDAT records are preserved and treated conservatively by GlobalDCE when
-referenced from raw global/function attributes.
+COMDAT records are preserved, references to modeled COMDAT records are verified,
+and members are treated conservatively by GlobalDCE when referenced from raw
+global/function attributes.
 Thread-local globals are preserved and treated conservatively by GlobalDCE as
 concurrency-visible roots.
 ```
@@ -67,10 +68,10 @@ Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  globaldce_weak_root
 
 local-only conservative:
-  none currently
+  globaldce_comdat_root
 
 unit-test only:
   module record round-trip
@@ -79,6 +80,8 @@ unit-test only:
   function calling convention round-trip
   scalar global and constant global round-trip
   COMDAT record and module flag metadata round-trip
+  unknown COMDAT reference rejection
+  weak linkage round-trip
   raw top-level module metadata round-trip
   unsupported aggregate global diagnostic
   void function and ret void verification

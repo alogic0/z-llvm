@@ -42,6 +42,7 @@ Implemented subset:
 ```text
 module-level dependency graph for supported functions and globals
 externally visible functions, globals, and aliases are live roots
+weak functions and globals are externally visible live roots
 non-local function definitions are roots
 direct calls from live functions mark local function definitions live
 exported aliases mark their target functions/globals live
@@ -74,6 +75,7 @@ Fixture coverage:
 opt-22 equivalent:
   globaldce_basic
   globaldce_alias_root
+  globaldce_weak_root
 
 local-only conservative:
   globaldce_comdat_root
@@ -84,6 +86,7 @@ local-only conservative:
 unit-test only:
   globaldce removes unreferenced local functions and globals
   exported alias keeps a private target function live
+  weak linkage is preserved and rooted
   COMDAT members are preserved conservatively
   thread-local globals are preserved conservatively
   known TLS model spellings are preserved and unknown models fail verifier checks

@@ -59,6 +59,8 @@ no global initializer rewriting
 no identical constant merging
 no available_externally model
 no GlobalsAA facts yet
+weak linkage is handled only by GlobalDCE root classification; it is not used
+by GlobalOpt, ConstantMerge, or LTO import/export decisions.
 ```
 
 Fixture coverage:
