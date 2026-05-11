@@ -270,7 +270,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 const later = accessLocation(function, layout, later_store.ptr, later_store.ty) orelse return false;
                 switch (alias.aliasLocations(later, location)) {
                     .must_alias => return fullyOverwrites(later, location),
-                    .may_alias => return false,
+                    .partial_alias, .may_alias => return false,
                     .no_alias => {},
                 }
             },

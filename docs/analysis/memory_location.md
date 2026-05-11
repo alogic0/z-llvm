@@ -128,7 +128,8 @@ no address spaces
 no globals
 no capture-sensitive disambiguation between distinct parameters
 no calls
-no partial_alias result
+partial_alias is represented by alias analysis when two MemoryLocation ranges
+overlap but are not identical
 no aggregate, struct, or vector layout
 no LLVM-equivalent structured GEP decomposition
 no metadata such as TBAA, alias.scope, or invariant.group

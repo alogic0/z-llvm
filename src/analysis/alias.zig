@@ -6,6 +6,7 @@ const memory_location = @import("memory_location.zig");
 pub const AliasResult = enum {
     no_alias,
     may_alias,
+    partial_alias,
     must_alias,
 };
 
@@ -54,8 +55,12 @@ pub fn aliasLocations(a: memory_location.MemoryLocation, b: memory_location.Memo
         if (a.root_kind == .parameter or b.root_kind == .parameter) return .may_alias;
         return .no_alias;
     }
-    if (a.offset != null and b.offset != null and a.offset.? == b.offset.?) return .must_alias;
     if (rangesDoNotOverlap(a, b)) return .no_alias;
+    if (a.offset != null and b.offset != null and a.offset.? == b.offset.?) {
+        if (a.size == null or b.size == null or a.size.? == b.size.?) return .must_alias;
+        return .partial_alias;
+    }
+    if (rangesOverlap(a, b)) return .partial_alias;
     return .may_alias;
 }
 
@@ -166,4 +171,12 @@ fn rangesDoNotOverlap(a: memory_location.MemoryLocation, b: memory_location.Memo
     const a_end = a.rangeEnd() orelse return false;
     const b_end = b.rangeEnd() orelse return false;
     return a_end <= b_begin or b_end <= a_begin;
+}
+
+fn rangesOverlap(a: memory_location.MemoryLocation, b: memory_location.MemoryLocation) bool {
+    const a_begin = a.offset orelse return false;
+    const b_begin = b.offset orelse return false;
+    const a_end = a.rangeEnd() orelse return false;
+    const b_end = b.rangeEnd() orelse return false;
+    return a_begin < b_end and b_begin < a_end;
 }

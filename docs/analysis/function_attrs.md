@@ -58,6 +58,7 @@ classify direct calls to writeonly callees as memory writes
 classify memory(none), memory(read), and memory(argmem: read) from Zig-emitted
 attribute groups for local mod/ref legality
 classify memory(write) and memory(argmem: write) as write-only memory effects
+feed call memory classification into alias/mod-ref and MemorySSA clobber checks
 classify all other calls as unknown
 ```
 

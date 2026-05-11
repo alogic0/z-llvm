@@ -7,21 +7,32 @@ overstating LLVM parity.
 
 ## Plan
 
-- [ ] Inventory pointer patterns still blocking accepted corpus
+- [x] Inventory pointer patterns still blocking accepted corpus
       optimizations: alloca fields, GEP chains, byval, sret, noalias,
       dereferenceable, and alias metadata.
-- [ ] Add structured memory-location decomposition for supported GEP and
+- [x] Add structured memory-location decomposition for supported GEP and
       aggregate offsets.
-- [ ] Extend alias results with must-alias, no-alias, partial-alias, and
+- [x] Extend alias results with must-alias, no-alias, partial-alias, and
       may-alias cases where size and offset are known.
-- [ ] Wire function and call ModRef facts through the shared memory-effect API.
-- [ ] Add fixtures for alias scopes, parameter attributes, disjoint fields,
+- [x] Wire function and call ModRef facts through the shared memory-effect API.
+- [x] Add fixtures for alias scopes, parameter attributes, disjoint fields,
       overlapping fields, and unknown calls.
-- [ ] Compare equivalent cases against LLVM AA behavior where possible.
-- [ ] Update alias, memory-location, memory-effect, and function-attrs docs.
+- [x] Compare equivalent cases against LLVM AA behavior where possible.
+- [x] Update alias, memory-location, memory-effect, and function-attrs docs.
 
 ## Exit Criteria
 
-- [ ] At least one source-backed memory optimization becomes less conservative.
-- [ ] Partial-overlap cases remain safe and tested.
-- [ ] Alias precision docs identify unsupported LLVM AA providers.
+- [x] At least one source-backed memory optimization becomes less conservative.
+- [x] Partial-overlap cases remain safe and tested.
+- [x] Alias precision docs identify unsupported LLVM AA providers.
+
+## Completed Slice
+
+Cycle 09 adds an explicit `partial_alias` result for known overlapping byte
+ranges. Same-root locations with known disjoint ranges still return `no_alias`;
+same-offset equal or unknown-size locations remain `must_alias`; known
+overlapping but non-identical ranges now return `partial_alias`.
+
+The new partial-overlap fixture keeps EarlyCSE conservative for overlapping
+parameter GEP ranges, while the existing disjoint parameter-GEP fixture remains
+the source-backed precision case.

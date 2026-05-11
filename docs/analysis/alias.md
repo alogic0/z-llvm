@@ -57,14 +57,14 @@ Implemented subset:
   Module-aware global and alias roots for accepted scalar globals
   DataLayout-aware access ranges when the module records a target datalayout
   Known disjoint byte ranges
+  Known partial-overlap byte ranges
   Load/store mod-ref queries
   Volatile/atomic/call unknown barriers
   Alias metadata preservation only; `!tbaa`, `!alias.scope`, and `!noalias`
   are not consumed by alias queries.
 
 Intentional divergences:
-  No address spaces, captures, recursive AA stack, interpreted metadata, or
-  partial-alias result.
+  No address spaces, captures, recursive AA stack, or interpreted metadata.
 
 Analysis preservation/invalidation:
   Alias analysis is rebuilt on demand and has no preserved state.
@@ -88,6 +88,7 @@ trace simple getelementptr chains back to their stack-slot root
 trace simple getelementptr chains from pointer parameters to a parameter root
 must_alias for zero-index GEPs from the same stack slot
 no_alias for non-overlapping same-root stack locations when offsets and byte sizes are known
+partial_alias for known overlapping but non-identical same-root access ranges
 no_mod_ref for non-overlapping same-parameter access ranges when the queried
 access type supplies size
 may_alias for unknown same-root GEP offsets
@@ -102,7 +103,7 @@ Upstream mapping:
 ```text
 This reproduces the stack-slot and pointer-parameter identity, first GEP-root tracing, MemoryLocation-backed byte range checks, and conservative mod/ref scaffolding needed by memory optimizations.
 LLVM BasicAA proves much broader no-alias facts using object identity, GEP offsets, sizes, globals, captures, calls, invariant metadata, and recursive queries through AAResults.
-LLVM's mod/ref queries combine alias analysis with instruction memory behavior; this subset only distinguishes direct load ref, direct store mod, no_mod_ref for known no-alias stack slots, and unknown barriers.
+LLVM's mod/ref queries combine alias analysis with instruction memory behavior; this subset only distinguishes direct load ref, direct store mod, no_mod_ref for known no-alias stack slots, and unknown barriers. Partial-alias ranges remain mod/ref barriers.
 ```
 
 Current users:
@@ -125,7 +126,6 @@ no capture analysis; distinct pointer parameters remain may_alias
 globals are limited to accepted scalar global definitions and aliases
 calls are limited to function-attribute memory-effect classification
 no metadata-driven alias precision; see `docs/analysis/alias_metadata.md`
-no partial_alias result
 no aggregate, struct, or vector layout
 no precise mod_ref result for calls or unknown instructions
 no query cache

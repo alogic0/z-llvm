@@ -4517,6 +4517,33 @@ test "alias analysis classifies source-backed parameter gep offsets" {
     try std.testing.expectEqual(@as(i128, 4), field_location.offset.?);
 }
 
+test "alias analysis classifies partial overlapping access ranges" {
+    const input =
+        \\define i32 @partial_alias(ptr %p) {
+        \\entry:
+        \\  %overlap = getelementptr i8, ptr %p, i64 2
+        \\  %a = load i32, ptr %p, align 4
+        \\  %b = load i32, ptr %overlap, align 1
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expectEqual(
+        alias.AliasResult.partial_alias,
+        alias.accessAlias(function, .{ .named = "p" }, .{ .int = 32 }, .{ .named = "overlap" }, .{ .int = 32 }),
+    );
+    try std.testing.expectEqual(
+        alias.ModRefInfo.ref,
+        alias.modRefForAccess(function, function.blocks.items[0].instructions.items[2], .{ .named = "p" }, .{ .int = 32 }),
+    );
+}
+
 test "alias analysis classifies globals and aliases with module context" {
     const input =
         \\@global_a = internal global i32 0

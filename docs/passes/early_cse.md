@@ -88,6 +88,7 @@ opt-22 equivalent:
   early_cse_volatile_load_reject
   early_cse_load_call_clobber_reject
   early_cse_load_branch_clobber_reject
+  early_cse_param_gep_partial_alias_reject
   early_cse_unreachable_store_not_clobber
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
@@ -110,6 +111,8 @@ local-only conservative:
   parity.
   early_cse_diamond_no_memory_phi proves MemorySSA avoids a join phi for pure
   predecessor diamonds; local leader naming differs from opt-22.
+  early_cse_param_gep_partial_alias_reject keeps overlapping parameter GEP
+  ranges as aliasing barriers.
   debug_early_cse_dbg_preserve preserves the leader instruction location and
   drops the removed redundant instruction location. This is a local
   debug-location-only rule, not LLVM debug-info salvage parity.

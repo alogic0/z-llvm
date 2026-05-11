@@ -249,7 +249,8 @@ Memory IR subset:
 
 Memory legality subset:
   shared memory-effect classification for pure, readonly load, write, and volatile/atomic barrier instructions
-  conservative alias/mod-ref scaffolding for known stack slots and load/store instructions
+  conservative alias/mod-ref scaffolding for known stack slots, globals,
+  parameter GEP ranges, partial-overlap ranges, and load/store instructions
 
 Control-flow IR subset:
   ret

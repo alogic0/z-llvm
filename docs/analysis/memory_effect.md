@@ -47,6 +47,7 @@ split volatile and atomic spelling through barrierKind while keeping both as har
 feed DCE, ADCE, GVN, and LICM legality through the shared classification
 feed EarlyCSE candidate legality through the shared safe-to-delete helper
 pair with alias.modRef for conservative load/store mod-ref answers
+partial-alias ranges from alias analysis remain mod/ref barriers
 pair with the MemorySSA-like clobber helper for GVN load availability
 ```
 
@@ -92,7 +93,8 @@ inline asm constraints and full atomic ordering are not interpreted
 syncscope remains rejected
 no intrinsic classification beyond explicit parser rejection
 no target-library handling and no inferred call attributes
-MemoryLocation size and offset model is limited to scalar stack-slot accesses
+MemoryLocation size and offset model is limited to accepted scalar stack,
+global, and parameter GEP accesses
 no MemoryLocation metadata model
 MemorySSA-like integration is limited to a linear clobber helper for accepted
 load/store/call checks
