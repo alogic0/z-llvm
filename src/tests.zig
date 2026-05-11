@@ -1647,12 +1647,30 @@ test "verifier rejects invalid ABI parameter attributes" {
     try std.testing.expectError(error.UnsupportedAbiType, sret_module.verify());
 }
 
-test "parser rejects varargs at declarations and calls" {
-    const vararg_decl =
-        \\declare void @printf(ptr, ...)
+test "parser preserves source-backed varargs declarations and calls" {
+    const input =
+        \\declare i32 @printf(ptr noundef nonnull readonly align 1 captures(none), ...)
+        \\
+        \\define i32 @caller(ptr %p) {
+        \\entry:
+        \\  %result = call i32 (ptr, ...) @printf(ptr nonnull readonly align 1 dereferenceable(1) %p, double 2.000000e+00)
+        \\  ret i32 %result
+        \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedVarArgs, ir.Module.parse(std.testing.allocator, vararg_decl));
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expect(module.declarations.items[0].is_varargs);
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("(ptr, ...)", call.callee_function_ty.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 
     const vararg_call =
         \\declare void @sink(ptr)

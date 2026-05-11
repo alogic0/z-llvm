@@ -159,6 +159,10 @@ completed foundation epics
 - [x] [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
 - [x] [Project Finish Statement](roadmap/project_finish_statement.md)
 
+## Completed Discovery Cycles
+
+- [x] [Completed Discovery Cycles](roadmap/historical/completed_discovery_cycles/README.md)
+
 Cycle 08 decision: stop this burn-down wave. The readiness gate passes, every
 remaining finish gap has a status, and no new measured cycle is active. Future
 work should be selected from the backlog or a new source-backed blocker.

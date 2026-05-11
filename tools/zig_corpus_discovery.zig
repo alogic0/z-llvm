@@ -45,6 +45,7 @@ const Counts = struct {
     compile_skip: usize = 0,
     emit_ok: usize = 0,
     local_ok: usize = 0,
+    input_too_large: usize = 0,
     parse_fail: usize = 0,
     verify_fail: usize = 0,
     optimizer_fail: usize = 0,
@@ -337,6 +338,8 @@ fn termOk(term: std.process.Child.Term) bool {
 }
 
 fn classifyLocalFailure(passes: []const u8, stderr: []const u8) []const u8 {
+    if (containsAny(stderr, &.{"StreamTooLong"})) return "input-too-large";
+
     if (containsAny(stderr, &.{
         "UnsupportedInstruction",
         "UnsupportedGlobal",
@@ -369,7 +372,9 @@ fn classifyLocalFailure(passes: []const u8, stderr: []const u8) []const u8 {
 }
 
 fn incrementFailure(counts: *Counts, status: []const u8) void {
-    if (std.mem.eql(u8, status, "parse-fail")) {
+    if (std.mem.eql(u8, status, "input-too-large")) {
+        counts.input_too_large += 1;
+    } else if (std.mem.eql(u8, status, "parse-fail")) {
         counts.parse_fail += 1;
     } else if (std.mem.eql(u8, status, "verify-fail")) {
         counts.verify_fail += 1;
@@ -480,6 +485,7 @@ fn writeProgress(
         \\compile_skip={}
         \\emit_ok={}
         \\local_ok={}
+        \\input_too_large={}
         \\parse_fail={}
         \\verify_fail={}
         \\optimizer_fail={}
@@ -496,6 +502,7 @@ fn writeProgress(
         counts.compile_skip,
         counts.emit_ok,
         counts.local_ok,
+        counts.input_too_large,
         counts.parse_fail,
         counts.verify_fail,
         counts.optimizer_fail,
@@ -508,7 +515,7 @@ fn writeProgress(
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const label = if (final) "final" else "progress";
     try stdout_writer.interface.print(
-        "{s} processed={}/{} compile-skip={} emit-ok={} local-ok={} parse-fail={} verify-fail={} optimizer-fail={}\n",
+        "{s} processed={}/{} compile-skip={} emit-ok={} local-ok={} input-too-large={} parse-fail={} verify-fail={} optimizer-fail={}\n",
         .{
             label,
             processed,
@@ -516,6 +523,7 @@ fn writeProgress(
             counts.compile_skip,
             counts.emit_ok,
             counts.local_ok,
+            counts.input_too_large,
             counts.parse_fail,
             counts.verify_fail,
             counts.optimizer_fail,

@@ -63,6 +63,10 @@ pub fn print(module: core.Module, writer: anytype) !void {
             try param.ty.format(writer);
             if (param.attrs) |attrs| try writer.print(" {s}", .{attrs});
         }
+        if (decl.is_varargs) {
+            if (decl.params.items.len != 0) try writer.writeAll(", ");
+            try writer.writeAll("...");
+        }
         try writer.writeByte(')');
         if (decl.attrs) |attrs| try writer.print(" {s}", .{attrs});
         try writer.writeByte('\n');
@@ -196,6 +200,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeByte(' ');
                         try store.value.format(writer);
                         try writer.writeAll(", ptr ");
+                        if (store.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
                         try store.ptr.format(writer);
                         try printMemorySuffix(store.attrs, writer);
                         try printInstructionMetadata(instruction.metadata, writer);
@@ -298,6 +303,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
                         try call.ret_ty.format(writer);
+                        if (call.callee_function_ty) |function_ty| try writer.print(" {s}", .{function_ty});
                         if (call.inline_asm) |inline_asm| {
                             try writer.writeAll(" asm ");
                             if (inline_asm.sideeffect) try writer.writeAll("sideeffect ");

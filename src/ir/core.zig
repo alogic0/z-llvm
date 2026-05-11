@@ -143,7 +143,7 @@ pub const Value = union(enum) {
     pub fn format(value: Value, writer: anytype) !void {
         switch (value) {
             .named => |name| {
-                if (std.mem.startsWith(u8, name, "@")) {
+                if (std.mem.startsWith(u8, name, "@") or std.mem.startsWith(u8, name, "!")) {
                     try writer.writeAll(name);
                 } else {
                     try writer.print("%{s}", .{name});
@@ -304,6 +304,7 @@ pub const FunctionLinkage = enum {
     external,
     extern_weak,
     weak,
+    weak_odr,
 
     pub fn parse(text: []const u8) ?FunctionLinkage {
         if (std.mem.eql(u8, text, "internal")) return .internal;
@@ -311,6 +312,7 @@ pub const FunctionLinkage = enum {
         if (std.mem.eql(u8, text, "external")) return .external;
         if (std.mem.eql(u8, text, "extern_weak")) return .extern_weak;
         if (std.mem.eql(u8, text, "weak")) return .weak;
+        if (std.mem.eql(u8, text, "weak_odr")) return .weak_odr;
         return null;
     }
 
@@ -322,6 +324,7 @@ pub const FunctionLinkage = enum {
             .external => try writer.writeAll("external "),
             .extern_weak => try writer.writeAll("extern_weak "),
             .weak => try writer.writeAll("weak "),
+            .weak_odr => try writer.writeAll("weak_odr "),
         }
     }
 };
@@ -403,10 +406,11 @@ pub const GlobalInitializer = union(enum) {
     scalar: Value,
     array: GlobalArrayInitializer,
     c_string: []const u8,
+    @"opaque": []const u8,
 
     pub fn deinit(initializer: *GlobalInitializer, allocator: std.mem.Allocator) void {
         switch (initializer.*) {
-            .none, .scalar, .c_string => {},
+            .none, .scalar, .c_string, .@"opaque" => {},
             .array => |*array| array.deinit(allocator),
         }
     }
@@ -416,6 +420,7 @@ pub const GlobalInitializer = union(enum) {
             .none => {},
             .scalar => |value| try value.format(writer),
             .c_string => |text| try writer.writeAll(text),
+            .@"opaque" => |text| try writer.writeAll(text),
             .array => |array| {
                 try writer.writeByte('[');
                 for (array.values.items, 0..) |value, index| {
@@ -438,6 +443,7 @@ pub const FunctionDecl = struct {
     calling_conv: ?[]const u8 = null,
     ret_attrs: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
+    is_varargs: bool = false,
     params: std.ArrayList(DeclParam),
 
     pub fn init(name: []const u8, ret_ty: Type) FunctionDecl {
@@ -564,7 +570,7 @@ pub const MemoryAttrs = struct {
     is_volatile: bool = false,
     atomic_ordering: ?[]const u8 = null,
     syncscope: ?[]const u8 = null,
-    @"align": ?u32 = null,
+    @"align": ?u64 = null,
 
     pub fn isAtomic(attrs: MemoryAttrs) bool {
         return attrs.atomic_ordering != null;
@@ -578,6 +584,7 @@ pub const MemoryAttrs = struct {
 pub const LoadInst = struct {
     ty: Type,
     ptr: Value,
+    ptr_addrspace: ?[]const u8 = null,
     attrs: MemoryAttrs = .{},
 };
 
@@ -585,6 +592,7 @@ pub const StoreInst = struct {
     ty: Type,
     value: Value,
     ptr: Value,
+    ptr_addrspace: ?[]const u8 = null,
     attrs: MemoryAttrs = .{},
 };
 
@@ -596,7 +604,7 @@ pub const AtomicRmwInst = struct {
     ordering: []const u8,
     syncscope: ?[]const u8 = null,
     is_volatile: bool = false,
-    @"align": ?u32 = null,
+    @"align": ?u64 = null,
 };
 
 pub const CmpxchgInst = struct {
@@ -609,7 +617,7 @@ pub const CmpxchgInst = struct {
     syncscope: ?[]const u8 = null,
     is_weak: bool = false,
     is_volatile: bool = false,
-    @"align": ?u32 = null,
+    @"align": ?u64 = null,
 };
 
 pub const FenceInst = struct {
@@ -674,6 +682,7 @@ pub const CallInst = struct {
     ret_ty: Type,
     callee: []const u8,
     callee_value: ?Value = null,
+    callee_function_ty: ?[]const u8 = null,
     calling_conv: ?[]const u8 = null,
     tail_kind: ?[]const u8 = null,
     inline_asm: ?InlineAsm = null,

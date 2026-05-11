@@ -201,6 +201,7 @@ const VerifyContext = struct {
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
+        if (std.mem.startsWith(u8, name, "!")) return if (ty == .metadata) {} else error.TypeMismatch;
         const def = ctx.defs.get(name) orelse return error.UnknownValue;
         if (!def.ty.eql(ty)) return error.TypeMismatch;
         try ctx.verifyDominatesUse(def, use_block_index, use_instruction_index);
@@ -222,6 +223,7 @@ const VerifyContext = struct {
             .named => |name| name,
         };
         if (isGlobalValueName(name) and ty == .ptr) return;
+        if (std.mem.startsWith(u8, name, "!")) return if (ty == .metadata) {} else error.TypeMismatch;
         const def = ctx.defs.get(name) orelse return error.UnknownValue;
         if (!def.ty.eql(ty)) return error.TypeMismatch;
         if (!ctx.reachable[predecessor_index]) return;
@@ -246,25 +248,50 @@ const VerifyContext = struct {
     }
 
     fn verifyPhiIncomingBlocks(ctx: VerifyContext, block_index: usize, phi: core.PhiInst) !void {
-        var seen = try ctx.allocator.alloc(bool, ctx.block_count);
-        defer ctx.allocator.free(seen);
-        @memset(seen, false);
+        var incoming_counts = try ctx.allocator.alloc(usize, ctx.block_count);
+        defer ctx.allocator.free(incoming_counts);
+        @memset(incoming_counts, 0);
 
         for (phi.incoming.items) |incoming| {
             const predecessor_index = ctx.function.blockIndex(incoming.block) orelse return error.UnknownBlock;
-            if (!ctx.hasEdge(predecessor_index, block_index)) return error.PhiIncomingNotPredecessor;
-            if (seen[predecessor_index]) return error.DuplicatePhiIncoming;
-            seen[predecessor_index] = true;
+            const edge_count = ctx.edgeCount(predecessor_index, block_index);
+            if (edge_count == 0) return error.PhiIncomingNotPredecessor;
+            incoming_counts[predecessor_index] += 1;
+            if (incoming_counts[predecessor_index] > edge_count) return error.DuplicatePhiIncoming;
         }
 
         for (0..ctx.block_count) |predecessor_index| {
-            if (!ctx.hasEdge(predecessor_index, block_index)) continue;
-            if (!seen[predecessor_index]) return error.MissingPhiIncoming;
+            const edge_count = ctx.edgeCount(predecessor_index, block_index);
+            if (edge_count == 0) continue;
+            if (incoming_counts[predecessor_index] != edge_count) return error.MissingPhiIncoming;
         }
     }
 
     fn hasEdge(ctx: VerifyContext, from: usize, to: usize) bool {
         return ctx.predecessors[ctx.edgeIndex(from, to)];
+    }
+
+    fn edgeCount(ctx: VerifyContext, from: usize, to: usize) usize {
+        const target_name = ctx.function.blocks.items[to].name;
+        const terminator = ctx.function.blocks.items[from].terminator orelse return 0;
+        var count: usize = 0;
+        switch (terminator) {
+            .ret, .@"unreachable" => {},
+            .br => |br| {
+                if (std.mem.eql(u8, br.target, target_name)) count += 1;
+            },
+            .condbr => |condbr| {
+                if (std.mem.eql(u8, condbr.then_target, target_name)) count += 1;
+                if (std.mem.eql(u8, condbr.else_target, target_name)) count += 1;
+            },
+            .@"switch" => |switch_term| {
+                if (std.mem.eql(u8, switch_term.default_target, target_name)) count += 1;
+                for (switch_term.cases.items) |case| {
+                    if (std.mem.eql(u8, case.target, target_name)) count += 1;
+                }
+            },
+        }
+        return count;
     }
 
     fn dominates(ctx: VerifyContext, dominator: usize, block: usize) bool {
@@ -306,7 +333,7 @@ pub fn verify(module: core.Module) !void {
         switch (global.initializer) {
             .none => switch (global.linkage) {
                 .external, .extern_weak => {},
-                .default, .internal, .private, .weak => return error.UnsupportedGlobalVariable,
+                .default, .internal, .private, .weak, .weak_odr => return error.UnsupportedGlobalVariable,
             },
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
@@ -314,12 +341,12 @@ pub fn verify(module: core.Module) !void {
                     .named, .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
-                    .undef, .null_value => {},
-                    .int, .fp, .named, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
+                    .undef, .null_value, .named => {},
+                    .int, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .aggregate => switch (value) {
-                    .undef => {},
-                    .int, .fp, .named, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
+                    .undef, .zero_initializer => {},
+                    .int, .fp, .named, .null_value, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .void, .float, .double, .metadata, .vector => return error.UnsupportedGlobalVariable,
             },
@@ -336,6 +363,13 @@ pub fn verify(module: core.Module) !void {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
                 if (!array_ty.elem_ty.eql(.{ .int = 8 })) return error.UnsupportedGlobalVariable;
                 if (!std.mem.startsWith(u8, text, "c\"") or !std.mem.endsWith(u8, text, "\"")) return error.UnsupportedGlobalVariable;
+            },
+            .@"opaque" => |text| {
+                if (text.len == 0) return error.UnsupportedGlobalVariable;
+                switch (global.ty) {
+                    .aggregate => {},
+                    .void, .int, .float, .double, .metadata, .ptr, .vector => return error.UnsupportedGlobalVariable,
+                }
             },
         }
     }
@@ -363,6 +397,14 @@ pub fn verify(module: core.Module) !void {
 
     for (module.aliases.items) |alias| {
         if (!hasGlobalValue(module, alias.target)) return error.UnknownGlobalAliasTarget;
+    }
+    for (module.globals.items) |global| {
+        if (global.initializer == .scalar and global.ty == .ptr) {
+            switch (global.initializer.scalar) {
+                .named => |name| if (isGlobalValueName(name) and !hasGlobalValue(module, name[1..])) return error.UnknownGlobalAliasTarget,
+                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+            }
+        }
     }
 
     for (module.functions.items) |function| {
@@ -777,10 +819,7 @@ fn verifyFunctionAbiAttrs(function: core.Function) !void {
 }
 
 fn verifyParamAbiAttrs(ty: core.Type, attrs: ?[]const u8) !void {
-    const text = attrs orelse return;
-    if ((hasAbiAttr(text, "byval") or hasAbiAttr(text, "sret")) and ty != .ptr) {
-        return error.UnsupportedAbiType;
-    }
+    try verifyParameterAttrs(ty, attrs);
 }
 
 fn hasAbiAttr(attrs: []const u8, name: []const u8) bool {
@@ -838,11 +877,14 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     if (findDeclaration(module, call.callee)) |decl| {
         if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, decl.calling_conv)) return error.CallSignatureMismatch;
-        if (call.args.items.len != decl.params.items.len) return error.CallSignatureMismatch;
-        for (call.args.items, 0..) |arg, index| {
+        if (decl.is_varargs) {
+            if (call.args.items.len < decl.params.items.len) return error.CallSignatureMismatch;
+        } else if (call.args.items.len != decl.params.items.len) return error.CallSignatureMismatch;
+        for (call.args.items[0..decl.params.items.len], 0..) |arg, index| {
             if (!arg.ty.eql(decl.params.items[index].ty)) return error.CallSignatureMismatch;
             try verifyCallArg(ctx, arg, block_index, instruction_index);
         }
+        for (call.args.items[decl.params.items.len..]) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
         return;
     }
 
@@ -866,14 +908,26 @@ fn verifyCallArg(ctx: VerifyContext, arg: core.CallArg, block_index: usize, inst
 }
 
 fn verifyCallArgAttrs(ty: core.Type, attrs: ?[]const u8) !void {
+    try verifyParameterAttrs(ty, attrs);
+}
+
+fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var rest = std.mem.trim(u8, attrs orelse return, " \t");
     if (rest.len == 0) return error.UnsupportedCallAttribute;
-    if (ty != .ptr) return error.UnsupportedCallAttribute;
 
     var saw_nonnull = false;
+    var saw_noundef = false;
+    var saw_noalias = false;
     var saw_readonly = false;
+    var saw_writeonly = false;
+    var saw_readnone = false;
+    var saw_captures = false;
     var saw_align = false;
     var saw_dereferenceable = false;
+    var saw_immarg = false;
+    var saw_range = false;
+    var saw_sret = false;
+    var saw_byval = false;
 
     while (rest.len != 0) {
         const token = firstAttrToken(rest);
@@ -883,28 +937,104 @@ fn verifyCallArgAttrs(ty: core.Type, attrs: ?[]const u8) !void {
         if (std.mem.eql(u8, token, "nonnull")) {
             if (saw_nonnull) return error.UnsupportedCallAttribute;
             saw_nonnull = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "noundef")) {
+            if (saw_noundef) return error.UnsupportedCallAttribute;
+            saw_noundef = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "noalias")) {
+            if (saw_noalias) return error.UnsupportedCallAttribute;
+            saw_noalias = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
             continue;
         }
         if (std.mem.eql(u8, token, "readonly")) {
             if (saw_readonly) return error.UnsupportedCallAttribute;
             saw_readonly = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "writeonly")) {
+            if (saw_writeonly) return error.UnsupportedCallAttribute;
+            saw_writeonly = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "readnone")) {
+            if (saw_readnone) return error.UnsupportedCallAttribute;
+            saw_readnone = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "returned")) {
+            continue;
+        }
+        if (std.mem.eql(u8, token, "zeroext") or std.mem.eql(u8, token, "signext")) {
+            switch (ty) {
+                .int => {},
+                else => return error.UnsupportedCallAttribute,
+            }
+            continue;
+        }
+        if (std.mem.eql(u8, token, "captures(none)") or std.mem.eql(u8, token, "captures(address_is_null)")) {
+            if (saw_captures) return error.UnsupportedCallAttribute;
+            saw_captures = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
             continue;
         }
         if (std.mem.eql(u8, token, "align")) {
             if (saw_align) return error.UnsupportedCallAttribute;
             saw_align = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
             const align_token = firstAttrToken(rest);
             if (align_token.len == 0) return error.InvalidAlignment;
             rest = std.mem.trim(u8, rest[align_token.len..], " \t");
-            const alignment = try std.fmt.parseInt(u32, align_token, 10);
+            const alignment = try std.fmt.parseInt(u64, align_token, 10);
             try verifyAlignment(alignment);
             continue;
         }
         if (dereferenceablePayload(token)) |payload| {
             if (saw_dereferenceable) return error.UnsupportedCallAttribute;
             saw_dereferenceable = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
             if (payload.len == 0) return error.UnsupportedCallAttribute;
             _ = try std.fmt.parseInt(u64, payload, 10);
+            continue;
+        }
+        if (abiPayload(token, "sret")) |payload| {
+            if (saw_sret) return error.UnsupportedCallAttribute;
+            saw_sret = true;
+            if (ty != .ptr) return error.UnsupportedAbiType;
+            if (payload.len == 0) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (abiPayload(token, "byval")) |payload| {
+            if (saw_byval) return error.UnsupportedCallAttribute;
+            saw_byval = true;
+            if (ty != .ptr) return error.UnsupportedAbiType;
+            if (payload.len == 0) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (abiPayload(token, "initializes")) |payload| {
+            if (ty != .ptr or payload.len == 0) return error.UnsupportedCallAttribute;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "immarg")) {
+            if (saw_immarg) return error.UnsupportedCallAttribute;
+            saw_immarg = true;
+            switch (ty) {
+                .int => {},
+                else => return error.UnsupportedCallAttribute,
+            }
+            continue;
+        }
+        if (rangePayload(token)) |payload| {
+            if (saw_range) return error.UnsupportedCallAttribute;
+            saw_range = true;
+            try verifyRangeAttrPayload(ty, payload);
             continue;
         }
         return error.UnsupportedCallAttribute;
@@ -916,6 +1046,31 @@ fn dereferenceablePayload(token: []const u8) ?[]const u8 {
     if (!std.mem.startsWith(u8, token, prefix)) return null;
     if (!std.mem.endsWith(u8, token, ")")) return null;
     return token[prefix.len .. token.len - 1];
+}
+
+fn abiPayload(token: []const u8, name: []const u8) ?[]const u8 {
+    if (!std.mem.startsWith(u8, token, name)) return null;
+    if (token.len <= name.len or token[name.len] != '(' or !std.mem.endsWith(u8, token, ")")) return null;
+    return token[name.len + 1 .. token.len - 1];
+}
+
+fn rangePayload(token: []const u8) ?[]const u8 {
+    const prefix = "range(";
+    if (!std.mem.startsWith(u8, token, prefix) or !std.mem.endsWith(u8, token, ")")) return null;
+    return token[prefix.len .. token.len - 1];
+}
+
+fn verifyRangeAttrPayload(ty: core.Type, payload: []const u8) !void {
+    switch (ty) {
+        .int => {},
+        else => return error.UnsupportedCallAttribute,
+    }
+    var parts = std.mem.tokenizeAny(u8, payload, " \t,");
+    const range_ty = parseType(parts.next() orelse return error.UnsupportedCallAttribute) catch return error.UnsupportedCallAttribute;
+    if (!range_ty.eql(ty)) return error.UnsupportedCallAttribute;
+    _ = try std.fmt.parseInt(i128, parts.next() orelse return error.UnsupportedCallAttribute, 10);
+    _ = try std.fmt.parseInt(i128, parts.next() orelse return error.UnsupportedCallAttribute, 10);
+    if (parts.next() != null) return error.UnsupportedCallAttribute;
 }
 
 fn verifyNamedTypes(module: core.Module) !void {
@@ -989,13 +1144,18 @@ fn verifyConstantExprValue(ty: core.Type, text: []const u8) anyerror!void {
         if (!cast.to_ty.eql(ty)) return error.InvalidCast;
         return;
     }
+    if (std.mem.startsWith(u8, text, "getelementptr ")) {
+        if (ty != .ptr) return error.TypeMismatch;
+        return;
+    }
     return error.UnsupportedConstantExpr;
 }
 
 fn verifyConstantExprOperand(ty: core.Type, value_text: []const u8) anyerror!void {
     if (std.mem.startsWith(u8, value_text, "inttoptr (") or
         std.mem.startsWith(u8, value_text, "ptrtoint (") or
-        std.mem.startsWith(u8, value_text, "sub ("))
+        std.mem.startsWith(u8, value_text, "sub (") or
+        std.mem.startsWith(u8, value_text, "getelementptr "))
     {
         try verifyConstantExprValue(ty, value_text);
         return;
@@ -1415,7 +1575,7 @@ fn verifyStoreMemoryAttrs(attrs: core.MemoryAttrs) !void {
     if (attrs.atomic_ordering) |ordering| try verifyAtomicStoreOrdering(ordering);
 }
 
-fn verifyAlignment(alignment: u32) !void {
+fn verifyAlignment(alignment: u64) !void {
     if (alignment == 0) return error.InvalidAlignment;
     if (!std.math.isPowerOfTwo(alignment)) return error.InvalidAlignment;
 }

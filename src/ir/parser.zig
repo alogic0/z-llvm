@@ -202,7 +202,11 @@ fn parseNamedTypeDefinition(line: []const u8) !core.NamedTypeDefinition {
     if (!std.mem.startsWith(u8, rest, "type ")) return error.InvalidNamedTypeDefinition;
     const body = std.mem.trim(u8, rest["type ".len..], " \t");
     if (body.len == 0) return error.InvalidNamedTypeDefinition;
-    if (body[0] != '{' or body[body.len - 1] != '}') return error.UnsupportedNamedTypeDefinition;
+    if (!((body[0] == '{' and body[body.len - 1] == '}') or
+        (body.len >= 3 and std.mem.startsWith(u8, body, "<{") and std.mem.endsWith(u8, body, "}>"))))
+    {
+        return error.UnsupportedNamedTypeDefinition;
+    }
 
     return .{
         .name = name[1..],
@@ -213,6 +217,7 @@ fn parseNamedTypeDefinition(line: []const u8) !core.NamedTypeDefinition {
 
 fn isSupportedNamedTypeName(name: []const u8) bool {
     if (name.len <= 1 or name[0] != '%') return false;
+    if (name[1] == '"') return name.len >= 3 and name[name.len - 1] == '"';
     for (name[1..]) |byte| switch (byte) {
         'a'...'z', 'A'...'Z', '0'...'9', '.', '_', '-' => {},
         else => return false,
@@ -260,12 +265,11 @@ fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
     if (aliased_ty.len == 0) return error.InvalidGlobalAlias;
 
     const target_text = std.mem.trim(u8, alias_body[comma + 1 ..], " \t");
-    var target_parts = std.mem.tokenizeAny(u8, target_text, " \t");
-    const target_ty = try parseType(target_parts.next() orelse return error.InvalidGlobalAlias);
+    const parsed_target = try parseLeadingType(target_text);
+    const target_ty = parsed_target.ty;
     if (target_ty != .ptr) return error.UnsupportedGlobalAlias;
-    const target_name = target_parts.next() orelse return error.InvalidGlobalAlias;
-    if (target_parts.next() != null) return error.UnsupportedGlobalAlias;
-    if (!std.mem.startsWith(u8, target_name, "@") or target_name.len == 1) return error.UnsupportedGlobalAlias;
+    const target_name = std.mem.trim(u8, parsed_target.after, " \t");
+    if (!isSupportedGlobalIdentifier(target_name)) return error.UnsupportedGlobalAlias;
 
     return .{
         .name = name_text[1..],
@@ -274,6 +278,12 @@ fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
         .target_ty = target_ty,
         .target = target_name[1..],
     };
+}
+
+fn isSupportedGlobalIdentifier(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "@") or text.len == 1) return false;
+    if (text[1] == '"') return text.len >= 3 and text[text.len - 1] == '"';
+    return std.mem.indexOfAny(u8, text, " \t") == null;
 }
 
 fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
@@ -345,6 +355,13 @@ fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
             .rest = trimmed[close + 1 ..],
         };
     }
+    if (trimmed[0] == '{') {
+        const close = findMatchingBrace(trimmed, 0) orelse return error.UnsupportedGlobalVariable;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .rest = trimmed[close + 1 ..],
+        };
+    }
 
     const end = std.mem.indexOfAny(u8, trimmed, " \t,") orelse trimmed.len;
     return .{
@@ -366,14 +383,15 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
         return .{ .c_string = text };
     }
     if (ty == .aggregate and std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, "]")) {
-        return .{ .array = try parseGlobalArrayInitializer(allocator, ty, text) };
+        const array = parseGlobalArrayInitializer(allocator, ty, text) catch return core.GlobalInitializer{ .@"opaque" = text };
+        return .{ .array = array };
     }
 
+    if (ty == .aggregate and std.mem.indexOfAny(u8, text, " \t") != null) return .{ .@"opaque" = text };
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => .{ .scalar = value },
-        .named => error.UnsupportedGlobalVariable,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr, .named => .{ .scalar = value },
     };
 }
 
@@ -480,6 +498,20 @@ fn findMatchingBracket(text: []const u8, open_index: usize) ?usize {
         if (byte == '[') {
             depth += 1;
         } else if (byte == ']') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
+fn findMatchingBrace(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '{') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '{') {
+            depth += 1;
+        } else if (byte == '}') {
             depth -= 1;
             if (depth == 0) return index;
         }
@@ -594,14 +626,22 @@ fn trimFirstToken(text: []const u8) []const u8 {
 fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text: []const u8) !void {
     const params_text = std.mem.trim(u8, text, " \t");
     if (params_text.len == 0) return;
-    if (std.mem.eql(u8, params_text, "...")) return error.UnsupportedVarArgs;
+    if (std.mem.eql(u8, params_text, "...")) {
+        decl.is_varargs = true;
+        return;
+    }
 
     var rest = params_text;
     while (rest.len != 0) {
         const comma = findTopLevelComma(rest);
         const raw_param = if (comma) |index| rest[0..index] else rest;
         const param_text = std.mem.trim(u8, raw_param, " \t");
-        if (std.mem.eql(u8, param_text, "...")) return error.UnsupportedVarArgs;
+        if (std.mem.eql(u8, param_text, "...")) {
+            decl.is_varargs = true;
+            rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+            if (rest.len != 0) return error.UnsupportedVarArgs;
+            break;
+        }
         const parsed_ty = try parseLeadingType(param_text);
         var parts = std.mem.tokenizeAny(u8, parsed_ty.after, " \t");
         const attrs_start = if (parts.next()) |part| @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr) else null;
@@ -690,6 +730,7 @@ fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
     const key = firstToken(attachment) orelse return false;
     if (attachment.len == key.len) return false;
     return std.mem.eql(u8, key, "!dbg") or
+        std.mem.eql(u8, key, "!prof") or
         std.mem.eql(u8, key, "!tbaa") or
         std.mem.eql(u8, key, "!alias.scope") or
         std.mem.eql(u8, key, "!noalias");
@@ -766,7 +807,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (core.CastOp.parse(op_text)) |op| {
-        if (std.mem.eql(u8, parts.peek() orelse return error.InvalidInstruction, "nneg")) _ = parts.next();
+        while (isCastFlag(parts.peek() orelse return error.InvalidInstruction)) _ = parts.next();
         const from_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
         if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "to")) return error.InvalidInstruction;
@@ -858,6 +899,12 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
         .result = result_text[1..],
         .kind = .{ .binary = binary },
     };
+}
+
+fn isCastFlag(text: []const u8) bool {
+    return std.mem.eql(u8, text, "nneg") or
+        std.mem.eql(u8, text, "nsw") or
+        std.mem.eql(u8, text, "nuw");
 }
 
 fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
@@ -1038,6 +1085,13 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     const ret_ty_offset = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
     rest = std.mem.trim(u8, rest[ret_ty_offset..], " \t");
 
+    const callee_function_ty: ?[]const u8 = if (rest.len != 0 and rest[0] == '(') blk: {
+        const close = findMatchingParen(rest, 0) orelse return error.InvalidCall;
+        const function_ty = rest[0 .. close + 1];
+        rest = std.mem.trim(u8, rest[close + 1 ..], " \t");
+        break :blk function_ty;
+    } else null;
+
     const open_paren = std.mem.indexOfScalar(u8, rest, '(') orelse return error.InvalidCall;
     const close_paren = std.mem.lastIndexOfScalar(u8, rest, ')') orelse return error.InvalidCall;
     if (close_paren < open_paren) return error.InvalidCall;
@@ -1069,6 +1123,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .ret_ty = ret_ty,
         .callee = if (inline_asm == null and callee_value == null) callee_text[1..] else "",
         .callee_value = callee_value,
+        .callee_function_ty = callee_function_ty,
         .calling_conv = calling_conv,
         .tail_kind = tail_kind,
         .inline_asm = inline_asm,
@@ -1234,7 +1289,7 @@ fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []con
 fn parseCallArg(text: []const u8) !core.CallArg {
     const typed = try parseLeadingType(text);
     if (typed.after.len == 0) return error.InvalidCall;
-    if (!callArgMayContainAttrs(typed.after)) {
+    if (callArgRemainderMayBeWholeValue(typed.after)) {
         if (parseValue(typed.after)) |value| {
             return .{
                 .ty = typed.ty,
@@ -1243,17 +1298,60 @@ fn parseCallArg(text: []const u8) !core.CallArg {
         } else |_| {}
     }
 
-    const value_start = findTrailingValueStart(typed.after) orelse return error.InvalidCall;
+    if (!callArgMayContainAttrs(typed.after)) {
+        return error.InvalidCall;
+    }
+
+    const value_start = findConstantExprValueStart(typed.after) orelse
+        (findTrailingValueStart(typed.after) orelse return error.InvalidCall);
     if (value_start == 0) return error.InvalidCall;
     const attrs = std.mem.trim(u8, typed.after[0..value_start], " \t");
     const value_text = std.mem.trim(u8, typed.after[value_start..], " \t");
     if (attrs.len == 0 or value_text.len == 0) return error.InvalidCall;
-    if (std.mem.indexOfAny(u8, value_text, " \t") != null) return error.UnsupportedCallAttribute;
+    if (std.mem.indexOfAny(u8, value_text, " \t") != null and !isSupportedConstantExpr(value_text)) {
+        return error.UnsupportedCallAttribute;
+    }
     return .{
         .ty = typed.ty,
         .attrs = attrs,
         .value = try parseValue(value_text),
     };
+}
+
+fn findConstantExprValueStart(text: []const u8) ?usize {
+    const needles = [_][]const u8{
+        " inttoptr (",
+        " ptrtoint (",
+        " sub (",
+        " getelementptr ",
+    };
+    for (needles) |needle| {
+        if (std.mem.indexOf(u8, text, needle)) |index| return index + 1;
+    }
+    return null;
+}
+
+fn callArgRemainderMayBeWholeValue(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return false;
+    if (trimmed[0] == '%' or trimmed[0] == '@' or trimmed[0] == '!' or trimmed[0] == '<') return true;
+    if (trimmed[0] == '-' or trimmed[0] == '+' or std.ascii.isDigit(trimmed[0])) return true;
+    if (std.mem.eql(u8, trimmed, "undef") or
+        std.mem.eql(u8, trimmed, "null") or
+        std.mem.eql(u8, trimmed, "zeroinitializer") or
+        std.mem.eql(u8, trimmed, "true") or
+        std.mem.eql(u8, trimmed, "false") or
+        std.mem.eql(u8, trimmed, "nan") or
+        std.mem.eql(u8, trimmed, "+nan") or
+        std.mem.eql(u8, trimmed, "-nan") or
+        std.mem.eql(u8, trimmed, "inf") or
+        std.mem.eql(u8, trimmed, "+inf") or
+        std.mem.eql(u8, trimmed, "-inf") or
+        isSupportedConstantExpr(trimmed))
+    {
+        return true;
+    }
+    return false;
 }
 
 fn callArgMayContainAttrs(text: []const u8) bool {
@@ -1362,25 +1460,95 @@ fn setFastMathFlag(flags: *core.FastMathFlags, token: []const u8) !void {
 }
 
 fn parseStore(line: []const u8) !core.Instruction {
-    var parts = std.mem.tokenizeAny(u8, line, " \t,");
-    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "store")) return error.InvalidInstruction;
-    var attrs = try parseMemoryPrefix(&parts);
-    const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-    const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-    const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-    if (ptr_ty != .ptr) return error.ExpectedPointerType;
-    const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
-    try parseMemorySuffix(&parts, &attrs);
+    var rest = std.mem.trim(u8, line["store ".len..], " \t");
+    var attrs = try parseMemoryPrefixText(&rest);
+
+    const stored = try parseLeadingType(rest);
+    const value_comma = findTopLevelComma(stored.after) orelse return error.InvalidInstruction;
+    const value = try parseValue(std.mem.trim(u8, stored.after[0..value_comma], " \t"));
+    rest = std.mem.trim(u8, stored.after[value_comma + 1 ..], " \t");
+
+    var ptr_addrspace: ?[]const u8 = null;
+    if (std.mem.startsWith(u8, rest, "ptr ")) {
+        rest = std.mem.trim(u8, rest["ptr ".len..], " \t");
+        if (firstToken(rest)) |token| {
+            if (isAddressSpaceToken(token)) {
+                ptr_addrspace = token;
+                rest = std.mem.trim(u8, rest[token.len..], " \t");
+            }
+        }
+    } else {
+        const ptr_ty = try parseLeadingType(rest);
+        if (ptr_ty.ty != .ptr) return error.ExpectedPointerType;
+        rest = ptr_ty.after;
+    }
+
+    const ptr: core.Value, const suffix: []const u8 = if (attrs.atomic_ordering != null) blk: {
+        const ptr_end = firstValueEnd(rest) orelse return error.InvalidInstruction;
+        break :blk .{
+            try parseValue(std.mem.trim(u8, rest[0..ptr_end], " \t")),
+            std.mem.trim(u8, rest[ptr_end..], " \t,"),
+        };
+    } else blk: {
+        const suffix_comma = findTopLevelComma(rest);
+        break :blk .{
+            try parseValue(std.mem.trim(u8, if (suffix_comma) |index| rest[0..index] else rest, " \t")),
+            if (suffix_comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "",
+        };
+    };
+    var suffix_parts = std.mem.tokenizeAny(u8, suffix, " \t,");
+    try parseMemorySuffix(&suffix_parts, &attrs);
 
     return .{
         .result = null,
         .kind = .{ .store = .{
-            .ty = ty,
+            .ty = stored.ty,
             .value = value,
             .ptr = ptr,
+            .ptr_addrspace = ptr_addrspace,
             .attrs = attrs,
         } },
     };
+}
+
+fn firstValueEnd(text: []const u8) ?usize {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return null;
+    return std.mem.indexOfAny(u8, trimmed, " \t,") orelse trimmed.len;
+}
+
+fn parseMemoryPrefixText(rest: *[]const u8) !core.MemoryAttrs {
+    var attrs: core.MemoryAttrs = .{};
+    while (true) {
+        const token = firstToken(rest.*) orelse return attrs;
+        if (std.mem.eql(u8, token, "volatile")) {
+            if (attrs.is_volatile) return error.InvalidAtomicMemory;
+            attrs.is_volatile = true;
+            rest.* = std.mem.trim(u8, rest.*[token.len..], " \t");
+            continue;
+        }
+        if (std.mem.eql(u8, token, "atomic")) {
+            if (attrs.atomic_ordering != null) return error.InvalidAtomicMemory;
+            attrs.atomic_ordering = "";
+            rest.* = std.mem.trim(u8, rest.*[token.len..], " \t");
+            continue;
+        }
+        if (std.mem.startsWith(u8, token, "syncscope")) {
+            if (attrs.syncscope != null or attrs.atomic_ordering == null) return error.InvalidAtomicMemory;
+            attrs.syncscope = token;
+            rest.* = std.mem.trim(u8, rest.*[token.len..], " \t");
+            continue;
+        }
+        return attrs;
+    }
+}
+
+fn isAddressSpaceToken(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "addrspace(") or !std.mem.endsWith(u8, text, ")")) return false;
+    const payload = text["addrspace(".len .. text.len - 1];
+    if (payload.len == 0) return false;
+    _ = std.fmt.parseInt(u32, payload, 10) catch return false;
+    return true;
 }
 
 fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
@@ -1531,11 +1699,11 @@ fn isSupportedAtomicOrdering(ordering: []const u8) bool {
     return false;
 }
 
-fn parseOptionalAlign(text: []const u8) !?u32 {
+fn parseOptionalAlign(text: []const u8) !?u64 {
     if (text.len == 0) return null;
     var parts = std.mem.tokenizeAny(u8, text, " \t,");
     if (!std.mem.eql(u8, parts.next() orelse return error.InvalidAtomicMemory, "align")) return error.InvalidAtomicMemory;
-    const alignment = try std.fmt.parseInt(u32, parts.next() orelse return error.InvalidAlignment, 10);
+    const alignment = try std.fmt.parseInt(u64, parts.next() orelse return error.InvalidAlignment, 10);
     if (parts.next() != null) return error.InvalidAtomicMemory;
     return alignment;
 }
@@ -1635,7 +1803,7 @@ fn parseMemorySuffix(parts: *std.mem.TokenIterator(u8, .any), attrs: *core.Memor
     while (parts.next()) |token| {
         if (std.mem.eql(u8, token, "align")) {
             const align_text = parts.next() orelse return error.InvalidAlignment;
-            attrs.@"align" = try std.fmt.parseInt(u32, align_text, 10);
+            attrs.@"align" = try std.fmt.parseInt(u64, align_text, 10);
             continue;
         }
         if (std.mem.startsWith(u8, token, "syncscope")) {
@@ -1992,6 +2160,10 @@ fn parseValue(text: []const u8) !core.Value {
         if (trimmed.len == 1) return error.InvalidValueName;
         return .{ .named = trimmed };
     }
+    if (trimmed[0] == '!') {
+        if (trimmed.len == 1) return error.InvalidValueName;
+        return .{ .named = trimmed };
+    }
     if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
     return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
 }
@@ -1999,7 +2171,8 @@ fn parseValue(text: []const u8) !core.Value {
 fn isSupportedConstantExpr(text: []const u8) bool {
     return (std.mem.startsWith(u8, text, "inttoptr (") or
         std.mem.startsWith(u8, text, "ptrtoint (") or
-        std.mem.startsWith(u8, text, "sub (")) and
+        std.mem.startsWith(u8, text, "sub (") or
+        std.mem.startsWith(u8, text, "getelementptr ")) and
         std.mem.endsWith(u8, text, ")");
 }
 
