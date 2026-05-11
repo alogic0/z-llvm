@@ -305,6 +305,8 @@ Scalar IR subset:
   instruction flags preserved: nsw, nuw, exact
   freeze spelling preserved for scalar integers
   freeze of integer constants folded by InstSimplify/InstCombine
+  strict fcmp false/true and constant ord/uno orderedness folding for scalar FP
+  constants
 
 InstSimplify subset:
   local scalar simplification helper for InstCombine
@@ -312,6 +314,8 @@ InstSimplify subset:
   defined constant division/remainder folding
   safe variable division/remainder identity folding
   freeze-constant folding
+  strict fcmp false/true folding
+  strict fcmp ord/uno folding only for classified scalar FP constants
   shared scalar expression equivalence for GVN and EarlyCSE
 
 SROA subset:

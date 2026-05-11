@@ -34,6 +34,8 @@ negative zero are parsed, classified by `analysis/fp_semantics.zig`, verified
 against scalar FP types, and printed verbatim
 fast-math flags on supported scalar FP binary ops and `fcmp` are parsed,
 verified, printed, and ignored by optimizers
+strict `fcmp false`/`true` and constant `fcmp ord`/`uno` can be folded by
+InstSimplify when no arithmetic, rounding, or exception fact is needed
 integer casts: trunc, zext, sext
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
@@ -60,14 +62,16 @@ opt-22 equivalent:
   fp_extended_adce_preserve
   fp_extended_sccp_preserve
   fp_fast_math_preserve
-  fp_strict_sensitive_preserve
+  fp_strict_fcmp_fold
 
 local-only conservative:
   flagged arithmetic and division are intentionally not folded by instcombine yet
   FP literals are classified and preserved but not folded
   fp_extended_gvn_no_cse
   fp_extended_early_cse_no_cse
+  fp_strict_sensitive_preserve
   fp_fast_math_sensitive_conservative
+  fp_strict_orderedness_fold
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
@@ -86,7 +90,9 @@ no scalar optimization over vector instructions; fixed vectors are parsed and
 verified only as described in `docs/ir_vectors.md`
 no pointer casts
 no bitcast/ptrtoint/inttoptr
-no floating-point optimization parity
+no floating-point arithmetic optimization parity
+no general FP comparison optimization parity beyond strict false/true and
+constant ord/uno orderedness
 no APFloat-equivalent arithmetic, rounding, exception, or complete bit-pattern
 semantic model
 no fast-math optimization semantics or FP exception behavior model

@@ -92,6 +92,14 @@ Fixture coverage:
   fp_extended_instcombine_preserve
   fp_fast_math_preserve
   fp_strict_sensitive_preserve
+  fp_strict_sensitive_preserve is local-conservative after Cycle 05: LLVM folds
+  some strict identities such as `fsub x, 0.0`, `fmul x, 1.0`, `fdiv x, 1.0`,
+  and rewrites self-compare to orderedness, but the local implementation keeps
+  them until the exact LLVM legality proof is reproduced.
+  fp_strict_fcmp_fold
+  fp_strict_orderedness_fold is local-conservative: the local APFloat-shaped
+  classifier folds only ord/uno constant orderedness and avoids general FP
+  comparison arithmetic.
   fp_fast_math_sensitive_conservative is local-conservative: LLVM may fold
   fast-math-sensitive identities after proving flag semantics, but the local
   optimizer preserves them until the FP legality model exists.
@@ -140,6 +148,9 @@ constant `trunc`, `zext`, and `sext` folding for integer constants
 defined constant `udiv`, `sdiv`, `urem`, and `srem` folding
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
 freeze of an integer constant -> that same constant
+strict `fcmp false` -> false
+strict `fcmp true` -> true
+strict `fcmp ord` and `fcmp uno` for classified scalar FP constants
 preserve `freeze` instructions
 ```
 
@@ -149,9 +160,11 @@ Upstream mapping:
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
 The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
-Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, `frem`, and `fcmp` are preserved rather than folded
-because NaN, signed-zero, FP constant semantics, and fast-math optimization
-legality are not modeled. Parsed fast-math flags are preserved, not used.
+Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
+than folded because NaN, signed-zero, rounding, and exception legality are not
+modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
+only enabled strict FP comparison folds. Parsed fast-math flags are preserved,
+not used.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 Debug-location-only folds may remove an instruction carrying `!dbg`; the
 current local behavior drops that location with the removed instruction instead
@@ -186,7 +199,9 @@ no non-constant cast simplification yet
 no unsafe division/remainder simplification
 no canonical reassociation
 no non-constant operand complexity ordering
-no floating-point folds or reassociation
+no floating-point arithmetic folds or reassociation
+no general ordered FP comparison folds
+no fast-math-driven FP folds
 no debug-info salvage for replaced instructions
 no target-specific combines
 ```

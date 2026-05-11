@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+const fp_semantics = @import("../analysis/fp_semantics.zig");
 
 pub fn canonicalizeCommutativeConstantRhs(binary: *ir.BinaryInst) bool {
     if (binary.ty.isVector()) return false;
@@ -18,7 +19,7 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .cast => |cast| simplifyCast(cast),
         .freeze => |freeze| simplifyFreeze(freeze),
         .icmp => |icmp| simplifyIcmp(icmp),
-        .fcmp => null,
+        .fcmp => |fcmp| simplifyFcmp(fcmp),
         .select => |select| simplifySelect(select),
         .call => |call| simplifyCall(call),
         .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => null,
@@ -280,6 +281,27 @@ fn simplifyIcmpConstants(icmp: ir.IcmpInst) ?ir.Value {
         },
     };
     return .{ .int = @intFromBool(result) };
+}
+
+fn simplifyFcmp(fcmp: ir.FcmpInst) ?ir.Value {
+    return switch (fcmp.predicate) {
+        .false => .{ .int = 0 },
+        .true => .{ .int = 1 },
+        .ord, .uno => simplifyFcmpOrderedness(fcmp),
+        .oeq, .ogt, .oge, .olt, .ole, .one, .ueq, .ugt, .uge, .ult, .ule, .une => null,
+    };
+}
+
+fn simplifyFcmpOrderedness(fcmp: ir.FcmpInst) ?ir.Value {
+    if (fcmp.lhs != .fp or fcmp.rhs != .fp) return null;
+    const lhs = fp_semantics.classify(fcmp.operand_ty, fcmp.lhs.fp) catch return null;
+    const rhs = fp_semantics.classify(fcmp.operand_ty, fcmp.rhs.fp) catch return null;
+    const unordered = lhs.category == .nan or rhs.category == .nan;
+    return .{ .int = switch (fcmp.predicate) {
+        .ord => if (unordered) 0 else 1,
+        .uno => if (unordered) 1 else 0,
+        .false, .oeq, .ogt, .oge, .olt, .ole, .one, .ueq, .ugt, .uge, .ult, .ule, .une, .true => return null,
+    } };
 }
 
 fn simplifySelect(select: ir.SelectInst) ?ir.Value {

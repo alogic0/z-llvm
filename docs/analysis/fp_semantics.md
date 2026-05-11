@@ -21,7 +21,8 @@ subnormal for known hex boundary spellings
 ```
 
 The parser still preserves the original textual spelling in IR values. The
-classifier is used by the verifier and future legality helpers; it does not
+classifier is used by the verifier and by strict `fcmp ord`/`fcmp uno`
+orderedness folds where both operands are scalar FP literals. It does not
 enable arithmetic folding by itself.
 
 ## Fixture Coverage
@@ -30,6 +31,7 @@ enable arithmetic folding by itself.
 fp_literal_preserve: ordinary decimal literals remain preserved
 fp_special_literals_preserve: nan, inf, and negative zero are classified and
 preserved without folding
+fp_strict_orderedness_fold: classified constants allow strict orderedness folds
 ```
 
 ## Gaps
@@ -40,6 +42,5 @@ no target rounding modes
 no exception behavior
 no signaling-vs-quiet NaN distinction
 no complete hex bit-pattern decoding
-no FP transform legality beyond classification
+no FP arithmetic transform legality beyond classification
 ```
-
