@@ -233,7 +233,7 @@ pub const all = [_]Pipeline{
         .mode = "ReleaseFast",
         .llvm_analogue = "Zig ReleaseFast / LLVM O3 accepted corpus subset",
         .intended_level = "accepted ReleaseFast corpus validation",
-        .notes = "keeps full release-o3 placeholders out of reduced corpus validation until roots and IPO semantics are fixture-ready",
+        .notes = "keeps full release-o3 placeholders and target-cost-sensitive transforms out of reduced corpus validation until roots, IPO, and TTI semantics are fixture-ready",
     },
     .{
         .name = "zig-release-small-accepted",
@@ -241,7 +241,7 @@ pub const all = [_]Pipeline{
         .mode = "ReleaseSmall",
         .llvm_analogue = "Zig ReleaseSmall / LLVM Oz accepted corpus subset",
         .intended_level = "accepted ReleaseSmall corpus validation",
-        .notes = "uses the same implemented subset as ReleaseFast until size-specific cost and global passes are fixture-ready",
+        .notes = "uses the same implemented subset as ReleaseFast until size-specific cost, TTI, and global passes are fixture-ready",
     },
     .{
         .name = "release-o3",

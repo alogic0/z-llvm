@@ -246,6 +246,16 @@ test "accepted Zig corpus pipelines exclude vector placeholders" {
     }
 }
 
+test "accepted release pipeline notes keep target cost out of scope" {
+    const release_fast = pipelines.find("zig-release-fast-accepted").?;
+    try std.testing.expect(std.mem.indexOf(u8, release_fast.notes, "target-cost-sensitive") != null);
+    try std.testing.expect(std.mem.indexOf(u8, release_fast.notes, "TTI") != null);
+
+    const release_small = pipelines.find("zig-release-small-accepted").?;
+    try std.testing.expect(std.mem.indexOf(u8, release_small.notes, "size-specific cost") != null);
+    try std.testing.expect(std.mem.indexOf(u8, release_small.notes, "TTI") != null);
+}
+
 test "lto prelink pipelines expose prelink placeholders without bitcode semantics" {
     const aliases = [_][]const u8{
         "lto-prelink-o3",

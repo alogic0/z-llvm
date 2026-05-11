@@ -235,7 +235,7 @@ parser blockers after Cycle 1:
 | Packed bitfield lowering checks | `packed_bits` |
 | Error switch lowering checks | `error_switch` |
 | Optional pointer null checks | `optional_pointer` |
-| Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements |
+| Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements, `docs/target/transform_cost_policy.md` |
 
 Connection to the LLVM pass inventory:
 
