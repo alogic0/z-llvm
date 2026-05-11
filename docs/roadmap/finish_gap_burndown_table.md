@@ -109,6 +109,7 @@ Pass status counts from the active pass pipeline inventory:
 | Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures and debug docs | Preserve `llvm.dbg.value`/`llvm.dbg.declare`; do not transform them until salvage exists. |
 | Full ThinLTO/bitcode summary behavior | out of scope for finish | bitcode/LTO docs | Keep compatibility decision and explicit unsupported diagnostics. |
 | Broad MC/Object/backend parity | out of scope for finish | backend handoff docs and readiness checks | Keep current x86_64 scalar smoke proofs only. |
+| SROA pointer field scalarization | conservative accepted boundary | `sroa_struct_ptr_field`, `sroa_struct_ptr_field_no_layout_reject` | Closed by Cycle 05 for DataLayout-backed simple aggregate fields. |
 | LLVM algorithm parity for all passes | out of scope for finish | `docs/analysis/algorithm_parity_audit.md` | Continue fixture-equivalent slices only when source-backed evidence requires them. |
 
 ## Selected Next Slice
@@ -116,5 +117,5 @@ Pass status counts from the active pass pipeline inventory:
 The stale `tiny_scalar_release_small` unsupported manifest row is closed. Broad
 raw Debug and ReleaseSafe rows now have explicit future activation conditions.
 The vector future boundary is closed as parse/verify/future. The active
-implementation slice is recorded in `docs/next_steps.md`: close one measured
-optimizer quality gap.
+implementation slice is recorded in `docs/next_steps.md`: tighten debug
+location behavior for transforms that already run.

@@ -183,7 +183,7 @@ fn aggregateFieldGep(layout: ?target.DataLayout, result: []const u8, aggregate_t
     if (field_value != .int or field_value.int < 0) return null;
     const field_index: usize = @intCast(field_value.int);
     const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return null;
-    if (field_ty != .int) return null;
+    if (!isScalarizableAggregateField(field_ty, layout != null)) return null;
     const offset = if (layout) |target_layout|
         memory_location.aggregateFieldOffsetWithLayout(target_layout, aggregate_ty, field_index) orelse return null
     else
@@ -198,6 +198,14 @@ fn aggregateFieldGep(layout: ?target.DataLayout, result: []const u8, aggregate_t
         .field_ty = field_ty,
         .offset = offset,
         .size = size,
+    };
+}
+
+fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
+    return switch (field_ty) {
+        .int => true,
+        .ptr => has_layout,
+        .void, .float, .double, .metadata, .aggregate, .vector => false,
     };
 }
 

@@ -12,17 +12,19 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 ## Active Cycle
 
 Source cycle:
-[Cycle 05: Optimizer Quality Burn-Down](roadmap/05_optimizer_quality_burndown_cycle.md)
+[Cycle 06: Debug Salvage Boundary Burn-Down](roadmap/06_debug_salvage_boundary_burndown_cycle.md)
 
 Durable finish table:
 [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
 
-### Optimizer Quality Slice: SROA Exact-Cover Aggregate Fields
+### Debug Salvage Boundary Slice
 
-- [ ] Select one measured optimizer gap from SROA, GVN PRE, or ADCE control
-      dependence.
-- [ ] Record LLVM source mapping and local unsupported behavior before changes.
-- [ ] Add accepted and rejected fixtures for the selected gap.
-- [ ] Compare equivalent fixtures against `opt-22`.
-- [ ] Update pass docs, analysis docs, fixture table, and the finish table.
+- [ ] Inventory transforms that remove or replace instructions carrying `!dbg`.
+- [ ] Add or refine fixtures for DCE, InstCombine, EarlyCSE, GVN, and SROA
+      where relevant.
+- [ ] Preserve debug locations on unchanged or leader instructions.
+- [ ] Keep `llvm.dbg.value` and `llvm.dbg.declare` transform pipelines
+      disabled until variable-location salvage exists.
+- [ ] Update debug metadata docs, affected pass docs, unsupported IR docs, and
+      the finish table.
 - [ ] Run `bash scripts/run_readiness_checks.sh`.

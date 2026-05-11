@@ -160,7 +160,7 @@ completed foundation epics
 - [x] [Cycle 02: Stale ReleaseSmall Corpus Row Closure](roadmap/02_stale_release_small_corpus_row_closure_cycle.md)
 - [x] [Cycle 03: Future Raw Debug and ReleaseSafe Row Policy](roadmap/03_future_raw_debug_release_safe_policy_cycle.md)
 - [x] [Cycle 04: Vector Future Boundary Closure](roadmap/04_vector_future_boundary_closure_cycle.md)
-- [ ] [Cycle 05: Optimizer Quality Burn-Down](roadmap/05_optimizer_quality_burndown_cycle.md)
+- [x] [Cycle 05: Optimizer Quality Burn-Down](roadmap/05_optimizer_quality_burndown_cycle.md)
 - [ ] [Cycle 06: Debug Salvage Boundary Burn-Down](roadmap/06_debug_salvage_boundary_burndown_cycle.md)
 - [ ] [Cycle 07: Handoff Proof Burn-Down](roadmap/07_handoff_proof_burndown_cycle.md)
 - [ ] [Cycle 08: Final Readiness Audit](roadmap/08_final_readiness_audit_cycle.md)
