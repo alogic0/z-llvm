@@ -21,28 +21,28 @@ legality are fully proven.
 ## Plan
 
 - [x] Extract shared expression-key construction for EarlyCSE and GVN.
-- [ ] Add stable hashing/equality for supported expression keys instead of
+- [x] Add stable hashing/equality for supported expression keys instead of
       linear scans where practical.
 - [x] Include flags, predicates, types, operands, call attributes, and memory
       location facts in expression keys.
 - [x] Keep load keys gated by the memory-dependence cycle's shared clobber
       helper.
-- [ ] Add readnone and readonly call fixtures only when parser and attribute
+- [x] Add readnone and readonly call fixtures only when parser and attribute
       support can represent the case honestly.
-- [ ] Add duplicate-PHI and phi-translation tests for supported exact cases.
-- [ ] Design a narrow PRE insertion rule for pure scalar expressions only:
+- [x] Add duplicate-PHI and phi-translation tests for supported exact cases.
+- [x] Design a narrow PRE insertion rule for pure scalar expressions only:
       no critical-edge splitting unless a CFG helper exists, no memory PRE, no
       partial PHI translation beyond documented cases.
-- [ ] Add accepted/rejected fixtures for every PRE shape.
-- [ ] Compare LLVM-equivalent cases with `opt-22`.
+- [x] Add accepted/rejected fixtures for every PRE shape.
+- [x] Compare LLVM-equivalent cases with `opt-22`.
 
 ## Exit Criteria
 
 - [x] EarlyCSE and GVN use compatible expression identity rules.
-- [ ] GVN has documented dominance and insertion-point checks for any PRE it
+- [x] GVN has documented dominance and insertion-point checks for any PRE it
       performs.
-- [ ] Memory value numbering remains conservative and tested.
-- [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
+- [x] Memory value numbering remains conservative and tested.
+- [x] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
 ## Completed Shared Expression-Key Slice
 
@@ -56,3 +56,28 @@ legality are fully proven.
 - [x] Documented the helper and its LLVM mapping in
       `docs/analysis/expression_key.md`.
 - [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
+
+## PRE Boundary
+
+- [x] PRE remains a documented no-op for now. The accepted local rule is:
+      insert only pure scalar expressions when all predecessor insertion blocks
+      already exist, no critical edge must be split, all inserted operands
+      dominate the insertion point, and the merge rewrite can be represented
+      with an exact PHI.
+- [x] No current local CFG shape satisfies that full rule with enough
+      infrastructure to beat LLVM safely, so GVN performs no PRE insertion in
+      this cycle.
+- [x] Memory PRE is explicitly rejected; load value numbering remains limited
+      to dominating available loads gated by the shared clobber helper.
+- [x] Existing accepted fixtures cover dominating scalar GVN, exact duplicate
+      PHIs, memory clobber rejection, and EarlyCSE memory rejection. Readnone
+      call value numbering remains unit-test/local-only until attribute-group
+      parsing is broad enough for an opt-22 fixture.
+
+## Remaining Follow-Up
+
+- [x] Add deterministic hash prefilters for supported non-memory expression
+      keys.
+- [ ] Replace linear expression scans with full scoped hash buckets once
+      expression keys can include all alias-sensitive memory facts without
+      missing must-alias equivalents.

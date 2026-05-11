@@ -19,6 +19,7 @@ pub const pass: pass_manager.ModulePass = .{
 const AvailableInstruction = struct {
     block_index: usize,
     instruction_index: usize,
+    hash: u64,
     instruction: ir.Instruction,
 };
 
@@ -95,6 +96,7 @@ fn visitBlock(
             try available.append(allocator, .{
                 .block_index = block_index,
                 .instruction_index = instruction_index,
+                .hash = expression_key.hash(instruction.*),
                 .instruction = instruction.*,
             });
         }
@@ -187,6 +189,7 @@ fn findAvailableEquivalent(
     while (index > 0) {
         index -= 1;
         const candidate = available[index];
+        if (candidate.hash != expression_key.hash(instruction)) continue;
         if (!sameAvailableExpression(module, function, candidate, block_index, instruction_index, instruction)) continue;
         return .{ .named = candidate.instruction.result orelse return null };
     }

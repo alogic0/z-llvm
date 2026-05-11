@@ -3,6 +3,69 @@ const alias = @import("alias.zig");
 const function_attrs = @import("function_attrs.zig");
 const ir = @import("../ir.zig");
 
+pub fn hash(instruction: ir.Instruction) u64 {
+    var state = HashState.init();
+    switch (instruction.kind) {
+        .binary => |binary| {
+            state.addTag(1);
+            state.addTag(@intFromEnum(binary.op));
+            state.addBool(binary.flags.nsw);
+            state.addBool(binary.flags.nuw);
+            state.addBool(binary.flags.exact);
+            state.addType(binary.ty);
+            state.addValue(binary.lhs);
+            state.addValue(binary.rhs);
+        },
+        .cast => |cast| {
+            state.addTag(2);
+            state.addTag(@intFromEnum(cast.op));
+            state.addType(cast.from_ty);
+            state.addValue(cast.value);
+            state.addType(cast.to_ty);
+        },
+        .icmp => |icmp| {
+            state.addTag(3);
+            state.addTag(@intFromEnum(icmp.predicate));
+            state.addType(icmp.operand_ty);
+            state.addValue(icmp.lhs);
+            state.addValue(icmp.rhs);
+        },
+        .select => |select| {
+            state.addTag(4);
+            state.addType(select.cond_ty);
+            state.addValue(select.cond);
+            state.addType(select.ty);
+            state.addValue(select.true_value);
+            state.addValue(select.false_value);
+        },
+        .phi => |phi| {
+            state.addTag(5);
+            state.addType(phi.ty);
+            for (phi.incoming.items) |incoming| {
+                state.addValue(incoming.value);
+                state.addBytes(incoming.block);
+            }
+        },
+        .load => {
+            // Keep all loads in one bucket so alias-proven must-alias pointers
+            // with different spelling are still compared by equality.
+            return 0;
+        },
+        .call => |call| {
+            state.addTag(6);
+            state.addType(call.ret_ty);
+            state.addBytes(call.callee);
+            if (call.calling_conv) |calling_conv| state.addBytes(calling_conv);
+            for (call.args.items) |arg| {
+                state.addType(arg.ty);
+                state.addValue(arg.value);
+            }
+        },
+        .freeze, .alloca, .store, .gep => state.addTag(0),
+    }
+    return state.value;
+}
+
 pub fn sameValueExpression(module: ir.Module, function: ir.Function, a: ir.Instruction, b: ir.Instruction) bool {
     if (sameScalarExpression(a, b)) return true;
     if (sameLoadExpression(function, a, b)) return true;
@@ -101,3 +164,68 @@ fn sameOptionalText(a: ?[]const u8, b: ?[]const u8) bool {
     if (a == null or b == null) return false;
     return std.mem.eql(u8, a.?, b.?);
 }
+
+const HashState = struct {
+    value: u64,
+
+    fn init() HashState {
+        return .{ .value = 14695981039346656037 };
+    }
+
+    fn addTag(state: *HashState, tag: usize) void {
+        state.addInt(@intCast(tag));
+    }
+
+    fn addBool(state: *HashState, value: bool) void {
+        state.addInt(if (value) 1 else 0);
+    }
+
+    fn addType(state: *HashState, ty: ir.Type) void {
+        switch (ty) {
+            .void => state.addTag(1),
+            .int => |bits| {
+                state.addTag(2);
+                state.addInt(bits);
+            },
+            .ptr => state.addTag(3),
+            .aggregate => |text| {
+                state.addTag(4);
+                state.addBytes(text);
+            },
+        }
+    }
+
+    fn addValue(state: *HashState, value: ir.Value) void {
+        switch (value) {
+            .named => |name| {
+                state.addTag(1);
+                state.addBytes(name);
+            },
+            .int => |int| {
+                state.addTag(2);
+                state.addInt128(int);
+            },
+            .undef => state.addTag(3),
+        }
+    }
+
+    fn addBytes(state: *HashState, bytes: []const u8) void {
+        for (bytes) |byte| state.addInt(byte);
+        state.addInt(0xff);
+    }
+
+    fn addInt(state: *HashState, int: u64) void {
+        var value = int;
+        for (0..8) |_| {
+            state.value ^= value & 0xff;
+            state.value *%= 1099511628211;
+            value >>= 8;
+        }
+    }
+
+    fn addInt128(state: *HashState, int: i128) void {
+        const bits: u128 = @bitCast(int);
+        state.addInt(@truncate(bits));
+        state.addInt(@truncate(bits >> 64));
+    }
+};

@@ -27,6 +27,7 @@ const ValueNumber = usize;
 
 const NumberedExpression = struct {
     number: ValueNumber,
+    hash: u64,
     instruction: ir.Instruction,
 };
 
@@ -57,7 +58,9 @@ const ValueTable = struct {
     }
 
     fn numberFor(table: *ValueTable, instruction: ir.Instruction) !ValueNumber {
+        const hash = expression_key.hash(instruction);
         for (table.entries.items) |entry| {
+            if (entry.hash != hash) continue;
             if (sameValueExpression(table.module, table.function, entry.instruction, instruction)) return entry.number;
         }
 
@@ -65,6 +68,7 @@ const ValueTable = struct {
         table.next_number += 1;
         try table.entries.append(table.allocator, .{
             .number = number,
+            .hash = hash,
             .instruction = instruction,
         });
         return number;
