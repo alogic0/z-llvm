@@ -17,8 +17,11 @@ instead of hand-written LLVM examples alone.
 - [x] Define fixture layout by source feature, optimization mode, target triple,
       and expected LLVM comparison mode.
 - [x] Add a fixture manifest format that records:
-      Zig version, target, optimization mode, command used, IR file, expected
-      parser/verifier status, and comparison notes.
+      Zig emitter version/revision, Zig source revision, target, optimization
+      mode, command used, IR file, expected parser/verifier status, and
+      comparison notes.
+- [x] Regenerate authoritative fixtures with a Zig executable built from the
+      same `../ziglang` checkout used by the inventory source anchors.
 - [x] Add initial source groups:
       integers, pointers, arrays, structs, optionals, error unions, slices,
       loops, calls, comptime constants, globals, atomics, volatile, inline asm,
@@ -46,6 +49,9 @@ instead of hand-written LLVM examples alone.
 - [x] Parser/verifier work can be driven from real Zig-emitted IR.
 - [x] Each optimizer epic has at least one Zig-originated fixture family.
 - [x] Unsupported IR forms are documented instead of silently ignored.
+- [x] Fixture emitter revision and inventory source revision match for
+      authoritative rows, or the mismatch is explicitly classified as
+      `legacy-bootstrap`.
 
 ## Completed Slices
 
@@ -55,8 +61,9 @@ instead of hand-written LLVM examples alone.
 - [x] Created `../fixtures/zig_ir/manifest.tsv`.
 - [x] Added first fixture group: `tiny_scalar`.
 - [x] Covered Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall in the manifest.
-- [x] Recorded Zig version, target triple, optimize mode, command used, emitted
-      IR path, checked IR path, and fixture classification.
+- [x] Recorded Zig emitter, source revision status, target triple, optimize
+      mode, command used, emitted IR path, checked IR path, and fixture
+      classification.
 - [x] Classified fixtures as `parse`, `verify`, `optimizer-input`,
       `unsupported`, or `future`.
 - [x] Added notes connecting each fixture row back to the LLVM pass inventory.
@@ -74,8 +81,18 @@ instead of hand-written LLVM examples alone.
 - [x] Left Debug and ReleaseSafe raw IR as generated-but-untracked when the
       emitted files were too broad for a checked fixture.
 
+### Slice 3: Align Fixture Emitter With Inventory Source
+
+- [x] Selected `../ziglang/build/stage4/bin/zig`.
+- [x] Regenerated the captured corpus with that executable.
+- [x] Updated `manifest.tsv` so authoritative rows record the matching source
+      revision.
+- [x] Replaced the previous `0.16.0` captured fixtures with current
+      `../ziglang` output.
+
 ## Completion Notes
 
-Epic 2 is complete as a corpus bootstrap, not as exhaustive Zig language
-coverage. Future epics should extend this corpus when they need a new
-source-backed IR construct.
+Epic 2 is complete as an authoritative corpus bootstrap for `../ziglang`
+revision `f35e38f6a6`, not as exhaustive Zig language coverage. Future epics
+should extend and refresh this corpus from the same Zig source revision used by
+the inventories.
