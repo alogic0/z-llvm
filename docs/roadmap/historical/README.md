@@ -3,8 +3,11 @@
 These roadmap files are retained for context, but they are no longer the main
 implementation path.
 
-The active roadmap starts at `../../README.md` and the active epic files live
+The active roadmap starts at `../../README.md` and the active cycle files live
 directly in `../`.
+
+Completed numbered epics from the first Zig LLVM removal roadmap live in
+`completed_epics/`.
 
 ## Archived Files
 
@@ -16,4 +19,3 @@ directly in `../`.
 - `target_datalayout_air_bridge_epic.md`
 - `vector_ir_and_target_cost_epic.md`
 - `verifier_foundation_epic.md`
-

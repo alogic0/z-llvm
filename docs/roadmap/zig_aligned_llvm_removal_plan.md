@@ -163,7 +163,7 @@ project can hand optimized IR or semantic results back toward Zig-owned codegen.
 
 Deliverables:
 
-- `docs/roadmap/08_native_backend_handoff_study.md`
+- `docs/roadmap/historical/completed_epics/08_native_backend_handoff_study.md`
 - `docs/codegen/zig_native_backend_handoff.md`
 - a list of optimizer outputs that are AIR/MIR-compatible in principle
 
@@ -201,7 +201,7 @@ libLLVM, while keeping this separate from native optimization work.
 
 Deliverables:
 
-- `docs/roadmap/09_optional_bitcode_debug_lto_tracks.md`
+- `docs/roadmap/historical/completed_epics/09_optional_bitcode_debug_lto_tracks.md`
 - `docs/semantics/optional_bitcode_debug_lto_tracks.md`
 - `docs/bitcode/construct_inventory.md`
 - `docs/debug/metadata_inventory.md`

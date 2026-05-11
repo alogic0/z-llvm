@@ -339,7 +339,7 @@ full object/linker behavior
 Deliverables:
 
 ```text
-docs/roadmap/08_native_backend_handoff_study.md
+docs/roadmap/historical/completed_epics/08_native_backend_handoff_study.md
 docs/codegen/zig_native_backend_handoff.md
 bounded fixtures under test/codegen/
 ```
@@ -486,7 +486,7 @@ Deliverables:
 docs/inventory/zig_llvm_api_inventory.md
 docs/inventory/zig_llvm_pass_pipeline_inventory.md
 docs/inventory/zig_emitted_ir_inventory.md
-docs/roadmap/03_llvm_compatible_ir_verifier_foundation.md
+docs/roadmap/historical/completed_epics/03_llvm_compatible_ir_verifier_foundation.md
 test/zig/
 test/opt/
 ```
