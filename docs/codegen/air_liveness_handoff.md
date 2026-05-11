@@ -25,6 +25,34 @@ z_llvm/src/mc/
 | Branch-pruned scalar CFG | AIR control-flow plus Liveness reachability | Validates that unreachable local work is removed before backend lowering when proven safe. |
 | Loop-invariant scalar chain | AIR loop body values plus Liveness ranges | Validates pure scalar loop facts while keeping memory LICM out of native handoff until alias precision improves. |
 
+## Optimizer-To-AIR Mapping
+
+| Local optimizer result | Zig-owned equivalent | Handoff note |
+| --- | --- | --- |
+| InstSimplify/InstCombine scalar identities | Sema/AIR scalar canonicalization or target instruction selection peepholes | Backend-neutral when integer flags, poison, FP, and target-cost boundaries are explicit. |
+| Mem2Reg promoted entry allocas | AIR values plus Liveness death facts | Useful as a stack-traffic expectation, but native codegen does not need LLVM allocas or PHIs. |
+| SROA zero-GEP and small aggregate splitting | AIR aggregate field access or source-level aggregate decomposition | Treat as a semantic comparison only; do not require LLVM GEP slicing in Zig-owned IR. |
+| SimplifyCFG/SCCP branch pruning | AIR block reachability and branch lowering | Backend-neutral when the pruned edge is proven unreachable without profile-only assumptions. |
+| DCE/ADCE removed pure operations | Liveness unreferenced instruction facts | Backend-neutral when side-effect and may-throw classification is shared. |
+| DSE removed overwritten stores | Frame-slot or memory-location liveness | Requires explicit alias/mod-ref proof before mapping to native stack slots. |
+| GVN/EarlyCSE repeated integer expressions | Optional AIR/MIR commoning | Release-quality optimization input, not a mandatory backend representation. |
+| LICM scalar hoisting | AIR/MIR loop invariant value placement | Only pure scalar hoisting maps today; memory LICM needs alias and MemorySSA precision. |
+| LoopInfo preheader/latch/exits | AIR loop region and Liveness loop live-ins | Useful for source-backed loop shape tests, not an LLVM loop-canonical-form requirement. |
+
+## LLVM-Only Mechanics
+
+These should remain comparison-IR details unless a Zig upstream design explicitly
+chooses a matching representation:
+
+```text
+PHI node spelling and incoming-edge storage
+entry-block alloca promotion as the source of SSA values
+GEP index arithmetic as the native aggregate model
+LLVM metadata graphs as optimizer legality facts
+pass names and pass pipeline order as the native optimizer architecture
+MemorySSA access-list storage layout
+```
+
 ## Facts That Should Disappear
 
 ```text
@@ -47,6 +75,10 @@ The script checks:
 return_constant: scalar return lowering
 call_one_arg: direct scalar call lowering
 stack_slot: fixed stack-slot lowering
+instcombine_safe_scalar: backend-neutral scalar fold expectation
+dse_overwrite: overwritten store cleanup expectation
+licm_invariant: pure loop-invariant scalar motion expectation
+globaldce_basic: global reachability expectation
 compare_codegen_asm.sh: full current tiny x86_64 assembly smoke matrix
 ```
 
