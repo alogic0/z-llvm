@@ -62,12 +62,15 @@ readiness check script that reproduces current claims
 The next wave should be selected from Zig's actual LLVM-removal blockers:
 
 ```text
-expand the Zig-emitted corpus before adding generic LLVM features
-promote generated differential failures into minimized fixtures
-replace local-conservative memory cases with path-aware MemorySSA only when needed
-advance native-backend handoff only from source-backed Zig fixtures
-keep MC/object/debug/LTO work validation-only until upstream needs it
+inline asm and atomicrmw IR representation with verifier fail-closed rules
+vector IR parser/verifier bootstrap plus target-cost policy boundaries
+AArch64 optimizer-input separation for target-independent passes
+Debug-mode reduction work for large source-backed Debug rows
+path-aware MemorySSA only after a source-backed fixture requires it
 ```
+
+The evidence behind that ordering is recorded in
+`docs/roadmap/source_backed_readiness_audit.md`.
 
 ## Current Verdict
 

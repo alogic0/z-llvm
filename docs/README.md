@@ -8,7 +8,9 @@ are complete and archived under `roadmap/historical/completed_big_cycles/`.
 The first raw Zig-emitted IR corpus blocker wave is complete and archived under
 `roadmap/historical/completed_corpus_blocker_cycles/`. The first source-backed
 corpus expansion cycles are complete and archived under
-`roadmap/historical/completed_corpus_expansion_cycles/`.
+`roadmap/historical/completed_corpus_expansion_cycles/`. The first
+source-backed roadmap cycles are complete and archived under
+`roadmap/historical/completed_source_backed_cycles/`.
 
 The purpose is to keep the project aligned with Zig's upstream LLVM-removal
 path:
@@ -85,20 +87,13 @@ completed foundation epics
 
 - [x] [Completed Corpus Expansion Cycles](roadmap/historical/completed_corpus_expansion_cycles/README.md)
 
-## Active Source-Backed Roadmap Cycles
+## Completed Source-Backed Roadmap Cycles
 
-- [x] [Cycle 1: Scalar FP Compare And Multiply](roadmap/01_scalar_fp_compare_and_multiply_cycle.md)
-- [x] [Cycle 2: Scalar FP Surface Closure](roadmap/02_scalar_fp_surface_closure_cycle.md)
-- [x] [Cycle 3: FP Conservative Optimizer Pass-Through](roadmap/03_fp_conservative_optimizer_passthrough_cycle.md)
-- [x] [Cycle 4: Target Features And Function Attributes Normalization](roadmap/04_target_features_and_function_attrs_cycle.md)
-- [x] [Cycle 5: ReleaseSmall Corpus Acceptance](roadmap/05_release_small_corpus_acceptance_cycle.md)
-- [x] [Cycle 6: ReleaseSafe Safety IR Expansion](roadmap/06_release_safe_safety_ir_expansion_cycle.md)
-- [x] [Cycle 7: Debug Metadata Corpus Expansion](roadmap/07_debug_metadata_corpus_expansion_cycle.md)
-- [x] [Cycle 8: AArch64 DataLayout Optimizer-Input Policy](roadmap/08_aarch64_datalayout_optimizer_policy_cycle.md)
-- [x] [Cycle 9: Atomic And Inline-Asm Boundary From Zig Rows](roadmap/09_atomic_inline_asm_boundary_from_zig_rows_cycle.md)
-- [x] [Cycle 10: Error, Optional, And Aggregate ABI Expansion](roadmap/10_error_optional_aggregate_abi_expansion_cycle.md)
-- [x] [Cycle 11: Alias And Memory Precision For Source-Backed Rows](roadmap/11_alias_memory_precision_source_backed_cycle.md)
-- [ ] [Cycle 12: Corpus Refresh And Readiness Audit](roadmap/12_corpus_refresh_and_readiness_audit_cycle.md)
+- [x] [Completed Source-Backed Roadmap Cycles](roadmap/historical/completed_source_backed_cycles/README.md)
+
+## Current Readiness Audit
+
+- [x] [Source-Backed Readiness Audit](roadmap/source_backed_readiness_audit.md)
 
 ## Future Backlog
 

@@ -56,6 +56,15 @@ The current authoritative emitter for new captures is:
 Older checked rows may retain their original emitter revision. The manifest is
 the row-level source of truth for mixed-generation corpus history.
 
+Cycle 12 refreshed selected rows against the current authoritative emitter:
+
+```text
+tiny_scalar ReleaseFast stripped capture: byte-identical to current stage4
+tiny_scalar ReleaseSmall stripped capture: byte-identical to current stage4
+floats_math ReleaseSmall stripped capture: byte-identical to current stage4
+tiny_scalar ReleaseSafe raw capture: still too broad for checked corpus use
+```
+
 When adding or refreshing fixtures:
 
 - [ ] Record the Zig executable version or revision used to emit the IR.

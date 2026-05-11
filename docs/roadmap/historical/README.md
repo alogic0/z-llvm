@@ -3,8 +3,8 @@
 These roadmap files are retained for context, but they are no longer the main
 implementation path.
 
-The active roadmap starts at `../../README.md` and the active cycle files live
-directly in `../`.
+The active roadmap starts at `../../README.md`. Future cycle files should live
+directly in `../` only after they become active work.
 
 Completed numbered epics from the first Zig LLVM removal roadmap live in
 `completed_epics/`.
@@ -19,6 +19,9 @@ Completed raw Zig-emitted IR corpus blocker cycles live in
 
 Completed source-backed corpus expansion cycles live in
 `completed_corpus_expansion_cycles/`.
+
+Completed source-backed roadmap cycles live in
+`completed_source_backed_cycles/`.
 
 ## Archived Files
 
