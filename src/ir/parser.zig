@@ -296,7 +296,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .undef, .null_value, .zero_initializer, .vector => .{ .scalar = value },
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector => .{ .scalar = value },
         .named => error.UnsupportedGlobalVariable,
     };
 }
@@ -320,7 +320,7 @@ fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text
         if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
         switch (value) {
             .int, .undef, .null_value => try initializer.values.append(allocator, value),
-            .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+            .named, .fp, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
@@ -1572,5 +1572,18 @@ fn parseValue(text: []const u8) !core.Value {
         if (trimmed.len == 1) return error.InvalidValueName;
         return .{ .named = trimmed };
     }
+    if (isUnsupportedFpLiteral(trimmed)) return error.UnsupportedFloatingPointLiteral;
+    if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
     return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
+}
+
+fn isFpLiteral(text: []const u8) bool {
+    return std.mem.indexOfAny(u8, text, ".eE") != null or std.mem.startsWith(u8, text, "0x") or std.mem.startsWith(u8, text, "-0x");
+}
+
+fn isUnsupportedFpLiteral(text: []const u8) bool {
+    if (std.mem.eql(u8, text, "nan") or std.mem.eql(u8, text, "-nan")) return true;
+    if (std.mem.eql(u8, text, "inf") or std.mem.eql(u8, text, "-inf")) return true;
+    if (std.mem.eql(u8, text, "-0.0") or std.mem.eql(u8, text, "-0.000000e+00")) return true;
+    return false;
 }

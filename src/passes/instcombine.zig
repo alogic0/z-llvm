@@ -54,7 +54,7 @@ fn canonicalize(instruction: *ir.Instruction) bool {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

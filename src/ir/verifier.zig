@@ -184,6 +184,7 @@ const VerifyContext = struct {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int => return if (ty.isVector()) error.TypeMismatch else {},
+            .fp => return if (ty == .float or ty == .double) {} else error.TypeMismatch,
             .undef => return,
             .null_value => unreachable,
             .zero_initializer => return,
@@ -200,6 +201,7 @@ const VerifyContext = struct {
         if (value == .null_value) return if (ty == .ptr) {} else error.TypeMismatch;
         const name = switch (value) {
             .int => return if (ty.isVector()) error.TypeMismatch else {},
+            .fp => return if (ty == .float or ty == .double) {} else error.TypeMismatch,
             .undef => return,
             .null_value => unreachable,
             .zero_initializer => return,
@@ -280,11 +282,11 @@ pub fn verify(module: core.Module) !void {
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
                     .int, .undef => {},
-                    .named, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                    .named, .fp, .null_value, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
                     .undef, .null_value => {},
-                    .int, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
+                    .int, .fp, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
                 .void, .float, .double, .aggregate, .vector => return error.UnsupportedGlobalVariable,
             },
@@ -294,7 +296,7 @@ pub fn verify(module: core.Module) !void {
                 if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
                 for (array.values.items) |value| switch (value) {
                     .int, .undef, .null_value, .zero_initializer, .vector => {},
-                    .named => return error.UnsupportedGlobalVariable,
+                    .fp, .named => return error.UnsupportedGlobalVariable,
                 };
             },
         }
@@ -668,7 +670,7 @@ fn verifyLaneIndex(vector_ty: core.Type, index_ty: core.Type, index: core.Value)
     switch (index) {
         .int => |lane| if (lane < 0 or lane >= vector_ty.vector.len) return error.TypeMismatch,
         .named, .undef => {},
-        .null_value, .zero_initializer, .vector => return error.TypeMismatch,
+        .fp, .null_value, .zero_initializer, .vector => return error.TypeMismatch,
     }
 }
 
@@ -681,7 +683,7 @@ fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value)
     switch (mask) {
         .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
         .undef, .zero_initializer => {},
-        .named, .int, .null_value => return error.TypeMismatch,
+        .named, .int, .fp, .null_value => return error.TypeMismatch,
     }
 }
 

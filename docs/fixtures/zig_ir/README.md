@@ -212,6 +212,7 @@ parser blockers after Cycle 1:
 | `switch_control` | `test/zig/inputs/switch_control.zig` | `test/zig/captured/switch_control.ReleaseFast.x86_64.ll` | switch lookup table, private array constant, branch/select lowering | `parse`, `verify`, `optimizer-input` |
 | `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll`; `test/zig/captured/floats_math.ReleaseSmall.x86_64.ll` | float/double signatures, `select`, `fadd`, size attrs | `parse`, `verify`, `optimizer-input`, `float-ir` |
 | `float_compare` | `test/zig/inputs/float_compare.zig` | `test/zig/captured/float_compare.ReleaseFast.x86_64.ll`; `test/zig/captured/float_compare.ReleaseSmall.x86_64.ll` | `fmul`, observed `fcmp olt`, scalar FP predicate surface, size attrs | `parse`, `verify`, `optimizer-input`, `float-ir` |
+| `fp_constants` | `test/zig/inputs/fp_constants.zig` | `test/zig/captured/fp_constants.ReleaseFast.x86_64.ll` | observed decimal `float` and `double` literal spellings | `parse`, `verify`, `optimizer-input`, `float-ir` |
 | `aggregate_abi` | `test/zig/inputs/aggregate_abi.zig` | `test/zig/captured/aggregate_abi.ReleaseFast.x86_64.ll` | small extern-struct ABI values lowered to integer packing | `parse`, `verify`, `optimizer-input` |
 | `packed_bits` | `test/zig/inputs/packed_bits.zig` | `test/zig/captured/packed_bits.ReleaseFast.x86_64.ll` | packed-struct masks, `or disjoint`, sign-bit tests | `parse`, `verify`, `optimizer-input` |
 | `error_switch` | `test/zig/inputs/error_switch.zig` | `test/zig/captured/error_switch.ReleaseFast.x86_64.ll` | error-switch branch/select/phi lowering and branch weights | `parse`, `verify`, `optimizer-input` |
@@ -232,7 +233,7 @@ parser blockers after Cycle 1:
 | Optional debug/instrumentation/LTO tracks | `atomics_inline_asm_debug`, `tiny_scalar` Debug rows, reduced `control_flow_calls` Debug rows |
 | ReleaseSafe safety IR | `release_safe_safety` |
 | Switch/table lowering blockers | `switch_control` |
-| Floating-point IR blockers | `floats_math`, `float_compare` |
+| Floating-point IR blockers | `floats_math`, `float_compare`, `fp_constants` |
 | Aggregate ABI scalarization checks | `aggregate_abi` |
 | Packed bitfield lowering checks | `packed_bits` |
 | Error switch lowering checks | `error_switch` |

@@ -51,6 +51,7 @@ br label %target
 br i1 <value>, label %then, label %else
 unreachable
 integer constants
+observed decimal `float` and `double` constants, preserved as raw FP literals
 i1 true/false constants, normalized to 1/0 internally
 undef constants
 named SSA values
@@ -61,6 +62,7 @@ named SSA values
 ```text
 fp80/fp128
 floating-point operations beyond scalar `fadd`/`fmul`
+NaN, infinity, signed-zero, and unobserved FP literal semantics
 arrays
 scalable vectors and unsupported vector element types
 structs

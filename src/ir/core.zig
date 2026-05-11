@@ -102,6 +102,7 @@ pub const VectorType = struct {
 pub const Value = union(enum) {
     named: []const u8,
     int: i128,
+    fp: []const u8,
     undef,
     null_value,
     zero_initializer,
@@ -111,18 +112,22 @@ pub const Value = union(enum) {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int, .undef, .null_value, .zero_initializer, .vector => false,
+                .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
             },
             .int => |value| switch (b) {
-                .named, .undef, .null_value, .zero_initializer, .vector => false,
+                .named, .fp, .undef, .null_value, .zero_initializer, .vector => false,
                 .int => |other_value| value == other_value,
+            },
+            .fp => |text| switch (b) {
+                .fp => |other_text| std.mem.eql(u8, text, other_text),
+                .named, .int, .undef, .null_value, .zero_initializer, .vector => false,
             },
             .undef => b == .undef,
             .null_value => b == .null_value,
             .zero_initializer => b == .zero_initializer,
             .vector => |text| switch (b) {
                 .vector => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .undef, .null_value, .zero_initializer => false,
+                .named, .int, .fp, .undef, .null_value, .zero_initializer => false,
             },
         };
     }
@@ -137,6 +142,7 @@ pub const Value = union(enum) {
                 }
             },
             .int => |int| try writer.print("{}", .{int}),
+            .fp => |text| try writer.writeAll(text),
             .undef => try writer.writeAll("undef"),
             .null_value => try writer.writeAll("null"),
             .zero_initializer => try writer.writeAll("zeroinitializer"),
@@ -773,7 +779,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

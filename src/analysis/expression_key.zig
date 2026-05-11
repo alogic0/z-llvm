@@ -235,11 +235,15 @@ const HashState = struct {
                 state.addTag(2);
                 state.addInt128(int);
             },
-            .undef => state.addTag(3),
-            .null_value => state.addTag(4),
-            .zero_initializer => state.addTag(5),
+            .fp => |text| {
+                state.addTag(3);
+                state.addBytes(text);
+            },
+            .undef => state.addTag(4),
+            .null_value => state.addTag(5),
+            .zero_initializer => state.addTag(6),
             .vector => |text| {
-                state.addTag(6);
+                state.addTag(7);
                 state.addBytes(text);
             },
         }

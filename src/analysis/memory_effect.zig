@@ -112,11 +112,11 @@ fn binaryMayTrap(binary: ir.BinaryInst) bool {
     return switch (binary.op) {
         .udiv, .urem => switch (binary.rhs) {
             .int => |rhs| rhs == 0,
-            .named, .undef, .null_value, .zero_initializer, .vector => true,
+            .named, .fp, .undef, .null_value, .zero_initializer, .vector => true,
         },
         .sdiv, .srem => switch (binary.rhs) {
             .int => |rhs| rhs == 0 or rhs == -1,
-            .named, .undef, .null_value, .zero_initializer, .vector => true,
+            .named, .fp, .undef, .null_value, .zero_initializer, .vector => true,
         },
         .fadd, .fmul, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
     };

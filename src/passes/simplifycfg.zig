@@ -257,7 +257,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
 
 fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
     return switch (value) {
-        .int, .undef, .null_value, .zero_initializer, .vector => value,
+        .int, .fp, .undef, .null_value, .zero_initializer, .vector => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
 }

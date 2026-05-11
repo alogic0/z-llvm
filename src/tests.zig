@@ -1612,6 +1612,64 @@ test "parser verifies null pointer constants from optional lowering" {
     try std.testing.expectError(error.TypeMismatch, invalid_module.verify());
 }
 
+test "parser preserves observed scalar FP literal spellings without folding" {
+    const input =
+        \\define float @float_literal() {
+        \\entry:
+        \\  ret float 1.500000e+00
+        \\}
+        \\
+        \\define double @double_literal() {
+        \\entry:
+        \\  ret double 2.250000e+00
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const float_ret = module.functions.items[0].blocks.items[0].terminator.?.ret.value.?;
+    try std.testing.expectEqualStrings("1.500000e+00", float_ret.fp);
+    const double_ret = module.functions.items[1].blocks.items[0].terminator.?.ret.value.?;
+    try std.testing.expectEqualStrings("2.250000e+00", double_ret.fp);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported FP literal spellings until strict semantics are modeled" {
+    const nan_input =
+        \\define double @nan_literal() {
+        \\entry:
+        \\  ret double nan
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, nan_input));
+
+    const inf_input =
+        \\define double @inf_literal() {
+        \\entry:
+        \\  ret double inf
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, inf_input));
+
+    const signed_zero_input =
+        \\define double @negative_zero_literal() {
+        \\entry:
+        \\  ret double -0.0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedFloatingPointLiteral, ir.Module.parse(std.testing.allocator, signed_zero_input));
+}
+
 test "parser preserves fixed vector signatures and rejects unsupported vector boundaries" {
     const vector_add =
         \\define i32 @vector_add() {
