@@ -6,8 +6,9 @@ The first optimizer cycle slices are complete and archived under
 `roadmap/historical/completed_cycle_slices/`. The first larger optimizer cycles
 are complete and archived under `roadmap/historical/completed_big_cycles/`.
 The first raw Zig-emitted IR corpus blocker wave is complete and archived under
-`roadmap/historical/completed_corpus_blocker_cycles/`. The active roadmap now
-targets the next source-backed corpus expansion wave.
+`roadmap/historical/completed_corpus_blocker_cycles/`. The first source-backed
+corpus expansion cycles are complete and archived under
+`roadmap/historical/completed_corpus_expansion_cycles/`.
 
 The purpose is to keep the project aligned with Zig's upstream LLVM-removal
 path:
@@ -68,14 +69,9 @@ completed foundation epics
 
 - [x] [Completed Corpus Blocker Cycles](roadmap/historical/completed_corpus_blocker_cycles/README.md)
 
-## Active Corpus Expansion Cycles
+## Completed Corpus Expansion Cycles
 
-- [x] [Cycle 1: TLS Concurrency Acceptance](roadmap/01_tls_concurrency_acceptance_cycle.md)
-- [x] [Cycle 2: Switch Table Global Constants](roadmap/02_switch_table_global_constants_cycle.md)
-- [x] [Cycle 3: Float IR Surface](roadmap/03_float_ir_surface_cycle.md)
-- [x] [Cycle 4: Atomic And Inline-Asm Fixture Closure](roadmap/04_atomic_inline_asm_fixture_closure_cycle.md)
-- [x] [Cycle 5: Corpus Capture Automation](roadmap/05_corpus_capture_automation_cycle.md)
-- [x] [Cycle 6: Next Source-Backed Fixture Wave](roadmap/06_next_source_backed_fixture_wave_cycle.md)
+- [x] [Completed Corpus Expansion Cycles](roadmap/historical/completed_corpus_expansion_cycles/README.md)
 
 ## Future Backlog
 
