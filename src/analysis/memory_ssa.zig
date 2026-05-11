@@ -124,7 +124,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
     const store_instruction = block.instructions.items[store_index];
     const store = switch (store_instruction.kind) {
         .store => |store| store,
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep, .call => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .call => return false,
     };
     if (memory_effect.classify(store_instruction) == .volatile_or_atomic_barrier) return false;
 
@@ -148,7 +148,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 if (alias.aliasLocations(later, location) != .no_alias) return false;
             },
             .call => return false,
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
         }
     }
     return false;
@@ -163,7 +163,7 @@ fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {
             .readonly_load => .use,
             .memory_write, .volatile_or_atomic_barrier, .unknown => .barrier,
         },
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => null,
     };
 }
 
@@ -171,7 +171,7 @@ fn accessPointer(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .load => |load| load.ptr,
         .store => |store| store.ptr,
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => null,
     };
 }
 

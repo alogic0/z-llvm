@@ -41,7 +41,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, layout: ?target.DataLayout, f
                     }
                 },
                 .load, .call => {},
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
             }
         }
     }

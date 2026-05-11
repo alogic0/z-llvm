@@ -116,7 +116,7 @@ fn tryScalarizeAggregateAlloca(
                     const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
                     store.ptr = .{ .named = replacement.alloca_name };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => {},
             }
         }
     }
@@ -225,7 +225,7 @@ fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_us
                         if (isNamed(store.value, slot)) return false;
                         saw_memory_use = true;
                     },
-                    .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => return false,
+                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => return false,
                 }
             }
         }
@@ -362,7 +362,7 @@ fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
             return switch (instruction.kind) {
                 .alloca => base_name,
                 .gep => |gep| pointerAllocaRoot(function, gep.ptr),
-                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .call => null,
             };
         }
     }
@@ -383,7 +383,7 @@ fn zeroOffsetAllocaBase(function: ir.Function, ptr: ir.Value) ?[]const u8 {
             return switch (instruction.kind) {
                 .alloca => base_name,
                 .gep => |gep| if (allIndicesAreZero(gep)) zeroOffsetAllocaBase(function, gep.ptr) else null,
-                .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .call => null,
             };
         }
     }
@@ -412,6 +412,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .fcmp => |*fcmp| {
+                    fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
+                    fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
                 },
                 .select => |*select| {
                     select.cond = replaceOperand(select.cond, name, replacement);
@@ -462,6 +466,7 @@ fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
         .cast => |cast| return isNamed(cast.value, name),
         .freeze => |freeze| return isNamed(freeze.value, name),
         .icmp => |icmp| return isNamed(icmp.lhs, name) or isNamed(icmp.rhs, name),
+        .fcmp => |fcmp| return isNamed(fcmp.lhs, name) or isNamed(fcmp.rhs, name),
         .select => |select| return isNamed(select.cond, name) or isNamed(select.true_value, name) or isNamed(select.false_value, name),
         .phi => |phi| {
             for (phi.incoming.items) |incoming| {

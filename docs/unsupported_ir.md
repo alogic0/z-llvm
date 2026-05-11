@@ -60,7 +60,7 @@ named SSA values
 
 ```text
 fp80/fp128
-floating-point operations beyond scalar `fadd`
+floating-point operations beyond scalar `fadd`/`fmul`
 arrays
 vectors
 structs
@@ -72,7 +72,7 @@ token/metadata types
 ## Unsupported Instructions
 
 ```text
-fcmp
+fcmp predicates beyond scalar `olt`
 phi token/blockaddress values
 indirect call
 call attributes beyond the supported calling convention spelling

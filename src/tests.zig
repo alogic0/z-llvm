@@ -2330,7 +2330,7 @@ test "parser preserves scalar array global constants from switch tables" {
     , output.writer.buffered());
 }
 
-test "parser preserves scalar float types and fadd" {
+test "parser preserves scalar float arithmetic and compare IR" {
     const input =
         \\define float @float_add(float %a, float %b) {
         \\entry:
@@ -2344,6 +2344,18 @@ test "parser preserves scalar float types and fadd" {
         \\  ret double %value
         \\}
         \\
+        \\define double @float_mul(double %a, double %b) {
+        \\entry:
+        \\  %product = fmul double %a, %b
+        \\  ret double %product
+        \\}
+        \\
+        \\define i1 @float_less(float %a, float %b) {
+        \\entry:
+        \\  %less = fcmp olt float %a, %b
+        \\  ret i1 %less
+        \\}
+        \\
     ;
 
     var module = try ir.Module.parse(std.testing.allocator, input);
@@ -2352,6 +2364,8 @@ test "parser preserves scalar float types and fadd" {
 
     try std.testing.expect(module.functions.items[0].ret_ty.eql(.float));
     try std.testing.expect(module.functions.items[1].ret_ty.eql(.double));
+    try std.testing.expect(module.functions.items[2].ret_ty.eql(.double));
+    try std.testing.expect(module.functions.items[3].ret_ty.eql(.{ .int = 1 }));
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -2360,16 +2374,8 @@ test "parser preserves scalar float types and fadd" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects unsupported floating point operations" {
-    const fmul_input =
-        \\define float @mul(float %a, float %b) {
-        \\entry:
-        \\  %r = fmul float %a, %b
-        \\  ret float %r
-        \\}
-        \\
-    ;
-    const fcmp_input =
+test "parser rejects unsupported floating point compare forms" {
+    const fcmp_predicate_input =
         \\define i1 @cmp(float %a, float %b) {
         \\entry:
         \\  %r = fcmp oeq float %a, %b
@@ -2377,9 +2383,20 @@ test "parser rejects unsupported floating point operations" {
         \\}
         \\
     ;
+    const fcmp_type_input =
+        \\define i1 @cmp(float %a, float %b) {
+        \\entry:
+        \\  %r = fcmp olt i32 1, 2
+        \\  ret i1 %r
+        \\}
+        \\
+    ;
 
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fmul_input));
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fcmp_input));
+    try std.testing.expectError(error.UnsupportedPredicate, ir.Module.parse(std.testing.allocator, fcmp_predicate_input));
+
+    var module = try ir.Module.parse(std.testing.allocator, fcmp_type_input);
+    defer module.deinit();
+    try std.testing.expectError(error.TypeMismatch, module.verify());
 }
 
 test "x86_64 codegen lowers add args to assembly" {

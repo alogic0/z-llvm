@@ -73,6 +73,7 @@ pub const Value = union(enum) {
 
 pub const BinaryOp = enum {
     fadd,
+    fmul,
     add,
     sub,
     mul,
@@ -89,6 +90,7 @@ pub const BinaryOp = enum {
 
     pub fn parse(text: []const u8) ?BinaryOp {
         if (std.mem.eql(u8, text, "fadd")) return .fadd;
+        if (std.mem.eql(u8, text, "fmul")) return .fmul;
         if (std.mem.eql(u8, text, "add")) return .add;
         if (std.mem.eql(u8, text, "sub")) return .sub;
         if (std.mem.eql(u8, text, "mul")) return .mul;
@@ -353,6 +355,26 @@ pub const IcmpInst = struct {
     rhs: Value,
 };
 
+pub const FcmpPredicate = enum {
+    olt,
+
+    pub fn parse(text: []const u8) ?FcmpPredicate {
+        if (std.mem.eql(u8, text, "olt")) return .olt;
+        return null;
+    }
+
+    pub fn name(predicate: FcmpPredicate) []const u8 {
+        return @tagName(predicate);
+    }
+};
+
+pub const FcmpInst = struct {
+    predicate: FcmpPredicate,
+    operand_ty: Type,
+    lhs: Value,
+    rhs: Value,
+};
+
 pub const SelectInst = struct {
     cond_ty: Type,
     cond: Value,
@@ -445,6 +467,7 @@ pub const Instruction = struct {
         cast: CastInst,
         freeze: FreezeInst,
         icmp: IcmpInst,
+        fcmp: FcmpInst,
         select: SelectInst,
         phi: PhiInst,
         alloca: AllocaInst,
@@ -475,6 +498,7 @@ pub const Instruction = struct {
             .cast => |cast| cast.to_ty,
             .freeze => |freeze| freeze.ty,
             .icmp => .{ .int = 1 },
+            .fcmp => .{ .int = 1 },
             .select => |select| select.ty,
             .phi => |phi| phi.ty,
             .alloca => .ptr,
@@ -496,6 +520,10 @@ pub const Instruction = struct {
             .icmp => |*icmp| {
                 icmp.lhs = resolveValue(aliases, icmp.lhs);
                 icmp.rhs = resolveValue(aliases, icmp.rhs);
+            },
+            .fcmp => |*fcmp| {
+                fcmp.lhs = resolveValue(aliases, fcmp.lhs);
+                fcmp.rhs = resolveValue(aliases, fcmp.rhs);
             },
             .select => |*select| {
                 select.cond = resolveValue(aliases, select.cond);
@@ -525,7 +553,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),

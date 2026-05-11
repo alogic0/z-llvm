@@ -197,7 +197,7 @@ parser blockers after Cycle 1:
 | `tls_concurrency` | `test/zig/inputs/tls_concurrency.zig` | `test/zig/captured/tls_concurrency.ReleaseFast.x86_64.ll` | `thread_local` global, TLS load/store accessors, target-memory attributes | `parse`, `verify`, `optimizer-input` |
 | `switch_control` | `test/zig/inputs/switch_control.zig` | `test/zig/captured/switch_control.ReleaseFast.x86_64.ll` | switch lookup table, private array constant, branch/select lowering | `parse`, `verify`, `optimizer-input` |
 | `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll` | float/double signatures, `select`, `fadd` | `parse`, `verify`, `float-ir`, `future` |
-| `float_compare` | `test/zig/inputs/float_compare.zig` | `test/zig/captured/float_compare.ReleaseFast.x86_64.ll` | `fmul`, `fcmp`, scalar FP predicates | `unsupported`, `future` |
+| `float_compare` | `test/zig/inputs/float_compare.zig` | `test/zig/captured/float_compare.ReleaseFast.x86_64.ll` | `fmul`, `fcmp olt`, scalar FP predicates | `parse`, `verify`, `float-ir`, `future` |
 | `aggregate_abi` | `test/zig/inputs/aggregate_abi.zig` | `test/zig/captured/aggregate_abi.ReleaseFast.x86_64.ll` | small extern-struct ABI values lowered to integer packing | `parse`, `verify`, `optimizer-input` |
 | `packed_bits` | `test/zig/inputs/packed_bits.zig` | `test/zig/captured/packed_bits.ReleaseFast.x86_64.ll` | packed-struct masks, `or disjoint`, sign-bit tests | `parse`, `verify`, `optimizer-input` |
 | `error_switch` | `test/zig/inputs/error_switch.zig` | `test/zig/captured/error_switch.ReleaseFast.x86_64.ll` | error-switch branch/select/phi lowering and branch weights | `parse`, `verify`, `optimizer-input` |

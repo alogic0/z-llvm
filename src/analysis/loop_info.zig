@@ -187,7 +187,7 @@ pub const NaturalLoop = struct {
         for (header.instructions.items) |instruction| {
             const phi = switch (instruction.kind) {
                 .phi => |phi| phi,
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => continue,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => continue,
             };
             const phi_result = instruction.result orelse continue;
             const incoming = classifyInductionIncoming(loop, function, phi) orelse continue;
@@ -229,7 +229,7 @@ pub const NaturalLoop = struct {
             for (function.blocks.items[block_index].instructions.items) |instruction| {
                 if (instruction.removed) continue;
                 switch (instruction.kind) {
-                    .binary, .cast, .freeze, .icmp, .select, .phi, .gep => {},
+                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .gep => {},
                     .alloca, .load, .store, .call => return false,
                 }
             }
@@ -312,7 +312,7 @@ fn alreadyHasExitPhi(function: ir.Function, exit_block: usize, value_name: []con
     for (function.blocks.items[exit_block].instructions.items) |instruction| {
         const phi = switch (instruction.kind) {
             .phi => |phi| phi,
-            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => break,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => break,
         };
         for (phi.incoming.items) |incoming| {
             if (valueMatchesName(incoming.value, value_name)) return true;
@@ -354,6 +354,7 @@ fn instructionUsesValue(instruction: ir.Instruction, value_name: []const u8) boo
         .cast => |cast| valueMatchesName(cast.value, value_name),
         .freeze => |freeze| valueMatchesName(freeze.value, value_name),
         .icmp => |icmp| valueMatchesName(icmp.lhs, value_name) or valueMatchesName(icmp.rhs, value_name),
+        .fcmp => |fcmp| valueMatchesName(fcmp.lhs, value_name) or valueMatchesName(fcmp.rhs, value_name),
         .select => |select| valueMatchesName(select.cond, value_name) or valueMatchesName(select.true_value, value_name) or valueMatchesName(select.false_value, value_name),
         .phi => |phi| {
             for (phi.incoming.items) |incoming| {
@@ -399,6 +400,10 @@ fn replaceInstructionUse(instruction: *ir.Instruction, value_name: []const u8, r
         .icmp => |*icmp| {
             icmp.lhs = replaceValue(icmp.lhs, value_name, replacement);
             icmp.rhs = replaceValue(icmp.rhs, value_name, replacement);
+        },
+        .fcmp => |*fcmp| {
+            fcmp.lhs = replaceValue(fcmp.lhs, value_name, replacement);
+            fcmp.rhs = replaceValue(fcmp.rhs, value_name, replacement);
         },
         .select => |*select| {
             select.cond = replaceValue(select.cond, value_name, replacement);
@@ -474,7 +479,7 @@ fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, ne
         if (!std.mem.eql(u8, result, next_value)) continue;
         const binary = switch (instruction.kind) {
             .binary => |binary| binary,
-            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => return null,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => return null,
         };
         if (binary.op != .add or !binary.ty.eql(ty)) return null;
         if (valueMatchesName(binary.lhs, phi_result)) return binary.rhs;
@@ -513,6 +518,7 @@ fn outsideInstructionUsesAreLcssa(
         .cast => |cast| !valueNamesLoopDefinition(cast.value, loop_defs),
         .freeze => |freeze| !valueNamesLoopDefinition(freeze.value, loop_defs),
         .icmp => |icmp| !valuesUseLoopDefinition(loop_defs, &.{ icmp.lhs, icmp.rhs }),
+        .fcmp => |fcmp| !valuesUseLoopDefinition(loop_defs, &.{ fcmp.lhs, fcmp.rhs }),
         .select => |select| !valuesUseLoopDefinition(loop_defs, &.{ select.cond, select.true_value, select.false_value }),
         .alloca => true,
         .load => |load| !valueNamesLoopDefinition(load.ptr, loop_defs),

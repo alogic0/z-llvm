@@ -116,6 +116,9 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
                 },
+                .fcmp => |fcmp| {
+                    if (isNamed(fcmp.lhs, slot) or isNamed(fcmp.rhs, slot)) return false;
+                },
                 .select => |select| {
                     if (isNamed(select.cond, slot) or
                         isNamed(select.true_value, slot) or
@@ -215,7 +218,7 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         if (instruction.removed) continue;
         switch (instruction.kind) {
             .store => |store| if (isNamed(store.ptr, slot)) return true,
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .call => {},
         }
     }
     return false;
@@ -252,7 +255,7 @@ fn blockLoadsSlotBeforeStore(block: ir.BasicBlock, slot: []const u8) bool {
         switch (instruction.kind) {
             .load => |load| if (isNamed(load.ptr, slot)) return true,
             .store => |store| if (isNamed(store.ptr, slot)) return false,
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => {},
         }
     }
     return false;
@@ -275,7 +278,7 @@ fn findSingleStore(function: ir.Function, slot: []const u8) ?SingleStore {
                         .value = store.value,
                     };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .call => {},
             }
         }
     }
@@ -295,7 +298,7 @@ fn singleStoreDominatesLoads(function: ir.Function, dom: dominator.Dominators, s
                         return false;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => {},
             }
         }
     }
@@ -317,7 +320,7 @@ fn promoteSingleStoreSlot(function: *ir.Function, alloca_block_index: usize, all
                     instruction.replacement = single_store.value;
                     replaceValue(function, result, single_store.value);
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => {},
             }
         }
     }
@@ -405,7 +408,7 @@ fn renameSlot(
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -435,7 +438,7 @@ fn addPhiIncoming(allocator: std.mem.Allocator, function: *ir.Function, block_in
                 });
                 return;
             },
-            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => return,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => return,
         }
     }
 }
@@ -471,6 +474,9 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
                 },
                 .icmp => |icmp| {
                     if (isNamed(icmp.lhs, slot) or isNamed(icmp.rhs, slot)) return false;
+                },
+                .fcmp => |fcmp| {
+                    if (isNamed(fcmp.lhs, slot) or isNamed(fcmp.rhs, slot)) return false;
                 },
                 .select => |select| {
                     if (isNamed(select.cond, slot) or
@@ -510,7 +516,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .load => |load| {
                 if (isNamed(load.ptr, slot) and !has_current_value) return false;
             },
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => {},
         }
     }
     return true;
@@ -547,7 +553,7 @@ fn promoteSingleBlockSlot(function: *ir.Function, block_index: usize, slot: []co
                     instruction.replacement = value;
                     replacement = .{ .name = result, .value = value };
                 },
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => {},
             }
         }
         if (replacement) |item| replaceValue(function, item.name, item.value);
@@ -568,6 +574,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .fcmp => |*fcmp| {
+                    fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
+                    fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
                 },
                 .select => |*select| {
                     select.cond = replaceOperand(select.cond, name, replacement);

@@ -677,6 +677,23 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
         };
     }
 
+    if (std.mem.eql(u8, op_text, "fcmp")) {
+        const predicate = core.FcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
+        const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
+        const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
+        if (parts.next() != null) return error.InvalidInstruction;
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .fcmp = .{
+                .predicate = predicate,
+                .operand_ty = operand_ty,
+                .lhs = lhs,
+                .rhs = rhs,
+            } },
+        };
+    }
+
     if (std.mem.eql(u8, op_text, "select")) {
         const cond_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const cond = try parseValue(parts.next() orelse return error.InvalidInstruction);

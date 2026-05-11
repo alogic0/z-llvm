@@ -94,8 +94,9 @@ fn isHoistable(instruction: ir.Instruction) bool {
     if (instruction.removed or !memory_effect.isSafeToSpeculativelyExecute(instruction)) return false;
     if (instruction.result == null) return false;
     return switch (instruction.kind) {
-        .binary, .cast, .icmp, .select => true,
-        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
+        .binary => |binary| !isFpBinary(binary.op),
+        .cast, .icmp, .select => true,
+        .freeze, .fcmp, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 
@@ -106,6 +107,7 @@ fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalL
         .cast => |cast| natural_loop.isLoopInvariantValue(cast.value, def_blocks),
         .icmp => |icmp| natural_loop.isLoopInvariantValue(icmp.lhs, def_blocks) and
             natural_loop.isLoopInvariantValue(icmp.rhs, def_blocks),
+        .fcmp => return false,
         .select => |select| natural_loop.isLoopInvariantValue(select.cond, def_blocks) and
             natural_loop.isLoopInvariantValue(select.true_value, def_blocks) and
             natural_loop.isLoopInvariantValue(select.false_value, def_blocks),
@@ -150,6 +152,7 @@ fn instructionUsesAreDominated(
         .cast => |cast| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{cast.value}),
         .freeze => |freeze| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{freeze.value}),
         .icmp => |icmp| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ icmp.lhs, icmp.rhs }),
+        .fcmp => |fcmp| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ fcmp.lhs, fcmp.rhs }),
         .select => |select| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ select.cond, select.true_value, select.false_value }),
         .alloca => return true,
         .load => |load| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{load.ptr}),
@@ -202,4 +205,8 @@ fn valueMatchesName(value: ir.Value, name: []const u8) bool {
         .int, .undef => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
+}
+
+fn isFpBinary(op: ir.BinaryOp) bool {
+    return op == .fadd or op == .fmul;
 }

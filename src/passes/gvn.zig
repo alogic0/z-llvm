@@ -175,13 +175,14 @@ fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
     if (effect != .none and effect != .readonly_load) {
         const call = switch (instruction.kind) {
             .call => |call| call,
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return false,
         };
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
     return switch (instruction.kind) {
-        .binary, .cast, .icmp, .select, .phi, .load => true,
-        .freeze, .alloca, .store, .gep, .call => false,
+        .binary => |binary| !isFpBinary(binary.op),
+        .cast, .icmp, .select, .phi, .load => true,
+        .freeze, .fcmp, .alloca, .store, .gep, .call => false,
     };
 }
 
@@ -214,6 +215,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .fcmp => |*fcmp| {
+                    fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
+                    fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
                 },
                 .select => |*select| {
                     select.cond = replaceOperand(select.cond, name, replacement);
@@ -263,4 +268,8 @@ fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value 
         .int, .undef => value,
         .named => |name| aliases.get(name) orelse value,
     };
+}
+
+fn isFpBinary(op: ir.BinaryOp) bool {
+    return op == .fadd or op == .fmul;
 }

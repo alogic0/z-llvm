@@ -39,7 +39,7 @@ pub fn classify(instruction: ir.Instruction) Effect {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .none,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .none,
         .call => .unknown,
     };
 }
@@ -48,7 +48,7 @@ pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
     return switch (instruction.kind) {
         .load => |load| memoryBarrierKind(load.attrs),
         .store => |store| memoryBarrierKind(store.attrs),
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => .none,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => .none,
     };
 }
 
@@ -83,7 +83,7 @@ pub fn mayTrap(instruction: ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |binary| binaryMayTrap(binary),
         .load, .store, .call => false,
-        .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => false,
+        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => false,
     };
 }
 
@@ -108,6 +108,6 @@ fn binaryMayTrap(binary: ir.BinaryInst) bool {
             .int => |rhs| rhs == 0 or rhs == -1,
             .named, .undef => true,
         },
-        .fadd, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
+        .fadd, .fmul, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
     };
 }

@@ -345,6 +345,16 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(icmp.operand_ty, icmp.lhs, block_index, instruction_index);
                         try ctx.verifyValue(icmp.operand_ty, icmp.rhs, block_index, instruction_index);
                     },
+                    .fcmp => |fcmp| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        switch (fcmp.operand_ty) {
+                            .float, .double => {},
+                            .void, .int, .ptr, .aggregate => return error.TypeMismatch,
+                        }
+                        try ctx.verifyValue(fcmp.operand_ty, fcmp.lhs, block_index, instruction_index);
+                        try ctx.verifyValue(fcmp.operand_ty, fcmp.rhs, block_index, instruction_index);
+                    },
                     .select => |select| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
@@ -539,23 +549,23 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     if (binary.flags.nsw or binary.flags.nuw) {
         switch (binary.op) {
             .add, .sub, .mul, .shl => {},
-            .fadd, .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fmul, .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.exact) {
         switch (binary.op) {
             .udiv, .sdiv, .lshr, .ashr => {},
-            .fadd, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fmul, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.disjoint) {
         switch (binary.op) {
             .@"or" => {},
-            .fadd, .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fmul, .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     switch (binary.op) {
-        .fadd => switch (binary.ty) {
+        .fadd, .fmul => switch (binary.ty) {
             .float, .double => {},
             .void, .int, .ptr, .aggregate => return error.TypeMismatch,
         },

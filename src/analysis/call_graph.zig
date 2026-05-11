@@ -125,7 +125,7 @@ fn collectDirectCallees(allocator: std.mem.Allocator, node: *Node, function: ir.
             if (instruction.removed) continue;
             switch (instruction.kind) {
                 .call => |call| try appendUnique(allocator, &node.callees, call.callee),
-                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => {},
             }
         }
     }

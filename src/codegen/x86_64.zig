@@ -263,7 +263,7 @@ fn lowerStraightLineInstructions(
                 }
             },
             .binary => {},
-            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep => return error.UnsupportedCodegenInstruction,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
 
@@ -392,7 +392,7 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => return error.UnsupportedCodegenInstruction,
+                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
     }
@@ -455,7 +455,7 @@ fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
         .@"and" => .@"and",
         .@"or" => .@"or",
         .xor => .xor,
-        .fadd, .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
+        .fadd, .fmul, .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
     };
 }
 
@@ -490,6 +490,10 @@ fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?Ar
         .icmp => |icmp| {
             try noteLiveValue(function, icmp.lhs, live);
             try noteLiveValue(function, icmp.rhs, live);
+        },
+        .fcmp => |fcmp| {
+            try noteLiveValue(function, fcmp.lhs, live);
+            try noteLiveValue(function, fcmp.rhs, live);
         },
         .select => |select| {
             try noteLiveValue(function, select.cond, live);
@@ -533,7 +537,7 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .fadd, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+        .fadd, .fmul, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 

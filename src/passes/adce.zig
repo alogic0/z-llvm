@@ -129,6 +129,10 @@ const LiveInstructions = struct {
                 try liveness.markValue(icmp.lhs);
                 try liveness.markValue(icmp.rhs);
             },
+            .fcmp => |fcmp| {
+                try liveness.markValue(fcmp.lhs);
+                try liveness.markValue(fcmp.rhs);
+            },
             .select => |select| {
                 try liveness.markValue(select.cond);
                 try liveness.markValue(select.true_value);

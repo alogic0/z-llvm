@@ -168,7 +168,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -204,6 +204,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 .icmp => |*icmp| {
                     icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
                     icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
+                },
+                .fcmp => |*fcmp| {
+                    fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
+                    fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
                 },
                 .select => |*select| {
                     select.cond = replaceOperand(select.cond, name, replacement);

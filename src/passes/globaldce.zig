@@ -135,6 +135,10 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
                     try addValueEdge(allocator, module, edges, icmp.lhs);
                     try addValueEdge(allocator, module, edges, icmp.rhs);
                 },
+                .fcmp => |fcmp| {
+                    try addValueEdge(allocator, module, edges, fcmp.lhs);
+                    try addValueEdge(allocator, module, edges, fcmp.rhs);
+                },
                 .select => |select| {
                     try addValueEdge(allocator, module, edges, select.cond);
                     try addValueEdge(allocator, module, edges, select.true_value);

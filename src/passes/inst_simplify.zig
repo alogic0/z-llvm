@@ -17,6 +17,7 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .cast => |cast| simplifyCast(cast),
         .freeze => |freeze| simplifyFreeze(freeze),
         .icmp => |icmp| simplifyIcmp(icmp),
+        .fcmp => null,
         .select => |select| simplifySelect(select),
         .call => |call| simplifyCall(call),
         .phi, .alloca, .load, .store, .gep => null,
@@ -27,7 +28,8 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
     return switch (a.kind) {
         .binary => |a_binary| switch (b.kind) {
             .binary => |b_binary| a_binary.op != .fadd and
-                b_binary.op != .fadd and
+                !isFpBinary(a_binary.op) and
+                !isFpBinary(b_binary.op) and
                 a_binary.op == b_binary.op and
                 a_binary.flags.nsw == b_binary.flags.nsw and
                 a_binary.flags.nuw == b_binary.flags.nuw and
@@ -36,38 +38,39 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),
-            .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),
-            .binary, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .cast, .freeze, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
         },
+        .fcmp => false,
         .select => |a_select| switch (b.kind) {
             .select => |b_select| a_select.cond_ty.eql(b_select.cond_ty) and
                 a_select.cond.eql(b_select.cond) and
                 a_select.ty.eql(b_select.ty) and
                 a_select.true_value.eql(b_select.true_value) and
                 a_select.false_value.eql(b_select.false_value),
-            .binary, .cast, .freeze, .icmp, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .gep, .call => false,
         },
         .phi => |a_phi| switch (b.kind) {
             .phi => |b_phi| samePhi(a_phi, b_phi),
-            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => false,
         },
         .load => |a_load| switch (b.kind) {
             .load => |b_load| a_load.ty.eql(b_load.ty) and a_load.ptr.eql(b_load.ptr) and
                 !a_load.attrs.isBarrier() and !b_load.attrs.isBarrier(),
-            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => false,
         },
         .freeze, .alloca, .store, .gep, .call => false,
     };
@@ -89,7 +92,7 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
 
     if (binary.flags.any()) return null;
     return switch (binary.op) {
-        .fadd => null,
+        .fadd, .fmul => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -146,7 +149,7 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
     const lhs = binary.lhs.int;
     const rhs = binary.rhs.int;
     return switch (binary.op) {
-        .fadd => null,
+        .fadd, .fmul => null,
         .add => if (!binary.flags.any()) .{ .int = lhs + rhs } else null,
         .sub => if (!binary.flags.any()) .{ .int = lhs - rhs } else null,
         .mul => if (!binary.flags.any()) .{ .int = lhs * rhs } else null,
@@ -331,8 +334,12 @@ fn intrinsicMinMaxKind(callee: []const u8) ?MinMaxKind {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .fadd, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+        .fadd, .fmul, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
+}
+
+fn isFpBinary(op: ir.BinaryOp) bool {
+    return op == .fadd or op == .fmul;
 }
 
 fn unsignedInt(value: i128, ty: ir.Type) ?u128 {

@@ -47,6 +47,10 @@ pub const UseCounts = struct {
                 try uses.addValue(icmp.lhs);
                 try uses.addValue(icmp.rhs);
             },
+            .fcmp => |fcmp| {
+                try uses.addValue(fcmp.lhs);
+                try uses.addValue(fcmp.rhs);
+            },
             .select => |select| {
                 try uses.addValue(select.cond);
                 try uses.addValue(select.true_value);
@@ -82,6 +86,10 @@ pub const UseCounts = struct {
             .icmp => |icmp| {
                 uses.removeValue(icmp.lhs);
                 uses.removeValue(icmp.rhs);
+            },
+            .fcmp => |fcmp| {
+                uses.removeValue(fcmp.lhs);
+                uses.removeValue(fcmp.rhs);
             },
             .select => |select| {
                 uses.removeValue(select.cond);

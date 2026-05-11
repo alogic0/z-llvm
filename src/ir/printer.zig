@@ -125,6 +125,15 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try icmp.rhs.format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
+                    .fcmp => |fcmp| {
+                        try writer.print("fcmp {s} ", .{fcmp.predicate.name()});
+                        try fcmp.operand_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try fcmp.lhs.format(writer);
+                        try writer.writeAll(", ");
+                        try fcmp.rhs.format(writer);
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
                     .select => |select| {
                         try writer.writeAll("select ");
                         try select.cond_ty.format(writer);

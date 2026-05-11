@@ -53,7 +53,7 @@ pub fn modRef(function: ir.Function, instruction: ir.Instruction, pointer: ir.Va
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesPointer(function, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
         .call => .unknown,
     };
 }
@@ -69,7 +69,7 @@ pub fn modRefInModule(module: ir.Module, function: ir.Function, instruction: ir.
             if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return .unknown;
             return if (accessAliasesPointerInModule(module, function, layout, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
-        .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep => .no_mod_ref,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .no_mod_ref,
         .call => .unknown,
     };
 }
