@@ -258,7 +258,7 @@ Connection to the LLVM pass inventory:
 | --- | --- |
 | `Debug` raw mode | `debug-o0`, `local-pipeline=zig-debug-accepted`, `verify`, `always-inline`, debug metadata placeholders. |
 | `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, `DILexicalBlock`, and `DILocation` preservation for instruction, branch, call-site, and loop PHI attachments through the verifier-only Debug pipeline. |
-| `Debug` intrinsic boundary | `llvm.dbg.value`, `llvm.dbg.declare`, `DILocalVariable`, and `DIExpression` are tracked as unsupported fixtures with `UnsupportedDebugIntrinsic`. |
+| `Debug` intrinsic boundary | `llvm.dbg.value`, `llvm.dbg.declare`, `DILocalVariable`, and `DIExpression` are accepted as parse/verify preservation fixtures; transform passes remain disabled until salvage exists. |
 | `ReleaseSafe` reduced safety mode | `release-o3`, `local-pipeline=zig-release-safe-accepted`, safety branch preservation, and opaque branch-weight metadata. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, and `aarch64-target-independent` optimizer-input coverage for verifier, integer InstCombine, and DCE only. |

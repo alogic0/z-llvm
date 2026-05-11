@@ -204,13 +204,14 @@ const HashState = struct {
             },
             .float => state.addTag(3),
             .double => state.addTag(4),
-            .ptr => state.addTag(5),
+            .metadata => state.addTag(5),
+            .ptr => state.addTag(6),
             .aggregate => |text| {
-                state.addTag(6);
+                state.addTag(7);
                 state.addBytes(text);
             },
             .vector => |vector| {
-                state.addTag(7);
+                state.addTag(8);
                 state.addInt(vector.len);
                 switch (vector.elem_ty) {
                     .int => |bits| {

@@ -1545,7 +1545,7 @@ test "parser preserves instruction debug metadata attachments" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects debug value intrinsics until salvage is represented" {
+test "parser preserves debug value intrinsics as variable-location boundary" {
     const input =
         \\declare void @llvm.dbg.value(metadata, metadata, metadata)
         \\
@@ -1567,10 +1567,22 @@ test "parser rejects debug value intrinsics until salvage is represented" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedDebugIntrinsic, ir.Module.parse(std.testing.allocator, input));
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instruction = module.functions.items[0].blocks.items[0].instructions.items[0];
+    const call = instruction.kind.call;
+    try std.testing.expect(call.isDebugVariableLocation());
+    try std.testing.expectEqualStrings("metadata i32 %a, metadata !9, metadata !DIExpression()", call.raw_args.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects debug declare intrinsics until variable locations are represented" {
+test "parser preserves debug declare intrinsics as variable-location boundary" {
     const input =
         \\declare void @llvm.dbg.declare(metadata, metadata, metadata)
         \\
@@ -1590,6 +1602,36 @@ test "parser rejects debug declare intrinsics until variable locations are repre
         \\!9 = !DILocalVariable(name: "p", arg: 1, scope: !4, file: !2, line: 1, type: !10)
         \\!10 = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: !11, size: 64)
         \\!11 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instruction = module.functions.items[0].blocks.items[0].instructions.items[0];
+    const call = instruction.kind.call;
+    try std.testing.expect(call.isDebugVariableLocation());
+    try std.testing.expectEqualStrings("metadata ptr %p, metadata !9, metadata !DIExpression()", call.raw_args.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported debug assign intrinsic" {
+    const input =
+        \\declare void @llvm.dbg.assign(metadata, metadata, metadata, metadata, metadata, metadata)
+        \\
+        \\define void @debug_assign(i32 %a) {
+        \\entry:
+        \\  call void @llvm.dbg.assign(metadata i32 %a, metadata !0, metadata !DIExpression(), metadata !1, metadata ptr undef, metadata !DIExpression())
+        \\  ret void
+        \\}
+        \\
+        \\!0 = !DILocalVariable(name: "a")
+        \\!1 = distinct !DIAssignID()
         \\
     ;
 

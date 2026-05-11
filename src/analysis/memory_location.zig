@@ -191,7 +191,7 @@ pub fn typeSize(ty: ir.Type) ?u64 {
         .float => 4,
         .double => 8,
         .aggregate => aggregateSize(ty),
-        .void, .ptr, .vector => null,
+        .void, .metadata, .ptr, .vector => null,
     };
 }
 
@@ -207,7 +207,7 @@ fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .ptr, .vector => return null,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
@@ -220,7 +220,7 @@ pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
 pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .ptr, .vector => return null,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
@@ -246,7 +246,7 @@ fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, 
 fn aggregateSize(ty: ir.Type) ?u64 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .ptr, .vector => return null,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| return array.count * (typeSize(array.element_ty) orelse return null);
     var fields = aggregateFields(text) orelse return null;

@@ -70,8 +70,9 @@ preserve declared opaque panic/runtime calls as side-effecting call barriers in
 reduced ReleaseSafe safety fixtures
 preserve declared opaque panic/runtime calls through DCE, ADCE, and SimplifyCFG
 when they are part of accepted ReleaseSafe safety-control fixtures
-reject llvm.dbg.value, llvm.dbg.declare, and llvm.dbg.assign with
-UnsupportedDebugIntrinsic until debug-value salvage is represented
+preserve llvm.dbg.value and llvm.dbg.declare raw operands as verifier-only
+debug variable-location intrinsics; reject llvm.dbg.assign with
+UnsupportedDebugIntrinsic until assignment tracking is represented
 reject sanitizer coverage, TSan, UBSan, llvm.ubsan.*, and llvm.trap
 instrumentation calls until runtime semantics are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,

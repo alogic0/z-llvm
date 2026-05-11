@@ -151,7 +151,7 @@ completed foundation epics
 
 ## Current Finish Roadmap Cycles
 
-- [ ] [Cycle 01: Debug Intrinsic Variable Location Boundary](roadmap/01_debug_intrinsic_variable_location_boundary_cycle.md)
+- [x] [Cycle 01: Debug Intrinsic Variable Location Boundary](roadmap/01_debug_intrinsic_variable_location_boundary_cycle.md)
 - [ ] [Cycle 02: Debug Metadata Graph Verification](roadmap/02_debug_metadata_graph_verification_cycle.md)
 - [ ] [Cycle 03: Debug Info Salvage Preservation](roadmap/03_debug_info_salvage_preservation_cycle.md)
 - [ ] [Cycle 04: APFloat Semantics Foundation](roadmap/04_apfloat_semantics_foundation_cycle.md)

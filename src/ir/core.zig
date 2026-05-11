@@ -5,6 +5,7 @@ pub const Type = union(enum) {
     int: u16,
     float,
     double,
+    metadata,
     ptr,
     aggregate: []const u8,
     vector: VectorType,
@@ -14,18 +15,19 @@ pub const Type = union(enum) {
             .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .void, .float, .double, .ptr, .aggregate, .vector => false,
+                .void, .float, .double, .metadata, .ptr, .aggregate, .vector => false,
             },
             .float => b == .float,
             .double => b == .double,
+            .metadata => b == .metadata,
             .ptr => b == .ptr,
             .aggregate => |text| switch (b) {
                 .aggregate => |other_text| std.mem.eql(u8, text, other_text),
-                .void, .int, .float, .double, .ptr, .vector => false,
+                .void, .int, .float, .double, .metadata, .ptr, .vector => false,
             },
             .vector => |vector| switch (b) {
                 .vector => |other_vector| vector.eql(other_vector),
-                .void, .int, .float, .double, .ptr, .aggregate => false,
+                .void, .int, .float, .double, .metadata, .ptr, .aggregate => false,
             },
         };
     }
@@ -40,6 +42,7 @@ pub const Type = union(enum) {
             .int => |bits| try writer.print("i{}", .{bits}),
             .float => try writer.writeAll("float"),
             .double => try writer.writeAll("double"),
+            .metadata => try writer.writeAll("metadata"),
             .ptr => try writer.writeAll("ptr"),
             .aggregate => |text| try writer.writeAll(text),
             .vector => |vector| try vector.format(writer),
@@ -646,10 +649,16 @@ pub const CallInst = struct {
     tail_kind: ?[]const u8 = null,
     inline_asm: ?InlineAsm = null,
     attrs: ?[]const u8 = null,
+    raw_args: ?[]const u8 = null,
     args: std.ArrayList(CallArg),
 
     pub fn deinit(call: *CallInst, allocator: std.mem.Allocator) void {
         call.args.deinit(allocator);
+    }
+
+    pub fn isDebugVariableLocation(call: CallInst) bool {
+        return std.mem.eql(u8, call.callee, "llvm.dbg.value") or
+            std.mem.eql(u8, call.callee, "llvm.dbg.declare");
     }
 };
 
@@ -926,5 +935,20 @@ pub const Module = struct {
 
     pub fn verify(module: Module) !void {
         return @import("verifier.zig").verify(module);
+    }
+
+    pub fn hasDebugVariableLocationIntrinsics(module: Module) bool {
+        for (module.functions.items) |function| {
+            for (function.blocks.items) |block| {
+                for (block.instructions.items) |instruction| {
+                    const call = switch (instruction.kind) {
+                        .call => |call| call,
+                        else => continue,
+                    };
+                    if (call.isDebugVariableLocation()) return true;
+                }
+            }
+        }
+        return false;
     }
 };

@@ -337,7 +337,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .ptr, .vector => return null,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -971,11 +971,21 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .tail_kind = tail_kind,
         .inline_asm = inline_asm,
         .attrs = attrs,
+        .raw_args = null,
         .args = .empty,
     };
     errdefer call.deinit(allocator);
 
-    try parseCallArgs(allocator, &call, rest[open_paren + 1 .. close_paren]);
+    const args_text = rest[open_paren + 1 .. close_paren];
+    if (inline_asm == null and isSupportedDebugIntrinsicCallee(call.callee)) {
+        if (call.calling_conv != null or call.tail_kind != null or call.attrs != null or call.ret_ty != .void or result != null) {
+            return error.UnsupportedDebugIntrinsic;
+        }
+        try validateDebugIntrinsicArgs(call.callee, args_text);
+        call.raw_args = args_text;
+    } else {
+        try parseCallArgs(allocator, &call, args_text);
+    }
 
     return .{
         .result = result,
@@ -1036,7 +1046,72 @@ fn isUnsupportedInstrumentationCallee(name: []const u8) bool {
 }
 
 fn isUnsupportedDebugIntrinsicCallee(name: []const u8) bool {
-    return std.mem.startsWith(u8, name, "llvm.dbg.");
+    return std.mem.startsWith(u8, name, "llvm.dbg.") and !isSupportedDebugIntrinsicCallee(name);
+}
+
+fn isSupportedDebugIntrinsicCallee(name: []const u8) bool {
+    return std.mem.eql(u8, name, "llvm.dbg.value") or
+        std.mem.eql(u8, name, "llvm.dbg.declare");
+}
+
+fn validateDebugIntrinsicArgs(callee: []const u8, text: []const u8) !void {
+    const args_text = std.mem.trim(u8, text, " \t");
+    var fields: [3][]const u8 = undefined;
+    var field_count: usize = 0;
+    var rest = args_text;
+    while (rest.len != 0) {
+        if (field_count == fields.len) return error.UnsupportedDebugIntrinsic;
+        const comma = findTopLevelComma(rest);
+        fields[field_count] = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        field_count += 1;
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+    if (field_count != 3) return error.UnsupportedDebugIntrinsic;
+
+    if (std.mem.eql(u8, callee, "llvm.dbg.value")) {
+        if (!isDebugValueLocationOperand(fields[0])) return error.UnsupportedDebugIntrinsic;
+    } else if (std.mem.eql(u8, callee, "llvm.dbg.declare")) {
+        if (!isDebugDeclareLocationOperand(fields[0])) return error.UnsupportedDebugIntrinsic;
+    } else {
+        return error.UnsupportedDebugIntrinsic;
+    }
+    if (!isDebugMetadataReferenceOperand(fields[1])) return error.UnsupportedDebugIntrinsic;
+    if (!isDebugExpressionOperand(fields[2])) return error.UnsupportedDebugIntrinsic;
+}
+
+fn isDebugValueLocationOperand(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "metadata ")) return false;
+    const rest = std.mem.trim(u8, text["metadata ".len..], " \t");
+    if (std.mem.startsWith(u8, rest, "!")) return isDebugMetadataValue(rest);
+    _ = parseTypedValue(rest) catch return false;
+    return true;
+}
+
+fn isDebugDeclareLocationOperand(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "metadata ")) return false;
+    const rest = std.mem.trim(u8, text["metadata ".len..], " \t");
+    if (std.mem.startsWith(u8, rest, "!")) return isDebugMetadataValue(rest);
+    const typed = parseTypedValue(rest) catch return false;
+    return typed.ty == .ptr;
+}
+
+fn isDebugMetadataReferenceOperand(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "metadata ")) return false;
+    return isDebugMetadataValue(std.mem.trim(u8, text["metadata ".len..], " \t"));
+}
+
+fn isDebugExpressionOperand(text: []const u8) bool {
+    if (!std.mem.startsWith(u8, text, "metadata ")) return false;
+    const rest = std.mem.trim(u8, text["metadata ".len..], " \t");
+    return isDebugMetadataValue(rest) or std.mem.startsWith(u8, rest, "!DIExpression(");
+}
+
+fn isDebugMetadataValue(text: []const u8) bool {
+    if (text.len < 2 or text[0] != '!') return false;
+    for (text[1..]) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
 }
 
 fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []const u8) !void {
@@ -1494,6 +1569,7 @@ fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (std.mem.eql(u8, trimmed, "metadata")) return .metadata;
     if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };

@@ -7,24 +7,33 @@ pretending to implement full debug-info salvage.
 
 ## Plan
 
-- [ ] Inventory every `llvm.dbg.*` intrinsic present in current Zig-emitted
+- [x] Inventory every `llvm.dbg.*` intrinsic present in current Zig-emitted
       Debug rows.
-- [ ] Add parser support for the smallest required `llvm.dbg.value` and
+- [x] Add parser support for the smallest required `llvm.dbg.value` and
       `llvm.dbg.declare` spellings.
-- [ ] Preserve intrinsic operands, metadata references, and call position
+- [x] Preserve intrinsic operands, metadata references, and call position
       through parse, print, verify, and no-op optimizer paths.
-- [ ] Keep transformations that would need variable-location salvage disabled
+- [x] Keep transformations that would need variable-location salvage disabled
       for functions containing accepted debug value intrinsics.
-- [ ] Add accepted and rejected reduced fixtures for supported and unsupported
+- [x] Add accepted and rejected reduced fixtures for supported and unsupported
       debug intrinsic forms.
-- [ ] Update `docs/debug/metadata_inventory.md`, `docs/unsupported_ir.md`, and
+- [x] Update `docs/debug/metadata_inventory.md`, `docs/unsupported_ir.md`, and
       the Zig IR manifest.
-- [ ] Run the readiness gate and record whether new Debug rows move from
+- [x] Run the readiness gate and record whether new Debug rows move from
       `future` to `optimizer-input` or only to `parse,verify`.
 
 ## Exit Criteria
 
-- [ ] At least one previously future-only Debug fixture is accepted through
+- [x] At least one previously future-only Debug fixture is accepted through
       parse and verify.
-- [ ] Unsupported debug intrinsic forms fail closed with named diagnostics.
-- [ ] Optimizer behavior remains conservative and documented.
+- [x] Unsupported debug intrinsic forms fail closed with named diagnostics.
+- [x] Optimizer behavior remains conservative and documented.
+
+## Completed Slice
+
+Cycle 01 accepts `llvm.dbg.value` and `llvm.dbg.declare` as preservation-only
+variable-location intrinsics. Raw operands are retained through parse, print,
+and verify, while the pass manager skips transform passes for modules that
+contain them until debug value salvage is implemented. The accepted reduced
+fixtures moved from `unsupported,future` to `parse,verify`; they are not
+`optimizer-input`.

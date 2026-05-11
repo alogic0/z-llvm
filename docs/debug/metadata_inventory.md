@@ -43,6 +43,8 @@ terminator metadata
 branch `!dbg` attachments and lexical-block metadata can round-trip opaquely in
 reduced Debug fixtures
 metadata node graphs are not interpreted
+`llvm.dbg.value` and `llvm.dbg.declare` are accepted only as preserved
+variable-location intrinsics with raw metadata operands
 debug-info updater behavior in passes is not implemented
 broken-debug-info diagnostics are not implemented locally
 ```
@@ -56,7 +58,7 @@ broken-debug-info diagnostics are not implemented locally
 | Subprograms | `DISubprogram` attached to function definitions | preserved as function attrs plus opaque raw metadata |
 | Lexical scopes | `DILexicalBlock`, inline scopes, namespace scopes | `DILexicalBlock` preserved opaquely; inline and namespace scopes missing |
 | Locations | `DILocation` attached to instructions and simple branch terminators | opaque `!dbg` attachment preservation |
-| Local variables | `DILocalVariable`, `dbg.declare`, `dbg.value`, `dbg.assign` | fail closed with `UnsupportedDebugIntrinsic` |
+| Local variables | `DILocalVariable`, `dbg.declare`, `dbg.value`, `dbg.assign` | `dbg.value` and `dbg.declare` preserve raw operands; `dbg.assign` remains unsupported |
 | Global variables | `DIGlobalVariableExpression` and global metadata attachments | missing |
 | Types | base, pointer, array, vector, struct, union, enum, optional/error union representations | missing |
 | Module flags | `Debug Info Version`, DWARF version, CodeView mode, PIC/PIE flags where relevant | raw records only |
@@ -109,28 +111,30 @@ src/ir/parser.zig and src/ir/printer.zig preserve branch !dbg attachments and
 opaque DILexicalBlock records in reduced Debug fixtures
 debug call-site and loop PHI locations are preserved opaquely through the
 verifier-only Debug corpus pipeline
-debug value and declare intrinsics remain rejected with
-`UnsupportedDebugIntrinsic` because metadata operands, variable locations, and
-salvage are not represented
-test/zig/expected/debug_value_intrinsic.unsupported.ll
-test/zig/expected/debug_declare_intrinsic.unsupported.ll
+debug value and declare intrinsics are accepted as preservation-only calls with
+raw metadata operands; transform passes are skipped for modules containing
+them because variable-location salvage is not represented
+test/zig/expected/debug_value_intrinsic.reduced.ll
+test/zig/expected/debug_declare_intrinsic.reduced.ll
 ```
 
 ## Debug Intrinsic Policy
 
 ```text
-llvm.dbg.value: reject with UnsupportedDebugIntrinsic
-llvm.dbg.declare: reject with UnsupportedDebugIntrinsic
+llvm.dbg.value: preserve raw operands; no debug value salvage
+llvm.dbg.declare: preserve raw operands; no variable-location salvage
 llvm.dbg.assign: reject with UnsupportedDebugIntrinsic
-DIExpression: preserved only inside opaque metadata records; not interpreted
-DILocalVariable: preserved only as opaque metadata in unsupported fixtures; no
-local variable tracking is represented
+DIExpression: preserved inside opaque metadata records and raw debug intrinsic
+operands; not interpreted
+DILocalVariable: preserved as opaque metadata and referenced by raw debug
+intrinsic operands; no local variable tracking is represented
 ```
 
-The local optimizer must not count debug intrinsics as semantic memory effects
-or program side effects because they are not represented as instructions in
-accepted IR. Rows containing them are classified as `unsupported,future` until
-the project can model debug-value salvage explicitly.
+The pass manager treats modules containing accepted debug variable-location
+intrinsics as verifier-only unless a pass has explicit salvage support. This is
+the local equivalent of LLVM's debug-info updater boundary: preserved
+`llvm.dbg.value` and `llvm.dbg.declare` calls are valid IR surface, but they do
+not license scalar transformations that could leave stale variable locations.
 
 Implemented Cycle 12 slice:
 

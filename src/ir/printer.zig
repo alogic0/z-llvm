@@ -289,11 +289,15 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         } else {
                             try writer.print(" @{s}(", .{call.callee});
                         }
-                        for (call.args.items, 0..) |arg, index| {
-                            if (index != 0) try writer.writeAll(", ");
-                            try arg.ty.format(writer);
-                            try writer.writeByte(' ');
-                            try arg.value.format(writer);
+                        if (call.raw_args) |raw_args| {
+                            try writer.writeAll(raw_args);
+                        } else {
+                            for (call.args.items, 0..) |arg, index| {
+                                if (index != 0) try writer.writeAll(", ");
+                                try arg.ty.format(writer);
+                                try writer.writeByte(' ');
+                                try arg.value.format(writer);
+                            }
                         }
                         try writer.writeByte(')');
                         if (call.attrs) |attrs| try writer.print(" {s}", .{attrs});

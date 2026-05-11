@@ -72,7 +72,9 @@ packed structs
 full optional and error-union ABI lowering beyond observed scalar/null-pointer
 fixtures
 function pointer types
-token/metadata types
+token types
+general metadata values outside declaration signatures and preserved debug
+intrinsic operands
 ```
 
 Fixed vectors are accepted only for a narrow parser/verifier surface:
@@ -127,10 +129,11 @@ TBAA interpretation beyond opaque `!tbaa` instruction attachment preservation
 noalias / alias.scope interpretation beyond opaque instruction attachment
 preservation
 debug metadata beyond opaque `!dbg` preservation for instructions, simple
-branches, call sites, loop PHIs, and reduced lexical-block fixtures
+branches, call sites, loop PHIs, reduced lexical-block fixtures, and raw
+`llvm.dbg.value` or `llvm.dbg.declare` operands
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation
-debug value, debug declare, and debug assign intrinsics; parser reports
-`UnsupportedDebugIntrinsic`
+debug value and debug declare salvage semantics; debug assign intrinsics still
+report `UnsupportedDebugIntrinsic`
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in
 reduced ReleaseSafe safety fixtures

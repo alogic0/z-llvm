@@ -78,6 +78,12 @@ pub const ModulePassManager = struct {
                 try writer.print("; before {s}\n", .{pass.name});
                 try module.print(writer);
             }
+            if (module.hasDebugVariableLocationIntrinsics() and isTransformPass(pass.category)) {
+                try module.verify();
+                if (options.trace) try writer.print("; skipped {s}: debug variable-location salvage is not modeled\n", .{pass.name});
+                executed += 1;
+                continue;
+            }
             const start = timestamp(context);
             const pass_result = try pass.run(module, context);
             const elapsed_ns = elapsedNanoseconds(start, timestamp(context));
@@ -93,6 +99,13 @@ pub const ModulePassManager = struct {
         return result;
     }
 };
+
+fn isTransformPass(category: PassCategory) bool {
+    return switch (category) {
+        .mandatory, .analysis, .pipeline_guard => false,
+        .canonicalization, .scalar, .memory, .loop, .ipo, .vector, .instrumentation, .lto, .codegen_prep => true,
+    };
+}
 
 fn timestamp(context: *Context) std.Io.Timestamp {
     const io = context.io orelse return .zero;

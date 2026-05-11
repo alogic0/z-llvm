@@ -288,7 +288,7 @@ pub fn verify(module: core.Module) !void {
                     .undef, .null_value => {},
                     .int, .fp, .named, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
-                .void, .float, .double, .aggregate, .vector => return error.UnsupportedGlobalVariable,
+                .void, .float, .double, .metadata, .aggregate, .vector => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
@@ -366,12 +366,12 @@ pub fn verify(module: core.Module) !void {
                         if (fcmp.fp_flags.any()) {
                             switch (fcmp.operand_ty) {
                                 .float, .double => {},
-                                .void, .int, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
+                                .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
                             }
                         }
                         switch (fcmp.operand_ty) {
                             .float, .double => {},
-                            .void, .int, .ptr, .aggregate, .vector => return error.TypeMismatch,
+                            .void, .int, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
                         }
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.lhs, block_index, instruction_index);
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.rhs, block_index, instruction_index);
@@ -573,6 +573,11 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         return;
     }
 
+    if (call.isDebugVariableLocation()) {
+        try verifyDebugVariableLocationCall(module, call);
+        return;
+    }
+
     if (findDeclaration(module, call.callee)) |decl| {
         if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, decl.calling_conv)) return error.CallSignatureMismatch;
@@ -605,6 +610,18 @@ fn verifyTargetRecords(module: core.Module) !void {
     if (module.target_datalayout) |layout_text| {
         const layout = try target.DataLayout.parse(layout_text);
         if (try layout.pointerSizeBits() == 0) return error.InvalidDataLayout;
+    }
+}
+
+fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !void {
+    if (call.raw_args == null) return error.UnsupportedDebugIntrinsic;
+    if (call.args.items.len != 0) return error.UnsupportedDebugIntrinsic;
+    if (call.ret_ty != .void) return error.UnsupportedDebugIntrinsic;
+    const decl = findDeclaration(module, call.callee) orelse return error.UnknownFunction;
+    if (decl.ret_ty != .void) return error.CallSignatureMismatch;
+    if (decl.params.items.len != 3) return error.CallSignatureMismatch;
+    for (decl.params.items) |param| {
+        if (param.ty != .metadata) return error.CallSignatureMismatch;
     }
 }
 
@@ -642,7 +659,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .ptr, .vector => return null,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -658,6 +675,7 @@ fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (std.mem.eql(u8, trimmed, "metadata")) return .metadata;
     if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
@@ -840,7 +858,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .float, .double => {},
             .vector => return error.UnsupportedType,
-            .void, .int, .ptr, .aggregate => return error.TypeMismatch,
+            .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => switch (binary.ty) {
             .int => {},
@@ -848,7 +866,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
                 .int => {},
                 .float, .double, .ptr => return error.TypeMismatch,
             },
-            .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
+            .void, .float, .double, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
     }
 }
@@ -858,7 +876,7 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .float, .double => {},
-            .void, .int, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
+            .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
     }
@@ -867,11 +885,11 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
 fn verifyCast(cast: core.CastInst) !void {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .float, .double, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .float, .double, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
