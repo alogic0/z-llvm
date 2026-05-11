@@ -4215,16 +4215,79 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     try source_backed_module.verify();
 }
 
-test "parser rejects unsupported atomic syncscope" {
+test "parser preserves atomic syncscope on supported atomic operations" {
     const input =
-        \\define void @memory_fence() {
+        \\define i32 @memory_syncscope(i32 %a, ptr %p, i32 %old, i32 %new) {
         \\entry:
+        \\  store atomic i32 %a, ptr %p syncscope("singlethread") release, align 4
+        \\  %v = load atomic i32, ptr %p syncscope("singlethread") acquire, align 4
+        \\  %rmw = atomicrmw add ptr %p, i32 %new syncscope("singlethread") monotonic, align 4
+        \\  %pair = cmpxchg weak ptr %p, i32 %old, i32 %new syncscope("singlethread") acq_rel monotonic, align 4
         \\  fence syncscope("singlethread") seq_cst
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects invalid atomic ordering combinations" {
+    const invalid_load =
+        \\define i32 @bad_atomic_load(ptr %p) {
+        \\entry:
+        \\  %v = load atomic i32, ptr %p, release, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var load_module = try ir.Module.parse(std.testing.allocator, invalid_load);
+    defer load_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, load_module.verify());
+
+    const invalid_store =
+        \\define void @bad_atomic_store(ptr %p) {
+        \\entry:
+        \\  store atomic i32 1, ptr %p, acquire, align 4
         \\  ret void
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, input));
+    var store_module = try ir.Module.parse(std.testing.allocator, invalid_store);
+    defer store_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, store_module.verify());
+
+    const invalid_fence =
+        \\define void @bad_fence() {
+        \\entry:
+        \\  fence monotonic
+        \\  ret void
+        \\}
+        \\
+    ;
+    var fence_module = try ir.Module.parse(std.testing.allocator, invalid_fence);
+    defer fence_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, fence_module.verify());
+
+    const invalid_cmpxchg =
+        \\define void @bad_cmpxchg(ptr %p, i32 %old, i32 %new) {
+        \\entry:
+        \\  %pair = cmpxchg ptr %p, i32 %old, i32 %new acquire release
+        \\  ret void
+        \\}
+        \\
+    ;
+    var cmpxchg_module = try ir.Module.parse(std.testing.allocator, invalid_cmpxchg);
+    defer cmpxchg_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, cmpxchg_module.verify());
 }
 
 test "parser preserves inline asm calls as side-effecting barriers" {

@@ -541,6 +541,7 @@ pub const AllocaInst = struct {
 pub const MemoryAttrs = struct {
     is_volatile: bool = false,
     atomic_ordering: ?[]const u8 = null,
+    syncscope: ?[]const u8 = null,
     @"align": ?u32 = null,
 
     pub fn isAtomic(attrs: MemoryAttrs) bool {
@@ -571,6 +572,7 @@ pub const AtomicRmwInst = struct {
     ptr: Value,
     value: Value,
     ordering: []const u8,
+    syncscope: ?[]const u8 = null,
     is_volatile: bool = false,
     @"align": ?u32 = null,
 };
@@ -582,12 +584,15 @@ pub const CmpxchgInst = struct {
     replacement: Value,
     success_ordering: []const u8,
     failure_ordering: []const u8,
+    syncscope: ?[]const u8 = null,
+    is_weak: bool = false,
     is_volatile: bool = false,
     @"align": ?u32 = null,
 };
 
 pub const FenceInst = struct {
     ordering: []const u8,
+    syncscope: ?[]const u8 = null,
 };
 
 pub const ExtractElementInst = struct {

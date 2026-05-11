@@ -94,7 +94,7 @@ Known gaps:
 
 ```text
 inline asm constraints and full atomic ordering are not interpreted
-syncscope remains rejected
+syncscope text is preserved for accepted atomic operations but not interpreted
 no intrinsic classification beyond explicit parser rejection
 no target-library handling and no inferred call attributes
 MemoryLocation size and offset model is limited to accepted scalar stack,
@@ -103,7 +103,8 @@ no MemoryLocation metadata model
 MemorySSA-like integration is limited to a linear clobber helper for accepted
 load/store/call checks
 no alias-aware instruction reordering
-no distinction between acquire/release/monotonic/etc ordering semantics
+no optimizer distinction between acquire/release/monotonic/acq_rel/seq_cst or
+syncscope semantics
 no address spaces, globals, captures, or target DataLayout
 no target-cost interpretation for vector lane operations
 ```

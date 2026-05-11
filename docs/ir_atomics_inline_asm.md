@@ -9,17 +9,24 @@ numbering before LLVM's atomic and inline-asm semantics are reproduced.
 ```text
 load atomic iN, ptr %p, <ordering>, align N
 store atomic iN %v, ptr %p, <ordering>, align N
+load/store with `syncscope("...")` before the ordering
+atomicrmw <op> ptr %p, iN %v [syncscope("...")] <ordering>, align N
+cmpxchg [weak] ptr %p, iN %old, iN %new [syncscope("...")] <success> <failure>, align N
+fence [syncscope("...")] <ordering>
 ```
 
 These forms are parsed and printed only as conservative memory barriers. The
 ordering text is preserved in the local `MemoryAttrs.atomic_ordering` field,
-but no transform interprets acquire, release, monotonic, or seq_cst semantics.
+and `syncscope("...")` text is preserved for supported atomic instructions.
+No transform interprets acquire, release, monotonic, acq_rel, seq_cst, or
+syncscope semantics.
 
 ## Explicit Rejections
 
 ```text
-syncscope
 inline asm lowering and constraint validation
+malformed syncscope text
+invalid atomic ordering combinations
 ```
 
 `atomicrmw`, `cmpxchg`, and `fence` are accepted only as conservative
@@ -53,6 +60,7 @@ Mem2Reg/SROA: local atomic alloca users are rejected conservatively.
 ```text
 local-only conservative opt fixture:
   memory_atomic_barrier_reject
+  atomic_ordering_syncscope_preserve
   adce_atomic_barrier_reject
   gvn_atomic_load_barrier_reject
   early_cse_atomic_load_barrier_reject
@@ -63,7 +71,8 @@ unit tests:
   atomic load/store parse/print preservation
   atomicrmw/cmpxchg/fence parse/print preservation as side-effecting barriers
   reduced inline asm parse/print preservation as a side-effecting memory barrier
-  syncscope rejection
+  syncscope preservation and malformed syncscope rejection
+  invalid atomic ordering combination rejection
   source-backed reduced inline-asm and atomicrmw fixtures from
   `atomics_inline_asm_debug_release_fast`
   memory-effect barrier classification
@@ -100,6 +109,7 @@ llvm-project-22/llvm/lib/Analysis/MemoryLocation.cpp
 ```
 
 LLVM models atomic ordering, sync scopes, volatile semantics, inline-asm
-constraints, and memory clobbers. This project currently preserves or rejects
-those constructs until the verifier, memory model, and optimizer legality rules
-can match the required semantics.
+constraints, and memory clobbers. This project preserves supported ordering and
+syncscope text and rejects invalid combinations, but still treats accepted
+atomic forms as hard optimizer barriers until the verifier, memory model, and
+optimizer legality rules can match LLVM's concurrency semantics.

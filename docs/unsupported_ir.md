@@ -111,7 +111,7 @@ bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecas
 switch
 landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad and
 personality functions
-atomic syncscope and atomic optimization semantics
+atomic optimization semantics
 inline asm
 ```
 
@@ -125,8 +125,7 @@ global attributes are preserved but not semantically interpreted
 fast-math flags on non-FP operations or unsupported FP/vector operations
 full alignment semantics
 full volatile semantics
-full atomic ordering semantics
-atomic `syncscope`
+full atomic ordering and syncscope semantics beyond parse/verify preservation
 atomic ordering interpretation and atomic-specific optimization
 calling conventions beyond parse-preserve support
 TBAA interpretation beyond opaque `!tbaa` instruction attachment preservation

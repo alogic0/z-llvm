@@ -7,20 +7,30 @@ and keep optimizers correct.
 
 ## Plan
 
-- [ ] Inventory atomic orderings, syncscopes, fences, cmpxchg, and atomicrmw
+- [x] Inventory atomic orderings, syncscopes, fences, cmpxchg, and atomicrmw
       forms emitted by Zig.
-- [ ] Parse and preserve ordering and syncscope operands for supported atomic
+- [x] Parse and preserve ordering and syncscope operands for supported atomic
       instructions.
-- [ ] Add verifier checks for valid ordering combinations and result types.
-- [ ] Classify atomics as barriers for existing scalar passes unless a precise
+- [x] Add verifier checks for valid ordering combinations and supported atomic
+      instruction forms.
+- [x] Classify atomics as barriers for existing scalar passes unless a precise
       transform is explicitly implemented.
-- [ ] Add fixtures for monotonic, acquire, release, acq_rel, seq_cst, weak
+- [x] Add fixtures for monotonic, acquire, release, acq_rel, seq_cst, weak
       cmpxchg, fences, and unsupported forms.
-- [ ] Document differences from LLVM's concurrency model.
-- [ ] Compare parse/verify preservation with `opt-22 -S` where useful.
+- [x] Document differences from LLVM's concurrency model.
+- [x] Compare parse/verify preservation with `opt-22 -S` where useful.
 
 ## Exit Criteria
 
-- [ ] Atomic rows preserve ordering and syncscope text.
-- [ ] Invalid atomic forms fail closed.
-- [ ] Optimizer treatment remains conservative and explicit.
+- [x] Atomic rows preserve ordering and syncscope text.
+- [x] Invalid atomic forms fail closed.
+- [x] Optimizer treatment remains conservative and explicit.
+
+## Completed Slice
+
+- Added `syncscope("...")` preservation for atomic load/store, `atomicrmw`,
+  `cmpxchg`, and `fence`.
+- Added weak `cmpxchg` parsing/printing and verifier checks for load, store,
+  RMW, cmpxchg, and fence ordering combinations.
+- Added `atomic_ordering_syncscope_preserve` as an `opt-22` equivalent DCE
+  fixture while keeping accepted atomics as hard memory barriers.

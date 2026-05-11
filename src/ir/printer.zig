@@ -198,12 +198,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try atomicrmw.ty.format(writer);
                         try writer.writeByte(' ');
                         try atomicrmw.value.format(writer);
+                        if (atomicrmw.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s}", .{atomicrmw.ordering});
                         if (atomicrmw.@"align") |alignment| try writer.print(", align {}", .{alignment});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .cmpxchg => |cmpxchg| {
                         try writer.writeAll("cmpxchg ");
+                        if (cmpxchg.is_weak) try writer.writeAll("weak ");
                         if (cmpxchg.is_volatile) try writer.writeAll("volatile ");
                         try writer.writeAll("ptr ");
                         try cmpxchg.ptr.format(writer);
@@ -215,12 +217,15 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try cmpxchg.ty.format(writer);
                         try writer.writeByte(' ');
                         try cmpxchg.replacement.format(writer);
+                        if (cmpxchg.syncscope) |syncscope| try writer.print(" {s}", .{syncscope});
                         try writer.print(" {s} {s}", .{ cmpxchg.success_ordering, cmpxchg.failure_ordering });
                         if (cmpxchg.@"align") |alignment| try writer.print(", align {}", .{alignment});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .fence => |fence| {
-                        try writer.print("fence {s}", .{fence.ordering});
+                        try writer.writeAll("fence ");
+                        if (fence.syncscope) |syncscope| try writer.print("{s} ", .{syncscope});
+                        try writer.print("{s}", .{fence.ordering});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .extractelement => |extract| {
@@ -374,7 +379,12 @@ fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {
 }
 
 fn printMemorySuffix(attrs: core.MemoryAttrs, writer: anytype) !void {
-    if (attrs.atomic_ordering) |ordering| try writer.print(", {s}", .{ordering});
+    if (attrs.syncscope) |syncscope| {
+        try writer.print(" {s}", .{syncscope});
+        if (attrs.atomic_ordering) |ordering| try writer.print(" {s}", .{ordering});
+    } else if (attrs.atomic_ordering) |ordering| {
+        try writer.print(", {s}", .{ordering});
+    }
     if (attrs.@"align") |alignment| try writer.print(", align {}", .{alignment});
 }
 

@@ -410,21 +410,22 @@ pub fn verify(module: core.Module) !void {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try ctx.verifyValue(.ptr, load.ptr, block_index, instruction_index);
-                        try verifyMemoryAttrs(load.attrs);
+                        try verifyLoadMemoryAttrs(load.attrs);
                     },
                     .store => |store| {
                         saw_non_phi = true;
                         if (instruction.result != null) return error.StoreHasResult;
                         try ctx.verifyValue(store.ty, store.value, block_index, instruction_index);
                         try ctx.verifyValue(.ptr, store.ptr, block_index, instruction_index);
-                        try verifyMemoryAttrs(store.attrs);
+                        try verifyStoreMemoryAttrs(store.attrs);
                     },
                     .atomicrmw => |atomicrmw| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try ctx.verifyValue(.ptr, atomicrmw.ptr, block_index, instruction_index);
                         try ctx.verifyValue(atomicrmw.ty, atomicrmw.value, block_index, instruction_index);
-                        try verifyAtomicOrdering(atomicrmw.ordering);
+                        try verifySyncScope(atomicrmw.syncscope);
+                        try verifyAtomicRmwOrdering(atomicrmw.ordering);
                         if (atomicrmw.@"align") |alignment| try verifyAlignment(alignment);
                     },
                     .cmpxchg => |cmpxchg| {
@@ -433,14 +434,15 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(.ptr, cmpxchg.ptr, block_index, instruction_index);
                         try ctx.verifyValue(cmpxchg.ty, cmpxchg.expected, block_index, instruction_index);
                         try ctx.verifyValue(cmpxchg.ty, cmpxchg.replacement, block_index, instruction_index);
-                        try verifyAtomicOrdering(cmpxchg.success_ordering);
-                        try verifyAtomicOrdering(cmpxchg.failure_ordering);
+                        try verifySyncScope(cmpxchg.syncscope);
+                        try verifyCmpxchgOrderings(cmpxchg.success_ordering, cmpxchg.failure_ordering);
                         if (cmpxchg.@"align") |alignment| try verifyAlignment(alignment);
                     },
                     .fence => |fence| {
                         saw_non_phi = true;
                         if (instruction.result != null) return error.StoreHasResult;
-                        try verifyAtomicOrdering(fence.ordering);
+                        try verifySyncScope(fence.syncscope);
+                        try verifyFenceOrdering(fence.ordering);
                     },
                     .extractelement => |extract| {
                         saw_non_phi = true;
@@ -1102,9 +1104,18 @@ fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {
     if (attrs.@"align") |alignment| {
         try verifyAlignment(alignment);
     }
-    if (attrs.atomic_ordering) |ordering| {
-        try verifyAtomicOrdering(ordering);
-    }
+    try verifySyncScope(attrs.syncscope);
+    if (attrs.syncscope != null and attrs.atomic_ordering == null) return error.InvalidAtomicMemory;
+}
+
+fn verifyLoadMemoryAttrs(attrs: core.MemoryAttrs) !void {
+    try verifyMemoryAttrs(attrs);
+    if (attrs.atomic_ordering) |ordering| try verifyAtomicLoadOrdering(ordering);
+}
+
+fn verifyStoreMemoryAttrs(attrs: core.MemoryAttrs) !void {
+    try verifyMemoryAttrs(attrs);
+    if (attrs.atomic_ordering) |ordering| try verifyAtomicStoreOrdering(ordering);
 }
 
 fn verifyAlignment(alignment: u32) !void {
@@ -1114,6 +1125,48 @@ fn verifyAlignment(alignment: u32) !void {
 
 fn verifyAtomicOrdering(ordering: []const u8) !void {
     if (!isKnownAtomicOrdering(ordering)) return error.InvalidAtomicMemory;
+}
+
+fn verifyAtomicLoadOrdering(ordering: []const u8) !void {
+    try verifyAtomicOrdering(ordering);
+    if (std.mem.eql(u8, ordering, "release") or std.mem.eql(u8, ordering, "acq_rel")) return error.InvalidAtomicMemory;
+}
+
+fn verifyAtomicStoreOrdering(ordering: []const u8) !void {
+    try verifyAtomicOrdering(ordering);
+    if (std.mem.eql(u8, ordering, "acquire") or std.mem.eql(u8, ordering, "acq_rel")) return error.InvalidAtomicMemory;
+}
+
+fn verifyAtomicRmwOrdering(ordering: []const u8) !void {
+    try verifyAtomicOrdering(ordering);
+    if (std.mem.eql(u8, ordering, "unordered")) return error.InvalidAtomicMemory;
+}
+
+fn verifyFenceOrdering(ordering: []const u8) !void {
+    try verifyAtomicOrdering(ordering);
+    if (std.mem.eql(u8, ordering, "unordered") or std.mem.eql(u8, ordering, "monotonic")) return error.InvalidAtomicMemory;
+}
+
+fn verifyCmpxchgOrderings(success: []const u8, failure: []const u8) !void {
+    try verifyAtomicRmwOrdering(success);
+    try verifyAtomicOrdering(failure);
+    if (std.mem.eql(u8, failure, "release") or std.mem.eql(u8, failure, "acq_rel")) return error.InvalidAtomicMemory;
+    if (atomicOrderingRank(failure) > atomicOrderingRank(success)) return error.InvalidAtomicMemory;
+}
+
+fn atomicOrderingRank(ordering: []const u8) u8 {
+    if (std.mem.eql(u8, ordering, "unordered")) return 0;
+    if (std.mem.eql(u8, ordering, "monotonic")) return 1;
+    if (std.mem.eql(u8, ordering, "acquire") or std.mem.eql(u8, ordering, "release")) return 2;
+    if (std.mem.eql(u8, ordering, "acq_rel")) return 3;
+    if (std.mem.eql(u8, ordering, "seq_cst")) return 4;
+    return 255;
+}
+
+fn verifySyncScope(syncscope: ?[]const u8) !void {
+    const text = syncscope orelse return;
+    if (!std.mem.startsWith(u8, text, "syncscope(\"") or !std.mem.endsWith(u8, text, "\")")) return error.InvalidAtomicMemory;
+    if (text.len <= "syncscope(\"\")".len) return error.InvalidAtomicMemory;
 }
 
 fn verifyBlockTarget(function: core.Function, block_name: []const u8) !void {

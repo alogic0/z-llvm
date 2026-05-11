@@ -1267,7 +1267,12 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
     var value_parts = std.mem.tokenizeAny(u8, value_text, " \t");
     const ty = try parseType(value_parts.next() orelse return error.InvalidAtomicMemory);
     const value = try parseValue(value_parts.next() orelse return error.InvalidAtomicMemory);
-    const ordering = value_parts.next() orelse return error.InvalidAtomicMemory;
+    var syncscope: ?[]const u8 = null;
+    var ordering = value_parts.next() orelse return error.InvalidAtomicMemory;
+    if (std.mem.startsWith(u8, ordering, "syncscope")) {
+        syncscope = ordering;
+        ordering = value_parts.next() orelse return error.InvalidAtomicMemory;
+    }
     if (!isSupportedAtomicOrdering(ordering)) return error.UnsupportedAtomicMemory;
     if (value_parts.next() != null) return error.InvalidAtomicMemory;
 
@@ -1278,6 +1283,7 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
         .ptr = ptr,
         .value = value,
         .ordering = ordering,
+        .syncscope = syncscope,
         .is_volatile = is_volatile,
         .@"align" = alignment,
     };
@@ -1286,9 +1292,19 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
 fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
     var rest = std.mem.trim(u8, text["cmpxchg".len..], " \t");
     var is_volatile = false;
-    if (std.mem.startsWith(u8, rest, "volatile ")) {
-        is_volatile = true;
-        rest = std.mem.trim(u8, rest["volatile".len..], " \t");
+    var is_weak = false;
+    while (true) {
+        if (std.mem.startsWith(u8, rest, "weak ")) {
+            is_weak = true;
+            rest = std.mem.trim(u8, rest["weak".len..], " \t");
+            continue;
+        }
+        if (std.mem.startsWith(u8, rest, "volatile ")) {
+            is_volatile = true;
+            rest = std.mem.trim(u8, rest["volatile".len..], " \t");
+            continue;
+        }
+        break;
     }
     if (std.mem.startsWith(u8, rest, "syncscope")) return error.UnsupportedAtomicMemory;
 
@@ -1315,7 +1331,12 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
     const replacement_ty = try parseType(replacement_parts.next() orelse return error.InvalidAtomicMemory);
     if (!replacement_ty.eql(ty)) return error.TypeMismatch;
     const replacement = try parseValue(replacement_parts.next() orelse return error.InvalidAtomicMemory);
-    const success_ordering = replacement_parts.next() orelse return error.InvalidAtomicMemory;
+    var syncscope: ?[]const u8 = null;
+    var success_ordering = replacement_parts.next() orelse return error.InvalidAtomicMemory;
+    if (std.mem.startsWith(u8, success_ordering, "syncscope")) {
+        syncscope = success_ordering;
+        success_ordering = replacement_parts.next() orelse return error.InvalidAtomicMemory;
+    }
     const failure_ordering = replacement_parts.next() orelse return error.InvalidAtomicMemory;
     if (!isSupportedAtomicOrdering(success_ordering) or !isSupportedAtomicOrdering(failure_ordering)) return error.UnsupportedAtomicMemory;
     if (replacement_parts.next() != null) return error.InvalidAtomicMemory;
@@ -1328,6 +1349,8 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
         .replacement = replacement,
         .success_ordering = success_ordering,
         .failure_ordering = failure_ordering,
+        .syncscope = syncscope,
+        .is_weak = is_weak,
         .is_volatile = is_volatile,
         .@"align" = alignment,
     };
@@ -1336,13 +1359,17 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
 fn parseFence(text: []const u8) !core.Instruction {
     var parts = std.mem.tokenizeAny(u8, text, " \t,");
     if (!std.mem.eql(u8, parts.next() orelse return error.InvalidAtomicMemory, "fence")) return error.InvalidAtomicMemory;
-    const ordering = parts.next() orelse return error.InvalidAtomicMemory;
-    if (std.mem.startsWith(u8, ordering, "syncscope")) return error.UnsupportedAtomicMemory;
+    var syncscope: ?[]const u8 = null;
+    var ordering = parts.next() orelse return error.InvalidAtomicMemory;
+    if (std.mem.startsWith(u8, ordering, "syncscope")) {
+        syncscope = ordering;
+        ordering = parts.next() orelse return error.InvalidAtomicMemory;
+    }
     if (!isSupportedAtomicOrdering(ordering)) return error.UnsupportedAtomicMemory;
     if (parts.next() != null) return error.InvalidAtomicMemory;
     return .{
         .result = null,
-        .kind = .{ .fence = .{ .ordering = ordering } },
+        .kind = .{ .fence = .{ .ordering = ordering, .syncscope = syncscope } },
     };
 }
 
@@ -1467,7 +1494,11 @@ fn parseMemorySuffix(parts: *std.mem.TokenIterator(u8, .any), attrs: *core.Memor
             attrs.@"align" = try std.fmt.parseInt(u32, align_text, 10);
             continue;
         }
-        if (std.mem.startsWith(u8, token, "syncscope")) return error.UnsupportedAtomicMemory;
+        if (std.mem.startsWith(u8, token, "syncscope")) {
+            if (attrs.syncscope != null or attrs.atomic_ordering == null) return error.InvalidAtomicMemory;
+            attrs.syncscope = token;
+            continue;
+        }
         if (attrs.atomic_ordering) |ordering| {
             if (ordering.len != 0) return error.InvalidInstruction;
             attrs.atomic_ordering = token;
