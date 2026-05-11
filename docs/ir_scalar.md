@@ -77,6 +77,8 @@ local-only conservative:
   fp_fast_math_sensitive_conservative
   fp_strict_orderedness_fold
   fp_fast_early_cse
+  fp_sccp_lattice
+  fp_fast_cse_reject
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze

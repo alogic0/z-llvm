@@ -25,8 +25,11 @@ Implemented subset:
 deterministic expression fingerprint for scalar keys, exact PHIs, and
 readnone-call keys
 scalar binary keys with opcode, flags, type, and operands
+FP binary keys include fast-math flags and are admitted only when the shared
+fast-math legality helper allows local value numbering
 integer cast keys with opcode, source type, value, and destination type
 icmp keys with predicate, operand type, and operands
+fcmp keys with fast-math flags, predicate, operand type, and operands
 select keys with condition type, condition, result type, and arms
 exact PHI keys with type and incoming value/block pairs
 load equality only when both loads are non-volatile, non-atomic, same type, and
@@ -51,5 +54,6 @@ hash prefilter only; no full scoped hash table yet
 no commutative operand normalization beyond InstCombine's local canonicalizer
 no MemorySSA value numbering for memory expressions
 no readonly call value numbering
+no strict FP expression keys outside the local `fast` boundary
 no GEP, freeze, vector, aggregate, or poison-aware expression keys
 ```

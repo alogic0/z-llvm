@@ -112,6 +112,8 @@ local-only conservative:
   `fsub`, `fdiv`, and `frem`.
   fp_fast_gvn admits repeated `fadd fast` expressions and matches opt-22 for
   the accepted dominator-tree value-numbering shape.
+  fp_fast_cse_reject documents that non-fast FP expressions stay outside the
+  local value-numbering boundary.
   debug_gvn_dbg_preserve preserves the leader instruction location and drops
   the removed redundant instruction location. Variable-location salvage remains
   out of scope.

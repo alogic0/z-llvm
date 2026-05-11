@@ -102,6 +102,8 @@ local-only conservative:
   `fsub`, `fdiv`, and `frem`.
   fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
   name differs from opt-22, so the fixture is local-conservative.
+  fp_fast_cse_reject documents that non-fast FP expressions stay outside the
+  local CSE boundary.
   early_cse_unreachable_store_not_clobber proves the path-aware local
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE

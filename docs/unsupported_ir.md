@@ -343,6 +343,11 @@ GVN subset:
   memory instructions rejected from scalar value numbering
   FP value numbering only under the local `fast` legality boundary
 
+SCCP subset:
+  integer and FP constants in the local lattice
+  FP constants feed already-legal InstSimplify folds only
+  no general APFloat arithmetic lattice
+
 LoopInfo subset:
   natural-loop discovery from dominator backedges
   unique preheader query

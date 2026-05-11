@@ -23,22 +23,25 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 const Lattice = union(enum) {
     unknown,
     undef,
-    constant: i128,
+    constant_int: i128,
+    constant_fp: []const u8,
     overdefined,
 
     fn fromValue(value: ir.Value) Lattice {
         return switch (value) {
-            .int => |int| .{ .constant = int },
+            .int => |int| .{ .constant_int = int },
+            .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
             .null_value => .overdefined,
-            .fp, .zero_initializer, .vector => .overdefined,
+            .zero_initializer, .vector => .overdefined,
             .named => .overdefined,
         };
     }
 
     fn asValue(lattice: Lattice) ?ir.Value {
         return switch (lattice) {
-            .constant => |int| .{ .int = int },
+            .constant_int => |int| .{ .int = int },
+            .constant_fp => |fp| .{ .fp = fp },
             .undef => .undef,
             .unknown, .overdefined => null,
         };
@@ -48,9 +51,13 @@ const Lattice = union(enum) {
         return switch (a) {
             .unknown => b == .unknown,
             .undef => b == .undef,
-            .constant => |a_int| switch (b) {
-                .constant => |b_int| a_int == b_int,
-                .unknown, .undef, .overdefined => false,
+            .constant_int => |a_int| switch (b) {
+                .constant_int => |b_int| a_int == b_int,
+                .unknown, .undef, .constant_fp, .overdefined => false,
+            },
+            .constant_fp => |a_fp| switch (b) {
+                .constant_fp => |b_fp| std.mem.eql(u8, a_fp, b_fp),
+                .unknown, .undef, .constant_int, .overdefined => false,
             },
             .overdefined => b == .overdefined,
         };
@@ -61,12 +68,19 @@ const Lattice = union(enum) {
             .unknown => b,
             .undef => switch (b) {
                 .unknown, .undef => .undef,
-                .constant => b,
+                .constant_int, .constant_fp => b,
                 .overdefined => .overdefined,
             },
-            .constant => |a_int| switch (b) {
+            .constant_int => |a_int| switch (b) {
                 .unknown, .undef => a,
-                .constant => |b_int| if (a_int == b_int) a else .overdefined,
+                .constant_int => |b_int| if (a_int == b_int) a else .overdefined,
+                .constant_fp => .overdefined,
+                .overdefined => .overdefined,
+            },
+            .constant_fp => |a_fp| switch (b) {
+                .unknown, .undef => a,
+                .constant_fp => |b_fp| if (std.mem.eql(u8, a_fp, b_fp)) a else .overdefined,
+                .constant_int => .overdefined,
                 .overdefined => .overdefined,
             },
             .overdefined => .overdefined,
@@ -237,7 +251,7 @@ const Solver = struct {
             .select => |*select| {
                 const cond = solver.valueLattice(select.cond);
                 switch (cond) {
-                    .constant => |value| {
+                    .constant_int => |value| {
                         const chosen = if (value == 0) select.false_value else select.true_value;
                         select.true_value = solver.materialize(chosen, unresolved, overdefined);
                         select.false_value = select.true_value;
@@ -248,7 +262,7 @@ const Solver = struct {
                         select.true_value = solver.materialize(select.true_value, unresolved, overdefined);
                         select.false_value = solver.materialize(select.false_value, unresolved, overdefined);
                     },
-                    .unknown, .overdefined => {
+                    .unknown, .constant_fp, .overdefined => {
                         select.true_value = solver.materialize(select.true_value, unresolved, overdefined);
                         select.false_value = solver.materialize(select.false_value, unresolved, overdefined);
                     },
@@ -265,7 +279,8 @@ const Solver = struct {
 
     fn materialize(solver: Solver, value: ir.Value, unresolved: *bool, overdefined: *bool) ir.Value {
         switch (solver.valueLattice(value)) {
-            .constant => |int| return .{ .int = int },
+            .constant_int => |int| return .{ .int = int },
+            .constant_fp => |fp| return .{ .fp = fp },
             .undef => return .undef,
             .unknown => unresolved.* = true,
             .overdefined => overdefined.* = true,
@@ -283,11 +298,11 @@ const Solver = struct {
                 const then_index = solver.function.blockIndex(condbr.then_target) orelse return false;
                 const else_index = solver.function.blockIndex(condbr.else_target) orelse return false;
                 return switch (solver.valueLattice(condbr.cond)) {
-                    .constant => |value| if (value == 0)
+                    .constant_int => |value| if (value == 0)
                         try solver.markEdge(block_index, else_index)
                     else
                         try solver.markEdge(block_index, then_index),
-                    .unknown, .undef, .overdefined => (try solver.markEdge(block_index, then_index)) or
+                    .unknown, .undef, .constant_fp, .overdefined => (try solver.markEdge(block_index, then_index)) or
                         (try solver.markEdge(block_index, else_index)),
                 };
             },
@@ -320,10 +335,11 @@ const Solver = struct {
 
     fn valueLattice(solver: Solver, value: ir.Value) Lattice {
         return switch (value) {
-            .int => |int| .{ .constant = int },
+            .int => |int| .{ .constant_int = int },
+            .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
             .null_value => .overdefined,
-            .fp, .zero_initializer, .vector => .overdefined,
+            .zero_initializer, .vector => .overdefined,
             .named => |name| solver.values.get(name) orelse .unknown,
         };
     }

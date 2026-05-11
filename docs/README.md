@@ -157,7 +157,7 @@ completed foundation epics
 - [x] [Cycle 04: APFloat Semantics Foundation](roadmap/04_apfloat_semantics_foundation_cycle.md)
 - [x] [Cycle 05: Strict FP Fold Legality](roadmap/05_strict_fp_fold_legality_cycle.md)
 - [x] [Cycle 06: Fast-Math Optimization Enablement](roadmap/06_fast_math_optimization_enablement_cycle.md)
-- [ ] [Cycle 07: FP Lattice and Value Numbering Legality](roadmap/07_fp_lattice_value_numbering_legality_cycle.md)
+- [x] [Cycle 07: FP Lattice and Value Numbering Legality](roadmap/07_fp_lattice_value_numbering_legality_cycle.md)
 - [ ] [Cycle 08: MemorySSA Updater and Phi Precision](roadmap/08_memoryssa_updater_phi_precision_cycle.md)
 - [ ] [Cycle 09: Alias Stack Precision Expansion](roadmap/09_alias_stack_precision_expansion_cycle.md)
 - [ ] [Cycle 10: GVN PRE and Load Redundancy Parity](roadmap/10_gvn_pre_load_redundancy_parity_cycle.md)
