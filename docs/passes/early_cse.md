@@ -40,6 +40,7 @@ Required IR invariants:
 Core LLVM algorithm data structures:
   ScopedHashTable of available expressions and values.
   Available-load tracking for memory cases.
+  Store-to-load forwarding through memory availability.
 
 Local target status:
   LLVM-shaped foundation with unit-test-only coverage for the current
@@ -55,6 +56,9 @@ pure binary expression matching
 pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
+store-to-load forwarding for must-alias non-volatile stack/pointer locations
+readnone call CSE when callee attributes prove no memory effects
+unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
 scalar expression equivalence shared with the InstSimplify helper
@@ -73,17 +77,21 @@ Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  early_cse_store_to_load
+  early_cse_volatile_load_reject
+  early_cse_unknown_call_reject
+  early_cse_ambiguous_alias_reject
 
 local-only conservative:
-  cross-block and safe-load CSE can differ from LLVM's printed SSA names for
-  otherwise equivalent small fixtures, so this pass is not marked
-  fixture-equivalent yet.
+  readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
+  declaration attributes into attribute groups that the current parser rejects,
+  so this case is not in `fixtures.tsv` yet.
 
 unit-test only:
   same-block repeated pure expression elimination
   dominating-block expression elimination
   conservative load CSE with alias/mod-ref proof
+  readnone call CSE
 ```
 
 Example:
@@ -103,8 +111,8 @@ Known gaps:
 
 ```text
 no full MemorySSA-backed load CSE
-no available-call CSE
-no available-store forwarding
+no full MemorySSA walker/updater
+no readonly call load-preservation model beyond conservative no-clobber
 no freeze CSE because undef/poison semantics need more modeling first
 no commutative operand canonicalization
 no target-library knowledge

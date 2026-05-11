@@ -16,22 +16,21 @@ including conservative memory-aware load, store, and call handling.
 
 ## Plan
 
-- [ ] Add or document the LLVM EarlyCSE algorithm contract.
-- [ ] Add scoped hash tables keyed by dominator scope.
-- [ ] Track available pure expressions.
-- [ ] Track available loads only when alias/mod-ref proves reuse safe.
-- [ ] Add conservative store-to-load forwarding.
-- [ ] Add call CSE only for calls with matching no-memory or safe memory-effect
+- [x] Add or document the LLVM EarlyCSE algorithm contract.
+- [x] Add scoped hash tables keyed by dominator scope.
+- [x] Track available pure expressions.
+- [x] Track available loads only when alias/mod-ref proves reuse safe.
+- [x] Add conservative store-to-load forwarding.
+- [x] Add call CSE only for calls with matching no-memory or safe memory-effect
       classification.
-- [ ] Add MemorySSA-like generation and clobber checks where needed.
-- [ ] Add rejected fixtures for volatile, atomic, unknown call, and ambiguous
+- [x] Add MemorySSA-like generation and clobber checks where needed.
+- [x] Add rejected fixtures for volatile, atomic, unknown call, and ambiguous
       alias cases.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] EarlyCSE uses dominator-scoped availability.
-- [ ] Memory CSE is routed through shared legality APIs.
-- [ ] Unsafe memory cases are rejected conservatively.
-- [ ] LLVM-equivalent and local-only behavior are separated in fixtures.
-
+- [x] EarlyCSE uses dominator-scoped availability.
+- [x] Memory CSE is routed through shared legality APIs.
+- [x] Unsafe memory cases are rejected conservatively.
+- [x] LLVM-equivalent and local-only behavior are separated in fixtures.

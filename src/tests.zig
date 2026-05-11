@@ -3932,6 +3932,47 @@ test "early-cse removes dominating pure and safe load expressions" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "early-cse removes matching readnone calls" {
+    const input =
+        \\declare i32 @pure(i32) readnone
+        \\
+        \\define i32 @cse_readnone_call(i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  %y = call i32 @pure(i32 %a)
+        \\  ret i32 %y
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(early_cse.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\declare i32 @pure(i32) readnone
+        \\
+        \\define i32 @cse_readnone_call(i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "gvn removes equivalent phi nodes and safe loads" {
     const input =
         \\define i32 @gvn_phi_load(i1 %cond, ptr %p, i32 %a, i32 %b) {
