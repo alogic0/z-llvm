@@ -58,12 +58,12 @@ Local target status:
 Implemented subset:
 
 ```text
-per-function scan for pure binary, integer cast, icmp, select, phi, and simple load expressions
+local ValueTable for pure binary, integer cast, icmp, select, phi, readnone call, and simple load expressions
+leader table scoped by dominator traversal
 shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
 equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
-dominator check for cross-block availability
-same-block availability by instruction order
+same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar expression equivalence shared with the InstSimplify helper
 ```
@@ -72,19 +72,26 @@ This is intentionally closer to a small value-table seed than to full LLVM GVN.
 It is enough to prove the project can move beyond same-block `early-cse` while
 still relying on the existing dominator analysis.
 
+PRE is explicitly deferred. The local pass does not insert expressions or split
+edges until dominance, critical-edge, and insertion-point rules are documented
+for the accepted IR surface.
+
 Fixture coverage:
 
 ```text
 opt-22 equivalent:
   gvn_dominating_expr
   gvn_scalar_with_memory
+  gvn_phi
 
 local-only conservative:
-  none currently
+  readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for
+  the equivalent fixture, which the current parser rejects.
 
 unit-test only:
   phi-aware redundancy
   simple load redundancy with no clobber
+  readnone call redundancy
 ```
 
 The volatile operation in `gvn_scalar_with_memory` is not value-numbered; it
@@ -97,7 +104,7 @@ no load PRE or MemorySSA
 no MemorySSA-backed memory value numbering
 no phi translation beyond exact phi expression matching
 no congruence-class iteration
-no expression hashing
+linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge or partial redundancy handling
-no assume, call, GEP, freeze, vector, or memory value numbering
+no assume, readonly call, GEP, freeze, vector, or memory value numbering
 ```

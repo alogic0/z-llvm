@@ -4027,6 +4027,47 @@ test "gvn removes equivalent phi nodes and safe loads" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "gvn removes matching readnone calls" {
+    const input =
+        \\declare i32 @pure(i32) readnone
+        \\
+        \\define i32 @gvn_readnone_call(i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  %y = call i32 @pure(i32 %a)
+        \\  ret i32 %y
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(gvn.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\declare i32 @pure(i32) readnone
+        \\
+        \\define i32 @gvn_readnone_call(i32 %a) {
+        \\entry:
+        \\  %x = call i32 @pure(i32 %a)
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "sccp folds direct calls to constant-return functions" {
     const input =
         \\define internal i32 @constant() {

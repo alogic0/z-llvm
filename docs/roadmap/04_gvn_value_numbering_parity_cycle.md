@@ -16,22 +16,21 @@ casts, calls, and memory-safe loads.
 
 ## Plan
 
-- [ ] Add or document the LLVM GVN algorithm contract.
-- [ ] Add a ValueTable for supported expression forms.
-- [ ] Add leader tables scoped by dominance.
-- [ ] Number expressions, PHIs, casts, calls, and loads for accepted IR.
-- [ ] Add load availability using conservative MemoryDependence or
+- [x] Add or document the LLVM GVN algorithm contract.
+- [x] Add a ValueTable for supported expression forms.
+- [x] Add leader tables scoped by dominance.
+- [x] Number expressions, PHIs, casts, calls, and loads for accepted IR.
+- [x] Add load availability using conservative MemoryDependence or
       MemorySSA-like checks.
-- [ ] Add duplicate-PHI elimination as a separate safe slice.
-- [ ] Add conservative PRE only after dominance and insertion-point rules are
+- [x] Add duplicate-PHI elimination as a separate safe slice.
+- [x] Add conservative PRE only after dominance and insertion-point rules are
       explicit.
-- [ ] Add fixtures where LLVM eliminates redundant expressions and loads.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Add fixtures where LLVM eliminates redundant expressions and loads.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] GVN has a real local value numbering model.
-- [ ] Memory-dependent GVN is legality-gated.
-- [ ] PRE is either implemented narrowly or explicitly deferred.
-- [ ] Fixture docs explain unsupported LLVM behavior.
-
+- [x] GVN has a real local value numbering model.
+- [x] Memory-dependent GVN is legality-gated.
+- [x] PRE is either implemented narrowly or explicitly deferred.
+- [x] Fixture docs explain unsupported LLVM behavior.
