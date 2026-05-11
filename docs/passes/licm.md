@@ -83,6 +83,7 @@ dominance and invariant operands allow it
 hoist nonvolatile loads in the loop header when the pointer is loop-invariant,
 the loop has no clobber for that access, and an existing preheader dominates
 the header
+reject memory LICM when the load pointer is defined inside the loop
 ```
 
 Current legality boundary:
@@ -91,21 +92,26 @@ Current legality boundary:
 hoistable: side-effect-free scalar binary, integer cast, icmp, select, and the
 narrow header-load case described above
 not hoistable: freeze, phi, alloca, store, getelementptr, volatile or atomic
-barriers, trapping division, non-header loads, and loads with loop clobbers
+barriers, trapping division, non-header loads, variant-pointer loads, and loads
+with loop clobbers
 not represented yet and therefore not hoistable: calls and unknown memory effects
 ```
 
 LLVM's full LICM uses `canSinkOrHoistInst`, alias analysis, MemorySSA, and
 speculation-safety checks to decide whether memory operations can move. This
-project deliberately keeps memory LICM disabled until the required alias/mod-ref
-or MemorySSA foundation exists.
+project deliberately limits memory LICM to invariant header-load hoisting until
+the required promotion, sinking, and MemorySSA updater pieces exist.
 
 Fixture coverage:
 
 ```text
-opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist, header load hoist
+opt-22 compared: invariant scalar hoist, variant-operand rejection,
+dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist,
+header load hoist
 local only: may-alias store rejection for memory LICM because opt-22 may still
 perform other loop rewrites around that shape
+local only: variant load-pointer rejection because opt-22 may sink/LCSSA-rewrite
+the load while the local pass simply refuses to move it
 opt-22 compared memory legality: scalar hoisting beside volatile memory
 local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, atomic barrier rejection, multi-latch rejection
 ```
@@ -121,7 +127,7 @@ Known gaps:
 
 ```text
 no store/call hoisting or sinking
-no MemorySSA updater or memory promotion
+no MemorySSA updater use in LICM or memory promotion
 no poison or freeze speculation safety checks beyond the current trapping-division guard
 no multi-latch loop hoisting
 no preheader creation
