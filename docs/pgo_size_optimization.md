@@ -14,8 +14,9 @@ zig-release-small-accepted: corpus conformance pipeline over accepted stripped I
 ```
 
 The accepted ReleaseSmall corpus currently validates parser, verifier, aliases,
-raw function attributes, and size attributes such as `minsize` and `optsize`.
-It intentionally uses only implemented passes.
+raw function attributes, size attributes such as `minsize` and `optsize`,
+integer scalar/intrinsic lowering, and conservative scalar FP preservation. It
+intentionally uses only implemented passes.
 
 ## Preserved Surface
 
@@ -58,5 +59,6 @@ no size-cost model for inlining, loops, vectorization, or codegen
 ```text
 unit test: size attributes and branch profile metadata round-trip opaquely
 corpus: tiny_scalar_release_small_captured
+corpus: integers_release_small, floats_math_release_small, float_compare_release_small
 pipeline placeholder test: require<branch-probability> and require<block-frequency>
 ```
