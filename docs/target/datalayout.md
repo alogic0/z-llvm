@@ -72,6 +72,20 @@ unit-test only:
   compact wasm32-wasi triple parsing
 ```
 
+## AArch64 Optimizer-Input Policy
+
+`docs/target/aarch64_optimizer_policy.md` records the current non-host target
+policy. The source-backed `integers_release_fast_aarch64` row remains
+`parse,verify,target-layout,future`: it proves parser/verifier/DataLayout
+acceptance but does not run the broad accepted release pipeline yet.
+
+Only target-independent scalar transforms may be compared with AArch64 target
+records before promotion. The current fixture is:
+
+```text
+test/opt/inputs/aarch64_instcombine_target_independent.ll
+```
+
 Known gaps:
 
 ```text
