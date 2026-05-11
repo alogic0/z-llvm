@@ -65,6 +65,19 @@ ThinLTO and FullLTO are not semantically distinct locally
 post-link LTO is not represented
 ```
 
+## Mode-Specific Boundary
+
+| Zig path | LLVM wrapper behavior | Local boundary |
+| --- | --- | --- |
+| non-LTO `ReleaseFast` / `ReleaseSafe` | `buildPerModuleDefaultPipeline(O3)` then target emission | `release-o3` and accepted corpus aliases; no bitcode handoff. |
+| non-LTO `ReleaseSmall` | `buildPerModuleDefaultPipeline(Oz)` then target emission | `release-oz` and accepted corpus alias; no bitcode handoff. |
+| `-flto=thin` in non-debug mode | Zig passes `ThinPreLink`, but wrapper builds `buildLTOPreLinkDefaultPipeline` | `lto-prelink-o3` or `lto-prelink-oz`; ThinLTO summary remains deferred. |
+| `-flto=full` in non-debug mode | Zig passes `FullPreLink` and wrapper builds `buildLTOPreLinkDefaultPipeline` | Same pre-link aliases as ThinLTO until summary/post-link behavior is represented. |
+| explicit bitcode output | LLVM writes bitcode after optimization | No local writer; construct inventory must be complete first. |
+
+The local LTO aliases are therefore optimizer-boundary checks, not bitcode
+writer or linker-LTO correctness claims.
+
 ## Behavior Gap Table
 
 | LLVM LTO behavior | Why it matters | Local status |

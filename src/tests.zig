@@ -246,6 +246,30 @@ test "accepted Zig corpus pipelines exclude vector placeholders" {
     }
 }
 
+test "lto prelink pipelines expose prelink placeholders without bitcode semantics" {
+    const aliases = [_][]const u8{
+        "lto-prelink-o3",
+        "lto-prelink-oz",
+    };
+
+    for (aliases) |alias_name| {
+        const descriptor = pipelines.find(alias_name).?;
+        try std.testing.expect(std.mem.indexOf(u8, descriptor.llvm_analogue, "buildLTOPreLinkDefaultPipeline") != null);
+        try std.testing.expect(std.mem.indexOf(u8, descriptor.notes, "no bitcode writer") != null);
+        try std.testing.expect(std.mem.indexOf(u8, descriptor.notes, "ThinLTO summary") != null);
+
+        var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+        defer pm.deinit();
+        try pipelines.addPasses(&pm, alias_name);
+
+        try std.testing.expect(pipelineContainsPass(pm, "verify"));
+        try std.testing.expect(pipelineContainsPass(pm, "canonicalize-aliases"));
+        try std.testing.expect(pipelineContainsPass(pm, "name-anon-globals"));
+        try std.testing.expect(!pipelineContainsPass(pm, "loop-vectorize"));
+        try std.testing.expect(!pipelineContainsPass(pm, "slp-vectorizer"));
+    }
+}
+
 fn pipelineContainsPass(pm: pass_manager.ModulePassManager, pass_name: []const u8) bool {
     for (pm.passes.items) |pass| {
         if (std.mem.eql(u8, pass.name, pass_name)) return true;

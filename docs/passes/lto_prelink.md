@@ -60,6 +60,8 @@ lto-prelink-o3 and lto-prelink-oz local pipelines are explicit.
 canonicalize-aliases and name-anon-globals are executable placeholders.
 verify and existing scalar/memory/global foundations are present in the local
 pre-link pipeline shape.
+pipeline descriptors explicitly state that bitcode writing and ThinLTO summary
+emission are not modeled.
 ```
 
 Intentional divergences:
@@ -82,6 +84,8 @@ opt-22 equivalent:
 
 local-only conservative:
   lto-prelink-o3 and lto-prelink-oz pipeline expansion tests
+  lto pre-link descriptor test that keeps bitcode writer and ThinLTO summary
+  semantics out of the local pipeline claim
 
 unit-test only:
   placeholder pass dispatch

@@ -224,7 +224,7 @@ pub const all = [_]Pipeline{
         .mode = "ReleaseSafe",
         .llvm_analogue = "Zig ReleaseSafe / LLVM O3 accepted corpus subset",
         .intended_level = "accepted ReleaseSafe corpus validation",
-        .notes = "limited to implemented canonicalization and DCE; safety IR rows remain future until parsed",
+        .notes = "limited to implemented canonicalization and DCE over accepted safety-control fixtures",
     },
     .{
         .name = "zig-release-fast-accepted",
@@ -264,7 +264,7 @@ pub const all = [_]Pipeline{
         .mode = "ReleaseFast/ReleaseSafe LTO pre-link",
         .llvm_analogue = "PassBuilder::buildLTOPreLinkDefaultPipeline(O3)",
         .intended_level = "Zig release LTO pre-link O3",
-        .notes = "LTO-specific global canonicalization is represented by placeholders",
+        .notes = "LTO-specific global canonicalization is represented by placeholders; no bitcode writer or ThinLTO summary is modeled",
     },
     .{
         .name = "lto-prelink-oz",
@@ -272,7 +272,7 @@ pub const all = [_]Pipeline{
         .mode = "ReleaseSmall LTO pre-link",
         .llvm_analogue = "PassBuilder::buildLTOPreLinkDefaultPipeline(Oz)",
         .intended_level = "Zig release LTO pre-link Oz",
-        .notes = "LTO-specific global canonicalization is represented by placeholders",
+        .notes = "LTO-specific global canonicalization is represented by placeholders; no bitcode writer or ThinLTO summary is modeled",
     },
 };
 

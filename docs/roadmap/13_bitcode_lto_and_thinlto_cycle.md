@@ -16,21 +16,31 @@ optimizer path on optional output formats.
 
 ## Plan
 
-- [ ] Refresh which Zig modes request bitcode, LTO, ThinLTO, or object-only
+- [x] Refresh which Zig modes request bitcode, LTO, ThinLTO, or object-only
       behavior.
-- [ ] Classify bitcode support as parser/input, writer/output, or no local need
+- [x] Classify bitcode support as parser/input, writer/output, or no local need
       for each accepted fixture.
-- [ ] Add construct inventory rows for every accepted IR feature in the current
+- [x] Add construct inventory rows for every accepted IR feature in the current
       corpus.
-- [ ] Keep ThinLTO summary emission deferred unless a concrete Zig path needs
+- [x] Keep ThinLTO summary emission deferred unless a concrete Zig path needs
       local reproduction.
-- [ ] Add LTO prelink pipeline docs for optimizer behavior that differs from
+- [x] Add LTO prelink pipeline docs for optimizer behavior that differs from
       normal ReleaseFast.
-- [ ] Define activation criteria for building a real bitcode writer.
+- [x] Define activation criteria for building a real bitcode writer.
 
 ## Exit Criteria
 
-- [ ] Bitcode/LTO requirements are source-backed and mode-specific.
-- [ ] Optional LTO work does not blur with core optimizer correctness.
-- [ ] A future bitcode writer has a construct inventory tied to accepted IR.
+- [x] Bitcode/LTO requirements are source-backed and mode-specific.
+- [x] Optional LTO work does not blur with core optimizer correctness.
+- [x] A future bitcode writer has a construct inventory tied to accepted IR.
 
+## Completion Notes
+
+- `docs/bitcode/construct_inventory.md` now maps Zig mode paths to
+  parser/input, writer/output, or no-local-need categories and lists construct
+  coverage for accepted corpus rows.
+- `docs/lto/behavior_gaps.md` records the exact boundary: Zig's non-debug LTO
+  modes use LLVM's pre-link builder locally modeled by `lto-prelink-o3` and
+  `lto-prelink-oz`, while bitcode output and ThinLTO summaries remain deferred.
+- Pipeline descriptor tests keep the local aliases pinned as pre-link optimizer
+  surfaces rather than bitcode writer or ThinLTO-summary implementations.
