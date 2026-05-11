@@ -268,6 +268,8 @@ const LcssaCandidate = struct {
 };
 
 fn findSimpleLcssaCandidate(allocator: std.mem.Allocator, function: ir.Function, loop: NaturalLoop, graph: cfg.Graph) !?LcssaCandidate {
+    if (!try loop.hasDedicatedExits(allocator, graph)) return null;
+
     var exits = try loop.exitBlocks(allocator, graph);
     defer exits.deinit(allocator);
     if (exits.items.len != 1) return null;

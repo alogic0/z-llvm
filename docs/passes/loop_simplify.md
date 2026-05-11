@@ -65,8 +65,10 @@ Cycle 17 added LoopInfo-side recognition for simple induction variables and
 side-effect-free loop-deletion candidates, but it still does not rotate loops,
 insert LCSSA PHIs, or delete loop blocks.
 Cycle 17 also added a simple scalar LCSSA formation helper for one-exit accepted
-loops. This is a targeted utility, not full LLVM `formLCSSA`.
-LCSSA form can be checked for existing exit phis but is not formed yet.
+loops with dedicated exits. This is a targeted utility, not full LLVM
+`formLCSSA`.
+LCSSA form can also be checked for existing exit phis outside the helper's
+narrow formation shape.
 ```
 
 Intentional divergences:
@@ -75,7 +77,7 @@ Intentional divergences:
 no preheader creation
 no latch canonicalization
 no dedicated-exit splitting
-no LCSSA formation
+no LCSSA formation for non-dedicated exits or multi-exit loops
 no loop rotation
 no side-effect-free loop deletion
 ```
@@ -90,5 +92,6 @@ local-only conservative:
   LICM negative fixtures document no-preheader and multi-latch rejection.
 
 unit-test only:
-  LoopInfo natural-loop queries and release-o3 loop placeholder dispatch
+  LoopInfo natural-loop queries, simple LCSSA formation, non-dedicated-exit
+  LCSSA rejection, and release-o3 loop placeholder dispatch
 ```

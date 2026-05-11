@@ -51,6 +51,10 @@ Implemented subset:
   availability through function attribute classification.
   unknown calls, volatile memory, atomic memory, may-alias stores, and
   same-pointer stores are clobbers.
+  Cross-block clobber queries are path-safe by construction: endpoint blocks
+  use instruction order, while any other memory access in another block is
+  treated as potentially between the queried accesses until a real MemorySSA
+  walker is implemented.
   GVN load availability uses this shared helper.
   EarlyCSE load CSE uses this helper before replacing an available load.
   DSE uses a MemorySSA-owned same-block overwrite query when direction and
@@ -59,6 +63,9 @@ Implemented subset:
 Intentional divergences:
   MemoryPhi support is conservative: join facts are barriers for accepted
   queries, not full per-location phi operands.
+  Cross-block queries deliberately reject more cases than LLVM. LLVM can walk
+  MemorySSA and use dominance/path facts; the local access-list helper treats
+  unknown intervening blocks as clobbers instead of relying on block order.
   LICM does not move memory instructions.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
   The access list is rebuilt per function and does not have a MemorySSAUpdater.
@@ -72,6 +79,8 @@ Fixture coverage:
   unit test: memory ssa clobber helper covers accepted memory-dependence cases
   unit test: memory ssa records narrow phi facts at joins
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
+  opt fixtures: early_cse_load_branch_clobber_reject
+  local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
 
 opt-22 comparison command:
@@ -80,4 +89,5 @@ opt-22 comparison command:
 
 Local-only fixture command:
   zig build test
+  bash scripts/compare_opt.sh
 ```

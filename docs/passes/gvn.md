@@ -66,6 +66,9 @@ equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
 load availability queries use the persisted local MemorySSA access list
+cross-block load availability is conservative: endpoint instruction order is
+used, but memory in other blocks is treated as a possible clobber instead of
+using numeric block order as a path proof
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
@@ -89,6 +92,9 @@ opt-22 equivalent:
   gvn_load_call_clobber_reject
 
 local-only conservative:
+  gvn_load_branch_clobber_reject keeps the later load because a store in a
+  different CFG block may reach the join. LLVM GVN can perform a stronger PRE
+  transform for this shape, so this fixture checks the local safety boundary.
   readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for
   the equivalent fixture, which the current parser rejects.
 

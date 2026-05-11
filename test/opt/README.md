@@ -72,6 +72,11 @@ Run all metadata-backed comparisons:
 bash scripts/compare_opt.sh
 ```
 
+`opt-equivalent` rows are compared against normalized `opt` output.
+`local-conservative` and `parse-preserve-only` rows are compared only against
+their checked-in `z_llvm` expected output because LLVM intentionally does more
+than the current local slice or emits IR outside the accepted parser surface.
+
 Use a different `opt` binary:
 
 ```bash

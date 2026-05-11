@@ -4433,6 +4433,34 @@ test "loop info checks LCSSA form for outside loop uses" {
     defer verify_loops.deinit();
     const verify_loop = verify_loops.loopForHeader(1) orelse return error.MissingLoop;
     try std.testing.expect(try verify_loop.hasLcssaForm(std.testing.allocator, rewrite_module.functions.items[0], verify_graph));
+
+    const non_dedicated =
+        \\define i32 @lcssa_non_dedicated(i1 %cond, i1 %side) {
+        \\entry:
+        \\  br i1 %side, label %outside, label %header
+        \\outside:
+        \\  br label %exit
+        \\header:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %latch ]
+        \\  br i1 %cond, label %latch, label %exit
+        \\latch:
+        \\  %next = add i32 %i, 1
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %i
+        \\}
+        \\
+    ;
+
+    var non_dedicated_module = try ir.Module.parse(std.testing.allocator, non_dedicated);
+    defer non_dedicated_module.deinit();
+    var non_dedicated_graph = try cfg.Graph.build(std.testing.allocator, non_dedicated_module.functions.items[0]);
+    defer non_dedicated_graph.deinit();
+    var non_dedicated_loops = try loop_info.LoopInfo.build(std.testing.allocator, non_dedicated_module.functions.items[0]);
+    defer non_dedicated_loops.deinit();
+    const non_dedicated_loop = non_dedicated_loops.loopForHeader(2) orelse return error.MissingLoop;
+    try std.testing.expect(!try non_dedicated_loop.hasDedicatedExits(std.testing.allocator, non_dedicated_graph));
+    try std.testing.expect(!try loop_info.formSimpleLcssa(&non_dedicated_module, 0, non_dedicated_loop.*, non_dedicated_graph));
 }
 
 test "loop info classifies reduced Zig corpus loop shape" {

@@ -74,7 +74,7 @@ pub const MemorySSA = struct {
 
     pub fn hasClobberBetween(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value) bool {
         for (memory.accesses.items) |access| {
-            if (!isBetween(access, from, to)) continue;
+            if (!isConservativelyBetween(access, from, to)) continue;
             switch (access.kind) {
                 .use => {},
                 .def, .barrier => {
@@ -99,7 +99,7 @@ pub fn hasClobberBetween(module: ir.Module, function: ir.Function, from: InstRef
                 .instruction_index = instruction_index,
                 .ptr = accessPointer(instruction),
             };
-            if (!isBetween(access, from, to)) continue;
+            if (!isConservativelyBetween(access, from, to)) continue;
             if (isBarrier(module, function, instruction, ptr)) return true;
         }
     }
@@ -175,7 +175,19 @@ fn accessPointer(instruction: ir.Instruction) ?ir.Value {
     };
 }
 
-fn isBetween(access: Access, from: InstRef, to: InstRef) bool {
+fn isConservativelyBetween(access: Access, from: InstRef, to: InstRef) bool {
+    if (from.block_index != to.block_index) {
+        if (access.block_index == from.block_index) {
+            const instruction_index = access.instruction_index orelse return true;
+            return instruction_index > from.instruction_index;
+        }
+        if (access.block_index == to.block_index) {
+            const instruction_index = access.instruction_index orelse return true;
+            return instruction_index < to.instruction_index;
+        }
+        return true;
+    }
+
     if (access.block_index == from.block_index) {
         const instruction_index = access.instruction_index orelse return access.block_index != to.block_index;
         if (instruction_index <= from.instruction_index) return false;
@@ -184,8 +196,7 @@ fn isBetween(access: Access, from: InstRef, to: InstRef) bool {
         const instruction_index = access.instruction_index orelse return true;
         if (instruction_index >= to.instruction_index) return false;
     }
-    if (from.block_index == to.block_index) return access.block_index == from.block_index;
-    return access.block_index >= @min(from.block_index, to.block_index) and access.block_index <= @max(from.block_index, to.block_index);
+    return access.block_index == from.block_index;
 }
 
 fn blockMayReachMemory(function: ir.Function, graph: cfg.Graph, block_index: usize) bool {

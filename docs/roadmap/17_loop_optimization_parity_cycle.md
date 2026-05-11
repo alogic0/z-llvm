@@ -41,7 +41,8 @@ LLVM-compatible loop optimization foundations for accepted Zig-emitted loops.
 ## Completion Notes
 
 - Added a simple scalar LCSSA formation helper for one-exit accepted loop shapes
-  and verifier-clean rewrite coverage.
+  with dedicated exits and verifier-clean rewrite coverage. Non-dedicated exits
+  are rejected so inserted PHIs cannot miss outside-predecessor incoming edges.
 - Added explicit LoopRotate status classification. Current accepted self-latch
   and non-canonical cases are rejected rather than transformed.
 - Added LoopDeletion status classification. Side-effect-free loops can be

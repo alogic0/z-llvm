@@ -39,3 +39,7 @@ model for accepted IR, without enabling unsafe memory optimizations.
   module DataLayout when available.
 - LICM memory motion remains disabled. The current model is a conservative
   access-list slice, not LLVM's full MemorySSA walker/updater.
+- Cross-block clobber checks are path-safe but conservative: endpoint blocks
+  use instruction order, while other blocks are treated as possible
+  intervening clobbers. This avoids unsafe block-index reasoning until a real
+  MemorySSA walker exists.

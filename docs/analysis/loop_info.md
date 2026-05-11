@@ -70,6 +70,7 @@ classify a value as loop invariant from definition-block ownership
 recognize simple integer induction PHIs with an add step in source-backed loop
 fixtures
 insert simple scalar LCSSA PHIs for a single-exit accepted loop shape
+refuse simple LCSSA formation unless all loop exits are dedicated
 classify LoopRotate support status with explicit unsupported reasons
 classify side-effect-free loop-deletion candidates without deleting them
 classify LoopDeletion support status while requiring a proven exit and no side effects
@@ -87,6 +88,8 @@ inserted preheaders, rotated loops
 recognized but not transformed yet: simple induction variables and
 side-effect-free deletion candidates
 implemented helper only: simple scalar LCSSA insertion for one exit block
+simple LCSSA insertion additionally requires dedicated exits so every inserted
+exit PHI has one incoming value for each predecessor of the exit block
 ```
 
 Fixture coverage:
@@ -98,6 +101,7 @@ unit-test only:
   backedge, loop-depth, contains-block, and loop-invariant value helpers
   LCSSA-form check for loop-defined values used outside the loop
   simple scalar LCSSA formation and verifier-clean rewrite
+  non-dedicated-exit rejection before simple LCSSA formation
   simple induction variable recognition for the reduced Zig corpus loop shape
   side-effecting loop deletion candidate rejection
   LoopRotate self-latch rejection and LoopDeletion eligible-but-not-implemented status

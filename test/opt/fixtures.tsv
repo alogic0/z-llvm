@@ -25,6 +25,7 @@ licm_nested_scalar_chain	licm	loop-mssa(licm)	test/opt/inputs/licm_nested_scalar
 gvn_scalar_with_memory	gvn,simplifycfg	gvn	test/opt/inputs/gvn_scalar_with_memory.ll	test/opt/expected/z_llvm/gvn_scalar_with_memory.ll	opt-equivalent	gvn,simplifycfg	scalar GVN still works beside volatile memory
 gvn_phi	gvn,dce	gvn,dce	test/opt/inputs/gvn_phi.ll	test/opt/expected/z_llvm/gvn_phi.ll	opt-equivalent	gvn,dce	duplicate PHI value numbering eliminates redundant phi
 gvn_load_call_clobber_reject	gvn	gvn	test/opt/inputs/gvn_load_call_clobber_reject.ll	test/opt/expected/z_llvm/gvn_load_call_clobber_reject.ll	opt-equivalent	gvn	intervening unknown call blocks load value numbering
+gvn_load_branch_clobber_reject	gvn	gvn	test/opt/inputs/gvn_load_branch_clobber_reject.ll	test/opt/expected/z_llvm/gvn_load_branch_clobber_reject.ll	local-conservative	gvn	branch-local store blocks load value numbering; LLVM GVN can do stronger PRE
 dce_scalar_with_memory	dce	dce	test/opt/inputs/dce_scalar_with_memory.ll	test/opt/expected/z_llvm/dce_scalar_with_memory.ll	opt-equivalent	dce	DCE removes pure scalar and readonly load but preserves volatile store
 dce_volatile_load_reject	dce	dce	test/opt/inputs/dce_volatile_load_reject.ll	test/opt/expected/z_llvm/dce_volatile_load_reject.ll	opt-equivalent	dce	volatile load is preserved
 dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/dse_overwrite.ll	opt-equivalent	dse	overwritten stack store removed
@@ -37,6 +38,7 @@ sccp_select_same_arms	sccp,dce	sccp,dce	test/opt/inputs/sccp_select_same_arms.ll
 early_cse_store_to_load	early-cse	early-cse	test/opt/inputs/early_cse_store_to_load.ll	test/opt/expected/z_llvm/early_cse_store_to_load.ll	opt-equivalent	early-cse	store-to-load forwarding for must-alias stack slot
 early_cse_volatile_load_reject	early-cse	early-cse	test/opt/inputs/early_cse_volatile_load_reject.ll	test/opt/expected/z_llvm/early_cse_volatile_load_reject.ll	opt-equivalent	early-cse	volatile loads are not CSE candidates
 early_cse_load_call_clobber_reject	early-cse	early-cse	test/opt/inputs/early_cse_load_call_clobber_reject.ll	test/opt/expected/z_llvm/early_cse_load_call_clobber_reject.ll	opt-equivalent	early-cse	intervening unknown call blocks load CSE
+early_cse_load_branch_clobber_reject	early-cse	early-cse	test/opt/inputs/early_cse_load_branch_clobber_reject.ll	test/opt/expected/z_llvm/early_cse_load_branch_clobber_reject.ll	opt-equivalent	early-cse	branch-local store blocks load CSE regardless of block order
 early_cse_unknown_call_reject	early-cse	early-cse	test/opt/inputs/early_cse_unknown_call_reject.ll	test/opt/expected/z_llvm/early_cse_unknown_call_reject.ll	opt-equivalent	early-cse	unknown call blocks store-to-load forwarding
 early_cse_ambiguous_alias_reject	early-cse	early-cse	test/opt/inputs/early_cse_ambiguous_alias_reject.ll	test/opt/expected/z_llvm/early_cse_ambiguous_alias_reject.ll	opt-equivalent	early-cse	may-alias pointer parameters block store-to-load forwarding
 simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg.ll	test/opt/expected/z_llvm/simplifycfg.ll	opt-equivalent	simplifycfg	generic LLVM headers only
