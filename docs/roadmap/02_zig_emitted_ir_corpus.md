@@ -14,9 +14,9 @@ instead of hand-written LLVM examples alone.
 
 ## Plan
 
-- [ ] Define fixture layout by source feature, optimization mode, target triple,
+- [x] Define fixture layout by source feature, optimization mode, target triple,
       and expected LLVM comparison mode.
-- [ ] Add a fixture manifest format that records:
+- [x] Add a fixture manifest format that records:
       Zig version, target, optimization mode, command used, IR file, expected
       parser/verifier status, and comparison notes.
 - [ ] Add initial source groups:
@@ -35,14 +35,35 @@ instead of hand-written LLVM examples alone.
 
 ## Deliverables
 
-- [ ] `../fixtures/zig_ir/README.md`
-- [ ] Fixture manifest files.
-- [ ] Initial Zig source fixture set.
+- [x] `../fixtures/zig_ir/README.md`
+- [x] Fixture manifest files.
+- [x] Initial Zig source fixture set.
 - [ ] Captured LLVM IR files.
-- [ ] Corpus coverage table.
+- [x] Corpus coverage table.
 
 ## Exit Criteria
 
 - [ ] Parser/verifier work can be driven from real Zig-emitted IR.
 - [ ] Each optimizer epic has at least one Zig-originated fixture family.
 - [ ] Unsupported IR forms are documented instead of silently ignored.
+
+## Completed Slices
+
+### Slice 1: Zig-Emitted IR Corpus Bootstrap
+
+- [x] Created `../fixtures/zig_ir/README.md`.
+- [x] Created `../fixtures/zig_ir/manifest.tsv`.
+- [x] Added first fixture group: `tiny_scalar`.
+- [x] Covered Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall in the manifest.
+- [x] Recorded Zig version, target triple, optimize mode, command used, emitted
+      IR path, checked IR path, and fixture classification.
+- [x] Classified fixtures as `parse`, `verify`, `optimizer-input`,
+      `unsupported`, or `future`.
+- [x] Added notes connecting each fixture row back to the LLVM pass inventory.
+
+Remaining broad-epic work:
+
+- [ ] Add more source groups beyond `tiny_scalar`.
+- [ ] Check in captured raw or sanitized LLVM IR files where they do not contain
+      machine-local paths or excessive unrelated std/debug support.
+- [ ] Add enough Zig-originated fixture families for every optimizer epic.

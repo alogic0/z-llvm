@@ -3,10 +3,15 @@
 Goal: keep a small checked-in bridge from real Zig LLVM backend output to the
 LLVM-compatible subset that this project can parse and compare.
 
+The corpus layout and manifest live in
+[`zig_ir/README.md`](zig_ir/README.md) and
+[`zig_ir/manifest.tsv`](zig_ir/manifest.tsv).
+
 Regenerate the raw fixture with Zig 0.16.0:
 
 ```bash
-zig build-obj -fllvm -flibllvm -fno-emit-bin -femit-llvm-ir=/tmp/z_llvm_tiny_scalar.ll -O ReleaseFast -target x86_64-linux-gnu test/zig/inputs/tiny_scalar.zig
+mkdir -p tmp/zig_ir/raw
+zig build-obj -fllvm -flibllvm -fno-emit-bin -femit-llvm-ir=tmp/zig_ir/raw/tiny_scalar.ReleaseFast.ll -O ReleaseFast -target x86_64-linux-gnu test/zig/inputs/tiny_scalar.zig
 ```
 
 Current checked-in fixture:
