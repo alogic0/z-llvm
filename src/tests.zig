@@ -14,6 +14,7 @@ const normalize = @import("normalize.zig");
 const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
+const postdominator = @import("analysis/postdominator.zig");
 const target = @import("target.zig");
 const target_library_info = @import("analysis/target_library_info.zig");
 const instcombine = @import("passes/instcombine.zig");
@@ -3396,6 +3397,75 @@ test "dominator analysis reports immediate dominators and frontiers" {
     try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(1));
     try std.testing.expectEqualSlices(usize, &.{3}, frontiers.frontier(2));
     try std.testing.expectEqualSlices(usize, &.{}, frontiers.frontier(3));
+}
+
+test "postdominator analysis answers postdominance queries" {
+    const input =
+        \\define i32 @postdom(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %exit
+        \\right:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var postdom = try postdominator.PostDominators.build(std.testing.allocator, function);
+    defer postdom.deinit();
+
+    try std.testing.expect(postdom.postdominates(3, 0));
+    try std.testing.expect(postdom.postdominates(3, 1));
+    try std.testing.expect(postdom.postdominates(3, 2));
+    try std.testing.expect(postdom.postdominates(3, 3));
+    try std.testing.expect(postdom.postdominates(1, 1));
+    try std.testing.expect(!postdom.postdominates(1, 0));
+    try std.testing.expect(!postdom.postdominates(1, 2));
+
+    try std.testing.expectEqual(@as(?usize, 3), postdom.immediatePostDominator(0));
+    try std.testing.expectEqual(@as(?usize, 3), postdom.immediatePostDominator(1));
+    try std.testing.expectEqual(@as(?usize, 3), postdom.immediatePostDominator(2));
+    try std.testing.expectEqual(@as(?usize, null), postdom.immediatePostDominator(3));
+}
+
+test "control dependence reports branch-controlled blocks" {
+    const input =
+        \\define i32 @control_dep(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %then, label %exit
+        \\then:
+        \\  br label %exit
+        \\exit:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
+
+    var postdom = try postdominator.PostDominators.build(std.testing.allocator, function);
+    defer postdom.deinit();
+
+    const dependence: postdominator.ControlDependence = .{
+        .graph = graph,
+        .postdom = postdom,
+    };
+
+    try std.testing.expect(dependence.isControlDependentOn(1, 0));
+    try std.testing.expect(!dependence.isControlDependentOn(2, 0));
+    try std.testing.expect(!dependence.isControlDependentOn(0, 0));
 }
 
 test "loop info finds a natural loop from a dominator backedge" {

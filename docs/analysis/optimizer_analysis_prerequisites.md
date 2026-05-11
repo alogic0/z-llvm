@@ -39,6 +39,8 @@ TargetLibraryInfo
 | --- | --- | --- | --- |
 | CFG predecessor/successor facts | `src/analysis/cfg.zig`, `src/ir/verifier.zig` | LLVM-shaped subset | verifier, SimplifyCFG, loop analysis |
 | Dominator tree/facts | `src/analysis/dominator.zig`, `src/ir/verifier.zig` | LLVM-shaped subset | verifier, Mem2Reg, GVN, LICM |
+| PostDominatorTree facts | `src/analysis/postdominator.zig` | LLVM-shaped subset | ADCE control-flow parity |
+| Control-dependence queries | `src/analysis/postdominator.zig` | LLVM-shaped subset | ADCE control-flow parity |
 | Def-use/use counts | `src/analysis/def_use.zig` | LLVM-shaped subset | DCE, ADCE, local pass diagnostics |
 | LoopInfo | `src/analysis/loop_info.zig` | LLVM-shaped subset | LICM and loop roadmap slices |
 | Memory effects | `src/analysis/memory_effect.zig` | LLVM-shaped subset | DCE, ADCE, GVN, LICM, memory legality |
@@ -53,8 +55,6 @@ TargetLibraryInfo
 
 | Hook | LLVM role | First likely consumer |
 | --- | --- | --- |
-| PostDominatorTree | Control-dependence and dead-control reasoning | ADCE parity, SimplifyCFG |
-| Control-dependence queries | Determines live terminators and control edges | ADCE parity |
 | Executable CFG block/edge tracking | Sparse conditional propagation and unreachable-edge pruning | SCCP parity |
 | Sparse value lattice | Constant/overdefined/undef lattice propagation | SCCP, IPSCCP |
 | Scoped hash tables | Dominance-scoped expression and value numbering state | GVN/NewGVN parity |
@@ -63,6 +63,11 @@ TargetLibraryInfo
 | AssumptionCache | Uses `llvm.assume` and known facts for transforms | InstSimplify, LICM, CVP |
 | TargetTransformInfo | Cost and legality model | loop/vector/scalar cost-based passes |
 | Global-use graph with linkage semantics | IPO/global cleanup correctness | GlobalDCE, inlining, internalization |
+
+The local postdominator/control-dependence hooks are intentionally small. They
+cover the accepted CFG fixtures needed by the ADCE parity cycle, but richer
+LLVM parity still needs virtual-root semantics, edge-specific updates, and
+integration with CFG mutation utilities.
 
 ## Local Policy
 

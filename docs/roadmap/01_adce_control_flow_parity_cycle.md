@@ -17,8 +17,8 @@ aggressive dead code elimination for the supported IR surface.
 ## Plan
 
 - [ ] Add or document the LLVM ADCE algorithm contract.
-- [ ] Add a minimal PostDominatorTree or postdom query for accepted CFGs.
-- [ ] Add control-dependence queries needed by ADCE.
+- [x] Add a minimal PostDominatorTree or postdom query for accepted CFGs.
+- [x] Add control-dependence queries needed by ADCE.
 - [ ] Rework ADCE liveness around an optimistic worklist.
 - [ ] Mark live terminators required by control dependence.
 - [ ] Remove dead regions when CFG updates are locally safe.
@@ -33,4 +33,3 @@ aggressive dead code elimination for the supported IR surface.
 - [ ] ADCE can delete covered dead control-flow regions safely.
 - [ ] Postdom/control-dependence limitations are documented.
 - [ ] Fixtures separate LLVM-equivalent behavior from conservative local gaps.
-

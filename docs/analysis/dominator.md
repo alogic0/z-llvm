@@ -45,7 +45,9 @@ Known gaps:
 no explicit dominator tree nodes
 no iterated dominance-frontier calculator
 no incremental updates
-no post-dominators
 no edge dominance
 no unreachable-block tree policy beyond filtering
 ```
+
+Post-dominator and control-dependence queries live separately in
+`docs/analysis/postdominator.md` and `src/analysis/postdominator.zig`.
