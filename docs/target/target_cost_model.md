@@ -28,6 +28,11 @@ loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
 placeholders only in full inventory pipeline descriptors
 ```
 
+Cycle 04 finish decision: `vector_future_release_fast` remains
+`parse,verify,future`. It is not optimizer-input because the fixture contains
+vector arithmetic that would need target-cost and native vector-lowering
+evidence before it can drive optimization expectations.
+
 Required before enabling vector transforms:
 
 ```text

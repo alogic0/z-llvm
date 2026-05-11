@@ -12,17 +12,17 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 ## Active Cycle
 
 Source cycle:
-[Cycle 04: Vector Future Boundary Closure](roadmap/04_vector_future_boundary_closure_cycle.md)
+[Cycle 05: Optimizer Quality Burn-Down](roadmap/05_optimizer_quality_burndown_cycle.md)
 
 Durable finish table:
 [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
 
-### Vector Future Boundary Closure Slice
+### Optimizer Quality Slice: SROA Exact-Cover Aggregate Fields
 
-- [ ] Inspect `vector_future_release_fast` and current vector opt fixtures.
-- [ ] Decide whether the row stays `parse,verify,future` or becomes a bounded
-      optimizer-input row.
-- [ ] If kept future, document the exact blocker and activation condition.
+- [ ] Select one measured optimizer gap from SROA, GVN PRE, or ADCE control
+      dependence.
+- [ ] Record LLVM source mapping and local unsupported behavior before changes.
+- [ ] Add accepted and rejected fixtures for the selected gap.
+- [ ] Compare equivalent fixtures against `opt-22`.
+- [ ] Update pass docs, analysis docs, fixture table, and the finish table.
 - [ ] Run `bash scripts/run_readiness_checks.sh`.
-- [ ] Update vector docs, target-cost docs, manifest notes, and the finish
-      table with the final boundary.

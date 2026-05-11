@@ -47,6 +47,12 @@ semantics. Scalar InstSimplify, GVN, and EarlyCSE still do not fold or
 value-number vector binary operations as scalar expressions. Vectorization and
 profitability remain blocked on TargetTransformInfo-style cost modeling.
 
+Cycle 04 keeps `vector_future_release_fast` as `parse,verify,future`, not as an
+optimizer-input corpus row. Activating that row requires a selected
+TargetTransformInfo-style cost model or native vector-lowering requirement, plus
+policy for vector FP semantics, vector-condition legality, and scalable
+vectors.
+
 Unsupported:
 
 ```text

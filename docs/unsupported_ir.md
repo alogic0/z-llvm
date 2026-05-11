@@ -128,7 +128,10 @@ tiny_scalar_release_small: future,legacy-bootstrap
 vector_future_release_fast: parse,verify,future
   Conservative accepted boundary. Fixed-vector syntax is parsed and verified,
   but vectorizers and target-cost-driven transforms remain out of scope for the
-  current finish line.
+  current finish line. Activate only after vector FP semantics,
+  vector-condition legality, scalable-vector policy, TargetTransformInfo-style
+  costs, and native vector lowering are selected as implementation
+  requirements.
 ```
 
 ## Unsupported Instructions
