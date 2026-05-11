@@ -41,7 +41,7 @@ completed foundation epics
 
 - [x] [Cycle 1: Memory Dependence And Legality Hardening](roadmap/01_memory_dependence_legality_hardening_cycle.md)
 - [x] [Cycle 2: SROA Aggregate Scalarization](roadmap/02_sroa_aggregate_scalarization_cycle.md)
-- [ ] [Cycle 3: CFG Mutation, ADCE, And SimplifyCFG](roadmap/03_cfg_mutation_adce_simplifycfg_cycle.md)
+- [x] [Cycle 3: CFG Mutation, ADCE, And SimplifyCFG](roadmap/03_cfg_mutation_adce_simplifycfg_cycle.md)
 - [ ] [Cycle 4: SCCP And InstCombine Semantics Expansion](roadmap/04_sccp_instcombine_semantics_cycle.md)
 - [ ] [Cycle 5: Value Numbering And PRE Foundation](roadmap/05_value_numbering_and_pre_cycle.md)
 - [ ] [Cycle 6: Loop Pipeline Quality](roadmap/06_loop_pipeline_quality_cycle.md)

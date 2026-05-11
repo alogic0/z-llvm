@@ -25,21 +25,21 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
       diamonds, loops, multiple exits, and unreachable blocks.
 - [x] Rework ADCE liveness toward an explicit block/instruction worklist for
       the supported CFG surface.
-- [ ] Mark live branch terminators from control dependence where the local
+- [x] Mark live branch terminators from control dependence where the local
       postdominator model proves it.
 - [x] Let ADCE delete more dead branch regions when PHI repair is locally safe.
-- [ ] Extend SimplifyCFG empty-block threading and branch folding with the same
+- [x] Extend SimplifyCFG empty-block threading and branch folding with the same
       CFG update helper.
-- [ ] Keep EH, invoke, switch, indirectbr, musttail, and debug salvage deferred.
-- [ ] Add accepted and rejected `opt-22` fixtures for every CFG rewrite shape.
+- [x] Keep EH, invoke, switch, indirectbr, musttail, and debug salvage deferred.
+- [x] Add accepted and rejected `opt-22` fixtures for every CFG rewrite shape.
 
 ## Exit Criteria
 
 - [x] ADCE and SimplifyCFG use shared CFG/PHI mutation helpers.
-- [ ] Rewritten CFGs pass verifier checks for PHIs, terminators, and block
+- [x] Rewritten CFGs pass verifier checks for PHIs, terminators, and block
       reachability.
-- [ ] Unsupported CFG shapes are rejected or left unchanged with fixtures.
-- [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
+- [x] Unsupported CFG shapes are rejected or left unchanged with fixtures.
+- [x] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
 ## Completed Slice
 
@@ -52,6 +52,21 @@ control flow without corrupting PHIs, dominance, or postdominance facts.
 - [x] Documented the helper as a rebuild-and-repair subset of LLVM's CFG update
       utilities.
 - [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
+
+## Completion Notes
+
+- [x] SimplifyCFG uses the shared helper for the current accepted branch
+      threading, block deletion, and PHI repair shapes.
+- [x] ADCE uses postdominator joins to prove branch conditions dead for the
+      accepted linear and acyclic branch-region shapes; arbitrary
+      control-dependence liveness remains outside the local subset.
+- [x] Deferred CFG forms remain rejected at the parser/IR boundary: EH,
+      `invoke`, `switch`, `indirectbr`, `callbr`, musttail/tail call
+      attributes, and debug salvage.
+- [x] Existing accepted/rejected fixtures now cover ADCE scalar chains, dead
+      branch regions, nested dead diamonds, side-effecting branch rejection,
+      SimplifyCFG constant/same-target branches, empty-block threading,
+      matching returns, unreachable pruning, and PHI cleanup.
 
 ## Completed Analysis Coverage Slice
 
