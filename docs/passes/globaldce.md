@@ -40,29 +40,33 @@ Local target status:
 Implemented subset:
 
 ```text
+module-level dependency graph for supported functions and globals
+externally visible functions and globals are live roots
 non-local function definitions are roots
 direct calls from live functions mark local function definitions live
 unreached internal/private functions are removed
-internal/private globals are removed because accepted IR cannot reference
-globals as values yet
+scalar global initializer references are represented in the graph if the parser
+accepts them
+unreached internal/private globals are removed
 ```
 
 Intentional divergences:
 
 ```text
-no aliases, ifuncs, comdats, metadata, or global initializer dependency graph
+no aliases, ifuncs, comdats, or metadata dependency graph
 no available_externally handling yet
-no global variable reference scanning until @global values are represented
+the parser still rejects most global-as-value and aggregate initializer forms,
+so global initializer edges are limited to the accepted scalar surface
 ```
 
 Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  globaldce_basic
 
 local-only conservative:
-  internal function kept through direct call and dead internal function/global removal
+  none currently
 
 unit-test only:
   globaldce removes unreferenced local functions and globals

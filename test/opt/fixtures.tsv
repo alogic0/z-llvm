@@ -50,3 +50,4 @@ mem2reg_volatile_store	mem2reg	mem2reg	test/opt/inputs/mem2reg_volatile_store.ll
 gep_memory	mem2reg	mem2reg	test/opt/inputs/gep_memory.ll	test/opt/expected/z_llvm/gep_memory.ll	opt-equivalent	mem2reg	GEP user keeps stack slot unpromoted
 sroa_zero_gep	sroa	sroa	test/opt/inputs/sroa_zero_gep.ll	test/opt/expected/z_llvm/sroa_zero_gep.ll	opt-equivalent	sroa	zero-offset GEP alloca forwarding enables promotion
 sroa_nested_zero_gep	sroa	sroa	test/opt/inputs/sroa_nested_zero_gep.ll	test/opt/expected/z_llvm/sroa_nested_zero_gep.ll	opt-equivalent	sroa	nested zero-offset GEP alloca forwarding enables promotion
+globaldce_basic	globaldce	globaldce	test/opt/inputs/globaldce_basic.ll	test/opt/expected/z_llvm/globaldce_basic.ll	opt-equivalent	globaldce	global graph keeps called internal helper and removes unreferenced locals

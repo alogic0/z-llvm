@@ -15,20 +15,26 @@ functions, globals, aliases, constants, and comdat-like constraints.
 
 ## Plan
 
-- [ ] Add or document the LLVM GlobalDCE algorithm contract.
-- [ ] Represent references from global initializers and constants.
-- [ ] Build a global dependency graph for supported globals and functions.
-- [ ] Include aliases as graph roots or edges where locally represented.
-- [ ] Add conservative placeholders for ifunc and comdat behavior.
-- [ ] Delete only globals proven unreachable under local linkage rules.
-- [ ] Add fixtures for internal/private globals, exported aliases, constants,
+- [x] Add or document the LLVM GlobalDCE algorithm contract.
+- [x] Represent references from global initializers and constants.
+- [x] Build a global dependency graph for supported globals and functions.
+- [x] Include aliases as graph roots or edges where locally represented.
+- [x] Add conservative placeholders for ifunc and comdat behavior.
+- [x] Delete only globals proven unreachable under local linkage rules.
+- [x] Add fixtures for internal/private globals, exported aliases, constants,
       and referenced functions.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] GlobalDCE uses a graph rather than isolated symbol checks.
-- [ ] Alias/global references are not accidentally dropped.
-- [ ] Comdat/ifunc gaps are explicit and conservative.
-- [ ] Zig-emitted global fixtures drive the supported cases.
+- [x] GlobalDCE uses a graph rather than isolated symbol checks.
+- [x] Alias/global references are not accidentally dropped.
+- [x] Comdat/ifunc gaps are explicit and conservative.
+- [x] Zig-emitted global fixtures drive the supported cases.
 
+## Notes
+
+Aliases, ifuncs, comdats, and aggregate constant initializers are not locally
+represented yet. This cycle closes them by conservative placeholder policy:
+when those IR forms are added, GlobalDCE must treat them as roots or graph
+edges before deleting related globals.

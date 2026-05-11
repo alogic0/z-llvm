@@ -11,39 +11,112 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
-    const removed_functions = try removeDeadFunctions(module.allocator, module);
-    const removed_globals = removeDeadGlobals(module);
+const NodeKind = enum { function, global };
+
+const NodeRef = struct {
+    kind: NodeKind,
+    name: []const u8,
+};
+
+const Node = struct {
+    ref: NodeRef,
+    edges: std.ArrayList(NodeRef),
+
+    fn deinit(node: *Node, allocator: std.mem.Allocator) void {
+        node.edges.deinit(allocator);
+    }
+};
+
+const GlobalDependencyGraph = struct {
+    allocator: std.mem.Allocator,
+    nodes: std.ArrayList(Node),
+    roots: std.ArrayList(NodeRef),
+
+    fn build(allocator: std.mem.Allocator, module: ir.Module) !GlobalDependencyGraph {
+        var graph: GlobalDependencyGraph = .{
+            .allocator = allocator,
+            .nodes = .empty,
+            .roots = .empty,
+        };
+        errdefer graph.deinit();
+
+        var calls = try call_graph.CallGraph.build(allocator, module);
+        defer calls.deinit();
+
+        for (module.functions.items) |function| {
+            const ref: NodeRef = .{ .kind = .function, .name = function.name };
+            var node: Node = .{ .ref = ref, .edges = .empty };
+            errdefer node.deinit(allocator);
+            if (!isLocal(function.linkage)) try graph.roots.append(allocator, ref);
+            const callees = calls.calleesOf(function.name) orelse &.{};
+            for (callees) |callee| {
+                if (!hasFunctionDefinition(module, callee)) continue;
+                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = callee });
+            }
+            try graph.nodes.append(allocator, node);
+        }
+
+        for (module.globals.items) |global| {
+            const ref: NodeRef = .{ .kind = .global, .name = global.name };
+            var node: Node = .{ .ref = ref, .edges = .empty };
+            errdefer node.deinit(allocator);
+            if (!isLocal(global.linkage)) try graph.roots.append(allocator, ref);
+            switch (global.initializer) {
+                .named => |name| {
+                    if (hasFunctionDefinition(module, name)) {
+                        try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = name });
+                    } else if (hasGlobalDefinition(module, name)) {
+                        try appendUniqueEdge(allocator, &node.edges, .{ .kind = .global, .name = name });
+                    }
+                },
+                .int, .undef => {},
+            }
+            try graph.nodes.append(allocator, node);
+        }
+
+        return graph;
+    }
+
+    fn deinit(graph: *GlobalDependencyGraph) void {
+        for (graph.nodes.items) |*node| node.deinit(graph.allocator);
+        graph.nodes.deinit(graph.allocator);
+        graph.roots.deinit(graph.allocator);
+    }
+
+    fn edgesOf(graph: GlobalDependencyGraph, ref: NodeRef) []const NodeRef {
+        for (graph.nodes.items) |node| {
+            if (sameRef(node.ref, ref)) return node.edges.items;
+        }
+        return &.{};
+    }
+};
+
+fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassResult {
+    var graph = try GlobalDependencyGraph.build(context.allocator, module.*);
+    defer graph.deinit();
+
+    var live = std.ArrayList(NodeRef).empty;
+    defer live.deinit(context.allocator);
+
+    var worklist = std.ArrayList(NodeRef).empty;
+    defer worklist.deinit(context.allocator);
+
+    for (graph.roots.items) |root| try markLive(context.allocator, &live, &worklist, root);
+    while (worklist.pop()) |ref| {
+        for (graph.edgesOf(ref)) |edge| try markLive(context.allocator, &live, &worklist, edge);
+    }
+
+    const removed_functions = removeDeadFunctions(module, live.items);
+    const removed_globals = removeDeadGlobals(module, live.items);
     return if (removed_functions or removed_globals) .changed else .unchanged;
 }
 
-fn removeDeadFunctions(allocator: std.mem.Allocator, module: *ir.Module) !bool {
-    var graph = try call_graph.CallGraph.build(allocator, module.*);
-    defer graph.deinit();
-
-    var live = std.StringHashMap(void).init(allocator);
-    defer live.deinit();
-
-    var worklist: std.ArrayList([]const u8) = .empty;
-    defer worklist.deinit(allocator);
-
-    for (module.functions.items) |function| {
-        if (!isLocal(function.linkage)) try markLive(allocator, &live, &worklist, function.name);
-    }
-
-    while (worklist.pop()) |function_name| {
-        const callees = graph.calleesOf(function_name) orelse continue;
-        for (callees) |callee| {
-            if (!hasDefinition(module.*, callee)) continue;
-            try markLive(allocator, &live, &worklist, callee);
-        }
-    }
-
+fn removeDeadFunctions(module: *ir.Module, live: []const NodeRef) bool {
     var changed = false;
     var index: usize = 0;
     while (index < module.functions.items.len) {
         const function = module.functions.items[index];
-        if (!isLocal(function.linkage) or live.contains(function.name)) {
+        if (!isLocal(function.linkage) or containsRef(live, .{ .kind = .function, .name = function.name })) {
             index += 1;
             continue;
         }
@@ -55,12 +128,12 @@ fn removeDeadFunctions(allocator: std.mem.Allocator, module: *ir.Module) !bool {
     return changed;
 }
 
-fn removeDeadGlobals(module: *ir.Module) bool {
+fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
     var changed = false;
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isLocal(global.linkage)) {
+        if (!isLocal(global.linkage) or containsRef(live, .{ .kind = .global, .name = global.name })) {
             index += 1;
             continue;
         }
@@ -72,18 +145,41 @@ fn removeDeadGlobals(module: *ir.Module) bool {
 
 fn markLive(
     allocator: std.mem.Allocator,
-    live: *std.StringHashMap(void),
-    worklist: *std.ArrayList([]const u8),
-    name: []const u8,
+    live: *std.ArrayList(NodeRef),
+    worklist: *std.ArrayList(NodeRef),
+    ref: NodeRef,
 ) !void {
-    if (live.contains(name)) return;
-    try live.put(name, {});
-    try worklist.append(allocator, name);
+    if (containsRef(live.items, ref)) return;
+    try live.append(allocator, ref);
+    try worklist.append(allocator, ref);
 }
 
-fn hasDefinition(module: ir.Module, name: []const u8) bool {
+fn appendUniqueEdge(allocator: std.mem.Allocator, edges: *std.ArrayList(NodeRef), ref: NodeRef) !void {
+    if (containsRef(edges.items, ref)) return;
+    try edges.append(allocator, ref);
+}
+
+fn containsRef(refs: []const NodeRef, ref: NodeRef) bool {
+    for (refs) |candidate| {
+        if (sameRef(candidate, ref)) return true;
+    }
+    return false;
+}
+
+fn sameRef(a: NodeRef, b: NodeRef) bool {
+    return a.kind == b.kind and std.mem.eql(u8, a.name, b.name);
+}
+
+fn hasFunctionDefinition(module: ir.Module, name: []const u8) bool {
     for (module.functions.items) |function| {
         if (std.mem.eql(u8, function.name, name)) return true;
+    }
+    return false;
+}
+
+fn hasGlobalDefinition(module: ir.Module, name: []const u8) bool {
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, name)) return true;
     }
     return false;
 }
