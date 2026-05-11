@@ -122,10 +122,20 @@ Run the accepted optimizer-input rows through the local optimizer with:
 scripts/run_zig_corpus.sh
 ```
 
-The runner reads `docs/fixtures/zig_ir/manifest.tsv`, selects rows with a
-checked IR path and `optimizer-input` classification, runs the configured local
-pipeline, and normalizes the result to ensure the local parser/verifier still
-accept the output. Override the pipeline with:
+The runner reads `docs/fixtures/zig_ir/manifest.tsv`, preserves empty TSV
+fields, and selects only rows with a checked IR path plus all of these
+classifications:
+
+```text
+parse
+verify
+optimizer-input
+```
+
+Rows marked `unsupported` are skipped even if they are useful future optimizer
+inputs. The runner then runs the configured local pipeline and normalizes the
+result to ensure the local parser/verifier still accept the output. Override the
+pipeline with:
 
 ```sh
 PASSES=verify,instcombine,dce scripts/run_zig_corpus.sh

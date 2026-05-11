@@ -47,6 +47,10 @@ completed foundation epics
 - [x] [Cycle 6: Loop Pipeline Quality](roadmap/06_loop_pipeline_quality_cycle.md)
 - [x] [Cycle 7: Zig Pipeline Corpus Parity](roadmap/07_zig_pipeline_corpus_parity_cycle.md)
 
+## Future Backlog
+
+- [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
+
 ## Operating Rule
 
 Do not implement these as one giant milestone. Select one cycle, extract a

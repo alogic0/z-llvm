@@ -74,10 +74,10 @@ legality are fully proven.
       call value numbering remains unit-test/local-only until attribute-group
       parsing is broad enough for an opt-22 fixture.
 
-## Remaining Follow-Up
+## Future Backlog Handoff
 
 - [x] Add deterministic hash prefilters for supported non-memory expression
       keys.
-- [ ] Replace linear expression scans with full scoped hash buckets once
-      expression keys can include all alias-sensitive memory facts without
-      missing must-alias equivalents.
+- [x] Move full scoped hash buckets to
+      `docs/roadmap/future_optimizer_backlog.md` because that work depends on
+      richer alias-sensitive expression keys beyond this completed cycle.
