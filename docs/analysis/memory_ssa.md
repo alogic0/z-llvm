@@ -51,10 +51,10 @@ Implemented subset:
   availability through function attribute classification.
   unknown calls, volatile memory, atomic memory, may-alias stores, and
   same-pointer stores are clobbers.
-  Cross-block clobber queries are path-safe by construction: endpoint blocks
-  use instruction order, while any other memory access in another block is
-  treated as potentially between the queried accesses until a real MemorySSA
-  walker is implemented.
+  Cross-block clobber queries are path-aware for the accepted access-list slice:
+  endpoint blocks use instruction order, while interior accesses are considered
+  only when CFG reachability places them on a path from the defining access to
+  the queried access.
   GVN load availability uses this shared helper.
   EarlyCSE load CSE uses this helper before replacing an available load.
   DSE uses a MemorySSA-owned same-block overwrite query when direction and
@@ -63,13 +63,16 @@ Implemented subset:
 Intentional divergences:
   MemoryPhi support is conservative: join facts are barriers for accepted
   queries, not full per-location phi operands.
-  Cross-block queries deliberately reject more cases than LLVM. LLVM can walk
-  MemorySSA and use dominance/path facts; the local access-list helper treats
-  unknown intervening blocks as clobbers instead of relying on block order.
+  Cross-block queries still reject more cases than LLVM. LLVM can walk MemorySSA
+  and skip non-clobbering accesses with cached optimized defs; the local helper
+  scans the access list and only uses CFG reachability to reject impossible
+  paths.
   LICM does not move memory instructions.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
   The access list is rebuilt per function and does not have a MemorySSAUpdater.
-  No MemorySSA walker, optimized access cache, or clobber-walk skipping exists.
+  No MemorySSAUpdater, optimized access cache, or clobber-walk skipping exists.
+  The path-aware query is still an access-list scan, not LLVM's optimized
+  walker.
 
 Analysis preservation/invalidation:
   The local access list is built per pass invocation. Mutating passes rebuild it
@@ -80,6 +83,7 @@ Fixture coverage:
   unit test: memory ssa records narrow phi facts at joins
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixtures: early_cse_load_branch_clobber_reject
+  opt fixture: early_cse_unreachable_store_not_clobber
   local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier

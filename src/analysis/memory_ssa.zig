@@ -30,21 +30,25 @@ pub const MemorySSA = struct {
     allocator: std.mem.Allocator,
     module: ir.Module,
     function: ir.Function,
+    graph: cfg.Graph,
     accesses: std.ArrayList(Access) = .empty,
 
     pub fn build(allocator: std.mem.Allocator, module: ir.Module, function: ir.Function) !MemorySSA {
+        var graph = try cfg.Graph.build(allocator, function);
+
         var memory: MemorySSA = .{
             .allocator = allocator,
             .module = module,
             .function = function,
+            .graph = graph,
         };
         errdefer memory.deinit();
 
-        var graph = try cfg.Graph.build(allocator, function);
-        defer graph.deinit();
+        const reachable = try graph.reachableFromEntry(allocator);
+        defer allocator.free(reachable);
 
         for (function.blocks.items, 0..) |block, block_index| {
-            if (graph.predecessors(block_index).len > 1 and blockMayReachMemory(function, graph, block_index)) {
+            if (graph.predecessors(block_index).len > 1 and blockMayReachMemory(function, graph, reachable, block_index)) {
                 try memory.accesses.append(allocator, .{
                     .kind = .phi,
                     .block_index = block_index,
@@ -70,6 +74,7 @@ pub const MemorySSA = struct {
 
     pub fn deinit(memory: *MemorySSA) void {
         memory.accesses.deinit(memory.allocator);
+        memory.graph.deinit();
     }
 
     pub fn hasClobberBetween(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value) bool {
@@ -78,7 +83,7 @@ pub const MemorySSA = struct {
 
     pub fn hasClobberBetweenAccess(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value, access_ty: ?ir.Type) bool {
         for (memory.accesses.items) |access| {
-            if (!isConservativelyBetween(access, from, to)) continue;
+            if (!memory.isPathAwareBetween(access, from, to)) continue;
             switch (access.kind) {
                 .use => {},
                 .def, .barrier => {
@@ -87,6 +92,44 @@ pub const MemorySSA = struct {
                     if (isBarrierForAccess(memory.module, memory.function, instruction, ptr, access_ty)) return true;
                 },
                 .phi => return true,
+            }
+        }
+        return false;
+    }
+
+    fn isPathAwareBetween(memory: MemorySSA, access: Access, from: InstRef, to: InstRef) bool {
+        if (from.block_index == to.block_index) {
+            return isConservativelyBetween(access, from, to);
+        }
+        if (access.block_index == from.block_index) {
+            const instruction_index = access.instruction_index orelse return true;
+            return instruction_index > from.instruction_index and memory.canReach(from.block_index, to.block_index);
+        }
+        if (access.block_index == to.block_index) {
+            const instruction_index = access.instruction_index orelse return true;
+            return instruction_index < to.instruction_index and memory.canReach(from.block_index, to.block_index);
+        }
+        return memory.canReach(from.block_index, access.block_index) and
+            memory.canReach(access.block_index, to.block_index);
+    }
+
+    fn canReach(memory: MemorySSA, start: usize, target_block: usize) bool {
+        if (start == target_block) return true;
+        var seen = memory.allocator.alloc(bool, memory.function.blocks.items.len) catch return true;
+        defer memory.allocator.free(seen);
+        @memset(seen, false);
+
+        var worklist: std.ArrayList(usize) = .empty;
+        defer worklist.deinit(memory.allocator);
+        worklist.append(memory.allocator, start) catch return true;
+        seen[start] = true;
+
+        while (worklist.pop()) |block_index| {
+            for (memory.graph.successors(block_index)) |successor| {
+                if (successor == target_block) return true;
+                if (seen[successor]) continue;
+                seen[successor] = true;
+                worklist.append(memory.allocator, successor) catch return true;
             }
         }
         return false;
@@ -215,9 +258,10 @@ fn isConservativelyBetween(access: Access, from: InstRef, to: InstRef) bool {
     return access.block_index == from.block_index;
 }
 
-fn blockMayReachMemory(function: ir.Function, graph: cfg.Graph, block_index: usize) bool {
+fn blockMayReachMemory(function: ir.Function, graph: cfg.Graph, reachable: []const bool, block_index: usize) bool {
     if (blockHasMemoryAccess(function.blocks.items[block_index])) return true;
     for (graph.predecessors(block_index)) |predecessor| {
+        if (!reachable[predecessor]) continue;
         if (blockHasMemoryAccess(function.blocks.items[predecessor])) return true;
     }
     return false;

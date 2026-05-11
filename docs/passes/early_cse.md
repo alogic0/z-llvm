@@ -88,6 +88,7 @@ opt-22 equivalent:
   early_cse_volatile_load_reject
   early_cse_load_call_clobber_reject
   early_cse_load_branch_clobber_reject
+  early_cse_unreachable_store_not_clobber
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
 
@@ -99,6 +100,10 @@ local-only conservative:
   more FP expressions once exact FP legality is modeled.
   fp_extended_early_cse_no_cse applies the same conservative boundary to scalar
   `fsub`, `fdiv`, and `frem`.
+  early_cse_unreachable_store_not_clobber proves the path-aware local
+  MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
+  so the fixture documents a local precision boundary rather than full EarlyCSE
+  parity.
 
 unit-test only:
   same-block repeated pure expression elimination
@@ -124,7 +129,8 @@ Known gaps:
 
 ```text
 no full MemorySSA walker/updater
-no full MemorySSA-backed load CSE beyond the accepted access-list query
+no full MemorySSA-backed load CSE beyond the accepted path-aware access-list
+query
 no readonly call load-preservation model beyond conservative no-clobber
 no freeze CSE because undef/poison semantics need more modeling first
 no FP CSE because NaN/signed-zero/fast-math legality is not modeled yet
