@@ -1930,6 +1930,30 @@ test "parser rejects sanitizer and trap instrumentation calls explicitly" {
     ;
     try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, sanitizer_call));
 
+    const tsan_call =
+        \\declare void @__tsan_read4(ptr)
+        \\
+        \\define void @instrumented_tsan(ptr %p) {
+        \\entry:
+        \\  call void @__tsan_read4(ptr %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, tsan_call));
+
+    const ubsan_call =
+        \\declare void @__ubsan_handle_add_overflow(ptr, i64, i64)
+        \\
+        \\define void @instrumented_ubsan(ptr %data, i64 %lhs, i64 %rhs) {
+        \\entry:
+        \\  call void @__ubsan_handle_add_overflow(ptr %data, i64 %lhs, i64 %rhs)
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, ubsan_call));
+
     const trap_call =
         \\declare void @llvm.trap()
         \\

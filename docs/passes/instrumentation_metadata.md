@@ -68,10 +68,12 @@ parse and print opaque instruction !dbg attachments
 preserve branch metadata attachments such as !prof as opaque text
 preserve declared opaque panic/runtime calls as side-effecting call barriers in
 reduced ReleaseSafe safety fixtures
+preserve declared opaque panic/runtime calls through DCE, ADCE, and SimplifyCFG
+when they are part of accepted ReleaseSafe safety-control fixtures
 reject llvm.dbg.value, llvm.dbg.declare, and llvm.dbg.assign with
 UnsupportedDebugIntrinsic until debug-value salvage is represented
-reject sanitizer/TSan/UBSan/trap instrumentation calls until runtime semantics
-are modeled
+reject sanitizer coverage, TSan, UBSan, llvm.ubsan.*, and llvm.trap
+instrumentation calls until runtime semantics are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
 module-tsan, tsan, alloc-token, and ee-instrument are executable placeholders
 ```
@@ -95,6 +97,7 @@ Fixture coverage:
 opt-22 equivalent:
   ReleaseSafe dynamic safety branch with an opaque runtime call compared for
   ADCE and SimplifyCFG preservation
+  ReleaseSafe opaque runtime call compared for DCE preservation
 
 local-only conservative:
   raw module metadata round-trip unit test
@@ -105,5 +108,13 @@ local-only conservative:
 unit-test only:
   instrumentation placeholder pass dispatch
   debug value intrinsic rejection until metadata operands and salvage exist
-  sanitizer/trap instrumentation call rejection
+  sanitizer coverage, TSan, UBSan, and trap instrumentation call rejection
+```
+
+Current boundary:
+
+```text
+preservation is supported for accepted safety-control IR
+generation or removal of sanitizer, coverage, TSan, UBSan, trap, entry/exit,
+and allocation instrumentation is not implemented
 ```

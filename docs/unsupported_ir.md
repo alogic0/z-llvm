@@ -134,6 +134,8 @@ debug value, debug declare, and debug assign intrinsics; parser reports
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in
 reduced ReleaseSafe safety fixtures
+sanitizer coverage, TSan, UBSan, `llvm.ubsan.*`, and `llvm.trap`
+instrumentation calls
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
