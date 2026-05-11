@@ -39,9 +39,11 @@ designed for EH edges.
 
 ```text
 unit test: invoke returns UnsupportedCallTerminator
+unit test: callbr returns UnsupportedCallTerminator
 unit test: landingpad returns UnsupportedExceptionHandling
 unit test: resume returns UnsupportedExceptionHandling
 unit test: catchswitch returns UnsupportedExceptionHandling
+unit test: catchret returns UnsupportedExceptionHandling
 unit test: cleanupret returns UnsupportedExceptionHandling
 unit test: catchpad returns UnsupportedExceptionHandling
 unit test: cleanuppad returns UnsupportedExceptionHandling
@@ -56,6 +58,10 @@ current accepted Zig corpus rows do not require LLVM EH pad CFG semantics
 future rows that contain invoke, landingpad, resume, catch/cleanup pads, or
 personality functions must stay unsupported until EH CFG/verifier support exists
 ```
+
+There are no accepted EH forms in the current IR subset, so no EH-specific CFG
+verifier is active. The verifier remains correct by refusing EH pads and unwind
+terminators before optimizer input classification.
 
 ## Upstream Mapping
 

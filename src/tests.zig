@@ -2803,6 +2803,19 @@ test "parser rejects unsupported indirect and control-flow call forms" {
     ;
     try std.testing.expectError(error.UnsupportedCallTerminator, ir.Module.parse(std.testing.allocator, invoke));
 
+    const callbr =
+        \\define void @asm_goto() {
+        \\entry:
+        \\  callbr void asm sideeffect "", ""() to label %fallthrough [label %target]
+        \\fallthrough:
+        \\  ret void
+        \\target:
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedCallTerminator, ir.Module.parse(std.testing.allocator, callbr));
+
     const landingpad =
         \\define ptr @eh_personality() {
         \\entry:
@@ -2842,6 +2855,17 @@ test "parser rejects unsupported indirect and control-flow call forms" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, cleanupret));
+
+    const catchret =
+        \\define void @catchret_eh(ptr %tok) {
+        \\entry:
+        \\  catchret from %tok to label %done
+        \\done:
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedExceptionHandling, ir.Module.parse(std.testing.allocator, catchret));
 
     const catchpad =
         \\define ptr @catchpad_eh(ptr %tok) {
