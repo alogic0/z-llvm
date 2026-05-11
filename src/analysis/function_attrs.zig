@@ -5,6 +5,7 @@ const memory_effect = @import("memory_effect.zig");
 pub const AttributeSet = struct {
     readnone: bool = false,
     readonly: bool = false,
+    writeonly: bool = false,
     argmemonly: bool = false,
     nofree: bool = false,
     norecurse: bool = false,
@@ -18,6 +19,7 @@ pub const AttributeSet = struct {
     pub fn merge(attrs: *AttributeSet, other: AttributeSet) void {
         attrs.readnone = attrs.readnone or other.readnone;
         attrs.readonly = attrs.readonly or other.readonly;
+        attrs.writeonly = attrs.writeonly or other.writeonly;
         attrs.argmemonly = attrs.argmemonly or other.argmemonly;
         attrs.nofree = attrs.nofree or other.nofree;
         attrs.norecurse = attrs.norecurse or other.norecurse;
@@ -34,13 +36,17 @@ pub const AttributeSet = struct {
         const attr_text = text orelse return attrs;
         if (hasMemoryEffect(attr_text, "none")) attrs.readnone = true;
         if (hasMemoryEffect(attr_text, "read")) attrs.readonly = true;
+        if (hasMemoryEffect(attr_text, "write")) attrs.writeonly = true;
         if (std.mem.indexOf(u8, attr_text, "argmem: read") != null) attrs.readonly = true;
+        if (std.mem.indexOf(u8, attr_text, "argmem: write") != null) attrs.writeonly = true;
         var it = std.mem.tokenizeAny(u8, attr_text, " \t,");
         while (it.next()) |token| {
             if (std.mem.eql(u8, token, "readnone")) {
                 attrs.readnone = true;
             } else if (std.mem.eql(u8, token, "readonly")) {
                 attrs.readonly = true;
+            } else if (std.mem.eql(u8, token, "writeonly")) {
+                attrs.writeonly = true;
             } else if (std.mem.eql(u8, token, "argmemonly")) {
                 attrs.argmemonly = true;
             } else if (std.mem.eql(u8, token, "nofree")) {
@@ -99,7 +105,8 @@ pub fn resolvedDeclarationAttributes(module: ir.Module, decl: ir.FunctionDecl) A
 pub fn callMemoryEffect(module: ir.Module, call: ir.CallInst) memory_effect.Effect {
     const attrs = calleeAttributes(module, call.callee) orelse return .unknown;
     if (attrs.readnone) return .none;
-    if (attrs.readonly) return .readonly_load;
+    if (attrs.readonly and !attrs.writeonly) return .readonly_load;
+    if (attrs.writeonly and !attrs.readonly) return .memory_write;
     return .unknown;
 }
 

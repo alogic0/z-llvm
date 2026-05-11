@@ -46,15 +46,18 @@ Local target status:
 Implemented subset:
 
 ```text
-recognize readnone, readonly, argmemonly, nofree, norecurse, nosync, nounwind,
-noinline, alwaysinline, and cold in raw function/declaration attributes
+recognize readnone, readonly, writeonly, argmemonly, nofree, norecurse, nosync,
+nounwind, noinline, alwaysinline, and cold in raw function/declaration
+attributes
 resolve #N attribute groups for definitions and declarations
 preserve target-cpu, target-features, frame-pointer, uwtable, size, and target
 memory attributes textually without using them as optimization facts
 classify direct calls to readnone callees as no memory effect
 classify direct calls to readonly callees as readonly memory
+classify direct calls to writeonly callees as memory writes
 classify memory(none), memory(read), and memory(argmem: read) from Zig-emitted
 attribute groups for local mod/ref legality
+classify memory(write) and memory(argmem: write) as write-only memory effects
 classify all other calls as unknown
 ```
 
@@ -73,14 +76,15 @@ Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  gvn_readonly_call_no_clobber
+  gvn_unknown_call_clobber_reject
 
 local-only conservative:
-  readnone, readonly, and unknown direct-call memory effect unit test
+  readnone, readonly, writeonly, and unknown direct-call memory effect unit test
   function/declaration IPO attribute group resolution test
 
 unit-test only:
   raw attribute classification and call mod/ref boundary
-  Zig-emitted memory(read, ...), memory(readwrite, ...), target-cpu, and
-  target-features preservation boundary
+  Zig-emitted memory(read, ...), memory(argmem: write), memory(readwrite, ...),
+  target-cpu, and target-features preservation boundary
 ```

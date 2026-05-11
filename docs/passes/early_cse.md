@@ -131,7 +131,8 @@ Known gaps:
 no full MemorySSA walker/updater
 no full MemorySSA-backed load CSE beyond the accepted path-aware access-list
 query
-no readonly call load-preservation model beyond conservative no-clobber
+readonly calls are modeled only as non-clobbering memory accesses; no readonly
+call return-value CSE
 no freeze CSE because undef/poison semantics need more modeling first
 no FP CSE because NaN/signed-zero/fast-math legality is not modeled yet
 no commutative operand canonicalization

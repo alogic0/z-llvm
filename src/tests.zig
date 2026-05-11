@@ -2085,12 +2085,14 @@ test "function attributes classify direct call memory effects conservatively" {
     const input =
         \\declare i32 @pure(i32) readnone
         \\declare i32 @reads(ptr) readonly
+        \\declare void @writes(ptr) writeonly
         \\declare i32 @unknown(i32)
         \\
         \\define i32 @caller(ptr %p, i32 %a) {
         \\entry:
         \\  %x = call i32 @pure(i32 %a)
         \\  %y = call i32 @reads(ptr %p)
+        \\  call void @writes(ptr %p)
         \\  %z = call i32 @unknown(i32 %y)
         \\  ret i32 %z
         \\}
@@ -2103,10 +2105,12 @@ test "function attributes classify direct call memory effects conservatively" {
 
     const pure_call = block.instructions.items[0].kind.call;
     const readonly_call = block.instructions.items[1].kind.call;
-    const unknown_call = block.instructions.items[2].kind.call;
+    const writeonly_call = block.instructions.items[2].kind.call;
+    const unknown_call = block.instructions.items[3].kind.call;
 
     try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, pure_call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, readonly_call));
+    try std.testing.expectEqual(memory_effect.Effect.memory_write, function_attrs.callMemoryEffect(module, writeonly_call));
     try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
 }
 
@@ -2185,13 +2189,16 @@ test "function attributes classify Zig memory effects conservatively" {
         \\
         \\declare i32 @arg_reads(ptr) #2
         \\
-        \\declare void @readwrite(ptr) #3
+        \\declare void @arg_writes(ptr) #3
+        \\
+        \\declare void @readwrite(ptr) #4
         \\
         \\define i32 @caller(ptr %p, i32 %a) {
         \\entry:
         \\  %x = call i32 @pure(i32 %a)
         \\  %y = call i32 @reads(ptr %p)
         \\  %z = call i32 @arg_reads(ptr %p)
+        \\  call void @arg_writes(ptr %p)
         \\  call void @readwrite(ptr %p)
         \\  ret i32 %z
         \\}
@@ -2199,7 +2206,8 @@ test "function attributes classify Zig memory effects conservatively" {
         \\attributes #0 = { mustprogress memory(none) "target-cpu"="x86-64" "target-features"="+sse2,-avx" }
         \\attributes #1 = { nounwind memory(read, argmem: none, inaccessiblemem: none, target_mem0: none) "frame-pointer"="all" }
         \\attributes #2 = { nounwind memory(argmem: read) }
-        \\attributes #3 = { nounwind memory(readwrite, argmem: none, inaccessiblemem: none, target_mem0: none) }
+        \\attributes #3 = { nounwind memory(argmem: write) }
+        \\attributes #4 = { nounwind memory(readwrite, argmem: none, inaccessiblemem: none, target_mem0: none) }
         \\
     ;
 
@@ -2211,7 +2219,8 @@ test "function attributes classify Zig memory effects conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.none, function_attrs.callMemoryEffect(module, block.instructions.items[0].kind.call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, block.instructions.items[1].kind.call));
     try std.testing.expectEqual(memory_effect.Effect.readonly_load, function_attrs.callMemoryEffect(module, block.instructions.items[2].kind.call));
-    try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, block.instructions.items[3].kind.call));
+    try std.testing.expectEqual(memory_effect.Effect.memory_write, function_attrs.callMemoryEffect(module, block.instructions.items[3].kind.call));
+    try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, block.instructions.items[4].kind.call));
 
     const feature_attrs = target.features.parseAttributeText(module.attribute_groups.items[0]);
     try std.testing.expectEqualStrings("x86-64", feature_attrs.cpu.?);

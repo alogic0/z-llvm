@@ -92,6 +92,8 @@ opt-22 equivalent:
   gvn_scalar_with_memory
   gvn_phi
   gvn_load_call_clobber_reject
+  gvn_readonly_call_no_clobber
+  gvn_unknown_call_clobber_reject
 
 local-only conservative:
   gvn_load_branch_clobber_reject keeps the later load because a store in a
@@ -100,8 +102,9 @@ local-only conservative:
   gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
   ignore a side-exit store outside the queried path. `opt-22` preserves this
   shape, so full load-placement parity remains future work.
-  readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for
-  the equivalent fixture, which the current parser rejects.
+  readnone call GVN is unit-tested locally. Readonly calls are trusted only as
+  non-clobbering memory accesses for repeated loads, matching the local
+  `memory(read)` fixture.
   fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
   more FP expressions when the exact legality conditions are proven; this
   project keeps them out of GVN for now.
@@ -127,5 +130,6 @@ no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge or partial redundancy handling
-no assume, readonly call, GEP, freeze, FP, vector, or memory value numbering
+no assume, readonly call return-value numbering, GEP, freeze, FP, vector, or
+memory value numbering
 ```

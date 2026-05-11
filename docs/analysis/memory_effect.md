@@ -79,6 +79,9 @@ Upstream mapping:
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
 This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly.
+Direct calls use preserved callee attributes only for the local `memory(none)`,
+`memory(read)`, `memory(write)`, `readnone`, `readonly`, and `writeonly`
+classification boundary.
 LICM also rejects locally trapping scalar operations such as division by an unknown denominator through the shared speculation helper.
 ```
 
@@ -88,7 +91,7 @@ Known gaps:
 inline asm constraints and full atomic ordering are not interpreted
 syncscope remains rejected
 no intrinsic classification beyond explicit parser rejection
-no target-library or readonly/readnone call handling
+no target-library handling and no inferred call attributes
 MemoryLocation size and offset model is limited to scalar stack-slot accesses
 no MemoryLocation metadata model
 MemorySSA-like integration is limited to a linear clobber helper for accepted
