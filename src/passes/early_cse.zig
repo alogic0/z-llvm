@@ -207,7 +207,7 @@ fn sameAvailableExpression(
         const load = instruction.kind.load;
         if (!candidate_load.ty.eql(load.ty)) return false;
         if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
-        return !hasClobber(function, candidate, block_index, instruction_index, load.ptr);
+        return !hasClobber(module, function, candidate, block_index, instruction_index, load.ptr);
     }
     if (sameReadnoneCall(module, candidate.instruction, instruction)) return true;
     return inst_simplify.sameExpression(candidate.instruction, instruction);
@@ -239,8 +239,9 @@ fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) boo
     return true;
 }
 
-fn hasClobber(function: ir.Function, candidate: AvailableInstruction, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
+fn hasClobber(module: ir.Module, function: ir.Function, candidate: AvailableInstruction, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
     return memory_ssa.hasClobberBetween(
+        module,
         function,
         .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
         .{ .block_index = block_index, .instruction_index = instruction_index },

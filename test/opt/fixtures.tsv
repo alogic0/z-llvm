@@ -20,6 +20,7 @@ licm_dominates_uses	licm	loop-mssa(licm)	test/opt/inputs/licm_dominates_uses.ll	
 licm_scalar_with_memory	licm	loop-mssa(licm)	test/opt/inputs/licm_scalar_with_memory.ll	test/opt/expected/z_llvm/licm_scalar_with_memory.ll	opt-equivalent	licm	scalar LICM still works beside volatile memory
 gvn_scalar_with_memory	gvn,simplifycfg	gvn	test/opt/inputs/gvn_scalar_with_memory.ll	test/opt/expected/z_llvm/gvn_scalar_with_memory.ll	opt-equivalent	gvn,simplifycfg	scalar GVN still works beside volatile memory
 gvn_phi	gvn,dce	gvn,dce	test/opt/inputs/gvn_phi.ll	test/opt/expected/z_llvm/gvn_phi.ll	opt-equivalent	gvn,dce	duplicate PHI value numbering eliminates redundant phi
+gvn_load_call_clobber_reject	gvn	gvn	test/opt/inputs/gvn_load_call_clobber_reject.ll	test/opt/expected/z_llvm/gvn_load_call_clobber_reject.ll	opt-equivalent	gvn	intervening unknown call blocks load value numbering
 dce_scalar_with_memory	dce	dce	test/opt/inputs/dce_scalar_with_memory.ll	test/opt/expected/z_llvm/dce_scalar_with_memory.ll	opt-equivalent	dce	DCE removes pure scalar and readonly load but preserves volatile store
 dce_volatile_load_reject	dce	dce	test/opt/inputs/dce_volatile_load_reject.ll	test/opt/expected/z_llvm/dce_volatile_load_reject.ll	opt-equivalent	dce	volatile load is preserved
 dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/dse_overwrite.ll	opt-equivalent	dse	overwritten stack store removed

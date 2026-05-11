@@ -63,6 +63,7 @@ leader table scoped by dominator traversal
 shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
 equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
+load availability is routed through the shared MemorySSA-like clobber helper
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar expression equivalence shared with the InstSimplify helper
@@ -83,6 +84,7 @@ opt-22 equivalent:
   gvn_dominating_expr
   gvn_scalar_with_memory
   gvn_phi
+  gvn_load_call_clobber_reject
 
 local-only conservative:
   readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for

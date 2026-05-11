@@ -44,6 +44,10 @@ Implemented subset:
   hasClobberBetween scans the accepted IR region between two accesses.
   alias.modRef decides whether an intervening instruction is a def/barrier for
   the queried pointer.
+  readnone and readonly direct calls are treated as non-clobbering for load
+  availability through function attribute classification.
+  unknown calls, volatile memory, atomic memory, may-alias stores, and
+  same-pointer stores are clobbers.
   GVN load availability uses this shared helper.
   EarlyCSE load CSE uses this helper before replacing an available load.
 
@@ -59,7 +63,8 @@ Analysis preservation/invalidation:
   accepted function directly.
 
 Fixture coverage:
-  unit test: memory ssa clobber helper reports store barriers between loads
+  unit test: memory ssa clobber helper covers accepted memory-dependence cases
+  opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
 
 opt-22 comparison command:
   covered indirectly through GVN and EarlyCSE memory fixtures in

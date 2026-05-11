@@ -48,6 +48,10 @@ Intentional divergences:
   No cross-block DSE.
   No partial-overwrite DSE.
   No memset/memcpy/memmove handling.
+  DSE deliberately keeps its single-block reverse scan for this cycle. Moving
+  it to the shared clobber helper waits until the helper can model overwrite
+  direction and MemoryPhi-like joins rather than only answering load
+  availability.
 
 Analysis preservation/invalidation:
   DSE mutates memory instructions and invalidates analyses under the local

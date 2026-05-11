@@ -107,7 +107,7 @@ fn visitBlock(
         if (instruction.removed or !isCandidate(table.module, instruction.*)) continue;
 
         const number = try table.numberFor(instruction.*);
-        if (findLeader(function.*, leaders.items, number, block_index, instruction_index, instruction.*)) |replacement| {
+        if (findLeader(table.module, function.*, leaders.items, number, block_index, instruction_index, instruction.*)) |replacement| {
             instruction.removed = true;
             instruction.replacement = replacement;
             const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -143,6 +143,7 @@ fn visitBlock(
 }
 
 fn findLeader(
+    module: ir.Module,
     function: ir.Function,
     leaders: []const Leader,
     number: ValueNumber,
@@ -155,7 +156,7 @@ fn findLeader(
         index -= 1;
         const leader = leaders[index];
         if (leader.number != number) continue;
-        if (!isMemoryAvailable(function, leader, block_index, instruction_index, instruction)) continue;
+        if (!isMemoryAvailable(module, function, leader, block_index, instruction_index, instruction)) continue;
         return .{ .named = leader.instruction.result orelse return null };
     }
     return null;
@@ -207,13 +208,14 @@ fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) boo
     return true;
 }
 
-fn isMemoryAvailable(function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, instruction: ir.Instruction) bool {
+fn isMemoryAvailable(module: ir.Module, function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, instruction: ir.Instruction) bool {
     if (instruction.kind != .load) return true;
-    return !hasClobber(function, leader, block_index, instruction_index, instruction.kind.load.ptr);
+    return !hasClobber(module, function, leader, block_index, instruction_index, instruction.kind.load.ptr);
 }
 
-fn hasClobber(function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
+fn hasClobber(module: ir.Module, function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
     return memory_ssa.hasClobberBetween(
+        module,
         function,
         .{ .block_index = leader.block_index, .instruction_index = leader.instruction_index },
         .{ .block_index = block_index, .instruction_index = instruction_index },

@@ -2806,14 +2806,36 @@ test "memory effect marks calls and trapping division conservatively" {
     try std.testing.expect(!memory_effect.isSafeToDelete(block.instructions.items[2]));
 }
 
-test "memory ssa clobber helper reports store barriers between loads" {
+test "memory ssa clobber helper covers accepted memory-dependence cases" {
     const input =
+        \\declare void @unknown()
+        \\declare void @readnone_call() readnone
+        \\declare void @readonly_call() readonly
+        \\
         \\define i32 @memory_ssa_clobber(ptr %p, ptr %q, i32 %v) {
         \\entry:
-        \\  %a = load i32, ptr %p
+        \\  %l0 = load i32, ptr %p
+        \\  %l1 = load i32, ptr %p
+        \\  store i32 %v, ptr %p
+        \\  %l2 = load i32, ptr %p
         \\  store i32 %v, ptr %q
-        \\  %b = load i32, ptr %p
-        \\  ret i32 %b
+        \\  %l3 = load i32, ptr %p
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  %left_load = load i32, ptr %left
+        \\  store i32 %v, ptr %right
+        \\  %left_load2 = load i32, ptr %left
+        \\  call void @unknown()
+        \\  %l4 = load i32, ptr %p
+        \\  call void @readnone_call()
+        \\  %l5 = load i32, ptr %p
+        \\  call void @readonly_call()
+        \\  %l6 = load i32, ptr %p
+        \\  %volatile_load = load volatile i32, ptr %p
+        \\  %l7 = load i32, ptr %p
+        \\  %atomic_load = load atomic i32, ptr %p acquire, align 4
+        \\  %l8 = load i32, ptr %p
+        \\  ret i32 %l8
         \\}
         \\
     ;
@@ -2822,12 +2844,15 @@ test "memory ssa clobber helper reports store barriers between loads" {
     defer module.deinit();
     const function = module.functions.items[0];
 
-    try std.testing.expect(memory_ssa.hasClobberBetween(
-        function,
-        .{ .block_index = 0, .instruction_index = 0 },
-        .{ .block_index = 0, .instruction_index = 2 },
-        .{ .named = "p" },
-    ));
+    try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 0 }, .{ .block_index = 0, .instruction_index = 1 }, .{ .named = "p" }));
+    try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 1 }, .{ .block_index = 0, .instruction_index = 3 }, .{ .named = "p" }));
+    try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 3 }, .{ .block_index = 0, .instruction_index = 5 }, .{ .named = "p" }));
+    try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 8 }, .{ .block_index = 0, .instruction_index = 10 }, .{ .named = "left" }));
+    try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 10 }, .{ .block_index = 0, .instruction_index = 12 }, .{ .named = "p" }));
+    try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 12 }, .{ .block_index = 0, .instruction_index = 14 }, .{ .named = "p" }));
+    try std.testing.expect(!memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 14 }, .{ .block_index = 0, .instruction_index = 16 }, .{ .named = "p" }));
+    try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 16 }, .{ .block_index = 0, .instruction_index = 18 }, .{ .named = "p" }));
+    try std.testing.expect(memory_ssa.hasClobberBetween(module, function, .{ .block_index = 0, .instruction_index = 18 }, .{ .block_index = 0, .instruction_index = 20 }, .{ .named = "p" }));
 }
 
 test "mem2reg promotes single-block stack slot" {

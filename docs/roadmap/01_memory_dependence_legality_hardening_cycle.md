@@ -19,7 +19,7 @@ accepted IR surface.
 
 ## Plan
 
-- [ ] Add direct clobber-helper unit tests for:
+- [x] Add direct clobber-helper unit tests for:
       load/load with no intervening clobber,
       load/store/load same pointer,
       load/store/load no-alias pointer,
@@ -28,26 +28,36 @@ accepted IR surface.
       load/readnone call/load,
       load/readonly call/load,
       volatile and atomic barriers.
-- [ ] Add `opt-22` fixtures for the same cases where LLVM behavior should
+- [x] Add `opt-22` fixtures for the same cases where LLVM behavior should
       match the local conservative model.
-- [ ] Route EarlyCSE load CSE through the shared clobber helper only.
-- [ ] Route GVN load availability through the same helper for every load
+- [x] Route EarlyCSE load CSE through the shared clobber helper only.
+- [x] Route GVN load availability through the same helper for every load
       replacement path.
-- [ ] Decide whether DSE should keep its single-block reverse scan or move to
+- [x] Decide whether DSE should keep its single-block reverse scan or move to
       the helper; document the chosen boundary.
-- [ ] Expand `alias.modRef` only for proven accepted IR shapes; keep unknowns
+- [x] Expand `alias.modRef` only for proven accepted IR shapes; keep unknowns
       conservative.
-- [ ] Add fixture metadata that separates LLVM-equivalent cases from local-only
+- [x] Add fixture metadata that separates LLVM-equivalent cases from local-only
       conservative cases.
-- [ ] Document the exact gap from real LLVM MemorySSA: no MemoryPhi placement,
+- [x] Document the exact gap from real LLVM MemorySSA: no MemoryPhi placement,
       no persisted def/use graph, no updater, no path-sensitive walker.
 
 ## Exit Criteria
 
-- [ ] Load CSE and load GVN share one tested clobber decision path.
-- [ ] Every memory transform has a rejected fixture for the nearest unsafe
+- [x] Load CSE and load GVN share one tested clobber decision path.
+- [x] Every memory transform has a rejected fixture for the nearest unsafe
       variant.
-- [ ] Volatile, atomic, unknown-call, and may-alias cases are protected by
+- [x] Volatile, atomic, unknown-call, and may-alias cases are protected by
       tests.
-- [ ] `zig build test` and `bash scripts/compare_opt.sh` pass.
+- [x] `zig build test` and `bash scripts/compare_opt.sh` pass.
 
+## Completed Slice
+
+Closed as a shared clobber-helper hardening slice:
+
+- `src/analysis/memory_ssa.zig` now classifies readnone/readonly calls as
+  non-clobbering and keeps unknown calls, same-pointer stores, may-alias stores,
+  volatile accesses, and atomic accesses conservative.
+- EarlyCSE and GVN load replacement paths use the same helper.
+- DSE remains on its single-block reverse scan by design until the shared
+  helper models overwrite direction and MemoryPhi-like joins.
