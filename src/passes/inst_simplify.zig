@@ -296,7 +296,7 @@ fn isSignedMin(value: i128, ty: ir.Type) bool {
 fn intBits(ty: ir.Type) ?u16 {
     return switch (ty) {
         .int => |bits| bits,
-        .void, .ptr => null,
+        .void, .ptr, .aggregate => null,
     };
 }
 

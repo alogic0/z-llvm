@@ -16,11 +16,227 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
     var changed = false;
     for (module.functions.items) |*function| {
         changed = try forwardZeroOffsetGeps(module.allocator, function) or changed;
+        changed = try scalarizeSimpleAggregateAllocas(module, function) or changed;
     }
 
     const promotion_result = try mem2reg.pass.run(module, context);
     changed = changed or promotion_result == .changed;
     return if (changed) .changed else .unchanged;
+}
+
+fn scalarizeSimpleAggregateAllocas(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    while (try scalarizeOneAggregateAlloca(module, function)) {
+        changed = true;
+    }
+    return changed;
+}
+
+fn scalarizeOneAggregateAlloca(module: *ir.Module, function: *ir.Function) !bool {
+    if (function.blocks.items.len == 0) return false;
+    const entry_block = &function.blocks.items[0];
+    for (entry_block.instructions.items, 0..) |instruction, instruction_index| {
+        if (instruction.removed or instruction.kind != .alloca) continue;
+        if (instruction.kind.alloca.allocated_ty != .aggregate) continue;
+        const slot = instruction.result orelse continue;
+        if (!try tryScalarizeAggregateAlloca(module, function, 0, instruction_index, slot, instruction.kind.alloca.allocated_ty)) continue;
+        return true;
+    }
+    return false;
+}
+
+const AggregateGepUse = struct {
+    const Kind = enum {
+        field_gep,
+    };
+
+    gep_name: []const u8,
+    field_index: usize,
+    field_ty: ir.Type,
+    offset: i128,
+    size: u64,
+    kind: Kind = .field_gep,
+};
+
+const FieldReplacement = struct {
+    field_index: usize,
+    ty: ir.Type,
+    alloca_name: []const u8,
+};
+
+fn tryScalarizeAggregateAlloca(
+    module: *ir.Module,
+    function: *ir.Function,
+    alloca_block_index: usize,
+    alloca_instruction_index: usize,
+    slot: []const u8,
+    aggregate_ty: ir.Type,
+) !bool {
+    var gep_uses: std.ArrayList(AggregateGepUse) = .empty;
+    defer gep_uses.deinit(module.allocator);
+
+    if (!try collectAggregateGepUses(module.allocator, function.*, slot, aggregate_ty, &gep_uses)) return false;
+    if (gep_uses.items.len == 0) return false;
+    if (!validateAggregateGepConsumers(function.*, slot, gep_uses.items)) return false;
+
+    var replacements: std.ArrayList(FieldReplacement) = .empty;
+    defer replacements.deinit(module.allocator);
+
+    for (gep_uses.items) |gep_use| {
+        if (fieldReplacementFor(replacements.items, gep_use.field_index) != null) continue;
+        const name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.sroa.{}", .{ slot, gep_use.field_index }));
+        try replacements.append(module.allocator, .{
+            .field_index = gep_use.field_index,
+            .ty = gep_use.field_ty,
+            .alloca_name = name,
+        });
+    }
+
+    var insertion_index = alloca_instruction_index + 1;
+    for (replacements.items) |replacement| {
+        try function.blocks.items[alloca_block_index].instructions.insert(module.allocator, insertion_index, .{
+            .result = replacement.alloca_name,
+            .kind = .{ .alloca = .{ .allocated_ty = replacement.ty } },
+        });
+        insertion_index += 1;
+    }
+
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*inst| {
+            if (inst.removed) continue;
+            switch (inst.kind) {
+                .load => |*load| {
+                    const gep_use = gepUseForPointer(gep_uses.items, load.ptr) orelse continue;
+                    const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
+                    load.ptr = .{ .named = replacement.alloca_name };
+                },
+                .store => |*store| {
+                    const gep_use = gepUseForPointer(gep_uses.items, store.ptr) orelse continue;
+                    const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
+                    store.ptr = .{ .named = replacement.alloca_name };
+                },
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+            }
+        }
+    }
+
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*inst| {
+            if (inst.removed) continue;
+            const result = inst.result orelse continue;
+            for (gep_uses.items) |gep_use| {
+                if (std.mem.eql(u8, result, gep_use.gep_name)) {
+                    inst.removed = true;
+                    break;
+                }
+            }
+        }
+    }
+    function.blocks.items[alloca_block_index].instructions.items[alloca_instruction_index].removed = true;
+    return true;
+}
+
+fn collectAggregateGepUses(
+    allocator: std.mem.Allocator,
+    function: ir.Function,
+    slot: []const u8,
+    aggregate_ty: ir.Type,
+    gep_uses: *std.ArrayList(AggregateGepUse),
+) !bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, slot)) continue;
+            }
+
+            switch (instruction.kind) {
+                .gep => |gep| {
+                    if (isNamed(gep.ptr, slot)) {
+                        const result = instruction.result orelse return false;
+                        const use = aggregateFieldGep(result, aggregate_ty, gep) orelse return false;
+                        try gep_uses.append(allocator, use);
+                    } else if (instructionUsesName(instruction, slot)) {
+                        return false;
+                    }
+                },
+                else => if (instructionUsesName(instruction, slot)) return false,
+            }
+        }
+    }
+    return true;
+}
+
+fn aggregateFieldGep(result: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AggregateGepUse {
+    if (!gep.source_ty.eql(aggregate_ty)) return null;
+    if (gep.indices.items.len != 2) return null;
+    const base_index = gep.indices.items[0].value;
+    if (base_index != .int or base_index.int != 0) return null;
+    const field_value = gep.indices.items[1].value;
+    if (field_value != .int or field_value.int < 0) return null;
+    const field_index: usize = @intCast(field_value.int);
+    const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return null;
+    if (field_ty != .int) return null;
+    const offset = memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return null;
+    const size = memory_location.typeSize(field_ty) orelse return null;
+    return .{
+        .gep_name = result,
+        .field_index = field_index,
+        .field_ty = field_ty,
+        .offset = offset,
+        .size = size,
+    };
+}
+
+fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_uses: []const AggregateGepUse) bool {
+    for (gep_uses) |gep_use| {
+        var saw_memory_use = false;
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                if (instruction.result) |result| {
+                    if (std.mem.eql(u8, result, gep_use.gep_name)) continue;
+                }
+                if (!instructionUsesName(instruction, gep_use.gep_name)) continue;
+                switch (instruction.kind) {
+                    .load => |load| {
+                        if (!isNamed(load.ptr, gep_use.gep_name)) return false;
+                        if (load.attrs.isBarrier()) return false;
+                        if (!load.ty.eql(gep_use.field_ty)) return false;
+                        saw_memory_use = true;
+                    },
+                    .store => |store| {
+                        if (!isNamed(store.ptr, gep_use.gep_name)) return false;
+                        if (store.attrs.isBarrier()) return false;
+                        if (!store.ty.eql(gep_use.field_ty)) return false;
+                        if (isNamed(store.value, slot)) return false;
+                        saw_memory_use = true;
+                    },
+                    .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => return false,
+                }
+            }
+        }
+        if (!saw_memory_use) return false;
+    }
+    return true;
+}
+
+fn gepUseForPointer(gep_uses: []const AggregateGepUse, ptr: ir.Value) ?AggregateGepUse {
+    const name = switch (ptr) {
+        .named => |name| name,
+        .int, .undef => return null,
+    };
+    for (gep_uses) |gep_use| {
+        if (std.mem.eql(u8, gep_use.gep_name, name)) return gep_use;
+    }
+    return null;
+}
+
+fn fieldReplacementFor(replacements: []const FieldReplacement, field_index: usize) ?FieldReplacement {
+    for (replacements) |replacement| {
+        if (replacement.field_index == field_index) return replacement;
+    }
+    return null;
 }
 
 fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !bool {
@@ -34,6 +250,7 @@ fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !
             const result = instruction.result orelse continue;
             const partition = slices.partitionFor(result) orelse continue;
             if (partition.offset != 0 or !partition.zero_offset_compatible) continue;
+            if (instruction.kind.gep.source_ty == .aggregate) continue;
             const base = partition.alloca_root;
 
             replaceValue(function, result, .{ .named = base });
@@ -223,5 +440,44 @@ fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.V
     return switch (value) {
         .int, .undef => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
+    };
+}
+
+fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
+    switch (instruction.kind) {
+        .binary => |binary| return isNamed(binary.lhs, name) or isNamed(binary.rhs, name),
+        .cast => |cast| return isNamed(cast.value, name),
+        .freeze => |freeze| return isNamed(freeze.value, name),
+        .icmp => |icmp| return isNamed(icmp.lhs, name) or isNamed(icmp.rhs, name),
+        .select => |select| return isNamed(select.cond, name) or isNamed(select.true_value, name) or isNamed(select.false_value, name),
+        .phi => |phi| {
+            for (phi.incoming.items) |incoming| {
+                if (isNamed(incoming.value, name)) return true;
+            }
+            return false;
+        },
+        .alloca => return false,
+        .load => |load| return isNamed(load.ptr, name),
+        .store => |store| return isNamed(store.value, name) or isNamed(store.ptr, name),
+        .gep => |gep| {
+            if (isNamed(gep.ptr, name)) return true;
+            for (gep.indices.items) |index| {
+                if (isNamed(index.value, name)) return true;
+            }
+            return false;
+        },
+        .call => |call| {
+            for (call.args.items) |arg| {
+                if (isNamed(arg.value, name)) return true;
+            }
+            return false;
+        },
+    }
+}
+
+fn isNamed(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .int, .undef => false,
+        .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

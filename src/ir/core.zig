@@ -4,15 +4,20 @@ pub const Type = union(enum) {
     void,
     int: u16,
     ptr,
+    aggregate: []const u8,
 
     pub fn eql(a: Type, b: Type) bool {
         return switch (a) {
             .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .void, .ptr => false,
+                .void, .ptr, .aggregate => false,
             },
             .ptr => b == .ptr,
+            .aggregate => |text| switch (b) {
+                .aggregate => |other_text| std.mem.eql(u8, text, other_text),
+                .void, .int, .ptr => false,
+            },
         };
     }
 
@@ -21,6 +26,7 @@ pub const Type = union(enum) {
             .void => try writer.writeAll("void"),
             .int => |bits| try writer.print("i{}", .{bits}),
             .ptr => try writer.writeAll("ptr"),
+            .aggregate => |text| try writer.writeAll(text),
         }
     }
 };

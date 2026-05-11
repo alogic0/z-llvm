@@ -27,6 +27,7 @@ const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
+const sroa = @import("passes/sroa.zig");
 
 test "named pipelines expand to stable pass sequences" {
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
@@ -2088,6 +2089,36 @@ test "dce updates use counts while removing instruction chains" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "sroa rejects volatile aggregate field accesses locally" {
+    const input =
+        \\define i32 @sroa_struct_volatile_reject(i32 %a) {
+        \\entry:
+        \\  %agg = alloca { i32, i32 }
+        \\  %p0 = getelementptr { i32, i32 }, ptr %agg, i32 0, i32 0
+        \\  store volatile i32 %a, ptr %p0
+        \\  %x = load i32, ptr %p0
+        \\  ret i32 %x
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(sroa.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "normalization preserves canonical LLVM-compatible fixture output" {

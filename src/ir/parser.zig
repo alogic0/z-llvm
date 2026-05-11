@@ -334,6 +334,18 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
             .kind = .{ .phi = try parsePhi(allocator, rhs_text) },
         };
     }
+    if (std.mem.startsWith(u8, rhs_text, "alloca ")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .alloca = try parseAlloca(rhs_text) },
+        };
+    }
+    if (std.mem.startsWith(u8, rhs_text, "getelementptr ")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .gep = try parseGep(allocator, rhs_text) },
+        };
+    }
 
     var parts = std.mem.tokenizeAny(u8, rhs_text, " \t,");
     const op_text = parts.next() orelse return error.InvalidInstruction;
@@ -408,15 +420,6 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
         };
     }
 
-    if (std.mem.eql(u8, op_text, "alloca")) {
-        const allocated_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
-        return .{
-            .result = result_text[1..],
-            .kind = .{ .alloca = .{ .allocated_ty = allocated_ty } },
-        };
-    }
-
     if (std.mem.eql(u8, op_text, "load")) {
         var attrs = try parseMemoryPrefix(&parts);
         const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
@@ -431,34 +434,6 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
                 .ptr = ptr,
                 .attrs = attrs,
             } },
-        };
-    }
-
-    if (std.mem.eql(u8, op_text, "getelementptr")) {
-        var gep: core.GepInst = .{
-            .source_ty = try parseType(parts.next() orelse return error.InvalidInstruction),
-            .ptr = undefined,
-            .indices = .empty,
-        };
-        errdefer gep.deinit(allocator);
-
-        const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        if (ptr_ty != .ptr) return error.ExpectedPointerType;
-        gep.ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
-
-        while (parts.next()) |index_ty_text| {
-            const index_ty = try parseType(index_ty_text);
-            const index_value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-            try gep.indices.append(allocator, .{
-                .ty = index_ty,
-                .value = index_value,
-            });
-        }
-        if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
-
-        return .{
-            .result = result_text[1..],
-            .kind = .{ .gep = gep },
         };
     }
 
@@ -479,6 +454,55 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
             .rhs = rhs,
         } },
     };
+}
+
+fn parseAlloca(text: []const u8) !core.AllocaInst {
+    const ty_text = std.mem.trim(u8, text["alloca ".len..], " \t");
+    if (ty_text.len == 0) return error.InvalidInstruction;
+    if (findTopLevelComma(ty_text) != null) return error.InvalidInstruction;
+    return .{ .allocated_ty = try parseType(ty_text) };
+}
+
+fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
+    var rest = std.mem.trim(u8, text["getelementptr ".len..], " \t");
+    const source_end = findTopLevelComma(rest) orelse return error.InvalidGetElementPtr;
+    var gep: core.GepInst = .{
+        .source_ty = try parseType(std.mem.trim(u8, rest[0..source_end], " \t")),
+        .ptr = undefined,
+        .indices = .empty,
+    };
+    errdefer gep.deinit(allocator);
+
+    rest = std.mem.trim(u8, rest[source_end + 1 ..], " \t");
+    const ptr_end = findTopLevelComma(rest) orelse return error.InvalidGetElementPtr;
+    const ptr_text = std.mem.trim(u8, rest[0..ptr_end], " \t");
+    var ptr_parts = std.mem.tokenizeAny(u8, ptr_text, " \t");
+    const ptr_ty = try parseType(ptr_parts.next() orelse return error.InvalidGetElementPtr);
+    if (ptr_ty != .ptr) return error.ExpectedPointerType;
+    gep.ptr = try parseValue(ptr_parts.next() orelse return error.InvalidGetElementPtr);
+    if (ptr_parts.next() != null) return error.InvalidGetElementPtr;
+
+    rest = std.mem.trim(u8, rest[ptr_end + 1 ..], " \t");
+    while (rest.len != 0) {
+        const next_comma = findTopLevelComma(rest);
+        const item = std.mem.trim(u8, if (next_comma) |index| rest[0..index] else rest, " \t");
+        var index_parts = std.mem.tokenizeAny(u8, item, " \t");
+        const index_ty = try parseType(index_parts.next() orelse return error.InvalidGetElementPtr);
+        const index_value = try parseValue(index_parts.next() orelse return error.InvalidGetElementPtr);
+        if (index_parts.next() != null) return error.InvalidGetElementPtr;
+        try gep.indices.append(allocator, .{
+            .ty = index_ty,
+            .value = index_value,
+        });
+
+        if (next_comma) |index| {
+            rest = std.mem.trim(u8, rest[index + 1 ..], " \t");
+        } else {
+            rest = "";
+        }
+    }
+    if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
+    return gep;
 }
 
 fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8) !core.Instruction {
@@ -722,12 +746,42 @@ fn parseLabel(text: []const u8) ![]const u8 {
 }
 
 fn parseType(text: []const u8) !core.Type {
-    if (std.mem.eql(u8, text, "void")) return .void;
-    if (std.mem.eql(u8, text, "ptr")) return .ptr;
-    if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
-    const bits = try std.fmt.parseInt(u16, text[1..], 10);
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (std.mem.eql(u8, trimmed, "void")) return .void;
+    if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (trimmed.len >= 2 and trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') return .{ .aggregate = trimmed };
+    if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
+    const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;
     return .{ .int = bits };
+}
+
+fn findTopLevelComma(text: []const u8) ?usize {
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    for (text, 0..) |byte, index| {
+        switch (byte) {
+            '{' => brace_depth += 1,
+            '}' => {
+                if (brace_depth == 0) return null;
+                brace_depth -= 1;
+            },
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            ',' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) return index,
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn parseValue(text: []const u8) !core.Value {

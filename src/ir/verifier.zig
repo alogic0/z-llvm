@@ -273,7 +273,7 @@ pub fn verify(module: core.Module) !void {
                 .undef => {},
                 .int, .named => return error.UnsupportedGlobalVariable,
             },
-            .void => return error.UnsupportedGlobalVariable,
+            .void, .aggregate => return error.UnsupportedGlobalVariable,
         }
     }
 
@@ -479,18 +479,18 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     }
     switch (binary.ty) {
         .int => {},
-        .void, .ptr => return error.TypeMismatch,
+        .void, .ptr, .aggregate => return error.TypeMismatch,
     }
 }
 
 fn verifyCast(cast: core.CastInst) !void {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .ptr => return error.TypeMismatch,
+        .void, .ptr, .aggregate => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .ptr => return error.TypeMismatch,
+        .void, .ptr, .aggregate => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,

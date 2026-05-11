@@ -56,13 +56,21 @@ Implemented subset:
   DataLayout-like offset/size facts through `src/analysis/memory_location.zig`
   Zero-offset partition forwarding to the base alloca
   Nested zero-offset partition forwarding to the base alloca
+  Textual struct aggregate parsing for the narrow `{ iN, iN, ... }` surface
+  Struct-field GEP offset calculation for constant field indices
+  Exact-cover scalar integer field alloca splitting for simple aggregate allocas
+  Rewriting of matching scalar field loads/stores to replacement allocas
   mem2reg handoff after forwarding
 
 Intentional divergences:
-  Non-zero known offsets are not rewritten yet because the local IR has no
-  aggregate/vector type model to split into replacement allocas.
-  DataLayout-backed offset facts are currently used by alias/memory-location
-  analysis, not by SROA rewriting.
+  The aggregate type model is textual and only accepts the small struct shape
+  needed by the current SROA fixture. It is not a full LLVM type system.
+  Replacement allocas are created only for scalar integer fields reached by
+  constant two-index struct GEPs.
+  Volatile, atomic, escaped, variable-index, vector, packed, pointer-sized, and
+  unknown-size cases are rejected locally for now. LLVM SROA can scalarize some
+  volatile field cases more precisely; this project keeps that as a documented
+  conservative gap until memory-use rewriting is stronger.
 
 Analysis preservation/invalidation:
   SROA mutates pointer uses and then runs mem2reg, so it invalidates analyses
@@ -72,11 +80,14 @@ Analysis preservation/invalidation:
 Fixture coverage:
   sroa_zero_gep
   sroa_nested_zero_gep
+  sroa_struct_two_i32
 
 Zig-emitted aggregate coverage:
-  The current accepted parser surface does not yet include LLVM aggregate types,
-  insertvalue/extractvalue, or aggregate allocas from the Zig corpus. Those
-  inputs remain explicit unsupported SROA cases until the IR surface lands.
+  The checked Zig `aggregates` corpus row captures struct-field GEPs, arrays,
+  slices, optionals, and error unions from Zig output. The first accepted local
+  aggregate SROA fixture is a reduced two-field integer struct alloca matching
+  the shape that SROA must handle before the full Zig aggregate corpus can be
+  parsed.
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -97,11 +108,16 @@ collect alloca-rooted GEPs as slices with offset, size, and compatibility state
 look up the rewrite partition for each GEP result
 require every GEP index to be integer constant zero
 replace uses of that zero-offset GEP result with the base alloca pointer
+parse small textual struct aggregate types
+calculate constant struct-field GEP offsets
+split simple integer struct-field partitions into scalar allocas
+rewrite exact-cover field loads/stores to those scalar allocas
 run the existing mem2reg promotion after forwarding
 ```
 
-This matches the first useful alloca-forwarding case needed before real slice
-partitioning. It lets a trivial zero-offset GEP stop blocking stack promotion.
+This matches the first useful alloca-forwarding and scalar aggregate splitting
+cases needed before full LLVM SROA partitioning. It lets trivial zero-offset GEPs
+and a simple two-field integer struct alloca stop blocking stack promotion.
 
 Fixture coverage:
 
@@ -109,23 +125,24 @@ Fixture coverage:
 opt-22 equivalent:
   sroa_zero_gep
   sroa_nested_zero_gep
+  sroa_struct_two_i32
 
 local-only conservative:
-  none currently
+  sroa_struct_volatile_reject
 
 unit-test only:
-  none currently
+  sroa rejects volatile aggregate field accesses locally
 ```
 
 Known gaps:
 
 ```text
-no aggregate type model
-no byte-offset slice builder
-no splitting into new allocas
+no full aggregate type model
+no complete LLVM AllocaSlices partition builder
 no partial load/store rewriting
 no memcpy/memmove rewriting
 no padding, integer widening, vector, or packed-aggregate handling
+no pointer-field scalarization until target DataLayout pointer sizes are wired
 no module-level target DataLayout parser; current offset facts use the local
 memory-location type-size subset
 ```

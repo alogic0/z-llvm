@@ -59,22 +59,138 @@ fn addOffsets(a: ?i128, b: ?i128) ?i128 {
     return (a orelse return null) + (b orelse return null);
 }
 
-fn gepOffset(gep: ir.GepInst) ?i128 {
-    const element_size = typeSize(gep.source_ty) orelse return null;
+pub fn gepOffset(gep: ir.GepInst) ?i128 {
+    var current_ty = gep.source_ty;
     var offset: i128 = 0;
-    for (gep.indices.items) |index| {
+    for (gep.indices.items, 0..) |index, index_position| {
         const value = switch (index.value) {
             .int => |value| value,
             .named, .undef => return null,
         };
-        offset += value * @as(i128, @intCast(element_size));
+        if (index_position == 0) {
+            const element_size = typeSize(current_ty) orelse return null;
+            offset += value * @as(i128, @intCast(element_size));
+            continue;
+        }
+        if (current_ty == .aggregate) {
+            if (value < 0) return null;
+            offset += aggregateFieldOffset(current_ty, @intCast(value)) orelse return null;
+            current_ty = aggregateFieldType(current_ty, @intCast(value)) orelse return null;
+        } else {
+            const element_size = typeSize(current_ty) orelse return null;
+            offset += value * @as(i128, @intCast(element_size));
+        }
     }
     return offset;
 }
 
-fn typeSize(ty: ir.Type) ?u64 {
+pub fn typeSize(ty: ir.Type) ?u64 {
     return switch (ty) {
         .int => |bits| if (bits % 8 == 0) bits / 8 else null,
+        .aggregate => aggregateSize(ty),
         .void, .ptr => null,
     };
+}
+
+pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
+    const text = switch (ty) {
+        .aggregate => |text| text,
+        .void, .int, .ptr => return null,
+    };
+    var fields = aggregateFields(text) orelse return null;
+    var index: usize = 0;
+    while (nextAggregateField(&fields)) |field_text| : (index += 1) {
+        if (index == field_index) return parseTypeLiteral(field_text);
+    }
+    return null;
+}
+
+pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
+    const text = switch (ty) {
+        .aggregate => |text| text,
+        .void, .int, .ptr => return null,
+    };
+    var fields = aggregateFields(text) orelse return null;
+    var index: usize = 0;
+    var offset: i128 = 0;
+    while (nextAggregateField(&fields)) |field_text| : (index += 1) {
+        if (index == field_index) return offset;
+        const field_ty = parseTypeLiteral(field_text) orelse return null;
+        const field_size = typeSize(field_ty) orelse return null;
+        offset += @intCast(field_size);
+    }
+    return null;
+}
+
+fn aggregateSize(ty: ir.Type) ?u64 {
+    const text = switch (ty) {
+        .aggregate => |text| text,
+        .void, .int, .ptr => return null,
+    };
+    var fields = aggregateFields(text) orelse return null;
+    var size: u64 = 0;
+    while (nextAggregateField(&fields)) |field_text| {
+        const field_ty = parseTypeLiteral(field_text) orelse return null;
+        size += typeSize(field_ty) orelse return null;
+    }
+    return size;
+}
+
+const AggregateFields = struct {
+    text: []const u8,
+    cursor: usize = 0,
+};
+
+fn aggregateFields(text: []const u8) ?AggregateFields {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len < 2 or trimmed[0] != '{' or trimmed[trimmed.len - 1] != '}') return null;
+    return .{ .text = std.mem.trim(u8, trimmed[1 .. trimmed.len - 1], " \t") };
+}
+
+fn nextAggregateField(fields: *AggregateFields) ?[]const u8 {
+    if (fields.cursor >= fields.text.len) return null;
+    const rest = fields.text[fields.cursor..];
+    const comma = findTopLevelComma(rest);
+    const field = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+    fields.cursor = if (comma) |index| fields.cursor + index + 1 else fields.text.len;
+    return field;
+}
+
+fn parseTypeLiteral(text: []const u8) ?ir.Type {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (std.mem.eql(u8, trimmed, "void")) return .void;
+    if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (trimmed.len >= 2 and trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') return .{ .aggregate = trimmed };
+    if (trimmed.len < 2 or trimmed[0] != 'i') return null;
+    const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
+    if (bits == 0) return null;
+    return .{ .int = bits };
+}
+
+fn findTopLevelComma(text: []const u8) ?usize {
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    for (text, 0..) |byte, index| {
+        switch (byte) {
+            '{' => brace_depth += 1,
+            '}' => {
+                if (brace_depth == 0) return null;
+                brace_depth -= 1;
+            },
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            ',' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) return index,
+            else => {},
+        }
+    }
+    return null;
 }
