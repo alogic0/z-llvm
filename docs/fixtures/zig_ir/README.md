@@ -195,7 +195,7 @@ Current local status:
 | `Debug` | raw IR generated successfully, but it pulls in large debug/std support and is classified as `future`. |
 | `ReleaseSafe` | raw IR generated successfully, but it is still large because safety/std support remains visible; classified as `future`. |
 | `ReleaseFast` | normalized scalar signature fixture and stripped captured raw fixture are checked in and classified as `parse,verify,optimizer-input`. |
-| `ReleaseSmall` | stripped captured raw fixture is checked in and classified as `parse,verify,optimizer-input`; generated `tmp/` raw output remains future-only. |
+| `ReleaseSmall` | stripped captured raw fixture is checked in and classified as `parse,verify,optimizer-input`; the old unstripped raw generation row is historical `future,legacy-bootstrap` evidence only. |
 
 Cycle 1 moved the stripped `ReleaseFast` and `ReleaseSmall` captures out of
 `unsupported` by preserving exported aliases, raw function header attributes,
@@ -210,7 +210,7 @@ parser blockers after Cycle 1:
 
 | Group | Source | Checked IR | Main IR features | Classification |
 | --- | --- | --- | --- | --- |
-| `tiny_scalar` | `test/zig/inputs/tiny_scalar.zig` | `test/zig/expected/tiny_scalar.normalized.ll`; `test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll`; `test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll` | module records, exported aliases, scalar add, mode-specific attrs | `parse`, `verify`, `optimizer-input`, `unsupported` |
+| `tiny_scalar` | `test/zig/inputs/tiny_scalar.zig` | `test/zig/expected/tiny_scalar.normalized.ll`; `test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll`; `test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll` | module records, exported aliases, scalar add, mode-specific attrs | `parse`, `verify`, `optimizer-input`, `future`, `legacy-bootstrap` |
 | `debug_metadata` | reduced from `test/zig/inputs/tiny_scalar.zig` and `test/zig/inputs/control_flow_calls.zig` Debug metadata shapes | `test/zig/expected/debug_metadata.reduced.ll`; `test/zig/expected/debug_scope_branch.reduced.ll`; `test/zig/expected/debug_call_chain.reduced.ll`; `test/zig/expected/debug_loop_sum.reduced.ll`; `test/zig/expected/debug_value_intrinsic.unsupported.ll`; `test/zig/expected/debug_declare_intrinsic.unsupported.ll` | compile-unit, subprogram, lexical block, branch, call-site, loop PHI, and instruction location metadata; debug value/declare fail-closed boundary | `parse`, `verify`, `optimizer-input`, `unsupported`, `future` |
 | `release_safe_safety` | reduced from `test/zig/inputs/tiny_scalar.zig` ReleaseSafe control-flow shape | `test/zig/expected/release_safe_safety.reduced.ll`; `test/zig/expected/release_safe_call_boundary.reduced.ll` | safety trap branch, declared opaque runtime call, `unreachable`, branch-weight metadata | `parse`, `verify`, `optimizer-input` |
 | `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseSmall.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference; AArch64 accepted only through the target-independent scalar pipeline | `parse`, `verify`, `optimizer-input`, `target-layout` |

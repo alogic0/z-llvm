@@ -106,7 +106,7 @@ the same-constant-lane extract-after-insert fold documented in
 
 ## Finish Burn-Down Corpus Status
 
-The current manifest has four unsupported or future rows relevant to the finish
+The current manifest has four future rows relevant to the finish
 definition:
 
 ```text
@@ -119,10 +119,10 @@ tiny_scalar_release_safe: future
   Later measured blocker. Reduced ReleaseSafe safety/runtime-call rows already
   define the accepted safety boundary.
 
-tiny_scalar_release_small: unsupported
-  Active next step. This old raw row predates the accepted stripped
-  tiny_scalar_release_small_captured row and must be removed, reduced, or
-  explicitly justified.
+tiny_scalar_release_small: future,legacy-bootstrap
+  Closed by Cycle 02. This historical unstripped raw row predates the accepted
+  stripped tiny_scalar_release_small_captured row and is retained only as future
+  evidence, not as an unsupported finish blocker.
 
 vector_future_release_fast: parse,verify,future
   Conservative accepted boundary. Fixed-vector syntax is parsed and verified,

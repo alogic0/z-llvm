@@ -12,20 +12,18 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 ## Active Cycle
 
 Source cycle:
-[Cycle 01: Finish Criteria and Gap Burn-Down](roadmap/01_finish_criteria_and_gap_burndown_cycle.md)
+[Cycle 03: Future Raw Debug and ReleaseSafe Row Policy](roadmap/03_future_raw_debug_release_safe_policy_cycle.md)
 
 Durable finish table:
 [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
 
-### Corpus Closure Slice: Stale ReleaseSmall Raw Row
+### Future Raw Debug And ReleaseSafe Policy Slice
 
-- [ ] Inspect `tiny_scalar_release_small` in
-      `docs/fixtures/zig_ir/manifest.tsv` and compare it with the accepted
-      `tiny_scalar_release_small_captured` row.
-- [ ] Decide whether the old raw unsupported row should be removed, replaced by
-      a reduced fixture, or kept as an explicit out-of-scope historical row.
-- [ ] If it remains in the manifest, update its classification and notes so it
-      is not an unowned finish blocker.
+- [ ] Inspect `tiny_scalar_debug`, `tiny_scalar_release_safe`, and their
+      reduced accepted replacements in `docs/fixtures/zig_ir/manifest.tsv`.
+- [ ] Decide whether the broad raw rows remain future evidence or move to a
+      historical note.
+- [ ] Add precise activation conditions for any row that remains future.
 - [ ] Run `bash scripts/run_readiness_checks.sh`.
 - [ ] Update `docs/roadmap/finish_gap_burndown_table.md` and
-      `docs/unsupported_ir.md` with the final disposition.
+      `docs/unsupported_ir.md` with the final policy.

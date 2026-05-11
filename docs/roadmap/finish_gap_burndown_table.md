@@ -51,7 +51,7 @@ Latest recorded summary:
 
 ```text
 ok manifest rows=37 optimizer_input=30
-summary accepted=30 unsupported=1 future=3 debug-info-only=0
+summary accepted=30 unsupported=0 future=4 debug-info-only=0
 ok readiness checks
 ```
 
@@ -79,7 +79,7 @@ Pass status counts from the active pass pipeline inventory:
 | --- | --- | --- | --- |
 | `tiny_scalar_debug` | `future` | Raw Debug IR is too broad because it pulls in debug and std support. Reduced Debug rows already cover the accepted metadata boundary. | Later measured blocker; reduce only if a new Debug construct becomes required. |
 | `tiny_scalar_release_safe` | `future` | Raw ReleaseSafe IR is broad. Reduced ReleaseSafe safety and runtime-call rows already cover the accepted safety boundary. | Later measured blocker; reduce only if a new safety construct becomes required. |
-| `tiny_scalar_release_small` | `unsupported` | Old raw ReleaseSmall row predates the stripped captured ReleaseSmall row and still records unsupported aliases/size attrs/raw function attributes. | Active next step: remove, replace, or reduce this stale unsupported row. |
+| `tiny_scalar_release_small` | `future,legacy-bootstrap` | Historical unstripped raw ReleaseSmall generation row predates the stripped captured ReleaseSmall row. | Closed by Cycle 02; retained as future evidence only, superseded by `tiny_scalar_release_small_captured`. |
 | `vector_future_release_fast` | `parse,verify,future` | Reduced vector row parses and verifies fixed-vector syntax but is not optimizer-input until target-cost/vector transform policy exists. | Conservative accepted boundary; vectorizers and target-cost-driven transforms remain out of scope for this finish line. |
 
 ## Burn-Down Order
@@ -102,7 +102,7 @@ Pass status counts from the active pass pipeline inventory:
 
 | Gap | Current status | Evidence owner | Next action |
 | --- | --- | --- | --- |
-| Stale raw ReleaseSmall unsupported row | active next step | `docs/fixtures/zig_ir/manifest.tsv` | Replace or justify `tiny_scalar_release_small`. |
+| Stale raw ReleaseSmall unsupported row | conservative accepted boundary | `docs/fixtures/zig_ir/manifest.tsv` | Closed by Cycle 02; accepted evidence is `tiny_scalar_release_small_captured`. |
 | Raw Debug whole-program shape | later measured blocker | `tiny_scalar_debug` plus reduced Debug rows | Keep reduced Debug fixtures unless a new source-backed construct is needed. |
 | Raw ReleaseSafe whole-program shape | later measured blocker | `tiny_scalar_release_safe` plus reduced safety rows | Keep reduced safety fixtures unless a new source-backed construct is needed. |
 | Fixed-vector optimizer participation | conservative accepted boundary | `vector_future_release_fast`, vector opt fixtures | Preserve parser/verifier plus narrow lane folds; keep vectorizers out of scope. |
@@ -113,6 +113,6 @@ Pass status counts from the active pass pipeline inventory:
 
 ## Selected Next Slice
 
-The active implementation slice is recorded in `docs/next_steps.md`: close the
-stale `tiny_scalar_release_small` unsupported manifest row by replacing,
-reducing, or explicitly justifying it.
+The stale `tiny_scalar_release_small` unsupported manifest row is closed. The
+active implementation slice is recorded in `docs/next_steps.md`: define the
+future-row policy for broad raw Debug and ReleaseSafe rows.
