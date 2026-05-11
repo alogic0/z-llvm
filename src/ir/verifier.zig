@@ -185,6 +185,7 @@ const VerifyContext = struct {
             .int, .undef => return,
             .named => |name| name,
         };
+        if (isGlobalValueName(name) and ty == .ptr) return;
         const def = ctx.defs.get(name) orelse return error.UnknownValue;
         if (!def.ty.eql(ty)) return error.TypeMismatch;
         try ctx.verifyDominatesUse(def, use_block_index, use_instruction_index);
@@ -195,6 +196,7 @@ const VerifyContext = struct {
             .int, .undef => return,
             .named => |name| name,
         };
+        if (isGlobalValueName(name) and ty == .ptr) return;
         const def = ctx.defs.get(name) orelse return error.UnknownValue;
         if (!def.ty.eql(ty)) return error.TypeMismatch;
         if (!ctx.reachable[predecessor_index]) return;
@@ -418,6 +420,10 @@ fn verifyDeclMatchesFunction(decl: core.FunctionDecl, function: core.Function) !
     for (decl.params.items, 0..) |param, index| {
         if (!param.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
     }
+}
+
+fn isGlobalValueName(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "@");
 }
 
 fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, block_index: usize, instruction_index: usize) !void {

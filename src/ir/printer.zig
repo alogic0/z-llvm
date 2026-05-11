@@ -19,6 +19,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
     for (module.globals.items) |global| {
         try writer.print("@{s} = ", .{global.name});
         try global.linkage.format(writer);
+        if (global.address_attrs) |address_attrs| try writer.print("{s} ", .{address_attrs});
         try writer.print("{s} ", .{global.kind.name()});
         try global.ty.format(writer);
         try writer.writeByte(' ');

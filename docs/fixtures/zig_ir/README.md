@@ -167,7 +167,6 @@ parser blockers after Cycle 1:
 
 | Fixture | First local rejection |
 | --- | --- |
-| `globals_comptime_release_fast` | `UnsupportedGlobalVariable` for richer globals and initializers. |
 | `atomics_inline_asm_debug_release_fast` | `UnsupportedGlobalVariable` before atomic and inline-asm parsing is reached. |
 
 ## Source Group Coverage
@@ -179,7 +178,7 @@ parser blockers after Cycle 1:
 | `pointers_memory` | `test/zig/inputs/pointers_memory.zig` | `test/zig/captured/pointers_memory.ReleaseFast.x86_64.ll` | pointer attrs, load/store, volatile load/store | `parse`, `verify`, `optimizer-input` |
 | `aggregates` | `test/zig/inputs/aggregates.zig` | `test/zig/captured/aggregates.ReleaseFast.x86_64.ll` | arrays, struct field GEP, slice iteration, optionals, error unions | `parse`, `verify`, `optimizer-input` |
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `parse`, `verify`, `optimizer-input` |
-| `globals_comptime` | `test/zig/inputs/globals_comptime.zig` | `test/zig/captured/globals_comptime.ReleaseFast.x86_64.ll` | internal globals, exported aliases, global load/store, comptime folding | `unsupported`, `optimizer-input` |
+| `globals_comptime` | `test/zig/inputs/globals_comptime.zig` | `test/zig/captured/globals_comptime.ReleaseFast.x86_64.ll` | internal globals, exported aliases, global load/store, comptime folding | `parse`, `verify`, `optimizer-input` |
 | `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll` | `atomicrmw`, inline asm side effects, debug-oriented source shape | `unsupported`, `debug-info-only`, `future` |
 
 ## Optimizer Epic Coverage

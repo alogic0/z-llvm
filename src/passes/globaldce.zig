@@ -11,7 +11,7 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-const NodeKind = enum { function, global };
+const NodeKind = enum { function, global, alias };
 
 const NodeRef = struct {
     kind: NodeKind,
@@ -74,6 +74,19 @@ const GlobalDependencyGraph = struct {
             try graph.nodes.append(allocator, node);
         }
 
+        for (module.aliases.items) |alias| {
+            const ref: NodeRef = .{ .kind = .alias, .name = alias.name };
+            var node: Node = .{ .ref = ref, .edges = .empty };
+            errdefer node.deinit(allocator);
+            if (!isLocal(alias.linkage)) try graph.roots.append(allocator, ref);
+            if (hasFunctionDefinition(module, alias.target)) {
+                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .function, .name = alias.target });
+            } else if (hasGlobalDefinition(module, alias.target)) {
+                try appendUniqueEdge(allocator, &node.edges, .{ .kind = .global, .name = alias.target });
+            }
+            try graph.nodes.append(allocator, node);
+        }
+
         return graph;
     }
 
@@ -108,7 +121,8 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
 
     const removed_functions = removeDeadFunctions(module, live.items);
     const removed_globals = removeDeadGlobals(module, live.items);
-    return if (removed_functions or removed_globals) .changed else .unchanged;
+    const removed_aliases = removeDeadAliases(module, live.items);
+    return if (removed_functions or removed_globals or removed_aliases) .changed else .unchanged;
 }
 
 fn removeDeadFunctions(module: *ir.Module, live: []const NodeRef) bool {
@@ -138,6 +152,21 @@ fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
             continue;
         }
         _ = module.globals.orderedRemove(index);
+        changed = true;
+    }
+    return changed;
+}
+
+fn removeDeadAliases(module: *ir.Module, live: []const NodeRef) bool {
+    var changed = false;
+    var index: usize = 0;
+    while (index < module.aliases.items.len) {
+        const alias = module.aliases.items[index];
+        if (!isLocal(alias.linkage) or containsRef(live, .{ .kind = .alias, .name = alias.name })) {
+            index += 1;
+            continue;
+        }
+        _ = module.aliases.orderedRemove(index);
         changed = true;
     }
     return changed;

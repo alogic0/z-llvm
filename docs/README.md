@@ -70,7 +70,7 @@ completed foundation epics
 - [x] [Cycle 2: Intrinsics And Call Semantics](roadmap/02_intrinsics_and_call_semantics_cycle.md)
 - [x] [Cycle 3: Pointer And Memory Corpus](roadmap/03_pointer_memory_corpus_cycle.md)
 - [x] [Cycle 4: Aggregate And Array IR Expansion](roadmap/04_aggregate_array_ir_expansion_cycle.md)
-- [ ] [Cycle 5: Globals, Aliases, And Global Optimization](roadmap/05_globals_aliases_and_globalopt_cycle.md)
+- [x] [Cycle 5: Globals, Aliases, And Global Optimization](roadmap/05_globals_aliases_and_globalopt_cycle.md)
 - [ ] [Cycle 6: Loop Metadata, LCSSA, And Assume](roadmap/06_loop_metadata_lcssa_and_assume_cycle.md)
 - [ ] [Cycle 7: Release Pipeline Conformance](roadmap/07_release_pipeline_conformance_cycle.md)
 - [ ] [Cycle 8: Debug Metadata Preservation](roadmap/08_debug_metadata_preservation_cycle.md)

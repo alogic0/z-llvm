@@ -52,7 +52,13 @@ pub const Value = union(enum) {
 
     pub fn format(value: Value, writer: anytype) !void {
         switch (value) {
-            .named => |name| try writer.print("%{s}", .{name}),
+            .named => |name| {
+                if (std.mem.startsWith(u8, name, "@")) {
+                    try writer.writeAll(name);
+                } else {
+                    try writer.print("%{s}", .{name});
+                }
+            },
             .int => |int| try writer.print("{}", .{int}),
             .undef => try writer.writeAll("undef"),
         }
@@ -233,6 +239,7 @@ pub const GlobalKind = enum {
 pub const Global = struct {
     name: []const u8,
     linkage: FunctionLinkage = .default,
+    address_attrs: ?[]const u8 = null,
     kind: GlobalKind,
     ty: Type,
     initializer: Value,

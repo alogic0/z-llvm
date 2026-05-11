@@ -1522,6 +1522,7 @@ test "globaldce removes unreferenced local functions and globals" {
     const input =
         \\@live_global = global i32 1
         \\@dead_global = internal global i32 2
+        \\@exported_helper = alias i32 (i32), ptr @helper
         \\
         \\define internal i32 @helper(i32 %x) {
         \\entry:
@@ -1558,6 +1559,8 @@ test "globaldce removes unreferenced local functions and globals" {
 
     const expected =
         \\@live_global = global i32 1
+        \\
+        \\@exported_helper = alias i32 (i32), ptr @helper
         \\
         \\define internal i32 @helper(i32 %x) {
         \\entry:

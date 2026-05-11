@@ -41,19 +41,21 @@ Implemented subset:
 
 ```text
 module-level dependency graph for supported functions and globals
-externally visible functions and globals are live roots
+externally visible functions, globals, and aliases are live roots
 non-local function definitions are roots
 direct calls from live functions mark local function definitions live
+exported aliases mark their target functions/globals live
 unreached internal/private functions are removed
 scalar global initializer references are represented in the graph if the parser
 accepts them
 unreached internal/private globals are removed
+unreached internal/private aliases are removed
 ```
 
 Intentional divergences:
 
 ```text
-no aliases, ifuncs, comdats, or metadata dependency graph
+no ifuncs, comdats, or metadata dependency graph
 no available_externally handling yet
 the parser still rejects most global-as-value and aggregate initializer forms,
 so global initializer edges are limited to the accepted scalar surface
@@ -70,4 +72,5 @@ local-only conservative:
 
 unit-test only:
   globaldce removes unreferenced local functions and globals
+  exported alias keeps a private target function live
 ```

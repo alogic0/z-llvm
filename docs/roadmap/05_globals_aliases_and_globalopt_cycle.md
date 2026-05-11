@@ -17,22 +17,36 @@ load/store patterns, GlobalDCE roots, and conservative GlobalOpt placeholders.
 
 ## Plan
 
-- [ ] Parse and preserve Zig-emitted global aliases.
-- [ ] Extend global initializers beyond scalar constants only where the corpus
+- [x] Parse and preserve Zig-emitted global aliases.
+- [x] Extend global initializers beyond scalar constants only where the corpus
       requires it.
-- [ ] Add global-as-value references for accepted load/store/call operands.
-- [ ] Strengthen GlobalDCE root marking for aliases and referenced globals.
-- [ ] Add conservative GlobalOpt and ConstantMerge placeholder docs for cases
+- [x] Add global-as-value references for accepted load/store/call operands.
+- [x] Strengthen GlobalDCE root marking for aliases and referenced globals.
+- [x] Add conservative GlobalOpt and ConstantMerge placeholder docs for cases
       not implemented yet.
-- [ ] Add `opt-22` fixtures for removable internal globals, live aliases, and
+- [x] Add `opt-22` fixtures for removable internal globals, live aliases, and
       initializer references.
-- [ ] Promote a reduced globals/comptime corpus fixture to accepted optimizer
+- [x] Promote a reduced globals/comptime corpus fixture to accepted optimizer
       input.
 
 ## Exit Criteria
 
-- [ ] GlobalDCE handles aliases and initializer references conservatively.
-- [ ] Global corpus blockers are classified by parser, verifier, or global pass
+- [x] GlobalDCE handles aliases and initializer references conservatively.
+- [x] Global corpus blockers are classified by parser, verifier, or global pass
       owner.
-- [ ] Unsupported global optimizations remain documented placeholders.
+- [x] Unsupported global optimizations remain documented placeholders.
 
+## Implementation Notes
+
+- `src/ir/parser.zig` preserves global address attributes such as
+  `unnamed_addr` before the global kind.
+- Global pointer operands such as `ptr @globals_comptime.global_counter` are
+  parsed as global-flavored named values and verify as conservative pointer
+  operands.
+- `src/passes/globaldce.zig` now treats exported aliases as roots and follows
+  alias edges to target functions or globals.
+- GlobalOpt, ConstantMerge, available-externally cleanup, and GlobalsAA remain
+  executable placeholders documented in
+  `docs/passes/global_cleanup_placeholders.md`.
+- The raw `globals_comptime_release_fast` corpus row now parses, verifies, and
+  runs through the local corpus pipeline.

@@ -184,6 +184,18 @@ fn parseGlobal(line: []const u8) !core.Global {
     const linkage = core.FunctionLinkage.parse(token) orelse .default;
     if (linkage != .default) token = parts.next() orelse return error.UnsupportedGlobalVariable;
 
+    const address_attrs_start: ?usize = if (isGlobalAddressAttr(token))
+        @intFromPtr(token.ptr) - @intFromPtr(rest.ptr)
+    else
+        null;
+    while (isGlobalAddressAttr(token)) {
+        token = parts.next() orelse return error.UnsupportedGlobalVariable;
+    }
+    const address_attrs = if (address_attrs_start) |start|
+        std.mem.trim(u8, rest[start..(@intFromPtr(token.ptr) - @intFromPtr(rest.ptr))], " \t")
+    else
+        "";
+
     const kind = core.GlobalKind.parse(token) orelse return error.UnsupportedGlobalVariable;
     const ty_text = parts.next() orelse return error.UnsupportedGlobalVariable;
     const ty = parseType(ty_text) catch return error.UnsupportedGlobalVariable;
@@ -206,11 +218,16 @@ fn parseGlobal(line: []const u8) !core.Global {
     return .{
         .name = name_text[1..],
         .linkage = linkage,
+        .address_attrs = if (address_attrs.len == 0) null else address_attrs,
         .kind = kind,
         .ty = ty,
         .initializer = initializer,
         .attrs = if (attrs.len == 0) null else attrs,
     };
+}
+
+fn isGlobalAddressAttr(token: []const u8) bool {
+    return std.mem.eql(u8, token, "unnamed_addr") or std.mem.eql(u8, token, "local_unnamed_addr");
 }
 
 fn parseGlobalInitializer(text: []const u8) !core.Value {
@@ -952,6 +969,10 @@ fn parseValue(text: []const u8) !core.Value {
     if (text[0] == '%') {
         if (text.len == 1) return error.InvalidValueName;
         return .{ .named = text[1..] };
+    }
+    if (text[0] == '@') {
+        if (text.len == 1) return error.InvalidValueName;
+        return .{ .named = text };
     }
     return .{ .int = try std.fmt.parseInt(i128, text, 10) };
 }
