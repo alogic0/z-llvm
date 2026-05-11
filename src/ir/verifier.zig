@@ -269,6 +269,7 @@ const VerifyContext = struct {
 
 pub fn verify(module: core.Module) !void {
     try verifyTargetRecords(module);
+    try verifyMetadataGraph(module);
 
     var global_defs = std.StringHashMap(void).init(module.allocator);
     defer global_defs.deinit();
@@ -507,6 +508,199 @@ pub fn verify(module: core.Module) !void {
         }
     }
 }
+
+fn verifyMetadataGraph(module: core.Module) !void {
+    var ids = std.AutoHashMap(u32, []const u8).init(module.allocator);
+    defer ids.deinit();
+
+    for (module.metadata.items) |line| {
+        if (parseNumberedMetadata(line)) |record| {
+            if (ids.contains(record.id)) return error.DuplicateMetadata;
+            try ids.put(record.id, record.body);
+        }
+    }
+
+    for (module.metadata.items) |line| {
+        if (std.mem.startsWith(u8, line, "!llvm.dbg.cu")) {
+            try verifyDebugCuRoot(line, ids);
+        }
+        const body = if (parseNumberedMetadata(line)) |record| record.body else metadataBody(line) orelse continue;
+        try verifyMetadataReferences(body, ids);
+        try verifyKnownMetadataNode(body, ids);
+    }
+
+    for (module.functions.items) |function| {
+        if (function.attrs) |attrs| try verifyMetadataAttachmentRefs(attrs, ids);
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                if (instruction.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids);
+            }
+            if (block.terminator) |terminator| switch (terminator) {
+                .br => |br| if (br.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
+                .condbr => |condbr| if (condbr.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
+                .ret, .@"unreachable" => {},
+            };
+        }
+    }
+}
+
+const NumberedMetadata = struct {
+    id: u32,
+    body: []const u8,
+};
+
+fn parseNumberedMetadata(line: []const u8) ?NumberedMetadata {
+    const trimmed = std.mem.trim(u8, line, " \t");
+    if (trimmed.len < 4 or trimmed[0] != '!') return null;
+    var index: usize = 1;
+    while (index < trimmed.len and std.ascii.isDigit(trimmed[index])) : (index += 1) {}
+    if (index == 1) return null;
+    const id = std.fmt.parseInt(u32, trimmed[1..index], 10) catch return null;
+    var rest = std.mem.trim(u8, trimmed[index..], " \t");
+    if (!std.mem.startsWith(u8, rest, "=")) return null;
+    rest = std.mem.trim(u8, rest[1..], " \t");
+    return .{ .id = id, .body = rest };
+}
+
+fn metadataBody(line: []const u8) ?[]const u8 {
+    const eq = std.mem.indexOfScalar(u8, line, '=') orelse return null;
+    return std.mem.trim(u8, line[eq + 1 ..], " \t");
+}
+
+fn verifyDebugCuRoot(line: []const u8, ids: std.AutoHashMap(u32, []const u8)) !void {
+    const body = metadataBody(line) orelse return error.InvalidDebugMetadata;
+    if (!std.mem.startsWith(u8, body, "!{") or !std.mem.endsWith(u8, body, "}")) return error.InvalidDebugMetadata;
+    var found = false;
+    var scanner = MetadataRefScanner.init(body);
+    while (scanner.next()) |id| {
+        found = true;
+        const metadata_target = ids.get(id) orelse return error.UnknownMetadata;
+        if (!knownNodeBody(metadata_target, "!DICompileUnit(")) return error.InvalidDebugMetadata;
+    }
+    if (!found) return error.InvalidDebugMetadata;
+}
+
+fn verifyMetadataReferences(body: []const u8, ids: std.AutoHashMap(u32, []const u8)) !void {
+    var scanner = MetadataRefScanner.init(body);
+    while (scanner.next()) |id| {
+        if (!ids.contains(id)) return error.UnknownMetadata;
+    }
+}
+
+fn verifyMetadataAttachmentRefs(text: []const u8, ids: std.AutoHashMap(u32, []const u8)) !void {
+    var scanner = MetadataRefScanner.init(text);
+    while (scanner.next()) |id| {
+        if (!ids.contains(id)) return error.UnknownMetadata;
+    }
+}
+
+fn verifyKnownMetadataNode(body: []const u8, ids: std.AutoHashMap(u32, []const u8)) !void {
+    if (knownNodeBody(body, "!DICompileUnit(")) {
+        if (!hasMetadataField(body, "language") or !hasMetadataField(body, "file")) return error.InvalidDebugMetadata;
+        try verifyFieldTargetKind(body, "file", ids, "!DIFile(");
+    } else if (knownNodeBody(body, "!DIFile(")) {
+        if (!hasMetadataField(body, "filename") or !hasMetadataField(body, "directory")) return error.InvalidDebugMetadata;
+    } else if (knownNodeBody(body, "!DISubprogram(")) {
+        if (!hasMetadataField(body, "name") or !hasMetadataField(body, "file") or !hasMetadataField(body, "type")) return error.InvalidDebugMetadata;
+        try verifyFieldTargetKind(body, "file", ids, "!DIFile(");
+        try verifyFieldTargetKind(body, "type", ids, "!DISubroutineType(");
+    } else if (knownNodeBody(body, "!DILexicalBlock(")) {
+        if (!hasMetadataField(body, "scope") or !hasMetadataField(body, "file")) return error.InvalidDebugMetadata;
+        try verifyFieldTargetAnyDebugNode(body, "scope", ids);
+        try verifyFieldTargetKind(body, "file", ids, "!DIFile(");
+    } else if (knownNodeBody(body, "!DILocalVariable(")) {
+        if (!hasMetadataField(body, "name") or !hasMetadataField(body, "scope") or !hasMetadataField(body, "type")) return error.InvalidDebugMetadata;
+        try verifyFieldTargetAnyDebugNode(body, "scope", ids);
+        try verifyFieldTargetAnyDebugNode(body, "type", ids);
+    } else if (knownNodeBody(body, "!DIExpression(")) {
+        if (!std.mem.endsWith(u8, std.mem.trim(u8, body, " \t"), ")")) return error.InvalidDebugMetadata;
+    } else if (knownNodeBody(body, "!DILocation(")) {
+        if (!hasMetadataField(body, "line") or !hasMetadataField(body, "column") or !hasMetadataField(body, "scope")) return error.InvalidDebugMetadata;
+        try verifyFieldTargetAnyDebugNode(body, "scope", ids);
+    } else if (knownNodeBody(body, "!DISubroutineType(")) {
+        if (!hasMetadataField(body, "types")) return error.InvalidDebugMetadata;
+    } else if (knownNodeBody(body, "!DIBasicType(")) {
+        if (!hasMetadataField(body, "name") or !hasMetadataField(body, "size")) return error.InvalidDebugMetadata;
+    } else if (knownNodeBody(body, "!DIDerivedType(")) {
+        if (!hasMetadataField(body, "tag")) return error.InvalidDebugMetadata;
+        if (metadataFieldRef(body, "baseType")) |id| try verifyMetadataIdExists(id, ids);
+    }
+}
+
+fn knownNodeBody(body: []const u8, prefix: []const u8) bool {
+    var trimmed = std.mem.trim(u8, body, " \t");
+    if (std.mem.startsWith(u8, trimmed, "distinct ")) trimmed = std.mem.trim(u8, trimmed["distinct ".len..], " \t");
+    return std.mem.startsWith(u8, trimmed, prefix);
+}
+
+fn hasMetadataField(body: []const u8, field: []const u8) bool {
+    return metadataFieldOffset(body, field) != null;
+}
+
+fn metadataFieldOffset(body: []const u8, field: []const u8) ?usize {
+    if (field.len == 0) return null;
+    var index: usize = 0;
+    while (std.mem.indexOfPos(u8, body, index, field)) |pos| {
+        const after = pos + field.len;
+        if (after < body.len and body[after] == ':' and (pos == 0 or !isMetadataIdentByte(body[pos - 1]))) {
+            return pos;
+        }
+        index = after;
+    }
+    return null;
+}
+
+fn isMetadataIdentByte(byte: u8) bool {
+    return std.ascii.isAlphanumeric(byte) or byte == '_' or byte == '-';
+}
+
+fn metadataFieldRef(body: []const u8, field: []const u8) ?u32 {
+    const pos = metadataFieldOffset(body, field) orelse return null;
+    var rest = std.mem.trim(u8, body[pos + field.len + 1 ..], " \t");
+    if (rest.len == 0 or rest[0] != '!') return null;
+    rest = rest[1..];
+    var end: usize = 0;
+    while (end < rest.len and std.ascii.isDigit(rest[end])) : (end += 1) {}
+    if (end == 0) return null;
+    return std.fmt.parseInt(u32, rest[0..end], 10) catch null;
+}
+
+fn verifyFieldTargetKind(body: []const u8, field: []const u8, ids: std.AutoHashMap(u32, []const u8), prefix: []const u8) !void {
+    const id = metadataFieldRef(body, field) orelse return error.InvalidDebugMetadata;
+    const metadata_target = ids.get(id) orelse return error.UnknownMetadata;
+    if (!knownNodeBody(metadata_target, prefix)) return error.InvalidDebugMetadata;
+}
+
+fn verifyFieldTargetAnyDebugNode(body: []const u8, field: []const u8, ids: std.AutoHashMap(u32, []const u8)) !void {
+    const id = metadataFieldRef(body, field) orelse return error.InvalidDebugMetadata;
+    try verifyMetadataIdExists(id, ids);
+}
+
+fn verifyMetadataIdExists(id: u32, ids: std.AutoHashMap(u32, []const u8)) !void {
+    if (!ids.contains(id)) return error.UnknownMetadata;
+}
+
+const MetadataRefScanner = struct {
+    text: []const u8,
+    index: usize = 0,
+
+    fn init(text: []const u8) MetadataRefScanner {
+        return .{ .text = text };
+    }
+
+    fn next(scanner: *MetadataRefScanner) ?u32 {
+        while (scanner.index < scanner.text.len) : (scanner.index += 1) {
+            if (scanner.text[scanner.index] != '!') continue;
+            const digit_start = scanner.index + 1;
+            if (digit_start >= scanner.text.len or !std.ascii.isDigit(scanner.text[digit_start])) continue;
+            var digit_end = digit_start;
+            while (digit_end < scanner.text.len and std.ascii.isDigit(scanner.text[digit_end])) : (digit_end += 1) {}
+            scanner.index = digit_end;
+            return std.fmt.parseInt(u32, scanner.text[digit_start..digit_end], 10) catch continue;
+        }
+        return null;
+    }
+};
 
 fn verifyDeclMatchesFunction(decl: core.FunctionDecl, function: core.Function) !void {
     if (!decl.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;

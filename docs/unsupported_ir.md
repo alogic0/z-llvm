@@ -128,9 +128,10 @@ calling conventions beyond parse-preserve support
 TBAA interpretation beyond opaque `!tbaa` instruction attachment preservation
 noalias / alias.scope interpretation beyond opaque instruction attachment
 preservation
-debug metadata beyond opaque `!dbg` preservation for instructions, simple
-branches, call sites, loop PHIs, reduced lexical-block fixtures, and raw
-`llvm.dbg.value` or `llvm.dbg.declare` operands
+debug metadata beyond the small verified DI graph subset, opaque `!dbg`
+preservation for instructions, simple branches, call sites, loop PHIs,
+reduced lexical-block fixtures, and raw `llvm.dbg.value` or
+`llvm.dbg.declare` operands
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation
 debug value and debug declare salvage semantics; debug assign intrinsics still
 report `UnsupportedDebugIntrinsic`

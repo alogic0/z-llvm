@@ -45,6 +45,8 @@ reduced Debug fixtures
 metadata node graphs are not interpreted
 `llvm.dbg.value` and `llvm.dbg.declare` are accepted only as preserved
 variable-location intrinsics with raw metadata operands
+known debug metadata nodes now get structural verifier checks for required
+fields and references
 debug-info updater behavior in passes is not implemented
 broken-debug-info diagnostics are not implemented locally
 ```
@@ -64,6 +66,29 @@ broken-debug-info diagnostics are not implemented locally
 | Module flags | `Debug Info Version`, DWARF version, CodeView mode, PIC/PIE flags where relevant | raw records only |
 | Discriminators | `AddDiscriminatorsPass` updates line-table discrimination | placeholder only |
 | Profile metadata | branch weights, call profile, function entry counts | opaque branch metadata preservation for reduced safety branches; call profile and function entry counts missing |
+
+## Verified Graph Subset
+
+The local verifier validates the shape of known debug metadata nodes while
+preserving unknown metadata records opaquely:
+
+```text
+!llvm.dbg.cu roots must reference DICompileUnit nodes
+DICompileUnit requires language and file and the file must reference DIFile
+DIFile requires filename and directory fields
+DISubprogram requires name, file, and type references
+DILexicalBlock requires scope and file references
+DILocalVariable requires name, scope, and type references
+DILocation requires line, column, and scope references
+DISubroutineType requires types
+DIBasicType requires name and size
+DIDerivedType requires tag and validates baseType when present
+```
+
+All numeric metadata references inside metadata records and `!dbg` attachments
+must resolve. Unknown-but-preserved nodes remain accepted when their numeric
+references are valid; this keeps the project conservative without requiring a
+full LLVM `DIBuilder` model.
 
 ## Optimizer Preservation Rules
 

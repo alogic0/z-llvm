@@ -73,8 +73,10 @@ Intentional divergences:
   printer and pass pipeline treat them as deleted instructions.
   It validates target triple and DataLayout syntax, but does not verify full
   target ABI semantics, address-space-specific layouts, or GEP offset legality.
-  It does not verify LLVM metadata, debug records, attributes, poison semantics,
-  or the full LLVM type system.
+  It verifies a small known-DI-node debug metadata graph subset and keeps
+  unknown metadata records opaque when references resolve.
+  It does not verify full LLVM metadata semantics, debug salvage, attributes,
+  poison semantics, or the full LLVM type system.
   It accepts only the parser-supported IR surface and rejects or never parses
   many LLVM constructs that LLVM's verifier can handle.
 

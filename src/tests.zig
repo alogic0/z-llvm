@@ -1510,6 +1510,62 @@ test "parser preserves raw module metadata records" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "verifier preserves unknown metadata nodes with valid references" {
+    const input =
+        \\define i32 @with_unknown_metadata(i32 %a) !dbg !1 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\!0 = !{!"opaque", !1}
+        \\!1 = distinct !DILocation(line: 1, column: 1, scope: !2)
+        \\!2 = distinct !DISubprogram(name: "f", scope: !3, file: !3, line: 1, type: !4, scopeLine: 1)
+        \\!3 = !DIFile(filename: "opaque.zig", directory: ".")
+        \\!4 = !DISubroutineType(types: !5)
+        \\!5 = !{}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
+test "verifier rejects dangling debug metadata references" {
+    const input =
+        \\define i32 @bad_debug_metadata(i32 %a) !dbg !4 {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\!4 = distinct !DISubprogram(name: "bad", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expectError(error.UnknownMetadata, module.verify());
+}
+
+test "verifier rejects impossible debug compile unit root" {
+    const input =
+        \\define i32 @bad_debug_cu(i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!0 = !DIFile(filename: "not_cu.zig", directory: ".")
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expectError(error.InvalidDebugMetadata, module.verify());
+}
+
 test "parser preserves instruction debug metadata attachments" {
     const input =
         \\source_filename = "debug_metadata"

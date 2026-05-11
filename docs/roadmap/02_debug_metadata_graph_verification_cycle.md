@@ -8,22 +8,31 @@ modeled yet.
 
 ## Plan
 
-- [ ] Inventory metadata node kinds used by accepted and future Debug corpus
+- [x] Inventory metadata node kinds used by accepted and future Debug corpus
       rows.
-- [ ] Add structural checks for compile units, files, subprograms, lexical
+- [x] Add structural checks for compile units, files, subprograms, lexical
       scopes, local variables, expressions, and location records where present.
-- [ ] Reject broken references, wrong operand counts, and impossible metadata
+- [x] Reject broken references, wrong operand counts, and impossible metadata
       root shapes.
-- [ ] Keep unknown-but-preserved metadata nodes explicitly classified.
-- [ ] Add reduced fixtures for valid graphs, dangling references, wrong node
+- [x] Keep unknown-but-preserved metadata nodes explicitly classified.
+- [x] Add reduced fixtures for valid graphs, dangling references, wrong node
       kinds, and unknown preserved nodes.
-- [ ] Document the supported graph subset and remaining LLVM DIBuilder gaps.
-- [ ] Compare preservation against the input text and, where meaningful,
+- [x] Document the supported graph subset and remaining LLVM DIBuilder gaps.
+- [x] Compare preservation against the input text and, where meaningful,
       `opt-22 -S`.
 
 ## Exit Criteria
 
-- [ ] Accepted Debug rows have metadata graph validation instead of opaque-only
+- [x] Accepted Debug rows have metadata graph validation instead of opaque-only
       preservation.
-- [ ] Invalid metadata fixtures fail with stable diagnostics.
-- [ ] Debug metadata docs identify every deliberately opaque node kind.
+- [x] Invalid metadata fixtures fail with stable diagnostics.
+- [x] Debug metadata docs identify every deliberately opaque node kind.
+
+## Completed Slice
+
+Cycle 02 adds verifier-side debug metadata graph checks for the local DI subset:
+`llvm.dbg.cu`, `DICompileUnit`, `DIFile`, `DISubprogram`, `DILexicalBlock`,
+`DILocalVariable`, `DIExpression`, `DILocation`, `DISubroutineType`,
+`DIBasicType`, and `DIDerivedType`. Unknown metadata records remain preserved
+when their numeric references resolve. Invalid fixtures now fail with
+`UnknownMetadata` or `InvalidDebugMetadata`.
