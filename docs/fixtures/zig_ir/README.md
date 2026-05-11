@@ -114,6 +114,23 @@ mkdir -p tmp/zig_ir/raw
 The checked normalized fixture corresponds to the scalar signatures from the
 current `../ziglang` `ReleaseFast` output.
 
+## Corpus Runner
+
+Run the accepted optimizer-input rows through the local optimizer with:
+
+```sh
+scripts/run_zig_corpus.sh
+```
+
+The runner reads `docs/fixtures/zig_ir/manifest.tsv`, selects rows with a
+checked IR path and `optimizer-input` classification, runs the configured local
+pipeline, and normalizes the result to ensure the local parser/verifier still
+accept the output. Override the pipeline with:
+
+```sh
+PASSES=verify,instcombine,dce scripts/run_zig_corpus.sh
+```
+
 ## Tiny Scalar Group
 
 Purpose:
