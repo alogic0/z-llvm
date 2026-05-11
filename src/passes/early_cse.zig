@@ -3,6 +3,7 @@ const alias = @import("../analysis/alias.zig");
 const dominator = @import("../analysis/dominator.zig");
 const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
+const memory_ssa = @import("../analysis/memory_ssa.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -200,14 +201,16 @@ fn sameAvailableExpression(
     instruction_index: usize,
     instruction: ir.Instruction,
 ) bool {
-    if (inst_simplify.sameExpression(candidate.instruction, instruction)) return true;
+    if (candidate.instruction.kind == .load or instruction.kind == .load) {
+        if (candidate.instruction.kind != .load or instruction.kind != .load) return false;
+        const candidate_load = candidate.instruction.kind.load;
+        const load = instruction.kind.load;
+        if (!candidate_load.ty.eql(load.ty)) return false;
+        if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
+        return !hasClobber(function, candidate, block_index, instruction_index, load.ptr);
+    }
     if (sameReadnoneCall(module, candidate.instruction, instruction)) return true;
-    if (candidate.instruction.kind != .load or instruction.kind != .load) return false;
-    const candidate_load = candidate.instruction.kind.load;
-    const load = instruction.kind.load;
-    if (!candidate_load.ty.eql(load.ty)) return false;
-    if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
-    return !hasClobber(function, candidate, block_index, instruction_index, load.ptr);
+    return inst_simplify.sameExpression(candidate.instruction, instruction);
 }
 
 fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) bool {
@@ -237,18 +240,12 @@ fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) boo
 }
 
 fn hasClobber(function: ir.Function, candidate: AvailableInstruction, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
-    for (function.blocks.items, 0..) |block, current_block_index| {
-        for (block.instructions.items, 0..) |instruction, current_instruction_index| {
-            if (instruction.removed) continue;
-            if (current_block_index == candidate.block_index and current_instruction_index <= candidate.instruction_index) continue;
-            if (current_block_index == block_index and current_instruction_index >= instruction_index) continue;
-            switch (alias.modRef(function, instruction, ptr)) {
-                .mod, .mod_ref, .unknown => return true,
-                .no_mod_ref, .ref => {},
-            }
-        }
-    }
-    return false;
+    return memory_ssa.hasClobberBetween(
+        function,
+        .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
+        .{ .block_index = block_index, .instruction_index = instruction_index },
+        ptr,
+    );
 }
 
 fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {

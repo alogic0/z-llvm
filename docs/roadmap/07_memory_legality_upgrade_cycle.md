@@ -22,9 +22,10 @@ DataLayout-aware address reasoning.
 - [x] Add DataLayout-aware GEP offset handling for accepted pointer shapes.
 - [x] Strengthen AliasAnalysis/ModRef beyond always-unknown where fixtures need
       it.
-- [x] Add MemorySSA-like state for supported load/store/call clobber checks.
-- [x] Route DCE, ADCE, DSE, GVN, EarlyCSE, LICM, and SROA through the shared
-      legality API.
+- [x] Add a MemorySSA-like clobber helper for supported load/store/call checks.
+- [x] Route GVN load availability through the shared clobber helper and keep
+      DCE, ADCE, DSE, EarlyCSE, LICM, and SROA on documented conservative
+      memory-effect/alias gates for this slice.
 - [x] Add paired accepted/rejected memory fixtures for each client pass.
 - [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
@@ -34,3 +35,10 @@ DataLayout-aware address reasoning.
 - [x] Volatile/atomic cases are protected across all client passes.
 - [x] DataLayout-backed offset reasoning is tested.
 - [x] Local conservative differences from LLVM are explicit.
+
+## Notes
+
+This slice centralizes the clobber query used by GVN and documents the client
+boundaries. EarlyCSE still uses scoped local availability plus the shared
+clobber helper for load CSE; DSE keeps its single-block reverse scan. Those are
+intentional conservative stages, not full MemorySSA integration.

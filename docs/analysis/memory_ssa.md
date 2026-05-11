@@ -45,6 +45,7 @@ Implemented subset:
   alias.modRef decides whether an intervening instruction is a def/barrier for
   the queried pointer.
   GVN load availability uses this shared helper.
+  EarlyCSE load CSE uses this helper before replacing an available load.
 
 Intentional divergences:
   DSE uses a single-block reverse scan instead of MemorySSA.

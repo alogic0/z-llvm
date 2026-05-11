@@ -2,20 +2,22 @@
 
 This document is the main roadmap entrypoint. The initial Zig LLVM removal
 epics are complete and archived under `roadmap/historical/completed_epics/`.
-The active roadmap is now the optimizer parity cycle plan.
+The active roadmap is now the optimizer parity cycle plan. Completed cycle
+entries mean the planned fixture-equivalent slice is closed, not that the full
+LLVM pass is completely reproduced.
 
 The purpose is to keep the project aligned with Zig's upstream LLVM-removal
 path:
 
 ```text
 completed foundation epics
-  -> ADCE control-flow parity
-  -> SCCP sparse lattice parity
-  -> EarlyCSE memory-aware parity
-  -> GVN value numbering parity
-  -> SROA real model
-  -> GlobalDCE/globals graph parity
-  -> shared memory legality upgrade
+  -> ADCE control-flow parity slice
+  -> SCCP sparse lattice parity slice
+  -> EarlyCSE memory-aware parity slice
+  -> GVN value numbering parity slice
+  -> SROA slice/partition model slice
+  -> GlobalDCE/globals graph parity slice
+  -> shared memory legality upgrade slice
 ```
 
 ## Completed Foundation Epics
@@ -30,15 +32,15 @@ completed foundation epics
 - [x] [Epic 8: Native Backend Handoff Study](roadmap/historical/completed_epics/08_native_backend_handoff_study.md)
 - [x] [Epic 9: Optional LLVM Bitcode, Debug, And LTO Tracks](roadmap/historical/completed_epics/09_optional_bitcode_debug_lto_tracks.md)
 
-## Active Cycles
+## Completed Cycle Slices
 
-- [x] [Cycle 1: ADCE Control-Flow Parity](roadmap/01_adce_control_flow_parity_cycle.md)
-- [x] [Cycle 2: SCCP Sparse Lattice Parity](roadmap/02_sccp_sparse_lattice_parity_cycle.md)
-- [x] [Cycle 3: EarlyCSE Memory-Aware Parity](roadmap/03_earlycse_memory_aware_parity_cycle.md)
-- [x] [Cycle 4: GVN Value Numbering Parity](roadmap/04_gvn_value_numbering_parity_cycle.md)
-- [x] [Cycle 5: SROA Real Model](roadmap/05_sroa_real_model_cycle.md)
-- [x] [Cycle 6: GlobalDCE And Globals Graph Parity](roadmap/06_globaldce_globals_graph_parity_cycle.md)
-- [x] [Cycle 7: Memory Legality Upgrade](roadmap/07_memory_legality_upgrade_cycle.md)
+- [x] [Cycle 1: ADCE Control-Flow Parity Slice](roadmap/01_adce_control_flow_parity_cycle.md)
+- [x] [Cycle 2: SCCP Sparse Lattice Parity Slice](roadmap/02_sccp_sparse_lattice_parity_cycle.md)
+- [x] [Cycle 3: EarlyCSE Memory-Aware Parity Slice](roadmap/03_earlycse_memory_aware_parity_cycle.md)
+- [x] [Cycle 4: GVN Value Numbering Parity Slice](roadmap/04_gvn_value_numbering_parity_cycle.md)
+- [x] [Cycle 5: SROA Model Slice](roadmap/05_sroa_real_model_cycle.md)
+- [x] [Cycle 6: GlobalDCE And Globals Graph Parity Slice](roadmap/06_globaldce_globals_graph_parity_cycle.md)
+- [x] [Cycle 7: Memory Legality Upgrade Slice](roadmap/07_memory_legality_upgrade_cycle.md)
 
 ## Operating Rule
 

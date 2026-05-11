@@ -6,9 +6,11 @@ optimization algorithms used by Zig's LLVM pipeline.
 This plan tracks algorithm reproduction, not only pass-name coverage. A pass is
 not considered reproduced just because a local pass with the same name exists.
 
-This file records parity gaps and the cycles that closed them for the currently
-accepted IR surface. Remaining exact-LLVM work is deferred only where the local
-IR cannot yet represent the LLVM construct being discussed.
+This file records parity gaps and the cycle slices that closed fixture-backed
+parts of them for the currently accepted IR surface. A `Closed` item means the
+planned slice is closed, not that every LLVM behavior in that area is complete.
+Remaining exact-LLVM work is deferred where the local IR cannot yet represent
+the LLVM construct being discussed.
 
 ## Reproduction Levels
 
