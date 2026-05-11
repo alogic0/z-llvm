@@ -66,9 +66,9 @@ equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
 load availability queries use the persisted local MemorySSA access list
-cross-block load availability is conservative: endpoint instruction order is
-used, but memory in other blocks is treated as a possible clobber instead of
-using numeric block order as a path proof
+cross-block load availability is path-aware for the accepted access-list slice:
+endpoint instruction order is used, and interior clobbers must be reachable on a
+CFG path between the leader load and the later load
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
@@ -97,6 +97,9 @@ local-only conservative:
   gvn_load_branch_clobber_reject keeps the later load because a store in a
   different CFG block may reach the join. LLVM GVN can perform a stronger PRE
   transform for this shape, so this fixture checks the local safety boundary.
+  gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
+  ignore a side-exit store outside the queried path. `opt-22` preserves this
+  shape, so full load-placement parity remains future work.
   readnone call GVN is unit-tested locally. `opt-22` emits attribute groups for
   the equivalent fixture, which the current parser rejects.
   fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
@@ -118,7 +121,8 @@ Known gaps:
 
 ```text
 no load PRE
-no MemorySSA-backed memory value numbering beyond the accepted access-list query
+no MemorySSA-backed memory value numbering beyond the accepted path-aware
+access-list query
 no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
