@@ -48,7 +48,7 @@ Core LLVM algorithm data structures:
   PromoteMemToReg handoff for scalarized slots
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent for listed fixtures
 
 Implemented subset:
   Zero-offset GEP forwarding to the base alloca

@@ -52,12 +52,14 @@ Core LLVM algorithm data structures:
   Rename stacks/current-value state
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent for listed fixtures
 
 Implemented subset:
   Entry-block scalar allocas
   Direct non-volatile non-atomic loads/stores
+  Single-store fast path when the store dominates every load
   Single-block and multi-block promotion
+  Live-in block pruning before dominance-frontier PHI placement
   Multi-slot promotion by repeated local promotion
   Undef replacement for promoted uninitialized loads
 
@@ -72,6 +74,7 @@ Analysis preservation/invalidation:
 
 Fixture coverage:
   mem2reg
+  mem2reg_single_store
   mem2reg_undef
   mem2reg_if
   mem2reg_loop
@@ -97,6 +100,7 @@ Implemented subset:
 
 ```text
 single-basic-block alloca promotion
+single-store promotion when one store dominates every load
 one multi-block stack slot per pass invocation
 multiple independent stack slots promoted until no promotable alloca remains
 alloca discovery restricted to the function entry block
@@ -105,6 +109,7 @@ volatile and atomic load/store users are rejected as memory barriers
 loads before the first store keep the slot unpromoted
 uninitialized promoted loads are replaced with undef
 dominance-frontier phi placement for join blocks
+live-in pruning to avoid PHIs in blocks where the promoted value is not live on entry
 dominator-tree rename walk for promoted stack-slot values
 phi incoming updates for CFG predecessors
 store instructions update the current SSA value for the slot
@@ -128,7 +133,7 @@ alloca forms with array counts, alignment, address spaces, or non-parsed type sy
 Upstream mapping:
 
 ```text
-This reproduces LLVM mem2reg's same-block scalar replacement and the first dominance-frontier phi-placement plus rename-walk shape.
+This reproduces LLVM mem2reg's same-block scalar replacement, single-store rewrite, live-in filtered dominance-frontier phi-placement, and rename-walk shape.
 LLVM's `Mem2Reg.cpp` pass wrapper finds promotable allocas by scanning only `Function::getEntryBlock`; this project follows that entry-block discovery rule.
 The promotability filter maps to LLVM's `isAllocaPromotable`: this subset accepts only direct non-volatile load/store users and rejects escapes conservatively.
 LLVM rejects volatile load/store users. LLVM permits atomic load/store users on local allocas, but this project currently rejects atomic users too because the shared memory-effect model treats atomic instructions as barriers until a more precise local-alloca exception is implemented.
@@ -141,6 +146,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   mem2reg
+  mem2reg_single_store
   mem2reg_undef
   mem2reg_if
   mem2reg_loop

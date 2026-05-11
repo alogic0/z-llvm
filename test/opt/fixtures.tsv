@@ -26,6 +26,7 @@ simplifycfg_thread_empty	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_thr
 simplifycfg_common_ret	simplifycfg	simplifycfg	test/opt/inputs/simplifycfg_common_ret.ll	test/opt/expected/z_llvm/simplifycfg_common_ret.ll	opt-equivalent	simplifycfg	matching return blocks merged into predecessor
 unreachable_simplifycfg	simplifycfg	simplifycfg	test/opt/inputs/unreachable_simplifycfg.ll	test/opt/expected/z_llvm/unreachable_simplifycfg.ll	opt-equivalent	simplifycfg	constant branch to unreachable is simplified
 mem2reg	mem2reg	mem2reg	test/opt/inputs/mem2reg.ll	test/opt/expected/z_llvm/mem2reg.ll	opt-equivalent	mem2reg	generic LLVM headers only
+mem2reg_single_store	mem2reg	mem2reg	test/opt/inputs/mem2reg_single_store.ll	test/opt/expected/z_llvm/mem2reg_single_store.ll	opt-equivalent	mem2reg	single-store fast path replaces dominated loads
 mem2reg_undef	mem2reg	mem2reg	test/opt/inputs/mem2reg_undef.ll	test/opt/expected/z_llvm/mem2reg_undef.ll	opt-equivalent	mem2reg	uninitialized stack load becomes undef
 mem2reg_if	mem2reg	mem2reg	test/opt/inputs/mem2reg_if.ll	test/opt/expected/z_llvm/mem2reg_if.ll	opt-equivalent	mem2reg	multi-block phi placement
 mem2reg_loop	mem2reg	mem2reg	test/opt/inputs/mem2reg_loop.ll	test/opt/expected/z_llvm/mem2reg_loop.ll	opt-equivalent	mem2reg	loop-carried phi placement

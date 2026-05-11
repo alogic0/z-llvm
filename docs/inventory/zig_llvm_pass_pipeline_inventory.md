@@ -165,11 +165,11 @@ Status meanings:
 | --- | --- | --- | --- | --- |
 | `verify` / `VerifierPass` | mandatory | P0 | foundation: SSA dominance and phi predecessor checks for accepted IR | `llvm/lib/IR/Verifier.cpp` |
 | `always-inline` | mandatory IPO | P0 | placeholder | `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` |
-| `mem2reg` | canonicalization | P0 | foundation | `llvm/lib/Transforms/Utils/Mem2Reg.cpp` |
-| `sroa` | canonicalization / memory | P0 | foundation | `llvm/lib/Transforms/Scalar/SROA.cpp` |
-| `instcombine` | canonicalization | P0 | foundation | `llvm/lib/Transforms/InstCombine/` |
-| `instsimplify` | canonicalization query | P0 | foundation | `llvm/lib/Analysis/InstructionSimplify.cpp` |
-| `simplifycfg` | canonicalization / CFG | P0 | foundation | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
+| `mem2reg` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Utils/Mem2Reg.cpp` |
+| `sroa` | canonicalization / memory | P0 | fixture-equivalent for listed zero-GEP fixtures | `llvm/lib/Transforms/Scalar/SROA.cpp` |
+| `instcombine` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/InstCombine/` |
+| `instsimplify` | canonicalization query | P0 | fixture-equivalent through InstCombine fixtures | `llvm/lib/Analysis/InstructionSimplify.cpp` |
+| `simplifycfg` | canonicalization / CFG | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
 | `early-cse` | canonicalization / scalar | P1 | foundation | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
 | `dse` | memory optimization | P1 | foundation | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | foundation | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
@@ -255,10 +255,10 @@ Status meanings:
 
 Use this order for the next optimizer epic:
 
-- [ ] P0 verifier and unsupported-IR diagnostics.
-- [ ] P0 SROA/mem2reg stack-shape expansion for Zig-emitted IR.
-- [ ] P0 InstSimplify/InstCombine scalar canonicalization.
-- [ ] P0 SimplifyCFG for common Zig-emitted block shapes.
+- [x] P0 verifier and unsupported-IR diagnostics.
+- [x] P0 SROA/mem2reg stack-shape expansion for Zig-emitted IR.
+- [x] P0 InstSimplify/InstCombine scalar canonicalization.
+- [x] P0 SimplifyCFG for common Zig-emitted block shapes.
 - [ ] P1 EarlyCSE/GVN/SCCP foundations once call/global side effects are modeled.
 - [ ] P1 memory legality: DSE, MemoryLocation, alias/mod-ref, and MemorySSA-like
       scaffolding only where needed by accepted fixtures.

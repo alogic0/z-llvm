@@ -46,7 +46,7 @@ Core LLVM algorithm data structures:
   Poison/undef/freeze-aware refusal rules
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent through listed InstCombine fixtures
 
 Implemented subset:
   Integer identity folds

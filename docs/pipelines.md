@@ -52,7 +52,7 @@ Core LLVM algorithm data structures:
   Analysis-manager require/invalidate pipeline entries
 
 Local target status:
-  LLVM-shaped algorithm subset
+  LLVM-shaped pipeline subset with per-pass fixture-equivalent status tags
 
 Implemented subset:
   Named pass registry

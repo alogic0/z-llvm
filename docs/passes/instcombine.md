@@ -60,7 +60,7 @@ Core LLVM algorithm data structures:
   Conservative poison/undef/freeze refusal rules
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent for listed fixtures
 
 Implemented subset:
   Local instruction scan with alias replacement

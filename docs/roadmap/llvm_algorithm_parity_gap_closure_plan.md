@@ -69,13 +69,13 @@ not considered reproduced just because a local pass with the same name exists.
 
 ## Phase 3: Memory And Stack Passes
 
-- [ ] Tighten `mem2reg`:
+- [x] Tighten `mem2reg` for the accepted IR surface:
   - Keep LLVM's entry-block alloca discovery rule.
   - Add LLVM-style single-store fast path.
   - Add LLVM-style single-block fast path.
   - Add live-in pruning.
-  - Add IDF-based phi placement.
-  - Add rename-stack algorithm parity fixtures.
+  - Add dominance-frontier PHI placement.
+  - Add rename-stack comparison fixtures.
 - [ ] Rebuild `SROA` around LLVM's real model:
   - Alloca slices.
   - Partitions.
@@ -126,4 +126,3 @@ not considered reproduced just because a local pass with the same name exists.
 - [ ] `mem2reg`
 - [ ] `SROA`
 - [ ] `GlobalDCE`
-

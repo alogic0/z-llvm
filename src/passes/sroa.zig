@@ -6,7 +6,7 @@ const pass_manager = @import("../pass_manager.zig");
 pub const pass: pass_manager.ModulePass = .{
     .name = "sroa",
     .category = .memory,
-    .target_status = "LLVM-shaped algorithm subset",
+    .target_status = "fixture-equivalent for listed fixtures",
     .upstream_owner = "llvm/lib/Transforms/Scalar/SROA.cpp",
     .run = run,
 };

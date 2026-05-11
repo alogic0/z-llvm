@@ -4,10 +4,20 @@ const dominator = @import("../analysis/dominator.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
+const InstructionRef = struct {
+    block_index: usize,
+    instruction_index: usize,
+};
+
+const SingleStore = struct {
+    location: InstructionRef,
+    value: ir.Value,
+};
+
 pub const pass: pass_manager.ModulePass = .{
     .name = "mem2reg",
     .category = .canonicalization,
-    .target_status = "LLVM-shaped algorithm subset",
+    .target_status = "fixture-equivalent for listed fixtures",
     .upstream_owner = "llvm/lib/Transforms/Utils/Mem2Reg.cpp",
     .run = run,
 };
@@ -46,6 +56,22 @@ fn promoteOneFunctionSlot(module: *ir.Module, function_index: usize) !bool {
         changed = true;
     }
     if (changed) return true;
+
+    instruction_index = 0;
+    while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
+        const instruction = entry_block.instructions.items[instruction_index];
+        if (instruction.removed or instruction.kind != .alloca) continue;
+        const slot = instruction.result orelse continue;
+        if (!isPromotableStackSlot(function.*, slot)) continue;
+        const single_store = findSingleStore(function.*, slot) orelse continue;
+
+        var dom = try dominator.Dominators.build(module.allocator, function.*);
+        defer dom.deinit();
+        if (!singleStoreDominatesLoads(function.*, dom, slot, single_store)) continue;
+
+        promoteSingleStoreSlot(function, entry_block_index, instruction_index, slot, single_store);
+        return true;
+    }
 
     instruction_index = 0;
     while (instruction_index < entry_block.instructions.items.len) : (instruction_index += 1) {
@@ -136,6 +162,9 @@ fn promoteMultiBlockSlot(
     var frontiers = try dominator.DominanceFrontiers.build(allocator, function.*, dom);
     defer frontiers.deinit();
 
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
     const block_count = function.blocks.items.len;
     const has_phi = try allocator.alloc(bool, block_count);
     defer allocator.free(has_phi);
@@ -159,8 +188,12 @@ fn promoteMultiBlockSlot(
         }
     }
 
+    const live_in = try computeLiveInBlocks(allocator, function.*, graph, slot, defines);
+    defer allocator.free(live_in);
+
     while (worklist.pop()) |def_block| {
         for (frontiers.frontier(def_block)) |frontier_block| {
+            if (!live_in[frontier_block]) continue;
             if (has_phi[frontier_block]) continue;
             const phi_name = try newPhiName(module, slot, countPhis(phi_names));
             try insertSlotPhi(allocator, function, frontier_block, ty, phi_name);
@@ -169,9 +202,6 @@ fn promoteMultiBlockSlot(
             if (!defines[frontier_block]) try worklist.append(allocator, frontier_block);
         }
     }
-
-    var graph = try cfg.Graph.build(allocator, function.*);
-    defer graph.deinit();
 
     var children = try buildDominatorChildren(allocator, dom);
     defer deinitChildren(allocator, &children);
@@ -189,6 +219,108 @@ fn blockStoresSlot(block: ir.BasicBlock, slot: []const u8) bool {
         }
     }
     return false;
+}
+
+fn computeLiveInBlocks(allocator: std.mem.Allocator, function: ir.Function, graph: cfg.Graph, slot: []const u8, defines: []const bool) ![]bool {
+    const live_in = try allocator.alloc(bool, function.blocks.items.len);
+    errdefer allocator.free(live_in);
+    @memset(live_in, false);
+
+    var worklist: std.ArrayList(usize) = .empty;
+    defer worklist.deinit(allocator);
+
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (!blockLoadsSlotBeforeStore(block, slot)) continue;
+        live_in[block_index] = true;
+        try worklist.append(allocator, block_index);
+    }
+
+    while (worklist.pop()) |block_index| {
+        for (graph.predecessors(block_index)) |predecessor| {
+            if (defines[predecessor] or live_in[predecessor]) continue;
+            live_in[predecessor] = true;
+            try worklist.append(allocator, predecessor);
+        }
+    }
+
+    return live_in;
+}
+
+fn blockLoadsSlotBeforeStore(block: ir.BasicBlock, slot: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .load => |load| if (isNamed(load.ptr, slot)) return true,
+            .store => |store| if (isNamed(store.ptr, slot)) return false,
+            .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .gep, .call => {},
+        }
+    }
+    return false;
+}
+
+fn findSingleStore(function: ir.Function, slot: []const u8) ?SingleStore {
+    var single_store: ?SingleStore = null;
+    for (function.blocks.items, 0..) |block, block_index| {
+        for (block.instructions.items, 0..) |instruction, instruction_index| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .store => |store| {
+                    if (!isNamed(store.ptr, slot)) continue;
+                    if (single_store != null) return null;
+                    single_store = .{
+                        .location = .{
+                            .block_index = block_index,
+                            .instruction_index = instruction_index,
+                        },
+                        .value = store.value,
+                    };
+                },
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .gep, .call => {},
+            }
+        }
+    }
+    return single_store;
+}
+
+fn singleStoreDominatesLoads(function: ir.Function, dom: dominator.Dominators, slot: []const u8, single_store: SingleStore) bool {
+    for (function.blocks.items, 0..) |block, block_index| {
+        for (block.instructions.items, 0..) |instruction, instruction_index| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .load => |load| {
+                    if (!isNamed(load.ptr, slot)) continue;
+                    if (single_store.location.block_index == block_index) {
+                        if (single_store.location.instruction_index >= instruction_index) return false;
+                    } else if (!dom.dominates(single_store.location.block_index, block_index)) {
+                        return false;
+                    }
+                },
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => {},
+            }
+        }
+    }
+    return true;
+}
+
+fn promoteSingleStoreSlot(function: *ir.Function, alloca_block_index: usize, alloca_instruction_index: usize, slot: []const u8, single_store: SingleStore) void {
+    function.blocks.items[alloca_block_index].instructions.items[alloca_instruction_index].removed = true;
+    function.blocks.items[single_store.location.block_index].instructions.items[single_store.location.instruction_index].removed = true;
+
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .load => |load| {
+                    if (!isNamed(load.ptr, slot)) continue;
+                    const result = instruction.result orelse continue;
+                    instruction.removed = true;
+                    instruction.replacement = single_store.value;
+                    replaceValue(function, result, single_store.value);
+                },
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .store, .gep, .call => {},
+            }
+        }
+    }
 }
 
 fn newPhiName(module: *ir.Module, slot: []const u8, index: usize) ![]const u8 {

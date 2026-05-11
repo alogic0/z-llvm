@@ -46,6 +46,7 @@ opt-22 -passes='instcombine,dce' test/opt/inputs/instcombine_safe_scalar.ll -S -
 opt-22 -passes=dse test/opt/inputs/dse_overwrite.ll -S -o /tmp/llvm_dse_overwrite.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simplifycfg.ll
 opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg_common_ret.ll -S -o /tmp/llvm_simplifycfg_common_ret.ll
+opt-22 -passes=mem2reg test/opt/inputs/mem2reg_single_store.ll -S -o /tmp/llvm_mem2reg_single_store.ll
 ```
 
 Run all currently mapped LLVM comparisons:
@@ -156,7 +157,7 @@ DSE: single-block overwritten stack-store removal with intervening read/barrier 
 ADCE: unused side-effect-free instruction chain removal subset
 SimplifyCFG: constant branch folding, unreachable block removal, phi cleanup, block merge, empty-block threading, and matching return-block merge subsets
 EarlyCSE: same-block repeated pure-expression elimination subset
-Mem2Reg: entry-block alloca discovery plus single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets
+Mem2Reg: entry-block alloca discovery plus single-store, single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets
 SROA: zero-offset and nested-zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
 LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset

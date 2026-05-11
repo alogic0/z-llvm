@@ -47,7 +47,7 @@ Core LLVM algorithm data structures:
   Terminator rewrite decisions
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent for listed fixtures
 
 Implemented subset:
   Constant and same-target conditional branch folding

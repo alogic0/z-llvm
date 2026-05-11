@@ -6,7 +6,7 @@ const pass_manager = @import("../pass_manager.zig");
 pub const pass: pass_manager.ModulePass = .{
     .name = "simplifycfg",
     .category = .canonicalization,
-    .target_status = "LLVM-shaped algorithm subset",
+    .target_status = "fixture-equivalent for listed fixtures",
     .upstream_owner = "llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp",
     .run = run,
 };
