@@ -237,8 +237,15 @@ const Solver = struct {
                         select.false_value = select.true_value;
                         select.cond = .{ .int = 1 };
                     },
-                    .unknown, .undef => unresolved.* = true,
-                    .overdefined => overdefined.* = true,
+                    .undef => {
+                        select.cond = .undef;
+                        select.true_value = solver.materialize(select.true_value, unresolved, overdefined);
+                        select.false_value = solver.materialize(select.false_value, unresolved, overdefined);
+                    },
+                    .unknown, .overdefined => {
+                        select.true_value = solver.materialize(select.true_value, unresolved, overdefined);
+                        select.false_value = solver.materialize(select.false_value, unresolved, overdefined);
+                    },
                 }
             },
             .phi, .alloca, .load, .store, .gep, .call => {},

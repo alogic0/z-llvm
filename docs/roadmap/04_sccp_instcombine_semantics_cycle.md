@@ -23,7 +23,7 @@ comparisons, select, and PHI handling.
 - [ ] Add more precise handling for PHI incoming values from unreachable edges.
 - [x] Add supported integer cast folds with width-aware signed/unsigned rules.
 - [ ] Expand `icmp` folding for signed/unsigned predicates and known constants.
-- [ ] Add select folding cases that are legal under local undef/freeze rules.
+- [x] Add select folding cases that are legal under local undef/freeze rules.
 - [ ] Audit all arithmetic folds involving flags (`nsw`, `nuw`, `exact`) and
       reject unsafe folds.
 - [ ] Add fixtures from Zig-emitted scalar IR where possible before synthetic
@@ -50,4 +50,13 @@ comparisons, select, and PHI handling.
       `sext i8 255` behavior against `opt-22`.
 - [x] Documented the width-aware bitpattern boundary in
       `docs/passes/inst_simplify.md`.
+- [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.
+
+## Completed SCCP Select Slice
+
+- [x] Adjusted SCCP select operand mapping so an overdefined condition does not
+      block legal identical-arm simplification.
+- [x] Added `sccp_select_same_arms` as an opt-22-equivalent fixture.
+- [x] Documented the selected local SCCP semantic boundary in
+      `docs/passes/sccp.md`.
 - [x] Verified with `zig build test` and `bash scripts/compare_opt.sh`.

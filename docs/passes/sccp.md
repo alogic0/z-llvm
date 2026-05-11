@@ -50,6 +50,8 @@ executable-block and executable-edge tracking
 edge-sensitive PHI visitation that ignores unreachable incoming values
 undef plus constant PHI resolution for covered scalar cases
 supported scalar instruction visitor using the InstSimplify helper
+select simplification where an overdefined condition still permits folding
+identical constant arms
 conditional branch edge marking and branch folding when the condition is constant
 direct call folding when the callee is a known local function that always returns the same constant
 ```
@@ -71,6 +73,7 @@ opt-22 equivalent:
   sccp_branch
   sccp_phi_edge
   sccp_undef_phi
+  sccp_select_same_arms
 
 local-only conservative:
   none currently
