@@ -122,8 +122,9 @@ full atomic ordering semantics
 atomic `syncscope`
 atomic ordering interpretation and atomic-specific optimization
 calling conventions beyond parse-preserve support
-TBAA
-noalias / alias.scope
+TBAA interpretation beyond opaque `!tbaa` instruction attachment preservation
+noalias / alias.scope interpretation beyond opaque instruction attachment
+preservation
 debug metadata beyond opaque `!dbg` preservation for instructions, simple
 branches, call sites, loop PHIs, and reduced lexical-block fixtures
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation

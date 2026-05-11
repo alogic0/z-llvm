@@ -1819,6 +1819,55 @@ test "parser preserves inert branch metadata attachments" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves alias metadata attachments opaquely" {
+    const input =
+        \\define i32 @alias_metadata(ptr %a, ptr %b) {
+        \\entry:
+        \\  %x = load i32, ptr %a, align 4, !tbaa !0, !alias.scope !3, !noalias !6
+        \\  store i32 %x, ptr %b, align 4, !tbaa !0, !alias.scope !6, !noalias !3
+        \\  ret i32 %x
+        \\}
+        \\
+        \\!0 = !{!1, !1, i64 0}
+        \\!1 = !{!"int", !2}
+        \\!2 = !{!"Simple C/C++ TBAA"}
+        \\!3 = !{!4}
+        \\!4 = distinct !{!4, !5}
+        \\!5 = distinct !{!5}
+        \\!6 = !{!7}
+        \\!7 = distinct !{!7, !5}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !3, !noalias !6", module.functions.items[0].blocks.items[0].instructions.items[0].metadata.?);
+    try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !6, !noalias !3", module.functions.items[0].blocks.items[0].instructions.items[1].metadata.?);
+    try std.testing.expectEqual(@as(usize, 8), module.metadata.items.len);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported instruction metadata attachments" {
+    const input =
+        \\define i32 @unsupported_metadata(ptr %p) {
+        \\entry:
+        \\  %x = load i32, ptr %p, align 4, !range !0
+        \\  ret i32 %x
+        \\}
+        \\
+        \\!0 = !{i32 0, i32 10}
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedInstructionMetadata, ir.Module.parse(std.testing.allocator, input));
+}
+
 test "parser preserves Zig raw aliases and attribute groups" {
     const input =
         \\source_filename = "tiny_scalar"

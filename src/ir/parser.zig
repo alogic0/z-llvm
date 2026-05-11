@@ -582,13 +582,30 @@ fn parseInstruction(allocator: std.mem.Allocator, line: []const u8) !core.Instru
     const metadata_start = std.mem.indexOf(u8, line, ", !");
     const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
     const instruction_text = if (metadata_start) |index| std.mem.trim(u8, line[0..index], " \t") else line;
-    if (metadata) |attachment| {
-        if (!std.mem.startsWith(u8, attachment, "!dbg ")) return error.UnsupportedInstructionMetadata;
-    }
+    if (metadata) |attachment| try validateInstructionMetadata(attachment);
 
     var instruction = try parseInstructionBody(allocator, instruction_text);
     instruction.metadata = metadata;
     return instruction;
+}
+
+fn validateInstructionMetadata(metadata: []const u8) !void {
+    var rest = std.mem.trim(u8, metadata, " \t");
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const attachment = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        if (!isSupportedInstructionMetadataAttachment(attachment)) return error.UnsupportedInstructionMetadata;
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+}
+
+fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
+    const key = firstToken(attachment) orelse return false;
+    if (attachment.len == key.len) return false;
+    return std.mem.eql(u8, key, "!dbg") or
+        std.mem.eql(u8, key, "!tbaa") or
+        std.mem.eql(u8, key, "!alias.scope") or
+        std.mem.eql(u8, key, "!noalias");
 }
 
 fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {

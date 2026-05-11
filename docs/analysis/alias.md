@@ -59,10 +59,12 @@ Implemented subset:
   Known disjoint byte ranges
   Load/store mod-ref queries
   Volatile/atomic/call unknown barriers
+  Alias metadata preservation only; `!tbaa`, `!alias.scope`, and `!noalias`
+  are not consumed by alias queries.
 
 Intentional divergences:
-  No address spaces, captures, recursive AA stack, metadata, or partial-alias
-  result.
+  No address spaces, captures, recursive AA stack, interpreted metadata, or
+  partial-alias result.
 
 Analysis preservation/invalidation:
   Alias analysis is rebuilt on demand and has no preserved state.
@@ -122,6 +124,7 @@ no address spaces
 no capture analysis; distinct pointer parameters remain may_alias
 globals are limited to accepted scalar global definitions and aliases
 calls are limited to function-attribute memory-effect classification
+no metadata-driven alias precision; see `docs/analysis/alias_metadata.md`
 no partial_alias result
 no aggregate, struct, or vector layout
 no precise mod_ref result for calls or unknown instructions
