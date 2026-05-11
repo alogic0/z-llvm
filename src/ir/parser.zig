@@ -8,6 +8,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         .source = try allocator.dupe(u8, text),
         .owned_strings = .empty,
         .module_asm = .empty,
+        .named_types = .empty,
         .globals = .empty,
         .aliases = .empty,
         .comdats = .empty,
@@ -51,6 +52,12 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         if (current_function == null and std.mem.startsWith(u8, line, "target datalayout")) {
             module.target_datalayout = try parseModuleStringRecord(line, "target datalayout");
             _ = try @import("../target.zig").DataLayout.parse(module.target_datalayout.?);
+            continue;
+        }
+
+        if (current_function == null and std.mem.startsWith(u8, line, "%")) {
+            const named_type = try parseNamedTypeDefinition(line);
+            try module.named_types.append(allocator, named_type);
             continue;
         }
 
@@ -153,7 +160,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     }
 
     if (current_function != null) return error.UnclosedFunction;
-    if (module.functions.items.len == 0 and module.module_asm.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
+    if (module.functions.items.len == 0 and module.module_asm.items.len == 0 and module.named_types.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
     return module;
 }
 
@@ -178,6 +185,33 @@ fn parseModuleAsm(line: []const u8) !void {
         }
     }
     return error.InvalidModuleAsm;
+}
+
+fn parseNamedTypeDefinition(line: []const u8) !core.NamedTypeDefinition {
+    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidNamedTypeDefinition;
+    const name = std.mem.trim(u8, line[0..eq_index], " \t");
+    if (!isSupportedNamedTypeName(name)) return error.UnsupportedNamedTypeDefinition;
+
+    const rest = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    if (!std.mem.startsWith(u8, rest, "type ")) return error.InvalidNamedTypeDefinition;
+    const body = std.mem.trim(u8, rest["type ".len..], " \t");
+    if (body.len == 0) return error.InvalidNamedTypeDefinition;
+    if (body[0] != '{' or body[body.len - 1] != '}') return error.UnsupportedNamedTypeDefinition;
+
+    return .{
+        .name = name[1..],
+        .body = body,
+        .raw = line,
+    };
+}
+
+fn isSupportedNamedTypeName(name: []const u8) bool {
+    if (name.len <= 1 or name[0] != '%') return false;
+    for (name[1..]) |byte| switch (byte) {
+        'a'...'z', 'A'...'Z', '0'...'9', '.', '_', '-' => {},
+        else => return false,
+    };
+    return true;
 }
 
 fn parseComdat(line: []const u8) !void {
@@ -881,10 +915,14 @@ fn containsUnsupportedEhFunctionAttr(attrs: []const u8) bool {
 }
 
 fn parseAlloca(text: []const u8) !core.AllocaInst {
-    const ty_text = std.mem.trim(u8, text["alloca ".len..], " \t");
+    const rest = std.mem.trim(u8, text["alloca ".len..], " \t");
+    const comma = findTopLevelComma(rest);
+    const ty_text = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
     if (ty_text.len == 0) return error.InvalidInstruction;
-    if (findTopLevelComma(ty_text) != null) return error.InvalidInstruction;
-    return .{ .allocated_ty = try parseType(ty_text) };
+    return .{
+        .allocated_ty = try parseType(ty_text),
+        .attrs = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else null,
+    };
 }
 
 fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
@@ -1649,6 +1687,7 @@ fn parseType(text: []const u8) !core.Type {
     if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
+    if (isSupportedNamedTypeName(trimmed)) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;

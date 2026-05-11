@@ -29,6 +29,7 @@ source_filename module record
 target datalayout module record
 target triple module record
 opaque module asm records
+opaque named type definitions in the `%name = type { ... }` spelling
 scalar global definitions with integer or undef initializers
 scalar constant global definitions with integer or undef initializers
 raw global suffix attributes preserved as text
@@ -76,6 +77,7 @@ semantics
 arrays
 scalable vectors and unsupported vector element types
 structs
+named type completion and named aggregate layout semantics
 packed structs
 full optional and error-union ABI lowering beyond observed scalar/null-pointer
 fixtures

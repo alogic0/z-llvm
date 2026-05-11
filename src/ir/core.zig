@@ -539,6 +539,7 @@ pub const PhiInst = struct {
 
 pub const AllocaInst = struct {
     allocated_ty: Type,
+    attrs: ?[]const u8 = null,
 };
 
 pub const MemoryAttrs = struct {
@@ -904,6 +905,7 @@ pub const Module = struct {
     target_triple: ?[]const u8 = null,
     target_datalayout: ?[]const u8 = null,
     module_asm: std.ArrayList([]const u8),
+    named_types: std.ArrayList(NamedTypeDefinition),
     globals: std.ArrayList(Global),
     aliases: std.ArrayList(GlobalAlias),
     comdats: std.ArrayList([]const u8),
@@ -919,6 +921,7 @@ pub const Module = struct {
     pub fn deinit(module: *Module) void {
         for (module.globals.items) |*global| global.deinit(module.allocator);
         module.module_asm.deinit(module.allocator);
+        module.named_types.deinit(module.allocator);
         module.globals.deinit(module.allocator);
         module.aliases.deinit(module.allocator);
         module.comdats.deinit(module.allocator);
@@ -961,4 +964,10 @@ pub const Module = struct {
         }
         return false;
     }
+};
+
+pub const NamedTypeDefinition = struct {
+    name: []const u8,
+    body: []const u8,
+    raw: []const u8,
 };

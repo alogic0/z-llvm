@@ -276,6 +276,7 @@ const VerifyContext = struct {
 
 pub fn verify(module: core.Module) !void {
     try verifyTargetRecords(module);
+    try verifyNamedTypes(module);
     try verifyMetadataGraph(module);
 
     var global_defs = std.StringHashMap(void).init(module.allocator);
@@ -815,6 +816,18 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     }
 
     return error.UnknownFunction;
+}
+
+fn verifyNamedTypes(module: core.Module) !void {
+    var defs = std.StringHashMap(void).init(module.allocator);
+    defer defs.deinit();
+
+    for (module.named_types.items) |named_type| {
+        if (named_type.name.len == 0) return error.InvalidNamedTypeDefinition;
+        if (named_type.body.len == 0) return error.InvalidNamedTypeDefinition;
+        if (defs.contains(named_type.name)) return error.DuplicateNamedTypeDefinition;
+        try defs.put(named_type.name, {});
+    }
 }
 
 fn verifyTargetRecords(module: core.Module) !void {

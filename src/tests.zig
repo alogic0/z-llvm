@@ -4451,6 +4451,46 @@ test "parser preserves module-level asm records opaquely" {
     try std.testing.expectEqualStrings("module asm \".set this_is_my_alias, derp;\"", module.module_asm.items[2]);
 }
 
+test "parser preserves named type definitions opaquely" {
+    const input =
+        \\source_filename = "named_types"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\%os.linux.rlimit = type { i64, i64 }
+        \\%os.linux.stack_t__struct_3163 = type { ptr, i32, [4 x i8], i64 }
+        \\
+        \\define void @use_named_type(ptr %p) {
+        \\entry:
+        \\  %slot = alloca %os.linux.rlimit, align 8
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 2), module.named_types.items.len);
+    try std.testing.expectEqualStrings("os.linux.rlimit", module.named_types.items[0].name);
+    try std.testing.expectEqualStrings("{ i64, i64 }", module.named_types.items[0].body);
+    try std.testing.expectEqualStrings("%os.linux.rlimit = type { i64, i64 }", module.named_types.items[0].raw);
+    try std.testing.expectEqualStrings("os.linux.stack_t__struct_3163", module.named_types.items[1].name);
+    try std.testing.expectEqualStrings("{ ptr, i32, [4 x i8], i64 }", module.named_types.items[1].body);
+}
+
+test "verifier rejects duplicate named type definitions" {
+    const input =
+        \\%os.linux.rlimit = type { i64, i64 }
+        \\%os.linux.rlimit = type { ptr, i64 }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try std.testing.expectError(error.DuplicateNamedTypeDefinition, module.verify());
+}
+
 test "parser rejects unsupported inline asm forms explicitly" {
     const missing_sideeffect =
         \\define void @inline_asm_barrier() {
