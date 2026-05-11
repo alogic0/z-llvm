@@ -96,7 +96,7 @@ fn isHoistable(instruction: ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |binary| !isFpBinary(binary.op),
         .cast, .icmp, .select => true,
-        .freeze, .fcmp, .phi, .alloca, .load, .store, .gep, .call => false,
+        .freeze, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
     };
 }
 
@@ -111,7 +111,7 @@ fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalL
         .select => |select| natural_loop.isLoopInvariantValue(select.cond, def_blocks) and
             natural_loop.isLoopInvariantValue(select.true_value, def_blocks) and
             natural_loop.isLoopInvariantValue(select.false_value, def_blocks),
-        .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
+        .freeze, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
     };
 }
 
@@ -157,6 +157,9 @@ fn instructionUsesAreDominated(
         .alloca => return true,
         .load => |load| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{load.ptr}),
         .store => |store| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ store.value, store.ptr }),
+        .atomicrmw => |atomicrmw| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ atomicrmw.ptr, atomicrmw.value }),
+        .cmpxchg => |cmpxchg| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ cmpxchg.ptr, cmpxchg.expected, cmpxchg.replacement }),
+        .fence => return true,
         .gep => |gep| {
             if (valueMatchesName(gep.ptr, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
             for (gep.indices.items) |index| {

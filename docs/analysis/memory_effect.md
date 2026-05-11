@@ -39,6 +39,8 @@ classify scalar binary, icmp, select, phi, alloca, and getelementptr as no memor
 classify nonvolatile nonatomic load as readonly_load
 classify nonvolatile nonatomic store as memory_write
 classify volatile or atomic load/store as volatile_or_atomic_barrier
+classify side-effecting inline asm as volatile_or_atomic_barrier
+classify atomicrmw, cmpxchg, and fence as volatile_or_atomic_barrier
 expose mayReadMemory, mayWriteMemory, and hasSideEffects helpers over that classification
 expose mayReadOrWriteMemory, mayThrow, mayTrap, isSafeToDelete, and isSafeToSpeculativelyExecute helpers
 split volatile and atomic spelling through barrierKind while keeping both as hard barriers
@@ -60,10 +62,12 @@ opt-22 equivalent:
 local-only conservative:
   licm_aligned_load_reject
   memory_atomic_barrier_reject
+  inline_asm_barrier_preserve
+  atomic_rmw_cmpxchg_fence_barrier
 
 unit-test only:
-  memory effect classification for pure instruction, readonly load, volatile load, store, and atomic store
-  volatile versus atomic barrier kind classification
+  memory effect classification for pure instruction, readonly load, volatile load, store, atomic store, inline asm, atomicrmw, cmpxchg, and fence
+  volatile, atomic, and inline asm barrier kind classification
   may-throw call and may-trap division classification
   safe-to-delete and safe-to-speculate predicates
   conservative unknown-pointer mod/ref behavior
@@ -73,16 +77,17 @@ Upstream mapping:
 
 ```text
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
-LLVM has richer behavior for calls, intrinsics, fences, atomics, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
-This project currently treats volatile/atomic memory as a hard barrier and leaves all memory motion disabled unless a later pass proves safety explicitly.
+LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
+This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly.
 LICM also rejects locally trapping scalar operations such as division by an unknown denominator through the shared speculation helper.
 ```
 
 Known gaps:
 
 ```text
-no inline asm, intrinsic, fence, cmpxchg, or atomicrmw classification beyond
-explicit parser rejection
+inline asm constraints and full atomic ordering are not interpreted
+syncscope remains rejected
+no intrinsic classification beyond explicit parser rejection
 no target-library or readonly/readnone call handling
 MemoryLocation size and offset model is limited to scalar stack-slot accesses
 no MemoryLocation metadata model

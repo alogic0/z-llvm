@@ -18,12 +18,14 @@ but no transform interprets acquire, release, monotonic, or seq_cst semantics.
 ## Explicit Rejections
 
 ```text
-atomicrmw
-cmpxchg
-fence
 syncscope
 inline asm lowering and constraint validation
 ```
+
+`atomicrmw`, `cmpxchg`, and `fence` are accepted only as conservative
+side-effecting memory barriers. Ordering text and optional alignment are
+preserved, but no pass interprets atomic ordering or performs atomic-specific
+optimization.
 
 Inline asm is represented only for the observed source-backed barrier shape:
 `call void asm sideeffect "...", "...~{memory}..."()`. The parser preserves the
@@ -32,10 +34,9 @@ a memory clobber. It does not validate registers, constraints, outputs, native
 lowering, or target-specific behavior.
 
 The current source-backed captured row
-`atomics_inline_asm_debug_release_fast` remains future-only because the full row
-also contains call-site attributes and `atomicrmw`. The reduced inline-asm
-barrier is accepted as optimizer input; a reduced `atomicrmw` fixture documents
-the next blocker in the same Zig source group.
+`atomics_inline_asm_debug_release_fast` is accepted as optimizer input under the
+barrier model. The reduced inline-asm and `atomicrmw` fixtures document the two
+source-backed shapes from the same Zig source group.
 
 ## Optimizer Policy
 
@@ -60,11 +61,13 @@ local-only conservative opt fixture:
 
 unit tests:
   atomic load/store parse/print preservation
+  atomicrmw/cmpxchg/fence parse/print preservation as side-effecting barriers
   reduced inline asm parse/print preservation as a side-effecting memory barrier
-  atomicrmw, cmpxchg, and fence rejection
+  syncscope rejection
   source-backed reduced inline-asm and atomicrmw fixtures from
   `atomics_inline_asm_debug_release_fast`
   memory-effect barrier classification
+  DCE preservation for atomicrmw, cmpxchg, and fence
   DCE/ADCE/GVN/EarlyCSE/LICM/DSE atomic barrier preservation
   Mem2Reg atomic alloca-user rejection
 ```
@@ -82,7 +85,7 @@ Source-backed reduced rejection fixtures:
 
 ```text
 test/zig/expected/atomics_inline_asm_inline_asm.reduced.ll
-test/zig/expected/atomics_inline_asm_atomicrmw.unsupported.ll
+test/zig/expected/atomics_inline_asm_atomicrmw.reduced.ll
 ```
 
 ## Upstream Mapping

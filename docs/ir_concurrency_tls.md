@@ -18,14 +18,12 @@ visible.
 ## Fail-Closed Surface
 
 ```text
-fence
-atomicrmw
-cmpxchg
 syncscope
-inline asm
+non-sideeffect or malformed inline asm
 ```
 
-These remain rejected or classified through the atomics/inline-asm boundary in
+Narrow `fence`, `atomicrmw`, `cmpxchg`, and side-effecting inline asm forms are
+classified through the conservative atomics/inline-asm barrier boundary in
 `docs/ir_atomics_inline_asm.md`.
 
 ## Fixture Coverage
@@ -43,7 +41,8 @@ opt-equivalent fixture:
 
 unit tests:
   thread-local global preservation through GlobalDCE
-  fence rejection through the atomic parser boundary
+  fence, atomicrmw, cmpxchg, and inline asm barrier preservation
+  syncscope rejection through the atomic parser boundary
   volatile/atomic memory-effect barriers
 ```
 

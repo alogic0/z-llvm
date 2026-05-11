@@ -23,15 +23,15 @@ current corpus proves and which next blockers should drive future slices.
 
 Parser:
 
-- Inline asm calls from `atomics_inline_asm_debug_release_fast` are rejected
-      before they can become optimizer input.
-- `atomicrmw` remains rejected until the IR models ordering, result value, and
-      read-modify-write memory effects.
+- Inline asm calls from `atomics_inline_asm_debug_release_fast` are accepted
+      only when side-effecting and modeled as conservative memory barriers.
+- `atomicrmw` is accepted only in narrow parser/verifier forms and modeled as
+      a conservative memory barrier.
 - Vector IR is represented only by the future boundary fixture.
 
 Verifier:
 
-- Atomic ordering, inline asm constraints, and vector lane/type invariants have
+- Full atomic ordering, inline asm constraints, and vector lane/type invariants have
       no verifier contract yet.
 - Debug metadata is preserved for reduced fixtures, but large Debug-mode Zig IR
       still needs smaller source-backed reductions before verifier policy can be
@@ -65,7 +65,8 @@ Atomics:
 
 - Atomic stores and loads are treated as hard conservative barriers in pass
       fixtures.
-- Source-backed `atomicrmw` remains a fail-closed parser boundary.
+- Source-backed `atomicrmw` has a reduced optimizer-input fixture. Full
+      syncscope and ordering semantics remain fail-closed.
 
 Backend handoff:
 
@@ -78,9 +79,8 @@ Backend handoff:
 The next wave should stay source-backed and pull only one bounded blocker at a
 time:
 
-1. Inline asm and `atomicrmw` IR representation with verifier fail-closed rules.
-2. Vector IR parser/verifier bootstrap plus target-cost policy boundaries.
-3. AArch64 optimizer-input separation for target-independent passes.
-4. Debug-mode reduction work for large source-backed Debug rows.
-5. Path-aware MemorySSA only after a source-backed fixture demonstrates that the
+1. Vector IR parser/verifier bootstrap plus target-cost policy boundaries.
+2. AArch64 optimizer-input separation for target-independent passes.
+3. Debug-mode reduction work for large source-backed Debug rows.
+4. Path-aware MemorySSA only after a source-backed fixture demonstrates that the
       current conservative scan blocks a needed transform.

@@ -136,7 +136,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
     const store_instruction = block.instructions.items[store_index];
     const store = switch (store_instruction.kind) {
         .store => |store| store,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .call => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .atomicrmw, .cmpxchg, .fence, .call => return false,
     };
     if (memory_effect.classify(store_instruction) == .volatile_or_atomic_barrier) return false;
 
@@ -159,7 +159,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 const later = accessLocation(function, layout, load.ptr, load.ty) orelse return false;
                 if (alias.aliasLocations(later, location) != .no_alias) return false;
             },
-            .call => return false,
+            .atomicrmw, .cmpxchg, .fence, .call => return false,
             .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
         }
     }
@@ -170,6 +170,7 @@ fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {
     return switch (instruction.kind) {
         .load => |load| if (load.attrs.isBarrier()) .barrier else .use,
         .store => |store| if (store.attrs.isBarrier()) .barrier else .def,
+        .atomicrmw, .cmpxchg, .fence => .barrier,
         .call => |call| switch (function_attrs.callMemoryEffect(module, call)) {
             .none => null,
             .readonly_load => .use,
@@ -183,6 +184,9 @@ fn accessPointer(instruction: ir.Instruction) ?ir.Value {
     return switch (instruction.kind) {
         .load => |load| load.ptr,
         .store => |store| store.ptr,
+        .atomicrmw => |atomicrmw| atomicrmw.ptr,
+        .cmpxchg => |cmpxchg| cmpxchg.ptr,
+        .fence => null,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .call => null,
     };
 }
@@ -222,7 +226,7 @@ fn blockMayReachMemory(function: ir.Function, graph: cfg.Graph, block_index: usi
 fn blockHasMemoryAccess(block: ir.BasicBlock) bool {
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;
-        if (instruction.kind == .load or instruction.kind == .store or instruction.kind == .call) return true;
+        if (instruction.kind == .load or instruction.kind == .store or instruction.kind == .atomicrmw or instruction.kind == .cmpxchg or instruction.kind == .fence or instruction.kind == .call) return true;
     }
     return false;
 }

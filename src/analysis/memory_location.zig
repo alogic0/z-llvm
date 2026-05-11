@@ -125,7 +125,7 @@ fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.
                     base.size = access_size orelse typeSizeMaybeLayout(layout, gep.source_ty);
                     return base;
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .call => return null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .call => return null,
             }
         }
     }

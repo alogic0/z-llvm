@@ -191,7 +191,7 @@ parser blockers after Cycle 1:
 
 | Fixture | First local rejection |
 | --- | --- |
-| `atomics_inline_asm_debug_release_fast` | Full row remains future because call-site attribute groups and `atomicrmw` still need separate cycles. |
+| `atomics_inline_asm_debug_release_fast` | Accepted as conservative inline-asm and atomic barriers; native lowering and atomic optimization remain out of scope. |
 
 ## Source Group Coverage
 
@@ -205,7 +205,7 @@ parser blockers after Cycle 1:
 | `aggregates` | `test/zig/inputs/aggregates.zig` | `test/zig/captured/aggregates.ReleaseFast.x86_64.ll` | arrays, struct field GEP, slice iteration, optionals, error unions | `parse`, `verify`, `optimizer-input` |
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `parse`, `verify`, `optimizer-input` |
 | `globals_comptime` | `test/zig/inputs/globals_comptime.zig` | `test/zig/captured/globals_comptime.ReleaseFast.x86_64.ll` | internal globals, exported aliases, global load/store, comptime folding | `parse`, `verify`, `optimizer-input` |
-| `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll`; `test/zig/expected/atomics_inline_asm_inline_asm.reduced.ll`; `test/zig/expected/atomics_inline_asm_atomicrmw.unsupported.ll` | `atomicrmw`, inline asm side effects and memory clobber, debug-oriented source shape | reduced inline asm accepted; full row and atomicrmw remain `unsupported`, `debug-info-only`, `future` |
+| `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll`; `test/zig/expected/atomics_inline_asm_inline_asm.reduced.ll`; `test/zig/expected/atomics_inline_asm_atomicrmw.reduced.ll` | `atomicrmw`, inline asm side effects and memory clobber, debug-oriented source shape | accepted as conservative optimizer-input barriers; lowering and optimization remain out of scope |
 | `tls_concurrency` | `test/zig/inputs/tls_concurrency.zig` | `test/zig/captured/tls_concurrency.ReleaseFast.x86_64.ll` | `thread_local` global, TLS load/store accessors, target-memory attributes | `parse`, `verify`, `optimizer-input` |
 | `switch_control` | `test/zig/inputs/switch_control.zig` | `test/zig/captured/switch_control.ReleaseFast.x86_64.ll` | switch lookup table, private array constant, branch/select lowering | `parse`, `verify`, `optimizer-input` |
 | `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll`; `test/zig/captured/floats_math.ReleaseSmall.x86_64.ll` | float/double signatures, `select`, `fadd`, size attrs | `parse`, `verify`, `optimizer-input`, `float-ir` |

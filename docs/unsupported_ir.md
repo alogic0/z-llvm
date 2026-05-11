@@ -83,7 +83,7 @@ invoke/callbr
 bitcast/ptrtoint/inttoptr/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast
 switch
 landingpad/resume/cleanupret/catchret/catchswitch/catchpad/cleanuppad
-atomicrmw/cmpxchg/fence
+atomic syncscope and atomic optimization semantics
 inline asm
 ```
 
@@ -98,8 +98,8 @@ fast-math flags
 full alignment semantics
 full volatile semantics
 full atomic ordering semantics
-atomic read-modify-write operations such as `atomicrmw`
-compare-exchange and fence operations
+atomic `syncscope`
+atomic ordering interpretation and atomic-specific optimization
 calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope

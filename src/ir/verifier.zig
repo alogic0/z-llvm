@@ -394,6 +394,29 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(.ptr, store.ptr, block_index, instruction_index);
                         try verifyMemoryAttrs(store.attrs);
                     },
+                    .atomicrmw => |atomicrmw| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try ctx.verifyValue(.ptr, atomicrmw.ptr, block_index, instruction_index);
+                        try ctx.verifyValue(atomicrmw.ty, atomicrmw.value, block_index, instruction_index);
+                        try verifyAtomicOrdering(atomicrmw.ordering);
+                        if (atomicrmw.@"align") |alignment| try verifyAlignment(alignment);
+                    },
+                    .cmpxchg => |cmpxchg| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try ctx.verifyValue(.ptr, cmpxchg.ptr, block_index, instruction_index);
+                        try ctx.verifyValue(cmpxchg.ty, cmpxchg.expected, block_index, instruction_index);
+                        try ctx.verifyValue(cmpxchg.ty, cmpxchg.replacement, block_index, instruction_index);
+                        try verifyAtomicOrdering(cmpxchg.success_ordering);
+                        try verifyAtomicOrdering(cmpxchg.failure_ordering);
+                        if (cmpxchg.@"align") |alignment| try verifyAlignment(alignment);
+                    },
+                    .fence => |fence| {
+                        saw_non_phi = true;
+                        if (instruction.result != null) return error.StoreHasResult;
+                        try verifyAtomicOrdering(fence.ordering);
+                    },
                     .gep => |gep| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
@@ -603,12 +626,20 @@ fn verifyCast(cast: core.CastInst) !void {
 
 fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {
     if (attrs.@"align") |alignment| {
-        if (alignment == 0) return error.InvalidAlignment;
-        if (!std.math.isPowerOfTwo(alignment)) return error.InvalidAlignment;
+        try verifyAlignment(alignment);
     }
     if (attrs.atomic_ordering) |ordering| {
-        if (!isKnownAtomicOrdering(ordering)) return error.InvalidAtomicMemory;
+        try verifyAtomicOrdering(ordering);
     }
+}
+
+fn verifyAlignment(alignment: u32) !void {
+    if (alignment == 0) return error.InvalidAlignment;
+    if (!std.math.isPowerOfTwo(alignment)) return error.InvalidAlignment;
+}
+
+fn verifyAtomicOrdering(ordering: []const u8) !void {
+    if (!isKnownAtomicOrdering(ordering)) return error.InvalidAtomicMemory;
 }
 
 fn verifyBlockTarget(function: core.Function, block_name: []const u8) !void {

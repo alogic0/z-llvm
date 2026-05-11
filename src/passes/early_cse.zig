@@ -128,7 +128,7 @@ fn visitBlock(
 fn forwardStoreToLoad(module: ir.Module, function: ir.Function, stores: []const AvailableStore, instruction: *ir.Instruction) ?ir.Value {
     const load = switch (instruction.kind) {
         .load => |load| load,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => return null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return null,
     };
     if (load.attrs.isBarrier()) return null;
 
@@ -167,6 +167,7 @@ fn updateMemoryAvailability(
             .none, .readonly_load => {},
             .memory_write, .volatile_or_atomic_barrier, .unknown => stores.clearRetainingCapacity(),
         },
+        .atomicrmw, .cmpxchg, .fence => stores.clearRetainingCapacity(),
         .load => |load| if (load.attrs.isBarrier()) stores.clearRetainingCapacity(),
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => {},
     }
@@ -231,14 +232,14 @@ fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {
     if (!memory_effect.isSafeToDelete(instruction)) {
         const call = switch (instruction.kind) {
             .call => |call| call,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep => return false,
         };
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
     return switch (instruction.kind) {
         .binary => |binary| !isFpBinary(binary.op),
         .cast, .icmp, .load => true,
-        .freeze, .fcmp, .select, .phi, .alloca, .store, .gep, .call => false,
+        .freeze, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
     };
 }
 

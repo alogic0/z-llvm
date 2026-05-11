@@ -147,6 +147,16 @@ const LiveInstructions = struct {
                 try liveness.markValue(store.value);
                 try liveness.markValue(store.ptr);
             },
+            .atomicrmw => |atomicrmw| {
+                try liveness.markValue(atomicrmw.ptr);
+                try liveness.markValue(atomicrmw.value);
+            },
+            .cmpxchg => |cmpxchg| {
+                try liveness.markValue(cmpxchg.ptr);
+                try liveness.markValue(cmpxchg.expected);
+                try liveness.markValue(cmpxchg.replacement);
+            },
+            .fence => {},
             .gep => |gep| {
                 try liveness.markValue(gep.ptr);
                 for (gep.indices.items) |index| try liveness.markValue(index.value);

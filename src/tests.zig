@@ -3582,7 +3582,7 @@ test "parser accepts narrow atomic load and store spelling as barriers" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser rejects unsupported atomic memory operations" {
+test "parser preserves atomicrmw cmpxchg and fence barriers" {
     const input =
         \\define i32 @memory_atomicrmw(ptr %p) {
         \\entry:
@@ -3592,7 +3592,11 @@ test "parser rejects unsupported atomic memory operations" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, input));
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(module.functions.items[0].blocks.items[0].instructions.items[0]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.atomic, memory_effect.barrierKind(module.functions.items[0].blocks.items[0].instructions.items[0]));
 
     const cmpxchg =
         \\define i32 @memory_cmpxchg(ptr %p, i32 %old, i32 %new) {
@@ -3602,16 +3606,23 @@ test "parser rejects unsupported atomic memory operations" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, cmpxchg));
+    var cmpxchg_module = try ir.Module.parse(std.testing.allocator, cmpxchg);
+    defer cmpxchg_module.deinit();
+    try cmpxchg_module.verify();
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(cmpxchg_module.functions.items[0].blocks.items[0].instructions.items[0]));
 
     const fence =
         \\define void @memory_fence() {
         \\entry:
         \\  fence seq_cst
+        \\  ret void
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, fence));
+    var fence_module = try ir.Module.parse(std.testing.allocator, fence);
+    defer fence_module.deinit();
+    try fence_module.verify();
+    try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(fence_module.functions.items[0].blocks.items[0].instructions.items[0]));
 
     const source_backed_atomicrmw =
         \\source_filename = "atomics_inline_asm_debug"
@@ -3625,7 +3636,21 @@ test "parser rejects unsupported atomic memory operations" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, source_backed_atomicrmw));
+    var source_backed_module = try ir.Module.parse(std.testing.allocator, source_backed_atomicrmw);
+    defer source_backed_module.deinit();
+    try source_backed_module.verify();
+}
+
+test "parser rejects unsupported atomic syncscope" {
+    const input =
+        \\define void @memory_fence() {
+        \\entry:
+        \\  fence syncscope("singlethread") seq_cst
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, input));
 }
 
 test "parser preserves inline asm calls as side-effecting barriers" {

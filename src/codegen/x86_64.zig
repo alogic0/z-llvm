@@ -263,7 +263,7 @@ fn lowerStraightLineInstructions(
                 }
             },
             .binary => {},
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return error.UnsupportedCodegenInstruction,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
 
@@ -393,7 +393,7 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => return error.UnsupportedCodegenInstruction,
+                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
     }
@@ -508,6 +508,16 @@ fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?Ar
             try noteLiveValue(function, store.value, live);
             try noteLiveValue(function, store.ptr, live);
         },
+        .atomicrmw => |atomicrmw| {
+            try noteLiveValue(function, atomicrmw.ptr, live);
+            try noteLiveValue(function, atomicrmw.value, live);
+        },
+        .cmpxchg => |cmpxchg| {
+            try noteLiveValue(function, cmpxchg.ptr, live);
+            try noteLiveValue(function, cmpxchg.expected, live);
+            try noteLiveValue(function, cmpxchg.replacement, live);
+        },
+        .fence => {},
         .gep => |gep| {
             try noteLiveValue(function, gep.ptr, live);
             for (gep.indices.items) |index| try noteLiveValue(function, index.value, live);

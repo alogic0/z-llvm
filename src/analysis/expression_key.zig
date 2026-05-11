@@ -66,7 +66,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
                 state.addValue(arg.value);
             }
         },
-        .freeze, .alloca, .store, .gep => state.addTag(0),
+        .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep => state.addTag(0),
     }
     return state.value;
 }
@@ -91,21 +91,21 @@ pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),
-            .binary, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .cast, .freeze, .fcmp, .select, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
         },
         .fcmp => false,
         .select => |a_select| switch (b.kind) {
@@ -114,24 +114,24 @@ pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_select.ty.eql(b_select.ty) and
                 a_select.true_value.eql(b_select.true_value) and
                 a_select.false_value.eql(b_select.false_value),
-            .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
         },
         .phi => |a_phi| switch (b.kind) {
             .phi => |b_phi| samePhi(a_phi, b_phi),
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
         },
-        .freeze, .alloca, .load, .store, .gep, .call => false,
+        .freeze, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => false,
     };
 }
 
 pub fn sameLoadExpression(function: ir.Function, a: ir.Instruction, b: ir.Instruction) bool {
     const a_load = switch (a.kind) {
         .load => |load| load,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return false,
     };
     const b_load = switch (b.kind) {
         .load => |load| load,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .gep, .call => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => return false,
     };
     if (!a_load.ty.eql(b_load.ty)) return false;
     if (a_load.attrs.isBarrier() or b_load.attrs.isBarrier()) return false;
@@ -141,11 +141,11 @@ pub fn sameLoadExpression(function: ir.Function, a: ir.Instruction, b: ir.Instru
 pub fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction) bool {
     const a_call = switch (a.kind) {
         .call => |call| call,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep => return false,
     };
     const b_call = switch (b.kind) {
         .call => |call| call,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .gep => return false,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep => return false,
     };
     if (function_attrs.callMemoryEffect(module, a_call) != .none) return false;
     if (function_attrs.callMemoryEffect(module, b_call) != .none) return false;

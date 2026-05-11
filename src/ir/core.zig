@@ -461,6 +461,31 @@ pub const StoreInst = struct {
     attrs: MemoryAttrs = .{},
 };
 
+pub const AtomicRmwInst = struct {
+    op: []const u8,
+    ty: Type,
+    ptr: Value,
+    value: Value,
+    ordering: []const u8,
+    is_volatile: bool = false,
+    @"align": ?u32 = null,
+};
+
+pub const CmpxchgInst = struct {
+    ptr: Value,
+    ty: Type,
+    expected: Value,
+    replacement: Value,
+    success_ordering: []const u8,
+    failure_ordering: []const u8,
+    is_volatile: bool = false,
+    @"align": ?u32 = null,
+};
+
+pub const FenceInst = struct {
+    ordering: []const u8,
+};
+
 pub const GepIndex = struct {
     ty: Type,
     value: Value,
@@ -515,6 +540,9 @@ pub const Instruction = struct {
         alloca: AllocaInst,
         load: LoadInst,
         store: StoreInst,
+        atomicrmw: AtomicRmwInst,
+        cmpxchg: CmpxchgInst,
+        fence: FenceInst,
         gep: GepInst,
         call: CallInst,
     },
@@ -545,9 +573,11 @@ pub const Instruction = struct {
             .phi => |phi| phi.ty,
             .alloca => .ptr,
             .load => |load| load.ty,
+            .atomicrmw => |atomicrmw| atomicrmw.ty,
+            .cmpxchg => .{ .aggregate = "{ i32, i1 }" },
             .gep => .ptr,
             .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
-            .store => null,
+            .store, .fence => null,
         };
     }
 
@@ -581,6 +611,16 @@ pub const Instruction = struct {
                 store.value = resolveValue(aliases, store.value);
                 store.ptr = resolveValue(aliases, store.ptr);
             },
+            .atomicrmw => |*atomicrmw| {
+                atomicrmw.ptr = resolveValue(aliases, atomicrmw.ptr);
+                atomicrmw.value = resolveValue(aliases, atomicrmw.value);
+            },
+            .cmpxchg => |*cmpxchg| {
+                cmpxchg.ptr = resolveValue(aliases, cmpxchg.ptr);
+                cmpxchg.expected = resolveValue(aliases, cmpxchg.expected);
+                cmpxchg.replacement = resolveValue(aliases, cmpxchg.replacement);
+            },
+            .fence => {},
             .gep => |*gep| {
                 gep.ptr = resolveValue(aliases, gep.ptr);
                 for (gep.indices.items) |*index| {
@@ -595,7 +635,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),

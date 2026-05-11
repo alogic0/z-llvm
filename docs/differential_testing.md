@@ -14,7 +14,7 @@ The runner:
 ```text
 generates scalar identity cases in a temporary directory
 compares z_llvm output with normalized opt-22 output
-generates unsupported vector and atomicrmw cases and expects failure
+generates unsupported vector and atomic `syncscope` cases and expects failure
 optionally runs lli-22 on a pure scalar main function when lli-22 is installed
 ```
 
@@ -33,7 +33,7 @@ xor x, 0
 
 ```text
 vector return type
-atomicrmw
+atomic syncscope
 ```
 
 ## Policy

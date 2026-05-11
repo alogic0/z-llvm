@@ -186,6 +186,40 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printMemorySuffix(store.attrs, writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
+                    .atomicrmw => |atomicrmw| {
+                        try writer.writeAll("atomicrmw ");
+                        if (atomicrmw.is_volatile) try writer.writeAll("volatile ");
+                        try writer.print("{s} ptr ", .{atomicrmw.op});
+                        try atomicrmw.ptr.format(writer);
+                        try writer.writeAll(", ");
+                        try atomicrmw.ty.format(writer);
+                        try writer.writeByte(' ');
+                        try atomicrmw.value.format(writer);
+                        try writer.print(" {s}", .{atomicrmw.ordering});
+                        if (atomicrmw.@"align") |alignment| try writer.print(", align {}", .{alignment});
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
+                    .cmpxchg => |cmpxchg| {
+                        try writer.writeAll("cmpxchg ");
+                        if (cmpxchg.is_volatile) try writer.writeAll("volatile ");
+                        try writer.writeAll("ptr ");
+                        try cmpxchg.ptr.format(writer);
+                        try writer.writeAll(", ");
+                        try cmpxchg.ty.format(writer);
+                        try writer.writeByte(' ');
+                        try cmpxchg.expected.format(writer);
+                        try writer.writeAll(", ");
+                        try cmpxchg.ty.format(writer);
+                        try writer.writeByte(' ');
+                        try cmpxchg.replacement.format(writer);
+                        try writer.print(" {s} {s}", .{ cmpxchg.success_ordering, cmpxchg.failure_ordering });
+                        if (cmpxchg.@"align") |alignment| try writer.print(", align {}", .{alignment});
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
+                    .fence => |fence| {
+                        try writer.print("fence {s}", .{fence.ordering});
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
                         try gep.source_ty.format(writer);

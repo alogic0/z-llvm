@@ -151,6 +151,16 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
                     try addValueEdge(allocator, module, edges, store.value);
                     try addValueEdge(allocator, module, edges, store.ptr);
                 },
+                .atomicrmw => |atomicrmw| {
+                    try addValueEdge(allocator, module, edges, atomicrmw.ptr);
+                    try addValueEdge(allocator, module, edges, atomicrmw.value);
+                },
+                .cmpxchg => |cmpxchg| {
+                    try addValueEdge(allocator, module, edges, cmpxchg.ptr);
+                    try addValueEdge(allocator, module, edges, cmpxchg.expected);
+                    try addValueEdge(allocator, module, edges, cmpxchg.replacement);
+                },
+                .fence => {},
                 .gep => |gep| {
                     try addValueEdge(allocator, module, edges, gep.ptr);
                     for (gep.indices.items) |index| try addValueEdge(allocator, module, edges, index.value);

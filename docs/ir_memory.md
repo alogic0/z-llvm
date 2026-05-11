@@ -39,10 +39,14 @@ store iN %value, ptr %slot
 store volatile iN %value, ptr %slot, align N
 store atomic iN %value, ptr %slot, <ordering>, align N
 %derived = getelementptr iN, ptr %slot, iN <index>
+%old = atomicrmw <op> ptr %slot, iN %value, <ordering>, align N
+%pair = cmpxchg ptr %slot, iN %expected, iN %replacement, <success-ordering> <failure-ordering>, align N
+fence <ordering>
 verification that load/store pointer operands have ptr type
 verification that store value operands match the stored type
 verification that parsed memory alignment is nonzero
 verification that getelementptr base operands have ptr type and at least one typed index
+verification that accepted atomicrmw/cmpxchg/fence orderings and alignments are well formed
 ```
 
 Upstream mapping:
@@ -50,9 +54,9 @@ Upstream mapping:
 ```text
 This reproduces the basic IR shape and verifier checks needed before memory optimization passes can run, plus a first opaque-pointer GEP form for pointer-derived memory operands.
 LLVM's memory instructions carry much more state: alignment, volatile and atomic ordering, address spaces, metadata, attributes, and target datalayout-sensitive rules.
-This subset preserves align and volatile spelling on load/store and recognizes narrow atomic load/store spelling only as a conservative memory barrier.
+This subset preserves align and volatile spelling on load/store and recognizes narrow atomic load/store, atomicrmw, cmpxchg, and fence spelling only as conservative memory barriers.
 The analysis layer computes simple byte offsets for scalar integer GEPs when the index is constant and the element type has a byte size.
-It deliberately rejects unsupported atomic operations such as cmpxchg and atomicrmw instead of modeling LLVM's full atomic ordering rules.
+It deliberately rejects unsupported atomic features such as syncscope instead of modeling LLVM's full atomic ordering rules.
 ```
 
 Known gaps:
@@ -61,7 +65,7 @@ Known gaps:
 no typed pointer or address-space modeling
 no semantic use of alignment for optimization
 no full volatile or atomic memory model
-no cmpxchg, atomicrmw, fence, syncscope, or atomic ordering semantics
+no syncscope or atomic ordering semantics beyond parser/verifier preservation
 inline asm and broader atomic semantics are tracked in
 `docs/ir_atomics_inline_asm.md`
 no datalayout-aware getelementptr offset computation beyond scalar integer element sizes

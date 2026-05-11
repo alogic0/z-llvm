@@ -168,7 +168,7 @@ fn simplifyTrivialPhis(function: *ir.Function) bool {
             if (instruction.removed) continue;
             const replacement = switch (instruction.kind) {
                 .phi => |phi| trivialPhiReplacement(phi),
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .gep, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .gep, .call => null,
             } orelse continue;
 
             const result = instruction.result orelse continue;
@@ -223,6 +223,16 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     store.value = replaceOperand(store.value, name, replacement);
                     store.ptr = replaceOperand(store.ptr, name, replacement);
                 },
+                .atomicrmw => |*atomicrmw| {
+                    atomicrmw.ptr = replaceOperand(atomicrmw.ptr, name, replacement);
+                    atomicrmw.value = replaceOperand(atomicrmw.value, name, replacement);
+                },
+                .cmpxchg => |*cmpxchg| {
+                    cmpxchg.ptr = replaceOperand(cmpxchg.ptr, name, replacement);
+                    cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
+                    cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
+                },
+                .fence => {},
                 .gep => |*gep| {
                     gep.ptr = replaceOperand(gep.ptr, name, replacement);
                     for (gep.indices.items) |*index| {

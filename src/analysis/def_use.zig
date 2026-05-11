@@ -65,6 +65,16 @@ pub const UseCounts = struct {
                 try uses.addValue(store.value);
                 try uses.addValue(store.ptr);
             },
+            .atomicrmw => |atomicrmw| {
+                try uses.addValue(atomicrmw.ptr);
+                try uses.addValue(atomicrmw.value);
+            },
+            .cmpxchg => |cmpxchg| {
+                try uses.addValue(cmpxchg.ptr);
+                try uses.addValue(cmpxchg.expected);
+                try uses.addValue(cmpxchg.replacement);
+            },
+            .fence => {},
             .gep => |gep| {
                 try uses.addValue(gep.ptr);
                 for (gep.indices.items) |index| try uses.addValue(index.value);
@@ -105,6 +115,16 @@ pub const UseCounts = struct {
                 uses.removeValue(store.value);
                 uses.removeValue(store.ptr);
             },
+            .atomicrmw => |atomicrmw| {
+                uses.removeValue(atomicrmw.ptr);
+                uses.removeValue(atomicrmw.value);
+            },
+            .cmpxchg => |cmpxchg| {
+                uses.removeValue(cmpxchg.ptr);
+                uses.removeValue(cmpxchg.expected);
+                uses.removeValue(cmpxchg.replacement);
+            },
+            .fence => {},
             .gep => |gep| {
                 uses.removeValue(gep.ptr);
                 for (gep.indices.items) |index| uses.removeValue(index.value);
