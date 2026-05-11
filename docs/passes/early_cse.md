@@ -43,8 +43,8 @@ Core LLVM algorithm data structures:
   Store-to-load forwarding through memory availability.
 
 Local target status:
-  LLVM-shaped foundation with unit-test-only coverage for the current
-  cross-block and load-CSE subset.
+  fixture-equivalent for listed memory and scalar fixtures, with local-only
+  unit coverage for readnone call CSE.
 ```
 
 Implemented subset:

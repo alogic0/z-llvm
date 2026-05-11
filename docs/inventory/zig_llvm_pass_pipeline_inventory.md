@@ -182,7 +182,7 @@ Status meanings:
 | `instcombine` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/InstCombine/` |
 | `instsimplify` | canonicalization query | P0 | fixture-equivalent through InstCombine fixtures | `llvm/lib/Analysis/InstructionSimplify.cpp` |
 | `simplifycfg` | canonicalization / CFG | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
-| `early-cse` | canonicalization / scalar | P1 | LLVM-shaped foundation, unit-test-only | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
+| `early-cse` | canonicalization / scalar | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
 | `dse` | memory optimization | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
 | `adce` | scalar DCE | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
 | `bdce` | scalar DCE | P2 | placeholder | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
@@ -230,7 +230,7 @@ Status meanings:
 | `callsite-splitting` | IPO/scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp` |
 | `deadargelim` | IPO cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
 | `globalopt` | global optimization | P2 | placeholder; partial globals only | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
-| `globaldce` | global cleanup | P2 | foundation | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
+| `globaldce` | global cleanup | P2 | fixture-equivalent for listed graph fixtures | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
 | `constmerge` | global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
 | `mergefunc` | size IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |
 | `elim-avail-extern` | LTO/global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp` |

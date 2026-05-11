@@ -15,19 +15,28 @@ which fixtures prove it, and which LLVM algorithm pieces remain missing.
 
 ## Plan
 
-- [ ] Build a pass-by-pass parity table from the current source and docs.
-- [ ] For every non-placeholder pass, list LLVM source files and local files.
-- [ ] Mark each pass as fixture-equivalent, LLVM-shaped subset, or
+- [x] Build a pass-by-pass parity table from the current source and docs.
+- [x] For every non-placeholder pass, list LLVM source files and local files.
+- [x] Mark each pass as fixture-equivalent, LLVM-shaped subset, or
       algorithm-parity target.
-- [ ] Add a missing-analysis column for DominatorTree, MemorySSA, TTI,
+- [x] Add a missing-analysis column for DominatorTree, MemorySSA, TTI,
       AssumptionCache, LoopInfo, and DataLayout.
-- [ ] Add a missing-IR-surface column for parser/verifier blockers.
-- [ ] Create follow-up issues or roadmap links for every high-risk gap.
-- [ ] Reconcile pass docs whose target status is stale.
+- [x] Add a missing-IR-surface column for parser/verifier blockers.
+- [x] Create follow-up issues or roadmap links for every high-risk gap.
+- [x] Reconcile pass docs whose target status is stale.
 
 ## Exit Criteria
 
-- [ ] The project has a single current parity table.
-- [ ] Every implemented pass has source-backed LLVM mapping.
-- [ ] Remaining gaps are linked to active or future cycles.
+- [x] The project has a single current parity table.
+- [x] Every implemented pass has source-backed LLVM mapping.
+- [x] Remaining gaps are linked to active or future cycles.
 
+## Completion Notes
+
+- Added `docs/analysis/algorithm_parity_audit.md` as the current single parity
+  table for implemented and placeholder pass families.
+- Reconciled stale `early-cse` and `globaldce` target status wording with the
+  current `opt-22` fixtures.
+- Linked high-risk gaps to upcoming cycles for MemorySSA/AA, loop parity,
+  scalar quality, Machine IR, object/debug/unwind, EH, atomics, module linkage,
+  PGO/size, and target features.

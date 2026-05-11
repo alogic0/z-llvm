@@ -34,7 +34,7 @@ Core LLVM algorithm data structures:
   Live global set and worklist.
 
 Local target status:
-  LLVM-shaped algorithm subset.
+  fixture-equivalent for listed graph fixtures.
 ```
 
 Implemented subset:
@@ -66,6 +66,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   globaldce_basic
+  globaldce_alias_root
 
 local-only conservative:
   none currently

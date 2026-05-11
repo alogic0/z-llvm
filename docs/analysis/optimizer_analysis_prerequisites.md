@@ -82,3 +82,6 @@ Each future pass slice should list:
 - missing LLVM analyses and the conservative fallback;
 - fixtures and `opt-22` commands used for comparison;
 - unsupported Zig-emitted IR constructs that prevented broader coverage.
+
+The current pass-by-pass status table is maintained in
+`docs/analysis/algorithm_parity_audit.md`.
