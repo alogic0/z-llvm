@@ -160,8 +160,8 @@ EarlyCSE: dominator-scoped available-value foundation with unit-test coverage fo
 Mem2Reg: entry-block alloca discovery plus single-store, single-block, multi-block, undef, multi-slot stack promotion, and volatile alloca-user rejection subsets
 SROA: zero-offset and nested-zero-offset GEP alloca forwarding subset
 GVN: dominating repeated pure-expression elimination subset with memory-effect rejection
-LoopInfo: natural-loop, preheader, exiting-block, and exit-block analysis subset
-LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, SSA dominance preservation, and conservative memory rejection fixtures
+LoopInfo: natural-loop, preheader, exiting-block, exit-block, latch-list, backedge, loop-depth, loop-invariant value, and LCSSA-form analysis subset
+LICM: pure scalar loop-invariant instruction hoisting subset, including integer casts, variant-operand rejection, explicit hoist-destination dominance checks, SSA dominance preservation, and conservative memory rejection fixtures
 Target/DataLayout: target triple parsing, initial target matrix recognition, minimal DataLayout query subset, and scalar/function ABI classification
 Module IR: source filename, target records, scalar globals, function linkage/visibility, calling conventions, raw function and parameter attributes, and void return preservation
 Call IR: function declarations, direct calls, scalar call signature verification, and conservative unknown memory-effect classification

@@ -19,6 +19,7 @@ Loop::getLoopPreheader
 Loop::hasLoopInvariantOperands
 Loop::makeLoopInvariant
 Instruction::mayReadOrWriteMemory
+Instruction::isSafeToSpeculativelyExecute
 ```
 
 LLVM LICM hoists loop-invariant computations to a loop preheader and sinks
@@ -57,7 +58,7 @@ Core LLVM algorithm data structures:
   Worklists for hoist and sink candidates.
 
 Local target status:
-  LLVM-shaped algorithm subset.
+  fixture-equivalent for listed scalar fixtures.
 ```
 
 Implemented subset:
@@ -66,10 +67,12 @@ Implemented subset:
 use LoopInfo natural loops
 require an existing unique unconditional preheader
 require the loop header to map to one current NaturalLoop record
+require the preheader to dominate the loop header
 use shared memory-effect classification for legality
 use shared safe-to-speculate checks so trapping scalar instructions are not hoisted
 hoist pure binary, integer cast, icmp, and select instructions
 require every operand to be constant, undef, a function parameter, or defined outside the loop
+require the preheader definition to dominate every use after the move
 move hoisted instructions to the preheader instruction list
 preserve SSA validity by moving only to the preheader, which dominates the loop header in the supported canonical shape
 ```

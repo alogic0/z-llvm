@@ -3,6 +3,11 @@ const cfg = @import("cfg.zig");
 const dominator = @import("dominator.zig");
 const ir = @import("../ir.zig");
 
+pub const Backedge = struct {
+    latch: usize,
+    header: usize,
+};
+
 pub const NaturalLoop = struct {
     header: usize,
     latch: usize,
@@ -31,6 +36,24 @@ pub const NaturalLoop = struct {
 
     pub fn latchBlock(loop: NaturalLoop) usize {
         return loop.latch;
+    }
+
+    pub fn latchBlocks(loop: NaturalLoop, allocator: std.mem.Allocator) !std.ArrayList(usize) {
+        var latches: std.ArrayList(usize) = .empty;
+        errdefer latches.deinit(allocator);
+        try latches.append(allocator, loop.latch);
+        return latches;
+    }
+
+    pub fn backedge(loop: NaturalLoop) Backedge {
+        return .{
+            .latch = loop.latch,
+            .header = loop.header,
+        };
+    }
+
+    pub fn depthLevel(loop: NaturalLoop) usize {
+        return loop.depth + 1;
     }
 
     pub fn preheader(loop: NaturalLoop, function: ir.Function, graph: cfg.Graph) ?usize {
@@ -92,7 +115,118 @@ pub const NaturalLoop = struct {
         }
         return true;
     }
+
+    pub fn hasLcssaForm(loop: NaturalLoop, allocator: std.mem.Allocator, function: ir.Function, graph: cfg.Graph) !bool {
+        var loop_defs = std.StringHashMap(void).init(allocator);
+        defer loop_defs.deinit();
+
+        for (loop.blocks.items) |block_index| {
+            if (block_index >= function.blocks.items.len) return false;
+            for (function.blocks.items[block_index].instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                if (instruction.result) |result| try loop_defs.put(result, {});
+            }
+        }
+
+        var exits = try loop.exitBlocks(allocator, graph);
+        defer exits.deinit(allocator);
+
+        for (function.blocks.items, 0..) |block, block_index| {
+            if (loop.contains(block_index)) continue;
+            for (block.instructions.items) |instruction| {
+                if (instruction.removed) continue;
+                if (!outsideInstructionUsesAreLcssa(function, loop, loop_defs, exits.items, instruction, block_index)) return false;
+            }
+            if (block.terminator) |terminator| {
+                if (terminatorUsesLoopDefinition(terminator, loop_defs)) return false;
+            }
+        }
+
+        return true;
+    }
+
+    pub fn isLoopInvariantValue(loop: NaturalLoop, value: ir.Value, def_blocks: std.StringHashMap(usize)) bool {
+        return switch (value) {
+            .int, .undef => true,
+            .named => |name| {
+                const block = def_blocks.get(name) orelse return false;
+                if (block == std.math.maxInt(usize)) return true;
+                return !loop.contains(block);
+            },
+        };
+    }
 };
+
+fn outsideInstructionUsesAreLcssa(
+    function: ir.Function,
+    loop: NaturalLoop,
+    loop_defs: std.StringHashMap(void),
+    exit_blocks: []const usize,
+    instruction: ir.Instruction,
+    block_index: usize,
+) bool {
+    return switch (instruction.kind) {
+        .phi => |phi| {
+            for (phi.incoming.items) |incoming| {
+                if (!valueNamesLoopDefinition(incoming.value, loop_defs)) continue;
+                if (!containsIndex(exit_blocks, block_index)) return false;
+                const incoming_block = function.blockIndex(incoming.block) orelse return false;
+                if (!loop.contains(incoming_block)) return false;
+            }
+            return true;
+        },
+        .binary => |binary| !valuesUseLoopDefinition(loop_defs, &.{ binary.lhs, binary.rhs }),
+        .cast => |cast| !valueNamesLoopDefinition(cast.value, loop_defs),
+        .freeze => |freeze| !valueNamesLoopDefinition(freeze.value, loop_defs),
+        .icmp => |icmp| !valuesUseLoopDefinition(loop_defs, &.{ icmp.lhs, icmp.rhs }),
+        .select => |select| !valuesUseLoopDefinition(loop_defs, &.{ select.cond, select.true_value, select.false_value }),
+        .alloca => true,
+        .load => |load| !valueNamesLoopDefinition(load.ptr, loop_defs),
+        .store => |store| !valuesUseLoopDefinition(loop_defs, &.{ store.value, store.ptr }),
+        .gep => |gep| {
+            if (valueNamesLoopDefinition(gep.ptr, loop_defs)) return false;
+            for (gep.indices.items) |index| {
+                if (valueNamesLoopDefinition(index.value, loop_defs)) return false;
+            }
+            return true;
+        },
+        .call => |call| {
+            for (call.args.items) |arg| {
+                if (valueNamesLoopDefinition(arg.value, loop_defs)) return false;
+            }
+            return true;
+        },
+    };
+}
+
+fn terminatorUsesLoopDefinition(terminator: ir.Terminator, loop_defs: std.StringHashMap(void)) bool {
+    return switch (terminator) {
+        .ret => |ret| if (ret.value) |value| valueNamesLoopDefinition(value, loop_defs) else false,
+        .br, .@"unreachable" => false,
+        .condbr => |condbr| valueNamesLoopDefinition(condbr.cond, loop_defs),
+    };
+}
+
+fn valuesUseLoopDefinition(loop_defs: std.StringHashMap(void), values: []const ir.Value) bool {
+    for (values) |value| {
+        if (valueNamesLoopDefinition(value, loop_defs)) return true;
+    }
+    return false;
+}
+
+fn valueNamesLoopDefinition(value: ir.Value, loop_defs: std.StringHashMap(void)) bool {
+    return switch (value) {
+        .int, .undef => false,
+        .named => |name| loop_defs.contains(name),
+    };
+}
+
+fn containsIndex(items: []const usize, value: usize) bool {
+    for (items) |item| {
+        if (item == value) return true;
+    }
+    return false;
+}
 
 pub const LoopInfo = struct {
     allocator: std.mem.Allocator,
@@ -141,6 +275,32 @@ pub const LoopInfo = struct {
             if (best == null or loop.depth > best.?.depth) best = loop;
         }
         return best;
+    }
+
+    pub fn loopDepth(info: LoopInfo, block_index: usize) usize {
+        const loop = info.loopForBlock(block_index) orelse return 0;
+        return loop.depthLevel();
+    }
+
+    pub fn latchesForHeader(info: LoopInfo, allocator: std.mem.Allocator, header: usize) !std.ArrayList(usize) {
+        var latches: std.ArrayList(usize) = .empty;
+        errdefer latches.deinit(allocator);
+        for (info.loops.items) |loop| {
+            if (loop.header != header) continue;
+            try appendUnique(allocator, &latches, loop.latch);
+        }
+        sortBlocks(latches.items);
+        return latches;
+    }
+
+    pub fn backedges(info: LoopInfo, allocator: std.mem.Allocator) !std.ArrayList(Backedge) {
+        var edges: std.ArrayList(Backedge) = .empty;
+        errdefer edges.deinit(allocator);
+        for (info.loops.items) |loop| {
+            try edges.append(allocator, loop.backedge());
+        }
+        sortBackedges(edges.items);
+        return edges;
     }
 
     fn computeNesting(info: *LoopInfo) void {
@@ -218,6 +378,20 @@ fn sortBlocks(items: []usize) void {
         const value = items[i];
         var j = i;
         while (j > 0 and items[j - 1] > value) : (j -= 1) {
+            items[j] = items[j - 1];
+        }
+        items[j] = value;
+    }
+}
+
+fn sortBackedges(items: []Backedge) void {
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        const value = items[i];
+        var j = i;
+        while (j > 0 and (items[j - 1].header > value.header or
+            (items[j - 1].header == value.header and items[j - 1].latch > value.latch))) : (j -= 1)
+        {
             items[j] = items[j - 1];
         }
         items[j] = value;

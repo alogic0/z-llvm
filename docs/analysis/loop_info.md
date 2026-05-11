@@ -7,6 +7,7 @@ llvm-project-22/llvm/include/llvm/Analysis/LoopInfo.h
 llvm-project-22/llvm/lib/Analysis/LoopInfo.cpp
 llvm-project-22/llvm/include/llvm/Support/GenericLoopInfo.h
 llvm-project-22/llvm/include/llvm/Support/GenericLoopInfoImpl.h
+llvm-project-22/llvm/lib/Transforms/Utils/LCSSA.cpp
 ```
 
 Upstream entry points to check:
@@ -26,6 +27,9 @@ Loop::getLoopPreheader
 Loop::getExitingBlocks
 Loop::getExitBlocks
 Loop::hasDedicatedExits
+Loop::getLoopDepth
+Loop::isLoopInvariant
+formLCSSA
 ```
 
 LLVM LoopInfo identifies natural loops from a dominator tree and records loop
@@ -40,6 +44,7 @@ preheader: a non-loop predecessor that branches unconditionally to the header
 exiting block: a block inside the loop with at least one successor outside the loop
 exit block: a block outside the loop with at least one predecessor inside the loop
 dedicated exit: an exit block whose predecessors are all inside the loop
+LCSSA: loop-defined values used outside the loop are passed through exit phis
 ```
 
 Implemented subset:
@@ -49,14 +54,43 @@ build CFG and dominator analysis for one function
 recognize a backedge when successor dominates predecessor
 construct the natural loop for each backedge by walking predecessors from latch
 query loop header, latch, and member block indexes
+query a single-latch list for current NaturalLoop records
+query backedges as latch/header pairs
 lookup a loop by header block index
 test whether a block index is inside a loop
 query a unique unconditional preheader
 collect unique exiting block indexes
 collect unique exit block indexes
 query whether exit blocks are dedicated
+check whether outside loop uses satisfy LCSSA form
 record parent loop index and nesting depth for natural loops
+query loop depth for a block
 lookup the innermost known loop for a block index
+classify a value as loop invariant from definition-block ownership
+```
+
+Canonical-form boundary:
+
+```text
+accepted for LICM: single current NaturalLoop record for a header, existing
+unconditional preheader, and a preheader that dominates the header
+queried but not created: dedicated exits
+checked but not formed: LCSSA
+not canonicalized yet: multi-latch loops, irreducible loops, split exits,
+inserted preheaders, rotated loops
+```
+
+Fixture coverage:
+
+```text
+unit-test only:
+  natural-loop discovery from dominator backedges
+  header/latch/latches/preheader/exiting/exit/dedicated-exit queries
+  backedge, loop-depth, contains-block, and loop-invariant value helpers
+  LCSSA-form check for loop-defined values used outside the loop
+
+opt-22 compared indirectly:
+  LICM fixtures exercise the currently accepted loop shape
 ```
 
 Known gaps:
@@ -64,6 +98,6 @@ Known gaps:
 ```text
 no full LLVM loop forest mutation API
 no loop verification
-no LoopSimplify or LCSSA integration
+no LoopSimplify mutation or LCSSA phi insertion
 no irreducible control-flow handling beyond natural-loop backedges
 ```

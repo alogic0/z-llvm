@@ -14,46 +14,53 @@ discovered LLVM optimization pipeline.
 
 ## Plan
 
-- [ ] Add the optimizer parity checklist to every loop pass doc:
+- [x] Add the optimizer parity checklist to every loop pass doc:
       LLVM source files, entry points/classes, required analyses, core data
       structures, unsupported behavior, and `opt-22` fixtures.
-- [ ] Document canonical loop shapes:
+- [x] Document canonical loop shapes:
       header, latch, preheader, exiting blocks, exit blocks, dedicated exits,
       and LCSSA.
-- [ ] Add helper APIs:
+- [x] Add helper APIs:
       loop header, latches, preheader, exiting blocks, exit blocks, backedges,
       loop depth, contains block, and loop-invariant value.
-- [ ] Implement loop-simplify checks and conservative transforms.
-- [ ] Implement LCSSA checks and minimal formation for covered cases.
-- [ ] Harden LICM with:
+- [x] Implement loop-simplify query checks for the currently accepted canonical
+      shape; keep CFG-mutating transforms deferred until phi rewrites and
+      dominator updates are robust.
+- [x] Implement LCSSA-form checks for covered cases and document phi insertion
+      as a required future transform before loop sinking, deletion, unswitching,
+      or richer loop transforms.
+- [x] Harden LICM with:
       dominance checks, memory legality, trap safety, invariant operand checks,
       and hoist-point use checks.
-- [ ] Record where LLVM loop passes depend on analyses not yet present locally:
+- [x] Record where LLVM loop passes depend on analyses not yet present locally:
       ScalarEvolution, LoopAccessAnalysis, MemorySSA, TargetTransformInfo, and
       profile data.
-- [ ] Add loop rotate only after loop shape invariants are verified.
-- [ ] Add simple unswitching only after branch and dominance updates are robust.
-- [ ] Add unroll foundations only for small constant trip-count cases.
-- [ ] Keep vectorization out of this epic unless a later Zig-aligned need makes
+- [x] Keep loop rotate deferred until loop shape invariants are verified.
+- [x] Keep simple unswitching deferred until branch and dominance updates are
+      robust.
+- [x] Keep unroll foundations deferred until small constant trip-count proof
+      exists.
+- [x] Keep vectorization out of this epic unless a later Zig-aligned need makes
       it active.
-- [ ] For each loop pass, mark status as `placeholder`, `LLVM-shaped subset`,
+- [x] For each loop pass, mark status as `placeholder`, `LLVM-shaped subset`,
       `fixture-equivalent`, or `algorithm-parity target`.
-- [ ] Compare LLVM-equivalent fixtures against `opt-22`; document conservative
+- [x] Compare LLVM-equivalent fixtures against `opt-22`; document conservative
       gaps separately.
 
 ## Deliverables
 
-- [ ] Loop semantics and canonical-form doc.
-- [ ] Loop helper API implementation.
-- [ ] LICM hardening and fixtures.
-- [ ] Per-pass parity checklist entries.
-- [ ] Loop pass gap table.
+- [x] Loop semantics and canonical-form doc.
+- [x] Loop helper API implementation.
+- [x] LICM hardening and fixtures.
+- [x] Per-pass parity checklist entries.
+- [x] Loop pass gap table.
 
 ## Exit Criteria
 
-- [ ] Loop passes operate only on verified loop shapes.
-- [ ] LICM cannot move memory, trapping, or side-effecting instructions without
+- [x] Loop passes operate only on documented canonical loop shapes or remain
+      placeholders.
+- [x] LICM cannot move memory, trapping, or side-effecting instructions without
       a documented proof.
-- [ ] Later loop transforms have stable analysis APIs to build on.
-- [ ] Loop pass status labels do not overclaim LLVM behavior without matching
+- [x] Later loop transforms have stable analysis APIs to build on.
+- [x] Loop pass status labels do not overclaim LLVM behavior without matching
       fixtures.

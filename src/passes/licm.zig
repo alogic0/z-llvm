@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const dominator = @import("../analysis/dominator.zig");
 const loop_info = @import("../analysis/loop_info.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
@@ -8,7 +9,7 @@ const pass_manager = @import("../pass_manager.zig");
 pub const pass: pass_manager.ModulePass = .{
     .name = "licm",
     .category = .loop,
-    .target_status = "LLVM-shaped algorithm subset",
+    .target_status = "fixture-equivalent for listed fixtures",
     .upstream_owner = "llvm/lib/Transforms/Scalar/LICM.cpp",
     .run = run,
 };
@@ -25,6 +26,9 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
     var graph = try cfg.Graph.build(allocator, function.*);
     defer graph.deinit();
 
+    var dom = try dominator.Dominators.build(allocator, function.*);
+    defer dom.deinit();
+
     var loops = try loop_info.LoopInfo.build(allocator, function.*);
     defer loops.deinit();
 
@@ -36,6 +40,8 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
     for (loops.loops.items) |natural_loop| {
         if (!hasUniqueLoopHeader(loops, natural_loop.header)) continue;
         const preheader = natural_loop.preheader(function.*, graph) orelse continue;
+        if (!dom.dominates(preheader, natural_loop.header)) continue;
+
         var local_changed = true;
         while (local_changed) {
             local_changed = false;
@@ -44,7 +50,10 @@ fn hoistFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool {
                 var instruction_index: usize = 0;
                 while (instruction_index < function.blocks.items[block_index].instructions.items.len) {
                     const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
-                    if (!isHoistable(instruction) or !isLoopInvariant(instruction, natural_loop, def_blocks)) {
+                    if (!isHoistable(instruction) or
+                        !isLoopInvariant(instruction, natural_loop, def_blocks) or
+                        !hoistDestinationDominatesUses(function.*, dom, instruction.result.?, preheader))
+                    {
                         instruction_index += 1;
                         continue;
                     }
@@ -92,25 +101,105 @@ fn isHoistable(instruction: ir.Instruction) bool {
 
 fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalLoop, def_blocks: std.StringHashMap(usize)) bool {
     return switch (instruction.kind) {
-        .binary => |binary| isInvariantValue(binary.lhs, natural_loop, def_blocks) and
-            isInvariantValue(binary.rhs, natural_loop, def_blocks),
-        .cast => |cast| isInvariantValue(cast.value, natural_loop, def_blocks),
-        .icmp => |icmp| isInvariantValue(icmp.lhs, natural_loop, def_blocks) and
-            isInvariantValue(icmp.rhs, natural_loop, def_blocks),
-        .select => |select| isInvariantValue(select.cond, natural_loop, def_blocks) and
-            isInvariantValue(select.true_value, natural_loop, def_blocks) and
-            isInvariantValue(select.false_value, natural_loop, def_blocks),
+        .binary => |binary| natural_loop.isLoopInvariantValue(binary.lhs, def_blocks) and
+            natural_loop.isLoopInvariantValue(binary.rhs, def_blocks),
+        .cast => |cast| natural_loop.isLoopInvariantValue(cast.value, def_blocks),
+        .icmp => |icmp| natural_loop.isLoopInvariantValue(icmp.lhs, def_blocks) and
+            natural_loop.isLoopInvariantValue(icmp.rhs, def_blocks),
+        .select => |select| natural_loop.isLoopInvariantValue(select.cond, def_blocks) and
+            natural_loop.isLoopInvariantValue(select.true_value, def_blocks) and
+            natural_loop.isLoopInvariantValue(select.false_value, def_blocks),
         .freeze, .phi, .alloca, .load, .store, .gep, .call => false,
     };
 }
 
-fn isInvariantValue(value: ir.Value, natural_loop: loop_info.NaturalLoop, def_blocks: std.StringHashMap(usize)) bool {
-    return switch (value) {
-        .int, .undef => true,
-        .named => |name| {
-            const block = def_blocks.get(name) orelse return false;
-            if (block == std.math.maxInt(usize)) return true;
-            return !natural_loop.contains(block);
+fn hoistDestinationDominatesUses(function: ir.Function, dom: dominator.Dominators, result: []const u8, destination_block: usize) bool {
+    for (function.blocks.items, 0..) |block, block_index| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |defined| {
+                if (std.mem.eql(u8, defined, result)) continue;
+            }
+            if (!instructionUsesAreDominated(function, dom, instruction, result, destination_block, block_index)) return false;
+        }
+        if (block.terminator) |terminator| {
+            if (terminatorUsesValue(terminator, result) and !dominatesTerminatorUse(dom, destination_block, block_index)) return false;
+        }
+    }
+    return true;
+}
+
+fn instructionUsesAreDominated(
+    function: ir.Function,
+    dom: dominator.Dominators,
+    instruction: ir.Instruction,
+    result: []const u8,
+    destination_block: usize,
+    use_block: usize,
+) bool {
+    switch (instruction.kind) {
+        .phi => |phi| {
+            for (phi.incoming.items) |incoming| {
+                if (!valueMatchesName(incoming.value, result)) continue;
+                const incoming_block = function.blockIndex(incoming.block) orelse return false;
+                if (!dominatesPhiIncomingUse(dom, destination_block, incoming_block)) return false;
+            }
+            return true;
         },
+        .binary => |binary| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ binary.lhs, binary.rhs }),
+        .cast => |cast| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{cast.value}),
+        .freeze => |freeze| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{freeze.value}),
+        .icmp => |icmp| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ icmp.lhs, icmp.rhs }),
+        .select => |select| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ select.cond, select.true_value, select.false_value }),
+        .alloca => return true,
+        .load => |load| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{load.ptr}),
+        .store => |store| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ store.value, store.ptr }),
+        .gep => |gep| {
+            if (valueMatchesName(gep.ptr, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
+            for (gep.indices.items) |index| {
+                if (valueMatchesName(index.value, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
+            }
+            return true;
+        },
+        .call => |call| {
+            for (call.args.items) |arg| {
+                if (valueMatchesName(arg.value, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
+            }
+            return true;
+        },
+    }
+}
+
+fn regularUsesAreDominated(dom: dominator.Dominators, destination_block: usize, use_block: usize, result: []const u8, values: []const ir.Value) bool {
+    for (values) |value| {
+        if (valueMatchesName(value, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
+    }
+    return true;
+}
+
+fn dominatesRegularInstructionUse(dom: dominator.Dominators, destination_block: usize, use_block: usize) bool {
+    return destination_block != use_block and dom.dominates(destination_block, use_block);
+}
+
+fn dominatesPhiIncomingUse(dom: dominator.Dominators, destination_block: usize, incoming_block: usize) bool {
+    return destination_block == incoming_block or dom.dominates(destination_block, incoming_block);
+}
+
+fn dominatesTerminatorUse(dom: dominator.Dominators, destination_block: usize, terminator_block: usize) bool {
+    return destination_block == terminator_block or dom.dominates(destination_block, terminator_block);
+}
+
+fn terminatorUsesValue(terminator: ir.Terminator, result: []const u8) bool {
+    return switch (terminator) {
+        .ret => |ret| if (ret.value) |value| valueMatchesName(value, result) else false,
+        .br, .@"unreachable" => false,
+        .condbr => |condbr| valueMatchesName(condbr.cond, result),
+    };
+}
+
+fn valueMatchesName(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .int, .undef => false,
+        .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

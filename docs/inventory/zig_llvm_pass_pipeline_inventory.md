@@ -176,8 +176,8 @@ Status meanings:
 | `bdce` | scalar DCE | P2 | placeholder | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
 | `sccp` / `ipsccp` | scalar / IPO | P1 | fixture-equivalent for listed SCCP fixtures / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
 | `gvn` | scalar / memory | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/GVN.cpp` |
-| `licm` | loop / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/LICM.cpp` |
-| `loop-instsimplify` | loop canonicalization | P1 | foundation | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
+| `licm` | loop / memory | P1 | fixture-equivalent for listed scalar fixtures | `llvm/lib/Transforms/Scalar/LICM.cpp` |
+| `loop-instsimplify` | loop canonicalization | P1 | LLVM-shaped foundation, unit-test-only | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
 | `loop-simplifycfg` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
 | `loop-rotate` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopRotation.cpp` |
 | `loop-deletion` | loop cleanup | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopDeletion.cpp` |

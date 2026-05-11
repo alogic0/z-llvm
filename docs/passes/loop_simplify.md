@@ -7,6 +7,7 @@ llvm-project-22/llvm/lib/Transforms/Utils/LoopSimplify.cpp
 llvm-project-22/llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp
 llvm-project-22/llvm/lib/Transforms/Scalar/LoopRotation.cpp
 llvm-project-22/llvm/lib/Transforms/Scalar/LoopDeletion.cpp
+llvm-project-22/llvm/lib/Transforms/Utils/LCSSA.cpp
 ```
 
 These passes prepare loops for later optimization by moving them toward
@@ -28,6 +29,7 @@ LLVM entry points/classes:
   LoopSimplifyCFGPass::run
   LoopRotatePass::run
   LoopDeletionPass::run
+  formLCSSA
 
 Required analyses:
   LoopInfo.
@@ -39,6 +41,8 @@ Required IR invariants:
   CFG rewrites must preserve SSA dominance, phi predecessor lists, and loop
   membership.
   Loop deletion requires proving the loop has no observable side effects.
+  LCSSA requires every loop-defined value used outside the loop to flow
+  through exit phis.
 
 Core LLVM algorithm data structures:
   Loop forest and loop block sets.
@@ -54,8 +58,10 @@ Implemented subset:
 
 ```text
 LoopInfo exposes headers, latches, preheaders, exiting blocks, exit blocks,
-dedicated-exit checks, containment, parent indexes, and nesting depth.
+dedicated-exit checks, containment, backedges, parent indexes, loop depth, and
+loop-invariant value classification.
 loop-simplifycfg, loop-rotate, and loop-deletion are executable placeholders.
+LCSSA form can be checked for existing exit phis but is not formed yet.
 ```
 
 Intentional divergences:
@@ -64,6 +70,7 @@ Intentional divergences:
 no preheader creation
 no latch canonicalization
 no dedicated-exit splitting
+no LCSSA formation
 no loop rotation
 no side-effect-free loop deletion
 ```

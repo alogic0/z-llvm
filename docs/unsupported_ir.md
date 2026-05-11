@@ -293,11 +293,15 @@ LoopInfo subset:
   unique preheader query
   loop exiting block query
   loop exit block query
+  latch-list, backedge, loop-depth, and loop-invariant value helpers
+  LCSSA-form check without LCSSA phi insertion
 
 LICM subset:
   pure loop-invariant instruction hoisting to an existing preheader
+  dominance and hoist-destination use checks for supported scalar motion
   memory-effect API blocks load/store/volatile/atomic hoisting
-  no memory LICM, store sinking, preheader creation, or MemorySSA promotion yet
+  no memory LICM, store sinking, LCSSA formation, preheader creation, or
+  MemorySSA promotion yet
 ```
 
 ## Next Unsupported Areas To Remove

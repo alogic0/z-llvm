@@ -3430,10 +3430,41 @@ test "loop info finds a natural loop from a dominator backedge" {
     try std.testing.expectEqual(@as(usize, 3), natural_loop.latch);
     try std.testing.expectEqual(@as(usize, 1), natural_loop.headerBlock());
     try std.testing.expectEqual(@as(usize, 3), natural_loop.latchBlock());
+    try std.testing.expectEqual(@as(usize, 1), natural_loop.depthLevel());
     try std.testing.expectEqualSlices(usize, &.{ 1, 2, 3 }, natural_loop.blocks.items);
     try std.testing.expect(natural_loop.contains(2));
+    try std.testing.expect(natural_loop.containsBlock(2));
     try std.testing.expect(!natural_loop.contains(4));
     try std.testing.expectEqual(@as(?usize, 0), natural_loop.preheader(function, graph));
+
+    var latches = try natural_loop.latchBlocks(std.testing.allocator);
+    defer latches.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{3}, latches.items);
+
+    const backedge = natural_loop.backedge();
+    try std.testing.expectEqual(@as(usize, 3), backedge.latch);
+    try std.testing.expectEqual(@as(usize, 1), backedge.header);
+
+    try std.testing.expectEqual(@as(usize, 1), loops.loopDepth(2));
+    try std.testing.expectEqual(@as(usize, 0), loops.loopDepth(4));
+
+    var header_latches = try loops.latchesForHeader(std.testing.allocator, 1);
+    defer header_latches.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(usize, &.{3}, header_latches.items);
+
+    var backedges = try loops.backedges(std.testing.allocator);
+    defer backedges.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 1), backedges.items.len);
+    try std.testing.expectEqual(@as(usize, 3), backedges.items[0].latch);
+    try std.testing.expectEqual(@as(usize, 1), backedges.items[0].header);
+
+    var def_blocks = std.StringHashMap(usize).init(std.testing.allocator);
+    defer def_blocks.deinit();
+    try def_blocks.put("a", std.math.maxInt(usize));
+    try def_blocks.put("x", 2);
+    try std.testing.expect(natural_loop.isLoopInvariantValue(.{ .named = "a" }, def_blocks));
+    try std.testing.expect(natural_loop.isLoopInvariantValue(.{ .int = 1 }, def_blocks));
+    try std.testing.expect(!natural_loop.isLoopInvariantValue(.{ .named = "x" }, def_blocks));
 
     var exiting = try natural_loop.exitingBlocks(std.testing.allocator, graph);
     defer exiting.deinit(std.testing.allocator);
@@ -3476,6 +3507,65 @@ test "licm leaves loops without an existing preheader unchanged" {
     _ = try pm.run(&module, &context, &output.writer, false);
     try module.print(&output.writer);
     try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "loop info checks LCSSA form for outside loop uses" {
+    const accepted =
+        \\define i32 @lcssa_ok(i1 %cond) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %latch ]
+        \\  br i1 %cond, label %latch, label %exit
+        \\latch:
+        \\  %next = add i32 %i, 1
+        \\  br label %header
+        \\exit:
+        \\  %i.lcssa = phi i32 [ %i, %header ]
+        \\  ret i32 %i.lcssa
+        \\}
+        \\
+    ;
+
+    var accepted_module = try ir.Module.parse(std.testing.allocator, accepted);
+    defer accepted_module.deinit();
+    const accepted_function = accepted_module.functions.items[0];
+
+    var accepted_loops = try loop_info.LoopInfo.build(std.testing.allocator, accepted_function);
+    defer accepted_loops.deinit();
+    var accepted_graph = try cfg.Graph.build(std.testing.allocator, accepted_function);
+    defer accepted_graph.deinit();
+
+    const accepted_loop = accepted_loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expect(try accepted_loop.hasLcssaForm(std.testing.allocator, accepted_function, accepted_graph));
+
+    const rejected =
+        \\define i32 @lcssa_bad(i1 %cond) {
+        \\entry:
+        \\  br label %header
+        \\header:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %latch ]
+        \\  br i1 %cond, label %latch, label %exit
+        \\latch:
+        \\  %next = add i32 %i, 1
+        \\  br label %header
+        \\exit:
+        \\  ret i32 %i
+        \\}
+        \\
+    ;
+
+    var rejected_module = try ir.Module.parse(std.testing.allocator, rejected);
+    defer rejected_module.deinit();
+    const rejected_function = rejected_module.functions.items[0];
+
+    var rejected_loops = try loop_info.LoopInfo.build(std.testing.allocator, rejected_function);
+    defer rejected_loops.deinit();
+    var rejected_graph = try cfg.Graph.build(std.testing.allocator, rejected_function);
+    defer rejected_graph.deinit();
+
+    const rejected_loop = rejected_loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expect(!try rejected_loop.hasLcssaForm(std.testing.allocator, rejected_function, rejected_graph));
 }
 
 test "licm leaves side-effecting stores in the loop" {
