@@ -9,6 +9,9 @@ directly in `../`.
 Completed numbered epics from the first Zig LLVM removal roadmap live in
 `completed_epics/`.
 
+Completed fixture-equivalent optimizer cycle slices live in
+`completed_cycle_slices/`.
+
 ## Archived Files
 
 - `calls_and_stack_frame_codegen_epic.md`

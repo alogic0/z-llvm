@@ -2,22 +2,23 @@
 
 This document is the main roadmap entrypoint. The initial Zig LLVM removal
 epics are complete and archived under `roadmap/historical/completed_epics/`.
-The active roadmap is now the optimizer parity cycle plan. Completed cycle
-entries mean the planned fixture-equivalent slice is closed, not that the full
-LLVM pass is completely reproduced.
+The first optimizer cycle slices are complete and archived under
+`roadmap/historical/completed_cycle_slices/`. The active roadmap is now the
+next set of larger optimizer cycles.
 
 The purpose is to keep the project aligned with Zig's upstream LLVM-removal
 path:
 
 ```text
 completed foundation epics
-  -> ADCE control-flow parity slice
-  -> SCCP sparse lattice parity slice
-  -> EarlyCSE memory-aware parity slice
-  -> GVN value numbering parity slice
-  -> SROA slice/partition model slice
-  -> GlobalDCE/globals graph parity slice
-  -> shared memory legality upgrade slice
+  -> completed fixture-equivalent optimizer slices
+  -> memory dependence and legality hardening
+  -> SROA aggregate scalarization
+  -> CFG mutation for ADCE/SimplifyCFG
+  -> SCCP/InstCombine semantic expansion
+  -> GVN/EarlyCSE value numbering and PRE foundation
+  -> loop pipeline quality
+  -> Zig pipeline corpus parity
 ```
 
 ## Completed Foundation Epics
@@ -34,13 +35,17 @@ completed foundation epics
 
 ## Completed Cycle Slices
 
-- [x] [Cycle 1: ADCE Control-Flow Parity Slice](roadmap/01_adce_control_flow_parity_cycle.md)
-- [x] [Cycle 2: SCCP Sparse Lattice Parity Slice](roadmap/02_sccp_sparse_lattice_parity_cycle.md)
-- [x] [Cycle 3: EarlyCSE Memory-Aware Parity Slice](roadmap/03_earlycse_memory_aware_parity_cycle.md)
-- [x] [Cycle 4: GVN Value Numbering Parity Slice](roadmap/04_gvn_value_numbering_parity_cycle.md)
-- [x] [Cycle 5: SROA Model Slice](roadmap/05_sroa_real_model_cycle.md)
-- [x] [Cycle 6: GlobalDCE And Globals Graph Parity Slice](roadmap/06_globaldce_globals_graph_parity_cycle.md)
-- [x] [Cycle 7: Memory Legality Upgrade Slice](roadmap/07_memory_legality_upgrade_cycle.md)
+- [x] [Completed Optimizer Cycle Slices](roadmap/historical/completed_cycle_slices/README.md)
+
+## Active Big Cycles
+
+- [ ] [Cycle 1: Memory Dependence And Legality Hardening](roadmap/01_memory_dependence_legality_hardening_cycle.md)
+- [ ] [Cycle 2: SROA Aggregate Scalarization](roadmap/02_sroa_aggregate_scalarization_cycle.md)
+- [ ] [Cycle 3: CFG Mutation, ADCE, And SimplifyCFG](roadmap/03_cfg_mutation_adce_simplifycfg_cycle.md)
+- [ ] [Cycle 4: SCCP And InstCombine Semantics Expansion](roadmap/04_sccp_instcombine_semantics_cycle.md)
+- [ ] [Cycle 5: Value Numbering And PRE Foundation](roadmap/05_value_numbering_and_pre_cycle.md)
+- [ ] [Cycle 6: Loop Pipeline Quality](roadmap/06_loop_pipeline_quality_cycle.md)
+- [ ] [Cycle 7: Zig Pipeline Corpus Parity](roadmap/07_zig_pipeline_corpus_parity_cycle.md)
 
 ## Operating Rule
 
