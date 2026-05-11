@@ -96,6 +96,8 @@ fast-math flags
 full alignment semantics
 full volatile semantics
 full atomic ordering semantics
+atomic read-modify-write operations such as `atomicrmw`
+compare-exchange and fence operations
 calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope
@@ -113,6 +115,7 @@ stack-frame codegen beyond one fixed i32 alloca/store/load/return slot
 AIR-like lowering beyond scalar binary/cast, basic terminator, stack-memory, and canonical-loop functions
 AIR-like standalone CLI/text input mode
 raw Zig-emitted LLVM IR before normalization
+inline asm calls and constraint/memory-clobber semantics
 exact Zig-emitted scalar instruction flag parity in AIR-like fixtures
 target-aware pipeline integration beyond CLI target/datalayout record injection
 mode pipeline descriptors are dependency-ordered approximations, not full LLVM pipeline-equivalent implementations

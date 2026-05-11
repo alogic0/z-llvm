@@ -3572,6 +3572,20 @@ test "parser rejects unsupported atomic memory operations" {
         \\
     ;
     try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, fence));
+
+    const source_backed_atomicrmw =
+        \\source_filename = "atomics_inline_asm_debug"
+        \\
+        \\@atomics_inline_asm_debug.atomic_counter = private unnamed_addr global i32 0, align 4
+        \\
+        \\define i32 @atomics_inline_asm_debug.atomic_add(i32 %value) {
+        \\entry:
+        \\  %old = atomicrmw add ptr @atomics_inline_asm_debug.atomic_counter, i32 %value monotonic, align 4
+        \\  ret i32 %old
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedAtomicMemory, ir.Module.parse(std.testing.allocator, source_backed_atomicrmw));
 }
 
 test "parser rejects inline asm calls explicitly" {
@@ -3585,6 +3599,18 @@ test "parser rejects inline asm calls explicitly" {
     ;
 
     try std.testing.expectError(error.UnsupportedInlineAsm, ir.Module.parse(std.testing.allocator, input));
+
+    const source_backed_inline_asm =
+        \\source_filename = "atomics_inline_asm_debug"
+        \\
+        \\define i32 @atomics_inline_asm_debug.inline_asm_barrier(i32 %value) {
+        \\entry:
+        \\  call void asm sideeffect "", "~{memory},~{dirflag},~{fpsr},~{flags}"()
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInlineAsm, ir.Module.parse(std.testing.allocator, source_backed_inline_asm));
 }
 
 test "parser normalizes getelementptr instructions" {

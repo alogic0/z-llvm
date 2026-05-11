@@ -29,6 +29,11 @@ Inline asm is rejected explicitly as `UnsupportedInlineAsm` instead of being
 treated as an indirect call. This keeps memory clobbers, constraints, and
 side-effect flags from being ignored accidentally.
 
+The current source-backed captured row
+`atomics_inline_asm_debug_release_fast` now reaches the inline-asm barrier and
+fails with `UnsupportedInlineAsm`. A reduced `atomicrmw` fixture documents the
+second blocker in the same Zig source group.
+
 ## Optimizer Policy
 
 ```text
@@ -53,6 +58,8 @@ local-only conservative opt fixture:
 unit tests:
   atomic load/store parse/print preservation
   atomicrmw, cmpxchg, fence, and inline asm rejection
+  source-backed reduced inline-asm and atomicrmw rejection fixtures from
+  `atomics_inline_asm_debug_release_fast`
   memory-effect barrier classification
   DCE/ADCE/GVN/EarlyCSE/LICM/DSE atomic barrier preservation
   Mem2Reg atomic alloca-user rejection
@@ -61,6 +68,13 @@ unit tests:
 Inline asm has no opt fixture because the parser rejects `call asm` before any
 optimizer pass can see it. That is intentional until constraints, side-effect
 flags, and memory clobbers are represented.
+
+Source-backed reduced rejection fixtures:
+
+```text
+test/zig/expected/atomics_inline_asm_inline_asm.unsupported.ll
+test/zig/expected/atomics_inline_asm_atomicrmw.unsupported.ll
+```
 
 ## Upstream Mapping
 
