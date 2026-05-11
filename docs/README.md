@@ -32,13 +32,13 @@ completed foundation epics
 
 ## Active Cycles
 
-- [ ] [Cycle 1: ADCE Control-Flow Parity](roadmap/01_adce_control_flow_parity_cycle.md)
-- [ ] [Cycle 2: SCCP Sparse Lattice Parity](roadmap/02_sccp_sparse_lattice_parity_cycle.md)
-- [ ] [Cycle 3: EarlyCSE Memory-Aware Parity](roadmap/03_earlycse_memory_aware_parity_cycle.md)
-- [ ] [Cycle 4: GVN Value Numbering Parity](roadmap/04_gvn_value_numbering_parity_cycle.md)
-- [ ] [Cycle 5: SROA Real Model](roadmap/05_sroa_real_model_cycle.md)
-- [ ] [Cycle 6: GlobalDCE And Globals Graph Parity](roadmap/06_globaldce_globals_graph_parity_cycle.md)
-- [ ] [Cycle 7: Memory Legality Upgrade](roadmap/07_memory_legality_upgrade_cycle.md)
+- [x] [Cycle 1: ADCE Control-Flow Parity](roadmap/01_adce_control_flow_parity_cycle.md)
+- [x] [Cycle 2: SCCP Sparse Lattice Parity](roadmap/02_sccp_sparse_lattice_parity_cycle.md)
+- [x] [Cycle 3: EarlyCSE Memory-Aware Parity](roadmap/03_earlycse_memory_aware_parity_cycle.md)
+- [x] [Cycle 4: GVN Value Numbering Parity](roadmap/04_gvn_value_numbering_parity_cycle.md)
+- [x] [Cycle 5: SROA Real Model](roadmap/05_sroa_real_model_cycle.md)
+- [x] [Cycle 6: GlobalDCE And Globals Graph Parity](roadmap/06_globaldce_globals_graph_parity_cycle.md)
+- [x] [Cycle 7: Memory Legality Upgrade](roadmap/07_memory_legality_upgrade_cycle.md)
 
 ## Operating Rule
 
@@ -54,11 +54,11 @@ as reproduced just because a same-named pass exists.
 
 Every optimizer pass should carry one status:
 
-- [ ] `placeholder`: known pass, not implemented.
-- [ ] `LLVM-shaped subset`: follows the broad LLVM pass structure for the local
+- `placeholder`: known pass, not implemented.
+- `LLVM-shaped subset`: follows the broad LLVM pass structure for the local
       IR surface.
-- [ ] `fixture-equivalent`: matches LLVM 22 for listed fixtures.
-- [ ] `algorithm-parity target`: implements the same core LLVM data structures
+- `fixture-equivalent`: matches LLVM 22 for listed fixtures.
+- `algorithm-parity target`: implements the same core LLVM data structures
       and algorithm flow for the supported IR surface.
 
 For each pass, record LLVM source files, entry points/classes, required

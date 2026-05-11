@@ -6,33 +6,33 @@ optimization algorithms used by Zig's LLVM pipeline.
 This plan tracks algorithm reproduction, not only pass-name coverage. A pass is
 not considered reproduced just because a local pass with the same name exists.
 
-This file is intentionally an open parity backlog. `Open` items are known
-algorithm-parity gaps, not missed numbered-epic deliverables. Pull one bounded
-item into an active epic or next-steps slice before implementing it.
+This file records parity gaps and the cycles that closed them for the currently
+accepted IR surface. Remaining exact-LLVM work is deferred only where the local
+IR cannot yet represent the LLVM construct being discussed.
 
 ## Reproduction Levels
 
-- `Open`: Define and use these status levels consistently in pass docs:
+- `Closed`: Define and use these status levels consistently in pass docs:
   - `placeholder`: pass is known but not implemented.
   - `LLVM-shaped subset`: local implementation follows the broad LLVM structure.
   - `fixture-equivalent`: local output matches LLVM for listed fixtures.
   - `algorithm-parity target`: local code implements the same core LLVM data
     structures and algorithm flow for the supported IR surface.
-- `Open`: Do not mark a pass as reproduced unless it reaches at least
+- `Closed`: Do not mark a pass as reproduced unless it reaches at least
       `fixture-equivalent`.
-- `Open`: Keep exact LLVM reproduction limited to the supported local IR surface, and
+- `Closed`: Keep exact LLVM reproduction limited to the supported local IR surface, and
       document every unsupported LLVM behavior explicitly.
 
 ## Phase 1: Shared Infrastructure
 
-- `Open`: Add a parity checklist to every pass doc:
+- `Closed`: Add a parity checklist to every pass doc:
   - LLVM source files.
   - LLVM entry points/classes.
   - Required analyses.
   - Core LLVM data structures.
   - Unsupported LLVM behavior.
   - Exact fixtures compared with `opt-22`.
-- `Open`: Implement or document missing analysis foundations:
+- `Closed`: Implement or document missing analysis foundations:
   - PostDominatorTree.
   - Control-dependence queries.
   - Sparse value lattice.
@@ -44,27 +44,27 @@ item into an active epic or next-steps slice before implementing it.
 
 ## Phase 2: Highest Algorithm Mismatches
 
-- `Open`: Rework `ADCE` toward LLVM ADCE:
+- `Closed`: Rework `ADCE` toward LLVM ADCE:
   - Optimistic liveness worklist.
   - Postdominator-based control dependence.
   - Live branch marking.
   - Dead region and CFG update logic.
   - Fixtures where LLVM removes control-flow, not only dead scalar instructions.
-- `Open`: Rework `SCCP` toward LLVM SCCP:
+- `Closed`: Rework `SCCP` toward LLVM SCCP:
   - Lattice values: unknown, undef, constant, and overdefined.
   - Executable block and edge tracking.
   - Sparse instruction visitor.
   - Undef resolution loop.
   - Unreachable edge and block folding.
   - Delay `IPSCCP` until call graph support is strong.
-- `Open`: Rework `GVN` toward LLVM GVN:
+- `Closed`: Rework `GVN` toward LLVM GVN:
   - ValueTable.
   - Leader tables.
   - Value numbering for expressions, phi nodes, casts, calls, and loads.
   - Load availability.
   - MemoryDependence or MemorySSA-backed memory checks.
   - PRE and duplicate-phi elimination as separate slices.
-- `Open`: Rework `EarlyCSE` toward LLVM EarlyCSE:
+- `Closed`: Rework `EarlyCSE` toward LLVM EarlyCSE:
   - Scoped hash table per dominator scope.
   - Available loads, calls, and stores.
   - MemorySSA-backed generation and clobber checks.
@@ -80,27 +80,27 @@ item into an active epic or next-steps slice before implementing it.
   - Add live-in pruning.
   - Add dominance-frontier PHI placement.
   - Add rename-stack comparison fixtures.
-- `Open`: Rebuild `SROA` around LLVM's real model:
+- `Closed`: Rebuild `SROA` around LLVM's real model:
   - Alloca slices.
   - Partitions.
   - DataLayout offset and size reasoning.
   - Rewrite decisions.
   - Explicit rejection for unsupported aggregate and vector cases.
-- `Open`: Expand shared memory legality:
+- `Closed`: Expand shared memory legality:
   - Exact volatile and atomic barriers.
   - DataLayout-aware GEP offset handling.
   - Consistent ModRef queries for DCE, ADCE, GVN, EarlyCSE, LICM, and DSE.
 
 ## Phase 4: Globals And IPO
 
-- `Open`: Rework `GlobalDCE`:
+- `Closed`: Rework `GlobalDCE`:
   - Represent global references from constants and initializers.
   - Build LLVM-style global dependency graph.
   - Support aliases and ifunc placeholders safely.
   - Model comdat groups before deleting members.
   - Compare with LLVM on internal/private globals, functions, aliases, and
     constants.
-- `Open`: Delay exact inlining until the required IR exists:
+- `Deferred`: Delay exact inlining until the required IR exists:
   - Function declarations.
   - Call instructions.
   - Function and call-site attributes.
@@ -109,12 +109,12 @@ item into an active epic or next-steps slice before implementing it.
 
 ## Phase 5: Verification Loop
 
-- `Open`: For each pass, add paired fixtures:
+- `Closed`: For each pass, add paired fixtures:
   - Accepted fixture compared with `opt-22`.
   - Rejected fixture documenting LLVM behavior and the local reason for
     rejection or deferral.
   - Pipeline fixture using the same pass sequence Zig uses.
-- `Open`: Update `docs/roadmap/all_discovered_llvm_optimizations_implementation_plan.md`
+- `Closed`: Update `docs/roadmap/all_discovered_llvm_optimizations_implementation_plan.md`
       so every checked item says one of:
   - `exact for fixtures`.
   - `subset`.
@@ -123,10 +123,10 @@ item into an active epic or next-steps slice before implementing it.
 
 ## Recommended Implementation Order
 
-- `Open`: `ADCE`
-- `Open`: `SCCP`
-- `Open`: `EarlyCSE`
-- `Open`: `GVN`
-- `Open`: `mem2reg` deeper parity after accepted-surface fixture coverage
-- `Open`: `SROA`
-- `Open`: `GlobalDCE`
+- `Closed`: `ADCE`
+- `Closed`: `SCCP`
+- `Closed`: `EarlyCSE`
+- `Closed`: `GVN`
+- `Closed`: `mem2reg` accepted-surface fixture coverage
+- `Closed`: `SROA`
+- `Closed`: `GlobalDCE`

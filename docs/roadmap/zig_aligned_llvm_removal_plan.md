@@ -233,8 +233,8 @@ Deliverables:
 The numbered foundation epics in `docs/README.md` are complete. New work should
 now come from a bounded source-backed slice, usually one of these:
 
-- Close an `Open` item from
-      `docs/roadmap/llvm_algorithm_parity_gap_closure_plan.md`.
+- Extend a closed optimizer parity cycle only when a new Zig-emitted fixture
+      exposes a concrete LLVM mismatch.
 - Extend the Zig-emitted IR corpus only when a new parser, verifier, optimizer,
       metadata, or target slice needs that construct.
 - Improve fixture parity for existing passes before adding unrelated pass names.
