@@ -64,6 +64,8 @@ loop-simplifycfg, loop-rotate, and loop-deletion are executable placeholders.
 Cycle 17 added LoopInfo-side recognition for simple induction variables and
 side-effect-free loop-deletion candidates, but it still does not rotate loops,
 insert LCSSA PHIs, or delete loop blocks.
+Cycle 17 also added a simple scalar LCSSA formation helper for one-exit accepted
+loops. This is a targeted utility, not full LLVM `formLCSSA`.
 LCSSA form can be checked for existing exit phis but is not formed yet.
 ```
 

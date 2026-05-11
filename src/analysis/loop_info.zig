@@ -15,6 +15,19 @@ pub const InductionVariable = struct {
     next_value: []const u8,
 };
 
+pub const LoopRotateStatus = enum {
+    unsupported_self_latch_header,
+    unsupported_no_preheader,
+    unsupported_not_implemented,
+};
+
+pub const LoopDeletionStatus = enum {
+    rejected_side_effects,
+    rejected_multiple_exits,
+    rejected_no_proven_exit,
+    eligible_not_implemented,
+};
+
 pub const NaturalLoop = struct {
     header: usize,
     latch: usize,
@@ -190,6 +203,26 @@ pub const NaturalLoop = struct {
         return inductions;
     }
 
+    pub fn rotationStatus(loop: NaturalLoop, function: ir.Function, graph: cfg.Graph) LoopRotateStatus {
+        if (loop.header == loop.latch) return .unsupported_self_latch_header;
+        if (loop.preheader(function, graph) == null) return .unsupported_no_preheader;
+        return .unsupported_not_implemented;
+    }
+
+    pub fn deletionStatus(loop: NaturalLoop, allocator: std.mem.Allocator, function: ir.Function, graph: cfg.Graph) !LoopDeletionStatus {
+        if (!loop.isSideEffectFreeDeletionCandidate(function)) return .rejected_side_effects;
+
+        var exits = try loop.exitBlocks(allocator, graph);
+        defer exits.deinit(allocator);
+        if (exits.items.len != 1) return .rejected_multiple_exits;
+
+        var exiting = try loop.exitingBlocks(allocator, graph);
+        defer exiting.deinit(allocator);
+        if (exiting.items.len == 0) return .rejected_no_proven_exit;
+
+        return .eligible_not_implemented;
+    }
+
     pub fn isSideEffectFreeDeletionCandidate(loop: NaturalLoop, function: ir.Function) bool {
         for (loop.blocks.items) |block_index| {
             if (block_index >= function.blocks.items.len) return false;
@@ -204,6 +237,204 @@ pub const NaturalLoop = struct {
         return true;
     }
 };
+
+pub fn formSimpleLcssa(module: *ir.Module, function_index: usize, loop: NaturalLoop, graph: cfg.Graph) !bool {
+    if (function_index >= module.functions.items.len) return false;
+    const allocator = module.allocator;
+    var changed = false;
+
+    while (true) {
+        const function = &module.functions.items[function_index];
+        const candidate = try findSimpleLcssaCandidate(allocator, function.*, loop, graph) orelse return changed;
+        const phi_name = try module.ownString(try std.fmt.allocPrint(allocator, "{s}.lcssa", .{candidate.value_name}));
+        const incoming = try buildExitIncoming(allocator, function.*, loop, graph, candidate.value_name, candidate.exit_block);
+        const phi_instruction: ir.Instruction = .{
+            .result = phi_name,
+            .kind = .{ .phi = .{
+                .ty = candidate.ty,
+                .incoming = incoming,
+            } },
+        };
+        try function.blocks.items[candidate.exit_block].instructions.insert(allocator, 0, phi_instruction);
+        rewriteOutsideLoopUses(function, loop, candidate.value_name, phi_name);
+        changed = true;
+    }
+}
+
+const LcssaCandidate = struct {
+    value_name: []const u8,
+    ty: ir.Type,
+    exit_block: usize,
+};
+
+fn findSimpleLcssaCandidate(allocator: std.mem.Allocator, function: ir.Function, loop: NaturalLoop, graph: cfg.Graph) !?LcssaCandidate {
+    var exits = try loop.exitBlocks(allocator, graph);
+    defer exits.deinit(allocator);
+    if (exits.items.len != 1) return null;
+    const exit_block = exits.items[0];
+
+    for (loop.blocks.items) |block_index| {
+        if (block_index >= function.blocks.items.len) return null;
+        for (function.blocks.items[block_index].instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const value_name = instruction.result orelse continue;
+            if (alreadyHasExitPhi(function, exit_block, value_name)) continue;
+            if (!outsideUsesValue(function, loop, value_name)) continue;
+            const ty = instruction.resultType() orelse continue;
+            return .{
+                .value_name = value_name,
+                .ty = ty,
+                .exit_block = exit_block,
+            };
+        }
+    }
+    return null;
+}
+
+fn buildExitIncoming(allocator: std.mem.Allocator, function: ir.Function, loop: NaturalLoop, graph: cfg.Graph, value_name: []const u8, exit_block: usize) !std.ArrayList(ir.PhiIncoming) {
+    var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+    errdefer incoming.deinit(allocator);
+
+    for (graph.predecessors(exit_block)) |predecessor| {
+        if (!loop.contains(predecessor)) continue;
+        try incoming.append(allocator, .{
+            .value = .{ .named = value_name },
+            .block = function.blocks.items[predecessor].name,
+        });
+    }
+    if (incoming.items.len == 0) return error.MissingPhiIncoming;
+    return incoming;
+}
+
+fn alreadyHasExitPhi(function: ir.Function, exit_block: usize, value_name: []const u8) bool {
+    for (function.blocks.items[exit_block].instructions.items) |instruction| {
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            .binary, .cast, .freeze, .icmp, .select, .alloca, .load, .store, .gep, .call => break,
+        };
+        for (phi.incoming.items) |incoming| {
+            if (valueMatchesName(incoming.value, value_name)) return true;
+        }
+    }
+    return false;
+}
+
+fn outsideUsesValue(function: ir.Function, loop: NaturalLoop, value_name: []const u8) bool {
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (loop.contains(block_index)) continue;
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instructionUsesValue(instruction, value_name)) return true;
+        }
+        if (block.terminator) |terminator| {
+            if (terminatorUsesValue(terminator, value_name)) return true;
+        }
+    }
+    return false;
+}
+
+fn rewriteOutsideLoopUses(function: *ir.Function, loop: NaturalLoop, value_name: []const u8, replacement_name: []const u8) void {
+    const replacement: ir.Value = .{ .named = replacement_name };
+    for (function.blocks.items, 0..) |*block, block_index| {
+        if (loop.contains(block_index)) continue;
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            if (instruction.kind == .phi and std.mem.eql(u8, instruction.result orelse "", replacement_name)) continue;
+            replaceInstructionUse(instruction, value_name, replacement);
+        }
+        if (block.terminator) |*terminator| replaceTerminatorUse(terminator, value_name, replacement);
+    }
+}
+
+fn instructionUsesValue(instruction: ir.Instruction, value_name: []const u8) bool {
+    return switch (instruction.kind) {
+        .binary => |binary| valueMatchesName(binary.lhs, value_name) or valueMatchesName(binary.rhs, value_name),
+        .cast => |cast| valueMatchesName(cast.value, value_name),
+        .freeze => |freeze| valueMatchesName(freeze.value, value_name),
+        .icmp => |icmp| valueMatchesName(icmp.lhs, value_name) or valueMatchesName(icmp.rhs, value_name),
+        .select => |select| valueMatchesName(select.cond, value_name) or valueMatchesName(select.true_value, value_name) or valueMatchesName(select.false_value, value_name),
+        .phi => |phi| {
+            for (phi.incoming.items) |incoming| {
+                if (valueMatchesName(incoming.value, value_name)) return true;
+            }
+            return false;
+        },
+        .alloca => false,
+        .load => |load| valueMatchesName(load.ptr, value_name),
+        .store => |store| valueMatchesName(store.value, value_name) or valueMatchesName(store.ptr, value_name),
+        .gep => |gep| {
+            if (valueMatchesName(gep.ptr, value_name)) return true;
+            for (gep.indices.items) |index| {
+                if (valueMatchesName(index.value, value_name)) return true;
+            }
+            return false;
+        },
+        .call => |call| {
+            for (call.args.items) |arg| {
+                if (valueMatchesName(arg.value, value_name)) return true;
+            }
+            return false;
+        },
+    };
+}
+
+fn terminatorUsesValue(terminator: ir.Terminator, value_name: []const u8) bool {
+    return switch (terminator) {
+        .ret => |ret| if (ret.value) |value| valueMatchesName(value, value_name) else false,
+        .br, .@"unreachable" => false,
+        .condbr => |condbr| valueMatchesName(condbr.cond, value_name),
+    };
+}
+
+fn replaceInstructionUse(instruction: *ir.Instruction, value_name: []const u8, replacement: ir.Value) void {
+    switch (instruction.kind) {
+        .binary => |*binary| {
+            binary.lhs = replaceValue(binary.lhs, value_name, replacement);
+            binary.rhs = replaceValue(binary.rhs, value_name, replacement);
+        },
+        .cast => |*cast| cast.value = replaceValue(cast.value, value_name, replacement),
+        .freeze => |*freeze| freeze.value = replaceValue(freeze.value, value_name, replacement),
+        .icmp => |*icmp| {
+            icmp.lhs = replaceValue(icmp.lhs, value_name, replacement);
+            icmp.rhs = replaceValue(icmp.rhs, value_name, replacement);
+        },
+        .select => |*select| {
+            select.cond = replaceValue(select.cond, value_name, replacement);
+            select.true_value = replaceValue(select.true_value, value_name, replacement);
+            select.false_value = replaceValue(select.false_value, value_name, replacement);
+        },
+        .phi => |*phi| for (phi.incoming.items) |*incoming| {
+            incoming.value = replaceValue(incoming.value, value_name, replacement);
+        },
+        .alloca => {},
+        .load => |*load| load.ptr = replaceValue(load.ptr, value_name, replacement),
+        .store => |*store| {
+            store.value = replaceValue(store.value, value_name, replacement);
+            store.ptr = replaceValue(store.ptr, value_name, replacement);
+        },
+        .gep => |*gep| {
+            gep.ptr = replaceValue(gep.ptr, value_name, replacement);
+            for (gep.indices.items) |*index| index.value = replaceValue(index.value, value_name, replacement);
+        },
+        .call => |*call| for (call.args.items) |*arg| {
+            arg.value = replaceValue(arg.value, value_name, replacement);
+        },
+    }
+}
+
+fn replaceTerminatorUse(terminator: *ir.Terminator, value_name: []const u8, replacement: ir.Value) void {
+    switch (terminator.*) {
+        .ret => |*ret| {
+            if (ret.value) |value| ret.value = replaceValue(value, value_name, replacement);
+        },
+        .br, .@"unreachable" => {},
+        .condbr => |*condbr| condbr.cond = replaceValue(condbr.cond, value_name, replacement),
+    }
+}
+
+fn replaceValue(value: ir.Value, value_name: []const u8, replacement: ir.Value) ir.Value {
+    return if (valueMatchesName(value, value_name)) replacement else value;
+}
 
 const InductionIncoming = struct {
     initial_value: ir.Value,

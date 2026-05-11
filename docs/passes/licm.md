@@ -78,6 +78,8 @@ preserve SSA validity by moving only to the preheader, which dominates the loop 
 nested loop legality is still driven by LoopInfo membership and dominance; the
 new induction-variable recognition is reserved for later loop passes and is not
 used to justify LICM movement
+hoist selected memory-free scalar chains out through nested loop preheaders when
+dominance and invariant operands allow it
 ```
 
 Current legality boundary:
@@ -96,7 +98,7 @@ or MemorySSA foundation exists.
 Fixture coverage:
 
 ```text
-opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist
+opt-22 compared: invariant scalar hoist, variant-operand rejection, dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist
 opt-22 compared memory legality: scalar hoisting beside volatile memory
 local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, atomic barrier rejection, multi-latch rejection
 ```
@@ -114,7 +116,6 @@ Known gaps:
 no load/store/call hoisting or sinking
 no MemorySSA or alias analysis integration
 no poison or freeze speculation safety checks beyond the current trapping-division guard
-no loop nest ordering beyond current natural-loop list
 no multi-latch loop hoisting
 no preheader creation
 no LCSSA, metadata, debug-info, or analysis preservation updates

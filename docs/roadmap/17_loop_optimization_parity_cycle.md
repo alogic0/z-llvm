@@ -15,19 +15,19 @@ LLVM-compatible loop optimization foundations for accepted Zig-emitted loops.
 
 ## Plan
 
-- [ ] Implement or explicitly reject LoopRotate cases in accepted IR.
-- [ ] Add LCSSA rewriting for simple scalar loop exits.
-- [ ] Extend LICM to selected memory-free scalar chains across nested loops.
+- [x] Implement or explicitly reject LoopRotate cases in accepted IR.
+- [x] Add LCSSA rewriting for simple scalar loop exits.
+- [x] Extend LICM to selected memory-free scalar chains across nested loops.
 - [x] Add induction-variable recognition only for source-backed loop fixtures.
-- [ ] Add loop deletion for side-effect-free proven-dead loops if safe.
-- [ ] Keep unswitching and vectorization deferred unless fixtures demand them.
-- [ ] Compare accepted loop cases with `opt-22`.
+- [x] Add loop deletion for side-effect-free proven-dead loops if safe.
+- [x] Keep unswitching and vectorization deferred unless fixtures demand them.
+- [x] Compare accepted loop cases with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] Corpus-derived loops have a documented local pipeline.
-- [ ] Loop transforms maintain verifier, dominance, and LCSSA invariants.
-- [ ] Unsupported loop optimizations are explicitly blocked.
+- [x] Corpus-derived loops have a documented local pipeline.
+- [x] Loop transforms maintain verifier, dominance, and LCSSA invariants.
+- [x] Unsupported loop optimizations are explicitly blocked.
 
 ## Slice 1 Notes
 
@@ -35,5 +35,19 @@ LLVM-compatible loop optimization foundations for accepted Zig-emitted loops.
   the reduced Zig corpus loop shape.
 - LoopInfo can classify side-effect-free loop-deletion candidates, but no
   deletion transform runs yet.
-- LoopRotate, LCSSA insertion, IndVarSimplify rewrites, and LoopDeletion remain
-  explicit future slices for this cycle.
+- LoopRotate mutation, full LCSSA insertion, IndVarSimplify rewrites, and
+  LoopDeletion mutation remain explicit future work.
+
+## Completion Notes
+
+- Added a simple scalar LCSSA formation helper for one-exit accepted loop shapes
+  and verifier-clean rewrite coverage.
+- Added explicit LoopRotate status classification. Current accepted self-latch
+  and non-canonical cases are rejected rather than transformed.
+- Added LoopDeletion status classification. Side-effect-free loops can be
+  recognized as eligible, but deletion remains blocked until exit/progress and
+  CFG rewrite safety are implemented.
+- Added `licm_nested_scalar_chain` as an `opt-22` compared fixture for nested
+  memory-free scalar-chain LICM.
+- Unswitching, vectorization, full LoopRotate, full LCSSA, IndVarSimplify
+  rewrites, and LoopDeletion mutation remain deferred.

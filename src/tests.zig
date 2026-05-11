@@ -4416,6 +4416,23 @@ test "loop info checks LCSSA form for outside loop uses" {
 
     const rejected_loop = rejected_loops.loopForHeader(1) orelse return error.MissingLoop;
     try std.testing.expect(!try rejected_loop.hasLcssaForm(std.testing.allocator, rejected_function, rejected_graph));
+
+    var rewrite_module = try ir.Module.parse(std.testing.allocator, rejected);
+    defer rewrite_module.deinit();
+    var rewrite_graph = try cfg.Graph.build(std.testing.allocator, rewrite_module.functions.items[0]);
+    defer rewrite_graph.deinit();
+    var rewrite_loops = try loop_info.LoopInfo.build(std.testing.allocator, rewrite_module.functions.items[0]);
+    defer rewrite_loops.deinit();
+    const rewrite_loop = rewrite_loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expect(try loop_info.formSimpleLcssa(&rewrite_module, 0, rewrite_loop.*, rewrite_graph));
+    try rewrite_module.verify();
+
+    var verify_graph = try cfg.Graph.build(std.testing.allocator, rewrite_module.functions.items[0]);
+    defer verify_graph.deinit();
+    var verify_loops = try loop_info.LoopInfo.build(std.testing.allocator, rewrite_module.functions.items[0]);
+    defer verify_loops.deinit();
+    const verify_loop = verify_loops.loopForHeader(1) orelse return error.MissingLoop;
+    try std.testing.expect(try verify_loop.hasLcssaForm(std.testing.allocator, rewrite_module.functions.items[0], verify_graph));
 }
 
 test "loop info classifies reduced Zig corpus loop shape" {
@@ -4471,6 +4488,8 @@ test "loop info classifies reduced Zig corpus loop shape" {
     try std.testing.expectEqual(ir.Value{ .int = 1 }, inductions.items[0].step_value);
     try std.testing.expectEqualStrings("next", inductions.items[0].next_value);
     try std.testing.expect(natural_loop.isSideEffectFreeDeletionCandidate(function));
+    try std.testing.expectEqual(loop_info.LoopRotateStatus.unsupported_self_latch_header, natural_loop.rotationStatus(function, graph));
+    try std.testing.expectEqual(loop_info.LoopDeletionStatus.eligible_not_implemented, try natural_loop.deletionStatus(std.testing.allocator, function, graph));
 }
 
 test "loop info rejects side-effecting loop deletion candidates" {
@@ -4495,8 +4514,11 @@ test "loop info rejects side-effecting loop deletion candidates" {
 
     var loops = try loop_info.LoopInfo.build(std.testing.allocator, function);
     defer loops.deinit();
+    var graph = try cfg.Graph.build(std.testing.allocator, function);
+    defer graph.deinit();
     const natural_loop = loops.loopForHeader(1) orelse return error.MissingLoop;
     try std.testing.expect(!natural_loop.isSideEffectFreeDeletionCandidate(function));
+    try std.testing.expectEqual(loop_info.LoopDeletionStatus.rejected_side_effects, try natural_loop.deletionStatus(std.testing.allocator, function, graph));
 }
 
 test "loop info reports nested loop depth and innermost block ownership" {

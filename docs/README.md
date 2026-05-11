@@ -82,7 +82,7 @@ completed foundation epics
 - [x] [Cycle 14: Native Backend Handoff Validation](roadmap/14_native_backend_handoff_validation_cycle.md)
 - [x] [Cycle 15: Algorithm Parity Audit](roadmap/15_algorithm_parity_audit_cycle.md)
 - [x] [Cycle 16: MemorySSA And Alias Precision](roadmap/16_memoryssa_and_alias_precision_cycle.md)
-- [ ] [Cycle 17: Loop Optimization Parity](roadmap/17_loop_optimization_parity_cycle.md)
+- [x] [Cycle 17: Loop Optimization Parity](roadmap/17_loop_optimization_parity_cycle.md)
 - [ ] [Cycle 18: Scalar Optimization Quality](roadmap/18_scalar_optimization_quality_cycle.md)
 - [ ] [Cycle 19: Machine IR Lowering Boundary](roadmap/19_machine_ir_lowering_boundary_cycle.md)
 - [ ] [Cycle 20: Object, Debug, And Unwind Boundary](roadmap/20_object_debug_and_unwind_cycle.md)
