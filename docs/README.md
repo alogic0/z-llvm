@@ -93,7 +93,7 @@ completed foundation epics
 - [x] [Cycle 4: Target Features And Function Attributes Normalization](roadmap/04_target_features_and_function_attrs_cycle.md)
 - [x] [Cycle 5: ReleaseSmall Corpus Acceptance](roadmap/05_release_small_corpus_acceptance_cycle.md)
 - [x] [Cycle 6: ReleaseSafe Safety IR Expansion](roadmap/06_release_safe_safety_ir_expansion_cycle.md)
-- [ ] [Cycle 7: Debug Metadata Corpus Expansion](roadmap/07_debug_metadata_corpus_expansion_cycle.md)
+- [x] [Cycle 7: Debug Metadata Corpus Expansion](roadmap/07_debug_metadata_corpus_expansion_cycle.md)
 - [ ] [Cycle 8: AArch64 DataLayout Optimizer-Input Policy](roadmap/08_aarch64_datalayout_optimizer_policy_cycle.md)
 - [ ] [Cycle 9: Atomic And Inline-Asm Boundary From Zig Rows](roadmap/09_atomic_inline_asm_boundary_from_zig_rows_cycle.md)
 - [ ] [Cycle 10: Error, Optional, And Aggregate ABI Expansion](roadmap/10_error_optional_aggregate_abi_expansion_cycle.md)

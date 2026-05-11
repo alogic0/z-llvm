@@ -40,6 +40,8 @@ raw top-level metadata records beginning with ! can round-trip
 instruction `!dbg` attachments can round-trip as opaque metadata
 branch/profile metadata attachments such as `!prof` can round-trip as opaque
 terminator metadata
+branch `!dbg` attachments and lexical-block metadata can round-trip opaquely in
+reduced Debug fixtures
 metadata node graphs are not interpreted
 debug-info updater behavior in passes is not implemented
 broken-debug-info diagnostics are not implemented locally
@@ -52,8 +54,8 @@ broken-debug-info diagnostics are not implemented locally
 | Compile units | `llvm.dbg.cu`, `DICompileUnit`, producer, language, optimized flag | opaque raw metadata |
 | Files | `DIFile` for root source and imported scopes | opaque raw metadata |
 | Subprograms | `DISubprogram` attached to function definitions | preserved as function attrs plus opaque raw metadata |
-| Lexical scopes | `DILexicalBlock`, inline scopes, namespace scopes | missing |
-| Locations | `DILocation` attached to instructions | opaque `!dbg` attachment preservation |
+| Lexical scopes | `DILexicalBlock`, inline scopes, namespace scopes | `DILexicalBlock` preserved opaquely; inline and namespace scopes missing |
+| Locations | `DILocation` attached to instructions and simple branch terminators | opaque `!dbg` attachment preservation |
 | Local variables | `DILocalVariable`, `dbg.declare`, `dbg.value`, `dbg.assign` | missing |
 | Global variables | `DIGlobalVariableExpression` and global metadata attachments | missing |
 | Types | base, pointer, array, vector, struct, union, enum, optional/error union representations | missing |
@@ -98,8 +100,11 @@ Implemented Cycle 8 slice:
 
 ```text
 test/zig/expected/debug_metadata.reduced.ll
+test/zig/expected/debug_scope_branch.reduced.ll
 src/ir/parser.zig preserves instruction !dbg attachments
 src/ir/printer.zig prints preserved instruction !dbg attachments
+src/ir/parser.zig and src/ir/printer.zig preserve branch !dbg attachments and
+opaque DILexicalBlock records in reduced Debug fixtures
 debug value intrinsics remain rejected because metadata operands and salvage are
 not represented
 ```
