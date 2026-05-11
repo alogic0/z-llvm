@@ -61,10 +61,10 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 
 | Fixture kind | Count | Meaning |
 | --- | ---: | --- |
-| `opt-equivalent` | 115 | Normalized local output matches `opt-22` for the listed pass pipeline. |
-| `local-conservative` | 43 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
+| `opt-equivalent` | 116 | Normalized local output matches `opt-22` for the listed pass pipeline. |
+| `local-conservative` | 44 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
 | `parse-preserve-only` | 7 | Fixture proves parser/verifier/printer preservation without transform parity. |
-| Total | 165 | Current opt fixture table size. |
+| Total | 167 | Current opt fixture table size. |
 
 Pass status counts from the active pass pipeline inventory:
 
@@ -84,21 +84,22 @@ Pass status counts from the active pass pipeline inventory:
 | `tiny_scalar_release_small` | `future,legacy-bootstrap` | Historical unstripped raw ReleaseSmall generation row predates the stripped captured ReleaseSmall row. | Closed by Cycle 02; retained as future evidence only, superseded by `tiny_scalar_release_small_captured`. |
 | `vector_future_release_fast` | `parse,verify,future` | Reduced vector row parses and verifies fixed-vector syntax but is not optimizer-input until vector FP semantics, vector-condition legality, scalable-vector policy, TTI-style costs, and native vector lowering are selected. | Conservative accepted boundary; vectorizers and target-cost-driven transforms remain out of scope for this finish line. |
 
-## Burn-Down Order
+## Burn-Down Result
 
-1. Corpus closure: remove, reduce, or explicitly justify the remaining
-   `future` and `unsupported` manifest rows.
-2. Verifier correctness: close only verifier gaps that appear in source-backed
-   rows, starting with operand bundles, address spaces, malformed metadata, and
-   EH boundary cases if they appear in the corpus.
-3. Optimizer quality: choose one measured pass-specific parity gap at a time,
-   preferring SROA slice rewriting, GVN PRE, or ADCE control dependence only
-   when fixture deltas prove the need.
-4. Debug boundary: add debug salvage only for transforms that remove or replace
-   instructions carrying `!dbg`; keep `llvm.dbg.value` and
-   `llvm.dbg.declare` conservative until variable-location salvage is modeled.
-5. Handoff proof: add one non-trivial native backend or AIR handoff validation
-   shape that proves accepted optimized IR can move toward Zig-owned codegen.
+Cycles 02-08 closed the measured finish burn-down wave:
+
+1. Corpus closure: the stale raw ReleaseSmall row is a future legacy-bootstrap
+   row, and the broad raw Debug/ReleaseSafe rows have explicit activation
+   conditions.
+2. Vector boundary: the reduced vector row is parse/verify/future and not an
+   optimizer-input row for this finish line.
+3. Optimizer quality: SROA gained DataLayout-backed pointer-field
+   scalarization with opt and local-conservative fixtures.
+4. Debug boundary: debug-location-only behavior is documented and fixture-backed
+   for DCE, InstCombine, EarlyCSE, GVN, and SROA; variable-location salvage
+   remains out of scope.
+5. Handoff proof: `call_stack_slot` validates fixed stack memory feeding a
+   direct x86_64 call through assembly, objdump, and readelf smoke checks.
 
 ## Gap Status Table
 
@@ -114,11 +115,11 @@ Pass status counts from the active pass pipeline inventory:
 | SROA pointer field scalarization | conservative accepted boundary | `sroa_struct_ptr_field`, `sroa_struct_ptr_field_no_layout_reject` | Closed by Cycle 05 for DataLayout-backed simple aggregate fields. |
 | LLVM algorithm parity for all passes | out of scope for finish | `docs/analysis/algorithm_parity_audit.md` | Continue fixture-equivalent slices only when source-backed evidence requires them. |
 
-## Selected Next Slice
+## Final Audit Decision
 
-The stale `tiny_scalar_release_small` unsupported manifest row is closed. Broad
-raw Debug and ReleaseSafe rows now have explicit future activation conditions.
-The vector future boundary is closed as parse/verify/future. SROA pointer
-field scalarization is closed for DataLayout-backed simple aggregate fields.
-The active implementation slice is recorded in `docs/next_steps.md`: tighten
-debug location behavior for transforms that already run.
+Cycle 08 closes this finish burn-down series without creating another measured
+cycle. Readiness passes, every remaining gap in this table has a status, and no
+pass or analysis doc was found claiming full LLVM algorithm parity for the
+current finish line. Future work should be pulled from
+`docs/roadmap/future_optimizer_backlog.md` or a new source-backed blocker, not
+from an implicit continuation of this burn-down wave.

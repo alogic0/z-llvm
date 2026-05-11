@@ -153,7 +153,7 @@ completed foundation epics
 
 - [x] [Finish Cycles 01-25 Archive](roadmap/historical/finish_cycles_01_25_archive/README.md)
 
-## Current Finish Burn-Down
+## Completed Finish Burn-Down 01-08
 
 - [x] [Cycle 01: Finish Criteria and Gap Burn-Down](roadmap/01_finish_criteria_and_gap_burndown_cycle.md)
 - [x] [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
@@ -163,10 +163,13 @@ completed foundation epics
 - [x] [Cycle 05: Optimizer Quality Burn-Down](roadmap/05_optimizer_quality_burndown_cycle.md)
 - [x] [Cycle 06: Debug Salvage Boundary Burn-Down](roadmap/06_debug_salvage_boundary_burndown_cycle.md)
 - [x] [Cycle 07: Handoff Proof Burn-Down](roadmap/07_handoff_proof_burndown_cycle.md)
-- [ ] [Cycle 08: Final Readiness Audit](roadmap/08_final_readiness_audit_cycle.md)
+- [x] [Cycle 08: Final Readiness Audit](roadmap/08_final_readiness_audit_cycle.md)
 
-The selected active implementation slice is kept short in
-[next_steps.md](next_steps.md).
+Cycle 08 decision: stop this burn-down wave. The readiness gate passes, every
+remaining finish gap has a status, and no new measured cycle is active. Future
+work should be selected from the backlog or a new source-backed blocker.
+
+The active work queue is kept short in [next_steps.md](next_steps.md).
 
 ## Future Backlog
 

@@ -11,18 +11,14 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-Source cycle:
-[Cycle 08: Final Readiness Audit](roadmap/08_final_readiness_audit_cycle.md)
+No active cycle is selected.
 
-Durable finish table:
-[Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
+The Cycle 02-08 finish burn-down wave is complete. The durable finish table is
+[Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md).
 
-### Final Readiness Audit Slice
+### Selection Rule
 
-- [ ] Refresh manifest, opt fixture, and pass status counts.
-- [ ] Audit unsupported IR, pass docs, and analysis docs for overstated parity
-      claims.
-- [ ] Update the finish table with final gap statuses.
-- [ ] Decide whether to archive this burn-down series or create one more
-      measured cycle.
-- [ ] Run `bash scripts/run_readiness_checks.sh`.
+- [ ] Select the next bounded slice from
+      [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md) or from a
+      new measured source-backed blocker.
+- [ ] Add upstream LLVM mapping before marking a new future step complete.
