@@ -93,6 +93,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     .binary => |binary| {
                         try writer.print("{s} ", .{binary.op.name()});
                         try printBinaryFlags(binary.flags, writer);
+                        try printFastMathFlags(binary.fp_flags, writer);
                         try binary.ty.format(writer);
                         try writer.writeByte(' ');
                         try binary.lhs.format(writer);
@@ -126,7 +127,9 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .fcmp => |fcmp| {
-                        try writer.print("fcmp {s} ", .{fcmp.predicate.name()});
+                        try writer.writeAll("fcmp ");
+                        try printFastMathFlags(fcmp.fp_flags, writer);
+                        try writer.print("{s} ", .{fcmp.predicate.name()});
                         try fcmp.operand_ty.format(writer);
                         try writer.writeByte(' ');
                         try fcmp.lhs.format(writer);
@@ -345,6 +348,20 @@ fn printBinaryFlags(flags: core.BinaryFlags, writer: anytype) !void {
     if (flags.nuw) try writer.writeAll("nuw ");
     if (flags.exact) try writer.writeAll("exact ");
     if (flags.disjoint) try writer.writeAll("disjoint ");
+}
+
+fn printFastMathFlags(flags: core.FastMathFlags, writer: anytype) !void {
+    if (flags.fast) {
+        try writer.writeAll("fast ");
+        return;
+    }
+    if (flags.nnan) try writer.writeAll("nnan ");
+    if (flags.ninf) try writer.writeAll("ninf ");
+    if (flags.nsz) try writer.writeAll("nsz ");
+    if (flags.arcp) try writer.writeAll("arcp ");
+    if (flags.contract) try writer.writeAll("contract ");
+    if (flags.afn) try writer.writeAll("afn ");
+    if (flags.reassoc) try writer.writeAll("reassoc ");
 }
 
 fn printMemoryPrefix(attrs: core.MemoryAttrs, writer: anytype) !void {

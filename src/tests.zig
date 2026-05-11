@@ -2831,12 +2831,43 @@ test "parser preserves scalar fcmp predicate surface" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
-test "parser keeps unsupported FP surface closed" {
-    const fast_fcmp_input =
-        \\define i1 @fast_cmp(float %a, float %b) {
+test "parser preserves fast-math flags without enabling FP folds" {
+    const input =
+        \\define float @fast_math_flags(float %a, float %b) {
         \\entry:
-        \\  %r = fcmp fast olt float %a, %b
-        \\  ret i1 %r
+        \\  %sum = fadd fast float %a, %b
+        \\  %product = fmul nnan ninf nsz arcp float %sum, %b
+        \\  %quotient = fdiv contract afn reassoc float %product, %b
+        \\  %cmp = fcmp nnan ninf olt float %sum, %quotient
+        \\  %value = select i1 %cmp, float %sum, float %quotient
+        \\  ret float %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser keeps unsupported FP surface closed" {
+    const invalid_fast_mix_input =
+        \\define float @invalid_fast_mix(float %a, float %b) {
+        \\entry:
+        \\  %r = fadd fast nnan float %a, %b
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    const integer_fast_math_input =
+        \\define i32 @integer_fast_math(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = add nnan i32 %a, %b
+        \\  ret i32 %r
         \\}
         \\
     ;
@@ -2865,7 +2896,10 @@ test "parser keeps unsupported FP surface closed" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedPredicate, ir.Module.parse(std.testing.allocator, fast_fcmp_input));
+    try std.testing.expectError(error.InvalidInstruction, ir.Module.parse(std.testing.allocator, invalid_fast_mix_input));
+    var integer_fast_math = try ir.Module.parse(std.testing.allocator, integer_fast_math_input);
+    defer integer_fast_math.deinit();
+    try std.testing.expectError(error.InvalidInstructionFlag, integer_fast_math.verify());
     try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_fcmp_input));
 
     var vector_fp_binary = try ir.Module.parse(std.testing.allocator, vector_fp_binary_input);

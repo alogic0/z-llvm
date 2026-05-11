@@ -54,6 +54,7 @@ opt-22 equivalent:
   dce_volatile_load_reject
   fp_dce_dead
   fp_extended_dce_preserve
+  fp_fast_math_preserve
 
 local-only conservative:
   none currently

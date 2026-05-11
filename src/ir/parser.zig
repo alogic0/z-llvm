@@ -708,6 +708,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "fcmp")) {
+        const fp_flags = try parseFastMathFlagsFromParts(&parts);
         const predicate = core.FcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
         const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
@@ -716,6 +717,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
         return .{
             .result = result_text[1..],
             .kind = .{ .fcmp = .{
+                .fp_flags = fp_flags,
                 .predicate = predicate,
                 .operand_ty = operand_ty,
                 .lhs = lhs,
@@ -774,6 +776,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
 fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
     var rest = std.mem.trim(u8, text, " \t");
     var flags: core.BinaryFlags = .{};
+    var fp_flags: core.FastMathFlags = .{};
     while (firstToken(rest)) |token| {
         if (std.mem.eql(u8, token, "nsw")) {
             if (flags.nsw) return error.InvalidInstruction;
@@ -787,6 +790,8 @@ fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
         } else if (std.mem.eql(u8, token, "disjoint")) {
             if (flags.disjoint) return error.InvalidInstruction;
             flags.disjoint = true;
+        } else if (isFastMathFlagToken(token)) {
+            try setFastMathFlag(&fp_flags, token);
         } else {
             break;
         }
@@ -802,6 +807,7 @@ fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {
     return .{
         .op = op,
         .flags = flags,
+        .fp_flags = fp_flags,
         .ty = typed.ty,
         .lhs = lhs,
         .rhs = rhs,
@@ -1058,6 +1064,60 @@ fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {
         return flags;
     }
     return flags;
+}
+
+fn parseFastMathFlagsFromParts(parts: *std.mem.TokenIterator(u8, .any)) !core.FastMathFlags {
+    var flags: core.FastMathFlags = .{};
+    while (parts.peek()) |token| {
+        if (!isFastMathFlagToken(token)) return flags;
+        try setFastMathFlag(&flags, token);
+        _ = parts.next();
+    }
+    return flags;
+}
+
+fn isFastMathFlagToken(token: []const u8) bool {
+    return std.mem.eql(u8, token, "fast") or
+        std.mem.eql(u8, token, "nnan") or
+        std.mem.eql(u8, token, "ninf") or
+        std.mem.eql(u8, token, "nsz") or
+        std.mem.eql(u8, token, "arcp") or
+        std.mem.eql(u8, token, "contract") or
+        std.mem.eql(u8, token, "afn") or
+        std.mem.eql(u8, token, "reassoc");
+}
+
+fn setFastMathFlag(flags: *core.FastMathFlags, token: []const u8) !void {
+    if (std.mem.eql(u8, token, "fast")) {
+        if (flags.any()) return error.InvalidInstruction;
+        flags.fast = true;
+        return;
+    }
+    if (flags.fast) return error.InvalidInstruction;
+    if (std.mem.eql(u8, token, "nnan")) {
+        if (flags.nnan) return error.InvalidInstruction;
+        flags.nnan = true;
+    } else if (std.mem.eql(u8, token, "ninf")) {
+        if (flags.ninf) return error.InvalidInstruction;
+        flags.ninf = true;
+    } else if (std.mem.eql(u8, token, "nsz")) {
+        if (flags.nsz) return error.InvalidInstruction;
+        flags.nsz = true;
+    } else if (std.mem.eql(u8, token, "arcp")) {
+        if (flags.arcp) return error.InvalidInstruction;
+        flags.arcp = true;
+    } else if (std.mem.eql(u8, token, "contract")) {
+        if (flags.contract) return error.InvalidInstruction;
+        flags.contract = true;
+    } else if (std.mem.eql(u8, token, "afn")) {
+        if (flags.afn) return error.InvalidInstruction;
+        flags.afn = true;
+    } else if (std.mem.eql(u8, token, "reassoc")) {
+        if (flags.reassoc) return error.InvalidInstruction;
+        flags.reassoc = true;
+    } else {
+        return error.InvalidInstruction;
+    }
 }
 
 fn parseStore(line: []const u8) !core.Instruction {

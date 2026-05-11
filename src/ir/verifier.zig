@@ -337,6 +337,7 @@ pub fn verify(module: core.Module) !void {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try verifyBinaryFlags(binary);
+                        try verifyBinaryFastMathFlags(binary);
                         try ctx.verifyValue(binary.ty, binary.lhs, block_index, instruction_index);
                         try ctx.verifyValue(binary.ty, binary.rhs, block_index, instruction_index);
                     },
@@ -360,6 +361,12 @@ pub fn verify(module: core.Module) !void {
                     .fcmp => |fcmp| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
+                        if (fcmp.fp_flags.any()) {
+                            switch (fcmp.operand_ty) {
+                                .float, .double => {},
+                                .void, .int, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
+                            }
+                        }
                         switch (fcmp.operand_ty) {
                             .float, .double => {},
                             .void, .int, .ptr, .aggregate, .vector => return error.TypeMismatch,
@@ -800,6 +807,17 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
             },
             .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
         },
+    }
+}
+
+fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
+    if (!binary.fp_flags.any()) return;
+    switch (binary.op) {
+        .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
+            .float, .double => {},
+            .void, .int, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
+        },
+        .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
     }
 }
 

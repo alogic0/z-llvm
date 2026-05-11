@@ -89,6 +89,7 @@ Fixture coverage:
   select_fold
   fp_instcombine_preserve
   fp_extended_instcombine_preserve
+  fp_fast_math_preserve
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -144,7 +145,8 @@ This reproduces a small identity-folding and constant-folding subset of InstComb
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
 The current implementation deliberately avoids using `nsw`, `nuw`, `exact`, division/remainder, or freeze facts for simplification.
 Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, `frem`, and `fcmp` are preserved rather than folded
-because fast-math, NaN, signed-zero, and FP constant semantics are not modeled.
+because NaN, signed-zero, FP constant semantics, and fast-math optimization
+legality are not modeled. Parsed fast-math flags are preserved, not used.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 ```
 

@@ -209,6 +209,22 @@ pub const BinaryFlags = struct {
     }
 };
 
+pub const FastMathFlags = struct {
+    fast: bool = false,
+    nnan: bool = false,
+    ninf: bool = false,
+    nsz: bool = false,
+    arcp: bool = false,
+    contract: bool = false,
+    afn: bool = false,
+    reassoc: bool = false,
+
+    pub fn any(flags: FastMathFlags) bool {
+        return flags.fast or flags.nnan or flags.ninf or flags.nsz or
+            flags.arcp or flags.contract or flags.afn or flags.reassoc;
+    }
+};
+
 pub const CastOp = enum {
     trunc,
     zext,
@@ -417,6 +433,7 @@ pub const FunctionDecl = struct {
 pub const BinaryInst = struct {
     op: BinaryOp,
     flags: BinaryFlags = .{},
+    fp_flags: FastMathFlags = .{},
     ty: Type,
     lhs: Value,
     rhs: Value,
@@ -485,6 +502,7 @@ pub const FcmpPredicate = enum {
 };
 
 pub const FcmpInst = struct {
+    fp_flags: FastMathFlags = .{},
     predicate: FcmpPredicate,
     operand_ty: Type,
     lhs: Value,

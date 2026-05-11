@@ -31,6 +31,8 @@ floating-point binary ops: fadd/fsub/fmul/fdiv/frem for scalar float/double pars
 floating-point compare: fcmp false/oeq/ogt/oge/olt/ole/one/ord/uno/ueq/ugt/uge/ult/ule/une/true for scalar float/double parse/verify only
 floating-point constants: observed decimal `float`/`double` literal spellings
 are parsed, verified against scalar FP types, and printed verbatim
+fast-math flags on supported scalar FP binary ops and `fcmp` are parsed,
+verified, printed, and ignored by optimizers
 integer casts: trunc, zext, sext
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
@@ -55,6 +57,7 @@ opt-22 equivalent:
   fp_extended_dce_preserve
   fp_extended_adce_preserve
   fp_extended_sccp_preserve
+  fp_fast_math_preserve
 
 local-only conservative:
   flagged arithmetic and division are intentionally not folded by instcombine yet
@@ -68,7 +71,7 @@ unit-test only:
   parser/printer/verifier round-trip for observed decimal FP literals
   parser rejection for NaN, infinity, and signed-zero literal spellings until
   strict semantics are modeled
-  parser/verifier rejection for unsupported fcmp predicates, vector FP, fast-math fcmp, and constrained FP calls
+  parser/verifier rejection for unsupported fcmp predicates, vector FP, invalid fast-math flag placement, and constrained FP calls
   instcombine no-fold behavior for flagged add and division
 ```
 
@@ -81,7 +84,7 @@ no pointer casts
 no bitcast/ptrtoint/inttoptr
 no floating-point optimization parity
 no NaN, infinity, signed-zero, or APFloat-equivalent semantic model
-no fast-math flag surface or FP exception behavior model
+no fast-math optimization semantics or FP exception behavior model
 no constrained FP intrinsic semantics
 no poison value
 no use of nsw/nuw/exact as optimization facts

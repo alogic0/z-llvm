@@ -63,7 +63,8 @@ named SSA values
 fp80/fp128
 floating-point operations beyond scalar `fadd`/`fsub`/`fmul`/`fdiv`/`frem`
 NaN, infinity, signed-zero, and unobserved FP literal semantics
-fast-math flags, constrained FP intrinsics, and FP exception semantics
+fast-math optimization semantics, constrained FP intrinsics, and FP exception
+semantics
 arrays
 scalable vectors and unsupported vector element types
 structs
@@ -114,7 +115,7 @@ function attributes are mostly preserved textually; only readnone/readonly and
 memory(none)/memory(read)/memory(argmem: read) affect local call memory effects
 parameter attributes are preserved but not semantically interpreted
 global attributes are preserved but not semantically interpreted
-fast-math flags
+fast-math flags on non-FP operations or unsupported FP/vector operations
 full alignment semantics
 full volatile semantics
 full atomic ordering semantics
