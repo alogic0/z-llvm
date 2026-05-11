@@ -15,20 +15,27 @@ that align with Zig's native LLVM-removal plan.
 
 ## Plan
 
-- [ ] Summarize completed local capabilities by subsystem.
-- [ ] Map every capability to Zig's native backend, AIR/Sema, or LLVM-compat
+- [x] Summarize completed local capabilities by subsystem.
+- [x] Map every capability to Zig's native backend, AIR/Sema, or LLVM-compat
       boundary.
-- [ ] Identify which work should remain external experiment versus upstreamable
+- [x] Identify which work should remain external experiment versus upstreamable
       design input.
-- [ ] Add reproducibility instructions for compiler version, fixture generation,
+- [x] Add reproducibility instructions for compiler version, fixture generation,
       opt comparison, and corpus runs.
-- [ ] Create a gap report suitable for Zig contributors to review.
-- [ ] Decide the next roadmap wave based on upstream alignment, not local
+- [x] Create a gap report suitable for Zig contributors to review.
+- [x] Decide the next roadmap wave based on upstream alignment, not local
       momentum alone.
 
 ## Exit Criteria
 
-- [ ] Upstream-facing docs can explain the project without overclaiming.
-- [ ] Reproduction commands are current and tested.
-- [ ] The next wave is grounded in Zig's actual removal path.
+- [x] Upstream-facing docs can explain the project without overclaiming.
+- [x] Reproduction commands are current and tested.
+- [x] The next wave is grounded in Zig's actual removal path.
 
+## Completion Notes
+
+- Added `docs/upstream_integration_readiness.md` as the contributor-facing
+  capability and gap report.
+- Added `scripts/run_readiness_checks.sh` to reproduce the current claims.
+- The next roadmap wave is explicitly tied to Zig-emitted corpus blockers and
+  upstream LLVM-removal needs rather than generic LLVM feature growth.
