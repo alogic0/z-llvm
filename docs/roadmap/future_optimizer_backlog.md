@@ -9,6 +9,21 @@ cycles in `docs/README.md`.
       expression keys can include all alias-sensitive memory facts without
       missing must-alias equivalents.
 
+## Floating-Point Optimizer Parity
+
+- [ ] Add an APFloat-equivalent semantic model for NaN, infinity, signed zero,
+      and target-dependent FP literal behavior.
+- [ ] Teach InstSimplify/InstCombine when strict FP identities such as
+      `x + 0.0`, `x * 1.0`, and self-`fcmp` folds are legal.
+- [ ] Use parsed fast-math flags as optimization facts only after matching
+      LLVM's `FastMathFlags` legality for NaN, signed zero, reassociation,
+      reciprocal, contraction, approximate-function, and target-cost-sensitive
+      transforms.
+- [ ] Extend SCCP with an FP constant lattice only after APFloat comparison
+      fixtures exist.
+- [ ] Enable FP value numbering/CSE only after NaN, signed-zero, fast-math, and
+      exception behavior are modeled.
+
 ## Source-Backed Next Wave
 
 These are not active cycles yet. Promote one item at a time only after selecting

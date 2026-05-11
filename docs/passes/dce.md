@@ -55,9 +55,11 @@ opt-22 equivalent:
   fp_dce_dead
   fp_extended_dce_preserve
   fp_fast_math_preserve
+  fp_strict_sensitive_preserve
 
 local-only conservative:
-  none currently
+  fp_fast_math_sensitive_conservative is preserved as part of the local
+  fast-math legality boundary.
 
 unit-test only:
   none currently

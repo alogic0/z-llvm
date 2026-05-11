@@ -90,6 +90,10 @@ Fixture coverage:
   fp_instcombine_preserve
   fp_extended_instcombine_preserve
   fp_fast_math_preserve
+  fp_strict_sensitive_preserve
+  fp_fast_math_sensitive_conservative is local-conservative: LLVM may fold
+  fast-math-sensitive identities after proving flag semantics, but the local
+  optimizer preserves them until the FP legality model exists.
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh

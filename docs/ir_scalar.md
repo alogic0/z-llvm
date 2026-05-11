@@ -58,12 +58,14 @@ opt-22 equivalent:
   fp_extended_adce_preserve
   fp_extended_sccp_preserve
   fp_fast_math_preserve
+  fp_strict_sensitive_preserve
 
 local-only conservative:
   flagged arithmetic and division are intentionally not folded by instcombine yet
   FP literals are preserved but not folded
   fp_extended_gvn_no_cse
   fp_extended_early_cse_no_cse
+  fp_fast_math_sensitive_conservative
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
