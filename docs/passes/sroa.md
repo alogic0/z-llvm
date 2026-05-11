@@ -92,6 +92,7 @@ Fixture coverage:
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject
   sroa_struct_escape_reject
+  debug_sroa_dbg_drop
   sroa_debug_declare_reject
   sroa_byval_param_boundary
 
@@ -149,6 +150,7 @@ opt-22 equivalent:
   sroa_byval_param_boundary
 
 local-only conservative:
+  debug_sroa_dbg_drop
   sroa_struct_ptr_field_no_layout_reject
   sroa_struct_volatile_reject
   sroa_debug_declare_reject
@@ -173,4 +175,7 @@ local type model still covers only the current integer and pointer struct/array
 subset
 debug declare salvage blocks aggregate rewriting until variable-location update
 semantics are modeled
+debug-location-only aggregate rewrites may drop `!dbg` locations attached to
+removed alloca/GEP/load/store instructions; no LLVM-style variable-location
+salvage is attempted
 ```

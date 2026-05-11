@@ -123,6 +123,16 @@ modules containing `llvm.dbg.value` or `llvm.dbg.declare` still skip transform
 passes until variable-location salvage exists
 ```
 
+Cycle 06 extends the same debug-location-only rule to SROA:
+
+```text
+SROA may remove aggregate alloca, GEP, load, and store instructions carrying
+`!dbg`; removed instruction locations are dropped with those instructions
+SROA preserves unchanged scalar instructions and their locations
+SROA still refuses `llvm.dbg.declare` aggregate rewriting because variable
+location update and salvage are not represented
+```
+
 This is intentionally weaker than LLVM's `salvageDebugInfo` and
 `replaceAllDbgUsesWith` behavior. It is valid only for debug-location-only
 fixtures that do not contain variable-location intrinsics.

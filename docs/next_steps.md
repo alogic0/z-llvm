@@ -12,19 +12,19 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 ## Active Cycle
 
 Source cycle:
-[Cycle 06: Debug Salvage Boundary Burn-Down](roadmap/06_debug_salvage_boundary_burndown_cycle.md)
+[Cycle 07: Handoff Proof Burn-Down](roadmap/07_handoff_proof_burndown_cycle.md)
 
 Durable finish table:
 [Finish Criteria and Gap Burn-Down Table](roadmap/finish_gap_burndown_table.md)
 
-### Debug Salvage Boundary Slice
+### Handoff Proof Slice
 
-- [ ] Inventory transforms that remove or replace instructions carrying `!dbg`.
-- [ ] Add or refine fixtures for DCE, InstCombine, EarlyCSE, GVN, and SROA
-      where relevant.
-- [ ] Preserve debug locations on unchanged or leader instructions.
-- [ ] Keep `llvm.dbg.value` and `llvm.dbg.declare` transform pipelines
-      disabled until variable-location salvage exists.
-- [ ] Update debug metadata docs, affected pass docs, unsupported IR docs, and
-      the finish table.
+- [ ] Inspect current handoff validation fixtures and identify the weakest
+      covered shape.
+- [ ] Select one non-trivial shape and keep it inside the existing x86_64 smoke
+      path.
+- [ ] Add the smallest fixture and validation command needed to prove the
+      selected handoff.
+- [ ] Update codegen handoff docs, readiness scripts, and the finish table.
+- [ ] Keep broad backend parity out of scope.
 - [ ] Run `bash scripts/run_readiness_checks.sh`.

@@ -172,7 +172,9 @@ preservation for instructions, simple branches, call sites, loop PHIs,
 reduced lexical-block fixtures, and raw `llvm.dbg.value` or
 `llvm.dbg.declare` operands
 lexical debug scopes beyond opaque `DILexicalBlock` metadata preservation
-debug value and debug declare salvage semantics; debug assign intrinsics still
+debug value and debug declare salvage semantics; debug-location-only transforms
+may drop `!dbg` locations with removed instructions, but variable-location
+intrinsics keep transform pipelines disabled; debug assign intrinsics still
 report `UnsupportedDebugIntrinsic`
 branch weights / profile metadata beyond opaque branch attachment preservation
 panic/runtime lowering beyond declared opaque runtime call preservation in

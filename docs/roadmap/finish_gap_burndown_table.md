@@ -60,9 +60,9 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 | Fixture kind | Count | Meaning |
 | --- | ---: | --- |
 | `opt-equivalent` | 115 | Normalized local output matches `opt-22` for the listed pass pipeline. |
-| `local-conservative` | 42 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
+| `local-conservative` | 43 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
 | `parse-preserve-only` | 7 | Fixture proves parser/verifier/printer preservation without transform parity. |
-| Total | 164 | Current opt fixture table size. |
+| Total | 165 | Current opt fixture table size. |
 
 Pass status counts from the active pass pipeline inventory:
 
@@ -106,7 +106,7 @@ Pass status counts from the active pass pipeline inventory:
 | Raw Debug whole-program shape | later measured blocker | `tiny_scalar_debug` plus reduced Debug rows | Activation condition: reduce a concrete uncovered Debug construct from raw Zig output. |
 | Raw ReleaseSafe whole-program shape | later measured blocker | `tiny_scalar_release_safe` plus reduced safety rows | Activation condition: reduce a concrete uncovered safety/runtime-call construct from raw Zig output. |
 | Fixed-vector optimizer participation | conservative accepted boundary | `vector_future_release_fast`, vector opt fixtures | Cycle 04 keeps the row parse/verify/future; activate only with target-cost or native vector-lowering requirements. |
-| Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures and debug docs | Preserve `llvm.dbg.value`/`llvm.dbg.declare`; do not transform them until salvage exists. |
+| Full debug variable-location salvage | out of scope for finish | debug intrinsic fixtures, `debug_*_dbg_*` opt fixtures, and debug docs | Cycle 06 documents DCE, InstCombine, EarlyCSE, GVN, and SROA debug-location-only behavior; preserve `llvm.dbg.value`/`llvm.dbg.declare` and do not transform them until salvage exists. |
 | Full ThinLTO/bitcode summary behavior | out of scope for finish | bitcode/LTO docs | Keep compatibility decision and explicit unsupported diagnostics. |
 | Broad MC/Object/backend parity | out of scope for finish | backend handoff docs and readiness checks | Keep current x86_64 scalar smoke proofs only. |
 | SROA pointer field scalarization | conservative accepted boundary | `sroa_struct_ptr_field`, `sroa_struct_ptr_field_no_layout_reject` | Closed by Cycle 05 for DataLayout-backed simple aggregate fields. |
@@ -116,6 +116,7 @@ Pass status counts from the active pass pipeline inventory:
 
 The stale `tiny_scalar_release_small` unsupported manifest row is closed. Broad
 raw Debug and ReleaseSafe rows now have explicit future activation conditions.
-The vector future boundary is closed as parse/verify/future. The active
-implementation slice is recorded in `docs/next_steps.md`: tighten debug
-location behavior for transforms that already run.
+The vector future boundary is closed as parse/verify/future. SROA pointer
+field scalarization is closed for DataLayout-backed simple aggregate fields.
+The active implementation slice is recorded in `docs/next_steps.md`: tighten
+debug location behavior for transforms that already run.
