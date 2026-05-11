@@ -41,14 +41,18 @@ parser, verifier, and optimizer work.
 ## Version Alignment Policy
 
 The authoritative corpus must be generated from the same Zig source checkout
-used by the inventories. Today the inventories point at `../ziglang`, and the
-checked captured fixtures were regenerated with:
+used by the inventories. Today the inventories point at `../ziglang`.
+
+The current authoritative emitter for new captures is:
 
 ```text
 ../ziglang/build/stage4/bin/zig
-0.17.0-dev.370+f35e38f6a
-../ziglang source revision f35e38f6a6
+0.17.0-dev.304+9787df942
+../ziglang source revision 9787df9421
 ```
+
+Older checked rows may retain their original emitter revision. The manifest is
+the row-level source of truth for mixed-generation corpus history.
 
 When adding or refreshing fixtures:
 

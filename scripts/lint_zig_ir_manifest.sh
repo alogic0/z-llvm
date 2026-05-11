@@ -22,6 +22,12 @@ split_tsv_line() {
   out_fields+=("$rest")
 }
 
+field_count() {
+  local line="$1"
+  local without_tabs="${line//$'\t'/}"
+  printf '%d\n' "$(( ${#line} - ${#without_tabs} + 1 ))"
+}
+
 has_classification() {
   local classes=",$1,"
   local needle=",$2,"
@@ -36,6 +42,12 @@ while IFS= read -r line; do
   line_no=$((line_no + 1))
   if [[ -z "$line" ]]; then
     continue
+  fi
+
+  actual_fields="$(field_count "$line")"
+  if [[ "$actual_fields" -ne "$expected_fields" ]]; then
+    printf '%s:%d expected %d TSV fields, found %d\n' "$manifest" "$line_no" "$expected_fields" "$actual_fields" >&2
+    exit 1
   fi
 
   fields=()
