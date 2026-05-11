@@ -46,7 +46,7 @@ TargetLibraryInfo
 | Memory effects | `src/analysis/memory_effect.zig` | LLVM-shaped subset | DCE, ADCE, GVN, LICM, memory legality |
 | Memory locations | `src/analysis/memory_location.zig` | local conservative subset | alias, DSE, SROA-related memory checks |
 | Alias/ModRef | `src/analysis/alias.zig` | local conservative subset | DSE and memory legality foundation |
-| MemorySSA-like state | `docs/analysis/memory_ssa.md` | design/foundation | later MemorySSA-backed LICM/GVN/DSE |
+| MemorySSA-like state | `src/analysis/memory_ssa.zig`, `docs/analysis/memory_ssa.md` | conservative clobber-query subset | GVN load availability and later MemorySSA-backed LICM/DSE |
 | Function attributes | `src/analysis/function_attrs.zig` | LLVM-shaped subset | call memory-effect classification |
 | Call graph/global reachability | `src/analysis/call_graph.zig` | LLVM-shaped subset | GlobalDCE foundation |
 | TargetLibraryInfo | `src/analysis/target_library_info.zig` | placeholder subset | libcall-aware scalar optimization |

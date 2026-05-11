@@ -37,27 +37,32 @@ Core LLVM algorithm data structures:
   Walker queries for clobbering memory accesses
 
 Local target status:
-  placeholder
+  LLVM-shaped clobber-query subset
 
 Implemented subset:
-  None. Current memory passes use local MemoryLocation and alias/mod-ref
-  queries directly. The shared memory-effect API also provides safe-to-delete
-  and safe-to-speculate predicates so passes have one conservative legality
-  gate before MemorySSA exists.
+  InstRef identifies a memory access by block and instruction index.
+  hasClobberBetween scans the accepted IR region between two accesses.
+  alias.modRef decides whether an intervening instruction is a def/barrier for
+  the queried pointer.
+  GVN load availability uses this shared helper.
 
 Intentional divergences:
   DSE uses a single-block reverse scan instead of MemorySSA.
   LICM does not move memory instructions.
-  GVN and EarlyCSE use alias/mod-ref clobber scans instead of MemorySSA walkers.
+  EarlyCSE still uses scoped local availability for store-to-load forwarding.
+  The helper is a linear conservative scan, not a MemorySSA def/use graph with
+  MemoryPhi placement.
 
 Analysis preservation/invalidation:
-  No local MemorySSA analysis exists yet.
+  No persisted local MemorySSA analysis exists yet; callers rebuild/query the
+  accepted function directly.
 
 Fixture coverage:
-  none
+  unit test: memory ssa clobber helper reports store barriers between loads
 
 opt-22 comparison command:
-  not applicable yet
+  covered indirectly through GVN and EarlyCSE memory fixtures in
+  `bash scripts/compare_opt.sh`
 
 Local-only fixture command:
   zig build test

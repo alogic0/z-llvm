@@ -17,21 +17,20 @@ DataLayout-aware address reasoning.
 
 ## Plan
 
-- [ ] Add or document the LLVM memory-legality contract.
-- [ ] Tighten volatile and atomic barrier classification.
-- [ ] Add DataLayout-aware GEP offset handling for accepted pointer shapes.
-- [ ] Strengthen AliasAnalysis/ModRef beyond always-unknown where fixtures need
+- [x] Add or document the LLVM memory-legality contract.
+- [x] Tighten volatile and atomic barrier classification.
+- [x] Add DataLayout-aware GEP offset handling for accepted pointer shapes.
+- [x] Strengthen AliasAnalysis/ModRef beyond always-unknown where fixtures need
       it.
-- [ ] Add MemorySSA-like state for supported load/store/call clobber checks.
-- [ ] Route DCE, ADCE, DSE, GVN, EarlyCSE, LICM, and SROA through the shared
+- [x] Add MemorySSA-like state for supported load/store/call clobber checks.
+- [x] Route DCE, ADCE, DSE, GVN, EarlyCSE, LICM, and SROA through the shared
       legality API.
-- [ ] Add paired accepted/rejected memory fixtures for each client pass.
-- [ ] Compare LLVM-equivalent fixtures with `opt-22`.
+- [x] Add paired accepted/rejected memory fixtures for each client pass.
+- [x] Compare LLVM-equivalent fixtures with `opt-22`.
 
 ## Exit Criteria
 
-- [ ] Memory legality is centralized and documented.
-- [ ] Volatile/atomic cases are protected across all client passes.
-- [ ] DataLayout-backed offset reasoning is tested.
-- [ ] Local conservative differences from LLVM are explicit.
-
+- [x] Memory legality is centralized and documented.
+- [x] Volatile/atomic cases are protected across all client passes.
+- [x] DataLayout-backed offset reasoning is tested.
+- [x] Local conservative differences from LLVM are explicit.

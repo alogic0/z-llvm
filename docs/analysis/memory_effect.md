@@ -45,6 +45,7 @@ split volatile and atomic spelling through barrierKind while keeping both as har
 feed DCE, ADCE, GVN, and LICM legality through the shared classification
 feed EarlyCSE candidate legality through the shared safe-to-delete helper
 pair with alias.modRef for conservative load/store mod-ref answers
+pair with the MemorySSA-like clobber helper for GVN load availability
 ```
 
 Fixture coverage:
@@ -84,7 +85,8 @@ no call, intrinsic, fence, cmpxchg, or atomicrmw classification
 no target-library or readonly/readnone call handling
 MemoryLocation size and offset model is limited to scalar stack-slot accesses
 no MemoryLocation metadata model
-no MemorySSA integration
+MemorySSA-like integration is limited to a linear clobber helper for accepted
+load/store/call checks
 no alias-aware instruction reordering
 no distinction between acquire/release/monotonic/etc ordering semantics
 no address spaces, globals, captures, or target DataLayout

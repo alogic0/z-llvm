@@ -3,6 +3,7 @@ const alias = @import("../analysis/alias.zig");
 const dominator = @import("../analysis/dominator.zig");
 const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
+const memory_ssa = @import("../analysis/memory_ssa.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -212,19 +213,12 @@ fn isMemoryAvailable(function: ir.Function, leader: Leader, block_index: usize, 
 }
 
 fn hasClobber(function: ir.Function, leader: Leader, block_index: usize, instruction_index: usize, ptr: ir.Value) bool {
-    for (function.blocks.items) |block| {
-        for (block.instructions.items, 0..) |instruction, current_instruction_index| {
-            if (instruction.removed) continue;
-            const current_block_index = function.blockIndex(block.name) orelse continue;
-            if (current_block_index == leader.block_index and current_instruction_index <= leader.instruction_index) continue;
-            if (current_block_index == block_index and current_instruction_index >= instruction_index) continue;
-            switch (alias.modRef(function, instruction, ptr)) {
-                .mod, .mod_ref, .unknown => return true,
-                .no_mod_ref, .ref => {},
-            }
-        }
-    }
-    return false;
+    return memory_ssa.hasClobberBetween(
+        function,
+        .{ .block_index = leader.block_index, .instruction_index = leader.instruction_index },
+        .{ .block_index = block_index, .instruction_index = instruction_index },
+        ptr,
+    );
 }
 
 fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value) void {

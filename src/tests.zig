@@ -9,6 +9,7 @@ const function_attrs = @import("analysis/function_attrs.zig");
 const loop_info = @import("analysis/loop_info.zig");
 const memory_effect = @import("analysis/memory_effect.zig");
 const memory_location = @import("analysis/memory_location.zig");
+const memory_ssa = @import("analysis/memory_ssa.zig");
 const ir = @import("ir.zig");
 const normalize = @import("normalize.zig");
 const mc = @import("mc.zig");
@@ -2803,6 +2804,30 @@ test "memory effect marks calls and trapping division conservatively" {
     try std.testing.expect(!memory_effect.mayTrap(block.instructions.items[1]));
     try std.testing.expect(memory_effect.mayThrow(block.instructions.items[2]));
     try std.testing.expect(!memory_effect.isSafeToDelete(block.instructions.items[2]));
+}
+
+test "memory ssa clobber helper reports store barriers between loads" {
+    const input =
+        \\define i32 @memory_ssa_clobber(ptr %p, ptr %q, i32 %v) {
+        \\entry:
+        \\  %a = load i32, ptr %p
+        \\  store i32 %v, ptr %q
+        \\  %b = load i32, ptr %p
+        \\  ret i32 %b
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    try std.testing.expect(memory_ssa.hasClobberBetween(
+        function,
+        .{ .block_index = 0, .instruction_index = 0 },
+        .{ .block_index = 0, .instruction_index = 2 },
+        .{ .named = "p" },
+    ));
 }
 
 test "mem2reg promotes single-block stack slot" {
