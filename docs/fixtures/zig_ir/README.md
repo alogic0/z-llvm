@@ -192,7 +192,7 @@ parser blockers after Cycle 1:
 | `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll` | `atomicrmw`, inline asm side effects, debug-oriented source shape | `unsupported`, `debug-info-only`, `future` |
 | `tls_concurrency` | `test/zig/inputs/tls_concurrency.zig` | `test/zig/captured/tls_concurrency.ReleaseFast.x86_64.ll` | `thread_local` global, TLS load/store accessors, target-memory attributes | `parse`, `verify`, `optimizer-input` |
 | `switch_control` | `test/zig/inputs/switch_control.zig` | `test/zig/captured/switch_control.ReleaseFast.x86_64.ll` | switch lookup table, private array constant, branch/select lowering | `parse`, `verify`, `optimizer-input` |
-| `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll` | float/double signatures, `select`, `fadd` | `unsupported`, `future` |
+| `floats_math` | `test/zig/inputs/floats_math.zig` | `test/zig/captured/floats_math.ReleaseFast.x86_64.ll` | float/double signatures, `select`, `fadd` | `parse`, `verify`, `float-ir`, `future` |
 | `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.unsupported.ll` | vector type, lane arithmetic, vector return | `unsupported`, `future` |
 
 ## Optimizer Epic Coverage

@@ -26,7 +26,9 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
 pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
     return switch (a.kind) {
         .binary => |a_binary| switch (b.kind) {
-            .binary => |b_binary| a_binary.op == b_binary.op and
+            .binary => |b_binary| a_binary.op != .fadd and
+                b_binary.op != .fadd and
+                a_binary.op == b_binary.op and
                 a_binary.flags.nsw == b_binary.flags.nsw and
                 a_binary.flags.nuw == b_binary.flags.nuw and
                 a_binary.flags.exact == b_binary.flags.exact and
@@ -87,6 +89,7 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
 
     if (binary.flags.any()) return null;
     return switch (binary.op) {
+        .fadd => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -143,6 +146,7 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
     const lhs = binary.lhs.int;
     const rhs = binary.rhs.int;
     return switch (binary.op) {
+        .fadd => null,
         .add => if (!binary.flags.any()) .{ .int = lhs + rhs } else null,
         .sub => if (!binary.flags.any()) .{ .int = lhs - rhs } else null,
         .mul => if (!binary.flags.any()) .{ .int = lhs * rhs } else null,
@@ -327,7 +331,7 @@ fn intrinsicMinMaxKind(callee: []const u8) ?MinMaxKind {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+        .fadd, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 
@@ -348,7 +352,7 @@ fn isSignedMin(value: i128, ty: ir.Type) bool {
 fn intBits(ty: ir.Type) ?u16 {
     return switch (ty) {
         .int => |bits| bits,
-        .void, .ptr, .aggregate => null,
+        .void, .float, .double, .ptr, .aggregate => null,
     };
 }
 

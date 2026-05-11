@@ -77,7 +77,9 @@ pub fn sameValueExpression(module: ir.Module, function: ir.Function, a: ir.Instr
 pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
     return switch (a.kind) {
         .binary => |a_binary| switch (b.kind) {
-            .binary => |b_binary| a_binary.op == b_binary.op and
+            .binary => |b_binary| a_binary.op != .fadd and
+                b_binary.op != .fadd and
+                a_binary.op == b_binary.op and
                 a_binary.flags.nsw == b_binary.flags.nsw and
                 a_binary.flags.nuw == b_binary.flags.nuw and
                 a_binary.flags.exact == b_binary.flags.exact and
@@ -191,9 +193,11 @@ const HashState = struct {
                 state.addTag(2);
                 state.addInt(bits);
             },
-            .ptr => state.addTag(3),
+            .float => state.addTag(3),
+            .double => state.addTag(4),
+            .ptr => state.addTag(5),
             .aggregate => |text| {
-                state.addTag(4);
+                state.addTag(6);
                 state.addBytes(text);
             },
         }

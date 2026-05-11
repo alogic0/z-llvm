@@ -74,7 +74,7 @@ fn findLiveInstruction(function: *ir.Function, result: []const u8) ?*ir.Instruct
 fn unsignedMask(value: i128, ty: ir.Type) ?u128 {
     const bits = switch (ty) {
         .int => |bits| bits,
-        .void, .ptr, .aggregate => return null,
+        .void, .float, .double, .ptr, .aggregate => return null,
     };
     if (bits == 0 or bits > 64) return null;
     const full_mask = (@as(u128, 1) << @intCast(bits)) - 1;

@@ -45,6 +45,8 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 0,
             .int => |bits| byteWidth(bits) orelse error.UnsupportedDataLayoutQuery,
+            .float => 4,
+            .double => 8,
             .ptr => byteWidth(try layout.pointerSizeBits()) orelse error.UnsupportedDataLayoutQuery,
             .aggregate => try layout.aggregateSizeBytes(ty),
         };
@@ -54,6 +56,8 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 8,
             .int => |bits| try layout.integerAbiAlignmentBits(bits),
+            .float => 32,
+            .double => 64,
             .ptr => try layout.pointerAbiAlignmentBits(),
             .aggregate => try layout.aggregateAlignmentBits(ty, .abi),
         };
@@ -63,6 +67,8 @@ pub const DataLayout = struct {
         return switch (ty) {
             .void => 8,
             .int => |bits| try layout.integerPreferredAlignmentBits(bits),
+            .float => 32,
+            .double => 64,
             .ptr => try layout.pointerPreferredAlignmentBits(),
             .aggregate => try layout.aggregateAlignmentBits(ty, .preferred),
         };
@@ -71,7 +77,7 @@ pub const DataLayout = struct {
     pub fn aggregateFieldOffsetBytes(layout: DataLayout, ty: ir.Type, field_index: usize) anyerror!i128 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .ptr => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .float, .double, .ptr => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| {
             const stride = try layout.arrayElementStrideBytes(array.element_ty);
@@ -93,7 +99,7 @@ pub const DataLayout = struct {
     fn aggregateSizeBytes(layout: DataLayout, ty: ir.Type) anyerror!u64 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .ptr => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .float, .double, .ptr => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| return array.count * try layout.arrayElementStrideBytes(array.element_ty);
 
@@ -113,7 +119,7 @@ pub const DataLayout = struct {
     fn aggregateAlignmentBits(layout: DataLayout, ty: ir.Type, kind: AlignmentKind) anyerror!u16 {
         const text = switch (ty) {
             .aggregate => |text| text,
-            .void, .int, .ptr => return error.UnsupportedDataLayoutQuery,
+            .void, .int, .float, .double, .ptr => return error.UnsupportedDataLayoutQuery,
         };
         if (arrayInfo(text)) |array| return switch (kind) {
             .abi => try layout.typeAbiAlignmentBits(array.element_ty),
@@ -252,6 +258,8 @@ fn parseTypeLiteral(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (std.mem.eql(u8, trimmed, "float")) return .float;
+    if (std.mem.eql(u8, trimmed, "double")) return .double;
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return null;

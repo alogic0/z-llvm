@@ -168,6 +168,8 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
 pub fn typeSize(ty: ir.Type) ?u64 {
     return switch (ty) {
         .int => |bits| if (bits % 8 == 0) bits / 8 else null,
+        .float => 4,
+        .double => 8,
         .aggregate => aggregateSize(ty),
         .void, .ptr => null,
     };
@@ -185,7 +187,7 @@ fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .ptr => return null,
+        .void, .int, .float, .double, .ptr => return null,
     };
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
@@ -198,7 +200,7 @@ pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
 pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .ptr => return null,
+        .void, .int, .float, .double, .ptr => return null,
     };
     var fields = aggregateFields(text) orelse return null;
     var index: usize = 0;
@@ -224,7 +226,7 @@ fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, 
 fn aggregateSize(ty: ir.Type) ?u64 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .ptr => return null,
+        .void, .int, .float, .double, .ptr => return null,
     };
     if (arrayInfo(text)) |array| return array.count * (typeSize(array.element_ty) orelse return null);
     var fields = aggregateFields(text) orelse return null;
@@ -275,6 +277,8 @@ fn parseTypeLiteral(text: []const u8) ?ir.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (std.mem.eql(u8, trimmed, "float")) return .float;
+    if (std.mem.eql(u8, trimmed, "double")) return .double;
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return null;

@@ -2330,6 +2330,58 @@ test "parser preserves scalar array global constants from switch tables" {
     , output.writer.buffered());
 }
 
+test "parser preserves scalar float types and fadd" {
+    const input =
+        \\define float @float_add(float %a, float %b) {
+        \\entry:
+        \\  %sum = fadd float %a, %b
+        \\  ret float %sum
+        \\}
+        \\
+        \\define double @float_select(double %a, double %b, i1 %cond) {
+        \\entry:
+        \\  %value = select i1 %cond, double %a, double %b
+        \\  ret double %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expect(module.functions.items[0].ret_ty.eql(.float));
+    try std.testing.expect(module.functions.items[1].ret_ty.eql(.double));
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects unsupported floating point operations" {
+    const fmul_input =
+        \\define float @mul(float %a, float %b) {
+        \\entry:
+        \\  %r = fmul float %a, %b
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    const fcmp_input =
+        \\define i1 @cmp(float %a, float %b) {
+        \\entry:
+        \\  %r = fcmp oeq float %a, %b
+        \\  ret i1 %r
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fmul_input));
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fcmp_input));
+}
+
 test "x86_64 codegen lowers add args to assembly" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

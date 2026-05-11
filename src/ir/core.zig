@@ -3,6 +3,8 @@ const std = @import("std");
 pub const Type = union(enum) {
     void,
     int: u16,
+    float,
+    double,
     ptr,
     aggregate: []const u8,
 
@@ -11,12 +13,14 @@ pub const Type = union(enum) {
             .void => b == .void,
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .void, .ptr, .aggregate => false,
+                .void, .float, .double, .ptr, .aggregate => false,
             },
+            .float => b == .float,
+            .double => b == .double,
             .ptr => b == .ptr,
             .aggregate => |text| switch (b) {
                 .aggregate => |other_text| std.mem.eql(u8, text, other_text),
-                .void, .int, .ptr => false,
+                .void, .int, .float, .double, .ptr => false,
             },
         };
     }
@@ -25,6 +29,8 @@ pub const Type = union(enum) {
         switch (ty) {
             .void => try writer.writeAll("void"),
             .int => |bits| try writer.print("i{}", .{bits}),
+            .float => try writer.writeAll("float"),
+            .double => try writer.writeAll("double"),
             .ptr => try writer.writeAll("ptr"),
             .aggregate => |text| try writer.writeAll(text),
         }
@@ -66,6 +72,7 @@ pub const Value = union(enum) {
 };
 
 pub const BinaryOp = enum {
+    fadd,
     add,
     sub,
     mul,
@@ -81,6 +88,7 @@ pub const BinaryOp = enum {
     srem,
 
     pub fn parse(text: []const u8) ?BinaryOp {
+        if (std.mem.eql(u8, text, "fadd")) return .fadd;
         if (std.mem.eql(u8, text, "add")) return .add;
         if (std.mem.eql(u8, text, "sub")) return .sub;
         if (std.mem.eql(u8, text, "mul")) return .mul;

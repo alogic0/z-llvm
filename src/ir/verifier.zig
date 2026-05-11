@@ -276,7 +276,7 @@ pub fn verify(module: core.Module) !void {
                     .undef => {},
                     .int, .named => return error.UnsupportedGlobalVariable,
                 },
-                .void, .aggregate => return error.UnsupportedGlobalVariable,
+                .void, .float, .double, .aggregate => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
@@ -511,7 +511,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .ptr => return null,
+        .void, .int, .float, .double, .ptr => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -525,6 +525,8 @@ fn parseType(text: []const u8) !core.Type {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (std.mem.eql(u8, trimmed, "void")) return .void;
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
+    if (std.mem.eql(u8, trimmed, "float")) return .float;
+    if (std.mem.eql(u8, trimmed, "double")) return .double;
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
@@ -537,35 +539,41 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     if (binary.flags.nsw or binary.flags.nuw) {
         switch (binary.op) {
             .add, .sub, .mul, .shl => {},
-            .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.exact) {
         switch (binary.op) {
             .udiv, .sdiv, .lshr, .ashr => {},
-            .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.disjoint) {
         switch (binary.op) {
             .@"or" => {},
-            .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
-    switch (binary.ty) {
-        .int => {},
-        .void, .ptr, .aggregate => return error.TypeMismatch,
+    switch (binary.op) {
+        .fadd => switch (binary.ty) {
+            .float, .double => {},
+            .void, .int, .ptr, .aggregate => return error.TypeMismatch,
+        },
+        .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => switch (binary.ty) {
+            .int => {},
+            .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
+        },
     }
 }
 
 fn verifyCast(cast: core.CastInst) !void {
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .ptr, .aggregate => return error.TypeMismatch,
+        .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .ptr, .aggregate => return error.TypeMismatch,
+        .void, .float, .double, .ptr, .aggregate => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,

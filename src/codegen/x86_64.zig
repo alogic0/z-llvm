@@ -455,7 +455,7 @@ fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
         .@"and" => .@"and",
         .@"or" => .@"or",
         .xor => .xor,
-        .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
+        .fadd, .mul, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => null,
     };
 }
 
@@ -533,7 +533,7 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+        .fadd, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 

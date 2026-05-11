@@ -27,6 +27,7 @@ Implemented subset:
 
 ```text
 integer binary ops: add/sub/mul/and/or/xor/shl/lshr/ashr/udiv/sdiv/urem/srem
+floating-point binary ops: fadd for scalar float/double parse/verify only
 integer casts: trunc, zext, sext
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
@@ -52,6 +53,8 @@ local-only conservative:
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
+  parser/printer/verifier round-trip for scalar float/double fadd and select
+  parser rejection for unsupported fmul/fcmp
   instcombine no-fold behavior for flagged add and division
 ```
 
@@ -61,7 +64,8 @@ Known gaps:
 no vectors
 no pointer casts
 no bitcast/ptrtoint/inttoptr
-no floating-point scalar operations
+no floating-point optimization parity
+no fmul/fsub/fdiv/frem/fcmp or fast-math flag surface
 no poison value
 no use of nsw/nuw/exact as optimization facts
 no division/remainder constant folding

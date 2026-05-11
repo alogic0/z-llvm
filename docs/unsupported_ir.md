@@ -59,7 +59,8 @@ named SSA values
 ## Unsupported Types
 
 ```text
-float/double/fp80/fp128
+fp80/fp128
+floating-point operations beyond scalar `fadd`
 arrays
 vectors
 structs
