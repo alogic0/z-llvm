@@ -188,6 +188,7 @@ parser blockers after Cycle 1:
 | `control_flow_calls` | `test/zig/inputs/control_flow_calls.zig` | `test/zig/captured/control_flow_calls.ReleaseFast.x86_64.ll` | loops, phi values, loop metadata, `llvm.assume`, inlined calls | `parse`, `verify`, `optimizer-input` |
 | `globals_comptime` | `test/zig/inputs/globals_comptime.zig` | `test/zig/captured/globals_comptime.ReleaseFast.x86_64.ll` | internal globals, exported aliases, global load/store, comptime folding | `parse`, `verify`, `optimizer-input` |
 | `atomics_inline_asm_debug` | `test/zig/inputs/atomics_inline_asm_debug.zig` | `test/zig/captured/atomics_inline_asm_debug.ReleaseFast.x86_64.ll` | `atomicrmw`, inline asm side effects, debug-oriented source shape | `unsupported`, `debug-info-only`, `future` |
+| `vector_future` | future Zig vector lowering | `test/zig/expected/vector_future.unsupported.ll` | vector type, lane arithmetic, vector return | `unsupported`, `future` |
 
 ## Optimizer Epic Coverage
 
@@ -200,6 +201,7 @@ parser blockers after Cycle 1:
 | IPO/global cleanup | `globals_comptime`, `control_flow_calls` |
 | Target/DataLayout handoff | `integers` on x86_64 and aarch64 |
 | Optional debug/instrumentation/LTO tracks | `atomics_inline_asm_debug`, `tiny_scalar` Debug rows |
+| Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements |
 
 Connection to the LLVM pass inventory:
 
@@ -209,6 +211,7 @@ Connection to the LLVM pass inventory:
 | `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, and instruction `DILocation` preservation without optimizer-input status. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, future optimizer comparison policy. |
+| `ReleaseFast` future vector mode | `vector-ir`, `target-cost`, `loop-vectorize`, `slp-vectorizer`, and `vector-combine` remain unsupported/future. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
 | `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |
 | `ReleaseSmall` raw mode | `release-oz`, size attributes, alias/global handling, unsupported-IR discovery. |
@@ -223,5 +226,5 @@ Connection to the LLVM pass inventory:
 - `Debug` and `ReleaseSafe` raw IR are too broad for the first corpus slice and
   should be reduced or sanitized before being checked in.
 - Intrinsics such as `llvm.smin` and `llvm.assume`, loop metadata, inline asm,
-  atomics, raw globals, and exported aliases are source-backed next inputs for
-  later parser/verifier/optimizer slices.
+  atomics, vector IR, raw globals, and exported aliases are source-backed next
+  inputs for later parser/verifier/optimizer slices.

@@ -223,6 +223,36 @@ test "nested pipeline placeholders reject unbalanced groups" {
     try std.testing.expectError(error.InvalidPassPipeline, pipelines.addPasses(&pm, "function(instcombine,dce"));
 }
 
+test "accepted Zig corpus pipelines exclude vector placeholders" {
+    const aliases = [_][]const u8{
+        "zig-debug-accepted",
+        "zig-release-safe-accepted",
+        "zig-release-fast-accepted",
+        "zig-release-small-accepted",
+    };
+    const vector_passes = [_][]const u8{
+        "loop-vectorize",
+        "slp-vectorizer",
+        "vector-combine",
+    };
+
+    for (aliases) |alias_name| {
+        var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+        defer pm.deinit();
+        try pipelines.addPasses(&pm, alias_name);
+        for (vector_passes) |pass_name| {
+            try std.testing.expect(!pipelineContainsPass(pm, pass_name));
+        }
+    }
+}
+
+fn pipelineContainsPass(pm: pass_manager.ModulePassManager, pass_name: []const u8) bool {
+    for (pm.passes.items) |pass| {
+        if (std.mem.eql(u8, pass.name, pass_name)) return true;
+    }
+    return false;
+}
+
 test "debug and release mode pipelines expose mode-sensitive scalar behavior" {
     const input =
         \\define i32 @mode(i32 %a) {
@@ -1393,6 +1423,58 @@ test "parser rejects debug value intrinsics until salvage is represented" {
     ;
 
     try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+}
+
+test "parser rejects vector IR boundary forms deliberately" {
+    const vector_add =
+        \\define i32 @vector_add() {
+        \\entry:
+        \\  %v = add <2 x i32> undef, undef
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_add));
+
+    const shuffle =
+        \\define i32 @shuffle() {
+        \\entry:
+        \\  %v = shufflevector <2 x i32> undef, <2 x i32> undef, <2 x i32> zeroinitializer
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, shuffle));
+
+    const insert =
+        \\define i32 @insert_lane(i32 %a) {
+        \\entry:
+        \\  %v = insertelement <2 x i32> undef, i32 %a, i32 0
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, insert));
+
+    const extract =
+        \\define i32 @extract_lane() {
+        \\entry:
+        \\  %v = extractelement <2 x i32> undef, i32 0
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, extract));
+
+    const vector_constant =
+        \\define i32 @vector_constant() {
+        \\entry:
+        \\  %v = freeze <2 x i32> <i32 1, i32 2>
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_constant));
 }
 
 test "parser preserves inert branch metadata attachments" {

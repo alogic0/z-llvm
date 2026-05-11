@@ -14,7 +14,8 @@ llvm-project-22/llvm/lib/Transforms/IPO/OpenMPOpt.cpp
 ```
 
 These domains require major IR surfaces that are intentionally absent from the
-current optimizer replacement.
+current optimizer replacement. Target-cost requirements for vector work are
+tracked in `docs/target/target_cost_model.md`.
 
 ## LLVM Algorithm Contract
 
@@ -61,6 +62,8 @@ Implemented subset:
 loop-vectorize, slp-vectorizer, vector-combine, coro-early, coro-split,
 coro-elide, coro-cleanup, coro-annotation-elide, openmp-opt, and
 openmp-opt-cgscc are executable placeholders.
+accepted Zig corpus pipelines intentionally exclude loop-vectorize,
+slp-vectorizer, and vector-combine until vector IR and target costs exist.
 ```
 
 Intentional divergences:
@@ -70,6 +73,8 @@ no vector IR
 no target vector cost model
 no coroutine IR or lowering
 no OpenMP representation
+vector types, shufflevector, insertelement, extractelement, and vector
+constants are parser rejection tests rather than accepted IR
 ```
 
 Fixture coverage:
@@ -79,8 +84,10 @@ opt-22 equivalent:
   none currently
 
 local-only conservative:
-  none currently
+  future vector fixture classified as unsupported/future
+  accepted corpus pipeline test excludes vector placeholders
 
 unit-test only:
   placeholder pass dispatch
+  parser rejection tests for vector boundary forms
 ```

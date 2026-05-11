@@ -82,6 +82,11 @@ before constructing `PassBuilder`:
 | `LoopVectorization` | `false` | Zig intentionally disables normal loop vectorization. Do not prioritize full loop-vectorizer replacement yet. |
 | `LoopInterleaving` | `!is_debug` | Release loop-vectorizer/interleaving behavior remains target-cost dependent. |
 | `MergeFunctions` | `!is_debug` | Release pipelines include `mergefunc`; debug does not. |
+
+Vectorization note: local accepted corpus pipelines exclude
+`loop-vectorize`, `slp-vectorizer`, and `vector-combine`. The full inventory
+keeps them as placeholders until vector IR and a TargetTransformInfo-like cost
+model exist; see `docs/target/target_cost_model.md`.
 | `allow_fast_isel` | `true` | Codegen setting, not an IR optimizer pass. |
 | `allow_machine_outliner` | disabled for RISC-V | Codegen setting, not an IR optimizer pass. |
 
