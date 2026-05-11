@@ -4,6 +4,10 @@ This note records the public Zig roadmap direction for reducing and eventually
 removing LLVM as a hard dependency. It is source-backed context for this
 project's own roadmap; it is not a substitute for local inventories and tests.
 
+This is a strategy note, not an active checklist. Epic completion is tracked in
+`docs/README.md`, and active slices should be pulled from the numbered epic
+files.
+
 ## Sources
 
 - Zig issue #16270: `make the main zig executable no longer depend on LLVM,
@@ -40,9 +44,9 @@ of using LLVM's IRBuilder API.
 
 Implication for this project:
 
-- [ ] Treat LLVM IR/bitcode compatibility as a migration and comparison track.
-- [ ] Do not require linking LLVM libraries for local optimizer experiments.
-- [ ] Keep source-level inventories of Zig's current LLVM API use.
+- Treat LLVM IR/bitcode compatibility as a migration and comparison track.
+- Do not require linking LLVM libraries for local optimizer experiments.
+- Keep source-level inventories of Zig's current LLVM API use.
 
 ### 2. Self-Hosted Native Backends
 
@@ -52,9 +56,9 @@ speed and control over code generation.
 
 Implication for this project:
 
-- [ ] Do not assume this repo should replace Zig's native backends.
-- [ ] Use local codegen/MC/object work as a bounded validation and study track.
-- [ ] Prefer documenting handoff points to Zig-owned backend IRs over growing a
+- Do not assume this repo should replace Zig's native backends.
+- Use local codegen/MC/object work as a bounded validation and study track.
+- Prefer documenting handoff points to Zig-owned backend IRs over growing a
       parallel general backend.
 
 ### 3. Incremental Compilation And In-Place Binary Patching
@@ -66,11 +70,11 @@ backend, linker, and debug information.
 
 Implication for this project:
 
-- [ ] Keep backend experiments small unless they clarify incremental/backend
+- Keep backend experiments small unless they clarify incremental/backend
       boundaries.
-- [ ] Do not design local object emission as the main replacement path unless a
+- Do not design local object emission as the main replacement path unless a
       Zig-aligned need is documented.
-- [ ] Track debug-info and linker implications separately from optimizer work.
+- Track debug-info and linker implications separately from optimizer work.
 
 ### 4. Replace LLD And Clang-Adjacent Dependencies Separately
 
@@ -80,10 +84,10 @@ preprocessor replacement.
 
 Implication for this project:
 
-- [ ] Keep linker, archive, C frontend, and Clang compatibility out of the core
+- Keep linker, archive, C frontend, and Clang compatibility out of the core
       optimizer roadmap.
-- [ ] Inventory them only where they affect the LLVM backend boundary.
-- [ ] Avoid absorbing LLD/Clang replacement work into this repo's optimizer
+- Inventory them only where they affect the LLVM backend boundary.
+- Avoid absorbing LLD/Clang replacement work into this repo's optimizer
       epics.
 
 ### 5. Optimization Quality Over Time
@@ -95,23 +99,23 @@ not a prerequisite for every step.
 
 Implication for this project:
 
-- [ ] Implement optimizer behavior only when tied to Zig's real LLVM pipeline.
-- [ ] Start with semantic correctness and canonicalization:
+- Implement optimizer behavior only when tied to Zig's real LLVM pipeline.
+- Start with semantic correctness and canonicalization:
       verifier, mem2reg, SROA, InstSimplify, InstCombine, SimplifyCFG.
-- [ ] Add memory, scalar, loop, IPO, vector, sanitizer, and LTO behavior in
+- Add memory, scalar, loop, IPO, vector, sanitizer, and LTO behavior in
       dependency order.
-- [ ] Compare LLVM-equivalent fixtures against LLVM 22.
+- Compare LLVM-equivalent fixtures against LLVM 22.
 
 ## Project Alignment
 
 This repository should help Zig's path by producing:
 
-- [ ] authoritative inventories of Zig's LLVM API and pass-pipeline use;
-- [ ] real Zig-emitted LLVM IR fixtures;
-- [ ] semantic docs for LLVM-compatible behavior Zig currently emits;
-- [ ] small optimizer replacements with `opt-22` comparison fixtures;
-- [ ] conservative gap tables explaining where LLVM does more;
-- [ ] native-backend handoff notes instead of duplicating Zig backends by
+- authoritative inventories of Zig's LLVM API and pass-pipeline use;
+- real Zig-emitted LLVM IR fixtures;
+- semantic docs for LLVM-compatible behavior Zig currently emits;
+- small optimizer replacements with `opt-22` comparison fixtures;
+- conservative gap tables explaining where LLVM does more;
+- native-backend handoff notes instead of duplicating Zig backends by
       default.
 
 The aligned local path is:
@@ -132,9 +136,9 @@ The implementable epic split starts at:
 
 ## What This Means For Roadmap Priority
 
-- [ ] Primary next work: verifier foundation and Zig-emitted IR inventory.
-- [ ] Optimizer work must come from
+- Primary next work: verifier foundation and Zig-emitted IR inventory.
+- Optimizer work must come from
       `docs/inventory/zig_llvm_pass_pipeline_inventory.md`.
-- [ ] Codegen/MC/object work stays paused unless needed for validation.
-- [ ] Broad backend, linker, debug, sanitizer, vector, and LTO work must have a
+- Codegen/MC/object work stays paused unless needed for validation.
+- Broad backend, linker, debug, sanitizer, vector, and LTO work must have a
       source-backed Zig need before becoming active.
