@@ -371,6 +371,47 @@ test "target matrix matches clang emitted datalayout records" {
     }
 }
 
+test "datalayout computes ABI padded aggregate layout" {
+    const layout = try target.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32");
+    const aggregate_ty: ir.Type = .{ .aggregate = "{ i8, i32 }" };
+
+    try std.testing.expectEqual(@as(u16, 64), try layout.pointerPreferredAlignmentBits());
+    try std.testing.expectEqual(@as(u16, 32), try layout.integerPreferredAlignmentBits(8));
+    try std.testing.expectEqual(@as(u16, 32), try layout.typeAbiAlignmentBits(aggregate_ty));
+    try std.testing.expectEqual(@as(u64, 8), try layout.typeStoreSizeBytes(aggregate_ty));
+    try std.testing.expectEqual(@as(i128, 0), try layout.aggregateFieldOffsetBytes(aggregate_ty, 0));
+    try std.testing.expectEqual(@as(i128, 4), try layout.aggregateFieldOffsetBytes(aggregate_ty, 1));
+
+    const array_ty: ir.Type = .{ .aggregate = "[2 x { i8, i32 }]" };
+    try std.testing.expectEqual(@as(u64, 16), try layout.typeStoreSizeBytes(array_ty));
+}
+
+test "memory locations can use module DataLayout for aggregate GEP offsets" {
+    const input =
+        \\target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
+        \\target triple = "aarch64-unknown-linux-gnu"
+        \\
+        \\define i32 @field_ptr() {
+        \\entry:
+        \\  %slot = alloca { i8, i32 }
+        \\  %field = getelementptr { i8, i32 }, ptr %slot, i32 0, i32 1
+        \\  %value = load i32, ptr %field
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const layout = try target.DataLayout.parse(module.target_datalayout.?);
+    const function = module.functions.items[0];
+    const location = memory_location.forPointerWithLayout(function, layout, .{ .named = "field" }) orelse return error.TestExpectedMemoryLocation;
+    try std.testing.expectEqual(@as(i128, 4), location.offset.?);
+    try std.testing.expectEqual(@as(u64, 8), location.size.?);
+}
+
 test "target triple parser accepts compact wasm32 wasi spelling" {
     const triple = try target.Triple.parse("wasm32-wasi");
     try std.testing.expect(triple.isWasm32());

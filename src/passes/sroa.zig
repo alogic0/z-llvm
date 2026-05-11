@@ -3,6 +3,7 @@ const memory_location = @import("../analysis/memory_location.zig");
 const ir = @import("../ir.zig");
 const mem2reg = @import("mem2reg.zig");
 const pass_manager = @import("../pass_manager.zig");
+const target = @import("../target.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "sroa",
@@ -75,7 +76,7 @@ fn tryScalarizeAggregateAlloca(
     var gep_uses: std.ArrayList(AggregateGepUse) = .empty;
     defer gep_uses.deinit(module.allocator);
 
-    if (!try collectAggregateGepUses(module.allocator, function.*, slot, aggregate_ty, &gep_uses)) return false;
+    if (!try collectAggregateGepUses(module.allocator, moduleLayout(module.*), function.*, slot, aggregate_ty, &gep_uses)) return false;
     if (gep_uses.items.len == 0) return false;
     if (!validateAggregateGepConsumers(function.*, slot, gep_uses.items)) return false;
 
@@ -138,6 +139,7 @@ fn tryScalarizeAggregateAlloca(
 
 fn collectAggregateGepUses(
     allocator: std.mem.Allocator,
+    layout: ?target.DataLayout,
     function: ir.Function,
     slot: []const u8,
     aggregate_ty: ir.Type,
@@ -154,7 +156,7 @@ fn collectAggregateGepUses(
                 .gep => |gep| {
                     if (isNamed(gep.ptr, slot)) {
                         const result = instruction.result orelse return false;
-                        const use = aggregateFieldGep(result, aggregate_ty, gep) orelse return false;
+                        const use = aggregateFieldGep(layout, result, aggregate_ty, gep) orelse return false;
                         try gep_uses.append(allocator, use);
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
@@ -167,7 +169,12 @@ fn collectAggregateGepUses(
     return true;
 }
 
-fn aggregateFieldGep(result: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AggregateGepUse {
+fn moduleLayout(module: ir.Module) ?target.DataLayout {
+    const text = module.target_datalayout orelse return null;
+    return target.DataLayout.parse(text) catch null;
+}
+
+fn aggregateFieldGep(layout: ?target.DataLayout, result: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AggregateGepUse {
     if (!gep.source_ty.eql(aggregate_ty)) return null;
     if (gep.indices.items.len != 2) return null;
     const base_index = gep.indices.items[0].value;
@@ -177,8 +184,14 @@ fn aggregateFieldGep(result: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst)
     const field_index: usize = @intCast(field_value.int);
     const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return null;
     if (field_ty != .int) return null;
-    const offset = memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return null;
-    const size = memory_location.typeSize(field_ty) orelse return null;
+    const offset = if (layout) |target_layout|
+        memory_location.aggregateFieldOffsetWithLayout(target_layout, aggregate_ty, field_index) orelse return null
+    else
+        memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return null;
+    const size = if (layout) |target_layout|
+        memory_location.typeSizeWithLayout(target_layout, field_ty) orelse return null
+    else
+        memory_location.typeSize(field_ty) orelse return null;
     return .{
         .gep_name = result,
         .field_index = field_index,

@@ -88,6 +88,7 @@ verify
 optimizer-input
 unsupported
 debug-info-only
+target-layout
 future
 legacy-bootstrap
 ```
@@ -97,7 +98,8 @@ A fixture can list multiple classifications separated by commas. Use
 consume yet. Use `future` when the mode or feature is documented but not yet a
 driver for implementation. Use `legacy-bootstrap` when the fixture was emitted
 by a Zig executable that does not match the `../ziglang` source checkout used by
-the inventories.
+the inventories. Use `target-layout` when a non-host or target-sensitive row is
+accepted for triple/DataLayout validation but is not yet an optimizer-input row.
 
 ## Regeneration Commands
 
@@ -206,6 +208,7 @@ Connection to the LLVM pass inventory:
 | `Debug` raw mode | `debug-o0`, `local-pipeline=zig-debug-accepted`, `verify`, `always-inline`, debug metadata placeholders. |
 | `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, and instruction `DILocation` preservation without optimizer-input status. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
+| `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, future optimizer comparison policy. |
 | `ReleaseSafe` raw mode | `release-o3`, safety-check emitted IR, future unsupported-IR discovery. |
 | `ReleaseSmall` stripped mode | `release-oz`, `local-pipeline=zig-release-small-accepted`, size-oriented attributes and aliases. |
 | `ReleaseSmall` raw mode | `release-oz`, size attributes, alias/global handling, unsupported-IR discovery. |

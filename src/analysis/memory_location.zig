@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+const datalayout = @import("../target/datalayout.zig");
 
 pub const MemoryLocation = struct {
     ptr: ir.Value,
@@ -18,11 +19,27 @@ pub fn forPointer(function: ir.Function, ptr: ir.Value) ?MemoryLocation {
     return build(function, ptr, null);
 }
 
+pub fn forPointerWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value) ?MemoryLocation {
+    return buildWithLayout(function, layout, ptr, null);
+}
+
 pub fn forAccess(function: ir.Function, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
     return build(function, ptr, typeSize(access_ty));
 }
 
+pub fn forAccessWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value, access_ty: ir.Type) ?MemoryLocation {
+    return buildWithLayout(function, layout, ptr, typeSizeWithLayout(layout, access_ty));
+}
+
 fn build(function: ir.Function, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
+    return buildInternal(function, null, ptr, access_size);
+}
+
+fn buildWithLayout(function: ir.Function, layout: datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
+    return buildInternal(function, layout, ptr, access_size);
+}
+
+fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.Value, access_size: ?u64) ?MemoryLocation {
     const name = switch (ptr) {
         .int, .undef => return null,
         .named => |name| name,
@@ -39,13 +56,13 @@ fn build(function: ir.Function, ptr: ir.Value, access_size: ?u64) ?MemoryLocatio
                     .ptr = ptr,
                     .root = result,
                     .offset = 0,
-                    .size = access_size orelse typeSize(alloca.allocated_ty),
+                    .size = access_size orelse typeSizeMaybeLayout(layout, alloca.allocated_ty),
                 },
                 .gep => |gep| {
-                    var base = build(function, gep.ptr, null) orelse return null;
+                    var base = buildInternal(function, layout, gep.ptr, null) orelse return null;
                     base.ptr = ptr;
-                    base.offset = addOffsets(base.offset, gepOffset(gep));
-                    base.size = access_size orelse typeSize(gep.source_ty);
+                    base.offset = addOffsets(base.offset, gepOffsetMaybeLayout(layout, gep));
+                    base.size = access_size orelse typeSizeMaybeLayout(layout, gep.source_ty);
                     return base;
                 },
                 .binary, .cast, .freeze, .icmp, .select, .phi, .load, .store, .call => return null,
@@ -60,6 +77,19 @@ fn addOffsets(a: ?i128, b: ?i128) ?i128 {
 }
 
 pub fn gepOffset(gep: ir.GepInst) ?i128 {
+    return gepOffsetInternal(null, gep);
+}
+
+pub fn gepOffsetWithLayout(layout: datalayout.DataLayout, gep: ir.GepInst) ?i128 {
+    return gepOffsetInternal(layout, gep);
+}
+
+fn gepOffsetMaybeLayout(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
+    if (layout) |target_layout| return gepOffsetWithLayout(target_layout, gep);
+    return gepOffset(gep);
+}
+
+fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
     var current_ty = gep.source_ty;
     var offset: i128 = 0;
     for (gep.indices.items, 0..) |index, index_position| {
@@ -68,16 +98,16 @@ pub fn gepOffset(gep: ir.GepInst) ?i128 {
             .named, .undef => return null,
         };
         if (index_position == 0) {
-            const element_size = typeSize(current_ty) orelse return null;
+            const element_size = typeSizeMaybeLayout(layout, current_ty) orelse return null;
             offset += value * @as(i128, @intCast(element_size));
             continue;
         }
         if (current_ty == .aggregate) {
             if (value < 0) return null;
-            offset += aggregateFieldOffset(current_ty, @intCast(value)) orelse return null;
+            offset += aggregateFieldOffsetMaybeLayout(layout, current_ty, @intCast(value)) orelse return null;
             current_ty = aggregateFieldType(current_ty, @intCast(value)) orelse return null;
         } else {
-            const element_size = typeSize(current_ty) orelse return null;
+            const element_size = typeSizeMaybeLayout(layout, current_ty) orelse return null;
             offset += value * @as(i128, @intCast(element_size));
         }
     }
@@ -90,6 +120,15 @@ pub fn typeSize(ty: ir.Type) ?u64 {
         .aggregate => aggregateSize(ty),
         .void, .ptr => null,
     };
+}
+
+pub fn typeSizeWithLayout(layout: datalayout.DataLayout, ty: ir.Type) ?u64 {
+    return layout.typeStoreSizeBytes(ty) catch null;
+}
+
+fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
+    if (layout) |target_layout| return typeSizeWithLayout(target_layout, ty);
+    return typeSize(ty);
 }
 
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
@@ -120,6 +159,15 @@ pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
         offset += @intCast(field_size);
     }
     return null;
+}
+
+pub fn aggregateFieldOffsetWithLayout(layout: datalayout.DataLayout, ty: ir.Type, field_index: usize) ?i128 {
+    return layout.aggregateFieldOffsetBytes(ty, field_index) catch null;
+}
+
+fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, field_index: usize) ?i128 {
+    if (layout) |target_layout| return aggregateFieldOffsetWithLayout(target_layout, ty, field_index);
+    return aggregateFieldOffset(ty, field_index);
 }
 
 fn aggregateSize(ty: ir.Type) ?u64 {

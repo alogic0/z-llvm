@@ -16,20 +16,31 @@ facts Zig's native backends need at optimizer handoff.
 
 ## Plan
 
-- [ ] Parse Zig-emitted target datalayout strings into structured local facts.
-- [ ] Add pointer size, ABI alignment, preferred alignment, and aggregate layout
+- [x] Parse Zig-emitted target datalayout strings into structured local facts.
+- [x] Add pointer size, ABI alignment, preferred alignment, and aggregate layout
       queries needed by memory-location and SROA.
-- [ ] Validate host and non-host target triples from the corpus.
-- [ ] Replace hard-coded type-size assumptions where DataLayout should decide.
-- [ ] Add aarch64 corpus-derived tests for layout-sensitive behavior.
-- [ ] Keep target features, vector register classes, and full ABI lowering out
+- [x] Validate host and non-host target triples from the corpus.
+- [x] Replace hard-coded type-size assumptions where DataLayout should decide.
+- [x] Add aarch64 corpus-derived tests for layout-sensitive behavior.
+- [x] Keep target features, vector register classes, and full ABI lowering out
       of scope unless a fixture requires them.
-- [ ] Document which optimizer decisions depend on target facts.
+- [x] Document which optimizer decisions depend on target facts.
 
 ## Exit Criteria
 
-- [ ] Memory-location and SROA offset calculations use parsed target facts for
+- [x] Memory-location and SROA offset calculations use parsed target facts for
       accepted layouts.
-- [ ] Non-host corpus fixtures are classified by target/DataLayout support.
-- [ ] Target-sensitive unsupported behavior fails closed.
+- [x] Non-host corpus fixtures are classified by target/DataLayout support.
+- [x] Target-sensitive unsupported behavior fails closed.
 
+## Completion Notes
+
+- `src/target/datalayout.zig` now exposes pointer preferred alignment, integer
+  preferred alignment, type store-size, type alignment, aggregate field-offset,
+  and simple aggregate size queries.
+- `src/analysis/memory_location.zig` has DataLayout-aware pointer/access/GEP
+  helpers, and SROA/DSE use module DataLayout when present.
+- The aarch64 corpus row is explicitly classified as `target-layout,future`:
+  parsed and verified for target facts, but not yet optimizer-input.
+- Target features, vector register classes, packed/scalable aggregates, full
+  ABI lowering, and address-space-specific pointer queries remain out of scope.
