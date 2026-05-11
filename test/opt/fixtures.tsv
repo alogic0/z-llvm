@@ -55,6 +55,7 @@ early_cse_atomic_load_barrier_reject	early-cse	early-cse	test/opt/inputs/early_c
 licm_atomic_store_barrier_reject	licm	loop-mssa(licm)	test/opt/inputs/licm_atomic_store_barrier_reject.ll	test/opt/expected/z_llvm/licm_atomic_store_barrier_reject.ll	local-conservative	licm	atomic store remains in the loop while pure scalar invariants may hoist
 dse_atomic_store_barrier_reject	dse	dse	test/opt/inputs/dse_atomic_store_barrier_reject.ll	test/opt/expected/z_llvm/dse_atomic_store_barrier_reject.ll	local-conservative	dse	atomic store is a barrier for later store elimination
 dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/dse_overwrite.ll	opt-equivalent	dse	overwritten stack store removed
+dse_partial_overwrite_reject	dse	dse	test/opt/inputs/dse_partial_overwrite_reject.ll	test/opt/expected/z_llvm/dse_partial_overwrite_reject.ll	opt-equivalent	dse	partial overwrite at the same offset does not remove the wider earlier store
 dse_load_barrier	dse	dse	test/opt/inputs/dse_load_barrier.ll	test/opt/expected/z_llvm/dse_load_barrier.ll	opt-equivalent	dse	intervening load keeps earlier store alive
 dse_volatile_barrier	dse	dse	test/opt/inputs/dse_volatile_barrier.ll	test/opt/expected/z_llvm/dse_volatile_barrier.ll	opt-equivalent	dse	volatile load is a DSE barrier
 sccp_branch	sccp,simplifycfg,dce	sccp,simplifycfg,dce	test/opt/inputs/sccp_branch.ll	test/opt/expected/z_llvm/sccp_branch.ll	opt-equivalent	sccp,simplifycfg,dce	constant branch folded through SCCP

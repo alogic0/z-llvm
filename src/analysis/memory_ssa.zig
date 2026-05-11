@@ -192,7 +192,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return false;
                 const later = accessLocation(function, layout, later_store.ptr, later_store.ty) orelse return false;
                 switch (alias.aliasLocations(later, location)) {
-                    .must_alias => return true,
+                    .must_alias => return fullyOverwrites(later, location),
                     .may_alias => return false,
                     .no_alias => {},
                 }
@@ -207,6 +207,14 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
         }
     }
     return false;
+}
+
+fn fullyOverwrites(later: memory_location.MemoryLocation, earlier: memory_location.MemoryLocation) bool {
+    const later_start = later.offset orelse return false;
+    const earlier_start = earlier.offset orelse return false;
+    const later_end = later.rangeEnd() orelse return false;
+    const earlier_end = earlier.rangeEnd() orelse return false;
+    return later_start <= earlier_start and later_end >= earlier_end;
 }
 
 fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {

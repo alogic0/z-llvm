@@ -40,13 +40,14 @@ Local target status:
 Implemented subset:
   Single-block overwrite query through the local MemorySSA helper
   Remove a stack store overwritten by a later must-alias store
+  Require the later store range to fully cover the earlier store range
   Preserve stores when a load, call, volatile/atomic access, unknown pointer, or
   may-alias access intervenes
 
 Intentional divergences:
   No full MemorySSA walker/updater.
   No cross-block DSE.
-  No partial-overwrite DSE.
+  Partial-overwrite DSE is rejected; partial overlaps are preservation barriers.
   No memset/memcpy/memmove handling.
   DSE deliberately keeps the query same-block only. Cross-block DSE waits until
   the MemorySSA helper can model overwrite direction across MemoryPhi-like
@@ -58,6 +59,7 @@ Analysis preservation/invalidation:
 
 Fixture coverage:
   dse_overwrite
+  dse_partial_overwrite_reject
   dse_load_barrier
 
 opt-22 comparison command:
@@ -72,7 +74,7 @@ Known gaps:
 ```text
 no full MemorySSA walker/updater
 no post-dominator or cross-block reasoning
-no partial-overlap handling
+no partial-overlap elimination
 no target-library memory intrinsic handling
 no debug-info salvage
 ```
