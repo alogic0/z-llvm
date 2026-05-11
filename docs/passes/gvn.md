@@ -52,7 +52,7 @@ Core LLVM algorithm data structures:
   Memory dependence facts for load and call cases.
 
 Local target status:
-  LLVM-shaped foundation.
+  fixture-equivalent for listed fixtures.
 ```
 
 Implemented subset:

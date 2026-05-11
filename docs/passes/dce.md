@@ -21,6 +21,12 @@ Instruction::mayReadOrWriteMemory
 
 This pass removes instructions whose results are unused and whose execution has no side effects.
 
+Local target status:
+
+```text
+fixture-equivalent for listed fixtures
+```
+
 Implemented subset:
 
 ```text

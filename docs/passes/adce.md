@@ -48,7 +48,7 @@ Core LLVM algorithm data structures:
   Control-dependence tracking through postdominators.
 
 Local target status:
-  Foundation only, not full LLVM ADCE.
+  fixture-equivalent for listed fixtures, but still not full LLVM ADCE.
 ```
 
 Implemented foundation subset:

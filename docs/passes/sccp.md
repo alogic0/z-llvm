@@ -38,7 +38,7 @@ Core LLVM algorithm data structures:
   Branch condition simplification.
 
 Local target status:
-  LLVM-shaped algorithm subset.
+  fixture-equivalent for listed fixtures.
 ```
 
 Implemented subset:

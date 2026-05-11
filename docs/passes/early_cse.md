@@ -42,7 +42,8 @@ Core LLVM algorithm data structures:
   Available-load tracking for memory cases.
 
 Local target status:
-  LLVM-shaped foundation.
+  LLVM-shaped foundation with unit-test-only coverage for the current
+  cross-block and load-CSE subset.
 ```
 
 Implemented subset:
@@ -75,7 +76,9 @@ opt-22 equivalent:
   none currently
 
 local-only conservative:
-  none currently
+  cross-block and safe-load CSE can differ from LLVM's printed SSA names for
+  otherwise equivalent small fixtures, so this pass is not marked
+  fixture-equivalent yet.
 
 unit-test only:
   same-block repeated pure expression elimination

@@ -170,12 +170,12 @@ Status meanings:
 | `instcombine` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/InstCombine/` |
 | `instsimplify` | canonicalization query | P0 | fixture-equivalent through InstCombine fixtures | `llvm/lib/Analysis/InstructionSimplify.cpp` |
 | `simplifycfg` | canonicalization / CFG | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |
-| `early-cse` | canonicalization / scalar | P1 | foundation | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
-| `dse` | memory optimization | P1 | foundation | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
-| `adce` | scalar DCE | P1 | foundation | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
+| `early-cse` | canonicalization / scalar | P1 | LLVM-shaped foundation, unit-test-only | `llvm/lib/Transforms/Scalar/EarlyCSE.cpp` |
+| `dse` | memory optimization | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp` |
+| `adce` | scalar DCE | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/ADCE.cpp` |
 | `bdce` | scalar DCE | P2 | placeholder | `llvm/lib/Transforms/Scalar/BDCE.cpp` |
-| `sccp` / `ipsccp` | scalar / IPO | P1 | foundation / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
-| `gvn` | scalar / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/GVN.cpp` |
+| `sccp` / `ipsccp` | scalar / IPO | P1 | fixture-equivalent for listed SCCP fixtures / IPSCCP placeholder | `llvm/lib/Transforms/Scalar/SCCP.cpp`, `llvm/lib/Transforms/IPO/SCCP.cpp` |
+| `gvn` | scalar / memory | P1 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/GVN.cpp` |
 | `licm` | loop / memory | P1 | foundation | `llvm/lib/Transforms/Scalar/LICM.cpp` |
 | `loop-instsimplify` | loop canonicalization | P1 | foundation | `llvm/lib/Transforms/Scalar/LoopInstSimplify.cpp` |
 | `loop-simplifycfg` | loop canonicalization | P1 | placeholder | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
@@ -259,8 +259,8 @@ Use this order for the next optimizer epic:
 - [x] P0 SROA/mem2reg stack-shape expansion for Zig-emitted IR.
 - [x] P0 InstSimplify/InstCombine scalar canonicalization.
 - [x] P0 SimplifyCFG for common Zig-emitted block shapes.
-- [ ] P1 EarlyCSE/GVN/SCCP foundations once call/global side effects are modeled.
-- [ ] P1 memory legality: DSE, MemoryLocation, alias/mod-ref, and MemorySSA-like
+- [x] P1 EarlyCSE/GVN/SCCP foundations once call/global side effects are modeled.
+- [x] P1 memory legality: DSE, MemoryLocation, alias/mod-ref, and MemorySSA-like
       scaffolding only where needed by accepted fixtures.
 - [ ] P1 loop canonicalization before loop performance transforms:
       loop-instsimplify, loop-simplifycfg, loop-rotate, loop-deletion.

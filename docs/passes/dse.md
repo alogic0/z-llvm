@@ -35,7 +35,7 @@ Core LLVM algorithm data structures:
   Intervening read/barrier checks
 
 Local target status:
-  LLVM-shaped algorithm subset
+  fixture-equivalent for listed fixtures
 
 Implemented subset:
   Single-block reverse scan

@@ -26,7 +26,7 @@ inventory
 - [x] [Epic 3: LLVM-Compatible IR Verifier Foundation](roadmap/03_llvm_compatible_ir_verifier_foundation.md)
 - [x] [Epic 4: Mandatory Canonicalization Passes](roadmap/04_mandatory_canonicalization_passes.md)
 - [x] [Epic 5: Memory And Side-Effect Semantics](roadmap/05_memory_and_side_effect_semantics.md)
-- [ ] [Epic 6: Scalar Optimization Pipeline](roadmap/06_scalar_optimization_pipeline.md)
+- [x] [Epic 6: Scalar Optimization Pipeline](roadmap/06_scalar_optimization_pipeline.md)
 - [ ] [Epic 7: Loop Optimization Pipeline](roadmap/07_loop_optimization_pipeline.md)
 - [ ] [Epic 8: Native Backend Handoff Study](roadmap/08_native_backend_handoff_study.md)
 - [ ] [Epic 9: Optional LLVM Bitcode, Debug, And LTO Tracks](roadmap/09_optional_bitcode_debug_lto_tracks.md)
