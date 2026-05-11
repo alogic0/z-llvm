@@ -820,13 +820,13 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
 
     if (call.inline_asm) |inline_asm| {
         if (!inline_asm.sideeffect) return error.UnsupportedInlineAsm;
-        for (call.args.items) |arg| try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+        for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
         return;
     }
 
     if (call.callee_value) |callee_value| {
         try ctx.verifyValue(.ptr, callee_value, block_index, instruction_index);
-        for (call.args.items) |arg| try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+        for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
         return;
     }
 
@@ -841,7 +841,7 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         if (call.args.items.len != decl.params.items.len) return error.CallSignatureMismatch;
         for (call.args.items, 0..) |arg, index| {
             if (!arg.ty.eql(decl.params.items[index].ty)) return error.CallSignatureMismatch;
-            try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+            try verifyCallArg(ctx, arg, block_index, instruction_index);
         }
         return;
     }
@@ -852,12 +852,70 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         if (call.args.items.len != function.params.items.len) return error.CallSignatureMismatch;
         for (call.args.items, 0..) |arg, index| {
             if (!arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
-            try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+            try verifyCallArg(ctx, arg, block_index, instruction_index);
         }
         return;
     }
 
     return error.UnknownFunction;
+}
+
+fn verifyCallArg(ctx: VerifyContext, arg: core.CallArg, block_index: usize, instruction_index: usize) !void {
+    try verifyCallArgAttrs(arg.ty, arg.attrs);
+    try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+}
+
+fn verifyCallArgAttrs(ty: core.Type, attrs: ?[]const u8) !void {
+    var rest = std.mem.trim(u8, attrs orelse return, " \t");
+    if (rest.len == 0) return error.UnsupportedCallAttribute;
+    if (ty != .ptr) return error.UnsupportedCallAttribute;
+
+    var saw_nonnull = false;
+    var saw_readonly = false;
+    var saw_align = false;
+    var saw_dereferenceable = false;
+
+    while (rest.len != 0) {
+        const token = firstAttrToken(rest);
+        if (token.len == 0) return error.UnsupportedCallAttribute;
+        rest = std.mem.trim(u8, rest[token.len..], " \t");
+
+        if (std.mem.eql(u8, token, "nonnull")) {
+            if (saw_nonnull) return error.UnsupportedCallAttribute;
+            saw_nonnull = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "readonly")) {
+            if (saw_readonly) return error.UnsupportedCallAttribute;
+            saw_readonly = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "align")) {
+            if (saw_align) return error.UnsupportedCallAttribute;
+            saw_align = true;
+            const align_token = firstAttrToken(rest);
+            if (align_token.len == 0) return error.InvalidAlignment;
+            rest = std.mem.trim(u8, rest[align_token.len..], " \t");
+            const alignment = try std.fmt.parseInt(u32, align_token, 10);
+            try verifyAlignment(alignment);
+            continue;
+        }
+        if (dereferenceablePayload(token)) |payload| {
+            if (saw_dereferenceable) return error.UnsupportedCallAttribute;
+            saw_dereferenceable = true;
+            if (payload.len == 0) return error.UnsupportedCallAttribute;
+            _ = try std.fmt.parseInt(u64, payload, 10);
+            continue;
+        }
+        return error.UnsupportedCallAttribute;
+    }
+}
+
+fn dereferenceablePayload(token: []const u8) ?[]const u8 {
+    const prefix = "dereferenceable(";
+    if (!std.mem.startsWith(u8, token, prefix)) return null;
+    if (!std.mem.endsWith(u8, token, ")")) return null;
+    return token[prefix.len .. token.len - 1];
 }
 
 fn verifyNamedTypes(module: core.Module) !void {

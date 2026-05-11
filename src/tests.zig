@@ -1402,6 +1402,82 @@ test "parser preserves inline asm call argument attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "verifier rejects unsupported call argument attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_ptr(ptr)
+        \\
+        \\define void @caller(ptr %p) {
+        \\entry:
+        \\  call void @takes_ptr(ptr nocapture %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.UnsupportedCallAttribute, module.verify());
+}
+
+test "verifier rejects invalid call argument attribute payloads" {
+    const invalid_align =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_ptr(ptr)
+        \\
+        \\define void @caller(ptr %p) {
+        \\entry:
+        \\  call void @takes_ptr(ptr align 3 %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var align_module = try ir.Module.parse(std.testing.allocator, invalid_align);
+    defer align_module.deinit();
+    try std.testing.expectError(error.InvalidAlignment, align_module.verify());
+
+    const invalid_dereferenceable =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_ptr(ptr)
+        \\
+        \\define void @caller(ptr %p) {
+        \\entry:
+        \\  call void @takes_ptr(ptr dereferenceable() %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var deref_module = try ir.Module.parse(std.testing.allocator, invalid_dereferenceable);
+    defer deref_module.deinit();
+    try std.testing.expectError(error.UnsupportedCallAttribute, deref_module.verify());
+}
+
+test "verifier rejects duplicate call argument attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @takes_ptr(ptr)
+        \\
+        \\define void @caller(ptr %p) {
+        \\entry:
+        \\  call void @takes_ptr(ptr nonnull nonnull %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    try std.testing.expectError(error.UnsupportedCallAttribute, module.verify());
+}
+
 test "parser preserves switch terminators" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
