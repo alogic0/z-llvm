@@ -691,6 +691,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     if (close_paren < open_paren) return error.InvalidCall;
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
     if (!std.mem.startsWith(u8, callee_text, "@")) return error.UnsupportedIndirectCall;
+    if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
     const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
     if (trailing.len != 0) return error.UnsupportedCallAttribute;
 
@@ -709,6 +710,14 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .result = result,
         .kind = .{ .call = call },
     };
+}
+
+fn isUnsupportedInstrumentationCallee(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "__sanitizer_") or
+        std.mem.startsWith(u8, name, "__tsan_") or
+        std.mem.startsWith(u8, name, "__ubsan_") or
+        std.mem.startsWith(u8, name, "llvm.ubsan.") or
+        std.mem.startsWith(u8, name, "llvm.trap");
 }
 
 fn parseCallArgs(allocator: std.mem.Allocator, call: *core.CallInst, text: []const u8) !void {

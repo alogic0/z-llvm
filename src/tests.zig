@@ -1551,6 +1551,32 @@ test "parser rejects unsupported sanitizer attribute groups explicitly" {
     try std.testing.expectError(error.UnsupportedAttributeGroup, ir.Module.parse(std.testing.allocator, input));
 }
 
+test "parser rejects sanitizer and trap instrumentation calls explicitly" {
+    const sanitizer_call =
+        \\declare void @__sanitizer_cov_trace_pc_guard(ptr)
+        \\
+        \\define void @instrumented(ptr %guard) {
+        \\entry:
+        \\  call void @__sanitizer_cov_trace_pc_guard(ptr %guard)
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, sanitizer_call));
+
+    const trap_call =
+        \\declare void @llvm.trap()
+        \\
+        \\define void @safety_trap() {
+        \\entry:
+        \\  call void @llvm.trap()
+        \\  unreachable
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedInstrumentationCall, ir.Module.parse(std.testing.allocator, trap_call));
+}
+
 test "verifier rejects direct call signature mismatch" {
     const input =
         \\declare i32 @callee(i32)

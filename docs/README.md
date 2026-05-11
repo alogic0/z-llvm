@@ -77,7 +77,7 @@ completed foundation epics
 - [x] [Cycle 9: Target DataLayout And ABI Semantics](roadmap/09_target_datalayout_and_abi_semantics_cycle.md)
 - [x] [Cycle 10: Interprocedural Optimization And Inlining Boundary](roadmap/10_interprocedural_optimization_cycle.md)
 - [x] [Cycle 11: Vector IR And Target Cost Boundary](roadmap/11_vector_ir_and_target_cost_cycle.md)
-- [ ] [Cycle 12: Sanitizer, Instrumentation, And Safety IR](roadmap/12_sanitizer_instrumentation_and_safety_cycle.md)
+- [x] [Cycle 12: Sanitizer, Instrumentation, And Safety IR](roadmap/12_sanitizer_instrumentation_and_safety_cycle.md)
 - [ ] [Cycle 13: Bitcode, LTO, And ThinLTO Boundary](roadmap/13_bitcode_lto_and_thinlto_cycle.md)
 - [ ] [Cycle 14: Native Backend Handoff Validation](roadmap/14_native_backend_handoff_validation_cycle.md)
 - [ ] [Cycle 15: Algorithm Parity Audit](roadmap/15_algorithm_parity_audit_cycle.md)

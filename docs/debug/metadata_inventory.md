@@ -38,6 +38,8 @@ llvm-project-22/llvm/lib/Transforms/Utils/AddDiscriminators.cpp
 ```text
 raw top-level metadata records beginning with ! can round-trip
 instruction `!dbg` attachments can round-trip as opaque metadata
+branch/profile metadata attachments such as `!prof` can round-trip as opaque
+terminator metadata
 metadata node graphs are not interpreted
 debug-info updater behavior in passes is not implemented
 broken-debug-info diagnostics are not implemented locally
@@ -57,7 +59,7 @@ broken-debug-info diagnostics are not implemented locally
 | Types | base, pointer, array, vector, struct, union, enum, optional/error union representations | missing |
 | Module flags | `Debug Info Version`, DWARF version, CodeView mode, PIC/PIE flags where relevant | raw records only |
 | Discriminators | `AddDiscriminatorsPass` updates line-table discrimination | placeholder only |
-| Profile metadata | branch weights, call profile, function entry counts | missing |
+| Profile metadata | branch weights, call profile, function entry counts | opaque branch metadata preservation for reduced safety branches; call profile and function entry counts missing |
 
 ## Optimizer Preservation Rules
 
@@ -100,6 +102,15 @@ src/ir/parser.zig preserves instruction !dbg attachments
 src/ir/printer.zig prints preserved instruction !dbg attachments
 debug value intrinsics remain rejected because metadata operands and salvage are
 not represented
+```
+
+Implemented Cycle 12 slice:
+
+```text
+test/zig/expected/release_safe_safety.reduced.ll
+src/ir/parser.zig preserves branch `!prof` attachments as opaque metadata
+sanitizer and trap instrumentation calls remain rejected until runtime
+semantics are represented
 ```
 
 ## Deferred Behavior

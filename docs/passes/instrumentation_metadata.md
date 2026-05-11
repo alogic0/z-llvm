@@ -65,6 +65,9 @@ Implemented subset:
 ```text
 parse and print raw top-level module metadata records beginning with !
 parse and print opaque instruction !dbg attachments
+preserve branch metadata attachments such as !prof as opaque text
+reject sanitizer/TSan/UBSan/trap instrumentation calls until runtime semantics
+are modeled
 add-discriminators, annotation2metadata, annotation-remarks, sancov,
 module-tsan, tsan, alloc-token, and ee-instrument are executable placeholders
 ```
@@ -78,6 +81,7 @@ no sanitizer runtime declarations or inserted callbacks
 no TSan memory instrumentation
 no entry/exit call insertion
 no debug value salvage, assignment tracking, or discriminator updates
+no UBSan or trap-call lowering semantics
 ```
 
 Fixture coverage:
@@ -89,8 +93,10 @@ opt-22 equivalent:
 local-only conservative:
   raw module metadata round-trip unit test
   reduced Debug metadata round-trip fixture
+  reduced ReleaseSafe safety branch fixture with branch-weight metadata
 
 unit-test only:
   instrumentation placeholder pass dispatch
   debug value intrinsic rejection until metadata operands and salvage exist
+  sanitizer/trap instrumentation call rejection
 ```

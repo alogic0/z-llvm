@@ -11,6 +11,7 @@ test/zig/inputs/tiny_scalar.zig
 test/zig/expected/tiny_scalar.normalized.ll
 test/zig/expected/tiny_scalar.project_lowered.ll
 test/zig/expected/tiny_scalar.project_optimized.ll
+test/zig/expected/release_safe_safety.reduced.ll
 ```
 
 The `src/testdata/zig_tiny_scalar.*.ll` copies exist only because Zig unit tests
@@ -182,6 +183,7 @@ parser blockers after Cycle 1:
 | Group | Source | Checked IR | Main IR features | Classification |
 | --- | --- | --- | --- | --- |
 | `tiny_scalar` | `test/zig/inputs/tiny_scalar.zig` | `test/zig/expected/tiny_scalar.normalized.ll`; `test/zig/captured/tiny_scalar.ReleaseFast.x86_64.ll`; `test/zig/captured/tiny_scalar.ReleaseSmall.x86_64.ll` | module records, exported aliases, scalar add, mode-specific attrs | `parse`, `verify`, `optimizer-input`, `unsupported` |
+| `release_safe_safety` | reduced from `test/zig/inputs/tiny_scalar.zig` ReleaseSafe control-flow shape | `test/zig/expected/release_safe_safety.reduced.ll` | safety trap branch, `unreachable`, branch-weight metadata | `parse`, `verify`, `optimizer-input` |
 | `integers` | `test/zig/inputs/integers.zig` | `test/zig/captured/integers.ReleaseFast.x86_64.ll`; `test/zig/captured/integers.ReleaseFast.aarch64.ll` | wrapping add, shifts, xor, `llvm.smin`, target datalayout difference | `parse`, `verify`, `optimizer-input`, `future` |
 | `pointers_memory` | `test/zig/inputs/pointers_memory.zig` | `test/zig/captured/pointers_memory.ReleaseFast.x86_64.ll` | pointer attrs, load/store, volatile load/store | `parse`, `verify`, `optimizer-input` |
 | `aggregates` | `test/zig/inputs/aggregates.zig` | `test/zig/captured/aggregates.ReleaseFast.x86_64.ll` | arrays, struct field GEP, slice iteration, optionals, error unions | `parse`, `verify`, `optimizer-input` |
@@ -201,6 +203,7 @@ parser blockers after Cycle 1:
 | IPO/global cleanup | `globals_comptime`, `control_flow_calls` |
 | Target/DataLayout handoff | `integers` on x86_64 and aarch64 |
 | Optional debug/instrumentation/LTO tracks | `atomics_inline_asm_debug`, `tiny_scalar` Debug rows |
+| ReleaseSafe safety IR | `release_safe_safety` |
 | Vector and target-cost boundary | `vector_future`, vectorizer placeholders, TargetTransformInfo requirements |
 
 Connection to the LLVM pass inventory:
@@ -209,6 +212,7 @@ Connection to the LLVM pass inventory:
 | --- | --- |
 | `Debug` raw mode | `debug-o0`, `local-pipeline=zig-debug-accepted`, `verify`, `always-inline`, debug metadata placeholders. |
 | `Debug` reduced metadata mode | `DICompileUnit`, `DISubprogram`, and instruction `DILocation` preservation without optimizer-input status. |
+| `ReleaseSafe` reduced safety mode | `release-o3`, `local-pipeline=zig-release-safe-accepted`, safety branch preservation, and opaque branch-weight metadata. |
 | `ReleaseFast` normalized scalar mode | `release-o3`, `local-pipeline=zig-release-fast-accepted`, `verify`, `instsimplify`, `instcombine`, `simplifycfg`, scalar pipeline aliases. |
 | `ReleaseFast` aarch64 target-layout mode | `target/data-layout-supported`, parsed aarch64 triple/DataLayout, future optimizer comparison policy. |
 | `ReleaseFast` future vector mode | `vector-ir`, `target-cost`, `loop-vectorize`, `slp-vectorizer`, and `vector-combine` remain unsupported/future. |
@@ -218,13 +222,10 @@ Connection to the LLVM pass inventory:
 
 ## Current Gaps
 
-- Raw aliases such as `@add = alias ...` are not accepted by the local parser.
-- Raw function attributes, attribute groups, and target-feature strings are
-  normalized away for the checked scalar fixture.
-- Debug metadata and module flags are preserved only in documentation for this
-  group.
-- `Debug` and `ReleaseSafe` raw IR are too broad for the first corpus slice and
-  should be reduced or sanitized before being checked in.
-- Intrinsics such as `llvm.smin` and `llvm.assume`, loop metadata, inline asm,
-  atomics, vector IR, raw globals, and exported aliases are source-backed next
-  inputs for later parser/verifier/optimizer slices.
+- Full raw `Debug` and `ReleaseSafe` IR are still too broad for direct checked
+  optimizer-input status; reduced fixtures carry the accepted metadata and
+  safety-control subsets.
+- Sanitizer and trap instrumentation calls are rejected explicitly until their
+  runtime ABI and lowering semantics are modeled.
+- Inline asm, atomics, vector IR, COMDAT/module flag semantics, and full debug
+  metadata graph interpretation remain source-backed future inputs.

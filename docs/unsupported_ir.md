@@ -97,8 +97,8 @@ full atomic ordering semantics
 calling conventions beyond parse-preserve support
 TBAA
 noalias / alias.scope
-instruction debug metadata
-branch weights / profile metadata
+instruction debug metadata beyond opaque `!dbg` preservation
+branch weights / profile metadata beyond opaque branch attachment preservation
 module flags
 target datalayout semantics beyond default pointer/integer alignment queries
 target triple semantics beyond initial target matrix recognition
@@ -149,6 +149,7 @@ InvalidFunctionDeclaration
 InvalidCall
 UnsupportedIndirectCall
 UnsupportedCallAttribute
+UnsupportedInstrumentationCall
 UnsupportedCallTerminator
 UnsupportedVarArgs
 UnsupportedAttributeGroup

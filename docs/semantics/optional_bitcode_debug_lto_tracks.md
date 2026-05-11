@@ -8,9 +8,9 @@ them blockers for the core verifier and optimizer roadmap.
 | Track | Primary doc | Current local status | Activation rule |
 | --- | --- | --- | --- |
 | LLVM bitcode handoff | `docs/bitcode/construct_inventory.md` | Inventory only; no writer. | Activate only when Zig needs LLVM IR/bitcode output without libLLVM or when a fixture requires bitcode round-trip validation. |
-| Debug-info preservation | `docs/debug/metadata_inventory.md` | Raw module metadata preservation plus sanitizer/debug placeholders. | Activate when a Zig-emitted fixture includes debug metadata that a local parser/pass would otherwise drop or corrupt. |
+| Debug-info preservation | `docs/debug/metadata_inventory.md` | Raw module metadata, instruction `!dbg`, and branch `!prof` preservation plus debug placeholders. | Activate when a Zig-emitted fixture includes debug metadata that a local parser/pass would otherwise drop or corrupt. |
 | ThinLTO/FullLTO behavior | `docs/lto/behavior_gaps.md` | Pre-link pipeline names and placeholders only. | Activate when a source-backed LTO mode needs local pre-link behavior beyond the current scalar/global foundations. |
-| Sanitizer and instrumentation metadata | `docs/passes/instrumentation_metadata.md` | Placeholder passes and raw metadata round-trip only. | Activate when sanitizer runtime declarations, callback insertion, or sanitizer attributes are represented in accepted IR. |
+| Sanitizer and instrumentation metadata | `docs/passes/instrumentation_metadata.md` | Placeholder passes, opaque profile metadata preservation, and explicit sanitizer/trap call rejection. | Activate when sanitizer runtime declarations, callback insertion, or sanitizer attributes are represented in accepted IR. |
 | Vectorization | `docs/roadmap/historical/vector_ir_and_target_cost_epic.md` | Deferred placeholder surface. | Activate only after vector IR, target features, TargetTransformInfo, LoopAccessAnalysis, and cost modeling are represented. |
 | Target-specific codegen details | `docs/codegen/zig_native_backend_handoff.md` | Validation-only x86_64 SysV bootstrap. | Activate only for tiny validation fixtures or source-backed target layout assumptions. |
 
@@ -69,6 +69,8 @@ Implemented today:
 
 ```text
 raw top-level module metadata round-trip
+instruction `!dbg` attachment round-trip
+branch `!prof` attachment round-trip
 debug/profile/sanitizer pass placeholders
 lto-prelink-o3 and lto-prelink-oz pipeline names
 canonicalize-aliases and name-anon-globals placeholders
@@ -81,7 +83,6 @@ Not implemented:
 ```text
 LLVM bitcode writer or parser
 metadata graph semantics
-debug locations on instructions
 debug-info updater behavior in passes
 sanitizer callback insertion
 ThinLTO summary index or post-link pipeline behavior
