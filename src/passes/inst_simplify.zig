@@ -95,7 +95,7 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
 
     if (binary.flags.any()) return null;
     return switch (binary.op) {
-        .fadd, .fmul => null,
+        .fadd, .fsub, .fmul, .fdiv, .frem => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -152,7 +152,7 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
     const lhs = binary.lhs.int;
     const rhs = binary.rhs.int;
     return switch (binary.op) {
-        .fadd, .fmul => null,
+        .fadd, .fsub, .fmul, .fdiv, .frem => null,
         .add => if (!binary.flags.any()) .{ .int = lhs + rhs } else null,
         .sub => if (!binary.flags.any()) .{ .int = lhs - rhs } else null,
         .mul => if (!binary.flags.any()) .{ .int = lhs * rhs } else null,
@@ -337,12 +337,12 @@ fn intrinsicMinMaxKind(callee: []const u8) ?MinMaxKind {
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
-        .fadd, .fmul, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
+        .fadd, .fsub, .fmul, .fdiv, .frem, .sub, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => false,
     };
 }
 
 fn isFpBinary(op: ir.BinaryOp) bool {
-    return op == .fadd or op == .fmul;
+    return op == .fadd or op == .fsub or op == .fmul or op == .fdiv or op == .frem;
 }
 
 fn unsignedInt(value: i128, ty: ir.Type) ?u128 {

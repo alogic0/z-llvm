@@ -102,6 +102,8 @@ local-only conservative:
   fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
   more FP expressions when the exact legality conditions are proven; this
   project keeps them out of GVN for now.
+  fp_extended_gvn_no_cse applies the same conservative boundary to scalar
+  `fsub`, `fdiv`, and `frem`.
 
 unit-test only:
   phi-aware redundancy

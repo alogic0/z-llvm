@@ -177,7 +177,7 @@ fn sameOptionalText(a: ?[]const u8, b: ?[]const u8) bool {
 }
 
 fn isFpBinary(op: ir.BinaryOp) bool {
-    return op == .fadd or op == .fmul;
+    return op == .fadd or op == .fsub or op == .fmul or op == .fdiv or op == .frem;
 }
 
 const HashState = struct {

@@ -153,7 +153,10 @@ pub const Value = union(enum) {
 
 pub const BinaryOp = enum {
     fadd,
+    fsub,
     fmul,
+    fdiv,
+    frem,
     add,
     sub,
     mul,
@@ -170,7 +173,10 @@ pub const BinaryOp = enum {
 
     pub fn parse(text: []const u8) ?BinaryOp {
         if (std.mem.eql(u8, text, "fadd")) return .fadd;
+        if (std.mem.eql(u8, text, "fsub")) return .fsub;
         if (std.mem.eql(u8, text, "fmul")) return .fmul;
+        if (std.mem.eql(u8, text, "fdiv")) return .fdiv;
+        if (std.mem.eql(u8, text, "frem")) return .frem;
         if (std.mem.eql(u8, text, "add")) return .add;
         if (std.mem.eql(u8, text, "sub")) return .sub;
         if (std.mem.eql(u8, text, "mul")) return .mul;

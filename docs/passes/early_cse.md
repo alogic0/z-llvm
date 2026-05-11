@@ -97,6 +97,8 @@ local-only conservative:
   so this case is not in `fixtures.tsv` yet.
   fp_early_cse_no_cse preserves repeated FP expressions locally. LLVM may CSE
   more FP expressions once exact FP legality is modeled.
+  fp_extended_early_cse_no_cse applies the same conservative boundary to scalar
+  `fsub`, `fdiv`, and `frem`.
 
 unit-test only:
   same-block repeated pure expression elimination

@@ -89,6 +89,7 @@ opt-22 equivalent:
   adce_nested_dead_diamond
   adce_store_branch_reject
   fp_adce_dead
+  fp_extended_adce_preserve
 
 local-only conservative:
   none currently

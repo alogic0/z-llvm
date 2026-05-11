@@ -61,8 +61,9 @@ named SSA values
 
 ```text
 fp80/fp128
-floating-point operations beyond scalar `fadd`/`fmul`
+floating-point operations beyond scalar `fadd`/`fsub`/`fmul`/`fdiv`/`frem`
 NaN, infinity, signed-zero, and unobserved FP literal semantics
+fast-math flags, constrained FP intrinsics, and FP exception semantics
 arrays
 scalable vectors and unsupported vector element types
 structs
@@ -79,7 +80,9 @@ Fixed vectors are accepted only for a narrow parser/verifier surface:
 <N x iM>, <N x float>, <N x double>, and <N x ptr> types
 vector function signatures and returns
 undef, zeroinitializer, named values, and typed vector constants
-integer/FP binary instructions with matching vector operand types
+integer binary instructions with matching vector operand types
+FP vector binary instructions remain unsupported until vector FP semantics are
+modeled separately
 extractelement, insertelement, and shufflevector parser/verifier preservation
 ```
 

@@ -282,5 +282,5 @@ fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value 
 }
 
 fn isFpBinary(op: ir.BinaryOp) bool {
-    return op == .fadd or op == .fmul;
+    return op == .fadd or op == .fsub or op == .fmul or op == .fdiv or op == .frem;
 }

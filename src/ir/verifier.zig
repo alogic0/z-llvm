@@ -771,28 +771,25 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     if (binary.flags.nsw or binary.flags.nuw) {
         switch (binary.op) {
             .add, .sub, .mul, .shl => {},
-            .fadd, .fmul, .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fsub, .fmul, .fdiv, .frem, .@"and", .@"or", .xor, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.exact) {
         switch (binary.op) {
             .udiv, .sdiv, .lshr, .ashr => {},
-            .fadd, .fmul, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fsub, .fmul, .fdiv, .frem, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     if (binary.flags.disjoint) {
         switch (binary.op) {
             .@"or" => {},
-            .fadd, .fmul, .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
+            .fadd, .fsub, .fmul, .fdiv, .frem, .add, .sub, .mul, .@"and", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
         }
     }
     switch (binary.op) {
-        .fadd, .fmul => switch (binary.ty) {
+        .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .float, .double => {},
-            .vector => |vector| switch (vector.elem_ty) {
-                .float, .double => {},
-                .int, .ptr => return error.TypeMismatch,
-            },
+            .vector => return error.UnsupportedType,
             .void, .int, .ptr, .aggregate => return error.TypeMismatch,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => switch (binary.ty) {

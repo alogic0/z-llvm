@@ -118,6 +118,6 @@ fn binaryMayTrap(binary: ir.BinaryInst) bool {
             .int => |rhs| rhs == 0 or rhs == -1,
             .named, .fp, .undef, .null_value, .zero_initializer, .vector => true,
         },
-        .fadd, .fmul, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
+        .fadd, .fsub, .fmul, .fdiv, .frem, .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr => false,
     };
 }

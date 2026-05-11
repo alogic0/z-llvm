@@ -2725,6 +2725,24 @@ test "parser preserves scalar float arithmetic and compare IR" {
         \\  ret double %product
         \\}
         \\
+        \\define float @float_sub(float %a, float %b) {
+        \\entry:
+        \\  %difference = fsub float %a, %b
+        \\  ret float %difference
+        \\}
+        \\
+        \\define double @float_div(double %a, double %b) {
+        \\entry:
+        \\  %quotient = fdiv double %a, %b
+        \\  ret double %quotient
+        \\}
+        \\
+        \\define float @float_rem(float %a, float %b) {
+        \\entry:
+        \\  %remainder = frem float %a, %b
+        \\  ret float %remainder
+        \\}
+        \\
         \\define i1 @float_less(float %a, float %b) {
         \\entry:
         \\  %less = fcmp olt float %a, %b
@@ -2740,7 +2758,10 @@ test "parser preserves scalar float arithmetic and compare IR" {
     try std.testing.expect(module.functions.items[0].ret_ty.eql(.float));
     try std.testing.expect(module.functions.items[1].ret_ty.eql(.double));
     try std.testing.expect(module.functions.items[2].ret_ty.eql(.double));
-    try std.testing.expect(module.functions.items[3].ret_ty.eql(.{ .int = 1 }));
+    try std.testing.expect(module.functions.items[3].ret_ty.eql(.float));
+    try std.testing.expect(module.functions.items[4].ret_ty.eql(.double));
+    try std.testing.expect(module.functions.items[5].ret_ty.eql(.float));
+    try std.testing.expect(module.functions.items[6].ret_ty.eql(.{ .int = 1 }));
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -2811,22 +2832,6 @@ test "parser preserves scalar fcmp predicate surface" {
 }
 
 test "parser keeps unsupported FP surface closed" {
-    const fsub_input =
-        \\define float @sub(float %a, float %b) {
-        \\entry:
-        \\  %r = fsub float %a, %b
-        \\  ret float %r
-        \\}
-        \\
-    ;
-    const fdiv_input =
-        \\define float @div(float %a, float %b) {
-        \\entry:
-        \\  %r = fdiv float %a, %b
-        \\  ret float %r
-        \\}
-        \\
-    ;
     const fast_fcmp_input =
         \\define i1 @fast_cmp(float %a, float %b) {
         \\entry:
@@ -2843,6 +2848,14 @@ test "parser keeps unsupported FP surface closed" {
         \\}
         \\
     ;
+    const vector_fp_binary_input =
+        \\define <2 x float> @vector_fadd(<2 x float> %a, <2 x float> %b) {
+        \\entry:
+        \\  %r = fadd <2 x float> %a, %b
+        \\  ret <2 x float> %r
+        \\}
+        \\
+    ;
     const constrained_input =
         \\define float @constrained(float %a, float %b) {
         \\entry:
@@ -2852,10 +2865,12 @@ test "parser keeps unsupported FP surface closed" {
         \\
     ;
 
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fsub_input));
-    try std.testing.expectError(error.UnsupportedInstruction, ir.Module.parse(std.testing.allocator, fdiv_input));
     try std.testing.expectError(error.UnsupportedPredicate, ir.Module.parse(std.testing.allocator, fast_fcmp_input));
     try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_fcmp_input));
+
+    var vector_fp_binary = try ir.Module.parse(std.testing.allocator, vector_fp_binary_input);
+    defer vector_fp_binary.deinit();
+    try std.testing.expectError(error.UnsupportedType, vector_fp_binary.verify());
 
     var constrained = try ir.Module.parse(std.testing.allocator, constrained_input);
     defer constrained.deinit();

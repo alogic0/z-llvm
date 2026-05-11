@@ -77,6 +77,7 @@ opt-22 equivalent:
   sccp_undef_phi
   sccp_select_same_arms
   fp_sccp_preserve
+  fp_extended_sccp_preserve
 
 local-only conservative:
   none currently
