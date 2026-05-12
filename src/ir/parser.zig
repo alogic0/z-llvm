@@ -2210,33 +2210,34 @@ fn parseBr(line: []const u8) !core.Terminator {
     const metadata_start = std.mem.indexOf(u8, line, ", !");
     const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
     const instruction_text = if (metadata_start) |index| line[0..index] else line;
-    var parts = std.mem.tokenizeAny(u8, instruction_text, " \t,");
-    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidBr, "br")) return error.InvalidBr;
-    const first_ty = try parseTypeOrLabel(parts.next() orelse return error.InvalidBr);
-    switch (first_ty) {
-        .label => {
-            const target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            if (parts.next() != null) return error.InvalidBr;
-            return .{ .br = .{ .target = target, .metadata = metadata } };
-        },
-        .ty => |cond_ty| {
-            const cond = try parseValue(parts.next() orelse return error.InvalidBr);
-            const then_label = parts.next() orelse return error.InvalidBr;
-            if (!std.mem.eql(u8, then_label, "label")) return error.InvalidBr;
-            const then_target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            const else_label = parts.next() orelse return error.InvalidBr;
-            if (!std.mem.eql(u8, else_label, "label")) return error.InvalidBr;
-            const else_target = try parseLabel(parts.next() orelse return error.InvalidBr);
-            if (parts.next() != null) return error.InvalidBr;
-            return .{ .condbr = .{
-                .cond_ty = cond_ty,
-                .cond = cond,
-                .then_target = then_target,
-                .else_target = else_target,
-                .metadata = metadata,
-            } };
-        },
+    if (!std.mem.startsWith(u8, instruction_text, "br ")) return error.InvalidBr;
+    var rest = std.mem.trim(u8, instruction_text["br ".len..], " \t");
+    if (std.mem.startsWith(u8, rest, "label ")) {
+        const target = try parseLabel(std.mem.trim(u8, rest["label ".len..], " \t"));
+        return .{ .br = .{ .target = target, .metadata = metadata } };
     }
+
+    const typed = try parseLeadingType(rest);
+    rest = std.mem.trim(u8, typed.after, " \t");
+    const cond_comma = findTopLevelComma(rest) orelse return error.InvalidBr;
+    const cond = try parseValue(std.mem.trim(u8, rest[0..cond_comma], " \t"));
+
+    rest = std.mem.trim(u8, rest[cond_comma + 1 ..], " \t");
+    if (!std.mem.startsWith(u8, rest, "label ")) return error.InvalidBr;
+    rest = std.mem.trim(u8, rest["label ".len..], " \t");
+    const then_comma = findTopLevelComma(rest) orelse return error.InvalidBr;
+    const then_target = try parseLabel(std.mem.trim(u8, rest[0..then_comma], " \t"));
+
+    rest = std.mem.trim(u8, rest[then_comma + 1 ..], " \t");
+    if (!std.mem.startsWith(u8, rest, "label ")) return error.InvalidBr;
+    const else_target = try parseLabel(std.mem.trim(u8, rest["label ".len..], " \t"));
+    return .{ .condbr = .{
+        .cond_ty = typed.ty,
+        .cond = cond,
+        .then_target = then_target,
+        .else_target = else_target,
+        .metadata = metadata,
+    } };
 }
 
 fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std.mem.SplitIterator(u8, .scalar)) !core.Terminator {
@@ -2476,8 +2477,21 @@ fn findTopLevelComma(text: []const u8) ?usize {
     var bracket_depth: usize = 0;
     var angle_depth: usize = 0;
     var paren_depth: usize = 0;
+    var in_string = false;
+    var escaped = false;
     for (text, 0..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
         switch (byte) {
+            '"' => in_string = true,
             '{' => brace_depth += 1,
             '}' => {
                 if (brace_depth == 0) return null;

@@ -31,6 +31,9 @@ Active cycle:
       fixed-vector source types in cast instructions, including vector mask
       bitcasts to equal-width scalar integers. Upstream mapping is recorded in
       [Vector IR Boundary](ir_vectors.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve
+      quoted branch labels containing commas. Upstream mapping is recorded in
+      [Control Flow IR](ir_control_flow.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

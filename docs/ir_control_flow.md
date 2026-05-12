@@ -24,6 +24,7 @@ Implemented subset:
 ret <type> <value>
 br label %target
 br i1 <cond>, label %then, label %else
+quoted branch labels containing punctuation such as commas
 switch <int type> <cond>, label %default [...]
 unreachable
 ```

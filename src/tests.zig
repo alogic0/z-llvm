@@ -2500,6 +2500,29 @@ test "parser preserves inert branch metadata attachments" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves quoted branch labels containing commas" {
+    const input =
+        \\define i32 @quoted_branch(i1 %cond) {
+        \\entry:
+        \\  br i1 %cond, label %"left,with,comma", label %"right,with,comma"
+        \\"left,with,comma":
+        \\  ret i32 1
+        \\"right,with,comma":
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves alias metadata attachments opaquely" {
     const input =
         \\define i32 @alias_metadata(ptr %a, ptr %b) {
