@@ -782,8 +782,8 @@ pub const Instruction = struct {
             .binary => |binary| binary.ty,
             .cast => |cast| cast.to_ty,
             .freeze => |freeze| freeze.ty,
-            .icmp => .{ .int = 1 },
-            .fcmp => .{ .int = 1 },
+            .icmp => |icmp| compareResultType(icmp.operand_ty),
+            .fcmp => |fcmp| compareResultType(fcmp.operand_ty),
             .select => |select| select.ty,
             .phi => |phi| phi.ty,
             .alloca => .ptr,
@@ -896,6 +896,16 @@ pub const Instruction = struct {
         }
     }
 };
+
+fn compareResultType(operand_ty: Type) Type {
+    return switch (operand_ty) {
+        .vector => |vector| .{ .vector = .{
+            .len = vector.len,
+            .elem_ty = .{ .int = 1 },
+        } },
+        else => .{ .int = 1 },
+    };
+}
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {

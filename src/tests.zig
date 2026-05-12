@@ -2559,6 +2559,28 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
     try splat_module.print(&splat_output.writer);
     try std.testing.expectEqualStrings(vector_splat, splat_output.writer.buffered());
 
+    const vector_compare_mask_bitcast =
+        \\define i16 @vector_compare_mask_bitcast(<16 x i8> %a) {
+        \\entry:
+        \\  %cmp = icmp eq <16 x i8> %a, splat (i8 10)
+        \\  %bits = bitcast <16 x i1> %cmp to i16
+        \\  ret i16 %bits
+        \\}
+        \\
+    ;
+    var mask_bitcast_module = try ir.Module.parse(std.testing.allocator, vector_compare_mask_bitcast);
+    defer mask_bitcast_module.deinit();
+    try mask_bitcast_module.verify();
+    try std.testing.expect(mask_bitcast_module.functions.items[0].blocks.items[0].instructions.items[0].resultType().?.eql(.{ .vector = .{
+        .len = 16,
+        .elem_ty = .{ .int = 1 },
+    } }));
+
+    var mask_bitcast_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer mask_bitcast_output.deinit();
+    try mask_bitcast_module.print(&mask_bitcast_output.writer);
+    try std.testing.expectEqualStrings(vector_compare_mask_bitcast, mask_bitcast_output.writer.buffered());
+
     const bad_vector_splat =
         \\define i1 @bad_vector_splat_icmp(<16 x i8> %a) {
         \\entry:

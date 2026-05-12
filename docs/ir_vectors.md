@@ -20,6 +20,8 @@ undef, zeroinitializer, named vector values, and typed vector constants
 LLVM splat vector constants such as `splat (i8 10)`, including instruction
 operands and call arguments
 integer and FP binary instructions with matching fixed-vector operand types
+vector integer and FP comparisons with fixed-vector operands produce `<N x i1>`
+mask result types
 extractelement with scalar integer lane indices
 insertelement with matching vector element value type
 shufflevector with matching input vector types and integer vector masks
@@ -75,6 +77,7 @@ unit tests:
   fixed-vector function signature, add, return, print, and verify
   typed vector constant through freeze
   typed vector splat constant through vector icmp
+  vector compare mask result type feeding a bitcast
   vector mask bitcast to equal-width integer
   scalar value rejected for vector return
   scalable vector rejected
