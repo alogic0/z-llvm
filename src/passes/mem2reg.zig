@@ -157,6 +157,7 @@ fn isPromotableStackSlot(function: ir.Function, slot: []const u8) bool {
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
+            .indirectbr => |indirectbr| if (isNamed(indirectbr.addr, slot)) return false,
             .@"switch" => |switch_term| {
                 if (isNamed(switch_term.cond, slot)) return false;
                 for (switch_term.cases.items) |case| {
@@ -535,6 +536,7 @@ fn isPromotableSingleBlockSlot(function: ir.Function, slot_block_index: usize, s
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| if (isNamed(condbr.cond, slot)) return false,
+            .indirectbr => |indirectbr| if (isNamed(indirectbr.addr, slot)) return false,
             .@"switch" => |switch_term| {
                 if (isNamed(switch_term.cond, slot)) return false;
                 for (switch_term.cases.items) |case| {
@@ -664,6 +666,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
             .@"switch" => |*switch_term| {
                 switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
                 for (switch_term.cases.items) |*case| {

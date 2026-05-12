@@ -48,6 +48,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                 .br => {},
                 .@"unreachable" => {},
                 .condbr => |*condbr| condbr.cond = resolveValue(aliases, condbr.cond),
+                .indirectbr => |*indirectbr| indirectbr.addr = resolveValue(aliases, indirectbr.addr),
                 .@"switch" => |*switch_term| {
                     switch_term.cond = resolveValue(aliases, switch_term.cond);
                     for (switch_term.cases.items) |*case| {

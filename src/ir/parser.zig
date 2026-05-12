@@ -144,6 +144,12 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
+        if (std.mem.startsWith(u8, line, "indirectbr ")) {
+            if (block.terminator != null) return error.MultipleTerminators;
+            block.terminator = try parseIndirectBr(allocator, line);
+            continue;
+        }
+
         if (std.mem.startsWith(u8, line, "switch ")) {
             if (block.terminator != null) return error.MultipleTerminators;
             block.terminator = try parseSwitch(allocator, line, &lines);
@@ -2362,6 +2368,50 @@ fn parseSwitchCase(allocator: std.mem.Allocator, switch_term: *core.SwitchTermin
         .value = typed.value,
         .target = target,
     });
+}
+
+fn parseIndirectBr(allocator: std.mem.Allocator, line: []const u8) !core.Terminator {
+    const metadata_start = std.mem.indexOf(u8, line, ", !");
+    const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
+    const instruction_text = if (metadata_start) |index| line[0..index] else line;
+    var rest = std.mem.trim(u8, instruction_text["indirectbr ".len..], " \t");
+
+    const typed = try parseLeadingType(rest);
+    rest = std.mem.trim(u8, typed.after, " \t");
+    const value_comma = findTopLevelComma(rest) orelse return error.InvalidBr;
+    const addr = try parseValue(std.mem.trim(u8, rest[0..value_comma], " \t"));
+    rest = std.mem.trim(u8, rest[value_comma + 1 ..], " \t");
+
+    if (rest.len == 0 or rest[0] != '[') return error.InvalidBr;
+    const close = findMatchingBracket(rest, 0) orelse return error.InvalidBr;
+    if (std.mem.trim(u8, rest[close + 1 ..], " \t").len != 0) return error.InvalidBr;
+
+    var indirectbr: core.IndirectBrTerminator = .{
+        .addr_ty = typed.ty,
+        .addr = addr,
+        .targets = .empty,
+        .metadata = metadata,
+    };
+    errdefer indirectbr.targets.deinit(allocator);
+
+    var targets_text = std.mem.trim(u8, rest[1..close], " \t");
+    if (targets_text.len == 0) return error.InvalidBr;
+    while (targets_text.len != 0) {
+        const comma = findTopLevelComma(targets_text);
+        const target_text = std.mem.trim(u8, if (comma) |index| targets_text[0..index] else targets_text, " \t");
+        try parseIndirectBrTarget(allocator, &indirectbr, target_text);
+        targets_text = if (comma) |index| std.mem.trim(u8, targets_text[index + 1 ..], " \t") else "";
+    }
+
+    return .{ .indirectbr = indirectbr };
+}
+
+fn parseIndirectBrTarget(allocator: std.mem.Allocator, indirectbr: *core.IndirectBrTerminator, text: []const u8) !void {
+    var parts = std.mem.tokenizeAny(u8, text, " \t");
+    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidBr, "label")) return error.InvalidBr;
+    const target = try parseLabel(parts.next() orelse return error.InvalidBr);
+    if (parts.next() != null) return error.InvalidBr;
+    try indirectbr.targets.append(allocator, target);
 }
 
 const TypeOrLabel = union(enum) {

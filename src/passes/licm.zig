@@ -226,6 +226,7 @@ fn terminatorUsesValue(terminator: ir.Terminator, result: []const u8) bool {
             }
             return false;
         },
+        .indirectbr => |indirectbr| valueMatchesName(indirectbr.addr, result),
     };
 }
 

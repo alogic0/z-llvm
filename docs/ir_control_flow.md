@@ -14,6 +14,7 @@ Upstream entry points to check:
 ReturnInst
 BranchInst
 SwitchInst
+IndirectBrInst
 UnreachableInst
 Verifier::visitTerminator
 ```
@@ -26,21 +27,23 @@ br label %target
 br i1 <cond>, label %then, label %else
 quoted branch labels containing punctuation such as commas
 switch <int type> <cond>, label %default [...]
+indirectbr ptr <addr>, [label %target, ...]
 unreachable
 ```
 
 Upstream mapping:
 
 ```text
-This reproduces basic LLVM terminator syntax and CFG successor behavior for returns, branches, conditional branches, integer switches, and unreachable blocks.
+This reproduces basic LLVM terminator syntax and CFG successor behavior for returns, branches, conditional branches, integer switches, indirect branches, and unreachable blocks.
 LLVM supports many more terminators and attaches richer debug, profile, and exception-handling metadata.
 ```
 
 Known gaps:
 
 ```text
-no invoke/callbr/indirectbr
+no invoke/callbr
 no resume/catchswitch/cleanupret/catchret
+limited indirectbr support: parse/verify/print and CFG successors only, no lowering or transformation
 limited switch support: integer cases only, no lowering/jump-table construction, no branch-probability semantics
 limited metadata/profile-weight handling
 ```

@@ -472,6 +472,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
             .@"switch" => |*switch_term| {
                 switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
                 for (switch_term.cases.items) |*case| {

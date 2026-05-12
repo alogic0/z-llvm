@@ -183,7 +183,7 @@ fn lowerStraightLineReturn(
             try lowerReturnValue(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
             try machine.instructions.append(allocator, .ret);
         },
-        .br, .condbr, .@"switch", .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
 }
 
@@ -550,7 +550,7 @@ fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction
     }
     if (block.terminator) |terminator| switch (terminator) {
         .ret => |ret| if (ret.value) |value| try noteLiveValue(function, value, &live),
-        .br, .condbr, .@"switch", .@"unreachable" => {},
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => {},
     };
     return live;
 }

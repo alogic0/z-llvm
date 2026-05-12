@@ -1647,6 +1647,39 @@ test "parser preserves switch terminators" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves indirectbr terminators" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @dispatch(ptr %addr) {
+        \\entry:
+        \\  indirectbr ptr %addr, [label %left, label %right]
+        \\left:
+        \\  ret void
+        \\right:
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const indirectbr = module.functions.items[0].blocks.items[0].terminator.?.indirectbr;
+    try std.testing.expect(indirectbr.addr_ty.eql(.ptr));
+    try std.testing.expectEqualStrings("addr", indirectbr.addr.named);
+    try std.testing.expectEqual(@as(usize, 2), indirectbr.targets.items.len);
+    try std.testing.expectEqualStrings("left", indirectbr.targets.items[0]);
+    try std.testing.expectEqualStrings("right", indirectbr.targets.items[1]);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser and verifier accept pointer integer casts" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

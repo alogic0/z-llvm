@@ -178,6 +178,7 @@ const LiveInstructions = struct {
             .br => {},
             .@"unreachable" => {},
             .condbr => |condbr| try liveness.markValue(condbr.cond),
+            .indirectbr => |indirectbr| try liveness.markValue(indirectbr.addr),
             .@"switch" => |switch_term| {
                 try liveness.markValue(switch_term.cond);
                 for (switch_term.cases.items) |case| try liveness.markValue(case.value);
@@ -222,7 +223,7 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
     for (function.blocks.items, 0..) |*block, block_index| {
         const condbr = switch (block.terminator orelse continue) {
             .condbr => |condbr| condbr,
-            .ret, .br, .@"switch", .@"unreachable" => continue,
+            .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
         };
 
         const ipdom_index = postdom.immediatePostDominator(block_index) orelse continue;
@@ -286,7 +287,7 @@ fn regionPathReachesJoin(function: ir.Function, graph: cfg.Graph, block_index: u
             return regionPathReachesJoin(function, graph, then_index, join_index, visiting) and
                 regionPathReachesJoin(function, graph, else_index, join_index, visiting);
         },
-        .ret, .@"switch", .@"unreachable" => return false,
+        .ret, .@"switch", .indirectbr, .@"unreachable" => return false,
     }
 }
 

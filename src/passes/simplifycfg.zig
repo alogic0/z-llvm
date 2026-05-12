@@ -52,6 +52,7 @@ fn simplifyTerminators(function: *ir.Function) bool {
             .ret => {},
             .br => {},
             .@"switch" => {},
+            .indirectbr => {},
             .@"unreachable" => {},
         }
     }
@@ -70,7 +71,7 @@ fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !b
         for (function.blocks.items, 0..) |*block, block_index| {
             const condbr = switch (block.terminator orelse continue) {
                 .condbr => |condbr| condbr,
-                .ret, .br, .@"switch", .@"unreachable" => continue,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
             };
             const shape = simpleDiamondSelectReturn(function.*, graph, block_index, condbr) orelse continue;
 
@@ -145,7 +146,7 @@ fn simpleDiamondSelectReturn(function: ir.Function, graph: cfg.Graph, block_inde
     const false_value = phiValueForBlock(phi, condbr.else_target) orelse return null;
     const ret = switch (merge.terminator orelse return null) {
         .ret => |ret| ret,
-        .br, .condbr, .@"switch", .@"unreachable" => return null,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
     };
     const ret_value = ret.value orelse return null;
     if (!ret.ty.eql(phi.ty) or !ret_value.eql(.{ .named = phi_name })) return null;
@@ -165,7 +166,7 @@ fn emptyBranchTarget(block: ir.BasicBlock) ?[]const u8 {
     if (block.instructions.items.len != 0) return null;
     return switch (block.terminator orelse return null) {
         .br => |br| br.target,
-        .ret, .condbr, .@"switch", .@"unreachable" => null,
+        .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => null,
     };
 }
 
@@ -222,7 +223,7 @@ fn retOnlyBlock(function: ir.Function, name: []const u8) ?RetInfo {
     if (block.instructions.items.len != 0) return null;
     return switch (block.terminator orelse return null) {
         .ret => |ret| .{ .ty = ret.ty, .value = ret.value },
-        .br, .condbr, .@"switch", .@"unreachable" => null,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => null,
     };
 }
 
@@ -239,7 +240,7 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
             if (block.instructions.items.len != 0) continue;
             const br = switch (block.terminator orelse continue) {
                 .br => |br| br,
-                .ret, .condbr, .@"switch", .@"unreachable" => continue,
+                .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => continue,
             };
             const target_index = function.blockIndex(br.target) orelse continue;
             if (target_index == block_index) continue;
@@ -273,6 +274,7 @@ fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function
                 .ret => continue,
                 .condbr => continue,
                 .@"switch" => continue,
+                .indirectbr => continue,
                 .@"unreachable" => continue,
             };
             const target_index = function.blockIndex(br.target) orelse continue;
@@ -403,6 +405,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
             .@"switch" => |*switch_term| {
                 switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
                 for (switch_term.cases.items) |*case| {

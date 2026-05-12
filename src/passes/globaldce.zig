@@ -184,6 +184,7 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
                 try addValueEdge(allocator, module, edges, switch_term.cond);
                 for (switch_term.cases.items) |case| try addValueEdge(allocator, module, edges, case.value);
             },
+            .indirectbr => |indirectbr| try addValueEdge(allocator, module, edges, indirectbr.addr),
             .br, .@"unreachable" => {},
         };
     }

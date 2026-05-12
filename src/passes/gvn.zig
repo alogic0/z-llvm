@@ -140,6 +140,7 @@ fn visitBlock(
         .br => {},
         .@"unreachable" => {},
         .condbr => |*condbr| condbr.cond = resolveValue(aliases.*, condbr.cond),
+        .indirectbr => |*indirectbr| indirectbr.addr = resolveValue(aliases.*, indirectbr.addr),
         .@"switch" => |*switch_term| {
             switch_term.cond = resolveValue(aliases.*, switch_term.cond);
             for (switch_term.cases.items) |*case| {
@@ -276,6 +277,7 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
             .br => {},
             .@"unreachable" => {},
             .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
+            .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
             .@"switch" => |*switch_term| {
                 switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
                 for (switch_term.cases.items) |*case| {

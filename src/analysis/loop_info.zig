@@ -90,7 +90,7 @@ pub const NaturalLoop = struct {
                 const target = function.blockIndex(br.target) orelse return null;
                 return if (target == loop.header) preheader_index else null;
             },
-            .ret, .condbr, .@"switch", .@"unreachable" => return null,
+            .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
         }
     }
 
@@ -398,6 +398,7 @@ fn terminatorUsesValue(terminator: ir.Terminator, value_name: []const u8) bool {
             }
             return false;
         },
+        .indirectbr => |indirectbr| valueMatchesName(indirectbr.addr, value_name),
     };
 }
 
@@ -469,6 +470,7 @@ fn replaceTerminatorUse(terminator: *ir.Terminator, value_name: []const u8, repl
                 case.value = replaceValue(case.value, value_name, replacement);
             }
         },
+        .indirectbr => |*indirectbr| indirectbr.addr = replaceValue(indirectbr.addr, value_name, replacement),
     }
 }
 
@@ -589,6 +591,7 @@ fn terminatorUsesLoopDefinition(terminator: ir.Terminator, loop_defs: std.String
             }
             return false;
         },
+        .indirectbr => |indirectbr| valueNamesLoopDefinition(indirectbr.addr, loop_defs),
     };
 }
 

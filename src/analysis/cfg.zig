@@ -38,6 +38,9 @@ pub const Graph = struct {
                     try graph.addEdge(function, block_index, switch_term.default_target);
                     for (switch_term.cases.items) |case| try graph.addEdge(function, block_index, case.target);
                 },
+                .indirectbr => |indirectbr| {
+                    for (indirectbr.targets.items) |target| try graph.addEdge(function, block_index, target);
+                },
             }
         }
 

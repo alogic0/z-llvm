@@ -921,11 +921,13 @@ pub const Terminator = union(enum) {
         metadata: ?[]const u8 = null,
     },
     @"switch": SwitchTerminator,
+    indirectbr: IndirectBrTerminator,
     @"unreachable",
 
     pub fn deinit(terminator: *Terminator, allocator: std.mem.Allocator) void {
         switch (terminator.*) {
             .@"switch" => |*switch_term| switch_term.cases.deinit(allocator),
+            .indirectbr => |*indirectbr| indirectbr.targets.deinit(allocator),
             .ret, .br, .condbr, .@"unreachable" => {},
         }
     }
@@ -942,6 +944,13 @@ pub const SwitchTerminator = struct {
     cond: Value,
     default_target: []const u8,
     cases: std.ArrayList(SwitchCase),
+    metadata: ?[]const u8 = null,
+};
+
+pub const IndirectBrTerminator = struct {
+    addr_ty: Type,
+    addr: Value,
+    targets: std.ArrayList([]const u8),
     metadata: ?[]const u8 = null,
 };
 

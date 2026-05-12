@@ -185,6 +185,7 @@ pub const UseCounts = struct {
                 try uses.addValue(switch_term.cond);
                 for (switch_term.cases.items) |case| try uses.addValue(case.value);
             },
+            .indirectbr => |indirectbr| try uses.addValue(indirectbr.addr),
         }
     }
 

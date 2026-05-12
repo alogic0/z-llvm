@@ -192,6 +192,7 @@ const Solver = struct {
                         changed = true;
                     }
                 },
+                .indirectbr => |*indirectbr| indirectbr.addr = resolveValue(aliases, indirectbr.addr),
                 .@"switch" => |*switch_term| {
                     switch_term.cond = resolveValue(aliases, switch_term.cond);
                     for (switch_term.cases.items) |*case| {
@@ -319,6 +320,13 @@ const Solver = struct {
                 }
                 return changed;
             },
+            .indirectbr => |indirectbr| {
+                var changed = false;
+                for (indirectbr.targets.items) |target_name| {
+                    changed = (try solver.markEdge(block_index, solver.function.blockIndex(target_name) orelse return false)) or changed;
+                }
+                return changed;
+            },
             .ret, .@"unreachable" => return false,
         }
     }
@@ -420,7 +428,7 @@ fn simplifyCall(module: ir.Module, instruction: ir.Instruction) ?ir.Value {
     if (block.instructions.items.len != 0) return null;
     return switch (block.terminator orelse return null) {
         .ret => |ret| ret.value,
-        .br, .condbr, .@"switch", .@"unreachable" => null,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => null,
     };
 }
 

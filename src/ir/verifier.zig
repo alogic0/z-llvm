@@ -82,6 +82,9 @@ const VerifyContext = struct {
                     try ctx.addEdge(block_index, switch_term.default_target);
                     for (switch_term.cases.items) |case| try ctx.addEdge(block_index, case.target);
                 },
+                .indirectbr => |indirectbr| {
+                    for (indirectbr.targets.items) |target_name| try ctx.addEdge(block_index, target_name);
+                },
             }
         }
     }
@@ -288,6 +291,11 @@ const VerifyContext = struct {
                 if (std.mem.eql(u8, switch_term.default_target, target_name)) count += 1;
                 for (switch_term.cases.items) |case| {
                     if (std.mem.eql(u8, case.target, target_name)) count += 1;
+                }
+            },
+            .indirectbr => |indirectbr| {
+                for (indirectbr.targets.items) |indirect_target| {
+                    if (std.mem.eql(u8, indirect_target, target_name)) count += 1;
                 }
             },
         }
@@ -618,6 +626,12 @@ pub fn verify(module: core.Module) !void {
                         try verifyBlockTarget(function, case.target);
                     }
                 },
+                .indirectbr => |indirectbr| {
+                    if (!indirectbr.addr_ty.eql(.ptr)) return error.BranchConditionTypeMismatch;
+                    try ctx.verifyValue(indirectbr.addr_ty, indirectbr.addr, block_index, block.instructions.items.len);
+                    if (indirectbr.targets.items.len == 0) return error.InvalidBr;
+                    for (indirectbr.targets.items) |target_name| try verifyBlockTarget(function, target_name);
+                },
                 .@"unreachable" => {},
             }
         }
@@ -654,6 +668,7 @@ fn verifyMetadataGraph(module: core.Module) !void {
                 .br => |br| if (br.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
                 .condbr => |condbr| if (condbr.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
                 .@"switch" => |switch_term| if (switch_term.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
+                .indirectbr => |indirectbr| if (indirectbr.metadata) |metadata| try verifyMetadataAttachmentRefs(metadata, ids),
                 .ret, .@"unreachable" => {},
             };
         }

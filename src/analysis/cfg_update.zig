@@ -41,6 +41,14 @@ pub fn retargetBlockTerminator(block: *ir.BasicBlock, old_target: []const u8, ne
                 }
             }
         },
+        .indirectbr => |*indirectbr| {
+            for (indirectbr.targets.items) |*target| {
+                if (std.mem.eql(u8, target.*, old_target)) {
+                    target.* = new_target;
+                    changed = true;
+                }
+            }
+        },
         .ret => {},
         .@"unreachable" => {},
     };

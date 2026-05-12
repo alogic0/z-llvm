@@ -397,6 +397,20 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     if (switch_term.metadata) |metadata| try writer.print(", {s}", .{metadata});
                     try writer.writeByte('\n');
                 },
+                .indirectbr => |indirectbr| {
+                    try writer.writeAll("  indirectbr ");
+                    try indirectbr.addr_ty.format(writer);
+                    try writer.writeByte(' ');
+                    try indirectbr.addr.format(writer);
+                    try writer.writeAll(", [");
+                    for (indirectbr.targets.items, 0..) |target, index| {
+                        if (index != 0) try writer.writeAll(", ");
+                        try writer.print("label %{s}", .{target});
+                    }
+                    try writer.writeByte(']');
+                    if (indirectbr.metadata) |metadata| try writer.print(", {s}", .{metadata});
+                    try writer.writeByte('\n');
+                },
                 .@"unreachable" => try writer.writeAll("  unreachable\n"),
             };
         }
