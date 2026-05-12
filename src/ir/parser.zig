@@ -761,7 +761,7 @@ fn implicitEntryBlockName(module: *core.Module, function: core.Function, first_l
         const number = std.fmt.parseInt(usize, param.name, 10) catch continue;
         if (max_numeric_param == null or number > max_numeric_param.?) max_numeric_param = number;
     }
-    const max_param = max_numeric_param orelse return "entry";
+    const max_param = max_numeric_param orelse return "0";
     return try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{max_param + 1}));
 }
 

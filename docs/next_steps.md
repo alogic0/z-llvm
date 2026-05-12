@@ -84,6 +84,10 @@ Active cycle:
       returns, aggregate fields, and `0xL...` literals without adding FP
       optimization semantics. Upstream mapping is recorded in
       [Scalar IR](ir_scalar.md).
+- [x] Source-backed parser/verifier blocker: infer unnamed implicit entry block
+      `%0` when the first instruction result is nonnumeric, so PHI incoming
+      edges from `%0` in stage4 standalone IR verify correctly. Upstream mapping
+      is recorded in [Control Flow IR](ir_control_flow.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

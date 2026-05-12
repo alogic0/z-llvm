@@ -1761,6 +1761,27 @@ test "parser infers numeric implicit entry block names" {
     try std.testing.expectEqualStrings("0", module.functions.items[0].blocks.items[0].name);
 }
 
+test "parser infers zero implicit entry block before nonnumeric result" {
+    const input =
+        \\define i1 @implicit_zero_entry(i1 %cond) {
+        \\  %.slot = alloca i8
+        \\  br i1 %cond, label %then, label %join
+        \\then:
+        \\  br label %join
+        \\join:
+        \\  %value = phi i1 [ true, %then ], [ false, %0 ]
+        \\  ret i1 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("0", module.functions.items[0].blocks.items[0].name);
+}
+
 test "parser and verifier accept pointer integer casts" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

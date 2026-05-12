@@ -26,6 +26,8 @@ ret <type> <value>
 br label %target
 br i1 <cond>, label %then, label %else
 quoted branch labels containing punctuation such as commas
+implicit entry block numbering for source-backed unnamed entry blocks,
+including `%0` when the first emitted instruction result has a nonnumeric name
 switch <int type> <cond>, label %default [...]
 indirectbr ptr <addr>, [label %target, ...]
 unreachable
