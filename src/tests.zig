@@ -3429,7 +3429,7 @@ test "parser preserves scalar array global constants from switch tables" {
         \\
         \\define i32 @lookup(i8 %idx) {
         \\entry:
-        \\  %wide = zext i8 %idx to i64
+        \\  %wide = zext nneg i8 %idx to i64
         \\  %gep = getelementptr i32, ptr @switch.table, i64 %wide
         \\  %value = load i32, ptr %gep, align 4
         \\  ret i32 %value

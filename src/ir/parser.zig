@@ -807,7 +807,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (core.CastOp.parse(op_text)) |op| {
-        while (isCastFlag(parts.peek() orelse return error.InvalidInstruction)) _ = parts.next();
+        const flags = try parseCastFlags(&parts);
         const from_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
         const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
         if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "to")) return error.InvalidInstruction;
@@ -817,6 +817,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .result = result_text[1..],
             .kind = .{ .cast = .{
                 .op = op,
+                .flags = flags,
                 .from_ty = from_ty,
                 .value = value,
                 .to_ty = to_ty,
@@ -905,6 +906,32 @@ fn isCastFlag(text: []const u8) bool {
     return std.mem.eql(u8, text, "nneg") or
         std.mem.eql(u8, text, "nsw") or
         std.mem.eql(u8, text, "nuw");
+}
+
+fn parseCastFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.CastFlags {
+    var flags: core.CastFlags = .{};
+    while (parts.peek()) |token| {
+        if (std.mem.eql(u8, token, "nneg")) {
+            if (flags.nneg) return error.InvalidInstructionFlag;
+            _ = parts.next();
+            flags.nneg = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "nsw")) {
+            if (flags.nsw) return error.InvalidInstructionFlag;
+            _ = parts.next();
+            flags.nsw = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "nuw")) {
+            if (flags.nuw) return error.InvalidInstructionFlag;
+            _ = parts.next();
+            flags.nuw = true;
+            continue;
+        }
+        return flags;
+    }
+    return flags;
 }
 
 fn parseBinaryInst(op: core.BinaryOp, text: []const u8) !core.BinaryInst {

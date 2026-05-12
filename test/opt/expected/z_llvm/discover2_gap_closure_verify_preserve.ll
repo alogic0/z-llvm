@@ -24,7 +24,7 @@ entry:
 
 define i8 @cast_flags(i32 %x) {
 entry:
-  %t = trunc i32 %x to i8
+  %t = trunc nuw i32 %x to i8
   ret i8 %t
 }
 

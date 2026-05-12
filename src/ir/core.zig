@@ -470,9 +470,24 @@ pub const BinaryInst = struct {
 
 pub const CastInst = struct {
     op: CastOp,
+    flags: CastFlags = .{},
     from_ty: Type,
     value: Value,
     to_ty: Type,
+};
+
+pub const CastFlags = struct {
+    nneg: bool = false,
+    nsw: bool = false,
+    nuw: bool = false,
+
+    pub fn eql(a: CastFlags, b: CastFlags) bool {
+        return a.nneg == b.nneg and a.nsw == b.nsw and a.nuw == b.nuw;
+    }
+
+    pub fn any(flags: CastFlags) bool {
+        return flags.nneg or flags.nsw or flags.nuw;
+    }
 };
 
 pub const FreezeInst = struct {

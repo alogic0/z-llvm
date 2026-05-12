@@ -162,7 +162,8 @@ the behavioral reference before marking the item complete.
 - [x] `tmp/zig_ir/discover_2/report.tsv` has been converted into a durable
       grouped backlog with representative fixture targets.
 - [x] Each implemented sub-slice cites the LLVM reference source file and
-      function used to reproduce the behavior.
+      function used to reproduce the behavior. The function-level mapping is
+      recorded in `docs/fixtures/zig_ir/discover_2_gap_summary.md`.
 - [x] All non-compile-skip `discover_2` rows are either:
       - accepted by parser/verifier;
       - classified as `input-too-large`;

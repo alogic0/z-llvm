@@ -1468,6 +1468,7 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
 }
 
 fn verifyCast(cast: core.CastInst) !void {
+    try verifyCastFlags(cast);
     switch (cast.op) {
         .ptrtoint => {
             if (cast.from_ty != .ptr) return error.InvalidCast;
@@ -1500,6 +1501,20 @@ fn verifyCast(cast: core.CastInst) !void {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
         .ptrtoint, .inttoptr => unreachable,
+    }
+}
+
+fn verifyCastFlags(cast: core.CastInst) !void {
+    switch (cast.op) {
+        .trunc => {
+            if (cast.flags.nneg) return error.InvalidInstructionFlag;
+        },
+        .zext => {
+            if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
+        },
+        .sext, .ptrtoint, .inttoptr => {
+            if (cast.flags.any()) return error.InvalidInstructionFlag;
+        },
     }
 }
 

@@ -46,16 +46,34 @@ Parser behavior follows the source-backed subset of:
 - `llvm/lib/AsmParser/LLParser.cpp`: globals, aliases, named type definitions,
   declarations, calls, call operands, parameter attributes, and metadata
   attachments.
+  - Function-level anchors: `parseGlobal`, `parseAlias`, `parseNamedType`,
+    `parseFunctionHeader`, `parseFunctionType`, `parseCall`, `parseParameterList`,
+    `parseOptionalParamAttrs`, `parseOptionalOperandBundles`,
+    `parseValID`, `parseType`, `parseInstruction`, and `parseMetadata`.
 - `llvm/lib/IR/AsmWriter.cpp`: printing globals, aliases, named types,
   declarations, calls, and metadata.
+  - Function-level anchors: `AssemblyWriter::printGlobal`,
+    `AssemblyWriter::printAlias`, `AssemblyWriter::printTypeIdentities`,
+    `AssemblyWriter::printFunction`, `AssemblyWriter::printInstruction`,
+    `AssemblyWriter::printInstructionLine`, `writeOperand`, and
+    `writeParamOperand`.
 - `llvm/lib/IR/Verifier.cpp`: global initializer rules, alias target checks,
   parameter attribute placement, varargs call shape, metadata operands, and PHI
   incoming validation.
+  - Function-level anchors: `Verifier::visitGlobalVariable`,
+    `Verifier::visitGlobalAlias`, `Verifier::visitFunction`,
+    `Verifier::visitCallBase`, `Verifier::visitPHINode`,
+    `Verifier::visitTruncInst`, and `Verifier::verifyAttributeTypes`.
 - `llvm/lib/IR/Attributes.cpp`: attribute spelling and payload validation.
+  - Function-level anchors: `Attribute::get`, `Attribute::getWithAlignment`,
+    `Attribute::getWithDereferenceableBytes`, `Attribute::getWithCaptureInfo`,
+    and `Attribute::getWithRange`.
 - `llvm/lib/IR/Type.cpp`: identified and packed structure type spelling.
+  - Function-level anchors: `StructType::create`, `StructType::setBody`,
+    `StructType::isPacked`, and `Type::print`.
 - `llvm/docs/LangRef.rst`: global variables, aliases, varargs, attributes,
-  address spaces, alignment, metadata operands, constant expressions, and PHI
-  incoming semantics.
+  cast flags, address spaces, alignment, metadata operands, constant
+  expressions, and PHI incoming semantics.
 
 ## Focused Validation
 

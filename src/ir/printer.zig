@@ -115,6 +115,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     },
                     .cast => |cast| {
                         try writer.print("{s} ", .{cast.op.name()});
+                        try printCastFlags(cast.flags, writer);
                         try cast.from_ty.format(writer);
                         try writer.writeByte(' ');
                         try cast.value.format(writer);
@@ -396,6 +397,12 @@ fn printBinaryFlags(flags: core.BinaryFlags, writer: anytype) !void {
     if (flags.nuw) try writer.writeAll("nuw ");
     if (flags.exact) try writer.writeAll("exact ");
     if (flags.disjoint) try writer.writeAll("disjoint ");
+}
+
+fn printCastFlags(flags: core.CastFlags, writer: anytype) !void {
+    if (flags.nneg) try writer.writeAll("nneg ");
+    if (flags.nsw) try writer.writeAll("nsw ");
+    if (flags.nuw) try writer.writeAll("nuw ");
 }
 
 fn printFastMathFlags(flags: core.FastMathFlags, writer: anytype) !void {

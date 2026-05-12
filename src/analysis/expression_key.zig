@@ -22,6 +22,9 @@ pub fn hash(instruction: ir.Instruction) u64 {
         .cast => |cast| {
             state.addTag(2);
             state.addTag(@intFromEnum(cast.op));
+            state.addBool(cast.flags.nneg);
+            state.addBool(cast.flags.nsw);
+            state.addBool(cast.flags.nuw);
             state.addType(cast.from_ty);
             state.addValue(cast.value);
             state.addType(cast.to_ty);
@@ -95,6 +98,7 @@ pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
+                a_cast.flags.eql(b_cast.flags) and
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),

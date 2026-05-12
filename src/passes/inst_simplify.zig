@@ -46,6 +46,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
+                a_cast.flags.eql(b_cast.flags) and
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),
@@ -228,6 +229,7 @@ fn foldSignedDivRem(binary: ir.BinaryInst, mode: DivRem) ?ir.Value {
 }
 
 fn simplifyCast(cast: ir.CastInst) ?ir.Value {
+    if (cast.flags.any()) return null;
     if (cast.value != .int) return null;
     const from_bits = intBits(cast.from_ty) orelse return null;
     const to_bits = intBits(cast.to_ty) orelse return null;
