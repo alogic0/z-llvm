@@ -503,13 +503,54 @@ fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {
 fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
     if (open_index >= text.len or text[open_index] != '(') return null;
     var depth: usize = 0;
+    var in_string = false;
+    var escaped = false;
     for (text[open_index..], open_index..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (byte == '"') {
+            in_string = true;
+            continue;
+        }
         if (byte == '(') {
             depth += 1;
         } else if (byte == ')') {
             depth -= 1;
             if (depth == 0) return index;
         }
+    }
+    return null;
+}
+
+fn findOpenParenOutsideString(text: []const u8, start_index: usize) ?usize {
+    var in_string = false;
+    var escaped = false;
+    var index = start_index;
+    while (index < text.len) : (index += 1) {
+        const byte = text[index];
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (byte == '"') {
+            in_string = true;
+            continue;
+        }
+        if (byte == '(') return index;
     }
     return null;
 }
@@ -570,7 +611,7 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
     if (!std.mem.endsWith(u8, line, "{")) return error.InvalidFunctionHeader;
     const body = std.mem.trim(u8, line["define ".len .. line.len - 1], " \t");
     const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionHeader;
-    const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionHeader;
+    const open_paren = findOpenParenOutsideString(body, name_start) orelse return error.InvalidFunctionHeader;
     const close_paren = findMatchingParen(body, open_paren) orelse return error.InvalidFunctionHeader;
     if (close_paren < open_paren) return error.InvalidFunctionHeader;
 
@@ -597,7 +638,7 @@ fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Fun
 fn parseFunctionDecl(allocator: std.mem.Allocator, line: []const u8) !core.FunctionDecl {
     const body = std.mem.trim(u8, line["declare ".len..], " \t");
     const name_start = std.mem.indexOfScalar(u8, body, '@') orelse return error.InvalidFunctionDeclaration;
-    const open_paren = std.mem.indexOfPos(u8, body, name_start, "(") orelse return error.InvalidFunctionDeclaration;
+    const open_paren = findOpenParenOutsideString(body, name_start) orelse return error.InvalidFunctionDeclaration;
     const close_paren = findMatchingParen(body, open_paren) orelse return error.InvalidFunctionDeclaration;
     if (close_paren < open_paren) return error.InvalidFunctionDeclaration;
 
@@ -1172,7 +1213,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         break :blk function_ty;
     } else null;
 
-    const open_paren = std.mem.indexOfScalar(u8, rest, '(') orelse return error.InvalidCall;
+    const open_paren = findOpenParenOutsideString(rest, 0) orelse return error.InvalidCall;
     const close_paren = findMatchingParen(rest, open_paren) orelse return error.InvalidCall;
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
     const inline_asm = if (std.mem.startsWith(u8, callee_text, "asm "))

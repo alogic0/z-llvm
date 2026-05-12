@@ -2655,6 +2655,36 @@ test "parser preserves llvm trap intrinsic call" {
     try std.testing.expectEqualStrings(trap_call, output.writer.buffered());
 }
 
+test "parser preserves quoted direct callee names containing parentheses" {
+    const input =
+        \\define private fastcc void @"log.scoped(.default).err__anon_3522"(i16 %.0.val) unnamed_addr #0 align 1 {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\define void @caller(i16 %code) {
+        \\entry:
+        \\  call fastcc void @"log.scoped(.default).err__anon_3522"(i16 %code)
+        \\  ret void
+        \\}
+        \\
+        \\attributes #0 = { nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[1].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("\"log.scoped(.default).err__anon_3522\"", call.callee);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier preserves ReleaseSafe runtime call trap boundary" {
     const input =
         \\source_filename = "release_safe_call_boundary"
