@@ -1348,9 +1348,16 @@ test "parser preserves pointer ABI parameter attributes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
+        \\%Named.Sret = type { i16, i8 }
+        \\
         \\declare void @takes_byval(ptr byval({ i32, i32 }), ptr sret({ i32, i32 }))
         \\
         \\define void @abi_attrs(ptr byval({ i32, i32 }) %src, ptr sret({ i32, i32 }) %dst) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\define void @named_sret(ptr noalias sret({ i16, %Named.Sret }) captures(none) %out) {
         \\entry:
         \\  ret void
         \\}
@@ -1365,6 +1372,7 @@ test "parser preserves pointer ABI parameter attributes" {
     try std.testing.expectEqualStrings("sret({ i32, i32 })", module.declarations.items[0].params.items[1].attrs.?);
     try std.testing.expectEqualStrings("byval({ i32, i32 })", module.functions.items[0].params.items[0].attrs.?);
     try std.testing.expectEqualStrings("sret({ i32, i32 })", module.functions.items[0].params.items[1].attrs.?);
+    try std.testing.expectEqualStrings("noalias sret({ i16, %Named.Sret }) captures(none)", module.functions.items[1].params.items[0].attrs.?);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();

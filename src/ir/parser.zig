@@ -770,14 +770,13 @@ fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, t
             while (parts.next()) |part| {
                 if (std.mem.startsWith(u8, part, "%")) {
                     param_name_token = part;
-                    break;
+                    continue;
                 }
                 if (param_attrs_start == null) {
                     param_attrs_start = @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr);
                 }
             }
             const param_name = param_name_token orelse return error.InvalidParameter;
-            if (parts.next() != null) return error.InvalidParameter;
             if (!std.mem.startsWith(u8, param_name, "%")) return error.InvalidValueName;
             const param_attrs = if (param_attrs_start) |start|
                 std.mem.trim(u8, param_text[start..(@intFromPtr(param_name.ptr) - @intFromPtr(param_text.ptr))], " \t")
