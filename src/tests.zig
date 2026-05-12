@@ -5152,6 +5152,35 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     try cmpxchg_module.verify();
     try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(cmpxchg_module.functions.items[0].blocks.items[0].instructions.items[0]));
 
+    const cmpxchg_extractvalue =
+        \\define i1 @cmpxchg_extractvalue(ptr %p, i32 %old, i32 %new) {
+        \\entry:
+        \\  %pair = cmpxchg ptr %p, i32 %old, i32 %new acquire monotonic
+        \\  %success = extractvalue { i32, i1 } %pair, 1
+        \\  ret i1 %success
+        \\}
+        \\
+    ;
+    var extractvalue_module = try ir.Module.parse(std.testing.allocator, cmpxchg_extractvalue);
+    defer extractvalue_module.deinit();
+    try extractvalue_module.verify();
+
+    var extractvalue_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer extractvalue_output.deinit();
+    try extractvalue_module.print(&extractvalue_output.writer);
+    try std.testing.expectEqualStrings(cmpxchg_extractvalue, extractvalue_output.writer.buffered());
+
+    const bad_extractvalue =
+        \\define i1 @bad_extractvalue(ptr %p, i32 %old, i32 %new) {
+        \\entry:
+        \\  %pair = cmpxchg ptr %p, i32 %old, i32 %new acquire monotonic
+        \\  %success = extractvalue { i32, i1 } %pair, 2
+        \\  ret i1 %success
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.TypeMismatch, ir.Module.parse(std.testing.allocator, bad_extractvalue));
+
     const fence =
         \\define void @memory_fence() {
         \\entry:

@@ -287,6 +287,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try shuffle.mask.format(writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
+                    .extractvalue => |extract| {
+                        try writer.writeAll("extractvalue ");
+                        try extract.aggregate_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try extract.aggregate.format(writer);
+                        try writer.print(", {s}", .{extract.indices});
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
                         try gep.source_ty.format(writer);

@@ -41,7 +41,7 @@ pub fn classify(instruction: ir.Instruction) Effect {
         .load => |load| if (load.attrs.isBarrier()) .volatile_or_atomic_barrier else .readonly_load,
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
         .atomicrmw, .cmpxchg, .fence => .volatile_or_atomic_barrier,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector => .none,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue => .none,
         .call => |call| if (call.inline_asm != null) .volatile_or_atomic_barrier else .unknown,
     };
 }
@@ -51,7 +51,7 @@ pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
         .load => |load| memoryBarrierKind(load.attrs),
         .store => |store| memoryBarrierKind(store.attrs),
         .atomicrmw, .cmpxchg, .fence => .atomic,
-        .extractelement, .insertelement, .shufflevector => .none,
+        .extractelement, .insertelement, .shufflevector, .extractvalue => .none,
         .call => |call| if (call.inline_asm) |inline_asm|
             if (inline_asm.has_memory_clobber) .inline_asm else .none
         else
@@ -93,7 +93,7 @@ pub fn mayThrow(instruction: ir.Instruction) bool {
 pub fn mayTrap(instruction: ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |binary| binaryMayTrap(binary),
-        .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .call => false,
+        .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .call => false,
         .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => false,
     };
 }

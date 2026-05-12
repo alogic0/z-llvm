@@ -125,7 +125,7 @@ fn collectDirectCallees(allocator: std.mem.Allocator, node: *Node, function: ir.
             if (instruction.removed) continue;
             switch (instruction.kind) {
                 .call => |call| if (call.inline_asm == null and call.callee_value == null) try appendUnique(allocator, &node.callees, call.callee),
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => {},
             }
         }
     }

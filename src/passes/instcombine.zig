@@ -63,7 +63,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 fn canonicalize(instruction: *ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |*binary| inst_simplify.canonicalizeCommutativeConstantRhs(binary),
-        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => false,
+        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
     };
 }
 
@@ -81,7 +81,7 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
 fn foldWithContext(instruction: ir.Instruction, inserted_vectors: std.StringHashMap(ir.InsertElementInst)) ?ir.Value {
     return switch (instruction.kind) {
         .extractelement => |extract| foldExtractAfterInsert(extract, inserted_vectors),
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .gep, .call => null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .extractvalue, .gep, .call => null,
     };
 }
 

@@ -670,6 +670,13 @@ pub const ShuffleVectorInst = struct {
     mask: Value,
 };
 
+pub const ExtractValueInst = struct {
+    aggregate_ty: Type,
+    aggregate: Value,
+    indices: []const u8,
+    result_ty: Type,
+};
+
 pub const GepIndex = struct {
     ty: Type,
     value: Value,
@@ -740,6 +747,7 @@ pub const Instruction = struct {
         extractelement: ExtractElementInst,
         insertelement: InsertElementInst,
         shufflevector: ShuffleVectorInst,
+        extractvalue: ExtractValueInst,
         gep: GepInst,
         call: CallInst,
     },
@@ -787,6 +795,7 @@ pub const Instruction = struct {
                 },
                 else => null,
             },
+            .extractvalue => |extract| extract.result_ty,
             .gep => .ptr,
             .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
             .store, .fence => null,
@@ -847,6 +856,7 @@ pub const Instruction = struct {
                 shuffle.rhs = resolveValue(aliases, shuffle.rhs);
                 shuffle.mask = resolveValue(aliases, shuffle.mask);
             },
+            .extractvalue => |*extract| extract.aggregate = resolveValue(aliases, extract.aggregate),
             .gep => |*gep| {
                 gep.ptr = resolveValue(aliases, gep.ptr);
                 for (gep.indices.items) |*index| {
@@ -864,7 +874,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),

@@ -338,7 +338,7 @@ fn lowerStraightLineInstructions(
                 }
             },
             .binary => {},
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => return error.UnsupportedCodegenInstruction,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
 
@@ -469,7 +469,7 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => return error.UnsupportedCodegenInstruction,
+                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
     }
@@ -594,6 +594,7 @@ fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?Ar
             try noteLiveValue(function, cmpxchg.replacement, live);
         },
         .fence, .extractelement, .insertelement, .shufflevector => {},
+        .extractvalue => |extract| try noteLiveValue(function, extract.aggregate, live),
         .gep => |gep| {
             try noteLiveValue(function, gep.ptr, live);
             for (gep.indices.items) |index| try noteLiveValue(function, index.value, live);

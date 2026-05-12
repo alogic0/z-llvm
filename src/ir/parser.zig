@@ -893,6 +893,12 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .kind = .{ .shufflevector = try parseShuffleVector(rhs_text) },
         };
     }
+    if (std.mem.eql(u8, op_text, "extractvalue")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .extractvalue = try parseExtractValue(rhs_text) },
+        };
+    }
 
     if (core.CastOp.parse(op_text)) |op| {
         const flags = try parseCastFlags(&parts);
@@ -1984,6 +1990,67 @@ fn parseShuffleVector(text: []const u8) !core.ShuffleVectorInst {
         .mask_ty = mask_arg.ty,
         .mask = mask_arg.value,
     };
+}
+
+fn parseExtractValue(text: []const u8) !core.ExtractValueInst {
+    var rest = std.mem.trim(u8, text["extractvalue".len..], " \t");
+    const aggregate_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const aggregate_arg = try parseTypedValue(std.mem.trim(u8, rest[0..aggregate_comma], " \t"));
+    const indices = std.mem.trim(u8, rest[aggregate_comma + 1 ..], " \t");
+    if (indices.len == 0) return error.InvalidInstruction;
+    const result_ty = try extractValueResultType(aggregate_arg.ty, indices);
+    return .{
+        .aggregate_ty = aggregate_arg.ty,
+        .aggregate = aggregate_arg.value,
+        .indices = indices,
+        .result_ty = result_ty,
+    };
+}
+
+fn extractValueResultType(aggregate_ty: core.Type, indices: []const u8) !core.Type {
+    var current_ty = aggregate_ty;
+    var rest = indices;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const index_text = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        if (index_text.len == 0) return error.InvalidInstruction;
+        const index = try std.fmt.parseInt(usize, index_text, 10);
+        current_ty = try aggregateElementType(current_ty, index);
+        rest = if (comma) |split| std.mem.trim(u8, rest[split + 1 ..], " \t") else "";
+    }
+    return current_ty;
+}
+
+fn aggregateElementType(aggregate_ty: core.Type, index: usize) !core.Type {
+    if (parseArrayType(aggregate_ty)) |array_ty| {
+        if (index >= array_ty.len) return error.TypeMismatch;
+        return array_ty.elem_ty;
+    }
+
+    const text = switch (aggregate_ty) {
+        .aggregate => |aggregate| aggregate,
+        .void, .int, .float, .double, .metadata, .ptr, .vector => return error.TypeMismatch,
+    };
+
+    const body = if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}"))
+        text[1 .. text.len - 1]
+    else if (std.mem.startsWith(u8, text, "<{") and std.mem.endsWith(u8, text, "}>"))
+        text[2 .. text.len - 2]
+    else
+        return error.TypeMismatch;
+
+    var rest = std.mem.trim(u8, body, " \t");
+    var field_index: usize = 0;
+    while (rest.len != 0) : (field_index += 1) {
+        const comma = findTopLevelComma(rest);
+        const field_text = std.mem.trim(u8, if (comma) |split| rest[0..split] else rest, " \t");
+        const field_ty = try parseLeadingType(field_text);
+        if (field_ty.after.len != 0) return error.UnsupportedType;
+        if (field_index == index) return field_ty.ty;
+        rest = if (comma) |split| std.mem.trim(u8, rest[split + 1 ..], " \t") else "";
+    }
+
+    return error.TypeMismatch;
 }
 
 fn parseSelect(text: []const u8) !core.SelectInst {

@@ -157,6 +157,7 @@ const LiveInstructions = struct {
                 try liveness.markValue(cmpxchg.replacement);
             },
             .fence, .extractelement, .insertelement, .shufflevector => {},
+            .extractvalue => |extract| try liveness.markValue(extract.aggregate),
             .gep => |gep| {
                 try liveness.markValue(gep.ptr);
                 for (gep.indices.items) |index| try liveness.markValue(index.value);

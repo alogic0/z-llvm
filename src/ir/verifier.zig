@@ -553,6 +553,11 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(shuffle.rhs_ty, shuffle.rhs, block_index, instruction_index);
                         try ctx.verifyValue(shuffle.mask_ty, shuffle.mask, block_index, instruction_index);
                     },
+                    .extractvalue => |extract| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try ctx.verifyValue(extract.aggregate_ty, extract.aggregate, block_index, instruction_index);
+                    },
                     .gep => |gep| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;

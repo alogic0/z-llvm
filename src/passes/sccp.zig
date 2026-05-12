@@ -207,7 +207,7 @@ const Solver = struct {
     fn visitPhi(solver: Solver, block_index: usize, instruction: ir.Instruction) Lattice {
         const phi = switch (instruction.kind) {
             .phi => |phi| phi,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => unreachable,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => unreachable,
         };
 
         var result: Lattice = .unknown;
@@ -279,7 +279,7 @@ const Solver = struct {
                     arg.value = solver.materialize(arg.value, unresolved, overdefined);
                 }
             },
-            .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => {},
+            .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => {},
         }
     }
 
@@ -376,7 +376,7 @@ fn propagateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
 
 fn instructionFallback(instruction: ir.Instruction) Lattice {
     return switch (instruction.kind) {
-        .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => .overdefined,
+        .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => .overdefined,
         .store => .unknown,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi => .unknown,
     };
@@ -401,7 +401,7 @@ fn prunePhiIncomingToExecutableEdges(solver: *Solver, block: *ir.BasicBlock, blo
                     changed = true;
                 }
             },
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep, .call => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => {},
         }
     }
     return changed;
@@ -410,7 +410,7 @@ fn prunePhiIncomingToExecutableEdges(solver: *Solver, block: *ir.BasicBlock, blo
 fn simplifyCall(module: ir.Module, instruction: ir.Instruction) ?ir.Value {
     const call = switch (instruction.kind) {
         .call => |call| call,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .gep => return null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => return null,
     };
     if (call.ret_ty == .void) return null;
     const callee = findFunction(module, call.callee) orelse return null;

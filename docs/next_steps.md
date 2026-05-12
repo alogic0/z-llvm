@@ -18,6 +18,9 @@ Active cycle:
       pointer operands in load, store, atomicrmw, and cmpxchg memory
       instructions. Upstream mapping is recorded in [Memory IR
       Subset](ir_memory.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve
+      `extractvalue` for aggregate cmpxchg result values. Upstream mapping is
+      recorded in [IR Values](ir_values.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
