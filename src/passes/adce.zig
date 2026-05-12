@@ -158,6 +158,10 @@ const LiveInstructions = struct {
             },
             .fence, .extractelement, .insertelement, .shufflevector => {},
             .extractvalue => |extract| try liveness.markValue(extract.aggregate),
+            .insertvalue => |insert| {
+                try liveness.markValue(insert.aggregate);
+                try liveness.markValue(insert.value);
+            },
             .gep => |gep| {
                 try liveness.markValue(gep.ptr);
                 for (gep.indices.items) |index| try liveness.markValue(index.value);

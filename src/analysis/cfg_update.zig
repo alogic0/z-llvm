@@ -59,7 +59,7 @@ pub fn replacePhiIncomingBlock(function: *ir.Function, old_name: []const u8, new
                         changed = true;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
             }
         }
     }
@@ -90,7 +90,7 @@ pub fn prunePhiIncomingToPredecessors(allocator: std.mem.Allocator, function: *i
                         changed = true;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
             }
         }
     }
@@ -117,7 +117,7 @@ pub fn prunePhiIncomingByReachability(function: *ir.Function, reachable: []const
                         changed = true;
                     }
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
             }
         }
     }

@@ -98,7 +98,7 @@ fn isHoistable(module: ir.Module, function: ir.Function, natural_loop: loop_info
         .binary => |binary| memory_effect.isSafeToSpeculativelyExecute(instruction) and !isFpBinary(binary.op),
         .cast, .icmp, .select => memory_effect.isSafeToSpeculativelyExecute(instruction),
         .load => |load| isHoistableLoad(module, function, natural_loop, block_index, instruction, load),
-        .freeze, .fcmp, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+        .freeze, .fcmp, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
 }
 
@@ -128,7 +128,7 @@ fn isLoopInvariant(instruction: ir.Instruction, natural_loop: loop_info.NaturalL
             natural_loop.isLoopInvariantValue(select.true_value, def_blocks) and
             natural_loop.isLoopInvariantValue(select.false_value, def_blocks),
         .load => |load| natural_loop.isLoopInvariantValue(load.ptr, def_blocks),
-        .freeze, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+        .freeze, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
 }
 
@@ -178,6 +178,7 @@ fn instructionUsesAreDominated(
         .cmpxchg => |cmpxchg| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ cmpxchg.ptr, cmpxchg.expected, cmpxchg.replacement }),
         .fence, .extractelement, .insertelement, .shufflevector => return true,
         .extractvalue => |extract| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{extract.aggregate}),
+        .insertvalue => |insert| return regularUsesAreDominated(dom, destination_block, use_block, result, &.{ insert.aggregate, insert.value }),
         .gep => |gep| {
             if (valueMatchesName(gep.ptr, result) and !dominatesRegularInstructionUse(dom, destination_block, use_block)) return false;
             for (gep.indices.items) |index| {

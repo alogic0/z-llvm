@@ -116,7 +116,7 @@ fn tryScalarizeAggregateAlloca(
                     const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
                     store.ptr = .{ .named = replacement.alloca_name };
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => {},
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
             }
         }
     }
@@ -233,7 +233,7 @@ fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_us
                         if (isNamed(store.value, slot)) return false;
                         saw_memory_use = true;
                     },
-                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => return false,
+                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return false,
                 }
             }
         }
@@ -370,7 +370,7 @@ fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
             return switch (instruction.kind) {
                 .alloca => base_name,
                 .gep => |gep| pointerAllocaRoot(function, gep.ptr),
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => null,
             };
         }
     }
@@ -391,7 +391,7 @@ fn zeroOffsetAllocaBase(function: ir.Function, ptr: ir.Value) ?[]const u8 {
             return switch (instruction.kind) {
                 .alloca => base_name,
                 .gep => |gep| if (allIndicesAreZero(gep)) zeroOffsetAllocaBase(function, gep.ptr) else null,
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .call => null,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => null,
             };
         }
     }
@@ -450,6 +450,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 },
                 .fence, .extractelement, .insertelement, .shufflevector => {},
                 .extractvalue => |*extract| extract.aggregate = replaceOperand(extract.aggregate, name, replacement),
+                .insertvalue => |*insert| {
+                    insert.aggregate = replaceOperand(insert.aggregate, name, replacement);
+                    insert.value = replaceOperand(insert.value, name, replacement);
+                },
                 .gep => |*gep| {
                     gep.ptr = replaceOperand(gep.ptr, name, replacement);
                     for (gep.indices.items) |*index| {
@@ -506,6 +510,7 @@ fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
         .cmpxchg => |cmpxchg| return isNamed(cmpxchg.ptr, name) or isNamed(cmpxchg.expected, name) or isNamed(cmpxchg.replacement, name),
         .fence, .extractelement, .insertelement, .shufflevector => return false,
         .extractvalue => |extract| return isNamed(extract.aggregate, name),
+        .insertvalue => |insert| return isNamed(insert.aggregate, name) or isNamed(insert.value, name),
         .gep => |gep| {
             if (isNamed(gep.ptr, name)) return true;
             for (gep.indices.items) |index| {

@@ -187,7 +187,7 @@ pub const NaturalLoop = struct {
         for (header.instructions.items) |instruction| {
             const phi = switch (instruction.kind) {
                 .phi => |phi| phi,
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => continue,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => continue,
             };
             const phi_result = instruction.result orelse continue;
             const incoming = classifyInductionIncoming(loop, function, phi) orelse continue;
@@ -230,7 +230,7 @@ pub const NaturalLoop = struct {
                 if (instruction.removed) continue;
                 switch (instruction.kind) {
                     .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .gep => {},
-                    .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .call => return false,
+                    .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => return false,
                 }
             }
         }
@@ -312,7 +312,7 @@ fn alreadyHasExitPhi(function: ir.Function, exit_block: usize, value_name: []con
     for (function.blocks.items[exit_block].instructions.items) |instruction| {
         const phi = switch (instruction.kind) {
             .phi => |phi| phi,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => break,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => break,
         };
         for (phi.incoming.items) |incoming| {
             if (valueMatchesName(incoming.value, value_name)) return true;
@@ -368,6 +368,7 @@ fn instructionUsesValue(instruction: ir.Instruction, value_name: []const u8) boo
         .atomicrmw => |atomicrmw| valueMatchesName(atomicrmw.ptr, value_name) or valueMatchesName(atomicrmw.value, value_name),
         .cmpxchg => |cmpxchg| valueMatchesName(cmpxchg.ptr, value_name) or valueMatchesName(cmpxchg.expected, value_name) or valueMatchesName(cmpxchg.replacement, value_name),
         .extractvalue => |extract| valueMatchesName(extract.aggregate, value_name),
+        .insertvalue => |insert| valueMatchesName(insert.aggregate, value_name) or valueMatchesName(insert.value, value_name),
         .fence, .extractelement, .insertelement, .shufflevector => false,
         .gep => |gep| {
             if (valueMatchesName(gep.ptr, value_name)) return true;
@@ -440,6 +441,10 @@ fn replaceInstructionUse(instruction: *ir.Instruction, value_name: []const u8, r
             cmpxchg.replacement = replaceValue(cmpxchg.replacement, value_name, replacement);
         },
         .extractvalue => |*extract| extract.aggregate = replaceValue(extract.aggregate, value_name, replacement),
+        .insertvalue => |*insert| {
+            insert.aggregate = replaceValue(insert.aggregate, value_name, replacement);
+            insert.value = replaceValue(insert.value, value_name, replacement);
+        },
         .fence, .extractelement, .insertelement, .shufflevector => {},
         .gep => |*gep| {
             gep.ptr = replaceValue(gep.ptr, value_name, replacement);
@@ -507,7 +512,7 @@ fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, ne
         if (!std.mem.eql(u8, result, next_value)) continue;
         const binary = switch (instruction.kind) {
             .binary => |binary| binary,
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => return null,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
         };
         if (binary.op != .add or !binary.ty.eql(ty)) return null;
         if (valueMatchesName(binary.lhs, phi_result)) return binary.rhs;
@@ -554,6 +559,7 @@ fn outsideInstructionUsesAreLcssa(
         .atomicrmw => |atomicrmw| !valuesUseLoopDefinition(loop_defs, &.{ atomicrmw.ptr, atomicrmw.value }),
         .cmpxchg => |cmpxchg| !valuesUseLoopDefinition(loop_defs, &.{ cmpxchg.ptr, cmpxchg.expected, cmpxchg.replacement }),
         .extractvalue => |extract| !valueNamesLoopDefinition(extract.aggregate, loop_defs),
+        .insertvalue => |insert| !valueNamesLoopDefinition(insert.aggregate, loop_defs) and !valueNamesLoopDefinition(insert.value, loop_defs),
         .fence, .extractelement, .insertelement, .shufflevector => true,
         .gep => |gep| {
             if (valueNamesLoopDefinition(gep.ptr, loop_defs)) return false;

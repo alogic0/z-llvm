@@ -182,7 +182,7 @@ fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
     if (effect != .none and effect != .readonly_load) {
         const call = switch (instruction.kind) {
             .call => |call| call,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return false,
         };
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
@@ -190,7 +190,7 @@ fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
         .binary => |binary| !isFpBinary(binary.op) or fast_math.allowFpValueNumbering(binary.fp_flags),
         .cast, .icmp, .select, .phi, .load => true,
         .fcmp => |fcmp| fast_math.allowFpValueNumbering(fcmp.fp_flags),
-        .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+        .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
 }
 
@@ -254,6 +254,10 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                 },
                 .fence, .extractelement, .insertelement, .shufflevector => {},
                 .extractvalue => |*extract| extract.aggregate = replaceOperand(extract.aggregate, name, replacement),
+                .insertvalue => |*insert| {
+                    insert.aggregate = replaceOperand(insert.aggregate, name, replacement);
+                    insert.value = replaceOperand(insert.value, name, replacement);
+                },
                 .gep => |*gep| {
                     gep.ptr = replaceOperand(gep.ptr, name, replacement);
                     for (gep.indices.items) |*index| {

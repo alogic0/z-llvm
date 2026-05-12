@@ -558,6 +558,12 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try ctx.verifyValue(extract.aggregate_ty, extract.aggregate, block_index, instruction_index);
                     },
+                    .insertvalue => |insert| {
+                        saw_non_phi = true;
+                        if (instruction.result == null) return error.InstructionNeedsResult;
+                        try ctx.verifyValue(insert.aggregate_ty, insert.aggregate, block_index, instruction_index);
+                        try ctx.verifyValue(insert.value_ty, insert.value, block_index, instruction_index);
+                    },
                     .gep => |gep| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;

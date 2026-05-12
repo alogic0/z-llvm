@@ -23,7 +23,7 @@ pub fn simplify(instruction: ir.Instruction) ?ir.Value {
         .fcmp => |fcmp| simplifyFcmp(fcmp),
         .select => |select| simplifySelect(select),
         .call => |call| simplifyCall(call),
-        .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => null,
+        .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => null,
     };
 }
 
@@ -42,7 +42,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_binary.ty.eql(b_binary.ty) and
                 a_binary.lhs.eql(b_binary.lhs) and
                 a_binary.rhs.eql(b_binary.rhs),
-            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+            .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
         },
         .cast => |a_cast| switch (b.kind) {
             .cast => |b_cast| a_cast.op == b_cast.op and
@@ -50,7 +50,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_cast.from_ty.eql(b_cast.from_ty) and
                 a_cast.value.eql(b_cast.value) and
                 a_cast.to_ty.eql(b_cast.to_ty),
-            .binary, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+            .binary, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
         },
         .icmp => |a_icmp| switch (b.kind) {
             .icmp => |b_icmp| a_icmp.predicate == b_icmp.predicate and
@@ -58,7 +58,7 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_icmp.operand_ty.eql(b_icmp.operand_ty) and
                 a_icmp.lhs.eql(b_icmp.lhs) and
                 a_icmp.rhs.eql(b_icmp.rhs),
-            .binary, .cast, .freeze, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+            .binary, .cast, .freeze, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
         },
         .fcmp => false,
         .select => |a_select| switch (b.kind) {
@@ -67,11 +67,11 @@ pub fn sameExpression(a: ir.Instruction, b: ir.Instruction) bool {
                 a_select.ty.eql(b_select.ty) and
                 a_select.true_value.eql(b_select.true_value) and
                 a_select.false_value.eql(b_select.false_value),
-            .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
         },
         .phi => |a_phi| switch (b.kind) {
             .phi => |b_phi| samePhi(a_phi, b_phi),
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
         },
         .load => |a_load| switch (b.kind) {
             .load => |b_load| a_load.ty.eql(b_load.ty) and a_load.ptr.eql(b_load.ptr) and

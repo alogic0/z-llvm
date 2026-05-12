@@ -90,6 +90,10 @@ pub const UseCounts = struct {
                 try uses.addValue(shuffle.mask);
             },
             .extractvalue => |extract| try uses.addValue(extract.aggregate),
+            .insertvalue => |insert| {
+                try uses.addValue(insert.aggregate);
+                try uses.addValue(insert.value);
+            },
             .gep => |gep| {
                 try uses.addValue(gep.ptr);
                 for (gep.indices.items) |index| try uses.addValue(index.value);
@@ -156,6 +160,10 @@ pub const UseCounts = struct {
                 uses.removeValue(shuffle.mask);
             },
             .extractvalue => |extract| uses.removeValue(extract.aggregate),
+            .insertvalue => |insert| {
+                uses.removeValue(insert.aggregate);
+                uses.removeValue(insert.value);
+            },
             .gep => |gep| {
                 uses.removeValue(gep.ptr);
                 for (gep.indices.items) |index| uses.removeValue(index.value);

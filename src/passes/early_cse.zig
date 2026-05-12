@@ -135,7 +135,7 @@ fn visitBlock(
 fn forwardStoreToLoad(module: ir.Module, function: ir.Function, stores: []const AvailableStore, instruction: *ir.Instruction) ?ir.Value {
     const load = switch (instruction.kind) {
         .load => |load| load,
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => return null,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
     };
     if (load.attrs.isBarrier()) return null;
 
@@ -176,7 +176,7 @@ fn updateMemoryAvailability(
         },
         .atomicrmw, .cmpxchg, .fence => stores.clearRetainingCapacity(),
         .load => |load| if (load.attrs.isBarrier()) stores.clearRetainingCapacity(),
-        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue => {},
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
     }
 }
 
@@ -239,7 +239,7 @@ fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {
     if (!memory_effect.isSafeToDelete(instruction)) {
         const call = switch (instruction.kind) {
             .call => |call| call,
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep => return false,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return false,
         };
         return call.ret_ty != .void and function_attrs.callMemoryEffect(module, call) == .none;
     }
@@ -247,7 +247,7 @@ fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {
         .binary => |binary| !isFpBinary(binary.op) or fast_math.allowFpValueNumbering(binary.fp_flags),
         .cast, .icmp, .load => true,
         .fcmp => |fcmp| fast_math.allowFpValueNumbering(fcmp.fp_flags),
-        .freeze, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .gep, .call => false,
+        .freeze, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
 }
 

@@ -899,6 +899,12 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
             .kind = .{ .extractvalue = try parseExtractValue(rhs_text) },
         };
     }
+    if (std.mem.eql(u8, op_text, "insertvalue")) {
+        return .{
+            .result = result_text[1..],
+            .kind = .{ .insertvalue = try parseInsertValue(rhs_text) },
+        };
+    }
 
     if (core.CastOp.parse(op_text)) |op| {
         return .{
@@ -2066,6 +2072,28 @@ fn parseExtractValue(text: []const u8) !core.ExtractValueInst {
         .aggregate = aggregate_arg.value,
         .indices = indices,
         .result_ty = result_ty,
+    };
+}
+
+fn parseInsertValue(text: []const u8) !core.InsertValueInst {
+    var rest = std.mem.trim(u8, text["insertvalue".len..], " \t");
+    const aggregate_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const aggregate_arg = try parseTypedValue(std.mem.trim(u8, rest[0..aggregate_comma], " \t"));
+
+    rest = std.mem.trim(u8, rest[aggregate_comma + 1 ..], " \t");
+    const value_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const value_arg = try parseTypedValue(std.mem.trim(u8, rest[0..value_comma], " \t"));
+    const indices = std.mem.trim(u8, rest[value_comma + 1 ..], " \t");
+    if (indices.len == 0) return error.InvalidInstruction;
+
+    const indexed_ty = try extractValueResultType(aggregate_arg.ty, indices);
+    if (!indexed_ty.eql(value_arg.ty)) return error.TypeMismatch;
+    return .{
+        .aggregate_ty = aggregate_arg.ty,
+        .aggregate = aggregate_arg.value,
+        .value_ty = value_arg.ty,
+        .value = value_arg.value,
+        .indices = indices,
     };
 }
 

@@ -295,6 +295,18 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.print(", {s}", .{extract.indices});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
+                    .insertvalue => |insert| {
+                        try writer.writeAll("insertvalue ");
+                        try insert.aggregate_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try insert.aggregate.format(writer);
+                        try writer.writeAll(", ");
+                        try insert.value_ty.format(writer);
+                        try writer.writeByte(' ');
+                        try insert.value.format(writer);
+                        try writer.print(", {s}", .{insert.indices});
+                        try printInstructionMetadata(instruction.metadata, writer);
+                    },
                     .gep => |gep| {
                         try writer.writeAll("getelementptr ");
                         try gep.source_ty.format(writer);

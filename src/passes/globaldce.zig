@@ -163,6 +163,10 @@ fn addFunctionGlobalEdges(allocator: std.mem.Allocator, module: ir.Module, edges
                 },
                 .fence, .extractelement, .insertelement, .shufflevector => {},
                 .extractvalue => |extract| try addValueEdge(allocator, module, edges, extract.aggregate),
+                .insertvalue => |insert| {
+                    try addValueEdge(allocator, module, edges, insert.aggregate);
+                    try addValueEdge(allocator, module, edges, insert.value);
+                },
                 .gep => |gep| {
                     try addValueEdge(allocator, module, edges, gep.ptr);
                     for (gep.indices.items) |index| try addValueEdge(allocator, module, edges, index.value);

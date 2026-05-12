@@ -5271,6 +5271,33 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     try overflow_module.print(&overflow_output.writer);
     try std.testing.expectEqualStrings(overflow_extractvalue, overflow_output.writer.buffered());
 
+    const insertvalue =
+        \\define { ptr, i64 } @insert_aggregate(ptr %p) {
+        \\entry:
+        \\  %agg = insertvalue { ptr, i64 } poison, ptr %p, 0
+        \\  ret { ptr, i64 } %agg
+        \\}
+        \\
+    ;
+    var insertvalue_module = try ir.Module.parse(std.testing.allocator, insertvalue);
+    defer insertvalue_module.deinit();
+    try insertvalue_module.verify();
+
+    var insertvalue_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer insertvalue_output.deinit();
+    try insertvalue_module.print(&insertvalue_output.writer);
+    try std.testing.expectEqualStrings(insertvalue, insertvalue_output.writer.buffered());
+
+    const bad_insertvalue =
+        \\define { ptr, i64 } @bad_insert_aggregate(ptr %p) {
+        \\entry:
+        \\  %agg = insertvalue { ptr, i64 } poison, i64 1, 0
+        \\  ret { ptr, i64 } %agg
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.TypeMismatch, ir.Module.parse(std.testing.allocator, bad_insertvalue));
+
     const bad_extractvalue =
         \\define i1 @bad_extractvalue(ptr %p, i32 %old, i32 %new) {
         \\entry:

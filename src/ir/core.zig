@@ -677,6 +677,14 @@ pub const ExtractValueInst = struct {
     result_ty: Type,
 };
 
+pub const InsertValueInst = struct {
+    aggregate_ty: Type,
+    aggregate: Value,
+    value_ty: Type,
+    value: Value,
+    indices: []const u8,
+};
+
 pub const GepIndex = struct {
     ty: Type,
     value: Value,
@@ -748,6 +756,7 @@ pub const Instruction = struct {
         insertelement: InsertElementInst,
         shufflevector: ShuffleVectorInst,
         extractvalue: ExtractValueInst,
+        insertvalue: InsertValueInst,
         gep: GepInst,
         call: CallInst,
     },
@@ -796,6 +805,7 @@ pub const Instruction = struct {
                 else => null,
             },
             .extractvalue => |extract| extract.result_ty,
+            .insertvalue => |insert| insert.aggregate_ty,
             .gep => .ptr,
             .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
             .store, .fence => null,
@@ -857,6 +867,10 @@ pub const Instruction = struct {
                 shuffle.mask = resolveValue(aliases, shuffle.mask);
             },
             .extractvalue => |*extract| extract.aggregate = resolveValue(aliases, extract.aggregate),
+            .insertvalue => |*insert| {
+                insert.aggregate = resolveValue(aliases, insert.aggregate);
+                insert.value = resolveValue(aliases, insert.value);
+            },
             .gep => |*gep| {
                 gep.ptr = resolveValue(aliases, gep.ptr);
                 for (gep.indices.items) |*index| {
@@ -874,7 +888,7 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),
