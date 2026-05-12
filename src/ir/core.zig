@@ -719,6 +719,7 @@ pub const CallInst = struct {
     callee_value: ?Value = null,
     callee_function_ty: ?[]const u8 = null,
     calling_conv: ?[]const u8 = null,
+    ret_attrs: ?[]const u8 = null,
     tail_kind: ?[]const u8 = null,
     inline_asm: ?InlineAsm = null,
     attrs: ?[]const u8 = null,

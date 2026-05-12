@@ -1410,6 +1410,34 @@ test "parser preserves call argument attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves call return attributes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i16 @llvm.ctpop.i16(i16)
+        \\
+        \\define i16 @caller(i16 %x) {
+        \\entry:
+        \\  %count = call range(i16 0, 17) i16 @llvm.ctpop.i16(i16 %x)
+        \\  ret i16 %count
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("range(i16 0, 17)", call.ret_attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves inline asm call argument attributes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

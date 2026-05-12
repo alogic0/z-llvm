@@ -43,6 +43,10 @@ Active cycle:
 - [x] Source-backed parser blocker: preserve named types inside parameter
       attributes such as `sret({ i16, %Named.Type })` without confusing them
       for SSA parameter names.
+- [x] Source-backed parser blocker: parse, verify, print, and preserve call-site
+      return attributes such as `call range(i16 0, 17) i16 @llvm.ctpop.i16(...)`.
+      Upstream mapping is recorded in [Intrinsics And Call
+      Semantics](semantics/intrinsics_and_call_semantics.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

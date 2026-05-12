@@ -17,8 +17,10 @@ semantics needed by Zig-emitted IR corpus rows.
 
 - Preserve `tail call` on direct calls. `musttail` and `notail` remain
   unsupported because their verifier and lowering semantics are stricter.
-- Preserve return attributes before the return type, such as Zig-emitted
-  `range(i32 ...)`, without interpreting them in optimizer legality yet.
+- Preserve return attributes before the return type on function headers and
+  call sites, such as Zig-emitted `range(i32 ...)` and
+  `call range(i16 0, 17) i16 @llvm.ctpop.i16(...)`, without interpreting them
+  in optimizer legality yet.
 - Preserve `or disjoint` as a poison-affecting binary flag and avoid folding
   flagged operations unless the local fold explicitly models the flag.
 - Resolve function and declaration attribute group references such as `#0`

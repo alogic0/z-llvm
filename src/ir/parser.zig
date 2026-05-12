@@ -1261,7 +1261,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         break :blk prefix_token;
     } else null;
 
-    const ret = try parseLeadingType(rest);
+    const ret = try parseCallReturnPrefix(rest);
     if (ret.after.len == 0) return error.InvalidCall;
     const ret_ty = ret.ty;
     rest = ret.after;
@@ -1299,6 +1299,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .callee_value = callee_value,
         .callee_function_ty = callee_function_ty,
         .calling_conv = calling_conv,
+        .ret_attrs = ret.attrs,
         .tail_kind = tail_kind,
         .inline_asm = inline_asm,
         .attrs = trailing.attrs,
@@ -1310,7 +1311,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
 
     const args_text = rest[open_paren + 1 .. close_paren];
     if (inline_asm == null and isSupportedDebugIntrinsicCallee(call.callee)) {
-        if (call.calling_conv != null or call.tail_kind != null or call.attrs != null or call.operand_bundle != null or call.ret_ty != .void or result != null) {
+        if (call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.attrs != null or call.operand_bundle != null or call.ret_ty != .void or result != null) {
             return error.UnsupportedDebugIntrinsic;
         }
         try validateDebugIntrinsicArgs(call.callee, args_text);
@@ -1323,6 +1324,36 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .result = result,
         .kind = .{ .call = call },
     };
+}
+
+const ParsedCallReturnPrefix = struct {
+    ty: core.Type,
+    attrs: ?[]const u8 = null,
+    after: []const u8,
+};
+
+fn parseCallReturnPrefix(text: []const u8) !ParsedCallReturnPrefix {
+    const original = std.mem.trim(u8, text, " \t");
+    var rest = original;
+    while (rest.len != 0) {
+        if (parseLeadingType(rest)) |typed| {
+            const attrs_len = @intFromPtr(rest.ptr) - @intFromPtr(original.ptr);
+            const attrs = std.mem.trim(u8, original[0..attrs_len], " \t");
+            return .{
+                .ty = typed.ty,
+                .attrs = if (attrs.len == 0) null else attrs,
+                .after = typed.after,
+            };
+        } else |err| switch (err) {
+            error.UnsupportedType => {},
+            else => return err,
+        }
+
+        const token_end = findTopLevelTokenEnd(rest) orelse return error.UnsupportedType;
+        if (token_end == 0) return error.UnsupportedType;
+        rest = std.mem.trim(u8, rest[token_end..], " \t");
+    }
+    return error.UnsupportedType;
 }
 
 const CallTrailing = struct {
@@ -2544,6 +2575,54 @@ fn findTopLevelComma(text: []const u8) ?usize {
         }
     }
     return null;
+}
+
+fn findTopLevelTokenEnd(text: []const u8) ?usize {
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    var paren_depth: usize = 0;
+    var in_string = false;
+    var escaped = false;
+    for (text, 0..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        switch (byte) {
+            '"' => in_string = true,
+            '{' => brace_depth += 1,
+            '}' => {
+                if (brace_depth == 0) return null;
+                brace_depth -= 1;
+            },
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+            },
+            ' ', '\t' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0 and paren_depth == 0) return index,
+            else => {},
+        }
+    }
+    if (brace_depth != 0 or bracket_depth != 0 or angle_depth != 0 or paren_depth != 0 or in_string) return null;
+    return text.len;
 }
 
 fn parseValue(text: []const u8) !core.Value {
