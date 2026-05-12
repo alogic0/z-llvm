@@ -45,6 +45,8 @@ store atomic iN %value, ptr getelementptr inbounds ... (...) <ordering>, align N
 %old = atomicrmw <op> ptr getelementptr inbounds ... (...), iN %value <ordering>, align N
 %pair = cmpxchg ptr %slot, iN %expected, iN %replacement, <success-ordering> <failure-ordering>, align N
 %pair = cmpxchg ptr getelementptr inbounds ... (...), iN %expected, iN %replacement <success-ordering> <failure-ordering>, align N
+cmpxchg result type is modeled as `{ T, i1 }` for the compared value type `T`,
+not as a fixed-width integer pair
 fence <ordering>
 verification that load/store pointer operands have ptr type
 verification that store value operands match the stored type

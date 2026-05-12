@@ -888,7 +888,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     if (std.mem.eql(u8, op_text, "cmpxchg")) {
         return .{
             .result = result_text[1..],
-            .kind = .{ .cmpxchg = try parseCmpxchg(rhs_text) },
+            .kind = .{ .cmpxchg = try parseCmpxchg(allocator, rhs_text) },
         };
     }
     if (std.mem.eql(u8, op_text, "extractelement")) {
@@ -1931,7 +1931,7 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
     };
 }
 
-fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
+fn parseCmpxchg(allocator: std.mem.Allocator, text: []const u8) !core.CmpxchgInst {
     var rest = std.mem.trim(u8, text["cmpxchg".len..], " \t");
     var is_volatile = false;
     var is_weak = false;
@@ -1960,6 +1960,8 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
     const expected_text = std.mem.trim(u8, rest[0..expected_comma], " \t");
     var expected_parts = std.mem.tokenizeAny(u8, expected_text, " \t");
     const ty = try parseType(expected_parts.next() orelse return error.InvalidAtomicMemory);
+    const result_ty_text = try cmpxchgResultTypeText(allocator, ty);
+    errdefer allocator.free(result_ty_text);
     const expected = try parseValue(expected_parts.next() orelse return error.InvalidAtomicMemory);
     if (expected_parts.next() != null) return error.InvalidAtomicMemory;
 
@@ -1984,6 +1986,7 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
     return .{
         .ptr = ptr_operand.ptr,
         .ty = ty,
+        .result_ty = .{ .aggregate = result_ty_text },
         .expected = expected,
         .replacement = replacement,
         .success_ordering = success_ordering,
@@ -1993,6 +1996,16 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
         .is_volatile = is_volatile,
         .@"align" = alignment,
     };
+}
+
+fn cmpxchgResultTypeText(allocator: std.mem.Allocator, ty: core.Type) ![]const u8 {
+    var output: std.Io.Writer.Allocating = .init(allocator);
+    defer output.deinit();
+
+    try output.writer.writeAll("{ ");
+    try ty.format(&output.writer);
+    try output.writer.writeAll(", i1 }");
+    return try allocator.dupe(u8, output.writer.buffered());
 }
 
 fn parseFence(text: []const u8) !core.Instruction {

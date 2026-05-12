@@ -5452,6 +5452,25 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     try extractvalue_module.print(&extractvalue_output.writer);
     try std.testing.expectEqualStrings(cmpxchg_extractvalue, extractvalue_output.writer.buffered());
 
+    const cmpxchg_i8_extractvalue =
+        \\define i1 @cmpxchg_i8_extractvalue(ptr %p, i8 %old, i8 %new) {
+        \\entry:
+        \\  %pair = cmpxchg weak ptr %p, i8 %old, i8 %new seq_cst seq_cst
+        \\  %success = extractvalue { i8, i1 } %pair, 1
+        \\  ret i1 %success
+        \\}
+        \\
+    ;
+    var i8_extractvalue_module = try ir.Module.parse(std.testing.allocator, cmpxchg_i8_extractvalue);
+    defer i8_extractvalue_module.deinit();
+    try i8_extractvalue_module.verify();
+    try std.testing.expect(i8_extractvalue_module.functions.items[0].blocks.items[0].instructions.items[0].resultType().?.eql(.{ .aggregate = "{ i8, i1 }" }));
+
+    var i8_extractvalue_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer i8_extractvalue_output.deinit();
+    try i8_extractvalue_module.print(&i8_extractvalue_output.writer);
+    try std.testing.expectEqualStrings(cmpxchg_i8_extractvalue, i8_extractvalue_output.writer.buffered());
+
     const overflow_extractvalue =
         \\declare { i8, i1 } @llvm.umul.with.overflow.i8(i8, i8)
         \\

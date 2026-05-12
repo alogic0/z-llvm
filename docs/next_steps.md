@@ -71,6 +71,10 @@ Active cycle:
       conditions of type `<N x i1>` when the selected values are fixed vectors
       with the same lane count. Upstream mapping is recorded in [Vector IR
       Boundary](ir_vectors.md).
+- [x] Source-backed verifier blocker: type `cmpxchg` results as `{ T, i1 }`
+      for the compared value type `T` so non-`i32` cmpxchg pairs can feed
+      `extractvalue`. Upstream mapping is recorded in [Memory IR
+      Subset](ir_memory.md) and [IR Values](ir_values.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

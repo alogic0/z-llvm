@@ -50,7 +50,7 @@ Upstream mapping:
 This reproduces the printed `undef` and `poison` constant forms and treats them as type-compatible with the expected operand type.
 LLVM models `undef` and `poison` as distinct typed values and has much richer constant folding rules around undefined and poison-producing values.
 LLVM uses `freeze` to turn undef/poison-sensitive values into a stable value before transforms that require that guarantee.
-The local `extractvalue` support reproduces the parser, verifier, printer, and def-use behavior needed for Zig stage4 cmpxchg result values such as `extractvalue { i32, i1 } %pair, 1`; aggregate layout and optimization semantics remain outside this slice.
+The local `extractvalue` support reproduces the parser, verifier, printer, and def-use behavior needed for Zig stage4 cmpxchg result values such as `extractvalue { i32, i1 } %pair, 1`; cmpxchg result aggregates are typed as `{ T, i1 }` for the compared value type `T`, while broader aggregate layout and optimization semantics remain outside this slice.
 The local `insertvalue` support preserves source-backed aggregate construction such as `insertvalue { ptr, i64 } poison, ptr %p, 0` without modeling aggregate optimization semantics.
 Aggregate PHI parsing preserves source-backed aggregate values and aggregate constant incoming values without folding or layout interpretation.
 The local call parser consumes full leading return types for direct calls, matching the LLVM assembly parser shape needed for Zig stage4 overflow intrinsic calls such as `call { i8, i1 } @llvm.umul.with.overflow.i8(...)`.

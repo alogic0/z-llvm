@@ -630,6 +630,7 @@ pub const AtomicRmwInst = struct {
 pub const CmpxchgInst = struct {
     ptr: Value,
     ty: Type,
+    result_ty: Type,
     expected: Value,
     replacement: Value,
     success_ordering: []const u8,
@@ -638,6 +639,10 @@ pub const CmpxchgInst = struct {
     is_weak: bool = false,
     is_volatile: bool = false,
     @"align": ?u64 = null,
+
+    pub fn deinit(cmpxchg: *CmpxchgInst, allocator: std.mem.Allocator) void {
+        if (cmpxchg.result_ty == .aggregate) allocator.free(cmpxchg.result_ty.aggregate);
+    }
 };
 
 pub const FenceInst = struct {
@@ -789,7 +794,7 @@ pub const Instruction = struct {
             .alloca => .ptr,
             .load => |load| load.ty,
             .atomicrmw => |atomicrmw| atomicrmw.ty,
-            .cmpxchg => .{ .aggregate = "{ i32, i1 }" },
+            .cmpxchg => |cmpxchg| cmpxchg.result_ty,
             .extractelement => |extract| switch (extract.vector_ty) {
                 .vector => |vector| vector.elem_ty.toType(),
                 else => null,
@@ -889,7 +894,8 @@ pub const Instruction = struct {
 
     pub fn deinit(instruction: *Instruction, allocator: std.mem.Allocator) void {
         switch (instruction.kind) {
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+            .cmpxchg => |*cmpxchg| cmpxchg.deinit(allocator),
             .phi => |*phi| phi.deinit(allocator),
             .gep => |*gep| gep.deinit(allocator),
             .call => |*call| call.deinit(allocator),
