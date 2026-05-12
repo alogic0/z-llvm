@@ -2392,6 +2392,35 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
     defer constant_module.deinit();
     try constant_module.verify();
 
+    const vector_splat =
+        \\define i1 @vector_splat_icmp(<16 x i8> %a) {
+        \\entry:
+        \\  %cmp = icmp eq <16 x i8> %a, splat (i8 10)
+        \\  ret i1 1
+        \\}
+        \\
+    ;
+    var splat_module = try ir.Module.parse(std.testing.allocator, vector_splat);
+    defer splat_module.deinit();
+    try splat_module.verify();
+
+    var splat_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer splat_output.deinit();
+    try splat_module.print(&splat_output.writer);
+    try std.testing.expectEqualStrings(vector_splat, splat_output.writer.buffered());
+
+    const bad_vector_splat =
+        \\define i1 @bad_vector_splat_icmp(<16 x i8> %a) {
+        \\entry:
+        \\  %cmp = icmp eq <16 x i8> %a, splat (i16 10)
+        \\  ret i1 1
+        \\}
+        \\
+    ;
+    var bad_splat_module = try ir.Module.parse(std.testing.allocator, bad_vector_splat);
+    defer bad_splat_module.deinit();
+    try std.testing.expectError(error.TypeMismatch, bad_splat_module.verify());
+
     const scalable =
         \\define <vscale x 2 x i32> @scalable(<vscale x 2 x i32> %a) {
         \\entry:

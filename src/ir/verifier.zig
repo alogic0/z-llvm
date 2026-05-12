@@ -1346,6 +1346,13 @@ fn parseVectorElementType(text: []const u8) !core.VectorElementType {
 fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
     if (ty != .vector) return error.TypeMismatch;
     const vector = ty.vector;
+    if (std.mem.startsWith(u8, text, "splat (") and std.mem.endsWith(u8, text, ")")) {
+        const body = std.mem.trim(u8, text["splat (".len .. text.len - 1], " \t");
+        const typed = try parseLeadingType(body);
+        if (!typed.ty.eql(vector.elem_ty.toType())) return error.TypeMismatch;
+        _ = try parseValueForLiteral(std.mem.trim(u8, typed.after, " \t"));
+        return;
+    }
     if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return error.InvalidValue;
     var rest = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
     var lane_count: u32 = 0;
@@ -1439,7 +1446,7 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
 
 fn parseValueForLiteral(text: []const u8) !void {
     if (text.len == 0) return error.InvalidValue;
-    if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "poison") or std.mem.eql(u8, text, "zeroinitializer")) return;
+    if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "poison") or std.mem.eql(u8, text, "null") or std.mem.eql(u8, text, "zeroinitializer")) return;
     if (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false")) return;
     _ = try std.fmt.parseInt(i128, text, 10);
 }

@@ -2449,7 +2449,11 @@ fn parseValue(text: []const u8) !core.Value {
     if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .zero_initializer;
     if (std.mem.eql(u8, trimmed, "true")) return .{ .int = 1 };
     if (std.mem.eql(u8, trimmed, "false")) return .{ .int = 0 };
-    if (trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = trimmed };
+    if ((trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') or
+        (std.mem.startsWith(u8, trimmed, "splat (") and std.mem.endsWith(u8, trimmed, ")")))
+    {
+        return .{ .vector = trimmed };
+    }
     if (isSupportedConstantExpr(trimmed)) return .{ .constant_expr = trimmed };
     if (trimmed[0] == '%') {
         if (trimmed.len == 1) return error.InvalidValueName;
