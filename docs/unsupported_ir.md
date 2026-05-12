@@ -59,7 +59,8 @@ br label %target
 br i1 <value>, label %then, label %else
 unreachable
 integer constants
-observed decimal `float` and `double` constants, preserved as raw FP literals
+observed decimal `float` and `double` constants plus source-backed scalar
+`fp128` hex literals, preserved as raw FP literals
 i1 true/false constants, normalized to 1/0 internally
 undef constants
 named SSA values
@@ -68,7 +69,7 @@ named SSA values
 ## Unsupported Types
 
 ```text
-fp80/fp128
+target-specific FP types beyond `x86_fp80` and `fp128`
 floating-point operations beyond scalar `fadd`/`fsub`/`fmul`/`fdiv`/`frem`
 FP arithmetic semantics for NaN, infinity, signed zero, and subnormals beyond
 literal classification and preservation

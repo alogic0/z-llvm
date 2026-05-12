@@ -94,7 +94,7 @@ fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.
     if (!extract.vector_ty.eql(insert.vector_ty)) return null;
     const vector_ty = switch (extract.vector_ty) {
         .vector => |vector_ty| vector_ty,
-        .void, .int, .float, .double, .metadata, .ptr, .aggregate => return null,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return null,
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return null;
     return insert.value;

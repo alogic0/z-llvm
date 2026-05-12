@@ -4237,6 +4237,47 @@ test "parser preserves scalar float arithmetic and compare IR" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves extended scalar FP ABI surface" {
+    const input =
+        \\declare i32 @__eqtf2(fp128, fp128)
+        \\
+        \\define fp128 @fp128_roundtrip(ptr %p, fp128 %x) {
+        \\entry:
+        \\  store fp128 %x, ptr %p, align 16
+        \\  %loaded = load fp128, ptr %p, align 16
+        \\  %cmp = call i32 @__eqtf2(fp128 %loaded, fp128 0xL00000000000000004002A00000000000)
+        \\  ret fp128 0xL00000000000000004004100000000000
+        \\}
+        \\
+        \\define void @longdouble_sink(x86_fp80 %x) {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\define void @longdouble_caller(x86_fp80 %x) {
+        \\entry:
+        \\  call void @longdouble_sink(x86_fp80 %x)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expect(module.functions.items[0].ret_ty.eql(.fp128));
+    try std.testing.expect(module.functions.items[0].params.items[1].ty.eql(.fp128));
+    try std.testing.expect(module.functions.items[1].params.items[0].ty.eql(.x86_fp80));
+    try std.testing.expect(module.functions.items[2].params.items[0].ty.eql(.x86_fp80));
+    try std.testing.expectEqual(fp_semantics.Category.normal, (try fp_semantics.classify(.fp128, "0xL00000000000000004002A00000000000")).category);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser rejects unsupported floating point compare forms" {
     const fcmp_predicate_input =
         \\define i1 @cmp(float %a, float %b) {

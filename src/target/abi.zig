@@ -78,6 +78,6 @@ fn classify(target_triple: triple.Triple, layout: datalayout.DataLayout, slot: S
             .value_class = .pointer,
             .size_bits = try layout.pointerSizeBits(),
         },
-        .float, .double, .metadata, .aggregate, .vector => return error.UnsupportedType,
+        .float, .double, .x86_fp80, .fp128, .metadata, .aggregate, .vector => return error.UnsupportedType,
     };
 }

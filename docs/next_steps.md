@@ -79,6 +79,11 @@ Active cycle:
       zero-parameter `naked` function definitions while preserving ordinary
       direct-call signature checks. Upstream mapping is recorded in [Intrinsics
       And Call Semantics](semantics/intrinsics_and_call_semantics.md).
+- [x] Source-backed parser/verifier blocker: preserve scalar `x86_fp80` and
+      `fp128` ABI surface for C ABI rows, including loads, stores, calls,
+      returns, aggregate fields, and `0xL...` literals without adding FP
+      optimization semantics. Upstream mapping is recorded in
+      [Scalar IR](ir_scalar.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

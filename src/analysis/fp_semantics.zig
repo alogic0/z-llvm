@@ -19,7 +19,7 @@ pub const Classification = struct {
 
 pub fn classify(ty: ir.Type, spelling: []const u8) !Classification {
     switch (ty) {
-        .float, .double => {},
+        .float, .double, .x86_fp80, .fp128 => {},
         else => return error.UnsupportedFloatingPointType,
     }
 

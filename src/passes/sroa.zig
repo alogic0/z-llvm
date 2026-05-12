@@ -205,7 +205,7 @@ fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
     return switch (field_ty) {
         .int => true,
         .ptr => has_layout,
-        .void, .float, .double, .metadata, .aggregate, .vector => false,
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

@@ -352,7 +352,7 @@ pub fn verify(module: core.Module) !void {
                     .undef, .poison, .null_value, .named => {},
                     .int, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
-                .float, .double => switch (value) {
+                .float, .double, .x86_fp80, .fp128 => switch (value) {
                     .fp => |text| {
                         _ = fp_semantics.classify(global.ty, text) catch return error.UnsupportedFloatingPointLiteral;
                     },
@@ -382,7 +382,7 @@ pub fn verify(module: core.Module) !void {
                 if (text.len == 0) return error.UnsupportedGlobalVariable;
                 switch (global.ty) {
                     .aggregate => {},
-                    .void, .int, .float, .double, .metadata, .ptr, .vector => return error.UnsupportedGlobalVariable,
+                    .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return error.UnsupportedGlobalVariable,
                 }
             },
         }
@@ -460,12 +460,12 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         if (fcmp.fp_flags.any()) {
                             switch (fcmp.operand_ty) {
-                                .float, .double => {},
+                                .float, .double, .x86_fp80, .fp128 => {},
                                 .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
                             }
                         }
                         switch (fcmp.operand_ty) {
-                            .float, .double => {},
+                            .float, .double, .x86_fp80, .fp128 => {},
                             .void, .int, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
                         }
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.lhs, block_index, instruction_index);
@@ -1370,7 +1370,7 @@ const ParsedArrayType = struct {
 fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     const text = switch (ty) {
         .aggregate => |aggregate| aggregate,
-        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
@@ -1386,6 +1386,8 @@ fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
+    if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
     if (std.mem.eql(u8, trimmed, "metadata")) return .metadata;
     if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
@@ -1625,7 +1627,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
     }
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
-            .float, .double => {},
+            .float, .double, .x86_fp80, .fp128 => {},
             .vector => return error.UnsupportedType,
             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
@@ -1635,7 +1637,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
                 .int => {},
                 .float, .double, .ptr => return error.TypeMismatch,
             },
-            .void, .float, .double, .metadata, .ptr, .aggregate => return error.TypeMismatch,
+            .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
     }
 }
@@ -1644,7 +1646,7 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
     if (!binary.fp_flags.any()) return;
     switch (binary.op) {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
-            .float, .double => {},
+            .float, .double, .x86_fp80, .fp128 => {},
             .void, .int, .metadata, .ptr, .aggregate, .vector => return error.InvalidInstructionFlag,
         },
         .add, .sub, .mul, .@"and", .@"or", .xor, .shl, .lshr, .ashr, .udiv, .sdiv, .urem, .srem => return error.InvalidInstructionFlag,
@@ -1681,11 +1683,11 @@ fn verifyCast(cast: core.CastInst) !void {
 
     const from_bits = switch (cast.from_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     const to_bits = switch (cast.to_ty) {
         .int => |bits| bits,
-        .void, .float, .double, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
     };
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
@@ -1713,6 +1715,8 @@ fn bitcastBits(ty: core.Type) ?u64 {
         .int => |bits| bits,
         .float => 32,
         .double => 64,
+        .x86_fp80 => 80,
+        .fp128 => 128,
         .vector => |vector| vector.len * (switch (vector.elem_ty) {
             .int => |bits| @as(u64, bits),
             .float => 32,

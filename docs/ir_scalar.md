@@ -27,8 +27,11 @@ Implemented subset:
 
 ```text
 integer binary ops: add/sub/mul/and/or/xor/shl/lshr/ashr/udiv/sdiv/urem/srem
-floating-point binary ops: fadd/fsub/fmul/fdiv/frem for scalar float/double parse/verify only
-floating-point compare: fcmp false/oeq/ogt/oge/olt/ole/one/ord/uno/ueq/ugt/uge/ult/ule/une/true for scalar float/double parse/verify only
+floating-point binary ops: fadd/fsub/fmul/fdiv/frem for scalar float/double/x86_fp80/fp128 parse/verify only
+floating-point compare: fcmp false/oeq/ogt/oge/olt/ole/one/ord/uno/ueq/ugt/uge/ult/ule/une/true for scalar float/double/x86_fp80/fp128 parse/verify only
+extended scalar FP ABI surface: x86_fp80/fp128 type parsing, printing,
+load/store, direct calls, returns, aggregate fields, and fp128 hex `0xL...`
+literal preservation
 floating-point constants: observed decimal spellings plus `nan`, `inf`, and
 negative zero are parsed, classified by `analysis/fp_semantics.zig`, verified
 against scalar FP types, and printed verbatim
@@ -83,6 +86,7 @@ local-only conservative:
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
   parser/printer/verifier round-trip for scalar float/double fadd/fsub/fmul/fdiv/frem, fcmp predicates, and select
+  parser/printer/verifier round-trip for scalar x86_fp80/fp128 ABI surface
   scalar-condition vector select with identical arms folds through the same
   select simplification rule
   parser/printer/verifier round-trip for observed decimal FP literals

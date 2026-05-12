@@ -190,6 +190,8 @@ pub fn typeSize(ty: ir.Type) ?u64 {
         .int => |bits| if (bits % 8 == 0) bits / 8 else null,
         .float => 4,
         .double => 8,
+        .x86_fp80 => 10,
+        .fp128 => 16,
         .aggregate => aggregateSize(ty),
         .void, .metadata, .ptr, .vector => null,
     };
@@ -207,7 +209,7 @@ fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| {
         if (field_index >= array.count) return null;
@@ -225,7 +227,7 @@ pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {
 pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| {
         if (field_index >= array.count) return null;
@@ -257,7 +259,7 @@ fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, 
 fn aggregateSize(ty: ir.Type) ?u64 {
     const text = switch (ty) {
         .aggregate => |text| text,
-        .void, .int, .float, .double, .metadata, .ptr, .vector => return null,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
     };
     if (arrayInfo(text)) |array| return array.count * (typeSize(array.element_ty) orelse return null);
     var fields = aggregateFields(text) orelse return null;
@@ -310,6 +312,8 @@ fn parseTypeLiteral(text: []const u8) ?ir.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
+    if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return null;
