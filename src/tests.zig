@@ -1284,6 +1284,38 @@ test "parser preserves function linkage and header attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser accepts anonymous aggregate return function header" {
+    const input =
+        \\define private fastcc { ptr, i64 } @main.errorName(i16 %0) unnamed_addr #0 align 1 {
+        \\  ret { ptr, i64 } undef
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqual(ir.FunctionLinkage.private, function.linkage);
+    try std.testing.expectEqualStrings("fastcc", function.calling_conv.?);
+    try std.testing.expect(function.ret_ty.eql(.{ .aggregate = "{ ptr, i64 }" }));
+    try std.testing.expectEqualStrings("unnamed_addr #0 align 1", function.attrs.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\define private fastcc { ptr, i64 } @main.errorName(i16 %0) unnamed_addr #0 align 1 {
+        \\1:
+        \\  ret { ptr, i64 } undef
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser preserves function visibility and parameter attributes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

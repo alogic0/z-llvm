@@ -519,6 +519,30 @@ fn findMatchingBrace(text: []const u8, open_index: usize) ?usize {
     return null;
 }
 
+fn findMatchingBracketOpen(text: []const u8, close_index: usize) ?usize {
+    return findMatchingOpen(text, close_index, '[', ']');
+}
+
+fn findMatchingBraceOpen(text: []const u8, close_index: usize) ?usize {
+    return findMatchingOpen(text, close_index, '{', '}');
+}
+
+fn findMatchingOpen(text: []const u8, close_index: usize, open_byte: u8, close_byte: u8) ?usize {
+    if (close_index >= text.len or text[close_index] != close_byte) return null;
+    var depth: usize = 0;
+    var index = close_index + 1;
+    while (index > 0) {
+        index -= 1;
+        const byte = text[index];
+        if (byte == close_byte) depth += 1;
+        if (byte == open_byte) {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
 fn parseFunctionHeader(allocator: std.mem.Allocator, line: []const u8) !core.Function {
     if (!std.mem.endsWith(u8, line, "{")) return error.InvalidFunctionHeader;
     const body = std.mem.trim(u8, line["define ".len .. line.len - 1], " \t");
@@ -2069,6 +2093,20 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
             .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
         };
     }
+    if (trimmed[0] == '{') {
+        const close = findMatchingBrace(trimmed, 0) orelse return error.UnsupportedType;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
+        };
+    }
+    if (trimmed[0] == '[') {
+        const close = findMatchingBracket(trimmed, 0) orelse return error.UnsupportedType;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
+        };
+    }
     const end = std.mem.indexOfAny(u8, trimmed, " \t") orelse trimmed.len;
     return .{
         .ty = try parseType(trimmed[0..end]),
@@ -2081,6 +2119,20 @@ fn parseTrailingType(text: []const u8) !ParsedTrailingType {
     if (trimmed.len == 0) return error.UnsupportedType;
     if (trimmed[trimmed.len - 1] == '>') {
         const open = findMatchingAngleOpen(trimmed, trimmed.len - 1) orelse return error.UnsupportedType;
+        return .{
+            .before = std.mem.trim(u8, trimmed[0..open], " \t"),
+            .ty = try parseType(trimmed[open..]),
+        };
+    }
+    if (trimmed[trimmed.len - 1] == '}') {
+        const open = findMatchingBraceOpen(trimmed, trimmed.len - 1) orelse return error.UnsupportedType;
+        return .{
+            .before = std.mem.trim(u8, trimmed[0..open], " \t"),
+            .ty = try parseType(trimmed[open..]),
+        };
+    }
+    if (trimmed[trimmed.len - 1] == ']') {
+        const open = findMatchingBracketOpen(trimmed, trimmed.len - 1) orelse return error.UnsupportedType;
         return .{
             .before = std.mem.trim(u8, trimmed[0..open], " \t"),
             .ty = try parseType(trimmed[open..]),
