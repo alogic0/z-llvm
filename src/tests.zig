@@ -1738,6 +1738,29 @@ test "parser preserves poison call arguments" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser infers numeric implicit entry block names" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i1 @implicit_entry_phi(i1 %cond) {
+        \\  %1 = zext i1 %cond to i8
+        \\  br i1 %cond, label %join, label %other
+        \\other:
+        \\  br label %join
+        \\join:
+        \\  %value = phi i1 [ true, %0 ], [ false, %other ]
+        \\  ret i1 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings("0", module.functions.items[0].blocks.items[0].name);
+}
+
 test "parser and verifier accept pointer integer casts" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

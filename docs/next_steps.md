@@ -60,6 +60,9 @@ Active cycle:
       `captures(...)` attributes including `captures(address)` and
       `captures(address, ret: address, provenance)` while keeping capture
       semantics conservative.
+- [x] Source-backed parser/verifier blocker: infer numeric implicit entry block
+      names from the first unnamed instruction result so PHI incoming references
+      such as `%0` resolve correctly.
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

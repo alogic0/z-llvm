@@ -127,7 +127,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         }
 
         if (current_block == null) {
-            try function.blocks.append(allocator, core.BasicBlock.init(try implicitEntryBlockName(&module, function.*)));
+            try function.blocks.append(allocator, core.BasicBlock.init(try implicitEntryBlockName(&module, function.*, line)));
             current_block = function.blocks.items.len - 1;
         }
         const block = &function.blocks.items[current_block.?];
@@ -751,7 +751,11 @@ fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, text:
     }
 }
 
-fn implicitEntryBlockName(module: *core.Module, function: core.Function) ![]const u8 {
+fn implicitEntryBlockName(module: *core.Module, function: core.Function, first_line: []const u8) ![]const u8 {
+    if (numericResultName(first_line)) |first_result| {
+        if (first_result > 0) return try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{first_result - 1}));
+    }
+
     var max_numeric_param: ?usize = null;
     for (function.params.items) |param| {
         const number = std.fmt.parseInt(usize, param.name, 10) catch continue;
@@ -759,6 +763,13 @@ fn implicitEntryBlockName(module: *core.Module, function: core.Function) ![]cons
     }
     const max_param = max_numeric_param orelse return "entry";
     return try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{max_param + 1}));
+}
+
+fn numericResultName(line: []const u8) ?usize {
+    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return null;
+    const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
+    if (result_text.len < 2 or result_text[0] != '%') return null;
+    return std.fmt.parseInt(usize, result_text[1..], 10) catch null;
 }
 
 fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Function, text: []const u8) !void {
