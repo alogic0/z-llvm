@@ -190,6 +190,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try printMemoryPrefix(load.attrs, writer);
                         try load.ty.format(writer);
                         try writer.writeAll(", ptr ");
+                        if (load.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
                         try load.ptr.format(writer);
                         try printMemorySuffix(load.attrs, writer);
                         try printInstructionMetadata(instruction.metadata, writer);

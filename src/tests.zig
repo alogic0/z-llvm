@@ -5005,6 +5005,64 @@ test "parser prints load and store memory attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves load from constant-expression gep pointer" {
+    const input =
+        \\@global = internal global [8 x i8] c"abcdefgh", align 1
+        \\
+        \\define i8 @load_gep_constexpr() {
+        \\entry:
+        \\  %v = load i8, ptr getelementptr inbounds nuw (i8, ptr @global, i64 2), align 1
+        \\  ret i8 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser preserves atomic memory through constant-expression gep pointer" {
+    const input =
+        \\@global = internal global [8 x i8] zeroinitializer, align 4
+        \\
+        \\define i32 @atomic_gep_constexpr(i32 %value) {
+        \\entry:
+        \\  store atomic i32 %value, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4) unordered, align 4
+        \\  %v = load atomic i32, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4) unordered, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    const expected =
+        \\@global = internal global [8 x i8] zeroinitializer, align 4
+        \\
+        \\define i32 @atomic_gep_constexpr(i32 %value) {
+        \\entry:
+        \\  store atomic i32 %value, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4), unordered, align 4
+        \\  %v = load atomic i32, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4), unordered, align 4
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "parser accepts narrow atomic load and store spelling as barriers" {
     const input =
         \\define i32 @memory_atomic(i32 %a) {
@@ -5122,6 +5180,21 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     var source_backed_module = try ir.Module.parse(std.testing.allocator, source_backed_atomicrmw);
     defer source_backed_module.deinit();
     try source_backed_module.verify();
+
+    const constant_expr_atomic_pointer =
+        \\@global = internal global [16 x i8] zeroinitializer, align 8
+        \\
+        \\define i32 @atomic_pointer_constexpr(i32 %old, i32 %new) {
+        \\entry:
+        \\  %rmw = atomicrmw xchg ptr getelementptr inbounds nuw (i8, ptr @global, i64 8), i32 %new release, align 4
+        \\  %pair = cmpxchg ptr getelementptr inbounds nuw (i8, ptr @global, i64 8), i32 %old, i32 %new acquire monotonic, align 4
+        \\  ret i32 %rmw
+        \\}
+        \\
+    ;
+    var constant_expr_module = try ir.Module.parse(std.testing.allocator, constant_expr_atomic_pointer);
+    defer constant_expr_module.deinit();
+    try constant_expr_module.verify();
 }
 
 test "parser preserves atomic syncscope on supported atomic operations" {

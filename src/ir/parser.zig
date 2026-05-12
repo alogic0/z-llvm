@@ -965,20 +965,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "load")) {
-        var attrs = try parseMemoryPrefix(&parts);
-        const ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const ptr_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        if (ptr_ty != .ptr) return error.ExpectedPointerType;
-        const ptr = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        try parseMemorySuffix(&parts, &attrs);
-        return .{
-            .result = result_text[1..],
-            .kind = .{ .load = .{
-                .ty = ty,
-                .ptr = ptr,
-                .attrs = attrs,
-            } },
-        };
+        return parseLoad(result_text[1..], rhs_text);
     }
 
     const op = core.BinaryOp.parse(op_text) orelse return error.UnsupportedInstruction;
@@ -1637,6 +1624,53 @@ fn parseStore(line: []const u8) !core.Instruction {
     const value = try parseValue(std.mem.trim(u8, stored.after[0..value_comma], " \t"));
     rest = std.mem.trim(u8, stored.after[value_comma + 1 ..], " \t");
 
+    const ptr_operand = try parseMemoryPointerOperand(rest, attrs);
+    var suffix_parts = std.mem.tokenizeAny(u8, ptr_operand.suffix, " \t,");
+    try parseMemorySuffix(&suffix_parts, &attrs);
+
+    return .{
+        .result = null,
+        .kind = .{ .store = .{
+            .ty = stored.ty,
+            .value = value,
+            .ptr = ptr_operand.ptr,
+            .ptr_addrspace = ptr_operand.ptr_addrspace,
+            .attrs = attrs,
+        } },
+    };
+}
+
+fn parseLoad(result: []const u8, text: []const u8) !core.Instruction {
+    var rest = std.mem.trim(u8, text["load".len..], " \t");
+    var attrs = try parseMemoryPrefixText(&rest);
+
+    const ty_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    const ty = try parseType(std.mem.trim(u8, rest[0..ty_comma], " \t"));
+    rest = std.mem.trim(u8, rest[ty_comma + 1 ..], " \t");
+
+    const ptr_operand = try parseMemoryPointerOperand(rest, attrs);
+    var suffix_parts = std.mem.tokenizeAny(u8, ptr_operand.suffix, " \t,");
+    try parseMemorySuffix(&suffix_parts, &attrs);
+
+    return .{
+        .result = result,
+        .kind = .{ .load = .{
+            .ty = ty,
+            .ptr = ptr_operand.ptr,
+            .ptr_addrspace = ptr_operand.ptr_addrspace,
+            .attrs = attrs,
+        } },
+    };
+}
+
+const MemoryPointerOperand = struct {
+    ptr: core.Value,
+    ptr_addrspace: ?[]const u8 = null,
+    suffix: []const u8,
+};
+
+fn parseMemoryPointerOperand(text: []const u8, attrs: core.MemoryAttrs) !MemoryPointerOperand {
+    var rest = std.mem.trim(u8, text, " \t");
     var ptr_addrspace: ?[]const u8 = null;
     if (std.mem.startsWith(u8, rest, "ptr ")) {
         rest = std.mem.trim(u8, rest["ptr ".len..], " \t");
@@ -1652,32 +1686,41 @@ fn parseStore(line: []const u8) !core.Instruction {
         rest = ptr_ty.after;
     }
 
-    const ptr: core.Value, const suffix: []const u8 = if (attrs.atomic_ordering != null) blk: {
-        const ptr_end = firstValueEnd(rest) orelse return error.InvalidInstruction;
-        break :blk .{
-            try parseValue(std.mem.trim(u8, rest[0..ptr_end], " \t")),
-            std.mem.trim(u8, rest[ptr_end..], " \t,"),
-        };
-    } else blk: {
-        const suffix_comma = findTopLevelComma(rest);
-        break :blk .{
-            try parseValue(std.mem.trim(u8, if (suffix_comma) |index| rest[0..index] else rest, " \t")),
-            if (suffix_comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "",
-        };
-    };
-    var suffix_parts = std.mem.tokenizeAny(u8, suffix, " \t,");
-    try parseMemorySuffix(&suffix_parts, &attrs);
-
-    return .{
-        .result = null,
-        .kind = .{ .store = .{
-            .ty = stored.ty,
-            .value = value,
-            .ptr = ptr,
+    if (attrs.atomic_ordering != null) {
+        const ptr_end = memoryPointerValueEnd(rest) orelse return error.InvalidInstruction;
+        return .{
+            .ptr = try parseValue(std.mem.trim(u8, rest[0..ptr_end], " \t")),
             .ptr_addrspace = ptr_addrspace,
-            .attrs = attrs,
-        } },
+            .suffix = std.mem.trim(u8, rest[ptr_end..], " \t,"),
+        };
+    }
+
+    const suffix_comma = findTopLevelComma(rest);
+    return .{
+        .ptr = try parseValue(std.mem.trim(u8, if (suffix_comma) |index| rest[0..index] else rest, " \t")),
+        .ptr_addrspace = ptr_addrspace,
+        .suffix = if (suffix_comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "",
     };
+}
+
+fn memoryPointerValueEnd(text: []const u8) ?usize {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return null;
+    if (constantExprEnd(trimmed)) |end| return end;
+    return firstValueEnd(trimmed);
+}
+
+fn constantExprEnd(text: []const u8) ?usize {
+    if (!(std.mem.startsWith(u8, text, "inttoptr (") or
+        std.mem.startsWith(u8, text, "ptrtoint (") or
+        std.mem.startsWith(u8, text, "sub (") or
+        std.mem.startsWith(u8, text, "getelementptr ")))
+    {
+        return null;
+    }
+    const open = findOpenParenOutsideString(text, 0) orelse return null;
+    const close = findMatchingParen(text, open) orelse return null;
+    return close + 1;
 }
 
 fn firstValueEnd(text: []const u8) ?usize {
@@ -1736,11 +1779,8 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
 
     const ptr_comma = findTopLevelComma(rest) orelse return error.InvalidAtomicMemory;
     const ptr_text = std.mem.trim(u8, rest[0..ptr_comma], " \t");
-    var ptr_parts = std.mem.tokenizeAny(u8, ptr_text, " \t");
-    const ptr_ty = try parseType(ptr_parts.next() orelse return error.InvalidAtomicMemory);
-    if (ptr_ty != .ptr) return error.ExpectedPointerType;
-    const ptr = try parseValue(ptr_parts.next() orelse return error.InvalidAtomicMemory);
-    if (ptr_parts.next() != null) return error.InvalidAtomicMemory;
+    const ptr_operand = try parseMemoryPointerOperand(ptr_text, .{});
+    if (ptr_operand.suffix.len != 0 or ptr_operand.ptr_addrspace != null) return error.InvalidAtomicMemory;
 
     rest = std.mem.trim(u8, rest[ptr_comma + 1 ..], " \t");
     const attr_comma = findTopLevelComma(rest);
@@ -1761,7 +1801,7 @@ fn parseAtomicRmw(text: []const u8) !core.AtomicRmwInst {
     return .{
         .op = op,
         .ty = ty,
-        .ptr = ptr,
+        .ptr = ptr_operand.ptr,
         .value = value,
         .ordering = ordering,
         .syncscope = syncscope,
@@ -1791,11 +1831,8 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
 
     const ptr_comma = findTopLevelComma(rest) orelse return error.InvalidAtomicMemory;
     const ptr_text = std.mem.trim(u8, rest[0..ptr_comma], " \t");
-    var ptr_parts = std.mem.tokenizeAny(u8, ptr_text, " \t");
-    const ptr_ty = try parseType(ptr_parts.next() orelse return error.InvalidAtomicMemory);
-    if (ptr_ty != .ptr) return error.ExpectedPointerType;
-    const ptr = try parseValue(ptr_parts.next() orelse return error.InvalidAtomicMemory);
-    if (ptr_parts.next() != null) return error.InvalidAtomicMemory;
+    const ptr_operand = try parseMemoryPointerOperand(ptr_text, .{});
+    if (ptr_operand.suffix.len != 0 or ptr_operand.ptr_addrspace != null) return error.InvalidAtomicMemory;
 
     rest = std.mem.trim(u8, rest[ptr_comma + 1 ..], " \t");
     const expected_comma = findTopLevelComma(rest) orelse return error.InvalidAtomicMemory;
@@ -1824,7 +1861,7 @@ fn parseCmpxchg(text: []const u8) !core.CmpxchgInst {
 
     const alignment = if (attr_comma) |index| try parseOptionalAlign(std.mem.trim(u8, rest[index + 1 ..], " \t")) else null;
     return .{
-        .ptr = ptr,
+        .ptr = ptr_operand.ptr,
         .ty = ty,
         .expected = expected,
         .replacement = replacement,
