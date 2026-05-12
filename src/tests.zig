@@ -1708,6 +1708,34 @@ test "parser preserves vector splat call arguments" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves poison call arguments" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i64 @takes_poison(i64)
+        \\
+        \\define i64 @caller() {
+        \\entry:
+        \\  %value = call i64 @takes_poison(i64 poison)
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqual(call.args.items[0].value, .poison);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser and verifier accept pointer integer casts" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

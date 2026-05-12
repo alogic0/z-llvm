@@ -1564,9 +1564,7 @@ fn parseCallArg(text: []const u8) !core.CallArg {
         } else |_| {}
     }
 
-    if (!callArgMayContainAttrs(typed.after)) {
-        return error.InvalidCall;
-    }
+    if (!callArgMayContainAttrs(typed.after)) return error.InvalidCall;
 
     const value_start = findConstantExprValueStart(typed.after) orelse
         (findTrailingValueStart(typed.after) orelse return error.InvalidCall);
@@ -1603,6 +1601,7 @@ fn callArgRemainderMayBeWholeValue(text: []const u8) bool {
     if (trimmed[0] == '%' or trimmed[0] == '@' or trimmed[0] == '!' or trimmed[0] == '<') return true;
     if (trimmed[0] == '-' or trimmed[0] == '+' or std.ascii.isDigit(trimmed[0])) return true;
     if (std.mem.eql(u8, trimmed, "undef") or
+        std.mem.eql(u8, trimmed, "poison") or
         std.mem.eql(u8, trimmed, "null") or
         std.mem.eql(u8, trimmed, "zeroinitializer") or
         std.mem.eql(u8, trimmed, "true") or

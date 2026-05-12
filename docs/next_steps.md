@@ -53,6 +53,9 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve vector
       splat constants in call arguments such as `<4 x i32> splat (i32 16)`.
       Upstream mapping is recorded in [Vector IR Boundary](ir_vectors.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve `poison`
+      as a compact call argument value such as `i64 poison`. Upstream mapping is
+      recorded in [IR Values](ir_values.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

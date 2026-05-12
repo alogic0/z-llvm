@@ -36,6 +36,7 @@ named SSA values: %name
 integer constants
 i1 boolean constants parsed as integer 1/0 for normalization
 undef constants
+poison constants
 extractvalue over aggregate values with integer index lists
 insertvalue over aggregate values with integer index lists
 aggregate-typed PHI values and aggregate constants in PHI incoming values
@@ -46,8 +47,8 @@ freeze instruction syntax is documented separately in [ir_scalar.md](ir_scalar.m
 Upstream mapping:
 
 ```text
-This reproduces the printed `undef` constant form and treats it as type-compatible with the expected operand type.
-LLVM models `undef` as a typed constant, distinguishes it from poison, and has much richer constant folding rules around undefined values.
+This reproduces the printed `undef` and `poison` constant forms and treats them as type-compatible with the expected operand type.
+LLVM models `undef` and `poison` as distinct typed values and has much richer constant folding rules around undefined and poison-producing values.
 LLVM uses `freeze` to turn undef/poison-sensitive values into a stable value before transforms that require that guarantee.
 The local `extractvalue` support reproduces the parser, verifier, printer, and def-use behavior needed for Zig stage4 cmpxchg result values such as `extractvalue { i32, i1 } %pair, 1`; aggregate layout and optimization semantics remain outside this slice.
 The local `insertvalue` support preserves source-backed aggregate construction such as `insertvalue { ptr, i64 } poison, ptr %p, 0` without modeling aggregate optimization semantics.
@@ -58,7 +59,6 @@ The local call parser consumes full leading return types for direct calls, match
 Known gaps:
 
 ```text
-no poison value
 no typed constant objects
 aggregate constants are preserved only in the currently observed PHI boundary
 extractvalue is parse/verify/print only; no aggregate folding or aggregate layout reasoning beyond selecting the indexed result type
