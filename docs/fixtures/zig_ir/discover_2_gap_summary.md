@@ -46,10 +46,14 @@ Parser behavior follows the source-backed subset of:
 - `llvm/lib/AsmParser/LLParser.cpp`: globals, aliases, named type definitions,
   declarations, calls, call operands, parameter attributes, and metadata
   attachments.
-  - Function-level anchors: `parseGlobal`, `parseAlias`, `parseNamedType`,
-    `parseFunctionHeader`, `parseFunctionType`, `parseCall`, `parseParameterList`,
-    `parseOptionalParamAttrs`, `parseOptionalOperandBundles`,
-    `parseValID`, `parseType`, `parseInstruction`, and `parseMetadata`.
+  - Function-level anchors: `LLParser::parseGlobal`,
+    `LLParser::parseAliasOrIFunc`, `LLParser::parseNamedType`,
+    `LLParser::parseFunctionHeader`, `LLParser::parseFunctionType`,
+    `LLParser::parseCall`, `LLParser::parseParameterList`,
+    `LLParser::parseOptionalParamAttrs`,
+    `LLParser::parseOptionalOperandBundles`, `LLParser::parseValID`,
+    `LLParser::parseType`, `LLParser::parseInstruction`, and
+    `LLParser::parseMetadata`.
 - `llvm/lib/IR/AsmWriter.cpp`: printing globals, aliases, named types,
   declarations, calls, and metadata.
   - Function-level anchors: `AssemblyWriter::printGlobal`,
@@ -67,8 +71,10 @@ Parser behavior follows the source-backed subset of:
 - `llvm/lib/IR/Attributes.cpp`: attribute spelling and payload validation.
   - Function-level anchors: `Attribute::get`, `Attribute::getWithAlignment`,
     `Attribute::getWithDereferenceableBytes`, `Attribute::getWithCaptureInfo`,
-    and `Attribute::getWithRange`.
-- `llvm/lib/IR/Type.cpp`: identified and packed structure type spelling.
+    `Attribute::get(..., const ConstantRange &)`, and
+    `AttrBuilder::addRangeAttr`.
+- `llvm/lib/IR/Type.cpp` and `llvm/include/llvm/IR/DerivedTypes.h`:
+  identified and packed structure type spelling.
   - Function-level anchors: `StructType::create`, `StructType::setBody`,
     `StructType::isPacked`, and `Type::print`.
 - `llvm/docs/LangRef.rst`: global variables, aliases, varargs, attributes,
