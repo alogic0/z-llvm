@@ -86,6 +86,18 @@ tiny_scalar raw Debug/ReleaseSafe/ReleaseFast/ReleaseSmall: regenerated under tm
 manifest: refreshed only for rows regenerated in this pass; reduced fixtures retain their original provenance
 ```
 
+Cycle 07 selected refresh against the current authoritative stage4 emitter:
+
+```text
+stage4 emitter: 0.17.0-dev.304+9787df942
+../ziglang source revision: 9787df9421
+tiny_scalar ReleaseFast stripped capture: byte-identical to checked capture
+integers ReleaseFast stripped capture: byte-identical to checked capture
+switch_control ReleaseFast stripped capture: byte-identical to checked capture
+optional_pointer ReleaseFast stripped capture: byte-identical to checked capture
+manifest: no row updates required
+```
+
 When adding or refreshing fixtures:
 
 - [ ] Record the Zig executable version or revision used to emit the IR.

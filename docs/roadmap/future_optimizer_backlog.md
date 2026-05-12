@@ -119,3 +119,5 @@ they were completed, superseded, or converted into conservative boundaries:
 - [x] Reduced Debug metadata rows for the accepted Debug boundary.
 - [x] Path-aware MemorySSA foundation and follow-up vector-lane clobber fix.
 - [x] Stale ReleaseSmall unsupported-row closure.
+- [x] Selected stage4 corpus freshness audit for `tiny_scalar`, `integers`,
+      `switch_control`, and `optional_pointer` ReleaseFast checked captures.

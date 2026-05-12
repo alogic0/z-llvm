@@ -13,11 +13,12 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 No active cycle is selected.
 
-The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-06 are
+The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
-Cycles](roadmap/historical/completed_discovery_cycles/README.md). Cycle 06
-closed the Cycle 05 cast-flag and LLVM reference-mapping review findings. The
-durable finish table is [Finish Criteria and Gap Burn-Down
+Cycles](roadmap/historical/completed_discovery_cycles/README.md). Cycle 07
+refreshed selected checked stage4 corpus rows byte-identically, so no new
+source-backed blocker is active. The durable finish table is [Finish Criteria
+and Gap Burn-Down
 Table](roadmap/finish_gap_burndown_table.md).
 
 ### Selection Rule
