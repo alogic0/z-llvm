@@ -1587,8 +1587,8 @@ fn verifyCast(cast: core.CastInst) !void {
             return;
         },
         .bitcast => {
-            const from_bits = scalarBitcastBits(cast.from_ty) orelse return error.InvalidCast;
-            const to_bits = scalarBitcastBits(cast.to_ty) orelse return error.InvalidCast;
+            const from_bits = bitcastBits(cast.from_ty) orelse return error.InvalidCast;
+            const to_bits = bitcastBits(cast.to_ty) orelse return error.InvalidCast;
             if (from_bits != to_bits) return error.InvalidCast;
             return;
         },
@@ -1624,12 +1624,18 @@ fn verifyCastFlags(cast: core.CastInst) !void {
     }
 }
 
-fn scalarBitcastBits(ty: core.Type) ?u16 {
+fn bitcastBits(ty: core.Type) ?u64 {
     return switch (ty) {
         .int => |bits| bits,
         .float => 32,
         .double => 64,
-        .void, .metadata, .ptr, .aggregate, .vector => null,
+        .vector => |vector| vector.len * (switch (vector.elem_ty) {
+            .int => |bits| @as(u64, bits),
+            .float => 32,
+            .double => 64,
+            .ptr => return null,
+        }),
+        .void, .metadata, .ptr, .aggregate => null,
     };
 }
 

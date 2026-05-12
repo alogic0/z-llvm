@@ -3802,6 +3802,35 @@ test "parser verifies and prints scalar bitcast instruction" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser verifies and prints vector bitcast instruction" {
+    const input =
+        \\define i16 @bitcast_vector_mask(<16 x i1> %mask) {
+        \\entry:
+        \\  %r = bitcast <16 x i1> %mask to i16
+        \\  ret i16 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cast = module.functions.items[0].blocks.items[0].instructions.items[0].kind.cast;
+    try std.testing.expectEqual(ir.CastOp.bitcast, cast.op);
+    try std.testing.expect(cast.from_ty.eql(ir.Type{ .vector = .{
+        .len = 16,
+        .elem_ty = .{ .int = 1 },
+    } }));
+    try std.testing.expectEqual(ir.Type{ .int = 16 }, cast.to_ty);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier rejects invalid scalar bitcast shapes" {
     const width_mismatch =
         \\define i32 @bad_width(double %x) {

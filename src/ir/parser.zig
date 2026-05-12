@@ -901,21 +901,9 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (core.CastOp.parse(op_text)) |op| {
-        const flags = try parseCastFlags(&parts);
-        const from_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const value = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (!std.mem.eql(u8, parts.next() orelse return error.InvalidInstruction, "to")) return error.InvalidInstruction;
-        const to_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
         return .{
             .result = result_text[1..],
-            .kind = .{ .cast = .{
-                .op = op,
-                .flags = flags,
-                .from_ty = from_ty,
-                .value = value,
-                .to_ty = to_ty,
-            } },
+            .kind = .{ .cast = try parseCastInst(op, rhs_text) },
         };
     }
 
@@ -993,6 +981,83 @@ fn isUnsupportedCastFlag(text: []const u8) bool {
     return std.mem.eql(u8, text, "exact") or
         std.mem.eql(u8, text, "disjoint") or
         isFastMathFlagToken(text);
+}
+
+fn parseCastInst(op: core.CastOp, text: []const u8) !core.CastInst {
+    var rest = std.mem.trim(u8, text, " \t");
+    const op_token = firstToken(rest) orelse return error.InvalidInstruction;
+    rest = std.mem.trim(u8, rest[op_token.len..], " \t");
+
+    var flags: core.CastFlags = .{};
+    while (firstToken(rest)) |token| {
+        if (std.mem.eql(u8, token, "nneg")) {
+            if (flags.nneg) return error.InvalidInstructionFlag;
+            flags.nneg = true;
+        } else if (std.mem.eql(u8, token, "nsw")) {
+            if (flags.nsw) return error.InvalidInstructionFlag;
+            flags.nsw = true;
+        } else if (std.mem.eql(u8, token, "nuw")) {
+            if (flags.nuw) return error.InvalidInstructionFlag;
+            flags.nuw = true;
+        } else if (isUnsupportedCastFlag(token)) {
+            return error.InvalidInstructionFlag;
+        } else {
+            break;
+        }
+        rest = trimFirstToken(rest);
+    }
+
+    const from = try parseLeadingType(rest);
+    const to_index = findTopLevelTo(from.after) orelse return error.InvalidInstruction;
+    const value_text = std.mem.trim(u8, from.after[0..to_index], " \t");
+    const to_ty = try parseType(std.mem.trim(u8, from.after[to_index + " to ".len ..], " \t"));
+    if (value_text.len == 0) return error.InvalidInstruction;
+    return .{
+        .op = op,
+        .flags = flags,
+        .from_ty = from.ty,
+        .value = try parseValue(value_text),
+        .to_ty = to_ty,
+    };
+}
+
+fn findTopLevelTo(text: []const u8) ?usize {
+    var brace_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var angle_depth: usize = 0;
+    var paren_depth: usize = 0;
+    var index: usize = 0;
+    while (index < text.len) : (index += 1) {
+        switch (text[index]) {
+            '{' => brace_depth += 1,
+            '}' => {
+                if (brace_depth == 0) return null;
+                brace_depth -= 1;
+            },
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '<' => angle_depth += 1,
+            '>' => {
+                if (angle_depth == 0) return null;
+                angle_depth -= 1;
+            },
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+            },
+            ' ' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0 and paren_depth == 0 and
+                index + " to ".len <= text.len and std.mem.eql(u8, text[index .. index + " to ".len], " to "))
+            {
+                return index;
+            },
+            else => {},
+        }
+    }
+    return null;
 }
 
 fn parseCastFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.CastFlags {

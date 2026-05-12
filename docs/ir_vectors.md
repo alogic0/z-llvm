@@ -22,6 +22,7 @@ integer and FP binary instructions with matching fixed-vector operand types
 extractelement with scalar integer lane indices
 insertelement with matching vector element value type
 shufflevector with matching input vector types and integer vector masks
+bitcast from fixed-width integer/FP vectors to equal-width scalar integer/FP types
 ```
 
 This is mostly a parser/verifier boundary. Cycle 17 enables a narrow optimizer
@@ -73,6 +74,7 @@ unit tests:
   fixed-vector function signature, add, return, print, and verify
   typed vector constant through freeze
   typed vector splat constant through vector icmp
+  vector mask bitcast to equal-width integer
   scalar value rejected for vector return
   scalable vector rejected
   unsupported vector element rejected

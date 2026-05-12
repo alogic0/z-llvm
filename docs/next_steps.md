@@ -27,6 +27,10 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve
       LLVM vector splat constants such as `splat (i8 10)` in vector compare
       operands. Upstream mapping is recorded in [Vector IR Boundary](ir_vectors.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve
+      fixed-vector source types in cast instructions, including vector mask
+      bitcasts to equal-width scalar integers. Upstream mapping is recorded in
+      [Vector IR Boundary](ir_vectors.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
