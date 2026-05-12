@@ -1997,6 +1997,50 @@ test "parser preserves source-backed varargs declarations and calls" {
     try std.testing.expectError(error.UnsupportedVarArgs, ir.Module.parse(std.testing.allocator, vararg_call));
 }
 
+test "verifier accepts source-backed naked function register-argument calls" {
+    const input =
+        \\define i64 @naked_target() #0 {
+        \\entry:
+        \\  unreachable
+        \\}
+        \\
+        \\define i64 @caller(ptr %entry, i64 %stack) {
+        \\entry:
+        \\  %result = call i64 @naked_target(ptr %entry, i64 %stack, i32 8195840)
+        \\  ret i64 %result
+        \\}
+        \\
+        \\attributes #0 = { naked nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+
+    const non_naked =
+        \\define i64 @target() {
+        \\entry:
+        \\  unreachable
+        \\}
+        \\
+        \\define i64 @caller(ptr %entry) {
+        \\entry:
+        \\  %result = call i64 @target(ptr %entry)
+        \\  ret i64 %result
+        \\}
+        \\
+    ;
+    var bad_module = try ir.Module.parse(std.testing.allocator, non_naked);
+    defer bad_module.deinit();
+    try std.testing.expectError(error.CallSignatureMismatch, bad_module.verify());
+}
+
 test "parser preserves return attributes before function return type" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

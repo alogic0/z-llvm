@@ -37,6 +37,9 @@ semantics needed by Zig-emitted IR corpus rows.
 - Parse indirect calls through pointer SSA values conservatively. The verifier
   checks only the callee pointer and argument values because opaque pointers do
   not carry a full callable signature locally.
+- Accept source-backed calls with register arguments to zero-parameter `naked`
+  function definitions, such as Zig's x86_64 clone shim, while continuing to
+  reject ordinary direct-call signature mismatches.
 - Fold integer min/max intrinsics only for source-backed scalar cases:
   `llvm.smin.*`, `llvm.smax.*`, `llvm.umin.*`, and `llvm.umax.*`.
 

@@ -75,6 +75,10 @@ Active cycle:
       for the compared value type `T` so non-`i32` cmpxchg pairs can feed
       `extractvalue`. Upstream mapping is recorded in [Memory IR
       Subset](ir_memory.md) and [IR Values](ir_values.md).
+- [x] Source-backed verifier blocker: accept register-argument calls to
+      zero-parameter `naked` function definitions while preserving ordinary
+      direct-call signature checks. Upstream mapping is recorded in [Intrinsics
+      And Call Semantics](semantics/intrinsics_and_call_semantics.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

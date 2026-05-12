@@ -924,7 +924,13 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     if (findFunction(module, call.callee)) |function| {
         if (!call.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, function.calling_conv)) return error.CallSignatureMismatch;
-        if (call.args.items.len != function.params.items.len) return error.CallSignatureMismatch;
+        if (call.args.items.len != function.params.items.len) {
+            if (function.params.items.len == 0 and functionHasAttribute(module, function, "naked")) {
+                for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
+                return;
+            }
+            return error.CallSignatureMismatch;
+        }
         for (call.args.items, 0..) |arg, index| {
             if (!arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
             try verifyCallArg(ctx, arg, block_index, instruction_index);
@@ -933,6 +939,42 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     }
 
     return error.UnknownFunction;
+}
+
+fn functionHasAttribute(module: core.Module, function: core.Function, name: []const u8) bool {
+    const attrs = function.attrs orelse return false;
+    if (hasAttributeToken(attrs, name)) return true;
+
+    var parts = std.mem.tokenizeAny(u8, attrs, " \t");
+    while (parts.next()) |token| {
+        if (!std.mem.startsWith(u8, token, "#")) continue;
+        if (attributeGroupHasAttribute(module, token, name)) return true;
+    }
+    return false;
+}
+
+fn attributeGroupHasAttribute(module: core.Module, group_ref: []const u8, name: []const u8) bool {
+    for (module.attribute_groups.items) |line| {
+        var rest = std.mem.trim(u8, line, " \t");
+        if (!std.mem.startsWith(u8, rest, "attributes")) continue;
+        rest = std.mem.trim(u8, rest["attributes".len..], " \t");
+        const ref_end = std.mem.indexOfAny(u8, rest, " \t") orelse continue;
+        if (!std.mem.eql(u8, rest[0..ref_end], group_ref)) continue;
+        rest = std.mem.trim(u8, rest[ref_end..], " \t");
+        if (!std.mem.startsWith(u8, rest, "=")) continue;
+        rest = std.mem.trim(u8, rest["=".len..], " \t");
+        if (rest.len < 2 or rest[0] != '{' or rest[rest.len - 1] != '}') continue;
+        if (hasAttributeToken(rest[1 .. rest.len - 1], name)) return true;
+    }
+    return false;
+}
+
+fn hasAttributeToken(attrs: []const u8, name: []const u8) bool {
+    var tokens = std.mem.tokenizeAny(u8, attrs, " \t{}=");
+    while (tokens.next()) |token| {
+        if (std.mem.eql(u8, token, name)) return true;
+    }
+    return false;
 }
 
 fn verifyCallOperandBundle(operand_bundle: ?[]const u8) !void {
