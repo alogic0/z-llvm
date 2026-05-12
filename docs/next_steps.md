@@ -56,6 +56,10 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve `poison`
       as a compact call argument value such as `i64 poison`. Upstream mapping is
       recorded in [IR Values](ir_values.md).
+- [x] Source-backed verifier blocker: accept preserved pointer parameter
+      `captures(...)` attributes including `captures(address)` and
+      `captures(address, ret: address, provenance)` while keeping capture
+      semantics conservative.
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

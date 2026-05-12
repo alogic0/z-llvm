@@ -1053,10 +1053,11 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
             }
             continue;
         }
-        if (std.mem.eql(u8, token, "captures(none)") or std.mem.eql(u8, token, "captures(address_is_null)")) {
+        if (capturesPayload(token)) |payload| {
             if (saw_captures) return error.UnsupportedCallAttribute;
             saw_captures = true;
             if (ty != .ptr) return error.UnsupportedCallAttribute;
+            if (payload.len == 0) return error.UnsupportedCallAttribute;
             continue;
         }
         if (std.mem.eql(u8, token, "align")) {
@@ -1113,6 +1114,12 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
         }
         return error.UnsupportedCallAttribute;
     }
+}
+
+fn capturesPayload(token: []const u8) ?[]const u8 {
+    const prefix = "captures(";
+    if (!std.mem.startsWith(u8, token, prefix) or !std.mem.endsWith(u8, token, ")")) return null;
+    return token[prefix.len .. token.len - 1];
 }
 
 fn dereferenceablePayload(token: []const u8) ?[]const u8 {

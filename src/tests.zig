@@ -1320,7 +1320,7 @@ test "parser preserves function visibility and parameter attributes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\define external hidden i32 @visible(i32 noundef %a, ptr nonnull readonly captures(none) initializes((0, 4)) %p) #1 {
+        \\define external hidden i32 @visible(i32 noundef %a, ptr nonnull readonly captures(none) initializes((0, 4)) %p, ptr nonnull readnone align 1 captures(address) %q, ptr nonnull readnone align 1 captures(address, ret: address, provenance) %r) #1 {
         \\entry:
         \\  ret i32 %a
         \\}
@@ -1336,6 +1336,8 @@ test "parser preserves function visibility and parameter attributes" {
     try std.testing.expectEqual(ir.FunctionVisibility.hidden, function.visibility);
     try std.testing.expectEqualStrings("noundef", function.params.items[0].attrs.?);
     try std.testing.expectEqualStrings("nonnull readonly captures(none) initializes((0, 4))", function.params.items[1].attrs.?);
+    try std.testing.expectEqualStrings("nonnull readnone align 1 captures(address)", function.params.items[2].attrs.?);
+    try std.testing.expectEqualStrings("nonnull readnone align 1 captures(address, ret: address, provenance)", function.params.items[3].attrs.?);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
