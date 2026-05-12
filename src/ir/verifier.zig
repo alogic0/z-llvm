@@ -1167,6 +1167,9 @@ fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !vo
 }
 
 fn verifyConstantExprValue(ty: core.Type, text: []const u8) anyerror!void {
+    if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}")) {
+        return if (ty == .aggregate) {} else error.TypeMismatch;
+    }
     if (std.mem.startsWith(u8, text, "sub (")) {
         switch (ty) {
             .int => {},

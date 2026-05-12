@@ -2189,9 +2189,9 @@ fn parseMemorySuffix(parts: *std.mem.TokenIterator(u8, .any), attrs: *core.Memor
 
 fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !core.PhiInst {
     var rest = std.mem.trim(u8, text["phi ".len..], " \t");
-    const ty_end = std.mem.indexOfAny(u8, rest, " \t") orelse return error.InvalidPhi;
-    const ty = try parseType(rest[0..ty_end]);
-    rest = std.mem.trim(u8, rest[ty_end..], " \t");
+    const parsed_ty = try parseLeadingType(rest);
+    const ty = parsed_ty.ty;
+    rest = std.mem.trim(u8, parsed_ty.after, " \t");
 
     var phi: core.PhiInst = .{
         .ty = ty,
@@ -2201,9 +2201,9 @@ fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !core.PhiInst {
 
     while (rest.len > 0) {
         if (rest[0] != '[') return error.InvalidPhi;
-        const close = std.mem.indexOfScalar(u8, rest, ']') orelse return error.InvalidPhi;
+        const close = findMatchingBracket(rest, 0) orelse return error.InvalidPhi;
         const incoming_text = std.mem.trim(u8, rest[1..close], " \t");
-        const comma = std.mem.indexOfScalar(u8, incoming_text, ',') orelse return error.InvalidPhi;
+        const comma = findTopLevelComma(incoming_text) orelse return error.InvalidPhi;
         const value_text = std.mem.trim(u8, incoming_text[0..comma], " \t");
         const block_text = std.mem.trim(u8, incoming_text[comma + 1 ..], " \t");
 
@@ -2579,6 +2579,7 @@ fn parseValue(text: []const u8) !core.Value {
 }
 
 fn isSupportedConstantExpr(text: []const u8) bool {
+    if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}")) return true;
     return (std.mem.startsWith(u8, text, "inttoptr (") or
         std.mem.startsWith(u8, text, "ptrtoint (") or
         std.mem.startsWith(u8, text, "sub (") or

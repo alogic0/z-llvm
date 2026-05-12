@@ -37,6 +37,9 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve
       `insertvalue` aggregate construction. Upstream mapping is recorded in
       [IR Values](ir_values.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve
+      aggregate-typed PHI nodes and aggregate constant incoming values. Upstream
+      mapping is recorded in [IR Values](ir_values.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

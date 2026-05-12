@@ -5298,6 +5298,29 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     ;
     try std.testing.expectError(error.TypeMismatch, ir.Module.parse(std.testing.allocator, bad_insertvalue));
 
+    const aggregate_phi =
+        \\define { ptr, i64 } @aggregate_phi(i1 %cond, { ptr, i64 } %value) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi { ptr, i64 } [ %value, %left ], [ { ptr inttoptr (i64 1 to ptr), i64 0 }, %right ]
+        \\  ret { ptr, i64 } %result
+        \\}
+        \\
+    ;
+    var aggregate_phi_module = try ir.Module.parse(std.testing.allocator, aggregate_phi);
+    defer aggregate_phi_module.deinit();
+    try aggregate_phi_module.verify();
+
+    var aggregate_phi_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer aggregate_phi_output.deinit();
+    try aggregate_phi_module.print(&aggregate_phi_output.writer);
+    try std.testing.expectEqualStrings(aggregate_phi, aggregate_phi_output.writer.buffered());
+
     const bad_extractvalue =
         \\define i1 @bad_extractvalue(ptr %p, i32 %old, i32 %new) {
         \\entry:
