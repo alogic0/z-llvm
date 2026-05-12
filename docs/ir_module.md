@@ -35,6 +35,8 @@ scalar global definitions: @name = [linkage] global iN <int-or-undef>
 scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
 initializerless external/extern_weak global declarations for observed pointer constants
 aggregate undef global definitions for fixed array types
+named aggregate global type prefixes, including quoted names with spaces or `=`
+opaque aggregate global initializers for source-backed named aggregate constants
 opaque C string constants for fixed i8 array globals
 thread_local scalar global and constant definitions preserved as raw address attributes
 known TLS model spellings preserved as raw address attributes

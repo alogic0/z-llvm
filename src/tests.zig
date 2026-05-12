@@ -2795,6 +2795,7 @@ test "parser preserves alias metadata attachments opaquely" {
         \\entry:
         \\  %x = load i32, ptr %a, align 4, !tbaa !0, !alias.scope !3, !noalias !6
         \\  store i32 %x, ptr %b, align 4, !tbaa !0, !alias.scope !6, !noalias !3
+        \\  %y = load ptr, ptr %b, align 8, !nonnull !8, !noundef !8
         \\  ret i32 %x
         \\}
         \\
@@ -2806,6 +2807,7 @@ test "parser preserves alias metadata attachments opaquely" {
         \\!5 = distinct !{!5}
         \\!6 = !{!7}
         \\!7 = distinct !{!7, !5}
+        \\!8 = !{}
         \\
     ;
 
@@ -2815,7 +2817,8 @@ test "parser preserves alias metadata attachments opaquely" {
 
     try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !3, !noalias !6", module.functions.items[0].blocks.items[0].instructions.items[0].metadata.?);
     try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !6, !noalias !3", module.functions.items[0].blocks.items[0].instructions.items[1].metadata.?);
-    try std.testing.expectEqual(@as(usize, 8), module.metadata.items.len);
+    try std.testing.expectEqualStrings("!nonnull !8, !noundef !8", module.functions.items[0].blocks.items[0].instructions.items[2].metadata.?);
+    try std.testing.expectEqual(@as(usize, 9), module.metadata.items.len);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -5868,6 +5871,30 @@ test "parser preserves named type definitions opaquely" {
     try std.testing.expectEqualStrings("%os.linux.rlimit = type { i64, i64 }", module.named_types.items[0].raw);
     try std.testing.expectEqualStrings("os.linux.stack_t__struct_3163", module.named_types.items[1].name);
     try std.testing.expectEqualStrings("{ ptr, i32, [4 x i8], i64 }", module.named_types.items[1].body);
+}
+
+test "parser preserves quoted named type definitions with equals in names" {
+    const input =
+        \\%"hash_map.Custom(.{ .thread_safe = true })" = type { ptr, i32, i32 }
+        \\@quoted_type_global = private unnamed_addr constant %"hash_map.Custom(.{ .thread_safe = true })" zeroinitializer, align 8
+        \\
+        \\define void @use_quoted_named_type(ptr %p) {
+        \\entry:
+        \\  %slot = alloca %"hash_map.Custom(.{ .thread_safe = true })", align 8
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 1), module.named_types.items.len);
+    try std.testing.expectEqualStrings("\"hash_map.Custom(.{ .thread_safe = true })\"", module.named_types.items[0].name);
+    try std.testing.expectEqualStrings("{ ptr, i32, i32 }", module.named_types.items[0].body);
+    try std.testing.expectEqual(@as(usize, 1), module.globals.items.len);
+    try std.testing.expectEqualStrings("%\"hash_map.Custom(.{ .thread_safe = true })\"", module.globals.items[0].ty.aggregate);
 }
 
 test "verifier rejects duplicate named type definitions" {

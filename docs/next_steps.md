@@ -88,6 +88,18 @@ Active cycle:
       `%0` when the first instruction result is nonnumeric, so PHI incoming
       edges from `%0` in stage4 standalone IR verify correctly. Upstream mapping
       is recorded in [Control Flow IR](ir_control_flow.md).
+- [x] Source-backed parser blocker: split top-level named type definitions at
+      an assignment separator outside quoted identifiers, so long quoted type
+      names containing `=` parse and verify. Upstream mapping is recorded in
+      [Named Type Definitions](ir_named_types.md).
+- [x] Source-backed parser blocker: parse quoted named aggregate type prefixes
+      on globals and leading instruction types, preserving opaque aggregate
+      initializers without interpreting layout. Upstream mapping is recorded in
+      [Module-Level IR](ir_module.md).
+- [x] Source-backed parser blocker: preserve `!nonnull` and `!noundef`
+      instruction metadata opaquely while keeping the metadata graph
+      uninterpreted. Upstream mapping is recorded in
+      [Alias Metadata Policy](analysis/alias_metadata.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

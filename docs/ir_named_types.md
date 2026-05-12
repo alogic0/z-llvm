@@ -12,6 +12,8 @@ Implemented local boundary:
 
 ```text
 parse top-level `%name = type { ... }` records before top-level fallback
+find the assignment separator outside quoted names, including source-backed
+names with `=` inside the quoted identifier
 preserve the full raw record line opaquely in module order
 print named type definitions after source/target records and module asm
 verify unique named type names and non-empty opaque bodies
@@ -28,7 +30,7 @@ Non-goals:
 ```text
 no recursive type completion validation
 no opaque struct type declarations
-no packed struct or arbitrary type-alias support
+no arbitrary type-alias support beyond observed aggregate records
 no DataLayout-backed aggregate layout from named type bodies
 no ABI lowering semantics for named type references
 ```

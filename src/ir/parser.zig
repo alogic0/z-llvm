@@ -200,7 +200,7 @@ fn parseModuleAsm(line: []const u8) !void {
 }
 
 fn parseNamedTypeDefinition(line: []const u8) !core.NamedTypeDefinition {
-    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidNamedTypeDefinition;
+    const eq_index = findAssignmentSeparator(line) orelse return error.InvalidNamedTypeDefinition;
     const name = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!isSupportedNamedTypeName(name)) return error.UnsupportedNamedTypeDefinition;
 
@@ -252,7 +252,7 @@ fn isSupportedComdatKind(kind: []const u8) bool {
 }
 
 fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
-    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.NotGlobalAlias;
+    const eq_index = findAssignmentSeparator(line) orelse return error.NotGlobalAlias;
     const name_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, name_text, "@") or name_text.len == 1) return error.InvalidGlobalAlias;
 
@@ -293,7 +293,7 @@ fn isSupportedGlobalIdentifier(text: []const u8) bool {
 }
 
 fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
-    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.UnsupportedGlobalVariable;
+    const eq_index = findAssignmentSeparator(line) orelse return error.UnsupportedGlobalVariable;
     const name_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, name_text, "@") or name_text.len == 1) return error.InvalidGlobalVariable;
 
@@ -354,6 +354,13 @@ const ParsedGlobalType = struct {
 fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (trimmed.len == 0) return error.UnsupportedGlobalVariable;
+    if (trimmed[0] == '<') {
+        const close = findMatchingAngle(trimmed, 0) orelse return error.UnsupportedGlobalVariable;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .rest = trimmed[close + 1 ..],
+        };
+    }
     if (trimmed[0] == '[') {
         const close = findMatchingBracket(trimmed, 0) orelse return error.UnsupportedGlobalVariable;
         return .{
@@ -363,6 +370,13 @@ fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
     }
     if (trimmed[0] == '{') {
         const close = findMatchingBrace(trimmed, 0) orelse return error.UnsupportedGlobalVariable;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .rest = trimmed[close + 1 ..],
+        };
+    }
+    if (trimmed.len >= 2 and trimmed[0] == '%' and trimmed[1] == '"') {
+        const close = findClosingQuote(trimmed, 1) orelse return error.UnsupportedGlobalVariable;
         return .{
             .ty = try parseType(trimmed[0 .. close + 1]),
             .rest = trimmed[close + 1 ..],
@@ -491,6 +505,46 @@ fn findLineCommentStart(line: []const u8) ?usize {
         if (byte == '"') {
             in_string = true;
         } else if (byte == ';') {
+            return index;
+        }
+    }
+    return null;
+}
+
+fn findAssignmentSeparator(line: []const u8) ?usize {
+    var in_string = false;
+    var escaped = false;
+    for (line, 0..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (byte == '"') {
+            in_string = true;
+        } else if (byte == '=') {
+            return index;
+        }
+    }
+    return null;
+}
+
+fn findClosingQuote(text: []const u8, quote_index: usize) ?usize {
+    if (quote_index >= text.len or text[quote_index] != '"') return null;
+    var escaped = false;
+    var index = quote_index + 1;
+    while (index < text.len) : (index += 1) {
+        const byte = text[index];
+        if (escaped) {
+            escaped = false;
+        } else if (byte == '\\') {
+            escaped = true;
+        } else if (byte == '"') {
             return index;
         }
     }
@@ -766,7 +820,7 @@ fn implicitEntryBlockName(module: *core.Module, function: core.Function, first_l
 }
 
 fn numericResultName(line: []const u8) ?usize {
-    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return null;
+    const eq_index = findAssignmentSeparator(line) orelse return null;
     const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (result_text.len < 2 or result_text[0] != '%') return null;
     return std.fmt.parseInt(usize, result_text[1..], 10) catch null;
@@ -837,7 +891,9 @@ fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
         std.mem.eql(u8, key, "!prof") or
         std.mem.eql(u8, key, "!tbaa") or
         std.mem.eql(u8, key, "!alias.scope") or
-        std.mem.eql(u8, key, "!noalias");
+        std.mem.eql(u8, key, "!noalias") or
+        std.mem.eql(u8, key, "!nonnull") or
+        std.mem.eql(u8, key, "!noundef");
 }
 
 fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
@@ -847,7 +903,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     if (std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return error.UnsupportedCallAttribute;
     if (std.mem.startsWith(u8, line, "invoke ") or std.mem.startsWith(u8, line, "callbr ")) return error.UnsupportedCallTerminator;
 
-    const eq_index = std.mem.indexOfScalar(u8, line, '=') orelse return error.InvalidInstruction;
+    const eq_index = findAssignmentSeparator(line) orelse return error.InvalidInstruction;
     const result_text = std.mem.trim(u8, line[0..eq_index], " \t");
     if (!std.mem.startsWith(u8, result_text, "%")) return error.InvalidValueName;
 
@@ -2514,6 +2570,13 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
     }
     if (trimmed[0] == '[') {
         const close = findMatchingBracket(trimmed, 0) orelse return error.UnsupportedType;
+        return .{
+            .ty = try parseType(trimmed[0 .. close + 1]),
+            .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),
+        };
+    }
+    if (trimmed.len >= 2 and trimmed[0] == '%' and trimmed[1] == '"') {
+        const close = findClosingQuote(trimmed, 1) orelse return error.UnsupportedType;
         return .{
             .ty = try parseType(trimmed[0 .. close + 1]),
             .after = std.mem.trim(u8, trimmed[close + 1 ..], " \t"),

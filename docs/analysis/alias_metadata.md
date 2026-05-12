@@ -30,6 +30,8 @@ forms:
 !tbaa
 !alias.scope
 !noalias
+!nonnull
+!noundef
 ```
 
 The parser preserves these attachments textually, the printer emits them back
