@@ -10,10 +10,13 @@ const usage =
     \\  --zig-source-dir=PATH   Zig source checkout used for stage4 emission [../ziglang]
     \\  --zig-exe=PATH          Zig executable for emission and local checks [<zig-source-dir>/build/stage4/bin/zig]
     \\  --test-root=PATH        Directory to scan for .zig files [<zig-source-dir>/test]
+    \\  --source-report=PATH    Use source rows from an existing report.tsv instead of scanning test-root
+    \\  --source-status=STATUS  With --source-report, keep only rows with this status
     \\  --out-dir=PATH          Discovery output directory [tmp/zig_ir/discovery]
     \\  --mode=MODE             Optimize mode [ReleaseFast]
     \\  --target=TRIPLE         Zig target [x86_64-linux-gnu]
     \\  --passes=PASSES         Local pipeline/pass list [verify]
+    \\  --local-input-limit=N   z_llvm input limit in bytes [1048576]
     \\  --max=N                 Stop after N candidate .zig files [0 means unlimited]
     \\  --progress-every=N      Write partial report and print progress every N files [25; 0 disables]
     \\  --no-strip              Do not pass -fstrip to Zig emission
@@ -31,10 +34,13 @@ const Options = struct {
     zig_source_dir: []const u8 = "../ziglang",
     zig_exe_override: ?[]const u8 = null,
     test_root_override: ?[]const u8 = null,
+    source_report: ?[]const u8 = null,
+    source_status: ?[]const u8 = null,
     out_dir: []const u8 = "tmp/zig_ir/discovery",
     mode: []const u8 = "ReleaseFast",
     target: []const u8 = "x86_64-linux-gnu",
     passes: []const u8 = "verify",
+    local_input_limit: usize = 1024 * 1024,
     max: usize = 0,
     progress_every: usize = 25,
     strip: bool = true,
@@ -78,7 +84,11 @@ pub fn main(init: std.process.Init) !void {
         for (candidates.items) |candidate| allocator.free(candidate);
         candidates.deinit(allocator);
     }
-    try collectCandidates(allocator, io, test_root, &candidates);
+    if (opts.source_report) |source_report| {
+        try collectCandidatesFromReport(allocator, io, source_report, opts.source_status, &candidates);
+    } else {
+        try collectCandidates(allocator, io, test_root, &candidates);
+    }
     std.mem.sort([]const u8, candidates.items, {}, stringLessThan);
 
     var report: std.ArrayList(u8) = .empty;
@@ -129,7 +139,7 @@ pub fn main(init: std.process.Init) !void {
 
         counts.emit_ok += 1;
 
-        const local = runLocalCheck(allocator, io, zig_exe, opts.passes, ir_path) catch |err| {
+        const local = runLocalCheck(allocator, io, zig_exe, opts.passes, opts.local_input_limit, ir_path) catch |err| {
             const log_path = try writeToolErrorLog(allocator, io, logs_dir, safe_name, "local", err);
             defer allocator.free(log_path);
             counts.optimizer_fail += 1;
@@ -195,6 +205,10 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.zig_exe_override = arg["--zig-exe=".len..];
         } else if (std.mem.startsWith(u8, arg, "--test-root=")) {
             opts.test_root_override = arg["--test-root=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--source-report=")) {
+            opts.source_report = arg["--source-report=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--source-status=")) {
+            opts.source_status = arg["--source-status=".len..];
         } else if (std.mem.startsWith(u8, arg, "--out-dir=")) {
             opts.out_dir = arg["--out-dir=".len..];
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
@@ -203,6 +217,8 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.target = arg["--target=".len..];
         } else if (std.mem.startsWith(u8, arg, "--passes=")) {
             opts.passes = arg["--passes=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--local-input-limit=")) {
+            opts.local_input_limit = try parseNonZeroUsize(arg["--local-input-limit=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--max=")) {
             opts.max = try std.fmt.parseInt(usize, arg["--max=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--progress-every=")) {
@@ -229,6 +245,12 @@ fn validateMode(mode: []const u8) !void {
     return error.UnsupportedOptimizeMode;
 }
 
+fn parseNonZeroUsize(text: []const u8) !usize {
+    const value = try std.fmt.parseInt(usize, text, 10);
+    if (value == 0) return error.InvalidInputLimit;
+    return value;
+}
+
 fn collectCandidates(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -244,6 +266,30 @@ fn collectCandidates(
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.path, ".zig")) continue;
         try candidates.append(allocator, try allocator.dupe(u8, entry.path));
+    }
+}
+
+fn collectCandidatesFromReport(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    report_path: []const u8,
+    source_status: ?[]const u8,
+    candidates: *std.ArrayList([]const u8),
+) !void {
+    const report = try std.Io.Dir.cwd().readFileAlloc(io, report_path, allocator, .limited(16 * 1024 * 1024));
+    defer allocator.free(report);
+
+    var lines = std.mem.splitScalar(u8, report, '\n');
+    _ = lines.next();
+    while (lines.next()) |line| {
+        if (std.mem.trim(u8, line, " \t\r").len == 0) continue;
+        var fields = std.mem.splitScalar(u8, line, '\t');
+        const status = fields.next() orelse continue;
+        const source = fields.next() orelse continue;
+        if (source_status) |wanted| {
+            if (!std.mem.eql(u8, status, wanted)) continue;
+        }
+        try candidates.append(allocator, try allocator.dupe(u8, source));
     }
 }
 
@@ -305,16 +351,20 @@ fn runLocalCheck(
     io: std.Io,
     zig_exe: []const u8,
     passes: []const u8,
+    local_input_limit: usize,
     ir_path: []const u8,
 ) !std.process.RunResult {
     const passes_arg = try std.fmt.allocPrint(allocator, "--passes={s}", .{passes});
     defer allocator.free(passes_arg);
+    const input_limit_arg = try std.fmt.allocPrint(allocator, "--input-limit={}", .{local_input_limit});
+    defer allocator.free(input_limit_arg);
     const argv = [_][]const u8{
         zig_exe,
         "build",
         "run",
         "--",
         passes_arg,
+        input_limit_arg,
         "--trace",
         ir_path,
     };
@@ -480,6 +530,9 @@ fn writeProgress(
         \\mode={s}
         \\target={s}
         \\passes={s}
+        \\source_report={s}
+        \\source_status={s}
+        \\local_input_limit={}
         \\candidates={}
         \\processed={}
         \\compile_skip={}
@@ -497,6 +550,9 @@ fn writeProgress(
         opts.mode,
         opts.target,
         opts.passes,
+        opts.source_report orelse "",
+        opts.source_status orelse "",
+        opts.local_input_limit,
         counts.candidates,
         processed,
         counts.compile_skip,

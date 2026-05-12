@@ -169,9 +169,9 @@ work should be selected from the backlog or a new source-backed blocker.
 
 The active work queue is kept short in [next_steps.md](next_steps.md).
 
-## Active Discovery Cycle
+## Active Tooling Cycle
 
-No active discovery cycle is selected.
+- [ ] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
 
 ## Completed Discovery Cycles
 

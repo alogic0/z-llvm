@@ -7,12 +7,15 @@ const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,verify plus inventory placeholders
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
+    \\Default input limit: 1048576 bytes
     \\
 ;
+
+const default_input_limit = 1024 * 1024;
 
 const Emit = enum {
     ir,
@@ -32,6 +35,7 @@ pub fn main(init: std.process.Init) !void {
     var trace = false;
     var timing = false;
     var pass_limit: ?usize = null;
+    var input_limit: usize = default_input_limit;
     var emit: Emit = .ir;
     var target_triple: ?[]const u8 = null;
     var target_datalayout: ?[]const u8 = null;
@@ -50,6 +54,8 @@ pub fn main(init: std.process.Init) !void {
             timing = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
+            input_limit = try parseInputLimit(arg["--input-limit=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--emit=")) {
             const emit_text = arg["--emit=".len..];
             if (std.mem.eql(u8, emit_text, "ir")) {
@@ -88,7 +94,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(2);
     };
 
-    const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
     defer allocator.free(input);
 
     var module = try ir.Module.parse(allocator, input);
@@ -154,6 +160,12 @@ pub fn main(init: std.process.Init) !void {
     });
     if (!trace) try module.print(stdout);
     try stdout.flush();
+}
+
+fn parseInputLimit(text: []const u8) !usize {
+    const limit = try std.fmt.parseInt(usize, text, 10);
+    if (limit == 0) return error.InvalidInputLimit;
+    return limit;
 }
 
 fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {

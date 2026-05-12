@@ -31,7 +31,7 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
             continue;
         }
 
-        const line_without_comment = if (std.mem.indexOfScalar(u8, raw_line, ';')) |index|
+        const line_without_comment = if (findLineCommentStart(raw_line)) |index|
             raw_line[0..index]
         else
             raw_line;
@@ -466,6 +466,29 @@ fn hasUnsupportedSanitizerAttribute(body: []const u8) bool {
         if (std.mem.startsWith(u8, token, "sanitize_")) return true;
     }
     return false;
+}
+
+fn findLineCommentStart(line: []const u8) ?usize {
+    var in_string = false;
+    var escaped = false;
+    for (line, 0..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (byte == '"') {
+            in_string = true;
+        } else if (byte == ';') {
+            return index;
+        }
+    }
+    return null;
 }
 
 fn parseModuleStringRecord(line: []const u8, key: []const u8) ![]const u8 {

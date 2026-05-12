@@ -3626,6 +3626,28 @@ test "verifier rejects unsupported aggregate globals explicitly" {
     try std.testing.expectError(error.UnsupportedGlobalVariable, module.verify());
 }
 
+test "parser preserves semicolons inside global C string literals" {
+    const input =
+        \\@ansi = private unnamed_addr constant [13 x i8] c"\1B[J\1B]9;4;0\1B\\\00", align 1
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings(
+        "c\"\\1B[J\\1B]9;4;0\\1B\\\\\\00\"",
+        module.globals.items[0].initializer.c_string,
+    );
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves scalar array global constants from switch tables" {
     const input =
         \\@switch.table = private unnamed_addr constant [3 x i32] [i32 11, i32 13, i32 17], align 4

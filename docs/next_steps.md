@@ -11,7 +11,9 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 ## Active Cycle
 
-No active cycle is selected.
+Active cycle:
+
+- [ ] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
