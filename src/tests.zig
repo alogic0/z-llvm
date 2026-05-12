@@ -5170,6 +5170,26 @@ test "parser preserves atomicrmw cmpxchg and fence barriers" {
     try extractvalue_module.print(&extractvalue_output.writer);
     try std.testing.expectEqualStrings(cmpxchg_extractvalue, extractvalue_output.writer.buffered());
 
+    const overflow_extractvalue =
+        \\declare { i8, i1 } @llvm.umul.with.overflow.i8(i8, i8)
+        \\
+        \\define i1 @overflow_extractvalue(i8 %x) {
+        \\entry:
+        \\  %pair = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 %x, i8 10)
+        \\  %overflow = extractvalue { i8, i1 } %pair, 1
+        \\  ret i1 %overflow
+        \\}
+        \\
+    ;
+    var overflow_module = try ir.Module.parse(std.testing.allocator, overflow_extractvalue);
+    defer overflow_module.deinit();
+    try overflow_module.verify();
+
+    var overflow_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer overflow_output.deinit();
+    try overflow_module.print(&overflow_output.writer);
+    try std.testing.expectEqualStrings(overflow_extractvalue, overflow_output.writer.buffered());
+
     const bad_extractvalue =
         \\define i1 @bad_extractvalue(ptr %p, i32 %old, i32 %new) {
         \\entry:

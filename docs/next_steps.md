@@ -21,6 +21,9 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve
       `extractvalue` for aggregate cmpxchg result values. Upstream mapping is
       recorded in [IR Values](ir_values.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve
+      aggregate-valued direct call results, including Zig stage4 overflow
+      intrinsic calls. Upstream mapping is recorded in [IR Values](ir_values.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

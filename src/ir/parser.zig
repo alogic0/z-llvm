@@ -1185,19 +1185,16 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     if (!std.mem.startsWith(u8, call_text, "call ")) return error.InvalidCall;
 
     var rest = std.mem.trim(u8, call_text["call ".len..], " \t");
-    var prefix_parts = std.mem.tokenizeAny(u8, rest, " \t");
-    var token = prefix_parts.next() orelse return error.InvalidCall;
+    const prefix_token = firstToken(rest) orelse return error.InvalidCall;
+    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(prefix_token)) blk: {
+        rest = trimFirstToken(rest);
+        break :blk prefix_token;
+    } else null;
 
-    const calling_conv: ?[]const u8 = if (core.isSupportedCallingConvention(token)) token else null;
-    if (calling_conv != null) token = prefix_parts.next() orelse return error.InvalidCall;
-
-    if (std.mem.indexOfScalar(u8, token, '(') != null) {
-        return error.UnsupportedIndirectCall;
-    }
-
-    const ret_ty = try parseType(token);
-    const ret_ty_offset = @intFromPtr(token.ptr) - @intFromPtr(rest.ptr) + token.len;
-    rest = std.mem.trim(u8, rest[ret_ty_offset..], " \t");
+    const ret = try parseLeadingType(rest);
+    if (ret.after.len == 0) return error.InvalidCall;
+    const ret_ty = ret.ty;
+    rest = ret.after;
 
     const callee_function_ty: ?[]const u8 = if (rest.len != 0 and rest[0] == '(') blk: {
         const close = findMatchingParen(rest, 0) orelse return error.InvalidCall;
