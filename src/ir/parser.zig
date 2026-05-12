@@ -908,6 +908,12 @@ fn isCastFlag(text: []const u8) bool {
         std.mem.eql(u8, text, "nuw");
 }
 
+fn isUnsupportedCastFlag(text: []const u8) bool {
+    return std.mem.eql(u8, text, "exact") or
+        std.mem.eql(u8, text, "disjoint") or
+        isFastMathFlagToken(text);
+}
+
 fn parseCastFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.CastFlags {
     var flags: core.CastFlags = .{};
     while (parts.peek()) |token| {
@@ -929,6 +935,7 @@ fn parseCastFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.CastFlags {
             flags.nuw = true;
             continue;
         }
+        if (isUnsupportedCastFlag(token)) return error.InvalidInstructionFlag;
         return flags;
     }
     return flags;

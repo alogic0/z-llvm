@@ -3438,6 +3438,79 @@ test "parser preserves scalar array global constants from switch tables" {
     , output.writer.buffered());
 }
 
+test "parser preserves source-backed cast flags" {
+    const input =
+        \\define i8 @narrow(i32 %x) {
+        \\entry:
+        \\  %t = trunc nuw i32 %x to i8
+        \\  ret i8 %t
+        \\}
+        \\
+        \\define i64 @widen(i8 %x) {
+        \\entry:
+        \\  %z = zext nneg i8 %x to i64
+        \\  ret i64 %z
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser and verifier reject invalid cast flags intentionally" {
+    const duplicate_flag =
+        \\define i8 @duplicate(i32 %x) {
+        \\entry:
+        \\  %t = trunc nuw nuw i32 %x to i8
+        \\  ret i8 %t
+        \\}
+        \\
+    ;
+    const unsupported_flag =
+        \\define i8 @unsupported(i32 %x) {
+        \\entry:
+        \\  %t = trunc exact i32 %x to i8
+        \\  ret i8 %t
+        \\}
+        \\
+    ;
+    const invalid_trunc_flag =
+        \\define i8 @invalid_trunc(i32 %x) {
+        \\entry:
+        \\  %t = trunc nneg i32 %x to i8
+        \\  ret i8 %t
+        \\}
+        \\
+    ;
+    const invalid_zext_flag =
+        \\define i64 @invalid_zext(i8 %x) {
+        \\entry:
+        \\  %z = zext nuw i8 %x to i64
+        \\  ret i64 %z
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.InvalidInstructionFlag, ir.Module.parse(std.testing.allocator, duplicate_flag));
+    try std.testing.expectError(error.InvalidInstructionFlag, ir.Module.parse(std.testing.allocator, unsupported_flag));
+
+    var invalid_trunc = try ir.Module.parse(std.testing.allocator, invalid_trunc_flag);
+    defer invalid_trunc.deinit();
+    try std.testing.expectError(error.InvalidInstructionFlag, invalid_trunc.verify());
+
+    var invalid_zext = try ir.Module.parse(std.testing.allocator, invalid_zext_flag);
+    defer invalid_zext.deinit();
+    try std.testing.expectError(error.InvalidInstructionFlag, invalid_zext.verify());
+}
+
 test "parser preserves scalar float arithmetic and compare IR" {
     const input =
         \\define float @float_add(float %a, float %b) {
