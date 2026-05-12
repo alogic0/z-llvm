@@ -2581,6 +2581,35 @@ test "parser preserves fixed vector signatures and rejects unsupported vector bo
     try mask_bitcast_module.print(&mask_bitcast_output.writer);
     try std.testing.expectEqualStrings(vector_compare_mask_bitcast, mask_bitcast_output.writer.buffered());
 
+    const vector_select =
+        \\define <16 x i4> @vector_select(<16 x i1> %mask, <16 x i4> %a, <16 x i4> %b) {
+        \\entry:
+        \\  %r = select <16 x i1> %mask, <16 x i4> %a, <16 x i4> %b
+        \\  ret <16 x i4> %r
+        \\}
+        \\
+    ;
+    var vector_select_module = try ir.Module.parse(std.testing.allocator, vector_select);
+    defer vector_select_module.deinit();
+    try vector_select_module.verify();
+
+    var vector_select_output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer vector_select_output.deinit();
+    try vector_select_module.print(&vector_select_output.writer);
+    try std.testing.expectEqualStrings(vector_select, vector_select_output.writer.buffered());
+
+    const bad_vector_select =
+        \\define <8 x i4> @bad_vector_select(<16 x i1> %mask, <8 x i4> %a, <8 x i4> %b) {
+        \\entry:
+        \\  %r = select <16 x i1> %mask, <8 x i4> %a, <8 x i4> %b
+        \\  ret <8 x i4> %r
+        \\}
+        \\
+    ;
+    var bad_vector_select_module = try ir.Module.parse(std.testing.allocator, bad_vector_select);
+    defer bad_vector_select_module.deinit();
+    try std.testing.expectError(error.SelectConditionTypeMismatch, bad_vector_select_module.verify());
+
     const bad_vector_splat =
         \\define i1 @bad_vector_splat_icmp(<16 x i8> %a) {
         \\entry:

@@ -20,8 +20,9 @@ undef, zeroinitializer, named vector values, and typed vector constants
 LLVM splat vector constants such as `splat (i8 10)`, including instruction
 operands and call arguments
 integer and FP binary instructions with matching fixed-vector operand types
-vector integer and FP comparisons with fixed-vector operands produce `<N x i1>`
-mask result types
+supported fixed-vector comparisons produce `<N x i1>` mask result types
+vector-condition `select` is accepted when the condition is `<N x i1>` and the
+selected values have the same fixed-vector lane count
 extractelement with scalar integer lane indices
 insertelement with matching vector element value type
 shufflevector with matching input vector types and integer vector masks
@@ -63,7 +64,7 @@ Unsupported:
 ```text
 scalable vectors
 vector element types outside integer, float, double, and ptr
-vector-condition select and vector comparisons beyond current parser boundaries
+vector comparisons beyond current parser boundaries
 vector FP transforms beyond parse/verify preservation for supported binary ops
 TargetTransformInfo-like profitability or vectorizer cost modeling
 loop-vectorize, slp-vectorizer, vector-combine
@@ -78,6 +79,8 @@ unit tests:
   typed vector constant through freeze
   typed vector splat constant through vector icmp
   vector compare mask result type feeding a bitcast
+  vector-condition select with matching lane counts accepted and mismatched
+  lane counts rejected
   vector mask bitcast to equal-width integer
   scalar value rejected for vector return
   scalable vector rejected

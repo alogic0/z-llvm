@@ -474,7 +474,7 @@ pub fn verify(module: core.Module) !void {
                     .select => |select| {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
-                        if (!select.cond_ty.eql(.{ .int = 1 })) return error.SelectConditionTypeMismatch;
+                        try verifySelectConditionType(select.cond_ty, select.ty);
                         try ctx.verifyValue(select.cond_ty, select.cond, block_index, instruction_index);
                         try ctx.verifyValue(select.ty, select.true_value, block_index, instruction_index);
                         try ctx.verifyValue(select.ty, select.false_value, block_index, instruction_index);
@@ -1402,6 +1402,17 @@ fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
 
 fn verifyVectorType(ty: core.Type) !void {
     if (ty != .vector) return error.TypeMismatch;
+}
+
+fn verifySelectConditionType(cond_ty: core.Type, value_ty: core.Type) !void {
+    if (cond_ty.eql(.{ .int = 1 })) return;
+    if (cond_ty != .vector or value_ty != .vector) return error.SelectConditionTypeMismatch;
+    if (cond_ty.vector.len != value_ty.vector.len) return error.SelectConditionTypeMismatch;
+    switch (cond_ty.vector.elem_ty) {
+        .int => |bits| if (bits == 1) return,
+        .float, .double, .ptr => {},
+    }
+    return error.SelectConditionTypeMismatch;
 }
 
 fn vectorElementType(ty: core.Type) core.Type {

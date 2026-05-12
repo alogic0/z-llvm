@@ -67,6 +67,10 @@ Active cycle:
       results as `<N x i1>` masks so source-backed vector compare masks can
       feed equal-width bitcasts. Upstream mapping is recorded in [Vector IR
       Boundary](ir_vectors.md).
+- [x] Source-backed verifier blocker: accept lane-wise vector `select`
+      conditions of type `<N x i1>` when the selected values are fixed vectors
+      with the same lane count. Upstream mapping is recorded in [Vector IR
+      Boundary](ir_vectors.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
