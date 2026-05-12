@@ -76,3 +76,6 @@ bug packet, fix report, code, fixtures, and focused reproduction.
 If review is positive, commit the reviewed code and any tracked docs before
 starting the next blocker. If review is rejected, do not commit the fix; return
 the finding to the fixer or create the next bug packet from the finding.
+
+For the three-role version of this workflow, use
+[three_agent_bug_discovery_fix_review_scheme.md](three_agent_bug_discovery_fix_review_scheme.md).
