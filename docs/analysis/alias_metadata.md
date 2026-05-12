@@ -32,6 +32,7 @@ forms:
 !noalias
 !nonnull
 !noundef
+!unpredictable
 ```
 
 The parser preserves these attachments textually, the printer emits them back

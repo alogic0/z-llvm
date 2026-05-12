@@ -27,6 +27,8 @@ extractelement with scalar integer lane indices
 insertelement with matching vector element value type
 shufflevector with matching input vector types and integer vector masks
 bitcast from fixed-width integer/FP vectors to equal-width scalar integer/FP types
+lane-wise integer trunc/zext/sext casts when fixed-vector lane counts match and
+element widths satisfy the scalar cast rule
 ```
 
 This is mostly a parser/verifier boundary. Cycle 17 enables a narrow optimizer

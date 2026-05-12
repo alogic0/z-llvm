@@ -1678,7 +1678,33 @@ fn verifyCast(cast: core.CastInst) !void {
             if (from_bits != to_bits) return error.InvalidCast;
             return;
         },
-        .trunc, .zext, .sext => {},
+        .trunc, .zext, .sext => {
+            if (cast.from_ty == .vector or cast.to_ty == .vector) {
+                const from_vector = switch (cast.from_ty) {
+                    .vector => |vector| vector,
+                    else => return error.TypeMismatch,
+                };
+                const to_vector = switch (cast.to_ty) {
+                    .vector => |vector| vector,
+                    else => return error.TypeMismatch,
+                };
+                if (from_vector.len != to_vector.len) return error.TypeMismatch;
+                const from_bits = switch (from_vector.elem_ty) {
+                    .int => |bits| bits,
+                    .float, .double, .ptr => return error.TypeMismatch,
+                };
+                const to_bits = switch (to_vector.elem_ty) {
+                    .int => |bits| bits,
+                    .float, .double, .ptr => return error.TypeMismatch,
+                };
+                switch (cast.op) {
+                    .trunc => if (from_bits <= to_bits) return error.InvalidCast,
+                    .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
+                    .bitcast, .ptrtoint, .inttoptr => unreachable,
+                }
+                return;
+            }
+        },
     }
 
     const from_bits = switch (cast.from_ty) {
@@ -1754,6 +1780,13 @@ fn verifyGlobalAddressAttrs(address_attrs: ?[]const u8) !void {
         if (std.mem.eql(u8, token, "local_unnamed_addr")) {
             if (saw_unnamed_addr or saw_local_unnamed_addr) return error.UnsupportedGlobalVariable;
             saw_local_unnamed_addr = true;
+            continue;
+        }
+        if (std.mem.eql(u8, token, "hidden") or
+            std.mem.eql(u8, token, "protected") or
+            std.mem.eql(u8, token, "dso_local") or
+            std.mem.eql(u8, token, "dso_preemptable"))
+        {
             continue;
         }
         return error.UnsupportedGlobalVariable;

@@ -2796,6 +2796,7 @@ test "parser preserves alias metadata attachments opaquely" {
         \\  %x = load i32, ptr %a, align 4, !tbaa !0, !alias.scope !3, !noalias !6
         \\  store i32 %x, ptr %b, align 4, !tbaa !0, !alias.scope !6, !noalias !3
         \\  %y = load ptr, ptr %b, align 8, !nonnull !8, !noundef !8
+        \\  %z = select i1 1, i32 %x, i32 0, !unpredictable !8
         \\  ret i32 %x
         \\}
         \\
@@ -2818,6 +2819,7 @@ test "parser preserves alias metadata attachments opaquely" {
     try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !3, !noalias !6", module.functions.items[0].blocks.items[0].instructions.items[0].metadata.?);
     try std.testing.expectEqualStrings("!tbaa !0, !alias.scope !6, !noalias !3", module.functions.items[0].blocks.items[0].instructions.items[1].metadata.?);
     try std.testing.expectEqualStrings("!nonnull !8, !noundef !8", module.functions.items[0].blocks.items[0].instructions.items[2].metadata.?);
+    try std.testing.expectEqualStrings("!unpredictable !8", module.functions.items[0].blocks.items[0].instructions.items[3].metadata.?);
     try std.testing.expectEqual(@as(usize, 9), module.metadata.items.len);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -3789,6 +3791,7 @@ test "parser preserves scalar global variables" {
         \\
         \\@g = internal global i32 42, align 4
         \\@c = private constant i8 undef
+        \\@hidden = extern_weak hidden constant ptr, align 8
         \\
         \\define i32 @readable(i32 %a) {
         \\entry:
@@ -3801,7 +3804,7 @@ test "parser preserves scalar global variables" {
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
+    try std.testing.expectEqual(@as(usize, 3), module.globals.items.len);
     try std.testing.expectEqual(ir.FunctionLinkage.internal, module.globals.items[0].linkage);
     try std.testing.expectEqual(ir.GlobalKind.global, module.globals.items[0].kind);
     try std.testing.expectEqual(@as(i128, 42), module.globals.items[0].initializer.scalar.int);
@@ -3809,6 +3812,10 @@ test "parser preserves scalar global variables" {
     try std.testing.expectEqual(ir.FunctionLinkage.private, module.globals.items[1].linkage);
     try std.testing.expectEqual(ir.GlobalKind.constant, module.globals.items[1].kind);
     try std.testing.expectEqual(ir.Value.undef, module.globals.items[1].initializer.scalar);
+    try std.testing.expectEqual(ir.FunctionLinkage.extern_weak, module.globals.items[2].linkage);
+    try std.testing.expectEqualStrings("hidden", module.globals.items[2].address_attrs.?);
+    try std.testing.expectEqual(ir.GlobalKind.constant, module.globals.items[2].kind);
+    try std.testing.expect(module.globals.items[2].initializer == .none);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -4121,6 +4128,32 @@ test "parser verifies and prints vector bitcast instruction" {
     try module.print(&output.writer);
 
     try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier accepts vector integer extension casts" {
+    const input =
+        \\define <2 x i64> @vector_zext(<2 x i32> %value) {
+        \\entry:
+        \\  %wide = zext <2 x i32> %value to <2 x i64>
+        \\  ret <2 x i64> %wide
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cast = module.functions.items[0].blocks.items[0].instructions.items[0].kind.cast;
+    try std.testing.expectEqual(ir.CastOp.zext, cast.op);
+    try std.testing.expect(cast.from_ty.eql(ir.Type{ .vector = .{
+        .len = 2,
+        .elem_ty = .{ .int = 32 },
+    } }));
+    try std.testing.expect(cast.to_ty.eql(ir.Type{ .vector = .{
+        .len = 2,
+        .elem_ty = .{ .int = 64 },
+    } }));
 }
 
 test "verifier rejects invalid scalar bitcast shapes" {

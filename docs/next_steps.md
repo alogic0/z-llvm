@@ -96,10 +96,18 @@ Active cycle:
       on globals and leading instruction types, preserving opaque aggregate
       initializers without interpreting layout. Upstream mapping is recorded in
       [Module-Level IR](ir_module.md).
-- [x] Source-backed parser blocker: preserve `!nonnull` and `!noundef`
-      instruction metadata opaquely while keeping the metadata graph
+- [x] Source-backed parser blocker: preserve `!nonnull`, `!noundef`, and
+      `!unpredictable` instruction metadata opaquely while keeping the metadata graph
       uninterpreted. Upstream mapping is recorded in
       [Alias Metadata Policy](analysis/alias_metadata.md).
+- [x] Source-backed parser blocker: preserve observed global pre-kind
+      visibility/preemption spellings such as `extern_weak hidden constant`
+      without assigning linker semantics locally. Upstream mapping is recorded
+      in [Module-Level IR](ir_module.md).
+- [x] Source-backed verifier blocker: accept lane-wise integer vector casts
+      such as `zext <2 x i32> ... to <2 x i64>` when lane counts and element
+      widths match LLVM verifier rules. Upstream mapping is recorded in
+      [Vector IR Boundary](ir_vectors.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

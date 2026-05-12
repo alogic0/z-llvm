@@ -393,6 +393,10 @@ fn parseGlobalTypePrefix(text: []const u8) !ParsedGlobalType {
 fn isGlobalAddressAttr(token: []const u8) bool {
     return std.mem.eql(u8, token, "unnamed_addr") or
         std.mem.eql(u8, token, "local_unnamed_addr") or
+        std.mem.eql(u8, token, "hidden") or
+        std.mem.eql(u8, token, "protected") or
+        std.mem.eql(u8, token, "dso_local") or
+        std.mem.eql(u8, token, "dso_preemptable") or
         std.mem.eql(u8, token, "thread_local") or
         std.mem.startsWith(u8, token, "thread_local(");
 }
@@ -893,7 +897,8 @@ fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
         std.mem.eql(u8, key, "!alias.scope") or
         std.mem.eql(u8, key, "!noalias") or
         std.mem.eql(u8, key, "!nonnull") or
-        std.mem.eql(u8, key, "!noundef");
+        std.mem.eql(u8, key, "!noundef") or
+        std.mem.eql(u8, key, "!unpredictable");
 }
 
 fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {

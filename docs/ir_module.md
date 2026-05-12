@@ -40,6 +40,8 @@ opaque aggregate global initializers for source-backed named aggregate constants
 opaque C string constants for fixed i8 array globals
 thread_local scalar global and constant definitions preserved as raw address attributes
 known TLS model spellings preserved as raw address attributes
+global pre-kind visibility/preemption spellings such as `hidden` are preserved
+as raw pre-kind attributes
 global suffix attributes preserved as raw text
 function/global linkage: default, internal, private, external, extern_weak, weak
 function visibility: default, hidden, protected
