@@ -1613,6 +1613,7 @@ fn callArgRemainderMayBeWholeValue(text: []const u8) bool {
         std.mem.eql(u8, trimmed, "inf") or
         std.mem.eql(u8, trimmed, "+inf") or
         std.mem.eql(u8, trimmed, "-inf") or
+        std.mem.startsWith(u8, trimmed, "splat (") or
         isSupportedConstantExpr(trimmed))
     {
         return true;

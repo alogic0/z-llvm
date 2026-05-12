@@ -17,7 +17,8 @@ Implemented subset:
 <N x ptr>
 vector function parameters and returns
 undef, zeroinitializer, named vector values, and typed vector constants
-LLVM splat vector constants such as `splat (i8 10)`
+LLVM splat vector constants such as `splat (i8 10)`, including instruction
+operands and call arguments
 integer and FP binary instructions with matching fixed-vector operand types
 extractelement with scalar integer lane indices
 insertelement with matching vector element value type

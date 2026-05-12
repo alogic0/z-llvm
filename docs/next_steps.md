@@ -50,6 +50,9 @@ Active cycle:
 - [x] Source-backed parser blocker: parse, verify, print, and preserve
       `indirectbr` terminators as conservative multi-successor CFG boundaries.
       Upstream mapping is recorded in [Control Flow IR](ir_control_flow.md).
+- [x] Source-backed parser blocker: parse, verify, print, and preserve vector
+      splat constants in call arguments such as `<4 x i32> splat (i32 16)`.
+      Upstream mapping is recorded in [Vector IR Boundary](ir_vectors.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

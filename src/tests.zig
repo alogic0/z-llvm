@@ -1680,6 +1680,34 @@ test "parser preserves indirectbr terminators" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves vector splat call arguments" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare <4 x i32> @add_splat(<4 x i32>, <4 x i32>)
+        \\
+        \\define <4 x i32> @caller(<4 x i32> %x) {
+        \\entry:
+        \\  %sum = call <4 x i32> @add_splat(<4 x i32> %x, <4 x i32> splat (i32 16))
+        \\  ret <4 x i32> %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("splat (i32 16)", call.args.items[1].value.vector);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser and verifier accept pointer integer casts" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
