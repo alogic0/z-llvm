@@ -103,6 +103,7 @@ pub fn resolvedDeclarationAttributes(module: ir.Module, decl: ir.FunctionDecl) A
 }
 
 pub fn callMemoryEffect(module: ir.Module, call: ir.CallInst) memory_effect.Effect {
+    if (call.operand_bundle != null) return .unknown;
     if (call.callee_value != null) return .unknown;
     const attrs = calleeAttributes(module, call.callee) orelse return .unknown;
     if (attrs.readnone) return .none;

@@ -167,7 +167,7 @@ pub const NaturalLoop = struct {
 
     pub fn isLoopInvariantValue(loop: NaturalLoop, value: ir.Value, def_blocks: std.StringHashMap(usize)) bool {
         return switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => true,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => true,
             .named => |name| {
                 const block = def_blocks.get(name) orelse return false;
                 if (block == std.math.maxInt(usize)) return true;
@@ -483,7 +483,7 @@ fn classifyInductionIncoming(loop: NaturalLoop, function: ir.Function, phi: ir.P
         if (incoming_block == loop.latch) {
             latch_value = switch (incoming.value) {
                 .named => |name| name,
-                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
             };
         } else if (incoming_block != loop.latch) {
             if (initial_value != null) return null;
@@ -517,7 +517,7 @@ fn findIntegerStep(latch: ir.BasicBlock, ty: ir.Type, phi_result: []const u8, ne
 
 fn valueMatchesName(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }
@@ -592,7 +592,7 @@ fn valuesUseLoopDefinition(loop_defs: std.StringHashMap(void), values: []const i
 
 fn valueNamesLoopDefinition(value: ir.Value, loop_defs: std.StringHashMap(void)) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |name| loop_defs.contains(name),
     };
 }

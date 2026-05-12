@@ -329,6 +329,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         }
                         try writer.writeByte(')');
                         if (call.attrs) |attrs| try writer.print(" {s}", .{attrs});
+                        if (call.operand_bundle) |operand_bundle| try writer.print(" {s}", .{operand_bundle});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                 }

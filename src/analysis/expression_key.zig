@@ -285,14 +285,15 @@ const HashState = struct {
                 state.addBytes(text);
             },
             .undef => state.addTag(4),
-            .null_value => state.addTag(5),
-            .zero_initializer => state.addTag(6),
+            .poison => state.addTag(5),
+            .null_value => state.addTag(6),
+            .zero_initializer => state.addTag(7),
             .vector => |text| {
-                state.addTag(7);
+                state.addTag(8);
                 state.addBytes(text);
             },
             .constant_expr => |text| {
-                state.addTag(8);
+                state.addTag(9);
                 state.addBytes(text);
             },
         }

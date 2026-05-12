@@ -32,7 +32,7 @@ const Lattice = union(enum) {
             .int => |int| .{ .constant_int = int },
             .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
-            .null_value => .overdefined,
+            .poison, .null_value => .overdefined,
             .zero_initializer, .vector, .constant_expr => .overdefined,
             .named => .overdefined,
         };
@@ -351,7 +351,7 @@ const Solver = struct {
             .int => |int| .{ .constant_int = int },
             .fp => |fp| .{ .constant_fp = fp },
             .undef => .undef,
-            .null_value => .overdefined,
+            .poison, .null_value => .overdefined,
             .zero_initializer, .vector, .constant_expr => .overdefined,
             .named => |name| solver.values.get(name) orelse .unknown,
         };
@@ -433,7 +433,7 @@ fn findFunction(module: ir.Module, name: []const u8) ?ir.Function {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

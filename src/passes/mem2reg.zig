@@ -659,14 +659,14 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
 
 fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |value_name| if (std.mem.eql(u8, value_name, name)) replacement else value,
     };
 }
 
 fn isNamed(value: ir.Value, name: []const u8) bool {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         .named => |value_name| std.mem.eql(u8, value_name, name),
     };
 }

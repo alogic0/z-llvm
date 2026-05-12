@@ -180,7 +180,7 @@ pub const UseCounts = struct {
 
     fn addValue(uses: *UseCounts, value: ir.Value) !void {
         switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
             .named => |name| {
                 const gop = try uses.counts.getOrPut(name);
                 if (gop.found_existing) {
@@ -194,7 +194,7 @@ pub const UseCounts = struct {
 
     fn removeValue(uses: *UseCounts, value: ir.Value) void {
         switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
             .named => |name| {
                 const count_ptr = uses.counts.getPtr(name) orelse return;
                 if (count_ptr.* <= 1) {

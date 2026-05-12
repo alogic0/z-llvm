@@ -60,3 +60,19 @@ A checkbox in `docs/next_steps.md` can be marked complete only after:
 3.  the relevant upstream LLVM mapping is documented;
 4.  the known unsupported behavior is documented;
 5.  the step is committed separately using the commit policy.
+
+## Discovery Fix Review Loop
+
+Source-backed blocker work follows this cycle:
+
+```text
+discover -> fix -> review -> commit
+```
+
+The discovery step writes one selected bug packet. The fix step implements only
+that packet and writes a fix report. The review step independently checks the
+bug packet, fix report, code, fixtures, and focused reproduction.
+
+If review is positive, commit the reviewed code and any tracked docs before
+starting the next blocker. If review is rejected, do not commit the fix; return
+the finding to the fixer or create the next bug packet from the finding.

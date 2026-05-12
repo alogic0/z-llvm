@@ -1434,6 +1434,72 @@ test "parser preserves inline asm call argument attributes" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves call operand bundles" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define void @caller() {
+        \\entry:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  call void @llvm.assume(i1 1) #0 [ "cold"() ], !noalias !0
+        \\  ret void
+        \\}
+        \\
+        \\attributes #0 = { nounwind }
+        \\
+        \\!0 = !{!1}
+        \\!1 = distinct !{!1}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const plain_call = module.functions.items[0].blocks.items[0].instructions.items[0];
+    try std.testing.expectEqualStrings("[ \"cold\"() ]", plain_call.kind.call.operand_bundle.?);
+    try std.testing.expect(plain_call.kind.call.attrs == null);
+
+    const attr_call = module.functions.items[0].blocks.items[0].instructions.items[1];
+    try std.testing.expectEqualStrings("#0", attr_call.kind.call.attrs.?);
+    try std.testing.expectEqualStrings("[ \"cold\"() ]", attr_call.kind.call.operand_bundle.?);
+    try std.testing.expectEqualStrings("!noalias !0", attr_call.metadata.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser rejects malformed call operand bundles" {
+    const unquoted =
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define void @caller() {
+        \\entry:
+        \\  call void @llvm.assume(i1 true) [ cold() ]
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedOperandBundle, ir.Module.parse(std.testing.allocator, unquoted));
+
+    const inputs =
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define void @caller(i32 %x) {
+        \\entry:
+        \\  call void @llvm.assume(i1 true) [ "cold"(i32 %x) ]
+        \\  ret void
+        \\}
+        \\
+    ;
+    try std.testing.expectError(error.UnsupportedOperandBundle, ir.Module.parse(std.testing.allocator, inputs));
+}
+
 test "verifier rejects unsupported call argument attributes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -1601,6 +1667,36 @@ test "parser preserves pointer cast constant expressions in phis" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser verifies and prints phi incoming poison" {
+    const input =
+        \\define i64 @phi_poison(i1 %cond, i64 %x) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i64 [ poison, %left ], [ %x, %right ]
+        \\  ret i64 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const phi = module.functions.items[0].blocks.items[3].instructions.items[0].kind.phi;
+    try std.testing.expectEqual(ir.Value.poison, phi.incoming.items[0].value);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves icmp samesign flag" {
     const input =
         \\define i1 @cmp(i64 %a, i64 %b) {
@@ -1648,6 +1744,40 @@ test "parser preserves integer constant expressions in icmp and binary operands"
 
     const shift = module.functions.items[0].blocks.items[0].instructions.items[1].kind.binary;
     try std.testing.expect(shift.lhs == .constant_expr);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser verifies and prints or disjoint flags" {
+    const input =
+        \\define i64 @or_disjoint(i8 %a, i64 %x) {
+        \\entry:
+        \\  %r = or disjoint i8 %a, 48
+        \\  %wide = zext i8 %r to i64
+        \\  %s = or disjoint i64 %x, 18014398509481984
+        \\  %out = or i64 %s, %wide
+        \\  ret i64 %out
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const byte_or = module.functions.items[0].blocks.items[0].instructions.items[0].kind.binary;
+    try std.testing.expectEqual(ir.BinaryOp.@"or", byte_or.op);
+    try std.testing.expect(byte_or.flags.disjoint);
+    try std.testing.expectEqual(ir.Type{ .int = 8 }, byte_or.ty);
+
+    const wide_or = module.functions.items[0].blocks.items[0].instructions.items[2].kind.binary;
+    try std.testing.expectEqual(ir.BinaryOp.@"or", wide_or.op);
+    try std.testing.expect(wide_or.flags.disjoint);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, wide_or.ty);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
@@ -2696,6 +2826,28 @@ test "function attributes classify direct call memory effects conservatively" {
     try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, unknown_call));
 }
 
+test "function attributes treat operand-bundled calls as unknown effects" {
+    const input =
+        \\declare i32 @pure() #0
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  %x = call i32 @pure() [ "cold"() ]
+        \\  ret i32 %x
+        \\}
+        \\
+        \\attributes #0 = { memory(none) nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const bundled_call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqual(memory_effect.Effect.unknown, function_attrs.callMemoryEffect(module, bundled_call));
+}
+
 fn containsText(haystack: []const []const u8, needle: []const u8) bool {
     for (haystack) |item| {
         if (std.mem.eql(u8, item, needle)) return true;
@@ -3314,6 +3466,52 @@ test "parser preserves scalar global variables" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves scalar floating point global initializers" {
+    const input =
+        \\@gf = private unnamed_addr global float 1.250000e+00, align 4
+        \\@gd = private unnamed_addr global double 1.230000e+00, align 8
+        \\
+        \\define double @read_double() {
+        \\entry:
+        \\  %v = load double, ptr @gd, align 8
+        \\  ret double %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqual(@as(usize, 2), module.globals.items.len);
+    try std.testing.expectEqualStrings("1.250000e+00", module.globals.items[0].initializer.scalar.fp);
+    try std.testing.expectEqualStrings("1.230000e+00", module.globals.items[1].initializer.scalar.fp);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects mismatched scalar floating point global initializers" {
+    const fp_on_int =
+        \\@bad = global i32 1.250000e+00
+        \\
+    ;
+    var int_module = try ir.Module.parse(std.testing.allocator, fp_on_int);
+    defer int_module.deinit();
+    try std.testing.expectError(error.UnsupportedGlobalVariable, int_module.verify());
+
+    const int_on_fp =
+        \\@bad = global double 1
+        \\
+    ;
+    var fp_module = try ir.Module.parse(std.testing.allocator, int_on_fp);
+    defer fp_module.deinit();
+    try std.testing.expectError(error.UnsupportedGlobalVariable, fp_module.verify());
+}
+
 test "parser preserves module flags and comdat records" {
     const input =
         \\source_filename = "module.zig"
@@ -3495,6 +3693,59 @@ test "parser preserves source-backed cast flags" {
     try module.print(&output.writer);
 
     try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "parser verifies and prints scalar bitcast instruction" {
+    const input =
+        \\define i64 @bitcast_double_to_i64(double %x) {
+        \\entry:
+        \\  %r = bitcast double %x to i64
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const cast = module.functions.items[0].blocks.items[0].instructions.items[0].kind.cast;
+    try std.testing.expectEqual(ir.CastOp.bitcast, cast.op);
+    try std.testing.expectEqual(@as(ir.Type, .double), cast.from_ty);
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, cast.to_ty);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
+test "verifier rejects invalid scalar bitcast shapes" {
+    const width_mismatch =
+        \\define i32 @bad_width(double %x) {
+        \\entry:
+        \\  %r = bitcast double %x to i32
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    const pointer_bitcast =
+        \\define i64 @bad_ptr(ptr %x) {
+        \\entry:
+        \\  %r = bitcast ptr %x to i64
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+
+    var bad_width = try ir.Module.parse(std.testing.allocator, width_mismatch);
+    defer bad_width.deinit();
+    try std.testing.expectError(error.InvalidCast, bad_width.verify());
+
+    var bad_ptr = try ir.Module.parse(std.testing.allocator, pointer_bitcast);
+    defer bad_ptr.deinit();
+    try std.testing.expectError(error.InvalidCast, bad_ptr.verify());
 }
 
 test "parser and verifier reject invalid cast flags intentionally" {
@@ -4408,6 +4659,57 @@ test "parser accepts array types and GEP prefixes from Zig aggregate IR" {
     const block = module.functions.items[0].blocks.items[0];
     try std.testing.expectEqualStrings("[4 x i8]", block.instructions.items[0].kind.gep.source_ty.aggregate);
     try std.testing.expectEqual(ir.Type{ .int = 8 }, block.instructions.items[1].kind.gep.source_ty);
+}
+
+test "parser accepts nested constant expression GEP pointer operands" {
+    const input =
+        \\@table = private unnamed_addr constant [4096 x i8] zeroinitializer, align 1
+        \\
+        \\define ptr @nested_gep(i64 %i) {
+        \\entry:
+        \\  %p = getelementptr inbounds nuw [4 x i8], ptr getelementptr inbounds nuw (i8, ptr @table, i64 1024), i64 %i
+        \\  ret ptr %p
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const gep = module.functions.items[0].blocks.items[0].instructions.items[0].kind.gep;
+    try std.testing.expectEqualStrings("getelementptr inbounds nuw (i8, ptr @table, i64 1024)", gep.ptr.constant_expr);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    const expected =
+        \\@table = private unnamed_addr constant [4096 x i8] zeroinitializer, align 1
+        \\
+        \\define ptr @nested_gep(i64 %i) {
+        \\entry:
+        \\  %p = getelementptr [4 x i8], ptr getelementptr inbounds nuw (i8, ptr @table, i64 1024), i64 %i
+        \\  ret ptr %p
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "parser rejects non-pointer typed nested constant expression GEP pointer operands" {
+    const input =
+        \\@table = private unnamed_addr constant [4096 x i8] zeroinitializer, align 1
+        \\
+        \\define ptr @bad_gep(i64 %i) {
+        \\entry:
+        \\  %p = getelementptr i8, i64 getelementptr (i8, ptr @table, i64 1), i64 %i
+        \\  ret ptr %p
+        \\}
+        \\
+    ;
+
+    try std.testing.expectError(error.ExpectedPointerType, ir.Module.parse(std.testing.allocator, input));
 }
 
 test "instcombine preserves non-neutral flagged arithmetic and division" {
@@ -7015,6 +7317,40 @@ test "early-cse removes matching readnone calls" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "early-cse preserves operand-bundled readnone calls conservatively" {
+    const input =
+        \\declare i32 @pure() #0
+        \\
+        \\define i32 @cse_bundled_readnone_call() {
+        \\entry:
+        \\  %x = call i32 @pure() [ "cold"() ]
+        \\  %y = call i32 @pure() [ "deopt"() ]
+        \\  %z = add i32 %x, %y
+        \\  ret i32 %z
+        \\}
+        \\
+        \\attributes #0 = { memory(none) nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(early_cse.pass);
+    try pm.add(dce.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
 test "gvn removes equivalent phi nodes and safe loads" {

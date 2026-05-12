@@ -391,7 +391,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr, .named => .{ .scalar = value },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr, .named => .{ .scalar = value },
     };
 }
 
@@ -413,7 +413,7 @@ fn parseGlobalArrayInitializer(allocator: std.mem.Allocator, ty: core.Type, text
         const value = try parseValue(item_parts.next() orelse return error.UnsupportedGlobalVariable);
         if (item_parts.next() != null) return error.UnsupportedGlobalVariable;
         switch (value) {
-            .int, .undef, .null_value => try initializer.values.append(allocator, value),
+            .int, .undef, .poison, .null_value => try initializer.values.append(allocator, value),
             .named, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
         }
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
@@ -1076,11 +1076,10 @@ fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
     rest = std.mem.trim(u8, rest[source_end + 1 ..], " \t");
     const ptr_end = findTopLevelComma(rest) orelse return error.InvalidGetElementPtr;
     const ptr_text = std.mem.trim(u8, rest[0..ptr_end], " \t");
-    var ptr_parts = std.mem.tokenizeAny(u8, ptr_text, " \t");
-    const ptr_ty = try parseType(ptr_parts.next() orelse return error.InvalidGetElementPtr);
-    if (ptr_ty != .ptr) return error.ExpectedPointerType;
-    gep.ptr = try parseValue(ptr_parts.next() orelse return error.InvalidGetElementPtr);
-    if (ptr_parts.next() != null) return error.InvalidGetElementPtr;
+    const ptr_arg = try parseLeadingType(ptr_text);
+    if (ptr_arg.ty != .ptr) return error.ExpectedPointerType;
+    if (ptr_arg.after.len == 0) return error.InvalidGetElementPtr;
+    gep.ptr = try parseValue(ptr_arg.after);
 
     rest = std.mem.trim(u8, rest[ptr_end + 1 ..], " \t");
     while (rest.len != 0) {
@@ -1151,8 +1150,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     } else null;
 
     const open_paren = std.mem.indexOfScalar(u8, rest, '(') orelse return error.InvalidCall;
-    const close_paren = std.mem.lastIndexOfScalar(u8, rest, ')') orelse return error.InvalidCall;
-    if (close_paren < open_paren) return error.InvalidCall;
+    const close_paren = findMatchingParen(rest, open_paren) orelse return error.InvalidCall;
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
     const inline_asm = if (std.mem.startsWith(u8, callee_text, "asm "))
         try parseInlineAsm(callee_text)
@@ -1169,13 +1167,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
             if (isUnsupportedInstrumentationCallee(callee_text[1..])) return error.UnsupportedInstrumentationCall;
         }
     }
-    const trailing = std.mem.trim(u8, rest[close_paren + 1 ..], " \t");
-    const attrs = if (trailing.len == 0)
-        null
-    else if (isSupportedCallAttributeRef(trailing))
-        trailing
-    else
-        return error.UnsupportedCallAttribute;
+    const trailing = try parseCallTrailing(rest[close_paren + 1 ..]);
 
     var call: core.CallInst = .{
         .ret_ty = ret_ty,
@@ -1185,7 +1177,8 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
         .calling_conv = calling_conv,
         .tail_kind = tail_kind,
         .inline_asm = inline_asm,
-        .attrs = attrs,
+        .attrs = trailing.attrs,
+        .operand_bundle = trailing.operand_bundle,
         .raw_args = null,
         .args = .empty,
     };
@@ -1193,7 +1186,7 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
 
     const args_text = rest[open_paren + 1 .. close_paren];
     if (inline_asm == null and isSupportedDebugIntrinsicCallee(call.callee)) {
-        if (call.calling_conv != null or call.tail_kind != null or call.attrs != null or call.ret_ty != .void or result != null) {
+        if (call.calling_conv != null or call.tail_kind != null or call.attrs != null or call.operand_bundle != null or call.ret_ty != .void or result != null) {
             return error.UnsupportedDebugIntrinsic;
         }
         try validateDebugIntrinsicArgs(call.callee, args_text);
@@ -1208,12 +1201,66 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     };
 }
 
+const CallTrailing = struct {
+    attrs: ?[]const u8 = null,
+    operand_bundle: ?[]const u8 = null,
+};
+
+fn parseCallTrailing(text: []const u8) !CallTrailing {
+    var rest = std.mem.trim(u8, text, " \t");
+    var trailing: CallTrailing = .{};
+
+    if (rest.len == 0) return trailing;
+
+    if (rest[0] == '#') {
+        const attrs = firstToken(rest) orelse return error.UnsupportedCallAttribute;
+        if (!isSupportedCallAttributeRef(attrs)) return error.UnsupportedCallAttribute;
+        trailing.attrs = attrs;
+        rest = std.mem.trim(u8, rest[attrs.len..], " \t");
+    }
+
+    if (rest.len == 0) return trailing;
+    if (rest[0] != '[') return error.UnsupportedCallAttribute;
+
+    try validateCallOperandBundle(rest);
+    trailing.operand_bundle = rest;
+    return trailing;
+}
+
 fn isSupportedCallAttributeRef(text: []const u8) bool {
     if (text.len < 2 or text[0] != '#') return false;
     for (text[1..]) |byte| {
         if (!std.ascii.isDigit(byte)) return false;
     }
     return true;
+}
+
+fn validateCallOperandBundle(text: []const u8) !void {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len < 2 or trimmed[0] != '[') return error.UnsupportedOperandBundle;
+    const close = findMatchingBracket(trimmed, 0) orelse return error.UnsupportedOperandBundle;
+    if (close + 1 != trimmed.len) return error.UnsupportedOperandBundle;
+
+    var rest = std.mem.trim(u8, trimmed[1..close], " \t");
+    if (rest.len == 0) return error.UnsupportedOperandBundle;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const bundle = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        try validateCallOperandBundleEntry(bundle);
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+}
+
+fn validateCallOperandBundleEntry(text: []const u8) !void {
+    var rest = std.mem.trim(u8, text, " \t");
+    const tag = parseQuotedPrefix(&rest) orelse return error.UnsupportedOperandBundle;
+    if (tag.len == 0) return error.UnsupportedOperandBundle;
+
+    rest = std.mem.trim(u8, rest, " \t");
+    if (rest.len == 0 or rest[0] != '(') return error.UnsupportedOperandBundle;
+    const close = findMatchingParen(rest, 0) orelse return error.UnsupportedOperandBundle;
+    if (close + 1 != rest.len) return error.UnsupportedOperandBundle;
+    if (std.mem.trim(u8, rest[1..close], " \t").len != 0) return error.UnsupportedOperandBundle;
 }
 
 fn parseInlineAsm(text: []const u8) !core.InlineAsm {
@@ -2232,6 +2279,7 @@ fn parseValue(text: []const u8) !core.Value {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (trimmed.len == 0) return error.InvalidValue;
     if (std.mem.eql(u8, trimmed, "undef")) return .undef;
+    if (std.mem.eql(u8, trimmed, "poison")) return .poison;
     if (std.mem.eql(u8, trimmed, "null")) return .null_value;
     if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .zero_initializer;
     if (std.mem.eql(u8, trimmed, "true")) return .{ .int = 1 };

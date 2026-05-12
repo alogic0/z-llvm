@@ -107,6 +107,7 @@ pub const Value = union(enum) {
     int: i128,
     fp: []const u8,
     undef,
+    poison,
     null_value,
     zero_initializer,
     vector: []const u8,
@@ -116,26 +117,27 @@ pub const Value = union(enum) {
         return switch (a) {
             .named => |name| switch (b) {
                 .named => |other_name| std.mem.eql(u8, name, other_name),
-                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
             },
             .int => |value| switch (b) {
-                .named, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
                 .int => |other_value| value == other_value,
             },
             .fp => |text| switch (b) {
                 .fp => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .undef, .null_value, .zero_initializer, .vector, .constant_expr => false,
+                .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
             },
             .undef => b == .undef,
+            .poison => b == .poison,
             .null_value => b == .null_value,
             .zero_initializer => b == .zero_initializer,
             .vector => |text| switch (b) {
                 .vector => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .fp, .undef, .null_value, .zero_initializer, .constant_expr => false,
+                .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .constant_expr => false,
             },
             .constant_expr => |text| switch (b) {
                 .constant_expr => |other_text| std.mem.eql(u8, text, other_text),
-                .named, .int, .fp, .undef, .null_value, .zero_initializer, .vector => false,
+                .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => false,
             },
         };
     }
@@ -152,6 +154,7 @@ pub const Value = union(enum) {
             .int => |int| try writer.print("{}", .{int}),
             .fp => |text| try writer.writeAll(text),
             .undef => try writer.writeAll("undef"),
+            .poison => try writer.writeAll("poison"),
             .null_value => try writer.writeAll("null"),
             .zero_initializer => try writer.writeAll("zeroinitializer"),
             .vector => |text| try writer.writeAll(text),
@@ -238,6 +241,7 @@ pub const CastOp = enum {
     trunc,
     zext,
     sext,
+    bitcast,
     ptrtoint,
     inttoptr,
 
@@ -245,6 +249,7 @@ pub const CastOp = enum {
         if (std.mem.eql(u8, text, "trunc")) return .trunc;
         if (std.mem.eql(u8, text, "zext")) return .zext;
         if (std.mem.eql(u8, text, "sext")) return .sext;
+        if (std.mem.eql(u8, text, "bitcast")) return .bitcast;
         if (std.mem.eql(u8, text, "ptrtoint")) return .ptrtoint;
         if (std.mem.eql(u8, text, "inttoptr")) return .inttoptr;
         return null;
@@ -702,6 +707,7 @@ pub const CallInst = struct {
     tail_kind: ?[]const u8 = null,
     inline_asm: ?InlineAsm = null,
     attrs: ?[]const u8 = null,
+    operand_bundle: ?[]const u8 = null,
     raw_args: ?[]const u8 = null,
     args: std.ArrayList(CallArg),
 
@@ -868,7 +874,7 @@ pub const Instruction = struct {
 
 fn resolveValue(aliases: std.StringHashMap(Value), value: Value) Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

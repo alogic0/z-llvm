@@ -69,7 +69,7 @@ fn canonicalize(instruction: *ir.Instruction) bool {
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {
     return switch (value) {
-        .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => value,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
         .named => |name| aliases.get(name) orelse value,
     };
 }

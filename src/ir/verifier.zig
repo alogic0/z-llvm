@@ -193,7 +193,7 @@ const VerifyContext = struct {
                 _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
                 return;
             },
-            .undef => return,
+            .undef, .poison => return,
             .null_value => unreachable,
             .zero_initializer => return,
             .vector => |text| return verifyVectorLiteral(ty, text),
@@ -215,7 +215,7 @@ const VerifyContext = struct {
                 _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
                 return;
             },
-            .undef => return,
+            .undef, .poison => return,
             .null_value => unreachable,
             .zero_initializer => return,
             .vector => |text| return verifyVectorLiteral(ty, text),
@@ -337,25 +337,31 @@ pub fn verify(module: core.Module) !void {
             },
             .scalar => |value| switch (global.ty) {
                 .int => switch (value) {
-                    .int, .undef => {},
+                    .int, .undef, .poison => {},
                     .named, .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
                 .ptr => switch (value) {
-                    .undef, .null_value, .named => {},
+                    .undef, .poison, .null_value, .named => {},
                     .int, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
+                .float, .double => switch (value) {
+                    .fp => |text| {
+                        _ = fp_semantics.classify(global.ty, text) catch return error.UnsupportedFloatingPointLiteral;
+                    },
+                    .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
+                },
                 .aggregate => switch (value) {
-                    .undef, .zero_initializer => {},
+                    .undef, .poison, .zero_initializer => {},
                     .int, .fp, .named, .null_value, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
-                .void, .float, .double, .metadata, .vector => return error.UnsupportedGlobalVariable,
+                .void, .metadata, .vector => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
                 if (!array_ty.elem_ty.eql(array.elem_ty)) return error.UnsupportedGlobalVariable;
                 if (array.values.items.len != array_ty.len) return error.UnsupportedGlobalVariable;
                 for (array.values.items) |value| switch (value) {
-                    .int, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+                    .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
                     .fp, .named => return error.UnsupportedGlobalVariable,
                 };
             },
@@ -402,7 +408,7 @@ pub fn verify(module: core.Module) !void {
         if (global.initializer == .scalar and global.ty == .ptr) {
             switch (global.initializer.scalar) {
                 .named => |name| if (isGlobalValueName(name) and !hasGlobalValue(module, name[1..])) return error.UnknownGlobalAliasTarget,
-                .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
             }
         }
     }
@@ -856,6 +862,7 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     if (call.calling_conv) |calling_conv| {
         if (!core.isSupportedCallingConvention(calling_conv)) return error.UnsupportedCallingConvention;
     }
+    try verifyCallOperandBundle(call.operand_bundle);
 
     if (call.inline_asm) |inline_asm| {
         if (!inline_asm.sideeffect) return error.UnsupportedInlineAsm;
@@ -900,6 +907,47 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     }
 
     return error.UnknownFunction;
+}
+
+fn verifyCallOperandBundle(operand_bundle: ?[]const u8) !void {
+    const text = std.mem.trim(u8, operand_bundle orelse return, " \t");
+    if (text.len < 2 or text[0] != '[') return error.UnsupportedOperandBundle;
+    const close = findMatchingBracket(text, 0) orelse return error.UnsupportedOperandBundle;
+    if (close + 1 != text.len) return error.UnsupportedOperandBundle;
+
+    var rest = std.mem.trim(u8, text[1..close], " \t");
+    if (rest.len == 0) return error.UnsupportedOperandBundle;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const bundle = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        try verifyCallOperandBundleEntry(bundle);
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+}
+
+fn verifyCallOperandBundleEntry(text: []const u8) !void {
+    var rest = std.mem.trim(u8, text, " \t");
+    const tag = parseQuotedPrefix(&rest) orelse return error.UnsupportedOperandBundle;
+    if (tag.len == 0) return error.UnsupportedOperandBundle;
+
+    rest = std.mem.trim(u8, rest, " \t");
+    if (rest.len == 0 or rest[0] != '(') return error.UnsupportedOperandBundle;
+    const close = findMatchingParen(rest, 0) orelse return error.UnsupportedOperandBundle;
+    if (close + 1 != rest.len) return error.UnsupportedOperandBundle;
+    if (std.mem.trim(u8, rest[1..close], " \t").len != 0) return error.UnsupportedOperandBundle;
+}
+
+fn parseQuotedPrefix(rest: *[]const u8) ?[]const u8 {
+    const text = std.mem.trim(u8, rest.*, " \t");
+    if (text.len == 0 or text[0] != '"') return null;
+    var index: usize = 1;
+    while (index < text.len) : (index += 1) {
+        if (text[index] == '"' and text[index - 1] != '\\') {
+            rest.* = text[index + 1 ..];
+            return text[1..index];
+        }
+    }
+    return null;
 }
 
 fn verifyCallArg(ctx: VerifyContext, arg: core.CallArg, block_index: usize, instruction_index: usize) !void {
@@ -1322,7 +1370,7 @@ fn verifyLaneIndex(vector_ty: core.Type, index_ty: core.Type, index: core.Value)
     if (index_ty != .int) return error.TypeMismatch;
     switch (index) {
         .int => |lane| if (lane < 0 or lane >= vector_ty.vector.len) return error.TypeMismatch,
-        .named, .undef => {},
+        .named, .undef, .poison => {},
         .fp, .null_value, .zero_initializer, .vector, .constant_expr => return error.TypeMismatch,
     }
 }
@@ -1335,7 +1383,7 @@ fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value)
     }
     switch (mask) {
         .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
-        .undef, .zero_initializer => {},
+        .undef, .poison, .zero_initializer => {},
         .named, .int, .fp, .null_value, .constant_expr => return error.TypeMismatch,
     }
 }
@@ -1404,16 +1452,56 @@ fn findMatchingAngle(text: []const u8, open_index: usize) ?usize {
     return null;
 }
 
+fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '(') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '(') {
+            depth += 1;
+        } else if (byte == ')') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
+fn findMatchingBracket(text: []const u8, open_index: usize) ?usize {
+    if (open_index >= text.len or text[open_index] != '[') return null;
+    var depth: usize = 0;
+    for (text[open_index..], open_index..) |byte, index| {
+        if (byte == '[') {
+            depth += 1;
+        } else if (byte == ']') {
+            depth -= 1;
+            if (depth == 0) return index;
+        }
+    }
+    return null;
+}
+
 fn findTopLevelComma(text: []const u8) ?usize {
     var angle_depth: usize = 0;
+    var bracket_depth: usize = 0;
+    var paren_depth: usize = 0;
     for (text, 0..) |byte, index| {
         switch (byte) {
+            '[' => bracket_depth += 1,
+            ']' => {
+                if (bracket_depth == 0) return null;
+                bracket_depth -= 1;
+            },
+            '(' => paren_depth += 1,
+            ')' => {
+                if (paren_depth == 0) return null;
+                paren_depth -= 1;
+            },
             '<' => angle_depth += 1,
             '>' => {
                 if (angle_depth == 0) return null;
                 angle_depth -= 1;
             },
-            ',' => if (angle_depth == 0) return index,
+            ',' => if (angle_depth == 0 and bracket_depth == 0 and paren_depth == 0) return index,
             else => {},
         }
     }
@@ -1486,6 +1574,12 @@ fn verifyCast(cast: core.CastInst) !void {
             if (cast.to_ty != .ptr) return error.InvalidCast;
             return;
         },
+        .bitcast => {
+            const from_bits = scalarBitcastBits(cast.from_ty) orelse return error.InvalidCast;
+            const to_bits = scalarBitcastBits(cast.to_ty) orelse return error.InvalidCast;
+            if (from_bits != to_bits) return error.InvalidCast;
+            return;
+        },
         .trunc, .zext, .sext => {},
     }
 
@@ -1500,7 +1594,7 @@ fn verifyCast(cast: core.CastInst) !void {
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-        .ptrtoint, .inttoptr => unreachable,
+        .bitcast, .ptrtoint, .inttoptr => unreachable,
     }
 }
 
@@ -1512,10 +1606,19 @@ fn verifyCastFlags(cast: core.CastInst) !void {
         .zext => {
             if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
         },
-        .sext, .ptrtoint, .inttoptr => {
+        .sext, .bitcast, .ptrtoint, .inttoptr => {
             if (cast.flags.any()) return error.InvalidInstructionFlag;
         },
     }
+}
+
+fn scalarBitcastBits(ty: core.Type) ?u16 {
+    return switch (ty) {
+        .int => |bits| bits,
+        .float => 32,
+        .double => 64,
+        .void, .metadata, .ptr, .aggregate, .vector => null,
+    };
 }
 
 fn verifyMemoryAttrs(attrs: core.MemoryAttrs) !void {

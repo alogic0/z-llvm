@@ -239,14 +239,14 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
         .trunc => truncateConstant(cast.value.int, to_bits),
         .zext => zeroExtendConstant(cast.value.int, from_bits),
         .sext => signExtendConstant(cast.value.int, from_bits),
-        .ptrtoint, .inttoptr => null,
+        .bitcast, .ptrtoint, .inttoptr => null,
     };
 }
 
 fn simplifyFreeze(freeze: ir.FreezeInst) ?ir.Value {
     return switch (freeze.value) {
         .int => freeze.value,
-        .named, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
 }
 

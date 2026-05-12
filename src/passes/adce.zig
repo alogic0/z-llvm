@@ -112,7 +112,7 @@ const LiveInstructions = struct {
 
     fn markValue(liveness: *LiveInstructions, value: ir.Value) !void {
         switch (value) {
-            .int, .fp, .undef, .null_value, .zero_initializer, .vector, .constant_expr => {},
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
             .named => |name| if (liveness.defs.get(name)) |index| try liveness.mark(index),
         }
     }
