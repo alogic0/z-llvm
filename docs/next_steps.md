@@ -11,21 +11,18 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 30: Inline asm memory-effect refinement
+Active slice: Slice 31: LTO prelink alias canonicalization
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `InlineAsm` extra-info flags, memory constraint classes, and
-      `CallBase` memory-effect handling.
-- [x] Represent inline-asm side effects separately from memory read/write
-      effects.
-- [x] Derive local `may_load`/`may_store` facts from `~{memory}` and simple
-      memory constraints.
-- [x] Keep non-`sideeffect` inline asm and target-specific constraint lowering
-      documented as local boundaries.
-- [x] Add unit and opt fixture coverage for side-effect-only and memory-clobber
-      inline asm behavior.
-- [x] Update atomic/inline-asm, memory-effect, parity, and roadmap docs.
-- [x] Run focused inline-asm comparison/tests.
+- [x] Map LLVM `CanonicalizeAliases.cpp` recursive alias-chain flattening.
+- [x] Replace the `canonicalize-aliases` placeholder with a real module pass.
+- [x] Implement alias-to-alias target canonicalization for represented global
+      aliases.
+- [x] Keep constant-expression aliasee rewriting and full private anonymous
+      value canonicalization documented as unsupported.
+- [x] Add opt-equivalent fixture coverage for an alias chain.
+- [x] Update LTO, parity, and roadmap docs.
+- [x] Run focused alias canonicalization comparison/tests.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 30.
+- [x] Review and commit Slice 31.

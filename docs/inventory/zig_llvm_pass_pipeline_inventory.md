@@ -260,7 +260,7 @@ Status meanings:
 | `coro-annotation-elide` | coroutine lowering | P3 | placeholder | `llvm/lib/Transforms/Coroutines/CoroAnnotationElide.cpp` |
 | `alloc-token` | allocation instrumentation | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/AllocToken.cpp` |
 | `memprof-remove-attributes` | MemProf cleanup | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/MemProfUse.cpp` |
-| `canonicalize-aliases` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
+| `canonicalize-aliases` | LTO/global canonicalization | P3 | alias-chain flattening slice | `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp` |
 | `name-anon-globals` | LTO/global canonicalization | P3 | placeholder | `llvm/lib/Transforms/Utils/NameAnonGlobals.cpp` |
 | `rel-lookup-table-converter` | codegen/linker prep | P3 | placeholder | `llvm/lib/Transforms/Utils/RelLookupTableConverter.cpp` |
 | `transform-warning` | diagnostics | P3 | placeholder | `llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp` |

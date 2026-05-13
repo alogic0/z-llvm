@@ -159,7 +159,7 @@ Each slice is complete only when it has:
 - [x] Slice 30: Inline asm memory effect refinement.
       Classify side effects from inline asm constraints and sideeffect markers.
       Required upstream mapping: LLVM inline asm memory effect handling.
-- [ ] Slice 31: LTO prelink alias canonicalization.
+- [x] Slice 31: LTO prelink alias canonicalization.
       Replace `canonicalize-aliases` placeholder for one alias-to-global shape.
       Required upstream mapping:
       `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp`.

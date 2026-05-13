@@ -4,6 +4,7 @@ const adce = @import("passes/adce.zig");
 const always_inline = @import("passes/always_inline.zig");
 const bdce = @import("passes/bdce.zig");
 const correlated_propagation = @import("passes/correlated_propagation.zig");
+const canonicalize_aliases = @import("passes/canonicalize_aliases.zig");
 const constmerge = @import("passes/constmerge.zig");
 const function_attrs = @import("passes/function_attrs.zig");
 const instcombine = @import("passes/instcombine.zig");
@@ -487,7 +488,7 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "recompute-globalsaa")) return placeholder.make("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
     if (std.mem.eql(u8, name, "globals-aa")) return placeholder.make("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
     if (std.mem.eql(u8, name, "mergefunc")) return placeholder.make("mergefunc", .ipo, "llvm/lib/Transforms/IPO/MergeFunctions.cpp");
-    if (std.mem.eql(u8, name, "canonicalize-aliases")) return placeholder.make("canonicalize-aliases", .lto, "llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp");
+    if (std.mem.eql(u8, name, "canonicalize-aliases")) return canonicalize_aliases.pass;
     if (std.mem.eql(u8, name, "name-anon-globals")) return placeholder.make("name-anon-globals", .lto, "llvm/lib/Transforms/Utils/NameAnonGlobals.cpp");
     if (std.mem.eql(u8, name, "require<globals-aa>")) return placeholder.make("require<globals-aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
     if (std.mem.eql(u8, name, "invalidate<aa>")) return placeholder.make("invalidate<aa>", .analysis, "llvm/include/llvm/IR/PassManager.h");
