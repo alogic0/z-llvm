@@ -13,6 +13,28 @@ const Definition = struct {
     location: ?InstructionLocation = null,
 };
 
+const ModuleLookup = struct {
+    module: core.Module,
+    declarations: *const std.StringHashMap(usize),
+    functions: *const std.StringHashMap(usize),
+    global_defs: *const std.StringHashMap(void),
+    decl_defs: *const std.StringHashMap(void),
+
+    fn findDeclaration(lookup: ModuleLookup, name: []const u8) ?core.FunctionDecl {
+        const index = lookup.declarations.get(name) orelse return null;
+        return lookup.module.declarations.items[index];
+    }
+
+    fn findFunction(lookup: ModuleLookup, name: []const u8) ?core.Function {
+        const index = lookup.functions.get(name) orelse return null;
+        return lookup.module.functions.items[index];
+    }
+
+    fn hasGlobalValue(lookup: ModuleLookup, name: []const u8) bool {
+        return lookup.global_defs.contains(name) or lookup.decl_defs.contains(name);
+    }
+};
+
 const VerifyContext = struct {
     allocator: std.mem.Allocator,
     function: core.Function,
@@ -343,6 +365,10 @@ pub fn verify(module: core.Module) !void {
     defer global_defs.deinit();
     var decl_defs = std.StringHashMap(void).init(module.allocator);
     defer decl_defs.deinit();
+    var decl_indices = std.StringHashMap(usize).init(module.allocator);
+    defer decl_indices.deinit();
+    var function_indices = std.StringHashMap(usize).init(module.allocator);
+    defer function_indices.deinit();
     var comdat_defs = std.StringHashMap(void).init(module.allocator);
     defer comdat_defs.deinit();
 
@@ -419,28 +445,38 @@ pub fn verify(module: core.Module) !void {
         if (alias.target_ty != .ptr) return error.UnsupportedGlobalAlias;
     }
 
-    for (module.declarations.items) |decl| {
+    for (module.declarations.items, 0..) |decl, decl_index| {
         if (global_defs.contains(decl.name)) return error.DuplicateDefinition;
         if (decl_defs.contains(decl.name)) return error.DuplicateDefinition;
         try verifyDeclAbiAttrs(decl);
         try decl_defs.put(decl.name, {});
+        try decl_indices.put(decl.name, decl_index);
     }
 
-    for (module.functions.items) |function| {
+    for (module.functions.items, 0..) |function, function_index| {
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
-        if (findDeclaration(module, function.name)) |decl| try verifyDeclMatchesFunction(decl, function);
+        if (decl_indices.get(function.name)) |decl_index| try verifyDeclMatchesFunction(module.declarations.items[decl_index], function);
         try verifyFunctionAbiAttrs(function);
         try verifyComdatReference(function.attrs, comdat_defs);
         try global_defs.put(function.name, {});
+        try function_indices.put(function.name, function_index);
     }
 
+    const lookup: ModuleLookup = .{
+        .module = module,
+        .declarations = &decl_indices,
+        .functions = &function_indices,
+        .global_defs = &global_defs,
+        .decl_defs = &decl_defs,
+    };
+
     for (module.aliases.items) |alias| {
-        if (!hasGlobalValue(module, alias.target)) return error.UnknownGlobalAliasTarget;
+        if (!lookup.hasGlobalValue(alias.target)) return error.UnknownGlobalAliasTarget;
     }
     for (module.globals.items) |global| {
         if (global.initializer == .scalar and global.ty == .ptr) {
             switch (global.initializer.scalar) {
-                .named => |name| if (isGlobalValueName(name) and !hasGlobalValue(module, name[1..])) return error.UnknownGlobalAliasTarget,
+                .named => |name| if (isGlobalValueName(name) and !lookup.hasGlobalValue(name[1..])) return error.UnknownGlobalAliasTarget,
                 .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => {},
             }
         }
@@ -617,7 +653,7 @@ pub fn verify(module: core.Module) !void {
                         } else if (instruction.result == null) {
                             return error.InstructionNeedsResult;
                         }
-                        try verifyCall(module, ctx, call, block_index, instruction_index);
+                        try verifyCall(lookup, ctx, call, block_index, instruction_index);
                     },
                 }
             }
@@ -913,7 +949,7 @@ fn isGlobalValueName(name: []const u8) bool {
     return std.mem.startsWith(u8, name, "@");
 }
 
-fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, block_index: usize, instruction_index: usize) !void {
+fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, block_index: usize, instruction_index: usize) !void {
     if (call.calling_conv) |calling_conv| {
         if (!core.isSupportedCallingConvention(calling_conv)) return error.UnsupportedCallingConvention;
     }
@@ -932,11 +968,11 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
     }
 
     if (call.isDebugVariableLocation()) {
-        try verifyDebugVariableLocationCall(module, call);
+        try verifyDebugVariableLocationCall(lookup.module, call);
         return;
     }
 
-    if (findDeclaration(module, call.callee)) |decl| {
+    if (lookup.findDeclaration(call.callee)) |decl| {
         if (!call.ret_ty.eql(decl.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, decl.calling_conv)) return error.CallSignatureMismatch;
         if (decl.is_varargs) {
@@ -950,11 +986,11 @@ fn verifyCall(module: core.Module, ctx: VerifyContext, call: core.CallInst, bloc
         return;
     }
 
-    if (findFunction(module, call.callee)) |function| {
+    if (lookup.findFunction(call.callee)) |function| {
         if (!call.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, function.calling_conv)) return error.CallSignatureMismatch;
         if (call.args.items.len != function.params.items.len) {
-            if (function.params.items.len == 0 and functionHasAttribute(module, function, "naked")) {
+            if (function.params.items.len == 0 and functionHasAttribute(lookup.module, function, "naked")) {
                 for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
                 return;
             }

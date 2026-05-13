@@ -19,6 +19,9 @@ Active cycle:
 - [x] Verifier throughput blocker: replace dense per-candidate dominator
       recomputation with bitset dominator sets, restoring fast verification for
       large Debug functions such as `behavior/sizeof_and_typeof.zig`.
+- [x] Verifier throughput blocker: build module-level declaration, function,
+      and global lookup maps once per verification instead of repeatedly
+      scanning the full module for call and global-reference checks.
 - [x] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
 - [x] Source-backed parser blocker: accept constant-expression `getelementptr`
       pointer operands in load, store, atomicrmw, and cmpxchg memory
