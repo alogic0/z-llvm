@@ -17,8 +17,13 @@ AAResultBase::alias
 BasicAAResult::alias
 BasicAAResult::aliasCheck
 BasicAAResult::aliasGEP
+BasicAAResult::getMemoryEffects
+BasicAAResult::getModRefInfo
+BasicAAResult::getArgModRefInfo
 MemoryLocation
 AAResults::getModRefInfo
+AAResults::getMemoryEffects
+MemoryEffects
 ModRefInfo
 ```
 
@@ -33,7 +38,12 @@ LLVM source files:
 LLVM entry points/classes:
   AAResults::alias
   AAResults::getModRefInfo
+  AAResults::getMemoryEffects
   BasicAAResult::aliasGEP
+  BasicAAResult::getMemoryEffects
+  BasicAAResult::getModRefInfo
+  BasicAAResult::getArgModRefInfo
+  MemoryEffects
   ModRefInfo
 
 Required analyses:
@@ -59,7 +69,16 @@ Implemented subset:
   Known disjoint byte ranges
   Known partial-overlap byte ranges
   Load/store mod-ref queries
-  Volatile/atomic/call unknown barriers
+  Direct-call mod-ref queries for resolved `memory(...)`, `readnone`,
+  `readonly`, `writeonly`, `argmemonly`, and `inaccessiblememonly`
+  attributes.
+  Inaccessible memory is removed from ordinary `MemoryLocation` queries, matching
+  LLVM BasicAA's `getWithoutLoc(IRMemLocation::InaccessibleMem)` shape.
+  Argmem-only calls are refined by aliasing each pointer call argument against
+  the queried local memory location.
+  Distinct stack roots are no-alias against incoming pointer parameters for
+  accepted local-object queries.
+  Volatile/atomic/unknown-call barriers
   Alias metadata preservation only; `!tbaa`, `!alias.scope`, and `!noalias`
   are not consumed by alias queries.
 
@@ -71,9 +90,10 @@ Analysis preservation/invalidation:
 
 Fixture coverage:
   unit tests in src/tests.zig
+  opt fixture: gvn_argmemonly_call_no_clobber
 
 opt-22 comparison command:
-  not applicable; currently analysis-only
+  bash scripts/compare_opt.sh test/opt/fixtures.tsv
 
 Local-only fixture command:
   zig build test
@@ -95,6 +115,14 @@ may_alias for unknown same-root GEP offsets
 may_alias for distinct parameters, unknown values, and non-stack-slot values
 mod/ref scaffold for load and store instructions
 no_mod_ref for memory instructions proven no_alias to the queried pointer
+direct call ModRef classification through function/declaration/call-site memory
+attributes
+no_mod_ref for `memory(none)` and inaccessiblemem-only direct calls when
+querying ordinary LLVM IR-accessible memory
+ref/mod/mod_ref for `memory(read)`, `memory(write)`, and `memory(readwrite)`
+direct calls
+argmem-only direct calls refine their result by checking pointer call arguments
+against the queried MemoryLocation
 unknown mod/ref for volatile or atomic memory barriers
 ```
 
@@ -103,7 +131,7 @@ Upstream mapping:
 ```text
 This reproduces the stack-slot and pointer-parameter identity, first GEP-root tracing, MemoryLocation-backed byte range checks, and conservative mod/ref scaffolding needed by memory optimizations.
 LLVM BasicAA proves much broader no-alias facts using object identity, GEP offsets, sizes, globals, captures, calls, invariant metadata, and recursive queries through AAResults.
-LLVM's mod/ref queries combine alias analysis with instruction memory behavior; this subset only distinguishes direct load ref, direct store mod, no_mod_ref for known no-alias stack slots, and unknown barriers. Partial-alias ranges remain mod/ref barriers.
+LLVM's mod/ref queries combine alias analysis with instruction memory behavior. This subset distinguishes direct load ref, direct store mod, direct call effects from resolved `MemoryEffects`-shaped attributes, no_mod_ref for known no-alias stack slots, and unknown barriers. Partial-alias ranges remain mod/ref barriers.
 ```
 
 Current users:
@@ -124,9 +152,10 @@ Known gaps:
 no address spaces
 no capture analysis; distinct pointer parameters remain may_alias
 globals are limited to accepted scalar global definitions and aliases
-calls are limited to function-attribute memory-effect classification
+calls are limited to resolved direct-call memory-effect attributes; no operand
+bundle, indirect call, target-library, or intrinsic-specific ModRef refinement
 no metadata-driven alias precision; see `docs/analysis/alias_metadata.md`
 no aggregate, struct, or vector layout
-no precise mod_ref result for calls or unknown instructions
+unknown instructions still return unknown mod/ref
 no query cache
 ```

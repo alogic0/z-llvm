@@ -105,6 +105,7 @@ opt-22 equivalent:
   gvn_phi
   gvn_load_call_clobber_reject
   gvn_readonly_call_no_clobber
+  gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
 
@@ -119,9 +120,10 @@ local-only conservative:
   because scalar PRE insertion is not implemented.
   gvn_diamond_load_no_memory_phi is local-conservative because local leader
   naming differs from opt-22 while MemorySSA proves the same load redundancy.
-  readnone call GVN is unit-tested locally. Readonly calls are trusted only as
-  non-clobbering memory accesses for repeated loads, matching the local
-  `memory(read)` fixture.
+  readnone call GVN is unit-tested locally. Readonly calls and accepted
+  argmem-only noalias calls are trusted as non-clobbering memory accesses for
+  repeated loads, matching the local `memory(read)` and `memory(argmem: write)`
+  fixtures.
   fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
   more FP expressions when the exact legality conditions are proven; this
   project keeps them out of GVN for now.

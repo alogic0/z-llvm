@@ -297,12 +297,6 @@ pub fn isBarrier(module: ir.Module, function: ir.Function, instruction: ir.Instr
 }
 
 pub fn isBarrierForAccess(module: ir.Module, function: ir.Function, instruction: ir.Instruction, ptr: ir.Value, access_ty: ?ir.Type) bool {
-    if (instruction.kind == .call) {
-        return switch (function_attrs.callMemoryEffect(module, instruction.kind.call)) {
-            .none, .readonly_load => false,
-            .memory_write, .volatile_or_atomic_barrier, .unknown => true,
-        };
-    }
     const mod_ref = if (access_ty) |ty|
         alias.modRefInModuleForAccess(module, function, instruction, ptr, ty)
     else

@@ -11,23 +11,27 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 8: DSE overwrite lattice for partial stores
+Active slice: Slice 9: Function call ModRef expansion
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `OverwriteResult`, `isOverwrite`, `isPartialOverwrite`, and
-      `InstOverlapIntervalsTy` entry points.
-- [x] Define the accepted local IR surface: same-block non-volatile integer
-      stores with known byte offsets and fixed byte sizes.
-- [x] Add a small byte-interval lattice for later partial stores that together
-      fully cover an earlier store.
-- [x] Preserve existing barriers: intervening loads, calls, volatile/atomic
-      memory, unknown locations, may-alias accesses, and cross-block DSE.
-- [x] Add an `opt-22` positive fixture where two later byte stores fully cover
-      an earlier wider integer store.
-- [x] Keep the existing partial-overwrite rejection fixture for incomplete
-      coverage.
-- [x] Update DSE, MemorySSA, and parity docs.
-- [x] Run focused DSE comparison.
+- [x] Map LLVM `BasicAAResult::getMemoryEffects`,
+      `BasicAAResult::getModRefInfo`, `MemoryEffects`, and `ModRefInfo`.
+- [x] Define the accepted local IR surface: direct non-inline-asm calls with
+      resolved declaration/function/call-site attributes and pointer arguments.
+- [x] Parse and model `memory(none)`, `memory(read)`, `memory(write)`,
+      `memory(readwrite)`, `memory(argmem: ...)`, `memory(inaccessiblemem: ...)`,
+      `readnone`, `readonly`, `writeonly`, `argmemonly`, and
+      `inaccessiblememonly` for ModRef queries.
+- [x] Route call ModRef queries through the alias layer so MemorySSA-backed
+      GVN, EarlyCSE, DSE, and LICM legality can distinguish no-mod-ref,
+      ref-only, mod-only, and unknown direct calls.
+- [x] Add unit coverage for readnone, readonly, argmem-only alias/noalias,
+      inaccessiblemem-only, and unknown direct calls.
+- [x] Add an `opt-22` comparison fixture showing an argmem-only noalias call
+      does not clobber a later load.
+- [x] Keep existing unknown-call clobber fixtures as negative boundaries.
+- [x] Update alias, MemorySSA/call-semantics, and parity docs.
+- [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 8 complete in the roadmap.
+- [x] Review, commit, and mark Slice 9 complete in the roadmap.

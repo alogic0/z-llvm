@@ -59,7 +59,7 @@ Each slice is complete only when it has:
       Replace reject-only partial overwrite behavior with a byte-interval
       lattice for selected integer stores. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp`.
-- [ ] Slice 9: Function call ModRef expansion.
+- [x] Slice 9: Function call ModRef expansion.
       Model readonly, readnone, argmemonly, inaccessiblememonly, and direct
       call effects in the local alias/ModRef layer. Required upstream mapping:
       `llvm/lib/Analysis/BasicAliasAnalysis.cpp` and LLVM `ModRefInfo`.

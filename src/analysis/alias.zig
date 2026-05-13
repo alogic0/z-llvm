@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+const function_attrs = @import("function_attrs.zig");
 const memory_effect = @import("memory_effect.zig");
 const memory_location = @import("memory_location.zig");
 
@@ -52,7 +53,9 @@ pub fn accessAliasInModule(module: ir.Module, function: ir.Function, a: ir.Value
 
 pub fn aliasLocations(a: memory_location.MemoryLocation, b: memory_location.MemoryLocation) AliasResult {
     if (!std.mem.eql(u8, a.root, b.root)) {
-        if (a.root_kind == .parameter or b.root_kind == .parameter) return .may_alias;
+        if (a.root_kind == .parameter and b.root_kind == .parameter) return .may_alias;
+        if (a.root_kind == .parameter and b.root_kind != .stack) return .may_alias;
+        if (b.root_kind == .parameter and a.root_kind != .stack) return .may_alias;
         return .no_alias;
     }
     if (rangesDoNotOverlap(a, b)) return .no_alias;
@@ -91,7 +94,8 @@ pub fn modRefInModule(module: ir.Module, function: ir.Function, instruction: ir.
             return if (accessAliasesPointerInModule(module, function, layout, store.ptr, store.ty, pointer)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence => .unknown,
+        .call => |call| callModRefInModule(module, function, layout, call, pointer),
     };
 }
 
@@ -122,7 +126,75 @@ pub fn modRefInModuleForAccess(module: ir.Module, function: ir.Function, instruc
             return if (accessAliasesAccessInModule(module, function, layout, store.ptr, store.ty, pointer, access_ty)) .mod else .no_mod_ref;
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => .no_mod_ref,
-        .atomicrmw, .cmpxchg, .fence, .call => .unknown,
+        .atomicrmw, .cmpxchg, .fence => .unknown,
+        .call => |call| callModRefInModuleForAccess(module, function, layout, call, pointer, access_ty),
+    };
+}
+
+fn callModRefInModule(module: ir.Module, function: ir.Function, layout: ?@import("../target.zig").DataLayout, call: ir.CallInst, pointer: ir.Value) ModRefInfo {
+    return callModRefForLocation(module, function, layout, call, pointer, null);
+}
+
+fn callModRefInModuleForAccess(module: ir.Module, function: ir.Function, layout: ?@import("../target.zig").DataLayout, call: ir.CallInst, pointer: ir.Value, access_ty: ir.Type) ModRefInfo {
+    return callModRefForLocation(module, function, layout, call, pointer, access_ty);
+}
+
+fn callModRefForLocation(module: ir.Module, function: ir.Function, layout: ?@import("../target.zig").DataLayout, call: ir.CallInst, pointer: ir.Value, access_ty: ?ir.Type) ModRefInfo {
+    const attrs = function_attrs.resolvedCallAttributes(module, call) orelse return .unknown;
+    const effects = attrs.memory_effects orelse return .unknown;
+
+    var result = toAliasModRef(effects.other);
+    if (effects.argmem != .no_mod_ref and callArgMayAliasLocation(module, function, layout, call, pointer, access_ty)) {
+        result = mergeModRef(result, toAliasModRef(effects.argmem));
+    }
+    return result;
+}
+
+fn callArgMayAliasLocation(module: ir.Module, function: ir.Function, layout: ?@import("../target.zig").DataLayout, call: ir.CallInst, pointer: ir.Value, access_ty: ?ir.Type) bool {
+    const query_location = if (access_ty) |ty|
+        locationForAccess(module, function, layout, pointer, ty) orelse return true
+    else
+        locationForPointer(module, function, layout, pointer) orelse return true;
+
+    for (call.args.items) |arg| {
+        if (arg.ty != .ptr) continue;
+        const arg_location = locationForPointer(module, function, layout, arg.value) orelse return true;
+        if (aliasLocations(arg_location, query_location) != .no_alias) return true;
+    }
+    return false;
+}
+
+fn toAliasModRef(value: function_attrs.AttributeSet.ModRef) ModRefInfo {
+    return switch (value) {
+        .no_mod_ref => .no_mod_ref,
+        .ref => .ref,
+        .mod => .mod,
+        .mod_ref => .mod_ref,
+    };
+}
+
+fn mergeModRef(a: ModRefInfo, b: ModRefInfo) ModRefInfo {
+    if (a == .unknown or b == .unknown) return .unknown;
+    const bits = modRefBits(a) | modRefBits(b);
+    return modRefFromBits(bits);
+}
+
+fn modRefBits(value: ModRefInfo) u2 {
+    return switch (value) {
+        .no_mod_ref => 0,
+        .ref => 1,
+        .mod => 2,
+        .mod_ref => 3,
+        .unknown => 3,
+    };
+}
+
+fn modRefFromBits(bits: u2) ModRefInfo {
+    return switch (bits) {
+        0 => .no_mod_ref,
+        1 => .ref,
+        2 => .mod,
+        3 => .mod_ref,
     };
 }
 

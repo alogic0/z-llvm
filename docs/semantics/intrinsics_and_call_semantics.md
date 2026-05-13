@@ -28,6 +28,15 @@ semantics needed by Zig-emitted IR corpus rows.
   for call memory-effect classification.
 - Treat `memory(none)` and `readnone` calls as no-memory-effect.
 - Treat `memory(read)` and `readonly` calls as read-only memory effects.
+- Preserve a small LLVM `MemoryEffects`-shaped model for direct calls:
+  all-memory `read`/`write`/`readwrite`, `argmem: ...`, and
+  `inaccessiblemem: ...`.
+- Treat `memory(argmem: ...)` direct calls as argument-memory-only for alias
+  ModRef queries when pointer arguments can be compared with the queried local
+  memory location.
+- Treat `memory(inaccessiblemem: ...)` direct calls as no-mod-ref for ordinary
+  LLVM IR-accessible memory queries while preserving their overall side-effect
+  classification.
 - Keep unknown calls and unknown intrinsics conservative.
 - Parse `llvm.assume` as a direct void call. Its Zig-emitted
   `memory(inaccessiblemem: write)` attribute keeps it side-effecting in the
@@ -80,6 +89,8 @@ bash scripts/compare_opt.sh
 - `invoke`, `callbr`, full `musttail` legality/lowering, operand bundle
   semantics, and inline asm lowering remain unsupported.
 - Attribute groups are parsed only as preserved IR records with conservative
-  memory-effect extraction, not as a full LLVM attribute model.
+  memory-effect extraction, not as a full LLVM attribute model. Operand bundles,
+  indirect calls, target-library effects, and intrinsic-specific call effects
+  remain conservative.
 - Loop instruction metadata is accepted only as parser input and is not
   preserved by the printer yet.

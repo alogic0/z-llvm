@@ -47,9 +47,13 @@ expose mayReadOrWriteMemory, mayThrow, mayTrap, isSafeToDelete, and isSafeToSpec
 split volatile and atomic spelling through barrierKind while keeping both as hard barriers
 feed DCE, ADCE, GVN, and LICM legality through the shared classification
 feed EarlyCSE candidate legality through the shared safe-to-delete helper
-pair with alias.modRef for conservative load/store mod-ref answers
+pair with alias.modRef for conservative load/store/direct-call mod-ref answers
 partial-alias ranges from alias analysis remain mod/ref barriers
 pair with the MemorySSA walker-shaped clobber helper for GVN load availability
+direct calls use a small LLVM `MemoryEffects`-shaped attribute model for
+`memory(none)`, all-memory `read`/`write`/`readwrite`, `argmem: ...`,
+`inaccessiblemem: ...`, `readnone`, `readonly`, `writeonly`, `argmemonly`, and
+`inaccessiblememonly`
 ```
 
 Fixture coverage:
@@ -59,6 +63,7 @@ opt-22 equivalent:
   dce_scalar_with_memory
   dce_volatile_load_reject
   gvn_scalar_with_memory
+  gvn_argmemonly_call_no_clobber
   licm_scalar_with_memory
   vector_lane_dead_dce
 
@@ -84,9 +89,11 @@ Upstream mapping:
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
 This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly. Fixed-vector lane operations are pure instructions, not memory barriers.
-Direct calls use preserved callee attributes only for the local `memory(none)`,
-`memory(read)`, `memory(write)`, `readnone`, `readonly`, and `writeonly`
-classification boundary.
+Direct calls use preserved callee/call-site attributes for the local
+`MemoryEffects`-shaped classification boundary. Alias ModRef ignores
+inaccessible memory for ordinary `MemoryLocation` queries and refines argmem
+effects through pointer call arguments when local MemoryLocation facts are
+available.
 LICM also rejects locally trapping scalar operations such as division by an unknown denominator through the shared speculation helper.
 ```
 

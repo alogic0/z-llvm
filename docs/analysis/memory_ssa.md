@@ -57,6 +57,11 @@ Implemented subset:
   def/barrier for the queried pointer using module DataLayout and globals.
   readnone and readonly direct calls are treated as non-clobbering for load
   availability through function attribute classification.
+  Direct calls with resolved `memory(argmem: ...)` attributes use alias ModRef
+  refinement, so a write through a noalias stack pointer argument does not
+  clobber an unrelated queried location.
+  Direct calls with resolved `memory(inaccessiblemem: ...)` attributes are
+  ignored for ordinary LLVM IR-accessible memory queries.
   Fixed-vector extractelement, insertelement, and shufflevector instructions are
   pure non-accesses, so they do not create MemoryUse, MemoryDef, or barrier
   entries.
@@ -108,6 +113,7 @@ Fixture coverage:
   opt fixture: early_cse_readonly_call_no_clobber
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixture: gvn_load_pre_diamond
+  opt fixture: gvn_argmemonly_call_no_clobber
   opt fixtures: early_cse_load_branch_clobber_reject
   opt fixture: early_cse_unreachable_store_not_clobber
   opt fixtures: gvn_vector_lane_not_clobber,

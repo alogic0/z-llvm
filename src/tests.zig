@@ -3411,6 +3411,54 @@ test "function attributes classify Zig memory effects conservatively" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "alias modref refines direct call memory effects" {
+    const input =
+        \\declare i32 @pure(i32) #0
+        \\declare i32 @reads_all(ptr) #1
+        \\declare void @arg_reads(ptr) #2
+        \\declare void @arg_writes(ptr) #3
+        \\declare void @inaccessible_write() #4
+        \\declare void @unknown(ptr)
+        \\
+        \\define void @caller(i32 %seed) {
+        \\entry:
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  %x = call i32 @pure(i32 %seed)
+        \\  %y = call i32 @reads_all(ptr %left)
+        \\  call void @arg_reads(ptr %left)
+        \\  call void @arg_writes(ptr %right)
+        \\  call void @arg_writes(ptr %left)
+        \\  call void @inaccessible_write()
+        \\  call void @unknown(ptr %left)
+        \\  ret void
+        \\}
+        \\
+        \\attributes #0 = { memory(none) }
+        \\attributes #1 = { memory(read, argmem: none, inaccessiblemem: none, target_mem0: none) }
+        \\attributes #2 = { memory(argmem: read) }
+        \\attributes #3 = { memory(argmem: write) }
+        \\attributes #4 = { memory(inaccessiblemem: write) }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    const block = function.blocks.items[0];
+    const left = ir.Value{ .named = "left" };
+
+    try std.testing.expectEqual(alias.ModRefInfo.no_mod_ref, alias.modRefInModule(module, function, block.instructions.items[2], left));
+    try std.testing.expectEqual(alias.ModRefInfo.ref, alias.modRefInModule(module, function, block.instructions.items[3], left));
+    try std.testing.expectEqual(alias.ModRefInfo.ref, alias.modRefInModule(module, function, block.instructions.items[4], left));
+    try std.testing.expectEqual(alias.ModRefInfo.no_mod_ref, alias.modRefInModule(module, function, block.instructions.items[5], left));
+    try std.testing.expectEqual(alias.ModRefInfo.mod, alias.modRefInModule(module, function, block.instructions.items[6], left));
+    try std.testing.expectEqual(alias.ModRefInfo.no_mod_ref, alias.modRefInModule(module, function, block.instructions.items[7], left));
+    try std.testing.expectEqual(alias.ModRefInfo.unknown, alias.modRefInModule(module, function, block.instructions.items[8], left));
+}
+
 test "instcombine folds integer minmax intrinsics for same operands" {
     const input =
         \\declare i32 @llvm.smin.i32(i32, i32) #0
@@ -6353,7 +6401,7 @@ test "alias analysis classifies stack slots" {
         alias.alias(function, .{ .named = "left" }, .{ .named = "right" }),
     );
     try std.testing.expectEqual(
-        alias.AliasResult.may_alias,
+        alias.AliasResult.no_alias,
         alias.alias(function, .{ .named = "left" }, .{ .named = "arg" }),
     );
 }
@@ -6536,7 +6584,7 @@ test "memory effect and mod-ref classify memory instructions conservatively" {
         alias.modRef(function, block.instructions.items[4], .{ .named = "left" }),
     );
     try std.testing.expectEqual(
-        alias.ModRefInfo.ref,
+        alias.ModRefInfo.no_mod_ref,
         alias.modRef(function, block.instructions.items[4], .{ .named = "arg" }),
     );
     try std.testing.expectEqual(
