@@ -40,7 +40,7 @@ src/pipelines.zig
 | Sparse constants | `sccp` foundation | fixture-equivalent for listed fixtures | InstSimplify, PHI simplification, SimplifyCFG cleanup |
 | Redundancy removal | `early-cse`, `gvn` foundation | `gvn` fixture-equivalent; `early-cse` unit-test-only for current broader local behavior | DominatorTree, InstSimplify equivalence, alias/mod-ref |
 | Memory cleanup | `dse` foundation | fixture-equivalent for listed fixtures | MemoryLocation, alias/mod-ref barriers |
-| Deferred scalar CFG/range passes | `correlated-propagation`, `reassociate`, `constraint-elimination`, `speculative-execution`, `bdce` | placeholder/deferred; `jump-threading` has a branch-on-PHI predecessor-constant slice | requires richer PHI translation, range facts, poison/flag model, KnownBits, or speculation policy |
+| Deferred scalar CFG/range passes | `reassociate`, `constraint-elimination`, `speculative-execution`, `bdce` | placeholder/deferred; `jump-threading` and `correlated-propagation` have narrow LLVM-shaped slices | requires richer PHI translation, range facts, poison/flag model, KnownBits, or speculation policy |
 
 ## Implemented Scalar Passes
 
@@ -60,11 +60,11 @@ The development scalar pipeline is:
 ```text
 simplifycfg
 jump-threading
-correlated-propagation placeholder
+correlated-propagation
 instcombine
 simplifycfg
 jump-threading
-correlated-propagation placeholder
+correlated-propagation
 instcombine
 aggressive-instcombine placeholder
 lower-constant-intrinsics placeholder

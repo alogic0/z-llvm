@@ -99,11 +99,11 @@ Implemented development pipelines:
 scalar-foundation:
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder
@@ -121,11 +121,11 @@ memory-foundation:
 zig-scalar-foundation:
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder
@@ -155,11 +155,11 @@ release-o3:
   mem2reg
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   simplifycfg
   jump-threading
-  correlated-propagation placeholder
+  correlated-propagation
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder

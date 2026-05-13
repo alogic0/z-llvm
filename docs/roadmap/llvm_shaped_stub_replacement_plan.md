@@ -31,7 +31,7 @@ Each slice is complete only when it has:
       condition is known along a predecessor edge. Keep PHI repair modeled
       after LLVM CFG update helpers. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/JumpThreading.cpp`.
-- [ ] Slice 3: `correlated-propagation` for branch-implied integer facts.
+- [x] Slice 3: `correlated-propagation` for branch-implied integer facts.
       Add a small LazyValueInfo-shaped fact table for `icmp` facts coming from
       dominating branches. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` and

@@ -202,7 +202,7 @@ Status meanings:
 | `loop-sink` | loop canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopSink.cpp` |
 | `extra-simple-loop-unswitch-passes` | loop optimization | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
 | `jump-threading` | CFG/scalar | P2 | branch-on-PHI predecessor-constant slice | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
-| `correlated-propagation` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
+| `correlated-propagation` | scalar | P2 | branch-implied integer icmp fact slice | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
 | `reassociate` | scalar canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
 | `constraint-elimination` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |
 | `speculative-execution` | scalar/code motion | P3 | placeholder | `llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp` |
