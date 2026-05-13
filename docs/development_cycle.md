@@ -28,6 +28,16 @@ scripts/lint_zig_ir_manifest.sh
 
 Readiness checks run manifest linting but do not regenerate fixtures.
 
+For corpus discovery, keep the same split:
+
+- stage4 Zig emits authoritative LLVM IR through `--zig-exe` or the default
+  `../ziglang/build/stage4/bin/zig`;
+- local checks build and run `z_llvm` with `zig` on `PATH` in ReleaseFast mode
+  by default;
+- use `--local-zllvm-exe=zig-out/bin/z_llvm` after an explicit
+  `zig build -Doptimize=ReleaseFast` when repeating large sweeps;
+- use `--local-trace` only for focused debugging, not full discovery sweeps.
+
 ## Required Upstream Mapping
 
 Each pass, analysis, IR feature, or codegen feature must document:

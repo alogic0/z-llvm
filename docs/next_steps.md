@@ -13,7 +13,7 @@ with text such as `(in progress: Cycle N in docs/next_steps.md)`.
 
 Active cycle:
 
-- [ ] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
+- [x] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
 - [x] Source-backed parser blocker: accept constant-expression `getelementptr`
       pointer operands in load, store, atomicrmw, and cmpxchg memory
       instructions. Upstream mapping is recorded in [Memory IR
@@ -112,6 +112,10 @@ Active cycle:
       brackets outside quoted labels, so generated labels containing `[]` do
       not terminate the switch early. Upstream mapping is recorded in
       [Control Flow IR](ir_control_flow.md).
+- [x] Source-backed discovery tooling blocker: run local corpus checks through
+      an optimized `z_llvm` path by default, keep stage4 Zig for IR emission,
+      and make trace output opt-in so large debug-heavy rows such as
+      `standalone/coff_dwarf/main.zig` do not dominate discovery sweeps.
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

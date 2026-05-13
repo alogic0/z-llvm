@@ -8,7 +8,11 @@ const usage =
     \\
     \\Options:
     \\  --zig-source-dir=PATH   Zig source checkout used for stage4 emission [../ziglang]
-    \\  --zig-exe=PATH          Zig executable for emission and local checks [<zig-source-dir>/build/stage4/bin/zig]
+    \\  --zig-exe=PATH          Zig executable for IR emission [<zig-source-dir>/build/stage4/bin/zig]
+    \\  --local-zig-exe=PATH    Zig executable for building/running z_llvm local checks [zig]
+    \\  --local-zllvm-exe=PATH  Prebuilt z_llvm executable for local checks [build through --local-zig-exe]
+    \\  --local-build-optimize=MODE
+    \\                          Optimize mode for `zig build run` local checks [ReleaseFast]
     \\  --test-root=PATH        Directory to scan for .zig files [<zig-source-dir>/test]
     \\  --source-report=PATH    Use source rows from an existing report.tsv instead of scanning test-root
     \\  --source-status=STATUS  With --source-report, keep only rows with this status
@@ -19,6 +23,7 @@ const usage =
     \\  --local-input-limit=N   z_llvm input limit in bytes [1048576]
     \\  --max=N                 Stop after N candidate .zig files [0 means unlimited]
     \\  --progress-every=N      Write partial report and print progress every N files [25; 0 disables]
+    \\  --local-trace           Pass --trace to z_llvm during local checks
     \\  --no-strip              Do not pass -fstrip to Zig emission
     \\  --help                  Show this help
     \\
@@ -33,6 +38,9 @@ const usage =
 const Options = struct {
     zig_source_dir: []const u8 = "../ziglang",
     zig_exe_override: ?[]const u8 = null,
+    local_zig_exe: []const u8 = "zig",
+    local_zllvm_exe: ?[]const u8 = null,
+    local_build_optimize: []const u8 = "ReleaseFast",
     test_root_override: ?[]const u8 = null,
     source_report: ?[]const u8 = null,
     source_status: ?[]const u8 = null,
@@ -43,6 +51,7 @@ const Options = struct {
     local_input_limit: usize = 1024 * 1024,
     max: usize = 0,
     progress_every: usize = 25,
+    local_trace: bool = false,
     strip: bool = true,
 };
 
@@ -139,7 +148,7 @@ pub fn main(init: std.process.Init) !void {
 
         counts.emit_ok += 1;
 
-        const local = runLocalCheck(allocator, io, zig_exe, opts.passes, opts.local_input_limit, ir_path) catch |err| {
+        const local = runLocalCheck(allocator, io, opts, ir_path) catch |err| {
             const log_path = try writeToolErrorLog(allocator, io, logs_dir, safe_name, "local", err);
             defer allocator.free(log_path);
             counts.optimizer_fail += 1;
@@ -203,6 +212,12 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.zig_source_dir = arg["--zig-source-dir=".len..];
         } else if (std.mem.startsWith(u8, arg, "--zig-exe=")) {
             opts.zig_exe_override = arg["--zig-exe=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--local-zig-exe=")) {
+            opts.local_zig_exe = arg["--local-zig-exe=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--local-zllvm-exe=")) {
+            opts.local_zllvm_exe = arg["--local-zllvm-exe=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--local-build-optimize=")) {
+            opts.local_build_optimize = arg["--local-build-optimize=".len..];
         } else if (std.mem.startsWith(u8, arg, "--test-root=")) {
             opts.test_root_override = arg["--test-root=".len..];
         } else if (std.mem.startsWith(u8, arg, "--source-report=")) {
@@ -223,6 +238,8 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.max = try std.fmt.parseInt(usize, arg["--max=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--progress-every=")) {
             opts.progress_every = try std.fmt.parseInt(usize, arg["--progress-every=".len..], 10);
+        } else if (std.mem.eql(u8, arg, "--local-trace")) {
+            opts.local_trace = true;
         } else if (std.mem.eql(u8, arg, "--no-strip")) {
             opts.strip = false;
         } else {
@@ -349,27 +366,33 @@ fn runEmit(
 fn runLocalCheck(
     allocator: std.mem.Allocator,
     io: std.Io,
-    zig_exe: []const u8,
-    passes: []const u8,
-    local_input_limit: usize,
+    opts: Options,
     ir_path: []const u8,
 ) !std.process.RunResult {
-    const passes_arg = try std.fmt.allocPrint(allocator, "--passes={s}", .{passes});
+    const passes_arg = try std.fmt.allocPrint(allocator, "--passes={s}", .{opts.passes});
     defer allocator.free(passes_arg);
-    const input_limit_arg = try std.fmt.allocPrint(allocator, "--input-limit={}", .{local_input_limit});
+    const input_limit_arg = try std.fmt.allocPrint(allocator, "--input-limit={}", .{opts.local_input_limit});
     defer allocator.free(input_limit_arg);
-    const argv = [_][]const u8{
-        zig_exe,
-        "build",
-        "run",
-        "--",
-        passes_arg,
-        input_limit_arg,
-        "--trace",
-        ir_path,
-    };
+
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
+    var optimize_arg: ?[]const u8 = null;
+    defer if (optimize_arg) |arg| allocator.free(arg);
+
+    if (opts.local_zllvm_exe) |local_exe| {
+        try argv.append(allocator, local_exe);
+    } else {
+        optimize_arg = try std.fmt.allocPrint(allocator, "-Doptimize={s}", .{opts.local_build_optimize});
+        try argv.appendSlice(allocator, &.{ opts.local_zig_exe, "build", optimize_arg.?, "run", "--" });
+    }
+
+    try argv.append(allocator, passes_arg);
+    try argv.append(allocator, input_limit_arg);
+    if (opts.local_trace) try argv.append(allocator, "--trace");
+    try argv.append(allocator, ir_path);
+
     return std.process.run(allocator, io, .{
-        .argv = &argv,
+        .argv = argv.items,
         .stdout_limit = .limited(16 * 1024 * 1024),
         .stderr_limit = .limited(16 * 1024 * 1024),
     });
@@ -526,6 +549,10 @@ fn writeProgress(
     try summary.print(allocator,
         \\complete={}
         \\zig_exe={s}
+        \\local_zig_exe={s}
+        \\local_zllvm_exe={s}
+        \\local_build_optimize={s}
+        \\local_trace={}
         \\test_root={s}
         \\mode={s}
         \\target={s}
@@ -546,6 +573,10 @@ fn writeProgress(
     , .{
         final,
         zig_exe,
+        opts.local_zig_exe,
+        opts.local_zllvm_exe orelse "",
+        opts.local_build_optimize,
+        opts.local_trace,
         test_root,
         opts.mode,
         opts.target,

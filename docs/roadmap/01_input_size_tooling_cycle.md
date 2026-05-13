@@ -23,6 +23,11 @@ failures under the current CLI input limit:
       same read cap.
 - [x] Add a discovery-harness option that forwards the local input limit to the
       local `z_llvm` check.
+- [x] Add discovery-harness controls for the local check executable/build mode
+      so large accepted rows can run through an optimized `z_llvm` instead of
+      an unoptimized `zig build run`.
+- [x] Make local trace output opt-in for focused debugging rather than the
+      default full-sweep path.
 - [x] Keep the default limit conservative unless the caller opts into a larger
       corpus sweep.
 - [x] Document the exact command for rerunning the 122 `input-too-large` rows
@@ -103,6 +108,51 @@ input-too-large=0
 parse-fail=1
 ```
 
+Later full-sweep status after parser fixes:
+
+```text
+ReleaseFast full sweep:
+processed=1474/1474
+emit-ok=465
+local-ok=465
+input-too-large=0
+parse-fail=0
+verify-fail=0
+optimizer-fail=0
+```
+
+ReleaseSafe exposed one source-backed parser blocker in
+`standalone/windows_bat_args/test.zig`; that blocker was fixed by making switch
+case-list close detection quote-aware. A follow-up full ReleaseSafe sweep showed
+no correctness failures through `1275/1474`, then exposed a tooling throughput
+problem: the default local check path used unoptimized `zig build run --trace`,
+causing `standalone/coff_dwarf/main.zig` to consume more than 19 minutes of CPU.
+
+The discovery harness now supports:
+
+```bash
+zig build -Doptimize=ReleaseFast
+zig run tools/zig_corpus_discovery.zig -- \
+  --out-dir=tmp/zig_ir/release_safe_fast_local \
+  --mode=ReleaseSafe \
+  --local-input-limit=67108864 \
+  --local-zllvm-exe=zig-out/bin/z_llvm \
+  --progress-every=25
+```
+
+Focused smoke result for `../ziglang/test/standalone/coff_dwarf` with the
+prebuilt ReleaseFast local verifier:
+
+```text
+processed=2/2
+emit-ok=2
+local-ok=2
+input-too-large=0
+parse-fail=0
+verify-fail=0
+optimizer-fail=0
+```
+
 ## Non-Goals
 
 - Do not broaden LLVM IR parsing or verification in this tooling cycle.
@@ -119,5 +169,7 @@ parse-fail=1
       parser/verifier failure that can become a bug packet.
 - [x] Filtered discovery replay can select the previous `input-too-large`
       bucket from `tmp/zig_ir/agent_discovery_01/report.tsv`.
-- [ ] `zig run tools/zig_corpus_discovery.zig -- --local-input-limit=<N> ...`
+- [x] `zig run tools/zig_corpus_discovery.zig -- --local-input-limit=<N> ...`
       records fewer `input-too-large` rows, ideally zero.
+- [x] Large local-check smoke can use a prebuilt ReleaseFast `z_llvm` through
+      `--local-zllvm-exe=zig-out/bin/z_llvm`.
