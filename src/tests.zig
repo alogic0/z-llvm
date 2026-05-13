@@ -2116,6 +2116,32 @@ test "parser preserves return attributes before function return type" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves address-space pointer function returns" {
+    const input =
+        \\define private fastcc ptr addrspace(256) @entry(ptr addrspace(256) align 4 %0) unnamed_addr #0 align 1 {
+        \\entry:
+        \\  ret ptr addrspace(256) %0
+        \\}
+        \\
+        \\attributes #0 = { nounwind }
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const function = module.functions.items[0];
+    try std.testing.expectEqualStrings("addrspace(256)", function.ret_attrs.?);
+    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].terminator.?.ret.ptr_addrspace.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves supported calling conventions" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

@@ -759,7 +759,12 @@ fn parseFunctionPrefix(prefix: []const u8, comptime invalid_error: anyerror) !Fu
             rest = trimFirstToken(rest);
         }
     }
-    if (rest.len != 0) parsed.ret_attrs = rest;
+    if (rest.len != 0 and typed_prefix.after_ty_attrs != null) return invalid_error;
+    if (rest.len != 0) {
+        parsed.ret_attrs = rest;
+    } else if (typed_prefix.after_ty_attrs) |attrs| {
+        parsed.ret_attrs = attrs;
+    }
     return parsed;
 }
 
@@ -2352,8 +2357,15 @@ fn parseRet(line: []const u8) !core.Terminator {
         if (std.mem.trim(u8, typed.after, " \t").len != 0) return error.InvalidRet;
         return .{ .ret = .{ .ty = ty } };
     }
-    const value = try parseValue(std.mem.trim(u8, typed.after, " \t"));
-    return .{ .ret = .{ .ty = ty, .value = value } };
+    var value_text = std.mem.trim(u8, typed.after, " \t");
+    const ptr_addrspace = if (ty == .ptr) blk: {
+        const token = firstToken(value_text) orelse break :blk null;
+        if (!isAddressSpaceToken(token)) break :blk null;
+        value_text = trimFirstToken(value_text);
+        break :blk token;
+    } else null;
+    const value = try parseValue(value_text);
+    return .{ .ret = .{ .ty = ty, .value = value, .ptr_addrspace = ptr_addrspace } };
 }
 
 fn parseBr(line: []const u8) !core.Terminator {
@@ -2585,6 +2597,7 @@ fn parseTypedValue(text: []const u8) !ParsedTypedValue {
 const ParsedTrailingType = struct {
     before: []const u8,
     ty: core.Type,
+    after_ty_attrs: ?[]const u8 = null,
 };
 
 fn parseLeadingType(text: []const u8) !ParsedLeadingType {
@@ -2628,6 +2641,20 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
 fn parseTrailingType(text: []const u8) !ParsedTrailingType {
     const trimmed = std.mem.trim(u8, text, " \t");
     if (trimmed.len == 0) return error.UnsupportedType;
+    if (firstTokenFromEnd(trimmed)) |last_token| {
+        if (isAddressSpaceToken(last_token)) {
+            const before_addrspace = std.mem.trim(u8, trimmed[0 .. @intFromPtr(last_token.ptr) - @intFromPtr(trimmed.ptr)], " \t");
+            if (firstTokenFromEnd(before_addrspace)) |ptr_token| {
+                if (std.mem.eql(u8, ptr_token, "ptr")) {
+                    return .{
+                        .before = std.mem.trim(u8, before_addrspace[0 .. @intFromPtr(ptr_token.ptr) - @intFromPtr(before_addrspace.ptr)], " \t"),
+                        .ty = .ptr,
+                        .after_ty_attrs = last_token,
+                    };
+                }
+            }
+        }
+    }
     if (trimmed[trimmed.len - 1] == '>') {
         const open = findMatchingAngleOpen(trimmed, trimmed.len - 1) orelse return error.UnsupportedType;
         return .{
@@ -2654,6 +2681,13 @@ fn parseTrailingType(text: []const u8) !ParsedTrailingType {
         .before = if (start) |index| std.mem.trim(u8, trimmed[0..index], " \t") else "",
         .ty = try parseType(if (start) |index| trimmed[index + 1 ..] else trimmed),
     };
+}
+
+fn firstTokenFromEnd(text: []const u8) ?[]const u8 {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (trimmed.len == 0) return null;
+    const start = std.mem.lastIndexOfAny(u8, trimmed, " \t");
+    return if (start) |index| trimmed[index + 1 ..] else trimmed;
 }
 
 fn parseVectorType(text: []const u8) !core.VectorType {

@@ -1045,6 +1045,7 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var saw_range = false;
     var saw_sret = false;
     var saw_byval = false;
+    var saw_addrspace = false;
 
     while (rest.len != 0) {
         const token = firstAttrToken(rest);
@@ -1155,8 +1156,24 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
             try verifyRangeAttrPayload(ty, payload);
             continue;
         }
+        if (isAddressSpaceAttr(token)) {
+            if (saw_addrspace) return error.UnsupportedCallAttribute;
+            saw_addrspace = true;
+            if (ty != .ptr) return error.UnsupportedCallAttribute;
+            continue;
+        }
         return error.UnsupportedCallAttribute;
     }
+}
+
+fn isAddressSpaceAttr(token: []const u8) bool {
+    if (!std.mem.startsWith(u8, token, "addrspace(") or !std.mem.endsWith(u8, token, ")")) return false;
+    const payload = token["addrspace(".len .. token.len - 1];
+    if (payload.len == 0) return false;
+    for (payload) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
 }
 
 fn capturesPayload(token: []const u8) ?[]const u8 {

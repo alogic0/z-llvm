@@ -123,6 +123,10 @@ Active cycle:
       pointer global constants initialized by supported constant expressions
       such as `inttoptr (...)`. Upstream mapping is recorded in
       [Module-Level IR](ir_module.md).
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      address-space pointer function return spellings such as
+      `ptr addrspace(256)`. Upstream mapping is recorded in
+      [Module-Level IR](ir_module.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

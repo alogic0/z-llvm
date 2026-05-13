@@ -48,6 +48,8 @@ function/global linkage: default, internal, private, external, extern_weak, weak
 function visibility: default, hidden, protected
 function calling conventions preserved: ccc, fastcc, coldcc
 function header attributes preserved as raw text
+address-space pointer function return spellings such as `ptr addrspace(N)`
+are preserved for source-backed Debug rows
 parameter attributes preserved as raw text
 void function return type
 ret void
@@ -89,6 +91,7 @@ unit-test only:
   function linkage and header attribute round-trip
   function visibility and parameter attribute round-trip
   function calling convention round-trip
+  address-space pointer function return round-trip
   scalar global and constant global round-trip
   COMDAT record and module flag metadata round-trip
   unknown COMDAT reference rejection

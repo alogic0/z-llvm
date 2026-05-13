@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const core = @import("core.zig");
 
 pub fn print(module: core.Module, writer: anytype) !void {
@@ -55,8 +57,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try decl.linkage.format(writer);
         try decl.visibility.format(writer);
         if (decl.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-        if (decl.ret_attrs) |ret_attrs| try writer.print("{s} ", .{ret_attrs});
-        try decl.ret_ty.format(writer);
+        try printReturnType(decl.ret_ty, decl.ret_attrs, writer);
         try writer.print(" @{s}(", .{decl.name});
         for (decl.params.items, 0..) |param, index| {
             if (index != 0) try writer.writeAll(", ");
@@ -79,8 +80,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
         try function.linkage.format(writer);
         try function.visibility.format(writer);
         if (function.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-        if (function.ret_attrs) |ret_attrs| try writer.print("{s} ", .{ret_attrs});
-        try function.ret_ty.format(writer);
+        try printReturnType(function.ret_ty, function.ret_attrs, writer);
         try writer.print(" @{s}(", .{function.name});
         for (function.params.items, 0..) |param, index| {
             if (index != 0) try writer.writeAll(", ");
@@ -324,8 +324,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         if (call.tail_kind) |tail_kind| try writer.print("{s} ", .{tail_kind});
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});
-                        if (call.ret_attrs) |ret_attrs| try writer.print("{s} ", .{ret_attrs});
-                        try call.ret_ty.format(writer);
+                        try printReturnType(call.ret_ty, call.ret_attrs, writer);
                         if (call.callee_function_ty) |function_ty| try writer.print(" {s}", .{function_ty});
                         if (call.inline_asm) |inline_asm| {
                             try writer.writeAll(" asm ");
@@ -360,6 +359,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                 .ret => |ret| {
                     try writer.writeAll("  ret ");
                     try ret.ty.format(writer);
+                    if (ret.ptr_addrspace) |addrspace_text| try writer.print(" {s}", .{addrspace_text});
                     if (ret.value) |value| {
                         try writer.writeByte(' ');
                         try value.format(writer);
@@ -427,6 +427,32 @@ pub fn print(module: core.Module, writer: anytype) !void {
         if (module.comdats.items.len != 0 or module.globals.items.len != 0 or module.aliases.items.len != 0 or module.declarations.items.len != 0 or module.functions.items.len != 0 or module.attribute_groups.items.len != 0) try writer.writeByte('\n');
         for (module.metadata.items) |metadata| try writer.print("{s}\n", .{metadata});
     }
+}
+
+fn printReturnType(ty: core.Type, attrs: ?[]const u8, writer: anytype) !void {
+    if (ty == .ptr) {
+        if (attrs) |text| {
+            if (startsWithAddressSpaceAttr(text)) {
+                try ty.format(writer);
+                try writer.print(" {s}", .{text});
+                return;
+            }
+        }
+    }
+    if (attrs) |text| try writer.print("{s} ", .{text});
+    try ty.format(writer);
+}
+
+fn startsWithAddressSpaceAttr(text: []const u8) bool {
+    const trimmed = std.mem.trim(u8, text, " \t");
+    if (!std.mem.startsWith(u8, trimmed, "addrspace(")) return false;
+    const close = std.mem.indexOfScalar(u8, trimmed, ')') orelse return false;
+    const payload = trimmed["addrspace(".len..close];
+    if (payload.len == 0) return false;
+    for (payload) |byte| {
+        if (!std.ascii.isDigit(byte)) return false;
+    }
+    return true;
 }
 
 fn printBinaryFlags(flags: core.BinaryFlags, writer: anytype) !void {

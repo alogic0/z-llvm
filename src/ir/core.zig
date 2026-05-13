@@ -930,6 +930,7 @@ pub const Terminator = union(enum) {
     ret: struct {
         ty: Type,
         value: ?Value = null,
+        ptr_addrspace: ?[]const u8 = null,
     },
     br: struct {
         target: []const u8,
