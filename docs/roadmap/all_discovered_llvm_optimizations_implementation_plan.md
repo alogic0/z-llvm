@@ -445,8 +445,8 @@ pipelines.
       linkage, visibility, unnamed addresses, aliases, comdat placeholders, and
       attributes as needed by Zig-emitted IR.
 - [x] Implement GlobalDCE for unreferenced internal/private globals/functions.
-- [x] Keep ConstantMerge as an explicit placeholder until identical scalar
-      constant cases are represented.
+- [x] Replace the ConstantMerge placeholder with the first identical scalar
+      private constant merge slice once those cases are represented.
 - [x] Replace the GlobalOpt placeholder with the first scalar direct-load
       cleanup slice once initializer semantics are sufficient for that surface.
 - [x] Keep available_externally handling as an explicit placeholder until

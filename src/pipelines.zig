@@ -4,6 +4,7 @@ const adce = @import("passes/adce.zig");
 const always_inline = @import("passes/always_inline.zig");
 const bdce = @import("passes/bdce.zig");
 const correlated_propagation = @import("passes/correlated_propagation.zig");
+const constmerge = @import("passes/constmerge.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
@@ -388,6 +389,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(globalopt.pass);
     } else if (std.mem.eql(u8, name, "globaldce")) {
         try pm.add(globaldce.pass);
+    } else if (std.mem.eql(u8, name, "constmerge")) {
+        try pm.add(constmerge.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
         try pm.add(licm.pass);
     } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
@@ -472,7 +475,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "callsite-splitting")) return placeholder.make("callsite-splitting", .scalar, "llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp");
     if (std.mem.eql(u8, name, "deadargelim")) return placeholder.make("deadargelim", .ipo, "llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp");
     if (std.mem.eql(u8, name, "dse")) return placeholder.make("dse", .memory, "llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp");
-    if (std.mem.eql(u8, name, "constmerge")) return placeholder.make("constmerge", .ipo, "llvm/lib/Transforms/IPO/ConstantMerge.cpp");
     if (std.mem.eql(u8, name, "elim-avail-extern")) return placeholder.make("elim-avail-extern", .ipo, "llvm/lib/Transforms/IPO/ElimAvailExtern.cpp");
     if (std.mem.eql(u8, name, "recompute-globalsaa")) return placeholder.make("recompute-globalsaa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");
     if (std.mem.eql(u8, name, "globals-aa")) return placeholder.make("globals-aa", .analysis, "llvm/lib/Analysis/GlobalsModRef.cpp");

@@ -117,7 +117,7 @@ Each slice is complete only when it has:
       Implement one GlobalOpt rewrite for internal immutable globals with all
       constant uses. Required upstream mapping:
       `llvm/lib/Transforms/IPO/GlobalOpt.cpp`.
-- [ ] Slice 21: `constmerge` for identical private constants.
+- [x] Slice 21: `constmerge` for identical private constants.
       Merge identical private constants while preserving linkage and COMDAT
       constraints. Required upstream mapping:
       `llvm/lib/Transforms/IPO/ConstantMerge.cpp`.

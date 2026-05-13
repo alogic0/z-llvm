@@ -231,7 +231,7 @@ Status meanings:
 | `deadargelim` | IPO cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
 | `globalopt` | global optimization | P2 | LLVM-shaped scalar direct-load cleanup slice | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
 | `globaldce` | global cleanup | P2 | fixture-equivalent for listed graph fixtures | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
-| `constmerge` | global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
+| `constmerge` | global cleanup | P3 | LLVM-shaped scalar private constant merge slice | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
 | `mergefunc` | size IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |
 | `elim-avail-extern` | LTO/global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ElimAvailExtern.cpp` |
 | `recompute-globalsaa` / `globals-aa` | analysis | P2 | placeholder | `llvm/lib/Analysis/GlobalsModRef.cpp` |

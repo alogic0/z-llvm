@@ -169,7 +169,8 @@ release-o3:
   adce
   licm
   globalopt
-  globaldce placeholder
+  globaldce
+  constmerge
   mergefunc placeholder
   annotation-remarks placeholder
   verify
