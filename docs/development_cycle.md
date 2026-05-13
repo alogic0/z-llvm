@@ -43,6 +43,19 @@ For corpus discovery, keep the same split:
   parses and verifies the module before entering the pass manager;
 - use `--local-trace` only for focused debugging, not full discovery sweeps.
 
+When a full source-backed verify sweep has no local failures, keep looking for
+blockers by repeating the sweep across Zig optimization modes in this order:
+
+```text
+Debug -> ReleaseFast -> ReleaseSafe -> ReleaseSmall
+```
+
+If all emitted rows in a mode pass local verification, treat that mode as clean
+for parser/verifier discovery and move to the next mode. If a sweep exposes a
+tooling or verifier throughput blocker before a semantic failure, close that
+blocker first, commit the reviewed fix, then rerun the interrupted sweep from a
+fresh output directory.
+
 ## Required Upstream Mapping
 
 Each pass, analysis, IR feature, or codegen feature must document:
