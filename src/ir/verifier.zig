@@ -19,12 +19,14 @@ const VerifyContext = struct {
     defs: std.StringHashMap(Definition),
     predecessors: []bool,
     reachable: []bool,
-    dominators: []bool,
+    dominators: []u64,
     block_count: usize,
+    dominator_word_count: usize,
 
     fn init(allocator: std.mem.Allocator, function: core.Function) !VerifyContext {
         const block_count = function.blocks.items.len;
         if (block_count == 0) return error.FunctionWithoutBlocks;
+        const dominator_word_count = (block_count + 63) / 64;
 
         var ctx: VerifyContext = .{
             .allocator = allocator,
@@ -32,20 +34,21 @@ const VerifyContext = struct {
             .defs = std.StringHashMap(Definition).init(allocator),
             .predecessors = try allocator.alloc(bool, block_count * block_count),
             .reachable = try allocator.alloc(bool, block_count),
-            .dominators = try allocator.alloc(bool, block_count * block_count),
+            .dominators = try allocator.alloc(u64, block_count * dominator_word_count),
             .block_count = block_count,
+            .dominator_word_count = dominator_word_count,
         };
         errdefer ctx.deinit();
 
         @memset(ctx.predecessors, false);
         @memset(ctx.reachable, false);
-        @memset(ctx.dominators, false);
+        @memset(ctx.dominators, 0);
 
         try ctx.verifyBlockNames();
         try ctx.buildPredecessors();
         try ctx.verifyEntryBlock();
         try ctx.buildReachability();
-        ctx.buildDominators();
+        try ctx.buildDominators();
         try ctx.collectDefinitions();
 
         return ctx;
@@ -116,15 +119,16 @@ const VerifyContext = struct {
         }
     }
 
-    fn buildDominators(ctx: *VerifyContext) void {
+    fn buildDominators(ctx: *VerifyContext) !void {
+        const new_dominators = try ctx.allocator.alloc(u64, ctx.dominator_word_count);
+        defer ctx.allocator.free(new_dominators);
+
         for (0..ctx.block_count) |block_index| {
             if (!ctx.reachable[block_index]) continue;
             if (block_index == 0) {
-                ctx.setDominates(0, 0, true);
+                ctx.setDominates(0, 0);
             } else {
-                for (0..ctx.block_count) |candidate| {
-                    ctx.setDominates(candidate, block_index, ctx.reachable[candidate]);
-                }
+                ctx.setReachableDominatorSet(block_index);
             }
         }
 
@@ -134,26 +138,23 @@ const VerifyContext = struct {
             for (1..ctx.block_count) |block_index| {
                 if (!ctx.reachable[block_index]) continue;
 
-                for (0..ctx.block_count) |candidate| {
-                    var new_value = candidate == block_index;
-                    if (!new_value) {
-                        var all_preds = true;
-                        var saw_reachable_pred = false;
-                        for (0..ctx.block_count) |pred| {
-                            if (!ctx.hasEdge(pred, block_index) or !ctx.reachable[pred]) continue;
-                            saw_reachable_pred = true;
-                            if (!ctx.dominates(candidate, pred)) {
-                                all_preds = false;
-                                break;
-                            }
-                        }
-                        new_value = saw_reachable_pred and all_preds;
+                @memset(new_dominators, ~@as(u64, 0));
+                var saw_reachable_pred = false;
+                for (0..ctx.block_count) |pred| {
+                    if (!ctx.hasEdge(pred, block_index) or !ctx.reachable[pred]) continue;
+                    saw_reachable_pred = true;
+                    const pred_dominators = ctx.dominatorSet(pred);
+                    for (new_dominators, pred_dominators) |*new_word, pred_word| {
+                        new_word.* &= pred_word;
                     }
+                }
+                if (!saw_reachable_pred) @memset(new_dominators, 0);
+                setBit(new_dominators, block_index);
 
-                    if (ctx.dominates(candidate, block_index) != new_value) {
-                        ctx.setDominates(candidate, block_index, new_value);
-                        changed = true;
-                    }
+                const current = ctx.dominatorSet(block_index);
+                if (!std.mem.eql(u64, current, new_dominators)) {
+                    @memcpy(current, new_dominators);
+                    changed = true;
                 }
             }
         }
@@ -303,17 +304,35 @@ const VerifyContext = struct {
     }
 
     fn dominates(ctx: VerifyContext, dominator: usize, block: usize) bool {
-        return ctx.dominators[ctx.edgeIndex(dominator, block)];
+        const set = ctx.dominatorSet(block);
+        return (set[dominator / 64] & (@as(u64, 1) << @intCast(dominator % 64))) != 0;
     }
 
-    fn setDominates(ctx: *VerifyContext, dominator: usize, block: usize, value: bool) void {
-        ctx.dominators[ctx.edgeIndex(dominator, block)] = value;
+    fn setDominates(ctx: *VerifyContext, dominator: usize, block: usize) void {
+        setBit(ctx.dominatorSet(block), dominator);
+    }
+
+    fn setReachableDominatorSet(ctx: *VerifyContext, block: usize) void {
+        const set = ctx.dominatorSet(block);
+        @memset(set, 0);
+        for (0..ctx.block_count) |candidate| {
+            if (ctx.reachable[candidate]) setBit(set, candidate);
+        }
+    }
+
+    fn dominatorSet(ctx: VerifyContext, block: usize) []u64 {
+        const start = block * ctx.dominator_word_count;
+        return ctx.dominators[start .. start + ctx.dominator_word_count];
     }
 
     fn edgeIndex(ctx: VerifyContext, from: usize, to: usize) usize {
         return to * ctx.block_count + from;
     }
 };
+
+fn setBit(set: []u64, index: usize) void {
+    set[index / 64] |= @as(u64, 1) << @intCast(index % 64);
+}
 
 pub fn verify(module: core.Module) !void {
     try verifyTargetRecords(module);

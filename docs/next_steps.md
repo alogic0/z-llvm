@@ -16,6 +16,9 @@ Active cycle:
 - [x] Corpus tooling throughput blocker: add `z_llvm --quiet` and make
       `tools/zig_corpus_discovery.zig` use it by default for local checks, so
       full Debug sweeps verify rows without printing multi-megabyte modules.
+- [x] Verifier throughput blocker: replace dense per-candidate dominator
+      recomputation with bitset dominator sets, restoring fast verification for
+      large Debug functions such as `behavior/sizeof_and_typeof.zig`.
 - [x] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
 - [x] Source-backed parser blocker: accept constant-expression `getelementptr`
       pointer operands in load, store, atomicrmw, and cmpxchg memory
