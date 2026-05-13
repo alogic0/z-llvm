@@ -15,6 +15,9 @@ GVNPass::run
 GVNPass::runImpl
 GVNPass::ValueTable
 GVNPass::ValueTable::createExpr
+GVNPass::processLoad
+GVNPass::PerformLoadPRE
+AvailableValueInBlock
 NewGVNPass::run
 NewGVN::CongruenceClass
 Instruction::mayReadOrWriteMemory
@@ -34,6 +37,9 @@ LLVM source files:
 LLVM entry points/classes:
   GVNPass::run
   GVNPass::ValueTable
+  GVNPass::processLoad
+  GVNPass::PerformLoadPRE
+  AvailableValueInBlock
   NewGVNPass::run
   NewGVN::CongruenceClass
 
@@ -50,6 +56,7 @@ Core LLVM algorithm data structures:
   Value table / expression numbering.
   Leader tables for available values.
   Memory dependence facts for load and call cases.
+  AvailableValueInBlock records for non-local load elimination and load PRE.
 
 Local target status:
   fixture-equivalent for listed fixtures.
@@ -69,6 +76,10 @@ load availability queries use the persisted local MemorySSA walker-shaped API
 cross-block load availability is path-aware for the accepted access-list slice:
 endpoint instruction order is used, and interior clobbers must be reachable on a
 CFG path between the leader load and the later load
+simple load PRE for one two-predecessor join shape:
+  one predecessor has an available must-alias load
+  one direct predecessor can receive one inserted load before its terminator
+  the join load is replaced by a PHI with incoming available/inserted values
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
@@ -80,9 +91,9 @@ This is intentionally closer to a small value-table seed than to full LLVM GVN.
 It is enough to prove the project can move beyond same-block `early-cse` while
 still relying on the existing dominator analysis.
 
-PRE is explicitly deferred. The local pass does not insert expressions or split
-edges until dominance, critical-edge, and insertion-point rules are documented
-for the accepted IR surface.
+Scalar PRE is still deferred. Load PRE is implemented only for the accepted
+two-predecessor diamond surface and does not split critical edges or perform
+general PHI translation.
 
 Fixture coverage:
 
@@ -94,6 +105,7 @@ opt-22 equivalent:
   gvn_phi
   gvn_load_call_clobber_reject
   gvn_readonly_call_no_clobber
+  gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
 
 local-only conservative:
@@ -103,8 +115,8 @@ local-only conservative:
   gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
   ignore a side-exit store outside the queried path. `opt-22` preserves this
   shape, so full load-placement parity remains future work.
-  gvn_scalar_pre_reject keeps partially available expressions unchanged because
-  scalar PRE insertion is not implemented.
+  gvn_scalar_pre_reject keeps partially available scalar expressions unchanged
+  because scalar PRE insertion is not implemented.
   gvn_diamond_load_no_memory_phi is local-conservative because local leader
   naming differs from opt-22 while MemorySSA proves the same load redundancy.
   readnone call GVN is unit-tested locally. Readonly calls are trusted only as
@@ -135,13 +147,14 @@ only checks that unrelated scalar expressions still use the normal GVN path.
 Known gaps:
 
 ```text
-no load PRE
+load PRE is limited to one direct two-predecessor diamond shape
 no MemorySSA-backed memory value numbering beyond the accepted path-aware
 walker query
-no phi translation beyond exact phi expression matching
+no general PHI translation beyond exact phi expression matching and the simple
+load-PRE PHI insertion
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
-no critical-edge or partial redundancy handling
+no critical-edge splitting or general partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, strict FP, vector,
 or memory value numbering
 FP value numbering is limited to the local `fast` boundary

@@ -1,4 +1,6 @@
 const std = @import("std");
+const alias = @import("../analysis/alias.zig");
+const cfg = @import("../analysis/cfg.zig");
 const dominator = @import("../analysis/dominator.zig");
 const expression_key = @import("../analysis/expression_key.zig");
 const fast_math = @import("../analysis/fast_math.zig");
@@ -19,7 +21,7 @@ pub const pass: pass_manager.ModulePass = .{
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        changed = try eliminateFunction(module.allocator, module.*, function) or changed;
+        changed = try eliminateFunction(module.allocator, module, function) or changed;
     }
     return if (changed) .changed else .unchanged;
 }
@@ -76,23 +78,226 @@ const ValueTable = struct {
     }
 };
 
-fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
+fn eliminateFunction(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function) !bool {
+    var changed = try performSimpleLoadPre(allocator, module, function);
+
     var dom = try dominator.Dominators.build(allocator, function.*);
     defer dom.deinit();
 
     var aliases = std.StringHashMap(ir.Value).init(allocator);
     defer aliases.deinit();
 
-    var table = ValueTable.init(allocator, module, function.*);
+    var table = ValueTable.init(allocator, module.*, function.*);
     defer table.deinit();
 
-    var memory = try memory_ssa.MemorySSA.build(allocator, module, function.*);
+    var memory = try memory_ssa.MemorySSA.build(allocator, module.*, function.*);
     defer memory.deinit();
 
     var leaders: std.ArrayList(Leader) = .empty;
     defer leaders.deinit(allocator);
 
-    return try visitBlock(allocator, function, dom, &aliases, &table, memory, &leaders, 0);
+    changed = try visitBlock(allocator, function, dom, &aliases, &table, memory, &leaders, 0) or changed;
+    return changed;
+}
+
+const PreIncoming = struct {
+    block_index: usize,
+    value: ir.Value,
+};
+
+fn performSimpleLoadPre(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function) !bool {
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
+    var dom = try dominator.Dominators.build(allocator, function.*);
+    defer dom.deinit();
+
+    var block_index: usize = 0;
+    while (block_index < function.blocks.items.len) : (block_index += 1) {
+        const predecessors = graph.predecessors(block_index);
+        if (predecessors.len != 2) continue;
+
+        const load_index = firstPreloadCandidateIndex(function.blocks.items[block_index]) orelse continue;
+        const load_instruction = function.blocks.items[block_index].instructions.items[load_index];
+        const load = switch (load_instruction.kind) {
+            .load => |load| load,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => continue,
+        };
+        if (load.attrs.isBarrier()) continue;
+        if (!valueAvailableAtEndOfBlock(function.*, dom, load.ptr, predecessors[0])) continue;
+        if (!valueAvailableAtEndOfBlock(function.*, dom, load.ptr, predecessors[1])) continue;
+        if (joinPrefixClobbers(module.*, function.*, block_index, load_index, load)) continue;
+
+        var incoming: std.ArrayList(PreIncoming) = .empty;
+        defer incoming.deinit(allocator);
+        var insertions: std.ArrayList(usize) = .empty;
+        defer insertions.deinit(allocator);
+
+        var existing_count: usize = 0;
+        for (predecessors) |predecessor| {
+            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
+                incoming.clearRetainingCapacity();
+                break;
+            }
+            if (findAvailablePredecessorLoad(module.*, function.*, predecessor, load)) |value| {
+                try incoming.append(allocator, .{ .block_index = predecessor, .value = value });
+                existing_count += 1;
+                continue;
+            }
+            try incoming.append(allocator, .{ .block_index = predecessor, .value = .undef });
+            try insertions.append(allocator, predecessor);
+        }
+
+        if (incoming.items.len != predecessors.len) continue;
+        if (existing_count == 0 or insertions.items.len != 1) continue;
+
+        const inserted_value = try insertPreLoad(allocator, module, function, insertions.items[0], load_instruction.result orelse continue, load);
+        for (incoming.items) |*entry| {
+            if (entry.block_index == insertions.items[0]) {
+                entry.value = inserted_value;
+                break;
+            }
+        }
+
+        try replaceLoadWithPhi(allocator, function, block_index, load_index, load_instruction.result orelse continue, load.ty, incoming.items);
+        return true;
+    }
+
+    return false;
+}
+
+fn firstPreloadCandidateIndex(block: ir.BasicBlock) ?usize {
+    for (block.instructions.items, 0..) |instruction, index| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => continue,
+            .load => return index,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
+        }
+    }
+    return null;
+}
+
+fn hasSingleSuccessorTo(graph: cfg.Graph, predecessor: usize, block_index: usize) bool {
+    const successors = graph.successors(predecessor);
+    return successors.len == 1 and successors[0] == block_index;
+}
+
+fn joinPrefixClobbers(module: ir.Module, function: ir.Function, block_index: usize, load_index: usize, load: ir.LoadInst) bool {
+    const block = function.blocks.items[block_index];
+    for (block.instructions.items[0..load_index]) |instruction| {
+        if (instruction.removed or instruction.kind == .phi) continue;
+        if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return true;
+    }
+    return false;
+}
+
+fn findAvailablePredecessorLoad(module: ir.Module, function: ir.Function, block_index: usize, load: ir.LoadInst) ?ir.Value {
+    const block = function.blocks.items[block_index];
+    var index = block.instructions.items.len;
+    while (index > 0) {
+        index -= 1;
+        const instruction = block.instructions.items[index];
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .load => |candidate| {
+                if (candidate.attrs.isBarrier()) return null;
+                if (!candidate.ty.eql(load.ty)) {
+                    if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return null;
+                    continue;
+                }
+                if (alias.accessAliasInModule(module, function, candidate.ptr, candidate.ty, load.ptr, load.ty) == .must_alias) {
+                    return .{ .named = instruction.result orelse return null };
+                }
+                if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return null;
+            },
+            .store, .atomicrmw, .cmpxchg, .fence, .call => {
+                if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return null;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+        }
+    }
+    return null;
+}
+
+fn insertPreLoad(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function, block_index: usize, base: []const u8, load: ir.LoadInst) !ir.Value {
+    const name = try uniquePreResultName(allocator, module, function.*, base);
+    try function.blocks.items[block_index].instructions.append(allocator, .{
+        .result = name,
+        .kind = .{ .load = load },
+    });
+    return .{ .named = name };
+}
+
+fn replaceLoadWithPhi(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    block_index: usize,
+    instruction_index: usize,
+    result: []const u8,
+    ty: ir.Type,
+    values: []const PreIncoming,
+) !void {
+    var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+    errdefer incoming.deinit(allocator);
+    for (values) |value| {
+        try incoming.append(allocator, .{
+            .value = value.value,
+            .block = function.blocks.items[value.block_index].name,
+        });
+    }
+    const phi_instruction: ir.Instruction = .{
+        .result = result,
+        .kind = .{ .phi = .{ .ty = ty, .incoming = incoming } },
+    };
+    try function.blocks.items[block_index].instructions.insert(allocator, 0, phi_instruction);
+    _ = function.blocks.items[block_index].instructions.orderedRemove(instruction_index + 1);
+}
+
+fn uniquePreResultName(allocator: std.mem.Allocator, module: *ir.Module, function: ir.Function, base: []const u8) ![]const u8 {
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try std.fmt.allocPrint(allocator, "{s}.pre", .{base})
+        else
+            try std.fmt.allocPrint(allocator, "{s}.pre{}", .{ base, suffix });
+        errdefer allocator.free(candidate);
+        if (!hasResultName(function, candidate)) return try module.ownString(candidate);
+        allocator.free(candidate);
+    }
+}
+
+fn hasResultName(function: ir.Function, name: []const u8) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return true;
+    }
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, name)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+fn valueAvailableAtEndOfBlock(function: ir.Function, dom: dominator.Dominators, value: ir.Value, block_index: usize) bool {
+    return switch (value) {
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => true,
+        .named => |name| {
+            for (function.params.items) |param| {
+                if (std.mem.eql(u8, param.name, name)) return true;
+            }
+            for (function.blocks.items, 0..) |block, defining_block| {
+                for (block.instructions.items) |instruction| {
+                    if (instruction.result) |result| {
+                        if (std.mem.eql(u8, result, name)) return dom.dominates(defining_block, block_index);
+                    }
+                }
+            }
+            return true;
+        },
+    };
 }
 
 fn visitBlock(

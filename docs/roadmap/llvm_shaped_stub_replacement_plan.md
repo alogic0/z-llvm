@@ -51,7 +51,7 @@ Each slice is complete only when it has:
 - [x] Slice 6: EarlyCSE load availability through MemorySSA.
       Rework load CSE to use the new walker instead of ad hoc clobber scans.
       Required upstream mapping: `llvm/lib/Transforms/Scalar/EarlyCSE.cpp`.
-- [ ] Slice 7: GVN load availability and simple load PRE.
+- [x] Slice 7: GVN load availability and simple load PRE.
       Implement one LLVM-shaped load PRE slice for a diamond where all required
       values are available or safely insertable. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/GVN.cpp`.
