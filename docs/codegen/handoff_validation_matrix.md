@@ -13,6 +13,7 @@ or remain LLVM-compatibility-only.
 | Memory/store cleanup | `test/opt/inputs/dse_overwrite.ll` | `zig build run -- --passes=dse ...` | Can the native path prove overwritten stack stores are unobservable before codegen? |
 | Loop scalar motion | `test/opt/inputs/licm_invariant.ll` | `zig build run -- --passes=licm ...` | Can AIR loop lowering or native MIR represent pure invariants without unsafe live-range growth? |
 | Global cleanup | `test/opt/inputs/globaldce_basic.ll` | `zig build run -- --passes=globaldce ...` | Which global liveness facts belong in Zig-owned global analysis instead of backend lowering? |
+| Optimized scalar codegen handoff | `test/handoff/inputs/scalar_add_zero.ll` | `bash scripts/run_handoff_validation.sh` | Can an LLVM-equivalent scalar canonicalization result pass through local x86_64 assembly/object emission with the same instruction bytes as LLVM `llc`? |
 | Tiny x86_64 backend smoke | `test/codegen/inputs/add_args.ll` and related codegen inputs | `bash scripts/compare_codegen_asm.sh` | Do target/ABI and Machine IR assumptions still produce inspectable assembly for tiny accepted shapes? |
 | Explicit scalar return handoff | `test/codegen/inputs/return_constant.ll` | `bash scripts/run_handoff_validation.sh` | Can a folded scalar value reach return lowering without extra LLVM-only structure? |
 | Explicit direct-call handoff | `test/codegen/inputs/call_one_arg.ll` | `bash scripts/run_handoff_validation.sh` | Are direct scalar calls represented at the handoff boundary without pulling in register allocation policy? |
@@ -25,10 +26,23 @@ Run all current handoff checks with:
 bash scripts/run_handoff_validation.sh
 ```
 
-The script deliberately compares local optimizer outputs against checked local
-fixtures, not against broad Zig native backend output. A direct Zig-native
-comparison should be added only when the same Zig source shape can be compiled
-through a selected native backend with stable output expectations.
+For the optimized scalar codegen handoff row, the script compares local
+optimized IR with `opt-22`, then compares local object disassembly with
+`llc-22` object disassembly. Other rows deliberately compare local optimizer
+outputs against checked local fixtures, not against broad Zig native backend
+output. A direct Zig-native comparison should be added only when the same Zig
+source shape can be compiled through a selected native backend with stable
+output expectations.
+
+LLVM source anchors for the optimized handoff row:
+
+```text
+llvm/lib/Passes/PassBuilderPipelines.cpp: optimizer pipeline construction
+llvm/lib/CodeGen/TargetPassConfig.cpp: target codegen pass pipeline ownership
+llvm/lib/Target/X86/X86ISelLowering.cpp: x86_64 target lowering
+llvm/lib/Target/X86/X86InstrInfo.td: x86 instruction selection descriptions
+llvm/lib/Target/X86/X86AsmPrinter.cpp: assembly/object emission boundary
+```
 
 ## Handoff Classification
 

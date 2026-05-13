@@ -40,6 +40,55 @@ run_opt_case \
   test/opt/inputs/globaldce_basic.ll \
   test/opt/expected/z_llvm/globaldce_basic.ll
 
+run_optimized_codegen_case() {
+  local id="$1"
+  local passes="$2"
+  local input="$3"
+  local expected_ir="$4"
+  local expected_asm="$5"
+  local expected_objdump="$6"
+  local optimized_ir="$tmp_dir/$id.optimized.ll"
+  local optimized_norm="$tmp_dir/$id.optimized.norm.ll"
+  local expected_norm="$tmp_dir/$id.expected.norm.ll"
+  local llvm_ir="$tmp_dir/$id.llvm.ll"
+  local llvm_norm="$tmp_dir/$id.llvm.norm.ll"
+  local local_asm="$tmp_dir/$id.s"
+  local local_obj="$tmp_dir/$id.local.o"
+  local local_objdump="$tmp_dir/$id.local.objdump.txt"
+  local llvm_obj="$tmp_dir/$id.llvm.o"
+  local llvm_objdump="$tmp_dir/$id.llvm.objdump.txt"
+
+  zig build run -- --passes="$passes" "$input" > "$optimized_ir"
+  zig run src/normalize_cli.zig -- "$optimized_ir" > "$optimized_norm"
+  zig run src/normalize_cli.zig -- "$expected_ir" > "$expected_norm"
+  diff -u "$expected_norm" "$optimized_norm"
+
+  opt-22 -S -passes="$passes" "$input" -o "$llvm_ir"
+  zig run src/normalize_cli.zig -- "$llvm_ir" > "$llvm_norm"
+  diff -u "$llvm_norm" "$optimized_norm"
+
+  zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu "$optimized_ir" > "$local_asm"
+  diff -u "$expected_asm" "$local_asm"
+
+  zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu "$optimized_ir" > "$local_obj"
+  objdump -dr "$local_obj" | sed -n '/Disassembly of section .text:/,$p' > "$local_objdump"
+  diff -u "$expected_objdump" "$local_objdump"
+
+  llc-22 -filetype=obj "$llvm_ir" -o "$llvm_obj"
+  objdump -dr "$llvm_obj" | sed -n '/Disassembly of section .text:/,$p' > "$llvm_objdump"
+  diff -u "$llvm_objdump" "$local_objdump"
+
+  printf 'ok handoff optimized-codegen %s [%s]\n' "$id" "$passes"
+}
+
+run_optimized_codegen_case \
+  scalar_add_zero \
+  instcombine,dce \
+  test/handoff/inputs/scalar_add_zero.ll \
+  test/handoff/expected/ir/scalar_add_zero.ll \
+  test/handoff/expected/asm/scalar_add_zero.s \
+  test/handoff/expected/objdump/scalar_add_zero.txt
+
 run_asm_case() {
   local id="$1"
   local input="test/codegen/inputs/$id.ll"

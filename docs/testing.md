@@ -148,8 +148,10 @@ arguments, and unsupported call live pressure.
 
 Native handoff validation is intentionally narrower than codegen completeness:
 `scripts/run_handoff_validation.sh` checks representative scalar, memory, loop,
-and global optimizer facts, then runs assembly, objdump, and readelf smoke
-checks to keep local backend experiments validation-only.
+and global optimizer facts, checks one optimized scalar pattern through local
+assembly/object emission against `opt-22` and `llc-22`, then runs assembly,
+objdump, and readelf smoke checks to keep local backend experiments
+validation-only.
 
 `scripts/run_generated_scalar_diff.sh` generates accepted scalar IR cases in a
 temporary directory, compares local output with `opt-22`, checks generated

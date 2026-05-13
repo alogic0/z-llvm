@@ -163,7 +163,7 @@ Each slice is complete only when it has:
       Replace `canonicalize-aliases` placeholder for one alias-to-global shape.
       Required upstream mapping:
       `llvm/lib/Transforms/Utils/CanonicalizeAliases.cpp`.
-- [ ] Slice 32: Backend handoff validation for one optimized pattern.
+- [x] Slice 32: Backend handoff validation for one optimized pattern.
       Take one completed optimizer pattern through local Machine IR/object smoke
       validation and compare to LLVM/assembler behavior where practical.
 

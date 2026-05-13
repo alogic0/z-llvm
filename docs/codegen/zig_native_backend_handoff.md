@@ -118,8 +118,11 @@ The gate covers representative scalar, memory, loop, and global optimizer
 outputs plus tiny x86_64 assembly smoke checks. Cycle 07 adds an explicit
 stack-memory-to-call proof (`call_stack_slot`) so the validation set includes
 fixed stack access feeding a direct call while preserving the local SysV stack
-alignment policy. It does not claim full native backend or object/codegen
-completeness.
+alignment policy. Stub Replacement Slice 32 adds an optimized scalar handoff
+proof (`test/handoff/inputs/scalar_add_zero.ll`): local `instcombine,dce`
+output is compared against `opt-22`, then emitted through local x86_64
+assembly/object paths and compared with `llc-22` object disassembly. It does
+not claim full native backend or object/codegen completeness.
 
 ## Out Of Scope
 
