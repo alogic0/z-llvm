@@ -1702,6 +1702,14 @@ fn verifyCast(cast: core.CastInst) !void {
             if (from_bits >= to_bits) return error.InvalidCast;
             return;
         },
+        .fptosi, .fptoui => {
+            _ = floatBits(cast.from_ty) orelse return error.InvalidCast;
+            switch (cast.to_ty) {
+                .int => {},
+                else => return error.InvalidCast,
+            }
+            return;
+        },
         .trunc, .zext, .sext => {
             if (cast.from_ty == .vector or cast.to_ty == .vector) {
                 const from_vector = switch (cast.from_ty) {
@@ -1724,7 +1732,7 @@ fn verifyCast(cast: core.CastInst) !void {
                 switch (cast.op) {
                     .trunc => if (from_bits <= to_bits) return error.InvalidCast,
                     .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-                    .fpext, .bitcast, .ptrtoint, .inttoptr => unreachable,
+                    .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => unreachable,
                 }
                 return;
             }
@@ -1742,7 +1750,7 @@ fn verifyCast(cast: core.CastInst) !void {
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-        .fpext, .bitcast, .ptrtoint, .inttoptr => unreachable,
+        .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => unreachable,
     }
 }
 
@@ -1754,7 +1762,7 @@ fn verifyCastFlags(cast: core.CastInst) !void {
         .zext => {
             if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
         },
-        .sext, .fpext, .bitcast, .ptrtoint, .inttoptr => {
+        .sext, .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => {
             if (cast.flags.any()) return error.InvalidInstructionFlag;
         },
     }

@@ -4368,6 +4368,18 @@ test "parser preserves scalar float arithmetic and compare IR" {
         \\  ret double %wide
         \\}
         \\
+        \\define i32 @float_to_signed(float %a) {
+        \\entry:
+        \\  %int = fptosi float %a to i32
+        \\  ret i32 %int
+        \\}
+        \\
+        \\define i32 @float_to_unsigned(float %a) {
+        \\entry:
+        \\  %int = fptoui float %a to i32
+        \\  ret i32 %int
+        \\}
+        \\
     ;
 
     var module = try ir.Module.parse(std.testing.allocator, input);
@@ -4382,6 +4394,8 @@ test "parser preserves scalar float arithmetic and compare IR" {
     try std.testing.expect(module.functions.items[5].ret_ty.eql(.float));
     try std.testing.expect(module.functions.items[6].ret_ty.eql(.{ .int = 1 }));
     try std.testing.expectEqual(ir.CastOp.fpext, module.functions.items[7].blocks.items[0].instructions.items[0].kind.cast.op);
+    try std.testing.expectEqual(ir.CastOp.fptosi, module.functions.items[8].blocks.items[0].instructions.items[0].kind.cast.op);
+    try std.testing.expectEqual(ir.CastOp.fptoui, module.functions.items[9].blocks.items[0].instructions.items[0].kind.cast.op);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();

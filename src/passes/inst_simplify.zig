@@ -239,7 +239,7 @@ fn simplifyCast(cast: ir.CastInst) ?ir.Value {
         .trunc => truncateConstant(cast.value.int, to_bits),
         .zext => zeroExtendConstant(cast.value.int, from_bits),
         .sext => signExtendConstant(cast.value.int, from_bits),
-        .fpext, .bitcast, .ptrtoint, .inttoptr => null,
+        .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => null,
     };
 }
 

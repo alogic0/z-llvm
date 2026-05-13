@@ -138,6 +138,10 @@ Active cycle:
 - [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
       `fpext float ... to double` used by C-varargs float promotion. Upstream
       mapping is recorded in [Scalar IR](ir_scalar.md).
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      `fptosi`/`fptoui` casts used by int-from-float safety checks without adding
+      local FP-to-int folding semantics. Upstream mapping is recorded in
+      [Scalar IR](ir_scalar.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
