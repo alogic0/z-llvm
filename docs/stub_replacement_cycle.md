@@ -34,6 +34,15 @@ Each slice follows this sequence:
 select -> map upstream -> reduce scope -> implement -> compare -> document -> review -> commit -> mark progress
 ```
 
+Commit/validation continuation policy:
+
+```text
+For each slice: update docs/next_steps.md, map upstream LLVM first, implement
+the LLVM-shaped behavior, add opt-22 fixtures, run focused comparison and
+readiness checks, commit that slice, then immediately continue with the next
+unchecked slice. Do not stop between successful slices.
+```
+
 ## 1. Select The Next Slice
 
 - Read `docs/roadmap/llvm_shaped_stub_replacement_plan.md`.
