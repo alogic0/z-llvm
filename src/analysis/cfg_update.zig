@@ -97,12 +97,84 @@ pub fn prunePhiIncomingToPredecessors(allocator: std.mem.Allocator, function: *i
                         _ = phi.incoming.orderedRemove(index);
                         changed = true;
                     }
+                    for (predecessors) |predecessor_index| {
+                        changed = pruneExcessPhiIncomingForPredecessor(function.*, block.name, phi, predecessor_index) or changed;
+                    }
                 },
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
             }
         }
     }
     return changed;
+}
+
+fn pruneExcessPhiIncomingForPredecessor(
+    function: ir.Function,
+    target_name: []const u8,
+    phi: *ir.PhiInst,
+    predecessor_index: usize,
+) bool {
+    const predecessor = function.blocks.items[predecessor_index];
+    const edge_count = terminatorTargetEdgeCount(predecessor.terminator, target_name);
+    if (edge_count == 0) return false;
+
+    var incoming_count: usize = 0;
+    var incoming_value: ?ir.Value = null;
+    for (phi.incoming.items) |incoming| {
+        if (!std.mem.eql(u8, incoming.block, predecessor.name)) continue;
+        incoming_count += 1;
+        if (incoming_value) |value| {
+            if (!value.eql(incoming.value)) return false;
+        } else {
+            incoming_value = incoming.value;
+        }
+    }
+    if (incoming_count <= edge_count) return false;
+
+    var changed = false;
+    var kept: usize = 0;
+    var index: usize = 0;
+    while (index < phi.incoming.items.len) {
+        if (!std.mem.eql(u8, phi.incoming.items[index].block, predecessor.name)) {
+            index += 1;
+            continue;
+        }
+        if (kept < edge_count) {
+            kept += 1;
+            index += 1;
+            continue;
+        }
+        _ = phi.incoming.orderedRemove(index);
+        changed = true;
+    }
+    return changed;
+}
+
+fn terminatorTargetEdgeCount(terminator: ?ir.Terminator, target_name: []const u8) usize {
+    const term = terminator orelse return 0;
+    var count: usize = 0;
+    switch (term) {
+        .ret, .@"unreachable" => {},
+        .br => |br| {
+            if (std.mem.eql(u8, br.target, target_name)) count += 1;
+        },
+        .condbr => |condbr| {
+            if (std.mem.eql(u8, condbr.then_target, target_name)) count += 1;
+            if (std.mem.eql(u8, condbr.else_target, target_name)) count += 1;
+        },
+        .@"switch" => |switch_term| {
+            if (std.mem.eql(u8, switch_term.default_target, target_name)) count += 1;
+            for (switch_term.cases.items) |case| {
+                if (std.mem.eql(u8, case.target, target_name)) count += 1;
+            }
+        },
+        .indirectbr => |indirectbr| {
+            for (indirectbr.targets.items) |target| {
+                if (std.mem.eql(u8, target, target_name)) count += 1;
+            }
+        },
+    }
+    return count;
 }
 
 pub fn prunePhiIncomingByReachability(function: *ir.Function, reachable: []const bool) bool {

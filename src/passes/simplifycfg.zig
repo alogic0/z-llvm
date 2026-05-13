@@ -303,7 +303,9 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
             if (hasPhi(function.blocks.items[target_index])) {
                 if (predecessors.len != 1) continue;
                 if (terminatorTargetEdgeCount(function.blocks.items[predecessors[0]].terminator, block.name) != 1) continue;
-                _ = cfg_update.replacePhiIncomingBlock(function, block.name, function.blocks.items[predecessors[0]].name);
+                const predecessor_name = function.blocks.items[predecessors[0]].name;
+                if (!canReplacePhiIncomingBlock(function.*, target_index, block.name, predecessor_name)) continue;
+                _ = cfg_update.replacePhiIncomingBlock(function, block.name, predecessor_name);
             }
 
             _ = cfg_update.retargetBranches(function, block.name, br.target);
@@ -313,6 +315,30 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
         }
     }
     return changed;
+}
+
+fn canReplacePhiIncomingBlock(function: ir.Function, target_index: usize, old_name: []const u8, new_name: []const u8) bool {
+    const target = function.blocks.items[target_index];
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => continue,
+        };
+
+        var replacement_value: ?ir.Value = null;
+        for (phi.incoming.items) |incoming| {
+            if (std.mem.eql(u8, incoming.block, old_name)) {
+                replacement_value = incoming.value;
+                break;
+            }
+        }
+        const value = replacement_value orelse continue;
+        for (phi.incoming.items) |incoming| {
+            if (std.mem.eql(u8, incoming.block, new_name) and !value.eql(incoming.value)) return false;
+        }
+    }
+    return true;
 }
 
 fn terminatorTargetEdgeCount(terminator: ?ir.Terminator, target_name: []const u8) usize {

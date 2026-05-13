@@ -7303,6 +7303,55 @@ test "simplifycfg does not thread phi predecessor through multiple edges" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
+test "simplifycfg keeps phi-distinct duplicate predecessor edges" {
+    const input =
+        \\define i32 @switch_distinct_phi_edges(i2 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  switch i2 %cond, label %empty_a [
+        \\    i2 0, label %empty_b
+        \\  ]
+        \\empty_a:
+        \\  br label %merge
+        \\empty_b:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %empty_a ], [ %b, %empty_b ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    const expected =
+        \\define i32 @switch_distinct_phi_edges(i2 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  switch i2 %cond, label %merge [
+        \\    i2 0, label %empty_b
+        \\  ]
+        \\empty_b:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ], [ %b, %empty_b ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
 test "cfg analysis reports successors predecessors and reachability" {
     const input =
         \\define i32 @cfg(i1 %cond, i32 %a) {

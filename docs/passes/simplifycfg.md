@@ -58,7 +58,8 @@ Implemented subset:
   Constant and same-target conditional branch folding
   Same-target branch PHI repair for duplicate identical incoming values
   Empty branch block threading
-  Single-predecessor empty branch block threading through phi nodes
+  Single-predecessor empty branch block threading through phi nodes when the
+  replacement preserves PHI incoming value consistency
   Unreachable block removal
   Phi incoming pruning and trivial phi replacement
   Single-predecessor branch block merge
@@ -108,7 +109,8 @@ replace trivial phi nodes whose remaining incoming values are all identical
 merge a block ending in an unconditional branch into its single-predecessor successor when the successor has no live phi nodes
 thread an empty unconditional branch block to its successor when the successor
 has no live phi nodes, or when the empty block has one predecessor and phi
-incoming labels can be rewritten to that predecessor
+incoming labels can be rewritten to that predecessor without merging distinct
+incoming values
 merge matching return blocks into the predecessor conditional block
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
@@ -117,10 +119,17 @@ a select returned from the branch block
 Upstream mapping:
 
 ```text
-This reproduces constant branch folding, same-destination conditional branch folding, unreachable block removal, a small phi cleanup subset, a simple unconditional branch block merge, a phi-free empty-block threading subset, and a strict empty-diamond select formation subset.
+This reproduces constant branch folding, same-destination conditional branch
+folding with PHI edge repair, unreachable block removal, a small phi cleanup
+subset, a simple unconditional branch block merge, a PHI-safe empty-block
+threading subset, and a strict empty-diamond select formation subset.
 LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
 The local implementation rebuilds graph facts around mutations and centralizes
 branch/PHI repair in `src/analysis/cfg_update.zig`.
+CFG updates account for duplicate CFG edges: when an edge rewrite reduces
+incoming edge multiplicity, duplicate PHI incoming entries are pruned only when
+their values are identical; when threading through a PHI target would merge
+distinct incoming values for one predecessor, the local transform is rejected.
 ```
 
 Fixture coverage:
@@ -144,6 +153,7 @@ unit-test only:
   phi incoming cleanup after unreachable predecessor removal
   trivial phi replacement
   same-target conditional branch folding
+  PHI-safe empty block threading across switch duplicate-edge predecessors
   verifier rejection for duplicate same-predecessor PHI values that differ
 ```
 
@@ -168,7 +178,8 @@ Known gaps:
 ```text
 no non-trivial phi-node rewrites; duplicate same-predecessor PHI values that
 differ are rejected by the verifier, matching LLVM verifier behavior
-no phi-aware branch threading
+no phi-aware branch threading when preserving distinct edge-specific incoming
+values would require splitting edges or synthesizing a new control-flow shape
 no general block merging
 no switch support
 no invoke/landingpad support
