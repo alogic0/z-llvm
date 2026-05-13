@@ -320,7 +320,11 @@ fn visitBlock(
         if (instruction.removed or !isCandidate(table.module, instruction.*)) continue;
 
         const number = try table.numberFor(instruction.*);
-        if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |replacement| {
+        if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |leader_index| {
+            const leader = leaders.items[leader_index];
+            expression_key.intersectRetainedFpFlags(&function.blocks.items[leader.block_index].instructions.items[leader.instruction_index], instruction.*);
+            leaders.items[leader_index].instruction = function.blocks.items[leader.block_index].instructions.items[leader.instruction_index];
+            const replacement: ir.Value = .{ .named = leader.instruction.result orelse return error.InstructionWithoutResult };
             instruction.removed = true;
             instruction.replacement = replacement;
             const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -371,14 +375,14 @@ fn findLeader(
     block_index: usize,
     instruction_index: usize,
     instruction: ir.Instruction,
-) ?ir.Value {
+) ?usize {
     var index = leaders.len;
     while (index > 0) {
         index -= 1;
         const leader = leaders[index];
         if (leader.number != number) continue;
         if (!isMemoryAvailable(module, function, memory, leader, block_index, instruction_index, instruction)) continue;
-        return .{ .named = leader.instruction.result orelse return null };
+        return index;
     }
     return null;
 }

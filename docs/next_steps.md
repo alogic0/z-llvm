@@ -11,25 +11,25 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 18b: APFloat-backed strict `fadd`/`fmul` constants
+Active slice: Slice 19: Fast-math CSE legality
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `InstructionSimplify.cpp` constant binary folding and
-      `InstCombineAddSub.cpp`/`InstCombineMulDivRem.cpp` strict FP handling.
-- [x] Define the accepted local IR surface: scalar `float`/`double` `fadd`
-      and `fmul` with literal FP operands where the result can reuse an
-      existing operand spelling.
-- [x] Fold strict `fadd` with positive-zero literal plus finite non-negative
-      literal to the non-zero operand.
-- [x] Fold strict `fmul` with one literal `1.0` to the other literal, and
-      positive-zero times finite non-negative literal to the zero operand.
-- [x] Keep general APFloat result formatting, negative zero edge cases,
-      infinities times zero, NaNs, rounding modes, exceptions, vectors, and
-      fast-math-sensitive variable folds out of scope and documented.
-- [x] Add `opt-22` comparison fixtures for selected strict `fadd`/`fmul`
-      constant folds.
-- [x] Update InstCombine docs and parity docs, then mark Slice 18 complete.
+- [x] Map LLVM `Instruction::isIdenticalToWhenDefined`,
+      EarlyCSE `SimpleValue` equality/`combineIRFlags`, and GVN value-table
+      expression equality for FP operations.
+- [x] Define the accepted local IR surface: scalar non-constrained FP
+      `fadd`/`fsub`/`fmul`/`fdiv`/`frem` and `fcmp` with identical operands.
+- [x] Remove the local `fast`-only CSE gate for that accepted surface.
+- [x] Intersect retained leader fast-math flags when EarlyCSE/GVN replace a
+      duplicate FP expression.
+- [x] Keep constrained FP intrinsics, dynamic rounding, vectors, commuted FP
+      equality, min/max select matching, and full poison/debug salvage out of
+      scope and documented.
+- [x] Add `opt-22` comparison fixtures for strict, partial-FMF, and mixed-FMF
+      FP CSE.
+- [x] Update EarlyCSE/GVN/fast-math docs and parity docs, then mark Slice 19
+      complete.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review and commit this Slice 18 sub-slice.
+- [x] Review and commit Slice 19.

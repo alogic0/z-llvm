@@ -14,7 +14,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
             state.addBool(binary.flags.nuw);
             state.addBool(binary.flags.exact);
             state.addBool(binary.flags.disjoint);
-            addFastMathFlags(&state, binary.fp_flags);
+            if (!isFpBinary(binary.op)) addFastMathFlags(&state, binary.fp_flags);
             state.addType(binary.ty);
             state.addValue(binary.lhs);
             state.addValue(binary.rhs);
@@ -39,7 +39,6 @@ pub fn hash(instruction: ir.Instruction) u64 {
         },
         .fcmp => |fcmp| {
             state.addTag(7);
-            addFastMathFlags(&state, fcmp.fp_flags);
             state.addTag(@intFromEnum(fcmp.predicate));
             state.addType(fcmp.operand_ty);
             state.addValue(fcmp.lhs);
@@ -115,7 +114,6 @@ pub fn sameScalarExpression(a: ir.Instruction, b: ir.Instruction) bool {
         .fcmp => |a_fcmp| switch (b.kind) {
             .fcmp => |b_fcmp| fast_math.allowFpValueNumbering(a_fcmp.fp_flags) and
                 fast_math.allowFpValueNumbering(b_fcmp.fp_flags) and
-                fast_math.sameFlags(a_fcmp.fp_flags, b_fcmp.fp_flags) and
                 a_fcmp.predicate == b_fcmp.predicate and
                 a_fcmp.operand_ty.eql(b_fcmp.operand_ty) and
                 a_fcmp.lhs.eql(b_fcmp.lhs) and
@@ -144,7 +142,6 @@ fn sameBinaryExpression(a_binary: ir.BinaryInst, b_binary: ir.BinaryInst) bool {
     if (isFpBinary(a_binary.op) or isFpBinary(b_binary.op)) {
         if (!fast_math.allowFpValueNumbering(a_binary.fp_flags)) return false;
         if (!fast_math.allowFpValueNumbering(b_binary.fp_flags)) return false;
-        if (!fast_math.sameFlags(a_binary.fp_flags, b_binary.fp_flags)) return false;
     }
     return a_binary.flags.nsw == b_binary.flags.nsw and
         a_binary.flags.nuw == b_binary.flags.nuw and
@@ -192,6 +189,27 @@ pub fn sameReadnoneCall(module: ir.Module, a: ir.Instruction, b: ir.Instruction)
         if (!a_arg.value.eql(b_arg.value)) return false;
     }
     return true;
+}
+
+pub fn intersectRetainedFpFlags(retained: *ir.Instruction, removed: ir.Instruction) void {
+    switch (retained.kind) {
+        .binary => |*retained_binary| {
+            const removed_binary = switch (removed.kind) {
+                .binary => |binary| binary,
+                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return,
+            };
+            if (!isFpBinary(retained_binary.op) or !isFpBinary(removed_binary.op)) return;
+            retained_binary.fp_flags = fast_math.intersect(retained_binary.fp_flags, removed_binary.fp_flags);
+        },
+        .fcmp => |*retained_fcmp| {
+            const removed_fcmp = switch (removed.kind) {
+                .fcmp => |fcmp| fcmp,
+                .binary, .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return,
+            };
+            retained_fcmp.fp_flags = fast_math.intersect(retained_fcmp.fp_flags, removed_fcmp.fp_flags);
+        },
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
+    }
 }
 
 fn samePhi(a: ir.PhiInst, b: ir.PhiInst) bool {

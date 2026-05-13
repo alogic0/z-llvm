@@ -37,7 +37,8 @@ pub fn allowSelfOrderedCompareFold(flags: ir.FastMathFlags) bool {
 }
 
 pub fn allowFpValueNumbering(flags: ir.FastMathFlags) bool {
-    return flags.fast;
+    _ = flags;
+    return true;
 }
 
 pub fn sameFlags(a: ir.FastMathFlags, b: ir.FastMathFlags) bool {
@@ -49,4 +50,22 @@ pub fn sameFlags(a: ir.FastMathFlags, b: ir.FastMathFlags) bool {
         a.contract == b.contract and
         a.afn == b.afn and
         a.reassoc == b.reassoc;
+}
+
+pub fn intersect(a: ir.FastMathFlags, b: ir.FastMathFlags) ir.FastMathFlags {
+    var result: ir.FastMathFlags = .{
+        .nnan = noNaNs(a) and noNaNs(b),
+        .ninf = noInfs(a) and noInfs(b),
+        .nsz = noSignedZeros(a) and noSignedZeros(b),
+        .arcp = allowReciprocal(a) and allowReciprocal(b),
+        .contract = allowContract(a) and allowContract(b),
+        .afn = approximateFunctions(a) and approximateFunctions(b),
+        .reassoc = allowReassociation(a) and allowReassociation(b),
+    };
+    if (result.nnan and result.ninf and result.nsz and result.arcp and
+        result.contract and result.afn and result.reassoc)
+    {
+        result = .{ .fast = true };
+    }
+    return result;
 }

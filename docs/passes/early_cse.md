@@ -78,7 +78,9 @@ candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
 scalar, load, and readnone-call expression equivalence shared with GVN
 FP binary ops and fcmp use the shared fast-math legality helper and are admitted
-only under the local `fast` boundary
+for scalar non-constrained FP expressions
+retained FP leaders intersect fast-math flags with the removed instruction,
+matching LLVM's `combineIRFlags` category for CSE
 ```
 
 Upstream mapping:
@@ -103,19 +105,21 @@ opt-22 equivalent:
   early_cse_unreachable_store_not_clobber
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
+  fp_early_cse_flags
 
 local-only conservative:
   readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
   declaration attributes into attribute groups that the current parser rejects,
   so this case is not in `fixtures.tsv` yet.
-  fp_early_cse_no_cse preserves repeated FP expressions locally. LLVM may CSE
-  more FP expressions once exact FP legality is modeled.
-  fp_extended_early_cse_no_cse applies the same conservative boundary to scalar
-  `fsub`, `fdiv`, and `frem`.
+  fp_early_cse_no_cse now CSEs strict FP binary/fcmp expressions, but remains
+  local-conservative because the local pipeline lacks LLVM's later select
+  simplification for that fixture.
+  fp_extended_early_cse_no_cse preserves non-redundant scalar `fsub`, `fdiv`,
+  and `frem` syntax.
   fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
   name differs from opt-22, so the fixture is local-conservative.
-  fp_fast_cse_reject documents that non-fast FP expressions stay outside the
-  local CSE boundary.
+  fp_fast_cse_reject documents an adjacent partial-FMF case where local
+  EarlyCSE keeps the earlier leader while opt-22 first removes the dead leader.
   early_cse_unreachable_store_not_clobber proves the path-aware local
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE
@@ -158,8 +162,8 @@ model
 readonly calls are modeled only as non-clobbering memory accesses; no readonly
 call return-value CSE
 no freeze CSE because undef/poison semantics need more modeling first
-no strict FP CSE; FP CSE is limited to the local `fast` boundary
-no commutative operand canonicalization
+no constrained-FP CSE for dynamic rounding or strict exceptions
+no FP commutative operand canonicalization
 no target-library knowledge
 no debug-info salvage beyond preserving the leader instruction location
 ```

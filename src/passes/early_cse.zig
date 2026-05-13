@@ -89,11 +89,14 @@ fn visitBlock(
         }
 
         if (isCseCandidate(module, instruction.*)) {
-            if (findAvailableEquivalent(module, function.*, walker, available.items, block_index, instruction_index, instruction.*)) |replacement| {
+            if (findAvailableEquivalent(module, function.*, walker, available.items, block_index, instruction_index, instruction.*)) |available_index| {
+                const candidate = available.items[available_index];
+                expression_key.intersectRetainedFpFlags(&function.blocks.items[candidate.block_index].instructions.items[candidate.instruction_index], instruction.*);
+                available.items[available_index].instruction = function.blocks.items[candidate.block_index].instructions.items[candidate.instruction_index];
                 instruction.removed = true;
-                instruction.replacement = replacement;
+                instruction.replacement = .{ .named = candidate.instruction.result orelse return error.InstructionWithoutResult };
                 const result = instruction.result orelse return error.InstructionWithoutResult;
-                try aliases.put(result, replacement);
+                try aliases.put(result, instruction.replacement.?);
                 changed = true;
                 continue;
             }
@@ -199,14 +202,14 @@ fn findAvailableEquivalent(
     block_index: usize,
     instruction_index: usize,
     instruction: ir.Instruction,
-) ?ir.Value {
+) ?usize {
     var index = available.len;
     while (index > 0) {
         index -= 1;
         const candidate = available[index];
         if (candidate.hash != expression_key.hash(instruction)) continue;
         if (!sameAvailableExpression(module, function, walker, candidate, block_index, instruction_index, instruction)) continue;
-        return .{ .named = candidate.instruction.result orelse return null };
+        return index;
     }
     return null;
 }

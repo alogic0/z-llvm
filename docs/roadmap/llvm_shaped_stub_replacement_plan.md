@@ -106,7 +106,7 @@ Each slice is complete only when it has:
       Replace conservative FP pass-through with APFloat-equivalent constant
       folding for selected `fadd`, `fmul`, and `fcmp` cases. Required upstream
       mapping: `llvm/lib/Analysis/InstructionSimplify.cpp` and APFloat users.
-- [ ] Slice 19: Fast-math CSE legality.
+- [x] Slice 19: Fast-math CSE legality.
       Allow EarlyCSE/GVN only when fast-math flags make the expression
       equivalence LLVM-compatible. Required upstream mapping:
       `EarlyCSE.cpp`, `GVN.cpp`, and LLVM fast-math flag handling.

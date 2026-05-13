@@ -69,7 +69,9 @@ local ValueTable for pure integer binary, integer cast, icmp, select, phi, readn
 expression identity shared with EarlyCSE through `src/analysis/expression_key.zig`
 leader table scoped by dominator traversal
 shared memory-effect API rejects memory-writing, volatile/atomic, and unknown instructions from value numbering
-equivalence by opcode, flags where present, type, and operands
+equivalence by opcode, supported non-FP flags, type, and operands
+scalar non-constrained FP binary ops and `fcmp` ignore fast-math flags for
+expression identity and intersect retained leader flags on replacement
 simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
 load availability queries use the persisted local MemorySSA walker-shaped API
@@ -84,7 +86,7 @@ same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
 FP binary ops and fcmp use the shared fast-math legality helper and are admitted
-only under the local `fast` boundary
+for scalar non-constrained FP expressions
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.
@@ -108,6 +110,7 @@ opt-22 equivalent:
   gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
+  fp_gvn_flags
 
 local-only conservative:
   gvn_load_branch_clobber_reject keeps the later load because a store in a
@@ -124,15 +127,13 @@ local-only conservative:
   argmem-only noalias calls are trusted as non-clobbering memory accesses for
   repeated loads, matching the local `memory(read)` and `memory(argmem: write)`
   fixtures.
-  fp_gvn_no_cse preserves repeated FP expressions locally. LLVM may eliminate
-  more FP expressions when the exact legality conditions are proven; this
-  project keeps them out of GVN for now.
-  fp_extended_gvn_no_cse applies the same conservative boundary to scalar
-  `fsub`, `fdiv`, and `frem`.
+  fp_gvn_no_cse now value-numbers strict FP binary/fcmp expressions, but remains
+  local-conservative because the local pipeline lacks LLVM's later select
+  simplification for that fixture.
+  fp_extended_gvn_no_cse preserves non-redundant scalar `fsub`, `fdiv`, and
+  `frem` syntax.
   fp_fast_gvn admits repeated `fadd fast` expressions and matches opt-22 for
   the accepted dominator-tree value-numbering shape.
-  fp_fast_cse_reject documents that non-fast FP expressions stay outside the
-  local value-numbering boundary.
   debug_gvn_dbg_preserve preserves the leader instruction location and drops
   the removed redundant instruction location. Variable-location salvage remains
   out of scope.
@@ -157,8 +158,8 @@ load-PRE PHI insertion
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no critical-edge splitting or general partial redundancy handling
-no assume, readonly call return-value numbering, GEP, freeze, strict FP, vector,
-or memory value numbering
-FP value numbering is limited to the local `fast` boundary
+no assume, readonly call return-value numbering, GEP, freeze, constrained FP,
+vector, or memory value numbering
+no FP commutative operand canonicalization
 no debug-info salvage beyond preserving the leader instruction location
 ```
