@@ -40,6 +40,8 @@ const VerifyContext = struct {
     function: core.Function,
     defs: std.StringHashMap(Definition),
     predecessors: []bool,
+    predecessor_lists: []std.ArrayList(usize),
+    successor_lists: []std.ArrayList(usize),
     reachable: []bool,
     dominators: []u64,
     block_count: usize,
@@ -55,6 +57,8 @@ const VerifyContext = struct {
             .function = function,
             .defs = std.StringHashMap(Definition).init(allocator),
             .predecessors = try allocator.alloc(bool, block_count * block_count),
+            .predecessor_lists = try allocator.alloc(std.ArrayList(usize), block_count),
+            .successor_lists = try allocator.alloc(std.ArrayList(usize), block_count),
             .reachable = try allocator.alloc(bool, block_count),
             .dominators = try allocator.alloc(u64, block_count * dominator_word_count),
             .block_count = block_count,
@@ -63,6 +67,8 @@ const VerifyContext = struct {
         errdefer ctx.deinit();
 
         @memset(ctx.predecessors, false);
+        @memset(ctx.predecessor_lists, .empty);
+        @memset(ctx.successor_lists, .empty);
         @memset(ctx.reachable, false);
         @memset(ctx.dominators, 0);
 
@@ -78,6 +84,10 @@ const VerifyContext = struct {
 
     fn deinit(ctx: *VerifyContext) void {
         ctx.defs.deinit();
+        for (ctx.predecessor_lists) |*list| list.deinit(ctx.allocator);
+        for (ctx.successor_lists) |*list| list.deinit(ctx.allocator);
+        ctx.allocator.free(ctx.predecessor_lists);
+        ctx.allocator.free(ctx.successor_lists);
         ctx.allocator.free(ctx.predecessors);
         ctx.allocator.free(ctx.reachable);
         ctx.allocator.free(ctx.dominators);
@@ -116,6 +126,10 @@ const VerifyContext = struct {
 
     fn addEdge(ctx: *VerifyContext, from: usize, target_name: []const u8) !void {
         const to = ctx.function.blockIndex(target_name) orelse return error.UnknownBlock;
+        if (!ctx.hasEdge(from, to)) {
+            try ctx.successor_lists[from].append(ctx.allocator, to);
+            try ctx.predecessor_lists[to].append(ctx.allocator, from);
+        }
         ctx.predecessors[ctx.edgeIndex(from, to)] = true;
     }
 
@@ -133,8 +147,8 @@ const VerifyContext = struct {
         try worklist.append(ctx.allocator, 0);
 
         while (worklist.pop()) |block_index| {
-            for (0..ctx.block_count) |successor| {
-                if (!ctx.hasEdge(block_index, successor) or ctx.reachable[successor]) continue;
+            for (ctx.successor_lists[block_index].items) |successor| {
+                if (ctx.reachable[successor]) continue;
                 ctx.reachable[successor] = true;
                 try worklist.append(ctx.allocator, successor);
             }
@@ -162,8 +176,8 @@ const VerifyContext = struct {
 
                 @memset(new_dominators, ~@as(u64, 0));
                 var saw_reachable_pred = false;
-                for (0..ctx.block_count) |pred| {
-                    if (!ctx.hasEdge(pred, block_index) or !ctx.reachable[pred]) continue;
+                for (ctx.predecessor_lists[block_index].items) |pred| {
+                    if (!ctx.reachable[pred]) continue;
                     saw_reachable_pred = true;
                     const pred_dominators = ctx.dominatorSet(pred);
                     for (new_dominators, pred_dominators) |*new_word, pred_word| {

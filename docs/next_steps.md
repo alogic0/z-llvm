@@ -24,6 +24,9 @@ Active cycle:
 - [x] Verifier throughput blocker: replace dense per-candidate dominator
       recomputation with bitset dominator sets, restoring fast verification for
       large Debug functions such as `behavior/sizeof_and_typeof.zig`.
+- [x] Verifier throughput blocker: keep actual predecessor and successor lists
+      beside the dense edge matrix so reachability and dominance do not scan
+      every possible edge in generated functions with thousands of blocks.
 - [x] Verifier throughput blocker: build module-level declaration, function,
       and global lookup maps once per verification instead of repeatedly
       scanning the full module for call and global-reference checks.
