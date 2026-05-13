@@ -44,7 +44,7 @@ Each slice is complete only when it has:
 
 ## Phase 2: MemorySSA And Alias Parity
 
-- [ ] Slice 5: MemorySSA walker API for clobber queries.
+- [x] Slice 5: MemorySSA walker API for clobber queries.
       Replace local block-range scans with a walker-shaped query over MemoryUse,
       MemoryDef, and MemoryPhi records. Required upstream mapping:
       `llvm/lib/Analysis/MemorySSA.cpp` and `MemorySSAUpdater`.

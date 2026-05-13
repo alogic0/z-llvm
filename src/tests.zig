@@ -6661,6 +6661,103 @@ test "memory ssa records narrow phi facts at joins" {
     try std.testing.expect(memory.hasClobberBetween(.{ .block_index = 1, .instruction_index = 0 }, .{ .block_index = 3, .instruction_index = 0 }, .{ .named = "p" }));
 }
 
+test "memory ssa walker reports clobbering access or live-on-entry" {
+    const input =
+        \\define i32 @memory_walker(i32 %v) {
+        \\entry:
+        \\  %left = alloca i32
+        \\  %right = alloca i32
+        \\  %first = load i32, ptr %left
+        \\  store i32 %v, ptr %right
+        \\  %second = load i32, ptr %left
+        \\  store i32 %v, ptr %left
+        \\  %third = load i32, ptr %left
+        \\  ret i32 %third
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function);
+    defer memory.deinit();
+    const walker = memory.getWalker();
+
+    try std.testing.expectEqual(@as(usize, 5), memory.accesses.items.len);
+    try std.testing.expectEqual(
+        memory_ssa.ClobberResult.live_on_entry,
+        walker.getClobberBetween(
+            .{ .block_index = 0, .instruction_index = 2 },
+            .{ .block_index = 0, .instruction_index = 4 },
+            .{ .named = "left" },
+            .{ .int = 32 },
+        ),
+    );
+
+    const clobber = walker.getClobberBetween(
+        .{ .block_index = 0, .instruction_index = 4 },
+        .{ .block_index = 0, .instruction_index = 6 },
+        .{ .named = "left" },
+        .{ .int = 32 },
+    );
+    switch (clobber) {
+        .live_on_entry => return error.ExpectedMemoryClobber,
+        .access => |access| {
+            try std.testing.expectEqual(memory_ssa.AccessKind.def, access.kind);
+            try std.testing.expectEqual(@as(usize, 0), access.block_index);
+            try std.testing.expectEqual(@as(?usize, 5), access.instruction_index);
+        },
+    }
+
+    const third_access = memory.findAccessIndex(.{ .block_index = 0, .instruction_index = 6 }) orelse return error.ExpectedMemoryAccess;
+    const clobber_for_use = walker.getClobberingMemoryAccessForAccess(third_access, .{ .named = "left" }, .{ .int = 32 });
+    switch (clobber_for_use) {
+        .live_on_entry => return error.ExpectedMemoryClobber,
+        .access => |access| {
+            try std.testing.expectEqual(memory_ssa.AccessKind.def, access.kind);
+            try std.testing.expectEqual(@as(?usize, 5), access.instruction_index);
+        },
+    }
+}
+
+test "memory ssa walker reports memory phi as clobber" {
+    const input =
+        \\define i32 @memory_walker_phi(i1 %cond, ptr %p, i32 %v) {
+        \\entry:
+        \\  br i1 %cond, label %left, label %right
+        \\left:
+        \\  store i32 %v, ptr %p
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %loaded = load i32, ptr %p
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    const function = module.functions.items[0];
+
+    var memory = try memory_ssa.MemorySSA.build(std.testing.allocator, module, function);
+    defer memory.deinit();
+    const walker = memory.getWalker();
+
+    const clobber = walker.getClobberingMemoryAccess(.{ .block_index = 3, .instruction_index = 0 }, .{ .named = "p" }, .{ .int = 32 });
+    switch (clobber) {
+        .live_on_entry => return error.ExpectedMemoryClobber,
+        .access => |access| {
+            try std.testing.expectEqual(memory_ssa.AccessKind.phi, access.kind);
+            try std.testing.expectEqual(@as(usize, 3), access.block_index);
+            try std.testing.expectEqual(@as(?usize, null), access.instruction_index);
+        },
+    }
+}
+
 test "memory ssa skips phis for pure predecessor diamonds" {
     const input =
         \\define i32 @memory_pure_diamond(i1 %cond, ptr %p) {

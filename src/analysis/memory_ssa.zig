@@ -26,6 +26,78 @@ pub const Access = struct {
     ptr: ?ir.Value = null,
 };
 
+pub const ClobberResult = union(enum) {
+    live_on_entry,
+    access: Access,
+
+    pub fn found(result: ClobberResult) bool {
+        return switch (result) {
+            .live_on_entry => false,
+            .access => true,
+        };
+    }
+};
+
+pub const Walker = struct {
+    memory: MemorySSA,
+
+    pub fn getClobberingMemoryAccess(walker: Walker, query: InstRef, ptr: ir.Value, access_ty: ?ir.Type) ClobberResult {
+        return walker.getClobberingMemoryAccessBefore(query, ptr, access_ty);
+    }
+
+    pub fn getClobberingMemoryAccessForAccess(walker: Walker, access_index: usize, ptr: ir.Value, access_ty: ?ir.Type) ClobberResult {
+        if (access_index >= walker.memory.accesses.items.len) return .live_on_entry;
+        const access = walker.memory.accesses.items[access_index];
+        const instruction_index = access.instruction_index orelse 0;
+        return walker.getClobberingMemoryAccessBefore(.{
+            .block_index = access.block_index,
+            .instruction_index = instruction_index,
+        }, ptr, access_ty);
+    }
+
+    pub fn getClobberBetween(walker: Walker, from: InstRef, to: InstRef, ptr: ir.Value, access_ty: ?ir.Type) ClobberResult {
+        var index = walker.memory.accesses.items.len;
+        while (index > 0) {
+            index -= 1;
+            const access = walker.memory.accesses.items[index];
+            if (!walker.memory.isPathAwareBetween(access, from, to)) continue;
+            if (walker.accessClobbers(access, ptr, access_ty)) return .{ .access = access };
+        }
+        return .live_on_entry;
+    }
+
+    fn getClobberingMemoryAccessBefore(walker: Walker, query: InstRef, ptr: ir.Value, access_ty: ?ir.Type) ClobberResult {
+        var index = walker.memory.accesses.items.len;
+        while (index > 0) {
+            index -= 1;
+            const access = walker.memory.accesses.items[index];
+            if (!walker.accessCanReachQuery(access, query)) continue;
+            if (walker.accessClobbers(access, ptr, access_ty)) return .{ .access = access };
+        }
+        return .live_on_entry;
+    }
+
+    fn accessCanReachQuery(walker: Walker, access: Access, query: InstRef) bool {
+        if (access.block_index == query.block_index) {
+            const instruction_index = access.instruction_index orelse return true;
+            return instruction_index < query.instruction_index;
+        }
+        return walker.memory.canReach(access.block_index, query.block_index);
+    }
+
+    fn accessClobbers(walker: Walker, access: Access, ptr: ir.Value, access_ty: ?ir.Type) bool {
+        return switch (access.kind) {
+            .use => false,
+            .def, .barrier => {
+                const instruction_index = access.instruction_index orelse return true;
+                const instruction = walker.memory.function.blocks.items[access.block_index].instructions.items[instruction_index];
+                return isBarrierForAccess(walker.memory.module, walker.memory.function, instruction, ptr, access_ty);
+            },
+            .phi => true,
+        };
+    }
+};
+
 pub const MemorySSA = struct {
     allocator: std.mem.Allocator,
     module: ir.Module,
@@ -82,19 +154,20 @@ pub const MemorySSA = struct {
     }
 
     pub fn hasClobberBetweenAccess(memory: MemorySSA, from: InstRef, to: InstRef, ptr: ir.Value, access_ty: ?ir.Type) bool {
-        for (memory.accesses.items) |access| {
-            if (!memory.isPathAwareBetween(access, from, to)) continue;
-            switch (access.kind) {
-                .use => {},
-                .def, .barrier => {
-                    const instruction_index = access.instruction_index orelse return true;
-                    const instruction = memory.function.blocks.items[access.block_index].instructions.items[instruction_index];
-                    if (isBarrierForAccess(memory.module, memory.function, instruction, ptr, access_ty)) return true;
-                },
-                .phi => return true,
-            }
+        return memory.getWalker().getClobberBetween(from, to, ptr, access_ty).found();
+    }
+
+    pub fn getWalker(memory: MemorySSA) Walker {
+        return .{ .memory = memory };
+    }
+
+    pub fn findAccessIndex(memory: MemorySSA, ref: InstRef) ?usize {
+        for (memory.accesses.items, 0..) |access, index| {
+            if (access.block_index != ref.block_index) continue;
+            if (access.instruction_index == null or access.instruction_index.? != ref.instruction_index) continue;
+            return index;
         }
-        return false;
+        return null;
     }
 
     pub fn deleteAccess(memory: *MemorySSA, block_index: usize, instruction_index: usize) bool {
@@ -214,20 +287,9 @@ fn sameAccess(a: Access, b: Access) bool {
 }
 
 pub fn hasClobberBetween(module: ir.Module, function: ir.Function, from: InstRef, to: InstRef, ptr: ir.Value) bool {
-    for (function.blocks.items, 0..) |block, block_index| {
-        for (block.instructions.items, 0..) |instruction, instruction_index| {
-            if (instruction.removed) continue;
-            const access: Access = .{
-                .kind = classifyAccess(module, instruction) orelse continue,
-                .block_index = block_index,
-                .instruction_index = instruction_index,
-                .ptr = accessPointer(instruction),
-            };
-            if (!isConservativelyBetween(access, from, to)) continue;
-            if (isBarrier(module, function, instruction, ptr)) return true;
-        }
-    }
-    return false;
+    var memory = MemorySSA.build(module.allocator, module, function) catch return true;
+    defer memory.deinit();
+    return memory.hasClobberBetween(from, to, ptr);
 }
 
 pub fn isBarrier(module: ir.Module, function: ir.Function, instruction: ir.Instruction, ptr: ir.Value) bool {

@@ -20,6 +20,9 @@ LLVM entry points/classes:
   MemoryDef
   MemoryUse
   MemoryPhi
+  MemorySSAWalker
+  MemorySSA::getWalker
+  MemorySSAWalker::getClobberingMemoryAccess
   MemorySSAUpdater
 
 Required analyses:
@@ -37,14 +40,19 @@ Core LLVM algorithm data structures:
   Walker queries for clobbering memory accesses
 
 Local target status:
-  LLVM-shaped access-list and clobber-query subset
+  LLVM-shaped access-list and walker-query subset
 
 Implemented subset:
   InstRef identifies a memory access by block and instruction index.
   MemorySSA.build records accepted MemoryUse, MemoryDef, barrier, and narrow
   MemoryPhi-like join facts in deterministic function order.
-  hasClobberBetween queries the persisted access list for GVN and EarlyCSE load
-  availability.
+  getWalker returns a MemorySSAWalker-shaped query object.
+  Walker.getClobberingMemoryAccess returns either live-on-entry or a
+  clobbering MemoryUse/MemoryDef/MemoryPhi-style access for accepted local IR.
+  Walker.getClobberBetween answers the existing GVN and EarlyCSE load
+  availability query using the same access-clobber logic.
+  hasClobberBetween routes through the walker API; the old direct
+  block/instruction scan is removed.
   alias.modRefInModule decides whether an intervening instruction is a
   def/barrier for the queried pointer using module DataLayout and globals.
   readnone and readonly direct calls are treated as non-clobbering for load
@@ -75,17 +83,16 @@ Implemented subset:
 Intentional divergences:
   MemoryPhi support is conservative: join facts are barriers for accepted
   queries, not full per-location phi operands.
-  Cross-block queries still reject more cases than LLVM. LLVM can walk MemorySSA
-  and skip non-clobbering accesses with cached optimized defs; the local helper
-  scans the access list and only uses CFG reachability to reject impossible
-  paths.
+  Cross-block queries still reject more cases than LLVM. LLVM's walker follows
+  defining accesses and caches optimized defs; the local walker scans the
+  access list and uses CFG reachability to reject impossible paths.
   LICM does not move memory instructions.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
   The access list is still usually rebuilt per function; updater support covers
   only simple access deletion/replacement.
   No optimized access cache or clobber-walk skipping exists.
-  The path-aware query is still an access-list scan, not LLVM's optimized
-  walker.
+  The walker is shape-compatible with LLVM query clients but not performance- or
+  precision-equivalent to LLVM's optimized walker.
 
 Analysis preservation/invalidation:
   The local access list is built per pass invocation. Mutating passes normally
@@ -93,6 +100,8 @@ Analysis preservation/invalidation:
   stores; complex CFG rewrites still rebuild rather than update in place.
 
 Fixture coverage:
+  unit test: memory ssa walker reports clobbering access or live-on-entry
+  unit test: memory ssa walker reports memory phi as clobber
   unit test: memory ssa clobber helper covers accepted memory-dependence cases
   unit test: memory ssa records narrow phi facts at joins
   unit test: memory ssa updater deletes accesses and dumps expectations

@@ -47,8 +47,9 @@ Implemented subset:
   Verify MemorySSA consistency after deleting stores
 
 Intentional divergences:
-  No full MemorySSA walker/updater; only simple access deletion/replacement
-  helpers exist in the analysis layer.
+  No full optimized MemorySSA walker/updater; only the first walker-shaped
+  clobber API and simple access deletion/replacement helpers exist in the
+  analysis layer.
   No cross-block DSE.
   Partial-overwrite DSE is rejected; partial overlaps are preservation barriers.
   No memset/memcpy/memmove handling.
@@ -79,7 +80,7 @@ Local-only fixture command:
 Known gaps:
 
 ```text
-no full MemorySSA walker/updater
+no full optimized MemorySSA walker/updater
 no post-dominator or cross-block reasoning
 no partial-overlap elimination
 no target-library memory intrinsic handling

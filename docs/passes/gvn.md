@@ -65,7 +65,7 @@ shared memory-effect API rejects memory-writing, volatile/atomic, and unknown in
 equivalence by opcode, flags where present, type, and operands
 simple load equivalence only when alias/mod-ref sees no clobber
 load availability is routed through the shared MemorySSA-like clobber helper
-load availability queries use the persisted local MemorySSA access list
+load availability queries use the persisted local MemorySSA walker-shaped API
 cross-block load availability is path-aware for the accepted access-list slice:
 endpoint instruction order is used, and interior clobbers must be reachable on a
 CFG path between the leader load and the later load
@@ -137,7 +137,7 @@ Known gaps:
 ```text
 no load PRE
 no MemorySSA-backed memory value numbering beyond the accepted path-aware
-access-list query
+walker query
 no phi translation beyond exact phi expression matching
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing

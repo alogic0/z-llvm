@@ -58,9 +58,9 @@ pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
 load equality always runs through the shared MemorySSA-like clobber helper
-load availability queries use the persisted local MemorySSA access list
-cross-block load CSE treats memory accesses in non-endpoint blocks as possible
-clobbers until a path-aware MemorySSA walker exists
+load availability queries use the persisted local MemorySSA walker-shaped API
+cross-block load CSE treats MemoryPhi, volatile/atomic, unknown calls, and
+aliasing stores as clobbers through that walker
 store-to-load forwarding for must-alias non-volatile stack/pointer locations
 readnone call CSE when callee attributes prove no memory effects
 unknown calls and volatile/atomic accesses clear local memory availability
@@ -140,7 +140,7 @@ after early-cse:
 Known gaps:
 
 ```text
-no full MemorySSA walker/updater
+no full optimized MemorySSA walker/updater
 no full MemorySSA-backed load CSE beyond the accepted path-aware access-list
 query
 readonly calls are modeled only as non-clobbering memory accesses; no readonly

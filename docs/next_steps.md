@@ -11,25 +11,24 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 4: `lower-expect` and branch-weight metadata preservation
+Active slice: Slice 5: MemorySSA walker API for clobber queries
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map `LowerExpectIntrinsic` upstream entry points.
-- [x] Define the accepted local IR surface: direct `llvm.expect.i1` calls whose
-      result feeds a same-block `br i1`.
-- [x] Implement branch condition replacement with the expect operand.
-- [x] Attach branch-weight metadata matching LLVM's default expected weights.
-- [x] Remove supported `llvm.expect.i1` calls by replacing their uses with the
-      first operand.
-- [x] Preserve unsupported cases without marking the pass complete for those
-      cases: `expect.with.probability`, switch/select/phi handling,
-      non-constant expected values, non-i1 forms, existing profile merge
-      policy, and debug salvage.
-- [x] Add `opt-22` comparison fixtures for the positive branch case and an
-      unsupported non-i1 preservation boundary.
-- [x] Update pass docs, pipeline docs, inventory status, and the algorithm
-      parity audit.
-- [x] Run focused comparison.
+- [x] Map LLVM `MemorySSA`, `MemoryUse`, `MemoryDef`, `MemoryPhi`,
+      `MemorySSAWalker`, and `MemorySSAUpdater` entry points.
+- [x] Define the accepted local IR surface: load/store/call/fence/atomic
+      accesses, conservative MemoryPhi barriers, and CFG reachability-backed
+      clobber queries.
+- [x] Add a MemorySSA walker API that returns live-on-entry or the clobbering
+      access for accepted queries.
+- [x] Route existing clobber helpers through the walker-shaped API instead of
+      direct block/instruction scans.
+- [x] Add unit coverage for direct clobber, live-on-entry, and MemoryPhi
+      clobber results.
+- [x] Document why `opt-22` comparison is not direct for this analysis API:
+      behavior is covered indirectly by existing EarlyCSE/GVN/DSE opt fixtures.
+- [x] Update MemorySSA docs and the algorithm parity audit.
+- [x] Run focused MemorySSA tests.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 4 complete in the roadmap.
+- [x] Review, commit, and mark Slice 5 complete in the roadmap.
