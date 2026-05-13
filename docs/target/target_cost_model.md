@@ -11,8 +11,9 @@ llvm-project-22/llvm/lib/Transforms/Vectorize/VectorCombine.cpp
 ```
 
 LLVM vector transforms depend on target legality and profitability facts, not
-only on vector IR syntax. The local replacement has no TargetTransformInfo-like
-model yet.
+only on vector IR syntax. The local replacement now has an analysis-only
+TargetTransformInfo skeleton, but it is not yet used to enable vectorizer-quality
+transforms.
 
 Implemented subset:
 
@@ -22,6 +23,9 @@ fixed-vector IR forms parse and verify
 fixed-vector lane operations may participate in target-independent DCE
 same-constant-lane extract-after-insert folds are target-independent
 scalar-condition vector selects with identical arms fold target-independently
+`src/analysis/target_transform_info.zig` exposes generic, x86_64, and AArch64
+cost query objects for scalar/vector arithmetic, shuffle-like operations, and
+scalarization overhead
 unsupported scalable vectors and malformed lane operations are rejected by parser tests
 future vector fixture records the parser/verifier boundary
 loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
@@ -36,8 +40,8 @@ evidence before it can drive optimization expectations.
 Required before enabling vector transforms:
 
 ```text
-target vector register and legal type facts
-operation cost queries for scalar and vector arithmetic
+complete target vector register and legal type facts
+broader operation cost queries for scalar and vector arithmetic
 memory access cost and alignment facts
 LoopAccessAnalysis and ScalarEvolution-like loop legality
 codegen/backend validation for generated vector IR
@@ -52,12 +56,21 @@ no vector optimization or scalar fold reuse beyond target-independent
 same-value identities
 no loop or SLP vectorization
 no target feature or CPU model cost variation
+no transform consumes the TargetTransformInfo skeleton yet
 ```
 
 Target feature extraction is documented in `docs/target/features.md`. Those
-facts are preserved for future TargetTransformInfo work, not consumed by the
-current optimizer. The current lane folds are allowed only because they are
+facts are preserved for future TargetTransformInfo expansion, not consumed by
+the current optimizer. The current lane folds are allowed only because they are
 target-independent semantic identities, not profitability decisions.
+
+Fixture coverage:
+
+```text
+unit tests:
+  TargetTransformInfo skeleton exposes x86_64, AArch64, and generic vector
+  arithmetic/shuffle/scalarization costs
+```
 
 The transform classification policy is tracked in
 `docs/target/transform_cost_policy.md`.

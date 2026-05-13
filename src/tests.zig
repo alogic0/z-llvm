@@ -19,6 +19,7 @@ const pipelines = @import("pipelines.zig");
 const postdominator = @import("analysis/postdominator.zig");
 const target = @import("target.zig");
 const target_library_info = @import("analysis/target_library_info.zig");
+const target_transform_info = @import("analysis/target_transform_info.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
@@ -294,6 +295,22 @@ test "AArch64 accepted pipeline keeps target-sensitive passes out of scope" {
     for (blocked) |pass_name| {
         try std.testing.expect(!pipelineContainsPass(pm, pass_name));
     }
+}
+
+test "TargetTransformInfo skeleton exposes target vector costs" {
+    const x86_tti = target_transform_info.TargetTransformInfo.forTriple("x86_64-unknown-linux-gnu");
+    const aarch64_tti = target_transform_info.TargetTransformInfo.forTriple("aarch64-unknown-linux-gnu");
+    const generic_tti = target_transform_info.TargetTransformInfo.forTriple("wasm32-wasi");
+
+    const v4i32: ir.Type = .{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } };
+    const v8i32: ir.Type = .{ .vector = .{ .len = 8, .elem_ty = .{ .int = 32 } } };
+
+    try std.testing.expectEqual(@as(u32, 1), x86_tti.arithmeticInstrCost(.add, v4i32, .throughput).value);
+    try std.testing.expectEqual(@as(u32, 1), aarch64_tti.shuffleCost(.permute, v4i32, .throughput).value);
+    try std.testing.expectEqual(@as(u32, 2), x86_tti.arithmeticInstrCost(.add, v8i32, .throughput).value);
+    try std.testing.expectEqual(@as(u32, 4), generic_tti.arithmeticInstrCost(.add, v4i32, .throughput).value);
+    try std.testing.expectEqual(@as(u32, 0), x86_tti.scalarizationOverhead(v4i32).value);
+    try std.testing.expectEqual(@as(u32, 8), x86_tti.scalarizationOverhead(v8i32).value);
 }
 
 test "lto prelink pipelines expose prelink placeholders without bitcode semantics" {

@@ -131,7 +131,7 @@ Each slice is complete only when it has:
 
 ## Phase 6: Vector, Target Cost, And Size/PGO Boundaries
 
-- [ ] Slice 24: TargetTransformInfo skeleton.
+- [x] Slice 24: TargetTransformInfo skeleton.
       Add target-cost query objects for x86_64 and AArch64 scalar/vector costs.
       Required upstream mapping: LLVM `TargetTransformInfo`.
 - [ ] Slice 25: `vector-combine` for extract/insert lane identity.

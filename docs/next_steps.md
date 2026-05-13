@@ -11,24 +11,19 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 23: `inline` for one direct internal call shape
+Active slice: Slice 24: TargetTransformInfo skeleton
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `InlinerPass::run`, `InlineAdvisor::getAdvice`,
-      `InlineCostCallAnalyzer`, and `InlineFunction`.
-- [x] Define the accepted local IR surface: direct calls to local/private
-      single-block callees with matching signature and no unsupported call-site
-      attributes.
-- [x] Add a basic cost gate for small side-effect-free callees and reject
-      noinline, recursive, indirect, declaration, multi-block, side-effecting,
-      and over-budget calls.
-- [x] Reuse the local InlineFunction-shaped clone/substitute path and remove
-      only local callees made dead by this inline pass.
-- [x] Add `opt-22` fixtures for one accepted inline case and one noinline
-      rejection boundary.
-- [x] Wire `inline` as a real pass and update IPO docs, pipeline docs, parity
-      docs, inventory, and roadmap status.
-- [x] Run focused comparison.
+- [x] Map LLVM `TargetTransformInfo`, `getArithmeticInstrCost`,
+      `getShuffleCost`, and scalarization-overhead query boundaries.
+- [x] Add local target-cost query objects for generic, x86_64, and AArch64.
+- [x] Model a first scalar/vector cost surface for integer/FP arithmetic and
+      vector shuffle-like operations.
+- [x] Keep the skeleton analysis-only; do not enable vectorizer-quality
+      transforms from these costs yet.
+- [x] Add focused unit coverage for x86_64, AArch64, and generic vector costs.
+- [x] Update target-cost, vector, parity, and roadmap docs.
+- [x] Run focused tests.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 23.
+- [x] Review and commit Slice 24.

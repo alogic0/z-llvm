@@ -56,13 +56,13 @@ This uses the same identical-arm rule as scalar `select`. It does not require a
 vector cost model because it removes an instruction without changing lane
 semantics. Scalar InstSimplify, GVN, and EarlyCSE still do not fold or
 value-number vector binary operations as scalar expressions. Vectorization and
-profitability remain blocked on TargetTransformInfo-style cost modeling.
+profitability remain blocked until the TargetTransformInfo skeleton is expanded
+and consumed by the relevant transforms.
 
 Cycle 04 keeps `vector_future_release_fast` as `parse,verify,future`, not as an
 optimizer-input corpus row. Activating that row requires a selected
-TargetTransformInfo-style cost model or native vector-lowering requirement, plus
-policy for vector FP semantics, vector-condition legality, and scalable
-vectors.
+TargetTransformInfo cost queries or native vector-lowering requirements, plus
+policy for vector FP semantics, vector-condition legality, and scalable vectors.
 
 Unsupported:
 
@@ -71,7 +71,7 @@ scalable vectors
 vector element types outside integer, float, double, and ptr
 vector comparisons beyond current parser boundaries
 vector FP transforms beyond parse/verify preservation for supported binary ops
-TargetTransformInfo-like profitability or vectorizer cost modeling
+TargetTransformInfo-driven profitability or vectorizer cost modeling
 loop-vectorize, slp-vectorizer, vector-combine
 native vector lowering
 ```

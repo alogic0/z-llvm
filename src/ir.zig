@@ -1,6 +1,8 @@
 const core = @import("ir/core.zig");
 
 pub const Type = core.Type;
+pub const VectorElementType = core.VectorElementType;
+pub const VectorType = core.VectorType;
 pub const Value = core.Value;
 pub const BinaryOp = core.BinaryOp;
 pub const BinaryFlags = core.BinaryFlags;

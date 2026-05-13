@@ -17,7 +17,7 @@ This project separates three legality classes:
 | --- | --- | --- |
 | Target-independent | May run when parser/verifier support exists and opt-22 fixtures match. | integer identity folds, DCE of side-effect-free scalar code, scalar CFG cleanup |
 | DataLayout-sensitive | May run only when the row's DataLayout facts are parsed and the pass uses the local DataLayout API. | scalar GEP offset reasoning, aggregate size/alignment checks |
-| TTI/TLI-sensitive | Must stay placeholder, rejected, or preserve-only until TargetTransformInfo or TargetLibraryInfo equivalents exist. | vectorization profitability, vector-combine, libcall shrink wrapping, div/rem pairing profitability, FP reciprocal/reassociation cost choices |
+| TTI/TLI-sensitive | Must stay placeholder, rejected, or preserve-only until the relevant TargetTransformInfo or TargetLibraryInfo query is implemented and consumed by that transform. | vectorization profitability, vector-combine, libcall shrink wrapping, div/rem pairing profitability, FP reciprocal/reassociation cost choices |
 
 Current policy:
 
@@ -29,6 +29,7 @@ AArch64 target records may appear on target-independent scalar fixtures.
 The source-backed AArch64 integer row uses only `aarch64-target-independent`.
 DataLayout is not a substitute for TargetTransformInfo.
 Target feature strings are preserved for future cost modeling but not consumed by transforms.
+The local TargetTransformInfo skeleton is analysis-only and does not enable vectorizer-quality transforms yet.
 ```
 
 Fixture coverage:
@@ -41,6 +42,7 @@ opt-22 equivalent:
   vector_lane_preserve
 
 unit tests:
+  TargetTransformInfo skeleton exposes generic, x86_64, and AArch64 vector costs
   accepted Zig corpus pipelines exclude loop-vectorize, slp-vectorizer, and vector-combine
   ReleaseFast and ReleaseSmall accepted pipeline notes document target-cost gaps
   AArch64 accepted pipeline excludes ABI, memory-motion, vector, TTI, and TLI transforms
