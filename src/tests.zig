@@ -3678,6 +3678,21 @@ test "verifier rejects phi incoming blocks that are not exact predecessors" {
     var duplicate_module = try ir.Module.parse(std.testing.allocator, duplicate_predecessor);
     defer duplicate_module.deinit();
     try std.testing.expectError(error.DuplicatePhiIncoming, duplicate_module.verify());
+
+    const duplicate_edge_different_values =
+        \\define i32 @bad(i1 %cond, i32 %a, i32 %b) {
+        \\entry:
+        \\  br i1 %cond, label %merge, label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ], [ %b, %entry ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var duplicate_edge_module = try ir.Module.parse(std.testing.allocator, duplicate_edge_different_values);
+    defer duplicate_edge_module.deinit();
+    try std.testing.expectError(error.DuplicatePhiIncoming, duplicate_edge_module.verify());
 }
 
 test "verifier rejects phi after non-phi instructions" {
@@ -7205,6 +7220,86 @@ test "simplifycfg merges matching return blocks" {
         \\}
         \\
     ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "simplifycfg collapses same-target branch PHI edges when values match" {
+    const input =
+        \\define i32 @same_target_same_phi(i1 %cond, i32 %a) {
+        \\entry:
+        \\  br i1 %cond, label %merge, label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %entry ], [ %a, %entry ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
+    const expected =
+        \\define i32 @same_target_same_phi(i1 %cond, i32 %a) {
+        \\entry:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "simplifycfg does not thread phi predecessor through multiple edges" {
+    const input =
+        \\define i32 @switch_duplicate_edge(i2 %cond, i32 %a) {
+        \\entry:
+        \\  switch i2 %cond, label %empty [
+        \\    i2 0, label %empty
+        \\  ]
+        \\empty:
+        \\  br label %merge
+        \\merge:
+        \\  %v = phi i32 [ %a, %empty ]
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    const expected =
+        \\define i32 @switch_duplicate_edge(i2 %cond, i32 %a) {
+        \\entry:
+        \\  switch i2 %cond, label %empty [
+        \\    i2 0, label %empty
+        \\  ]
+        \\empty:
+        \\  ret i32 %a
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(simplifycfg.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.print(&output.writer);
+
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 

@@ -37,6 +37,8 @@ fn simplifyTerminators(function: *ir.Function) bool {
         switch (terminator) {
             .condbr => |condbr| {
                 if (std.mem.eql(u8, condbr.then_target, condbr.else_target)) {
+                    if (!canCollapseDuplicatePhiIncoming(function.*, condbr.then_target, block.name)) continue;
+                    _ = collapseDuplicatePhiIncoming(function, condbr.then_target, block.name);
                     block.terminator = .{ .br = .{ .target = condbr.then_target } };
                     changed = true;
                 } else if (commonReturn(function.*, condbr)) |ret| {
@@ -54,6 +56,58 @@ fn simplifyTerminators(function: *ir.Function) bool {
             .@"switch" => {},
             .indirectbr => {},
             .@"unreachable" => {},
+        }
+    }
+    return changed;
+}
+
+fn canCollapseDuplicatePhiIncoming(function: ir.Function, target_name: []const u8, predecessor_name: []const u8) bool {
+    const target_index = function.blockIndex(target_name) orelse return false;
+    const target = function.blocks.items[target_index];
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        const phi = switch (instruction.kind) {
+            .phi => |phi| phi,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => continue,
+        };
+
+        var value: ?ir.Value = null;
+        for (phi.incoming.items) |incoming| {
+            if (!std.mem.eql(u8, incoming.block, predecessor_name)) continue;
+            if (value) |existing| {
+                if (!existing.eql(incoming.value)) return false;
+            } else {
+                value = incoming.value;
+            }
+        }
+    }
+    return true;
+}
+
+fn collapseDuplicatePhiIncoming(function: *ir.Function, target_name: []const u8, predecessor_name: []const u8) bool {
+    const target_index = function.blockIndex(target_name) orelse return false;
+    var changed = false;
+    for (function.blocks.items[target_index].instructions.items) |*instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => |*phi| {
+                var saw_incoming = false;
+                var index: usize = 0;
+                while (index < phi.incoming.items.len) {
+                    if (!std.mem.eql(u8, phi.incoming.items[index].block, predecessor_name)) {
+                        index += 1;
+                        continue;
+                    }
+                    if (!saw_incoming) {
+                        saw_incoming = true;
+                        index += 1;
+                        continue;
+                    }
+                    _ = phi.incoming.orderedRemove(index);
+                    changed = true;
+                }
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
         }
     }
     return changed;
@@ -248,6 +302,7 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
             if (predecessors.len == 0) continue;
             if (hasPhi(function.blocks.items[target_index])) {
                 if (predecessors.len != 1) continue;
+                if (terminatorTargetEdgeCount(function.blocks.items[predecessors[0]].terminator, block.name) != 1) continue;
                 _ = cfg_update.replacePhiIncomingBlock(function, block.name, function.blocks.items[predecessors[0]].name);
             }
 
@@ -258,6 +313,33 @@ fn threadEmptyBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function)
         }
     }
     return changed;
+}
+
+fn terminatorTargetEdgeCount(terminator: ?ir.Terminator, target_name: []const u8) usize {
+    const term = terminator orelse return 0;
+    var count: usize = 0;
+    switch (term) {
+        .ret, .@"unreachable" => {},
+        .br => |br| {
+            if (std.mem.eql(u8, br.target, target_name)) count += 1;
+        },
+        .condbr => |condbr| {
+            if (std.mem.eql(u8, condbr.then_target, target_name)) count += 1;
+            if (std.mem.eql(u8, condbr.else_target, target_name)) count += 1;
+        },
+        .@"switch" => |switch_term| {
+            if (std.mem.eql(u8, switch_term.default_target, target_name)) count += 1;
+            for (switch_term.cases.items) |case| {
+                if (std.mem.eql(u8, case.target, target_name)) count += 1;
+            }
+        },
+        .indirectbr => |indirectbr| {
+            for (indirectbr.targets.items) |target_name_candidate| {
+                if (std.mem.eql(u8, target_name_candidate, target_name)) count += 1;
+            }
+        },
+    }
+    return count;
 }
 
 fn mergeTrivialBranchBlocks(allocator: std.mem.Allocator, function: *ir.Function) !bool {

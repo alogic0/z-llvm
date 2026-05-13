@@ -291,11 +291,19 @@ const VerifyContext = struct {
         var incoming_counts = try ctx.allocator.alloc(usize, ctx.block_count);
         defer ctx.allocator.free(incoming_counts);
         @memset(incoming_counts, 0);
+        var incoming_values = try ctx.allocator.alloc(?core.Value, ctx.block_count);
+        defer ctx.allocator.free(incoming_values);
+        @memset(incoming_values, null);
 
         for (phi.incoming.items) |incoming| {
             const predecessor_index = ctx.function.blockIndex(incoming.block) orelse return error.UnknownBlock;
             const edge_count = ctx.edgeCount(predecessor_index, block_index);
             if (edge_count == 0) return error.PhiIncomingNotPredecessor;
+            if (incoming_values[predecessor_index]) |existing_value| {
+                if (!existing_value.eql(incoming.value)) return error.DuplicatePhiIncoming;
+            } else {
+                incoming_values[predecessor_index] = incoming.value;
+            }
             incoming_counts[predecessor_index] += 1;
             if (incoming_counts[predecessor_index] > edge_count) return error.DuplicatePhiIncoming;
         }

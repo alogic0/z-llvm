@@ -56,6 +56,7 @@ Local target status:
 
 Implemented subset:
   Constant and same-target conditional branch folding
+  Same-target branch PHI repair for duplicate identical incoming values
   Empty branch block threading
   Single-predecessor empty branch block threading through phi nodes
   Unreachable block removal
@@ -79,6 +80,7 @@ Fixture coverage:
   simplifycfg_thread_empty
   simplifycfg_common_ret
   simplifycfg_diamond_select
+  simplifycfg_same_target_phi
   simplifycfg_loop_shape_reject
   simplifycfg_side_effect_diamond_reject
   simplifycfg_unlock_instcombine
@@ -99,7 +101,7 @@ Implemented subset:
 ```text
 br i1 1, label %a, label %b -> br label %a
 br i1 0, label %a, label %b -> br label %b
-br i1 %cond, label %a, label %a -> br label %a
+br i1 %cond, label %a, label %a -> br label %a, with duplicate identical PHI incoming entries repaired
 remove blocks unreachable from the entry block
 remove phi incoming values from unreachable predecessor blocks
 replace trivial phi nodes whose remaining incoming values are all identical
@@ -128,6 +130,7 @@ opt-22 equivalent:
   simplifycfg
   simplifycfg_thread_empty
   simplifycfg_diamond_select
+  simplifycfg_same_target_phi
   simplifycfg_loop_shape_reject
   simplifycfg_side_effect_diamond_reject
   simplifycfg_unlock_instcombine
@@ -141,6 +144,7 @@ unit-test only:
   phi incoming cleanup after unreachable predecessor removal
   trivial phi replacement
   same-target conditional branch folding
+  verifier rejection for duplicate same-predecessor PHI values that differ
 ```
 
 Example:
@@ -162,7 +166,8 @@ entry:
 Known gaps:
 
 ```text
-no non-trivial phi-node rewrites
+no non-trivial phi-node rewrites; duplicate same-predecessor PHI values that
+differ are rejected by the verifier, matching LLVM verifier behavior
 no phi-aware branch threading
 no general block merging
 no switch support

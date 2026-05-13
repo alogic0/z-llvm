@@ -52,7 +52,7 @@ entry:
   ]
 
 join:
-  %v = phi i32 [ 0, %entry ], [ 1, %entry ], [ 2, %entry ]
+  %v = phi i32 [ 0, %entry ], [ 0, %entry ], [ 0, %entry ]
   ret i32 %v
 }
 
