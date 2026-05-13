@@ -13,6 +13,7 @@ const gvn = @import("passes/gvn.zig");
 const jump_threading = @import("passes/jump_threading.zig");
 const licm = @import("passes/licm.zig");
 const loop_instsimplify = @import("passes/loop_instsimplify.zig");
+const lower_expect = @import("passes/lower_expect.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const placeholder = @import("passes/placeholder.zig");
 const sccp = @import("passes/sccp.zig");
@@ -360,6 +361,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(jump_threading.pass);
     } else if (std.mem.eql(u8, name, "correlated-propagation")) {
         try pm.add(correlated_propagation.pass);
+    } else if (std.mem.eql(u8, name, "lower-expect")) {
+        try pm.add(lower_expect.pass);
     } else if (std.mem.eql(u8, name, "verify")) {
         try pm.add(verify.pass);
     } else if (std.mem.eql(u8, name, "dce")) {
@@ -400,7 +403,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "lower-constant-intrinsics")) return placeholder.make("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp");
     if (std.mem.eql(u8, name, "drop-unnecessary-assumes")) return placeholder.make("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp");
     if (std.mem.eql(u8, name, "tailcallelim")) return placeholder.make("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp");
-    if (std.mem.eql(u8, name, "lower-expect")) return placeholder.make("lower-expect", .codegen_prep, "llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp");
     if (std.mem.eql(u8, name, "div-rem-pairs")) return placeholder.make("div-rem-pairs", .codegen_prep, "llvm/lib/Transforms/Scalar/DivRemPairs.cpp");
     if (std.mem.eql(u8, name, "float2int")) return placeholder.make("float2int", .codegen_prep, "llvm/lib/Transforms/Scalar/Float2Int.cpp");
     if (std.mem.eql(u8, name, "libcalls-shrinkwrap")) return placeholder.make("libcalls-shrinkwrap", .codegen_prep, "llvm/lib/Transforms/Utils/LibCallsShrinkWrap.cpp");

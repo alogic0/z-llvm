@@ -209,7 +209,7 @@ Status meanings:
 | `tailcallelim` | call/CFG | P2 | placeholder | `llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp` |
 | `div-rem-pairs` | scalar/codegen prep | P2 | placeholder | `llvm/lib/Transforms/Scalar/DivRemPairs.cpp` |
 | `float2int` | scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/Float2Int.cpp` |
-| `lower-expect` | canonicalization / profiling metadata | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
+| `lower-expect` | canonicalization / profiling metadata | P2 | llvm.expect.i1 branch metadata slice | `llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp` |
 | `lower-constant-intrinsics` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp` |
 | `drop-unnecessary-assumes` | canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp` |
 | `infer-alignment` | memory / target facts | P2 | placeholder | `llvm/lib/Transforms/Scalar/InferAlignment.cpp` |

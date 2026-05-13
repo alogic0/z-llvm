@@ -50,20 +50,31 @@ Core LLVM algorithm data structures:
   Profile metadata rewrites.
 
 Local target status:
-  TargetLibraryInfo foundation plus executable placeholders.
+  TargetLibraryInfo foundation, lower-expect i1 branch slice, and executable
+  placeholders for the remaining codegen-prep passes.
 ```
 
 Implemented subset:
 
 ```text
-lower-expect, div-rem-pairs, float2int, tailcallelim, libcalls-shrinkwrap,
-inject-tli-mappings, and rel-lookup-table-converter are executable placeholders.
+lower-expect:
+  direct `llvm.expect.i1` calls feeding a same-block conditional branch are
+  replaced with their first operand, and the branch receives default
+  `!prof !{!"branch_weights", !"expected", i32 2000, i32 1}` metadata when
+  the expected value is true, or the inverse weights when it is false.
+
+div-rem-pairs, float2int, tailcallelim, libcalls-shrinkwrap,
+inject-tli-mappings, and rel-lookup-table-converter remain executable
+placeholders.
 ```
 
 Intentional divergences:
 
 ```text
-no llvm.expect intrinsic representation
+no `llvm.expect.with.probability`
+no `llvm.expect` switch/select/phi handling
+no non-i1 `llvm.expect` lowering
+no existing profile metadata merge policy
 no div/rem pairing
 no floating-point IR legality
 no tail recursion elimination
@@ -74,10 +85,10 @@ Fixture coverage:
 
 ```text
 opt-22 equivalent:
-  none currently
+  lower_expect_i1_branch
 
 local-only conservative:
-  none currently
+  lower_expect_i32_preserve
 
 unit-test only:
   placeholder pass dispatch and TargetLibraryInfo lookup

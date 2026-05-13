@@ -11,26 +11,25 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 3: `correlated-propagation` for branch-implied integer facts
+Active slice: Slice 4: `lower-expect` and branch-weight metadata preservation
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map `CorrelatedValuePropagation` and `LazyValueInfo` upstream entry
-      points.
-- [x] Define the accepted local IR surface: dominating conditional branches on
-      same-block integer `icmp` results comparing a named value with an integer
-      constant.
-- [x] Add a small LazyValueInfo-shaped fact table for edge-derived `icmp`
-      predicates.
-- [x] Implement `icmp` replacement when the fact table proves the comparison
-      true or false at the instruction block.
+- [x] Map `LowerExpectIntrinsic` upstream entry points.
+- [x] Define the accepted local IR surface: direct `llvm.expect.i1` calls whose
+      result feeds a same-block `br i1`.
+- [x] Implement branch condition replacement with the expect operand.
+- [x] Attach branch-weight metadata matching LLVM's default expected weights.
+- [x] Remove supported `llvm.expect.i1` calls by replacing their uses with the
+      first operand.
 - [x] Preserve unsupported cases without marking the pass complete for those
-      cases: non-dominating edges, multi-predecessor edge targets, non-constant
-      RHS, PHI/select/range reasoning, assumes, switches, overflow flags, and
-      intrinsic handling.
-- [x] Add `opt-22` comparison fixtures for positive branch-implied equality
-      facts and unsupported no-fact preservation.
-- [x] Update pass and analysis docs plus the algorithm parity audit.
+      cases: `expect.with.probability`, switch/select/phi handling,
+      non-constant expected values, non-i1 forms, existing profile merge
+      policy, and debug salvage.
+- [x] Add `opt-22` comparison fixtures for the positive branch case and an
+      unsupported non-i1 preservation boundary.
+- [x] Update pass docs, pipeline docs, inventory status, and the algorithm
+      parity audit.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 3 complete in the roadmap.
+- [x] Review, commit, and mark Slice 4 complete in the roadmap.

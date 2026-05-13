@@ -36,7 +36,7 @@ Each slice is complete only when it has:
       dominating branches. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` and
       `llvm/lib/Analysis/LazyValueInfo.cpp`.
-- [ ] Slice 4: `lower-expect` and branch-weight metadata preservation.
+- [x] Slice 4: `lower-expect` and branch-weight metadata preservation.
       Lower simple `llvm.expect` integer forms into branch-weight metadata or
       preserve them with an explicit unsupported diagnostic when metadata
       support is insufficient. Required upstream mapping:
