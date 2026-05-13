@@ -105,6 +105,7 @@ Fixture coverage:
   unit test: memory ssa clobber helper covers accepted memory-dependence cases
   unit test: memory ssa records narrow phi facts at joins
   unit test: memory ssa updater deletes accesses and dumps expectations
+  opt fixture: early_cse_readonly_call_no_clobber
   opt fixtures: early_cse_load_call_clobber_reject, gvn_load_call_clobber_reject
   opt fixtures: early_cse_load_branch_clobber_reject
   opt fixture: early_cse_unreachable_store_not_clobber

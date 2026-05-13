@@ -12,6 +12,10 @@ Upstream entry points to check:
 EarlyCSEPass::run
 EarlyCSE
 SimpleValue
+LoadValue
+AvailableLoads
+EarlyCSE::isSameMemGeneration
+MemorySSA::getWalker
 ScopedHashTable used for available values
 ```
 
@@ -27,6 +31,8 @@ LLVM entry points/classes:
   EarlyCSEPass::run
   EarlyCSE
   SimpleValue
+  LoadValue
+  EarlyCSE::isSameMemGeneration
 
 Required analyses:
   DominatorTree for LLVM's scoped traversal.
@@ -39,7 +45,8 @@ Required IR invariants:
 
 Core LLVM algorithm data structures:
   ScopedHashTable of available expressions and values.
-  Available-load tracking for memory cases.
+  Available-load tracking for memory cases through LoadValue records.
+  MemorySSA walker queries when generation counters alone are insufficient.
   Store-to-load forwarding through memory availability.
 
 Local target status:
@@ -58,10 +65,13 @@ pure integer cast expression matching
 pure icmp expression matching
 safe load CSE only when alias/mod-ref proves no clobber in the supported local region
 load equality always runs through the shared MemorySSA-like clobber helper
-load availability queries use the persisted local MemorySSA walker-shaped API
+load availability queries call the persisted local MemorySSA walker-shaped API
+through an `isSameMemoryGeneration` helper modeled after LLVM
 cross-block load CSE treats MemoryPhi, volatile/atomic, unknown calls, and
 aliasing stores as clobbers through that walker
 store-to-load forwarding for must-alias non-volatile stack/pointer locations
+store-to-load forwarding still uses the local scoped store table; LLVM's store
+generation model is not reproduced in this slice
 readnone call CSE when callee attributes prove no memory effects
 unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
@@ -85,6 +95,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   early_cse_store_to_load
+  early_cse_readonly_call_no_clobber
   early_cse_volatile_load_reject
   early_cse_load_call_clobber_reject
   early_cse_load_branch_clobber_reject
@@ -141,8 +152,9 @@ Known gaps:
 
 ```text
 no full optimized MemorySSA walker/updater
-no full MemorySSA-backed load CSE beyond the accepted path-aware access-list
-query
+no full MemorySSA-backed load CSE beyond the accepted path-aware walker query
+store-to-load forwarding is not yet routed through LLVM's LoadValue generation
+model
 readonly calls are modeled only as non-clobbering memory accesses; no readonly
 call return-value CSE
 no freeze CSE because undef/poison semantics need more modeling first

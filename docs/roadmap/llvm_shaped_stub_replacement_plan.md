@@ -48,7 +48,7 @@ Each slice is complete only when it has:
       Replace local block-range scans with a walker-shaped query over MemoryUse,
       MemoryDef, and MemoryPhi records. Required upstream mapping:
       `llvm/lib/Analysis/MemorySSA.cpp` and `MemorySSAUpdater`.
-- [ ] Slice 6: EarlyCSE load availability through MemorySSA.
+- [x] Slice 6: EarlyCSE load availability through MemorySSA.
       Rework load CSE to use the new walker instead of ad hoc clobber scans.
       Required upstream mapping: `llvm/lib/Transforms/Scalar/EarlyCSE.cpp`.
 - [ ] Slice 7: GVN load availability and simple load PRE.

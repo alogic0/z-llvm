@@ -54,7 +54,7 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     var memory = try memory_ssa.MemorySSA.build(allocator, module, function.*);
     defer memory.deinit();
 
-    return try visitBlock(allocator, module, function, dom, memory, &aliases, &available, &stores, 0);
+    return try visitBlock(allocator, module, function, dom, memory.getWalker(), &aliases, &available, &stores, 0);
 }
 
 fn visitBlock(
@@ -62,7 +62,7 @@ fn visitBlock(
     module: ir.Module,
     function: *ir.Function,
     dom: dominator.Dominators,
-    memory: memory_ssa.MemorySSA,
+    walker: memory_ssa.Walker,
     aliases: *std.StringHashMap(ir.Value),
     available: *std.ArrayList(AvailableInstruction),
     stores: *std.ArrayList(AvailableStore),
@@ -89,7 +89,7 @@ fn visitBlock(
         }
 
         if (isCseCandidate(module, instruction.*)) {
-            if (findAvailableEquivalent(module, function.*, memory, available.items, block_index, instruction_index, instruction.*)) |replacement| {
+            if (findAvailableEquivalent(module, function.*, walker, available.items, block_index, instruction_index, instruction.*)) |replacement| {
                 instruction.removed = true;
                 instruction.replacement = replacement;
                 const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -127,7 +127,7 @@ fn visitBlock(
 
     for (0..function.blocks.items.len) |child_index| {
         if (dom.immediateDominator(child_index) != block_index) continue;
-        changed = try visitBlock(allocator, module, function, dom, memory, aliases, available, stores, child_index) or changed;
+        changed = try visitBlock(allocator, module, function, dom, walker, aliases, available, stores, child_index) or changed;
     }
 
     return changed;
@@ -194,7 +194,7 @@ fn pruneMayAliasStores(module: ir.Module, function: ir.Function, stores: *std.Ar
 fn findAvailableEquivalent(
     module: ir.Module,
     function: ir.Function,
-    memory: memory_ssa.MemorySSA,
+    walker: memory_ssa.Walker,
     available: []const AvailableInstruction,
     block_index: usize,
     instruction_index: usize,
@@ -205,7 +205,7 @@ fn findAvailableEquivalent(
         index -= 1;
         const candidate = available[index];
         if (candidate.hash != expression_key.hash(instruction)) continue;
-        if (!sameAvailableExpression(module, function, memory, candidate, block_index, instruction_index, instruction)) continue;
+        if (!sameAvailableExpression(module, function, walker, candidate, block_index, instruction_index, instruction)) continue;
         return .{ .named = candidate.instruction.result orelse return null };
     }
     return null;
@@ -214,7 +214,7 @@ fn findAvailableEquivalent(
 fn sameAvailableExpression(
     module: ir.Module,
     function: ir.Function,
-    memory: memory_ssa.MemorySSA,
+    walker: memory_ssa.Walker,
     candidate: AvailableInstruction,
     block_index: usize,
     instruction_index: usize,
@@ -226,7 +226,8 @@ fn sameAvailableExpression(
         const load = instruction.kind.load;
         if (!candidate_load.ty.eql(load.ty)) return false;
         if (alias.alias(function, candidate_load.ptr, load.ptr) != .must_alias) return false;
-        return !memory.hasClobberBetweenAccess(
+        return isSameMemoryGeneration(
+            walker,
             .{ .block_index = candidate.block_index, .instruction_index = candidate.instruction_index },
             .{ .block_index = block_index, .instruction_index = instruction_index },
             load.ptr,
@@ -234,6 +235,10 @@ fn sameAvailableExpression(
         );
     }
     return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
+}
+
+fn isSameMemoryGeneration(walker: memory_ssa.Walker, earlier: memory_ssa.InstRef, later: memory_ssa.InstRef, ptr: ir.Value, ty: ir.Type) bool {
+    return !walker.getClobberBetween(earlier, later, ptr, ty).found();
 }
 
 fn isCseCandidate(module: ir.Module, instruction: ir.Instruction) bool {
