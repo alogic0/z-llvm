@@ -26,7 +26,7 @@ Each slice is complete only when it has:
       control flow. Required upstream mapping:
       `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` and LLVM call graph update
       behavior.
-- [ ] Slice 2: `jump-threading` for constant predecessor conditions.
+- [x] Slice 2: `jump-threading` for constant predecessor conditions.
       Implement LLVM-shaped predecessor threading for blocks whose branch
       condition is known along a predecessor edge. Keep PHI repair modeled
       after LLVM CFG update helpers. Required upstream mapping:

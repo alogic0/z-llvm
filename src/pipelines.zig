@@ -9,6 +9,7 @@ const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
 const globaldce = @import("passes/globaldce.zig");
 const gvn = @import("passes/gvn.zig");
+const jump_threading = @import("passes/jump_threading.zig");
 const licm = @import("passes/licm.zig");
 const loop_instsimplify = @import("passes/loop_instsimplify.zig");
 const mem2reg = @import("passes/mem2reg.zig");
@@ -354,6 +355,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(instcombine.pass);
     } else if (std.mem.eql(u8, name, "always-inline")) {
         try pm.add(always_inline.pass);
+    } else if (std.mem.eql(u8, name, "jump-threading")) {
+        try pm.add(jump_threading.pass);
     } else if (std.mem.eql(u8, name, "verify")) {
         try pm.add(verify.pass);
     } else if (std.mem.eql(u8, name, "dce")) {
@@ -393,7 +396,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "aggressive-instcombine")) return placeholder.make("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/");
     if (std.mem.eql(u8, name, "lower-constant-intrinsics")) return placeholder.make("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp");
     if (std.mem.eql(u8, name, "drop-unnecessary-assumes")) return placeholder.make("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp");
-    if (std.mem.eql(u8, name, "jump-threading")) return placeholder.make("jump-threading", .scalar, "llvm/lib/Transforms/Scalar/JumpThreading.cpp");
     if (std.mem.eql(u8, name, "correlated-propagation")) return placeholder.make("correlated-propagation", .scalar, "llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp");
     if (std.mem.eql(u8, name, "tailcallelim")) return placeholder.make("tailcallelim", .codegen_prep, "llvm/lib/Transforms/Scalar/TailRecursionElimination.cpp");
     if (std.mem.eql(u8, name, "lower-expect")) return placeholder.make("lower-expect", .codegen_prep, "llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp");

@@ -69,8 +69,9 @@ Implemented subset:
 Intentional divergences:
   No speculation, sinking, hoisting, switch lowering, invoke/EH handling,
   profile metadata, or target transform info.
-  JumpThreading, CorrelatedValuePropagation, and TailCallElim are explicit
-  placeholders until their algorithms are implemented.
+  CorrelatedValuePropagation and TailCallElim are explicit placeholders until
+  their algorithms are implemented. JumpThreading has a narrow branch-on-PHI
+  predecessor-constant slice documented in `docs/passes/jump_threading.md`.
 
 Analysis preservation/invalidation:
   SimplifyCFG mutates CFG and invalidates analyses under the local pass-manager

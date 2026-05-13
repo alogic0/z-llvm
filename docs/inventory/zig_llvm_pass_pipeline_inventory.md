@@ -201,7 +201,7 @@ Status meanings:
 | `loop-load-elim` | loop/memory optimization | P3 | placeholder | `llvm/lib/Transforms/Scalar/LoopLoadElimination.cpp` |
 | `loop-sink` | loop canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopSink.cpp` |
 | `extra-simple-loop-unswitch-passes` | loop optimization | P3 | placeholder | `llvm/lib/Passes/PassBuilderPipelines.cpp` |
-| `jump-threading` | CFG/scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
+| `jump-threading` | CFG/scalar | P2 | branch-on-PHI predecessor-constant slice | `llvm/lib/Transforms/Scalar/JumpThreading.cpp` |
 | `correlated-propagation` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/CorrelatedValuePropagation.cpp` |
 | `reassociate` | scalar canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/Reassociate.cpp` |
 | `constraint-elimination` | scalar | P2 | placeholder | `llvm/lib/Transforms/Scalar/ConstraintElimination.cpp` |

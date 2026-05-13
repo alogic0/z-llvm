@@ -98,11 +98,11 @@ Implemented development pipelines:
 ```text
 scalar-foundation:
   simplifycfg
-  jump-threading placeholder
+  jump-threading
   correlated-propagation placeholder
   instcombine
   simplifycfg
-  jump-threading placeholder
+  jump-threading
   correlated-propagation placeholder
   instcombine
   aggressive-instcombine placeholder
@@ -120,10 +120,12 @@ memory-foundation:
 
 zig-scalar-foundation:
   simplifycfg
-  jump-threading placeholder
+  jump-threading
   correlated-propagation placeholder
   instcombine
   simplifycfg
+  jump-threading
+  correlated-propagation placeholder
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder
@@ -139,7 +141,7 @@ Implemented Zig mode descriptors:
 debug-o0:
   verify
   ee-instrument placeholder
-  always-inline placeholder
+  always-inline
   alloc-token placeholder
   annotation-remarks placeholder
   verify
@@ -152,8 +154,12 @@ release-o3:
   sroa
   mem2reg
   simplifycfg
+  jump-threading
+  correlated-propagation placeholder
   instcombine
   simplifycfg
+  jump-threading
+  correlated-propagation placeholder
   instcombine
   aggressive-instcombine placeholder
   lower-constant-intrinsics placeholder
