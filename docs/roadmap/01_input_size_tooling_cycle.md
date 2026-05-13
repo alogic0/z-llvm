@@ -153,6 +153,20 @@ verify-fail=0
 optimizer-fail=0
 ```
 
+Full ReleaseSafe sweep after the tooling fix:
+
+```text
+out-dir=tmp/zig_ir/full_discovery_17_release_safe_fast_local
+processed=1474/1474
+compile-skip=1009
+emit-ok=465
+local-ok=465
+input-too-large=0
+parse-fail=0
+verify-fail=0
+optimizer-fail=0
+```
+
 ## Non-Goals
 
 - Do not broaden LLVM IR parsing or verification in this tooling cycle.

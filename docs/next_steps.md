@@ -116,6 +116,9 @@ Active cycle:
       an optimized `z_llvm` path by default, keep stage4 Zig for IR emission,
       and make trace output opt-in so large debug-heavy rows such as
       `standalone/coff_dwarf/main.zig` do not dominate discovery sweeps.
+- [x] Full ReleaseSafe source-backed sweep with the optimized local checker:
+      `processed=1474/1474`, `emit-ok=465`, `local-ok=465`, and zero
+      input-size, parse, verify, or optimizer failures.
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery
