@@ -103,6 +103,39 @@ tooling or verifier throughput blocker before a semantic failure, close that
 blocker first, commit the reviewed fix, then rerun the interrupted sweep from a
 fresh output directory.
 
+After verify discovery is clean in all four modes, start optimizer discovery
+with the accepted corpus pipelines:
+
+```text
+Debug -> zig-debug-accepted
+ReleaseFast -> zig-release-fast-accepted
+ReleaseSafe -> zig-release-safe-accepted
+ReleaseSmall -> zig-release-small-accepted
+```
+
+Optimizer sweeps use the same compiler split and output-directory rules, but
+must pass the accepted pipeline explicitly. Do not rely on `--pass-limit=0` for
+optimizer discovery; that shortcut is only for default verify-only sweeps. The
+usual optimizer command shape is:
+
+```bash
+zig build -Doptimize=ReleaseFast
+
+zig run tools/zig_corpus_discovery.zig -- \
+  --out-dir=tmp/zig_ir/<optimizer-sweep-name> \
+  --mode=<Debug|ReleaseFast|ReleaseSafe|ReleaseSmall> \
+  --passes=<zig-*-accepted> \
+  --local-input-limit=67108864 \
+  --local-zllvm-exe=zig-out/bin/z_llvm \
+  --progress-every=50
+```
+
+If an optimizer sweep fails, classify the first row as pass behavior,
+transform-legality, or post-transform verifier failure. Reduce and fix that
+blocker before continuing broad optimizer sweeps. If the accepted pipeline is
+deliberately conservative compared with LLVM, document the local boundary and
+compare only the cases where upstream parity is expected.
+
 ## Required Upstream Mapping
 
 Each pass, analysis, IR feature, or codegen feature must document:
