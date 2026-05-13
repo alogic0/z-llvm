@@ -28,7 +28,8 @@ scripts/lint_zig_ir_manifest.sh
 
 Readiness checks run manifest linting but do not regenerate fixtures.
 
-For corpus discovery, keep the same split:
+For corpus discovery, use `tools/zig_corpus_discovery.zig` and keep the same
+compiler split:
 
 - stage4 Zig emits authoritative LLVM IR through `--zig-exe` or the default
   `../ziglang/build/stage4/bin/zig`;
@@ -42,6 +43,17 @@ For corpus discovery, keep the same split:
   `--pass-limit=0` to the local `z_llvm` invocation because `z_llvm` already
   parses and verifies the module before entering the pass manager;
 - use `--local-trace` only for focused debugging, not full discovery sweeps.
+
+The usual command shape is:
+
+```bash
+zig run tools/zig_corpus_discovery.zig -- \
+  --out-dir=tmp/zig_ir/<sweep-name> \
+  --mode=<Debug|ReleaseFast|ReleaseSafe|ReleaseSmall> \
+  --local-input-limit=67108864 \
+  --local-zllvm-exe=zig-out/bin/z_llvm \
+  --progress-every=50
+```
 
 When a full source-backed verify sweep has no local failures, keep looking for
 blockers by repeating the sweep across Zig optimization modes in this order:
