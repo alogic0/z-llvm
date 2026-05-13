@@ -28,6 +28,7 @@ const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 const sroa = @import("passes/sroa.zig");
 const verify = @import("passes/verify.zig");
+const vector_combine = @import("passes/vector_combine.zig");
 
 pub const Pipeline = struct {
     name: []const u8,
@@ -397,6 +398,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(function_attrs.pass);
     } else if (std.mem.eql(u8, name, "inline")) {
         try pm.add(inline_pass.pass);
+    } else if (std.mem.eql(u8, name, "vector-combine")) {
+        try pm.add(vector_combine.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
         try pm.add(licm.pass);
     } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
@@ -463,7 +466,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "transform-warning")) return placeholder.make("transform-warning", .instrumentation, "llvm/lib/Transforms/Scalar/WarnMissedTransforms.cpp");
     if (std.mem.eql(u8, name, "loop-vectorize")) return placeholder.make("loop-vectorize", .vector, "llvm/lib/Transforms/Vectorize/LoopVectorize.cpp");
     if (std.mem.eql(u8, name, "slp-vectorizer")) return placeholder.make("slp-vectorizer", .vector, "llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp");
-    if (std.mem.eql(u8, name, "vector-combine")) return placeholder.make("vector-combine", .vector, "llvm/lib/Transforms/Vectorize/VectorCombine.cpp");
     if (std.mem.eql(u8, name, "coro-early")) return placeholder.make("coro-early", .ipo, "llvm/lib/Transforms/Coroutines/CoroEarly.cpp");
     if (std.mem.eql(u8, name, "coro-split")) return placeholder.make("coro-split", .ipo, "llvm/lib/Transforms/Coroutines/CoroSplit.cpp");
     if (std.mem.eql(u8, name, "coro-elide")) return placeholder.make("coro-elide", .ipo, "llvm/lib/Transforms/Coroutines/CoroElide.cpp");

@@ -246,7 +246,7 @@ Status meanings:
 | `inject-tli-mappings` | TLI/vector library metadata | P3 | placeholder | `llvm/lib/Transforms/Utils/InjectTLIMappings.cpp` |
 | `loop-vectorize` | vectorization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/LoopVectorize.cpp` |
 | `slp-vectorizer` | vectorization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp` |
-| `vector-combine` | vector canonicalization | P3 | placeholder | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
+| `vector-combine` | vector canonicalization | P3 | lane-identity extract/insert slice | `llvm/lib/Transforms/Vectorize/VectorCombine.cpp` |
 | `chr` | control-height reduction | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/ControlHeightReduction.cpp` |
 | `cg-profile` | profile metadata | P3 | placeholder | `llvm/lib/Transforms/Instrumentation/CGProfile.cpp` |
 | `ee-instrument` | instrumentation | P3 | placeholder | `llvm/lib/Transforms/Utils/EntryExitInstrumenter.cpp` |

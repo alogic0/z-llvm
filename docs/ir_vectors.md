@@ -41,6 +41,8 @@ slice for fixed-vector lane operations:
 extractelement, insertelement, and shufflevector are pure, side-effect-free instructions
 unused lane operations may be removed by DCE
 extractelement (insertelement V, X, C), C -> X when C is the same constant lane
+extractelement (insertelement V, X, C1), C2 -> extractelement V, C2 when C1
+and C2 are different constant lanes
 vector lane operations do not clobber MemorySSA, alias ModRef, GVN load
 availability, EarlyCSE local store availability, or DSE overwrite scans
 ```
@@ -101,12 +103,14 @@ opt-22 equivalent:
   vector_lane_preserve
   vector_lane_dead_dce
   vector_extract_insert_fold
+  vector_combine_extract_insert_same
   vector_select_same_arms
   early_cse_vector_lane_store_forward
   dse_vector_lane_not_barrier
 
 local-only conservative:
   vector_extract_insert_mismatch_reject
+  vector_combine_extract_insert_mismatch
   vector_shuffle_undef_mask_preserve
   gvn_vector_lane_not_clobber
 ```

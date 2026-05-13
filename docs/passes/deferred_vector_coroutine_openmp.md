@@ -53,28 +53,30 @@ Core LLVM algorithm data structures:
   OpenMP runtime call graph and kernel metadata.
 
 Local target status:
-  Placeholder only.
+  Vectorizers are placeholders. vector-combine has one lane-identity slice.
 ```
 
 Implemented subset:
 
 ```text
-loop-vectorize, slp-vectorizer, vector-combine, coro-early, coro-split,
-coro-elide, coro-cleanup, coro-annotation-elide, openmp-opt, and
-openmp-opt-cgscc are executable placeholders.
+loop-vectorize, slp-vectorizer, coro-early, coro-split, coro-elide,
+coro-cleanup, coro-annotation-elide, openmp-opt, and openmp-opt-cgscc are
+executable placeholders.
+vector-combine has a narrow lane-identity slice for extract-after-insert only.
 accepted Zig corpus pipelines intentionally exclude loop-vectorize,
-slp-vectorizer, and vector-combine until target costs and vector transform
-legality exist.
+slp-vectorizer, and broader vector-combine until target costs and vector
+transform legality exist.
 ```
 
 Intentional divergences:
 
 ```text
-fixed-vector and lane-operation parser/verifier support only; no vector optimizer input
-no target vector cost model
+fixed-vector and lane-operation parser/verifier support plus one vector-combine
+lane identity only; no vectorizer optimizer input
+no transform consumes the target vector cost skeleton yet
 no coroutine IR or lowering
 no OpenMP representation
-vector transform semantics beyond parser/verifier preservation
+vector transform semantics beyond the extract-after-insert identity
 ```
 
 Fixture coverage:
@@ -82,13 +84,15 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   vector_lane_preserve
+  vector_combine_extract_insert_same
 
 local-only conservative:
+  vector_combine_extract_insert_mismatch
   future vector fixture classified as parse/verify/future
   accepted corpus pipeline test excludes vector placeholders
 
 unit-test only:
-  placeholder pass dispatch
+  placeholder pass dispatch for remaining vector/coroutine/OpenMP passes
   parser/verifier tests for lane operations, scalable vectors, and malformed
   lane-operation boundary forms
 ```

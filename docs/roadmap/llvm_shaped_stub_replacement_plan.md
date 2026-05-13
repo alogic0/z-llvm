@@ -134,7 +134,7 @@ Each slice is complete only when it has:
 - [x] Slice 24: TargetTransformInfo skeleton.
       Add target-cost query objects for x86_64 and AArch64 scalar/vector costs.
       Required upstream mapping: LLVM `TargetTransformInfo`.
-- [ ] Slice 25: `vector-combine` for extract/insert lane identity.
+- [x] Slice 25: `vector-combine` for extract/insert lane identity.
       Replace the current mismatch reject fixture with one LLVM-shaped vector
       combine. Required upstream mapping:
       `llvm/lib/Transforms/Vectorize/VectorCombine.cpp`.
