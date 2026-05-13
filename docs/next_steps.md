@@ -108,6 +108,10 @@ Active cycle:
       such as `zext <2 x i32> ... to <2 x i64>` when lane counts and element
       widths match LLVM verifier rules. Upstream mapping is recorded in
       [Vector IR Boundary](ir_vectors.md).
+- [x] Source-backed ReleaseSafe parser blocker: find switch case-list closing
+      brackets outside quoted labels, so generated labels containing `[]` do
+      not terminate the switch early. Upstream mapping is recorded in
+      [Control Flow IR](ir_control_flow.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

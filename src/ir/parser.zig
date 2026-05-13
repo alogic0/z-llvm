@@ -2395,10 +2395,7 @@ fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std
     const comma = findTopLevelComma(header) orelse return error.InvalidSwitch;
     const cond_arg = try parseTypedValue(std.mem.trim(u8, header[0..comma], " \t"));
     const default_text = std.mem.trim(u8, header[comma + 1 ..], " \t");
-    var default_parts = std.mem.tokenizeAny(u8, default_text, " \t");
-    if (!std.mem.eql(u8, default_parts.next() orelse return error.InvalidSwitch, "label")) return error.InvalidSwitch;
-    const default_target = try parseLabel(default_parts.next() orelse return error.InvalidSwitch);
-    if (default_parts.next() != null) return error.InvalidSwitch;
+    const default_target = try parseLabelOperand(default_text, error.InvalidSwitch);
 
     var switch_term: core.SwitchTerminator = .{
         .cond_ty = cond_arg.ty,
@@ -2416,7 +2413,7 @@ fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std
         }
 
         const raw_line = lines.next() orelse return error.InvalidSwitch;
-        const line_without_comment = if (std.mem.indexOfScalar(u8, raw_line, ';')) |index|
+        const line_without_comment = if (findLineCommentStart(raw_line)) |index|
             raw_line[0..index]
         else
             raw_line;
@@ -2425,7 +2422,7 @@ fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std
 }
 
 fn parseSwitchCasesLine(allocator: std.mem.Allocator, switch_term: *core.SwitchTerminator, line: []const u8) !?[]const u8 {
-    const close = std.mem.indexOfScalar(u8, line, ']');
+    const close = findSwitchCasesClose(line);
     const cases_text = std.mem.trim(u8, if (close) |index| line[0..index] else line, " \t");
     if (cases_text.len != 0) try parseSwitchCase(allocator, switch_term, cases_text);
     if (close) |index| {
@@ -2440,19 +2437,47 @@ fn parseSwitchCasesLine(allocator: std.mem.Allocator, switch_term: *core.SwitchT
     return null;
 }
 
+fn findSwitchCasesClose(line: []const u8) ?usize {
+    var in_string = false;
+    var escaped = false;
+    for (line, 0..) |byte, index| {
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (byte == '\\') {
+                escaped = true;
+            } else if (byte == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (byte == '"') {
+            in_string = true;
+        } else if (byte == ']') {
+            return index;
+        }
+    }
+    return null;
+}
+
 fn parseSwitchCase(allocator: std.mem.Allocator, switch_term: *core.SwitchTerminator, text: []const u8) !void {
     const comma = findTopLevelComma(text) orelse return error.InvalidSwitch;
     const typed = try parseTypedValue(std.mem.trim(u8, text[0..comma], " \t"));
     const label_text = std.mem.trim(u8, text[comma + 1 ..], " \t");
-    var parts = std.mem.tokenizeAny(u8, label_text, " \t");
-    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidSwitch, "label")) return error.InvalidSwitch;
-    const target = try parseLabel(parts.next() orelse return error.InvalidSwitch);
-    if (parts.next() != null) return error.InvalidSwitch;
+    const target = try parseLabelOperand(label_text, error.InvalidSwitch);
     try switch_term.cases.append(allocator, .{
         .value_ty = typed.ty,
         .value = typed.value,
         .target = target,
     });
+}
+
+fn parseLabelOperand(text: []const u8, comptime err: anyerror) ![]const u8 {
+    const keyword = firstToken(text) orelse return err;
+    if (!std.mem.eql(u8, keyword, "label")) return err;
+    const target = std.mem.trim(u8, text[keyword.len..], " \t");
+    if (target.len == 0) return err;
+    return parseLabel(target);
 }
 
 fn parseIndirectBr(allocator: std.mem.Allocator, line: []const u8) !core.Terminator {
@@ -2511,6 +2536,11 @@ fn parseTypeOrLabel(text: []const u8) !TypeOrLabel {
 
 fn parseLabel(text: []const u8) ![]const u8 {
     if (!std.mem.startsWith(u8, text, "%") or text.len == 1) return error.InvalidLabel;
+    if (text[1] == '"') {
+        if (findClosingQuote(text, 1) != text.len - 1) return error.InvalidLabel;
+    } else if (std.mem.indexOfAny(u8, text, " \t") != null) {
+        return error.InvalidLabel;
+    }
     return text[1..];
 }
 

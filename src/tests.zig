@@ -1649,6 +1649,33 @@ test "parser preserves switch terminators" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves switch labels containing bracket characters" {
+    const input =
+        \\define i32 @switch_bracket_label(i32 %tag) {
+        \\entry:
+        \\  switch i32 %tag, label %default [
+        \\    i32 0, label %"array_hash_map.Custom([]const u8).exit"
+        \\  ], !prof !0
+        \\"array_hash_map.Custom([]const u8).exit":
+        \\  ret i32 7
+        \\default:
+        \\  ret i32 99
+        \\}
+        \\
+        \\!0 = !{!"branch_weights", i32 1, i32 2}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const switch_term = module.functions.items[0].blocks.items[0].terminator.?.@"switch";
+    try std.testing.expectEqual(@as(usize, 1), switch_term.cases.items.len);
+    try std.testing.expectEqualStrings("\"array_hash_map.Custom([]const u8).exit\"", switch_term.cases.items[0].target);
+    try std.testing.expectEqualStrings("!prof !0", switch_term.metadata.?);
+}
+
 test "parser preserves indirectbr terminators" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
