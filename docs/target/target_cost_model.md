@@ -28,8 +28,10 @@ cost query objects for scalar/vector arithmetic, shuffle-like operations, and
 scalarization overhead
 unsupported scalable vectors and malformed lane operations are rejected by parser tests
 future vector fixture records the parser/verifier boundary
-loop-vectorize, slp-vectorizer, and vector-combine remain executable no-op
-placeholders only in full inventory pipeline descriptors
+loop-vectorize remains an executable no-op placeholder in full inventory
+pipeline descriptors
+slp-vectorizer recognizes one same-op scalar bundle shape, then records that
+BoUpSLP tree construction and TTI profitability are unsupported
 ```
 
 Cycle 04 finish decision: `vector_future_release_fast` remains
@@ -54,9 +56,9 @@ no optimizer-input vector corpus rows beyond reduced lane-operation fixtures
 no lane-operation profitability model
 no vector optimization or scalar fold reuse beyond target-independent
 same-value identities
-no loop or SLP vectorization
+no loop vectorization or SLP vector IR rewriting
 no target feature or CPU model cost variation
-no transform consumes the TargetTransformInfo skeleton yet
+no transform consumes the TargetTransformInfo skeleton for profitability yet
 ```
 
 Target feature extraction is documented in `docs/target/features.md`. Those

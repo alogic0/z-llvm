@@ -28,6 +28,31 @@ pub const PassCategory = enum {
 pub const Context = struct {
     allocator: std.mem.Allocator,
     io: ?std.Io = null,
+    diagnostic_count: usize = 0,
+    last_diagnostic: ?PassDiagnostic = null,
+
+    pub fn emitDiagnostic(
+        context: *Context,
+        pass_name: []const u8,
+        function_name: []const u8,
+        value_name: ?[]const u8,
+        message: []const u8,
+    ) void {
+        context.diagnostic_count += 1;
+        context.last_diagnostic = .{
+            .pass_name = pass_name,
+            .function_name = function_name,
+            .value_name = value_name,
+            .message = message,
+        };
+    }
+};
+
+pub const PassDiagnostic = struct {
+    pass_name: []const u8,
+    function_name: []const u8,
+    value_name: ?[]const u8 = null,
+    message: []const u8,
 };
 
 pub const ModulePass = struct {
@@ -85,10 +110,18 @@ pub const ModulePassManager = struct {
                 continue;
             }
             const start = timestamp(context);
+            const diagnostic_count_before = context.diagnostic_count;
             const pass_result = try pass.run(module, context);
             const elapsed_ns = elapsedNanoseconds(start, timestamp(context));
             try module.verify();
             if (options.timing) try writer.print("; time {s}: {} ns\n", .{ pass.name, elapsed_ns });
+            if (options.trace and context.diagnostic_count != diagnostic_count_before) {
+                if (context.last_diagnostic) |diagnostic| {
+                    try writer.print("; diagnostic {s}: @{s}", .{ diagnostic.pass_name, diagnostic.function_name });
+                    if (diagnostic.value_name) |value_name| try writer.print(" %{s}", .{value_name});
+                    try writer.print(": {s}\n", .{diagnostic.message});
+                }
+            }
             if (options.trace) {
                 try writer.print("; after {s}: {s}\n", .{ pass.name, @tagName(pass_result) });
                 try module.print(writer);

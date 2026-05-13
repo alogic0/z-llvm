@@ -138,7 +138,7 @@ Each slice is complete only when it has:
       Replace the current mismatch reject fixture with one LLVM-shaped vector
       combine. Required upstream mapping:
       `llvm/lib/Transforms/Vectorize/VectorCombine.cpp`.
-- [ ] Slice 26: SLP vectorizer recognition-only pass.
+- [x] Slice 26: SLP vectorizer recognition-only pass.
       Detect one straight-line isomorphic operation group and emit an explicit
       unsupported diagnostic before transformation. This is a planning slice,
       not a completed algorithm. Required upstream mapping:

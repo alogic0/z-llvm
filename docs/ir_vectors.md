@@ -74,7 +74,7 @@ vector element types outside integer, float, double, and ptr
 vector comparisons beyond current parser boundaries
 vector FP transforms beyond parse/verify preservation for supported binary ops
 TargetTransformInfo-driven profitability or vectorizer cost modeling
-loop-vectorize, slp-vectorizer, vector-combine
+loop-vectorize and full SLP vectorization
 native vector lowering
 ```
 
@@ -111,6 +111,7 @@ opt-22 equivalent:
 local-only conservative:
   vector_extract_insert_mismatch_reject
   vector_combine_extract_insert_mismatch
+  slp_vectorizer_recognition
   vector_shuffle_undef_mask_preserve
   gvn_vector_lane_not_clobber
 ```

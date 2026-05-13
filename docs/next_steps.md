@@ -11,21 +11,20 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 25: `vector-combine` for extract/insert lane identity
+Active slice: Slice 26: SLP vectorizer recognition-only pass
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `VectorCombine` pass structure and the exact
-      extract-after-insert fold owner in `InstCombineVectorOps.cpp`.
-- [x] Define the accepted local IR surface: fixed vectors, constant extract and
-      insert indices, matching vector type, and matching inserted scalar type.
-- [x] Implement same-lane extraction as replacement with the inserted scalar.
-- [x] Implement different-lane extraction as replacement with an extract from
-      the original vector.
-- [x] Remove the now-dead insertelement only when it has no remaining uses.
-- [x] Add `opt-22` fixtures for same-lane and different-lane extraction.
-- [x] Wire `vector-combine` as a real pass and update vector, target-cost,
-      parity, inventory, and roadmap docs.
+- [x] Map LLVM `SLPVectorizerPass::run`, `collectSeedInstructions`,
+      `tryToVectorizeList`, and BoUpSLP tree/profitability boundaries.
+- [x] Define the accepted local recognition surface: same-block, straight-line,
+      same-op scalar binary instructions with matching flags and type.
+- [x] Replace the executable placeholder with a real recognition-only pass.
+- [x] Emit an explicit unsupported diagnostic through pass context when a
+      bundle is recognized but BoUpSLP rewriting is unavailable.
+- [x] Add fixture coverage proving the pass preserves IR while recognizing the
+      unsupported transformation boundary.
+- [x] Update vector, target-cost, parity, inventory, and roadmap docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 25.
+- [x] Review and commit Slice 26.

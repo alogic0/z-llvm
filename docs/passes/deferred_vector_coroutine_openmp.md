@@ -53,15 +53,19 @@ Core LLVM algorithm data structures:
   OpenMP runtime call graph and kernel metadata.
 
 Local target status:
-  Vectorizers are placeholders. vector-combine has one lane-identity slice.
+  LoopVectorize remains a placeholder. SLPVectorizer has a recognition-only
+  same-op scalar bundle slice with an explicit unsupported transform
+  diagnostic. vector-combine has one lane-identity slice.
 ```
 
 Implemented subset:
 
 ```text
-loop-vectorize, slp-vectorizer, coro-early, coro-split, coro-elide,
-coro-cleanup, coro-annotation-elide, openmp-opt, and openmp-opt-cgscc are
-executable placeholders.
+loop-vectorize, coro-early, coro-split, coro-elide, coro-cleanup,
+coro-annotation-elide, openmp-opt, and openmp-opt-cgscc are executable
+placeholders.
+slp-vectorizer scans for one BoUpSLP-shaped same-block scalar binary bundle
+and records the unsupported reason before transformation.
 vector-combine has a narrow lane-identity slice for extract-after-insert only.
 accepted Zig corpus pipelines intentionally exclude loop-vectorize,
 slp-vectorizer, and broader vector-combine until target costs and vector
@@ -73,6 +77,8 @@ Intentional divergences:
 ```text
 fixed-vector and lane-operation parser/verifier support plus one vector-combine
 lane identity only; no vectorizer optimizer input
+SLP recognition does not build BoUpSLP trees, schedule bundles, ask TTI for
+profitability, or rewrite vector IR
 no transform consumes the target vector cost skeleton yet
 no coroutine IR or lowering
 no OpenMP representation
@@ -88,10 +94,12 @@ opt-22 equivalent:
 
 local-only conservative:
   vector_combine_extract_insert_mismatch
+  slp_vectorizer_recognition
   future vector fixture classified as parse/verify/future
   accepted corpus pipeline test excludes vector placeholders
 
 unit-test only:
+  SLP diagnostic context for recognized unsupported bundles
   placeholder pass dispatch for remaining vector/coroutine/OpenMP passes
   parser/verifier tests for lane operations, scalable vectors, and malformed
   lane-operation boundary forms

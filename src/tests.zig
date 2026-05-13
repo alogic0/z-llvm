@@ -29,6 +29,7 @@ const licm = @import("passes/licm.zig");
 const mem2reg = @import("passes/mem2reg.zig");
 const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
+const slp_vectorizer = @import("passes/slp_vectorizer.zig");
 const sroa = @import("passes/sroa.zig");
 
 test "named pipelines expand to stable pass sequences" {
@@ -8654,4 +8655,45 @@ test "sccp folds direct calls to constant-return functions" {
         \\
     ;
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "slp vectorizer recognizes same-op scalar bundles and reports unsupported transform" {
+    const input =
+        \\define i32 @slp_seed(i32 %a, i32 %b, i32 %c, i32 %d) {
+        \\entry:
+        \\  %x0 = add i32 %a, %b
+        \\  %x1 = add i32 %c, %d
+        \\  %sum = add i32 %x0, %x1
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    const candidate = slp_vectorizer.findCandidate(module.functions.items[0]) orelse return error.ExpectedSlpCandidate;
+    try std.testing.expectEqualStrings("slp_seed", candidate.function_name);
+    try std.testing.expectEqualStrings("entry", candidate.block_name);
+    try std.testing.expectEqualStrings("x0", candidate.first_result);
+    try std.testing.expectEqualStrings("x1", candidate.second_result);
+    try std.testing.expectEqual(ir.BinaryOp.add, candidate.opcode);
+    try std.testing.expectEqual(@as(usize, 2), candidate.lanes);
+
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pm.add(slp_vectorizer.pass);
+
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    const result = try pm.run(&module, &context, &output.writer, false);
+    try std.testing.expectEqual(pass_manager.PassResult.unchanged, result);
+    try std.testing.expectEqual(@as(usize, 1), context.diagnostic_count);
+    const diagnostic = context.last_diagnostic orelse return error.ExpectedSlpDiagnostic;
+    try std.testing.expectEqualStrings("slp-vectorizer", diagnostic.pass_name);
+    try std.testing.expectEqualStrings("slp_seed", diagnostic.function_name);
+    try std.testing.expectEqualStrings("x0", diagnostic.value_name.?);
+    try std.testing.expectEqualStrings(slp_vectorizer.diagnostic_message, diagnostic.message);
 }
