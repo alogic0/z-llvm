@@ -83,7 +83,7 @@ Each slice is complete only when it has:
       pattern. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` and
       `llvm/lib/Analysis/ScalarEvolution.cpp`.
-- [ ] Slice 14: LICM memory promotion.
+- [x] Slice 14: LICM memory promotion.
       Move beyond load hoisting into scalar promotion for one stack slot with no
       aliasing writes, preserving LCSSA. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LICM.cpp`.

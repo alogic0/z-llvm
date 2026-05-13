@@ -98,7 +98,7 @@ unsupported.
 | --- | --- |
 | DCE | Uses `isSafeToDelete` so stores, calls, volatile, and atomic memory are preserved. |
 | ADCE | Uses the same safe-to-delete rule as the current conservative data-dependence foundation. |
-| LICM | Uses `isSafeToSpeculativelyExecute`; loads, stores, calls, volatile/atomic memory, and trapping division stay in the loop. |
+| LICM | Uses `isSafeToSpeculativelyExecute`; selected invariant loads and one stack-slot load/store promotion shape can move, while calls, volatile/atomic memory, and trapping division stay in the loop. |
 | GVN | Uses memory-effect classification to reject writing/unknown/barrier instructions and alias/mod-ref to protect load value numbering. |
 | EarlyCSE | Uses `isSafeToDelete` and alias/mod-ref guarded load availability. |
 | DSE | Uses MemoryLocation plus alias/mod-ref-style barrier rules for single-block overwritten store removal. |
@@ -113,6 +113,7 @@ dce_scalar_with_memory
 dce_volatile_load_reject
 gvn_scalar_with_memory
 licm_scalar_with_memory
+licm_promote_stack
 dse_overwrite
 dse_load_barrier
 mem2reg_volatile_load
@@ -127,7 +128,7 @@ barrier kind split for volatile versus atomic spelling
 unknown call may-throw behavior
 division may-trap behavior
 LICM trapping-division rejection
-LICM aligned-load rejection until memory LICM exists
+LICM aligned-load rejection outside the accepted one-slot promotion shape
 DCE atomic barrier preservation
 known stack-slot alias, no-alias, and may-alias queries
 known scalar GEP offset and disjoint range queries
@@ -146,7 +147,7 @@ bash scripts/compare_opt.sh
 These are intentional Epic 5 boundaries, not accidental mismatches:
 
 - no MemorySSA graph or updater;
-- no memory LICM, load PRE, store sinking, or cross-block DSE;
+- no general memory LICM, load PRE, store sinking, or cross-block DSE;
 - no readonly/readnone call deletion in DCE yet, even though call attributes are
   parsed for function-attribute analysis;
 - no target-library call mod/ref modeling;

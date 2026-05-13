@@ -65,6 +65,7 @@ opt-22 equivalent:
   gvn_scalar_with_memory
   gvn_argmemonly_call_no_clobber
   licm_scalar_with_memory
+  licm_promote_stack
   vector_lane_dead_dce
 
 local-only conservative:
@@ -88,7 +89,7 @@ Upstream mapping:
 ```text
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
-This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves all memory motion disabled unless a later pass proves safety explicitly. Fixed-vector lane operations are pure instructions, not memory barriers.
+This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves memory motion disabled unless a later pass proves safety explicitly. Fixed-vector lane operations are pure instructions, not memory barriers.
 Direct calls use preserved callee/call-site attributes for the local
 `MemoryEffects`-shaped classification boundary. Alias ModRef ignores
 inaccessible memory for ordinary `MemoryLocation` queries and refines argmem

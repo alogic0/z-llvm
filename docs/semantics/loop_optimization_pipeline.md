@@ -103,7 +103,7 @@ loop depth 0.
 | --- | --- | --- |
 | `LoopInfo` | LLVM-shaped subset | Natural loops from dominator backedges, loop nesting, preheader/exit queries |
 | `loop-instsimplify` | LLVM-shaped subset | Applies local InstSimplify only inside recognized loop blocks |
-| `licm` | fixture-equivalent for listed fixtures | Hoists pure scalar invariant instructions to an existing preheader |
+| `licm` | LLVM-shaped subset for listed fixtures | Hoists pure scalar invariant instructions, hoists selected invariant loads, and promotes one alloca-backed loop load/store slot |
 | `loop-simplifycfg` | LLVM-shaped subset | Constant loop-local branch folding and simple loop-block merging for accepted LCSSA/preheader/dedicated-exit loops |
 | `loop-rotate` | LLVM-shaped subset | Single-latch counted while loop rotated into guarded do-while shape with LCSSA repair |
 | `loop-deletion` | LLVM-shaped subset | `mustprogress` side-effect-free counted loop with no outside uses is deleted |
@@ -140,6 +140,8 @@ slice; full trip counts, induction variables, deletion, and unroll decisions
 remain missing
 LoopAccessAnalysis: vectorization and memory dependence in loops
 MemorySSA: memory LICM, memory sinking, loop deletion legality
+  Current LICM uses only a narrow one-slot promotion shape; general MemorySSA
+  updater behavior remains missing.
 TargetTransformInfo: rotate, unroll, vectorization, and profitability decisions
 BlockFrequencyInfo/ProfileSummaryInfo: profile-guided loop profitability
 AssumptionCache: condition and range facts used by simplification and LICM
@@ -153,10 +155,11 @@ opt-22 compared:
   licm_variant_operand
   licm_dominates_uses
   licm_scalar_with_memory
+  licm_promote_stack
 
 local-only conservative:
   no-preheader LICM rejection
-  memory load/store LICM rejection
+  memory load/store LICM rejection outside the accepted one-slot promotion shape
   aligned-load LICM rejection
   trapping-division LICM rejection
   atomic/volatile memory barrier preservation

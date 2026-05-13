@@ -91,7 +91,8 @@ Intentional divergences:
   Cross-block queries still reject more cases than LLVM. LLVM's walker follows
   defining accesses and caches optimized defs; the local walker scans the
   access list and uses CFG reachability to reject impossible paths.
-  LICM does not move memory instructions.
+  LICM has one local stack-slot promotion shape, but does not maintain a general
+  MemorySSA updater for arbitrary memory motion.
   EarlyCSE still uses scoped local availability for store-to-load forwarding.
   The access list is still usually rebuilt per function; updater support covers
   only simple access deletion/replacement.

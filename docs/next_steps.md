@@ -11,25 +11,26 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 13: `indvars` canonical IV recognition and rewrite
+Active slice: Slice 14: LICM memory promotion
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `IndVarSimplifyPass::run`, `rewriteLoopExitValues`,
-      `simplifyAndExtend`, and ScalarEvolution affine AddRec construction.
-- [x] Define the accepted local IR surface: self-latch counted loop, canonical
-      `{0,+,1}` IV, one derived affine integer IV, equality exit on the
-      canonical post-inc value, one dedicated exit, and exit use of the derived
-      post-inc value.
-- [x] Add a small SCEV-like affine AddRec helper for recognized LoopInfo IVs.
-- [x] Replace the `indvars` placeholder with a real pass for that surface.
-- [x] Rewrite the accepted derived IV exit value to the closed form computed
-      from the loop limit, matching LLVM's narrow output shape.
-- [x] Add an `opt-22` comparison fixture for the accepted affine IV rewrite.
-- [x] Keep widening, non-self-latch loops, non-affine recurrences, non-equality
-      exits, multiple exits, memory effects, debug salvage, and general
-      ScalarEvolution out of scope and documented.
-- [x] Update IndVarSimplify, SCEV, inventory, parity, and loop pipeline docs.
+- [x] Map LLVM `collectPromotionCandidates`, `isOnlyMemoryAccess`,
+      `promoteLoopAccessesToScalars`, and `LoopPromoter`.
+- [x] Define the accepted local IR surface: one invariant stack pointer, one
+      preheader store, loop loads/stores only to that pointer, one dedicated
+      exit, no aliasing writes, and scalar integer values only.
+- [x] Promote the accepted loop memory location to a scalar loop-carried PHI.
+- [x] Rewrite loop loads to the current scalar value and loop stores to update
+      the scalar value.
+- [x] Store the final promoted scalar value to the pointer on the dedicated
+      exit edge.
+- [x] Add an `opt-22` comparison fixture for the accepted promotion shape.
+- [x] Keep multiple exits, aliasing memory, calls, volatile/atomic accesses,
+      non-stack pointers, MemorySSA updater precision, debug salvage, and
+      general SSAUpdater behavior out of scope and documented.
+- [x] Update LICM, MemorySSA/ScalarEvolution boundaries if needed, inventory,
+      parity, and loop pipeline docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 13 complete in the roadmap.
+- [x] Review, commit, and mark Slice 14 complete in the roadmap.

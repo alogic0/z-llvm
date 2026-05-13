@@ -39,6 +39,10 @@ LLVM entry points/classes:
   hoistRegion
   sinkRegion
   canSinkOrHoistInst
+  collectPromotionCandidates
+  isOnlyMemoryAccess
+  promoteLoopAccessesToScalars
+  LoopPromoter
 
 Required analyses:
   LoopInfo.
@@ -58,7 +62,8 @@ Core LLVM algorithm data structures:
   Worklists for hoist and sink candidates.
 
 Local target status:
-  fixture-equivalent for listed scalar fixtures.
+  LLVM-shaped subset for listed scalar, invariant-load, and one stack-slot
+  promotion fixture.
 ```
 
 Implemented subset:
@@ -84,6 +89,11 @@ hoist nonvolatile loads in the loop header when the pointer is loop-invariant,
 the loop has no clobber for that access, and an existing preheader dominates
 the header
 reject memory LICM when the load pointer is defined inside the loop
+promote one stack-slot memory location to a scalar loop-carried value when the
+loop has exactly one nonvolatile load and one nonvolatile store to that pointer,
+one self-latch, one dedicated exit, and no other memory effects
+insert the promoted preheader load, loop PHI, exit LCSSA PHI, and exit writeback
+store in the same shape as LLVM's `LoopPromoter` for the accepted fixture
 ```
 
 Current legality boundary:
@@ -91,6 +101,8 @@ Current legality boundary:
 ```text
 hoistable: side-effect-free scalar binary, integer cast, icmp, select, and the
 narrow header-load case described above
+promotable: one alloca-backed integer slot with a single loop load/store pair,
+no aliasing memory operations, a self-latch loop, and a dedicated exit
 not hoistable: freeze, phi, alloca, store, getelementptr, volatile or atomic
 barriers, trapping division, non-header loads, variant-pointer loads, and loads
 with loop clobbers
@@ -99,15 +111,15 @@ not represented yet and therefore not hoistable: calls and unknown memory effect
 
 LLVM's full LICM uses `canSinkOrHoistInst`, alias analysis, MemorySSA, and
 speculation-safety checks to decide whether memory operations can move. This
-project deliberately limits memory LICM to invariant header-load hoisting until
-the required promotion, sinking, and MemorySSA updater pieces exist.
+project implements only one promotion shape from `promoteLoopAccessesToScalars`;
+general promotion, sinking, and MemorySSA updater precision remain missing.
 
 Fixture coverage:
 
 ```text
 opt-22 compared: invariant scalar hoist, variant-operand rejection,
 dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist,
-header load hoist
+header load hoist, stack-slot memory promotion
 local only: may-alias store rejection for memory LICM because opt-22 may still
 perform other loop rewrites around that shape
 local only: variant load-pointer rejection because opt-22 may sink/LCSSA-rewrite
@@ -127,7 +139,9 @@ Known gaps:
 
 ```text
 no store/call hoisting or sinking
-no MemorySSA updater use in LICM or memory promotion
+no general MemorySSA updater use in LICM or memory promotion
+no memory promotion beyond the accepted one-load/one-store alloca-backed
+self-latch fixture
 no poison or freeze speculation safety checks beyond the current trapping-division guard
 no multi-latch loop hoisting
 no preheader creation
