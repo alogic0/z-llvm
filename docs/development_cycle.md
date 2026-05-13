@@ -47,6 +47,8 @@ compiler split:
 The usual command shape is:
 
 ```bash
+zig build -Doptimize=ReleaseFast
+
 zig run tools/zig_corpus_discovery.zig -- \
   --out-dir=tmp/zig_ir/<sweep-name> \
   --mode=<Debug|ReleaseFast|ReleaseSafe|ReleaseSmall> \
@@ -54,6 +56,39 @@ zig run tools/zig_corpus_discovery.zig -- \
   --local-zllvm-exe=zig-out/bin/z_llvm \
   --progress-every=50
 ```
+
+To start or restart a discovery cycle:
+
+1.  Check whether any old discovery process is still running:
+
+    ```bash
+    ps -ef | rg 'zig_corpus_discovery|stage4/bin/zig|zig-out/bin/z_llvm'
+    ```
+
+2.  Build the local checker once in ReleaseFast mode:
+
+    ```bash
+    zig build -Doptimize=ReleaseFast
+    ```
+
+3.  Pick the first mode that has not completed cleanly. Use a new
+    `tmp/zig_ir/<sweep-name>` directory; do not reuse an interrupted output
+    directory.
+
+4.  Run `tools/zig_corpus_discovery.zig` with the command shape above.
+
+5.  After the sweep finishes, inspect the summary and failure rows:
+
+    ```bash
+    cat tmp/zig_ir/<sweep-name>/summary.txt
+    rg -n '^(parse-fail|verify-fail|optimizer-fail|input-too-large)' \
+      tmp/zig_ir/<sweep-name>/report.tsv
+    ```
+
+6.  If the sweep is clean, record the clean mode and continue to the next mode.
+    If it finds a failure, reduce and fix that blocker before starting another
+    broad sweep. If it reveals tooling or verifier throughput trouble, fix and
+    commit that first, then restart the interrupted mode in a fresh directory.
 
 When a full source-backed verify sweep has no local failures, keep looking for
 blockers by repeating the sweep across Zig optimization modes in this order:
