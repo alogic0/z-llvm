@@ -149,7 +149,7 @@ Each slice is complete only when it has:
 
 ## Phase 7: Debug, Atomics, LTO, And Backend-Adjacent Boundaries
 
-- [ ] Slice 28: Debug location salvage for InstCombine.
+- [x] Slice 28: Debug location salvage for InstCombine.
       Salvage one replaced value's debug location instead of dropping it.
       Required upstream mapping: LLVM debug value salvage utilities.
 - [ ] Slice 29: Atomic ordering semantic verifier.

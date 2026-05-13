@@ -214,8 +214,9 @@ fast-math flags are interpreted only through `docs/analysis/fast_math.md`; the
 first enabled fast-math folds are `fadd nsz x, +0.0` and `fcmp nnan oeq x, x`.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 Debug-location-only folds may remove an instruction carrying `!dbg`; the
-current local behavior drops that location with the removed instruction instead
-of attempting LLVM-style debug-info salvage.
+local pass now transfers that location to the first later metadata-free user of
+the replaced value. This is a narrow debug-location salvage slice, not full
+LLVM `salvageDebugInfo` or variable-location rewriting.
 ```
 
 Example:
@@ -253,6 +254,7 @@ no non-constant operand complexity ordering
 no floating-point arithmetic folds or reassociation
 no general ordered FP comparison folds
 no fast-math-driven FP folds beyond the listed nsz/nnan identities
-no debug-info salvage for replaced instructions
+no debug-info salvage beyond one removed-instruction `!dbg` transfer to a
+metadata-free user; no variable-location salvage
 no target-specific combines
 ```

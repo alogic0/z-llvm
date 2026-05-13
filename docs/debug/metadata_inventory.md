@@ -97,9 +97,9 @@ Before a pass can claim debug-aware behavior, it needs an explicit policy:
 ```text
 instruction deletion: current local policy drops attached `!dbg` with the
 deleted instruction; debug value salvage is unsupported
-instruction replacement: current local policy drops the removed instruction's
-location unless the instruction is mutated in place; explicit transfer is
-unsupported
+instruction replacement: InstCombine has one debug-location-only transfer from
+a removed instruction to the first later metadata-free user of the replaced
+value; broader explicit transfer is unsupported
 CFG rewrite: preserve branch/debug locations or record unsupported behavior
 code motion: keep a valid debug location or explicitly clear it
 inlining: create inline scopes only after inline debug metadata is represented
@@ -108,15 +108,17 @@ loop transforms: preserve locations through hoist/rotate/unroll only after tests
 
 Current passes are debug-location-aware only at the preservation boundary:
 unchanged instructions keep their opaque `!dbg` attachments, removed or replaced
-instructions drop them, and no pass attempts LLVM's debug value salvage,
+instructions usually drop them, except for the InstCombine one-user transfer
+slice. No pass attempts LLVM's full debug value salvage,
 assignment tracking, discriminator update, or inline-scope construction.
 
 Cycle 03 makes that boundary executable for selected scalar passes:
 
 ```text
 DCE may delete dead instructions with `!dbg`; the deleted location is dropped
-InstCombine may replace folded instructions with existing values; the removed
-instruction's location is dropped
+InstCombine may replace folded instructions with existing values; it transfers
+the removed instruction's `!dbg` to the first metadata-free user in the accepted
+debug-location-only slice
 EarlyCSE and GVN preserve the leader instruction location and drop the removed
 redundant instruction location
 modules containing `llvm.dbg.value` or `llvm.dbg.declare` still skip transform
