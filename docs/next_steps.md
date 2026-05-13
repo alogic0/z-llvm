@@ -11,24 +11,24 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 11: `loop-rotate` for single-latch counted loops
+Active slice: Slice 12: `loop-deletion` for provably side-effect-free finite loops
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `LoopRotatePass::run`, `LoopRotate.cpp`, `LoopRotationUtils`,
-      `Loop::getLoopPreheader`, `Loop::getLoopLatch`, and PHI repair behavior.
-- [x] Define the accepted local IR surface: preheader, header, body, latch, and
-      exit blocks; one latch; one dedicated exit; header condition branches to
-      body or exit; latch unconditionally branches back to the header.
-- [x] Replace the `loop-rotate` placeholder with a real loop pass for that
+- [x] Map LLVM `LoopDeletionPass::run`, `deleteDeadLoop`, `isLoopDead`, and
+      ScalarEvolution-backed exit count checks.
+- [x] Define the accepted local IR surface: single-latch counted loop with
+      preheader, one dedicated exit, `mustprogress`, pure scalar loop body, and
+      no outside uses of loop-defined values.
+- [x] Replace the `loop-deletion` placeholder with a real loop pass for that
       surface.
-- [x] Rotate the accepted while-shaped loop into the LLVM-compatible
-      do-while-shaped loop for a simple counted integer induction pattern.
-- [x] Repair PHI incoming blocks and exit LCSSA PHIs for the accepted shape.
-- [x] Add an `opt-22` comparison fixture for the accepted counted loop.
-- [x] Keep multi-latch loops, side exits, nested loops, metadata, debug salvage,
-      MemorySSA updates, and general PHI duplication out of scope and documented.
-- [x] Update loop simplify/rotation and parity docs.
+- [x] Delete the accepted side-effect-free loop by retargeting the preheader to
+      the exit and removing unreachable loop blocks.
+- [x] Add an `opt-22` comparison fixture for the accepted finite loop.
+- [x] Keep unknown trip counts, memory effects, calls, live loop outputs, multi-exit loops,
+      non-dedicated exits, nested loops, and SCEV generality out of scope and
+      documented.
+- [x] Update loop deletion and parity docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 11 complete in the roadmap.
+- [x] Review, commit, and mark Slice 12 complete in the roadmap.

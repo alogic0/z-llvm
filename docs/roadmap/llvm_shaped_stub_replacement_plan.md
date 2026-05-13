@@ -74,7 +74,7 @@ Each slice is complete only when it has:
       Reproduce the smallest LLVM loop-rotation shape with preheader, header,
       latch, and dedicated exits. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopRotation.cpp`.
-- [ ] Slice 12: `loop-deletion` for provably side-effect-free finite loops.
+- [x] Slice 12: `loop-deletion` for provably side-effect-free finite loops.
       Use ScalarEvolution-shaped trip-count facts only for simple counted loops.
       Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopDeletion.cpp`.
