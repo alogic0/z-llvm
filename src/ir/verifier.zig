@@ -1696,6 +1696,12 @@ fn verifyCast(cast: core.CastInst) !void {
             if (from_bits != to_bits) return error.InvalidCast;
             return;
         },
+        .fpext => {
+            const from_bits = floatBits(cast.from_ty) orelse return error.InvalidCast;
+            const to_bits = floatBits(cast.to_ty) orelse return error.InvalidCast;
+            if (from_bits >= to_bits) return error.InvalidCast;
+            return;
+        },
         .trunc, .zext, .sext => {
             if (cast.from_ty == .vector or cast.to_ty == .vector) {
                 const from_vector = switch (cast.from_ty) {
@@ -1718,7 +1724,7 @@ fn verifyCast(cast: core.CastInst) !void {
                 switch (cast.op) {
                     .trunc => if (from_bits <= to_bits) return error.InvalidCast,
                     .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-                    .bitcast, .ptrtoint, .inttoptr => unreachable,
+                    .fpext, .bitcast, .ptrtoint, .inttoptr => unreachable,
                 }
                 return;
             }
@@ -1736,7 +1742,7 @@ fn verifyCast(cast: core.CastInst) !void {
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-        .bitcast, .ptrtoint, .inttoptr => unreachable,
+        .fpext, .bitcast, .ptrtoint, .inttoptr => unreachable,
     }
 }
 
@@ -1748,10 +1754,20 @@ fn verifyCastFlags(cast: core.CastInst) !void {
         .zext => {
             if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
         },
-        .sext, .bitcast, .ptrtoint, .inttoptr => {
+        .sext, .fpext, .bitcast, .ptrtoint, .inttoptr => {
             if (cast.flags.any()) return error.InvalidInstructionFlag;
         },
     }
+}
+
+fn floatBits(ty: core.Type) ?u16 {
+    return switch (ty) {
+        .float => 32,
+        .double => 64,
+        .x86_fp80 => 80,
+        .fp128 => 128,
+        .void, .int, .metadata, .ptr, .aggregate, .vector => null,
+    };
 }
 
 fn bitcastBits(ty: core.Type) ?u64 {

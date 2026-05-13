@@ -4362,6 +4362,12 @@ test "parser preserves scalar float arithmetic and compare IR" {
         \\  ret i1 %less
         \\}
         \\
+        \\define double @float_extend(float %a) {
+        \\entry:
+        \\  %wide = fpext float %a to double
+        \\  ret double %wide
+        \\}
+        \\
     ;
 
     var module = try ir.Module.parse(std.testing.allocator, input);
@@ -4375,6 +4381,7 @@ test "parser preserves scalar float arithmetic and compare IR" {
     try std.testing.expect(module.functions.items[4].ret_ty.eql(.double));
     try std.testing.expect(module.functions.items[5].ret_ty.eql(.float));
     try std.testing.expect(module.functions.items[6].ret_ty.eql(.{ .int = 1 }));
+    try std.testing.expectEqual(ir.CastOp.fpext, module.functions.items[7].blocks.items[0].instructions.items[0].kind.cast.op);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();

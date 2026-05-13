@@ -135,6 +135,9 @@ Active cycle:
       address-space pointer value types on `alloca`, `load`, and `store` while
       keeping opaque-pointer semantics conservative. Upstream mapping is recorded
       in [Memory IR Subset](ir_memory.md).
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      `fpext float ... to double` used by C-varargs float promotion. Upstream
+      mapping is recorded in [Scalar IR](ir_scalar.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

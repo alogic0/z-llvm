@@ -42,6 +42,7 @@ InstSimplify when no arithmetic, rounding, or exception fact is needed
 fast-math `nsz` enables `fadd x, +0.0`, `nnan` enables self-compare
 orderedness folds, and `fast` enables local FP expression CSE/value numbering
 integer casts: trunc, zext, sext
+floating-point cast preservation: fpext for source-backed float-to-double varargs promotion
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
 verifier rejects pointer binary ops, pointer casts, invalid cast widths, and invalid flag/op combinations
@@ -85,6 +86,7 @@ local-only conservative:
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
+  parser/printer/verifier round-trip for fpext float-to-double
   parser/printer/verifier round-trip for scalar float/double fadd/fsub/fmul/fdiv/frem, fcmp predicates, and select
   parser/printer/verifier round-trip for scalar x86_fp80/fp128 ABI surface
   scalar-condition vector select with identical arms folds through the same
