@@ -100,7 +100,7 @@ test "Zig mode pipelines expand to stable pass and placeholder sequences" {
     }{
         .{ .name = "verify", .category = .mandatory, .status = "LLVM-shaped algorithm subset" },
         .{ .name = "ee-instrument", .category = .instrumentation, .status = "placeholder" },
-        .{ .name = "always-inline", .category = .ipo, .status = "placeholder" },
+        .{ .name = "always-inline", .category = .ipo, .status = "LLVM-shaped subset for direct internal single-block calls" },
         .{ .name = "alloc-token", .category = .instrumentation, .status = "placeholder" },
         .{ .name = "annotation-remarks", .category = .instrumentation, .status = "placeholder" },
         .{ .name = "verify", .category = .mandatory, .status = "LLVM-shaped algorithm subset" },

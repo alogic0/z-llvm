@@ -1,6 +1,7 @@
 const std = @import("std");
 const pass_manager = @import("pass_manager.zig");
 const adce = @import("passes/adce.zig");
+const always_inline = @import("passes/always_inline.zig");
 const bdce = @import("passes/bdce.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
@@ -351,6 +352,8 @@ fn nestedPipelineBody(expression: []const u8) ?[]const u8 {
 fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
     if (std.mem.eql(u8, name, "instcombine")) {
         try pm.add(instcombine.pass);
+    } else if (std.mem.eql(u8, name, "always-inline")) {
+        try pm.add(always_inline.pass);
     } else if (std.mem.eql(u8, name, "verify")) {
         try pm.add(verify.pass);
     } else if (std.mem.eql(u8, name, "dce")) {
@@ -387,7 +390,6 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
 }
 
 fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
-    if (std.mem.eql(u8, name, "always-inline")) return placeholder.make("always-inline", .ipo, "llvm/lib/Transforms/IPO/AlwaysInliner.cpp");
     if (std.mem.eql(u8, name, "aggressive-instcombine")) return placeholder.make("aggressive-instcombine", .canonicalization, "llvm/lib/Transforms/AggressiveInstCombine/");
     if (std.mem.eql(u8, name, "lower-constant-intrinsics")) return placeholder.make("lower-constant-intrinsics", .canonicalization, "llvm/lib/Transforms/Scalar/LowerConstantIntrinsics.cpp");
     if (std.mem.eql(u8, name, "drop-unnecessary-assumes")) return placeholder.make("drop-unnecessary-assumes", .canonicalization, "llvm/lib/Transforms/Scalar/DropUnnecessaryAssumes.cpp");

@@ -180,6 +180,10 @@ The active work queue is kept short in [next_steps.md](next_steps.md).
 ## Future Backlog
 
 - [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
+- [ ] [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
+
+Use [Stub Replacement Cycle](stub_replacement_cycle.md) when pulling slices
+from the LLVM-shaped stub replacement plan.
 
 ## Operating Rule
 
