@@ -424,7 +424,7 @@ fn classifyAccess(module: ir.Module, instruction: ir.Instruction) ?AccessKind {
         .call => |call| switch (function_attrs.callMemoryEffect(module, call)) {
             .none => null,
             .readonly_load => .use,
-            .memory_write, .volatile_or_atomic_barrier, .unknown => .barrier,
+            .side_effect, .readonly_side_effect, .memory_write, .volatile_or_atomic_barrier, .unknown => .barrier,
         },
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => null,
     };

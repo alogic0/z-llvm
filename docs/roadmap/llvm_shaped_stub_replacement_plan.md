@@ -156,7 +156,7 @@ Each slice is complete only when it has:
       Move from atomic-as-barrier only to LLVM-compatible validation of ordering
       and syncscope combinations. Required upstream mapping:
       `llvm/lib/IR/Verifier.cpp`.
-- [ ] Slice 30: Inline asm memory effect refinement.
+- [x] Slice 30: Inline asm memory effect refinement.
       Classify side effects from inline asm constraints and sideeffect markers.
       Required upstream mapping: LLVM inline asm memory effect handling.
 - [ ] Slice 31: LTO prelink alias canonicalization.

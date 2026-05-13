@@ -176,7 +176,7 @@ fn updateMemoryAvailability(
         },
         .call => |call| switch (function_attrs.callMemoryEffect(module, call)) {
             .none, .readonly_load => {},
-            .memory_write, .volatile_or_atomic_barrier, .unknown => stores.clearRetainingCapacity(),
+            .side_effect, .readonly_side_effect, .memory_write, .volatile_or_atomic_barrier, .unknown => stores.clearRetainingCapacity(),
         },
         .atomicrmw, .cmpxchg, .fence => stores.clearRetainingCapacity(),
         .load => |load| if (load.attrs.isBarrier()) stores.clearRetainingCapacity(),

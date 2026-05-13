@@ -8,6 +8,8 @@ llvm-project-22/llvm/include/llvm/IR/Instructions.h
 llvm-project-22/llvm/lib/IR/Instruction.cpp
 llvm-project-22/llvm/include/llvm/Analysis/AliasAnalysis.h
 llvm-project-22/llvm/include/llvm/Analysis/MemoryLocation.h
+llvm-project-22/llvm/include/llvm/IR/InlineAsm.h
+llvm-project-22/llvm/lib/IR/Instructions.cpp
 ```
 
 Upstream entry points to check:
@@ -25,6 +27,10 @@ AtomicOrdering
 AAResults::getModRefInfo
 ModRefInfo
 MemoryLocation
+InlineAsm::Extra_HasSideEffects
+InlineAsm::Extra_MayLoad
+InlineAsm::Extra_MayStore
+CallBase::getMemoryEffects
 ```
 
 LLVM exposes memory behavior through instruction predicates, volatile/atomic
@@ -40,7 +46,10 @@ classify fixed-vector lane operations as no memory access
 classify nonvolatile nonatomic load as readonly_load
 classify nonvolatile nonatomic store as memory_write
 classify volatile or atomic load/store as volatile_or_atomic_barrier
-classify side-effecting inline asm as volatile_or_atomic_barrier
+classify inline asm `sideeffect` without memory constraints as side_effect
+classify inline asm input memory constraints as readonly_side_effect
+classify inline asm output memory constraints as memory_write
+classify inline asm `~{memory}` clobbers as volatile_or_atomic_barrier
 classify atomicrmw, cmpxchg, and fence as volatile_or_atomic_barrier
 expose mayReadMemory, mayWriteMemory, and hasSideEffects helpers over that classification
 expose mayReadOrWriteMemory, mayThrow, mayTrap, isSafeToDelete, and isSafeToSpeculativelyExecute helpers
@@ -67,17 +76,18 @@ opt-22 equivalent:
   licm_scalar_with_memory
   licm_promote_stack
   vector_lane_dead_dce
+  inline_asm_barrier_preserve
+  inline_asm_sideeffect_preserve
+  atomic_rmw_cmpxchg_fence_barrier
 
 local-only conservative:
   licm_aligned_load_reject
   memory_atomic_barrier_reject
-  inline_asm_barrier_preserve
-  atomic_rmw_cmpxchg_fence_barrier
 
 unit-test only:
   memory effect classification for pure instruction, vector lane instruction,
-  readonly load, volatile load, store, atomic store, inline asm, atomicrmw,
-  cmpxchg, and fence
+  readonly load, volatile load, store, atomic store, side-effect-only inline
+  asm, inline asm memory constraints, atomicrmw, cmpxchg, and fence
   volatile, atomic, and inline asm barrier kind classification
   may-throw call and may-trap division classification
   safe-to-delete and safe-to-speculate predicates
@@ -89,7 +99,12 @@ Upstream mapping:
 ```text
 This reproduces the first shared legality layer behind LLVM's instruction memory predicates and mod/ref queries.
 LLVM has richer behavior for calls, intrinsics, atomic ordering, target library calls, MemorySSA, MemoryLocation sizes, and metadata-driven memory facts.
-This project currently treats volatile, atomic, and inline-asm memory as hard barriers and leaves memory motion disabled unless a later pass proves safety explicitly. Fixed-vector lane operations are pure instructions, not memory barriers.
+This project currently treats volatile, atomic, and inline-asm memory clobbers
+as hard barriers and leaves memory motion disabled unless a later pass proves
+safety explicitly. Inline asm `sideeffect` is represented separately from
+`may_load`/`may_store` facts, but MemorySSA clients still stay conservative for
+inline asm calls. Fixed-vector lane operations are pure instructions, not memory
+barriers.
 Direct calls use preserved callee/call-site attributes for the local
 `MemoryEffects`-shaped classification boundary. Alias ModRef ignores
 inaccessible memory for ordinary `MemoryLocation` queries and refines argmem
@@ -101,7 +116,7 @@ LICM also rejects locally trapping scalar operations such as division by an unkn
 Known gaps:
 
 ```text
-inline asm constraints and full atomic ordering are not interpreted
+target-specific inline asm constraint lowering and full atomic ordering are not interpreted
 syncscope text is preserved for accepted atomic operations but not interpreted
 no intrinsic classification beyond explicit parser rejection
 no target-library handling and no inferred call attributes

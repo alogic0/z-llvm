@@ -6163,6 +6163,8 @@ test "parser preserves inline asm calls as side-effecting barriers" {
     try std.testing.expect(call.inline_asm != null);
     try std.testing.expect(call.inline_asm.?.sideeffect);
     try std.testing.expect(call.inline_asm.?.has_memory_clobber);
+    try std.testing.expect(call.inline_asm.?.may_load);
+    try std.testing.expect(call.inline_asm.?.may_store);
     try std.testing.expectEqual(memory_effect.Effect.volatile_or_atomic_barrier, memory_effect.classify(module.functions.items[0].blocks.items[0].instructions.items[0]));
     try std.testing.expectEqual(memory_effect.BarrierKind.inline_asm, memory_effect.barrierKind(module.functions.items[0].blocks.items[0].instructions.items[0]));
 
@@ -6182,6 +6184,46 @@ test "parser preserves inline asm calls as side-effecting barriers" {
     const source_backed_call = source_backed_module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expect(source_backed_call.inline_asm != null);
     try std.testing.expect(source_backed_call.inline_asm.?.has_memory_clobber);
+    try std.testing.expect(source_backed_call.inline_asm.?.may_load);
+    try std.testing.expect(source_backed_call.inline_asm.?.may_store);
+}
+
+test "parser classifies inline asm side effects separately from memory constraints" {
+    const input =
+        \\define void @inline_asm_effects(ptr %p) {
+        \\entry:
+        \\  call void asm sideeffect "", "~{dirflag},~{fpsr},~{flags}"()
+        \\  call void asm sideeffect "", "m"(ptr %p)
+        \\  call void asm sideeffect "", "=*m"(ptr %p)
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const block = module.functions.items[0].blocks.items[0];
+    const sideeffect_only = block.instructions.items[0].kind.call.inline_asm.?;
+    try std.testing.expect(sideeffect_only.sideeffect);
+    try std.testing.expect(!sideeffect_only.has_memory_clobber);
+    try std.testing.expect(!sideeffect_only.may_load);
+    try std.testing.expect(!sideeffect_only.may_store);
+    try std.testing.expectEqual(memory_effect.Effect.side_effect, memory_effect.classify(block.instructions.items[0]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.none, memory_effect.barrierKind(block.instructions.items[0]));
+
+    const memory_input = block.instructions.items[1].kind.call.inline_asm.?;
+    try std.testing.expect(memory_input.may_load);
+    try std.testing.expect(!memory_input.may_store);
+    try std.testing.expectEqual(memory_effect.Effect.readonly_side_effect, memory_effect.classify(block.instructions.items[1]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.inline_asm, memory_effect.barrierKind(block.instructions.items[1]));
+
+    const memory_output = block.instructions.items[2].kind.call.inline_asm.?;
+    try std.testing.expect(!memory_output.may_load);
+    try std.testing.expect(memory_output.may_store);
+    try std.testing.expectEqual(memory_effect.Effect.memory_write, memory_effect.classify(block.instructions.items[2]));
+    try std.testing.expectEqual(memory_effect.BarrierKind.inline_asm, memory_effect.barrierKind(block.instructions.items[2]));
 }
 
 test "parser preserves module-level asm records opaquely" {

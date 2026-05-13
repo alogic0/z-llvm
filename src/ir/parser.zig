@@ -1547,12 +1547,77 @@ fn parseInlineAsm(text: []const u8) !core.InlineAsm {
     const constraints = parseQuotedPrefix(&rest) orelse return error.UnsupportedInlineAsm;
     if (std.mem.trim(u8, rest, " \t").len != 0) return error.UnsupportedInlineAsm;
 
+    const memory_effects = inlineAsmMemoryEffects(constraints);
     return .{
         .template = template,
         .constraints = constraints,
         .sideeffect = sideeffect,
-        .has_memory_clobber = std.mem.indexOf(u8, constraints, "~{memory}") != null,
+        .has_memory_clobber = memory_effects.has_memory_clobber,
+        .may_load = memory_effects.may_load,
+        .may_store = memory_effects.may_store,
     };
+}
+
+const InlineAsmMemoryEffects = struct {
+    has_memory_clobber: bool = false,
+    may_load: bool = false,
+    may_store: bool = false,
+};
+
+fn inlineAsmMemoryEffects(constraints: []const u8) InlineAsmMemoryEffects {
+    var effects: InlineAsmMemoryEffects = .{};
+    var rest = constraints;
+    while (rest.len != 0) {
+        const comma = findTopLevelComma(rest);
+        const constraint = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        classifyInlineAsmConstraint(constraint, &effects);
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+    return effects;
+}
+
+fn classifyInlineAsmConstraint(constraint: []const u8, effects: *InlineAsmMemoryEffects) void {
+    if (std.mem.eql(u8, constraint, "~{memory}")) {
+        effects.has_memory_clobber = true;
+        effects.may_load = true;
+        effects.may_store = true;
+        return;
+    }
+    if (constraint.len == 0 or constraint[0] == '~') return;
+
+    const writes = std.mem.indexOfScalar(u8, constraint, '=') != null or
+        std.mem.indexOfScalar(u8, constraint, '+') != null;
+    const reads = !writes or std.mem.indexOfScalar(u8, constraint, '+') != null;
+    const start = inlineAsmConstraintCodeStart(constraint);
+    if (hasInlineAsmMemoryConstraintCode(constraint[start..])) {
+        if (reads) effects.may_load = true;
+        if (writes) effects.may_store = true;
+    }
+}
+
+fn inlineAsmConstraintCodeStart(constraint: []const u8) usize {
+    var index: usize = 0;
+    while (index < constraint.len) : (index += 1) {
+        switch (constraint[index]) {
+            '=', '+', '&', '*' => continue,
+            else => return index,
+        }
+    }
+    return index;
+}
+
+fn hasInlineAsmMemoryConstraintCode(text: []const u8) bool {
+    var index: usize = 0;
+    while (index < text.len) : (index += 1) {
+        switch (text[index]) {
+            'm', 'o', 'V' => return true,
+            else => {},
+        }
+    }
+    inline for (.{ "Um", "Un", "Uq", "Us", "Ut", "Uv", "Uy", "ZQ", "ZR", "ZS", "ZT" }) |code| {
+        if (std.mem.indexOf(u8, text, code) != null) return true;
+    }
+    return false;
 }
 
 fn parseQuotedPrefix(rest: *[]const u8) ?[]const u8 {

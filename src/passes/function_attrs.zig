@@ -102,6 +102,8 @@ fn callMemoryEffect(
 fn mergeEffects(a: memory_effect.Effect, b: memory_effect.Effect) memory_effect.Effect {
     if (a == .unknown or b == .unknown) return .unknown;
     if (a == .volatile_or_atomic_barrier or b == .volatile_or_atomic_barrier) return .unknown;
+    if (a == .side_effect or b == .side_effect) return .unknown;
+    if (a == .readonly_side_effect or b == .readonly_side_effect) return .unknown;
     if (a == .memory_write or b == .memory_write) {
         if (a == .readonly_load or b == .readonly_load) return .unknown;
         return .memory_write;
@@ -116,7 +118,7 @@ fn applyMemoryAttribute(module: *ir.Module, function: *ir.Function, effect: memo
     return switch (effect) {
         .none => appendFunctionAttr(module, function, "memory(none)"),
         .readonly_load => appendFunctionAttr(module, function, "memory(read)"),
-        .memory_write, .volatile_or_atomic_barrier, .unknown => false,
+        .side_effect, .readonly_side_effect, .memory_write, .volatile_or_atomic_barrier, .unknown => false,
     };
 }
 

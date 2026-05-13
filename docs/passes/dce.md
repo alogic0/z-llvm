@@ -32,7 +32,7 @@ Implemented subset:
 ```text
 mark values used by live instructions and terminators
 remove unused pure add/sub/mul, fadd/fsub/fmul/fdiv/frem, icmp/fcmp, phi, alloca, and load instructions
-keep store, volatile, atomic, and unknown memory instructions because the shared memory-effect API classifies them as side-effecting
+keep store, volatile, atomic, inline asm sideeffect, and unknown memory instructions because the shared memory-effect API classifies them as side-effecting
 use the shared `isSafeToDelete` helper rather than pass-local side-effect rules
 iterate until no newly unused instructions remain
 ```
@@ -56,6 +56,7 @@ opt-22 equivalent:
   fp_extended_dce_preserve
   fp_fast_math_preserve
   fp_strict_sensitive_preserve
+  inline_asm_sideeffect_preserve
 
 local-only conservative:
   fp_fast_math_sensitive_conservative is preserved as part of the local
@@ -87,7 +88,7 @@ Known gaps:
 no control-flow-sensitive liveness
 no MemorySSA or alias-aware memory liveness
 no volatile or atomic memory removal
-no calls
+no call removal, including inline asm calls
 no debug-info salvage beyond dropping locations with removed instructions
 no aggressive DCE for unreachable control-flow
 ```

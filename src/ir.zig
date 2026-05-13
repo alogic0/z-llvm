@@ -40,6 +40,7 @@ pub const ShuffleVectorInst = core.ShuffleVectorInst;
 pub const GepIndex = core.GepIndex;
 pub const GepInst = core.GepInst;
 pub const CallArg = core.CallArg;
+pub const InlineAsm = core.InlineAsm;
 pub const CallInst = core.CallInst;
 pub const Instruction = core.Instruction;
 pub const Terminator = core.Terminator;

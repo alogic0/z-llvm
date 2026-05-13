@@ -11,21 +11,21 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 29: Atomic ordering semantic verifier
+Active slice: Slice 30: Inline asm memory-effect refinement
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `Verifier.cpp` atomic load/store, `cmpxchg`, `atomicrmw`,
-      and fence validation.
-- [x] Add LLVM-shaped atomic access type and byte-sized power-of-two checks
-      for the local scalar/vector surface.
-- [x] Add LLVM-shaped `atomicrmw` operation/type and `cmpxchg` operand-type
-      validation.
-- [x] Keep DataLayout-dependent pointer and vector-pointer sizing documented
-      as a local boundary.
-- [x] Add unit coverage for accepted ordering/syncscope forms and rejected
-      LLVM verifier cases.
-- [x] Update atomic/verifier/parity/roadmap docs.
-- [x] Run focused verifier tests.
+- [x] Map LLVM `InlineAsm` extra-info flags, memory constraint classes, and
+      `CallBase` memory-effect handling.
+- [x] Represent inline-asm side effects separately from memory read/write
+      effects.
+- [x] Derive local `may_load`/`may_store` facts from `~{memory}` and simple
+      memory constraints.
+- [x] Keep non-`sideeffect` inline asm and target-specific constraint lowering
+      documented as local boundaries.
+- [x] Add unit and opt fixture coverage for side-effect-only and memory-clobber
+      inline asm behavior.
+- [x] Update atomic/inline-asm, memory-effect, parity, and roadmap docs.
+- [x] Run focused inline-asm comparison/tests.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 29.
+- [x] Review and commit Slice 30.

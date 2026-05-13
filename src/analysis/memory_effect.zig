@@ -2,29 +2,31 @@ const ir = @import("../ir.zig");
 
 pub const Effect = enum {
     none,
+    side_effect,
     readonly_load,
+    readonly_side_effect,
     memory_write,
     volatile_or_atomic_barrier,
     unknown,
 
     pub fn mayReadMemory(effect: Effect) bool {
         return switch (effect) {
-            .readonly_load, .volatile_or_atomic_barrier, .unknown => true,
-            .none, .memory_write => false,
+            .readonly_load, .readonly_side_effect, .volatile_or_atomic_barrier, .unknown => true,
+            .none, .side_effect, .memory_write => false,
         };
     }
 
     pub fn mayWriteMemory(effect: Effect) bool {
         return switch (effect) {
             .memory_write, .volatile_or_atomic_barrier, .unknown => true,
-            .none, .readonly_load => false,
+            .none, .side_effect, .readonly_load, .readonly_side_effect => false,
         };
     }
 
     pub fn hasSideEffects(effect: Effect) bool {
         return switch (effect) {
             .none, .readonly_load => false,
-            .memory_write, .volatile_or_atomic_barrier, .unknown => true,
+            .side_effect, .readonly_side_effect, .memory_write, .volatile_or_atomic_barrier, .unknown => true,
         };
     }
 };
@@ -42,7 +44,7 @@ pub fn classify(instruction: ir.Instruction) Effect {
         .store => |store| if (store.attrs.isBarrier()) .volatile_or_atomic_barrier else .memory_write,
         .atomicrmw, .cmpxchg, .fence => .volatile_or_atomic_barrier,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => .none,
-        .call => |call| if (call.inline_asm != null) .volatile_or_atomic_barrier else .unknown,
+        .call => |call| if (call.inline_asm) |inline_asm| classifyInlineAsm(inline_asm) else .unknown,
     };
 }
 
@@ -53,11 +55,19 @@ pub fn barrierKind(instruction: ir.Instruction) BarrierKind {
         .atomicrmw, .cmpxchg, .fence => .atomic,
         .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => .none,
         .call => |call| if (call.inline_asm) |inline_asm|
-            if (inline_asm.has_memory_clobber) .inline_asm else .none
+            if (inline_asm.may_load or inline_asm.may_store) .inline_asm else .none
         else
             .none,
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep => .none,
     };
+}
+
+fn classifyInlineAsm(inline_asm: ir.InlineAsm) Effect {
+    if (inline_asm.may_load and inline_asm.may_store) return .volatile_or_atomic_barrier;
+    if (inline_asm.may_store) return .memory_write;
+    if (inline_asm.may_load) return .readonly_side_effect;
+    if (inline_asm.sideeffect) return .side_effect;
+    return .unknown;
 }
 
 fn memoryBarrierKind(attrs: ir.MemoryAttrs) BarrierKind {

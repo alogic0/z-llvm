@@ -41,11 +41,12 @@ side-effecting memory barriers. Ordering text and optional alignment are
 preserved, but no pass interprets atomic ordering or performs atomic-specific
 optimization.
 
-Inline asm is represented only for the observed source-backed barrier shape:
-`call void asm sideeffect "...", "...~{memory}..."()`. The parser preserves the
-template and constraint strings, records `sideeffect`, and marks `~{memory}` as
-a memory clobber. It does not validate registers, constraints, outputs, native
-lowering, or target-specific behavior.
+Inline asm is represented for side-effecting calls. The parser preserves the
+template and constraint strings, records `sideeffect`, and separates the
+side-effect marker from memory effects: `~{memory}` becomes may-load/may-store,
+simple input memory constraints become may-load, and simple output memory
+constraints become may-store. It does not validate registers, constraints,
+outputs, native lowering, or target-specific behavior.
 
 The current source-backed captured row
 `atomics_inline_asm_debug_release_fast` is accepted as optimizer input under the
@@ -60,6 +61,9 @@ GVN/EarlyCSE: volatile, atomic, and inline asm memory block memory value reuse.
 LICM: volatile, atomic, loads, stores, calls, and inline asm are not hoisted.
 DSE: volatile, atomic, and inline asm memory are barriers for store elimination.
 Mem2Reg/SROA: local atomic alloca users are rejected conservatively.
+Inline asm `sideeffect` without memory constraints remains live, but is not
+classified as a may-load/may-store memory access by the shared memory-effect
+helper.
 ```
 
 ## Fixture Coverage
@@ -93,7 +97,8 @@ unit tests:
 Inline asm has an opt fixture for preservation only:
 
 ```text
-inline_asm_barrier_preserve
+  inline_asm_barrier_preserve
+  inline_asm_sideeffect_preserve
 ```
 
 It proves the local optimizer can remove unrelated dead scalar code while

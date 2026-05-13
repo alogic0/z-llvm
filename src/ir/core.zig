@@ -732,6 +732,8 @@ pub const InlineAsm = struct {
     constraints: []const u8,
     sideeffect: bool = false,
     has_memory_clobber: bool = false,
+    may_load: bool = false,
+    may_store: bool = false,
 };
 
 pub const CallInst = struct {
