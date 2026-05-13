@@ -38,6 +38,9 @@ For corpus discovery, keep the same split:
   `zig build -Doptimize=ReleaseFast` when repeating large sweeps;
 - keep the default `--local-quiet` behavior for large sweeps so local verify
   checks do not print the whole normalized module for every row;
+- for default `--passes=verify` discovery sweeps, the tool adds
+  `--pass-limit=0` to the local `z_llvm` invocation because `z_llvm` already
+  parses and verifies the module before entering the pass manager;
 - use `--local-trace` only for focused debugging, not full discovery sweeps.
 
 ## Required Upstream Mapping

@@ -20,6 +20,8 @@ const usage =
     \\  --mode=MODE             Optimize mode [ReleaseFast]
     \\  --target=TRIPLE         Zig target [x86_64-linux-gnu]
     \\  --passes=PASSES         Local pipeline/pass list [verify]
+    \\                          verify-only sweeps use z_llvm --pass-limit=0
+    \\                          because the CLI verifier already gates parsing
     \\  --local-input-limit=N   z_llvm input limit in bytes [1048576]
     \\  --max=N                 Stop after N candidate .zig files [0 means unlimited]
     \\  --progress-every=N      Write partial report and print progress every N files [25; 0 disables]
@@ -395,6 +397,7 @@ fn runLocalCheck(
 
     try argv.append(allocator, passes_arg);
     try argv.append(allocator, input_limit_arg);
+    if (std.mem.eql(u8, opts.passes, "verify")) try argv.append(allocator, "--pass-limit=0");
     if (opts.local_trace) try argv.append(allocator, "--trace");
     if (opts.local_quiet) try argv.append(allocator, "--quiet");
     try argv.append(allocator, ir_path);

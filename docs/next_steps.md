@@ -16,6 +16,11 @@ Active cycle:
 - [x] Corpus tooling throughput blocker: add `z_llvm --quiet` and make
       `tools/zig_corpus_discovery.zig` use it by default for local checks, so
       full Debug sweeps verify rows without printing multi-megabyte modules.
+- [x] Corpus tooling throughput blocker: make `z_llvm --quiet` skip final IR
+      rendering instead of formatting the module into a discard writer.
+- [x] Corpus tooling throughput blocker: make verify-only discovery sweeps use
+      `--pass-limit=0`, relying on the mandatory parse-time verifier instead of
+      running the verifier pass redundantly.
 - [x] Verifier throughput blocker: replace dense per-candidate dominator
       recomputation with bitset dominator sets, restoring fast verification for
       large Debug functions such as `behavior/sizeof_and_typeof.zig`.
