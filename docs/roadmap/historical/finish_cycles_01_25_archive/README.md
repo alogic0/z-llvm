@@ -34,4 +34,4 @@ current implementation work.
 
 ## Archived Candidate Wave
 
-- [ ] [Cycle 25: Evidence-Backed Gap Wave](25_next_evidence_backed_gap_wave.md)
+- [Cycle 25: Evidence-Backed Gap Wave](25_next_evidence_backed_gap_wave.md)

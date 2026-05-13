@@ -184,7 +184,7 @@ The active work queue is kept short in [next_steps.md](next_steps.md).
 
 ## Future Backlog
 
-- [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
+- [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
 
 Use [Stub Replacement Cycle](stub_replacement_cycle.md) only if a future audit
 adds new slices to the LLVM-shaped stub replacement plan.
