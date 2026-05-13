@@ -8,7 +8,7 @@ const target = @import("../target.zig");
 pub const pass: pass_manager.ModulePass = .{
     .name = "sroa",
     .category = .memory,
-    .target_status = "fixture-equivalent for listed fixtures",
+    .target_status = "LLVM-shaped algorithm subset",
     .upstream_owner = "llvm/lib/Transforms/Scalar/SROA.cpp",
     .run = run,
 };
@@ -46,19 +46,6 @@ fn scalarizeOneAggregateAlloca(module: *ir.Module, function: *ir.Function) !bool
     return false;
 }
 
-const AggregateGepUse = struct {
-    const Kind = enum {
-        field_gep,
-    };
-
-    gep_name: []const u8,
-    field_index: usize,
-    field_ty: ir.Type,
-    offset: i128,
-    size: u64,
-    kind: Kind = .field_gep,
-};
-
 const FieldReplacement = struct {
     field_index: usize,
     ty: ir.Type,
@@ -73,22 +60,27 @@ fn tryScalarizeAggregateAlloca(
     slot: []const u8,
     aggregate_ty: ir.Type,
 ) !bool {
-    var gep_uses: std.ArrayList(AggregateGepUse) = .empty;
-    defer gep_uses.deinit(module.allocator);
+    var slices = try AllocaSlices.collect(module.allocator, moduleLayout(module.*), function.*);
+    defer slices.deinit();
 
-    if (!try collectAggregateGepUses(module.allocator, moduleLayout(module.*), function.*, slot, aggregate_ty, &gep_uses)) return false;
-    if (gep_uses.items.len == 0) return false;
-    if (!validateAggregateGepConsumers(function.*, slot, gep_uses.items)) return false;
+    var partitions = try slices.partitionsForAlloca(module.allocator, slot);
+    defer partitions.deinit(module.allocator);
+
+    if (partitions.items.len == 0) return false;
+    if (!try aggregateAllocaOnlyUsesPartitions(module.allocator, function.*, slot, aggregate_ty, partitions.items)) return false;
+    if (!validateAggregatePartitionConsumers(function.*, slot, partitions.items)) return false;
 
     var replacements: std.ArrayList(FieldReplacement) = .empty;
     defer replacements.deinit(module.allocator);
 
-    for (gep_uses.items) |gep_use| {
-        if (fieldReplacementFor(replacements.items, gep_use.field_index) != null) continue;
-        const name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.sroa.{}", .{ slot, gep_use.field_index }));
+    for (partitions.items) |partition| {
+        const field_index = partition.field_index orelse return false;
+        const field_ty = partition.field_ty orelse return false;
+        if (fieldReplacementFor(replacements.items, field_index) != null) continue;
+        const name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.sroa.{}", .{ slot, field_index }));
         try replacements.append(module.allocator, .{
-            .field_index = gep_use.field_index,
-            .ty = gep_use.field_ty,
+            .field_index = field_index,
+            .ty = field_ty,
             .alloca_name = name,
         });
     }
@@ -107,13 +99,13 @@ fn tryScalarizeAggregateAlloca(
             if (inst.removed) continue;
             switch (inst.kind) {
                 .load => |*load| {
-                    const gep_use = gepUseForPointer(gep_uses.items, load.ptr) orelse continue;
-                    const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
+                    const partition = partitionForPointer(partitions.items, load.ptr) orelse continue;
+                    const replacement = fieldReplacementFor(replacements.items, partition.field_index orelse continue) orelse continue;
                     load.ptr = .{ .named = replacement.alloca_name };
                 },
                 .store => |*store| {
-                    const gep_use = gepUseForPointer(gep_uses.items, store.ptr) orelse continue;
-                    const replacement = fieldReplacementFor(replacements.items, gep_use.field_index) orelse continue;
+                    const partition = partitionForPointer(partitions.items, store.ptr) orelse continue;
+                    const replacement = fieldReplacementFor(replacements.items, partition.field_index orelse continue) orelse continue;
                     store.ptr = .{ .named = replacement.alloca_name };
                 },
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
@@ -125,8 +117,8 @@ fn tryScalarizeAggregateAlloca(
         for (block.instructions.items) |*inst| {
             if (inst.removed) continue;
             const result = inst.result orelse continue;
-            for (gep_uses.items) |gep_use| {
-                if (std.mem.eql(u8, result, gep_use.gep_name)) {
+            for (partitions.items) |partition| {
+                if (std.mem.eql(u8, result, partition.value)) {
                     inst.removed = true;
                     break;
                 }
@@ -137,14 +129,20 @@ fn tryScalarizeAggregateAlloca(
     return true;
 }
 
-fn collectAggregateGepUses(
+fn aggregateAllocaOnlyUsesPartitions(
     allocator: std.mem.Allocator,
-    layout: ?target.DataLayout,
     function: ir.Function,
     slot: []const u8,
     aggregate_ty: ir.Type,
-    gep_uses: *std.ArrayList(AggregateGepUse),
+    partitions: []const SlicePartition,
 ) !bool {
+    var partition_values = std.StringHashMap(void).init(allocator);
+    defer partition_values.deinit();
+    for (partitions) |partition| {
+        if (!partition.source_ty.eql(aggregate_ty)) return false;
+        try partition_values.put(partition.value, {});
+    }
+
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -156,8 +154,7 @@ fn collectAggregateGepUses(
                 .gep => |gep| {
                     if (isNamed(gep.ptr, slot)) {
                         const result = instruction.result orelse return false;
-                        const use = aggregateFieldGep(layout, result, aggregate_ty, gep) orelse return false;
-                        try gep_uses.append(allocator, use);
+                        if (!partition_values.contains(result)) return false;
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
                     }
@@ -174,7 +171,7 @@ fn moduleLayout(module: ir.Module) ?target.DataLayout {
     return target.DataLayout.parse(text) catch null;
 }
 
-fn aggregateFieldGep(layout: ?target.DataLayout, result: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AggregateGepUse {
+fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_root: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AllocaSlice {
     if (!gep.source_ty.eql(aggregate_ty)) return null;
     if (gep.indices.items.len != 2) return null;
     const base_index = gep.indices.items[0].value;
@@ -193,11 +190,15 @@ fn aggregateFieldGep(layout: ?target.DataLayout, result: []const u8, aggregate_t
     else
         memory_location.typeSize(field_ty) orelse return null;
     return .{
-        .gep_name = result,
+        .kind = .aggregate_field,
+        .alloca_root = alloca_root,
+        .value = result,
+        .source_ty = aggregate_ty,
         .field_index = field_index,
         .field_ty = field_ty,
         .offset = offset,
         .size = size,
+        .zero_offset_compatible = false,
     };
 }
 
@@ -209,27 +210,28 @@ fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
     };
 }
 
-fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_uses: []const AggregateGepUse) bool {
-    for (gep_uses) |gep_use| {
+fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, partitions: []const SlicePartition) bool {
+    for (partitions) |partition| {
+        const field_ty = partition.field_ty orelse return false;
         var saw_memory_use = false;
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
                 if (instruction.removed) continue;
                 if (instruction.result) |result| {
-                    if (std.mem.eql(u8, result, gep_use.gep_name)) continue;
+                    if (std.mem.eql(u8, result, partition.value)) continue;
                 }
-                if (!instructionUsesName(instruction, gep_use.gep_name)) continue;
+                if (!instructionUsesName(instruction, partition.value)) continue;
                 switch (instruction.kind) {
                     .load => |load| {
-                        if (!isNamed(load.ptr, gep_use.gep_name)) return false;
+                        if (!isNamed(load.ptr, partition.value)) return false;
                         if (load.attrs.isBarrier()) return false;
-                        if (!load.ty.eql(gep_use.field_ty)) return false;
+                        if (!load.ty.eql(field_ty)) return false;
                         saw_memory_use = true;
                     },
                     .store => |store| {
-                        if (!isNamed(store.ptr, gep_use.gep_name)) return false;
+                        if (!isNamed(store.ptr, partition.value)) return false;
                         if (store.attrs.isBarrier()) return false;
-                        if (!store.ty.eql(gep_use.field_ty)) return false;
+                        if (!store.ty.eql(field_ty)) return false;
                         if (isNamed(store.value, slot)) return false;
                         saw_memory_use = true;
                     },
@@ -242,13 +244,13 @@ fn validateAggregateGepConsumers(function: ir.Function, slot: []const u8, gep_us
     return true;
 }
 
-fn gepUseForPointer(gep_uses: []const AggregateGepUse, ptr: ir.Value) ?AggregateGepUse {
+fn partitionForPointer(partitions: []const SlicePartition, ptr: ir.Value) ?SlicePartition {
     const name = switch (ptr) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    for (gep_uses) |gep_use| {
-        if (std.mem.eql(u8, gep_use.gep_name, name)) return gep_use;
+    for (partitions) |partition| {
+        if (std.mem.eql(u8, partition.value, name)) return partition;
     }
     return null;
 }
@@ -261,7 +263,7 @@ fn fieldReplacementFor(replacements: []const FieldReplacement, field_index: usiz
 }
 
 fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !bool {
-    var slices = try AllocaSlices.collect(allocator, function.*);
+    var slices = try AllocaSlices.collect(allocator, null, function.*);
     defer slices.deinit();
 
     var changed = false;
@@ -284,25 +286,39 @@ fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !
 }
 
 const AllocaSlice = struct {
+    const Kind = enum {
+        pointer_gep,
+        aggregate_field,
+    };
+
+    kind: Kind,
     alloca_root: []const u8,
     value: []const u8,
+    source_ty: ir.Type,
     offset: i128,
     size: ?u64,
     zero_offset_compatible: bool,
+    field_index: ?usize = null,
+    field_ty: ?ir.Type = null,
 };
 
 const SlicePartition = struct {
+    kind: AllocaSlice.Kind,
     alloca_root: []const u8,
+    value: []const u8,
+    source_ty: ir.Type,
     offset: i128,
     size: ?u64,
     zero_offset_compatible: bool,
+    field_index: ?usize = null,
+    field_ty: ?ir.Type = null,
 };
 
 const AllocaSlices = struct {
     allocator: std.mem.Allocator,
     slices: std.ArrayList(AllocaSlice),
 
-    fn collect(allocator: std.mem.Allocator, function: ir.Function) !AllocaSlices {
+    fn collect(allocator: std.mem.Allocator, layout: ?target.DataLayout, function: ir.Function) !AllocaSlices {
         var slices: std.ArrayList(AllocaSlice) = .empty;
         errdefer slices.deinit(allocator);
 
@@ -312,14 +328,24 @@ const AllocaSlices = struct {
                 const result = instruction.result orelse continue;
                 const gep = instruction.kind.gep;
                 const base = gepAllocaRoot(function, gep) orelse continue;
-                const location = memory_location.forPointer(function, .{ .named = result }) orelse continue;
-                try slices.append(allocator, .{
-                    .alloca_root = base,
-                    .value = result,
-                    .offset = location.offset orelse continue,
-                    .size = location.size,
-                    .zero_offset_compatible = allIndicesAreZero(gep),
-                });
+                if (rootAllocaType(function, base)) |root_ty| {
+                    if (root_ty == .aggregate) {
+                        if (aggregateFieldSlice(layout, result, base, root_ty, gep)) |slice| {
+                            try slices.append(allocator, slice);
+                        }
+                    }
+                }
+                if (memory_location.forPointer(function, .{ .named = result })) |location| {
+                    try slices.append(allocator, .{
+                        .kind = .pointer_gep,
+                        .alloca_root = base,
+                        .value = result,
+                        .source_ty = gep.source_ty,
+                        .offset = location.offset orelse continue,
+                        .size = location.size,
+                        .zero_offset_compatible = allIndicesAreZero(gep),
+                    });
+                }
             }
         }
 
@@ -336,16 +362,70 @@ const AllocaSlices = struct {
     fn partitionFor(alloca_slices: AllocaSlices, value: []const u8) ?SlicePartition {
         for (alloca_slices.slices.items) |slice| {
             if (!std.mem.eql(u8, slice.value, value)) continue;
-            return .{
-                .alloca_root = slice.alloca_root,
-                .offset = slice.offset,
-                .size = slice.size,
-                .zero_offset_compatible = slice.zero_offset_compatible,
-            };
+            return partitionFromSlice(slice);
         }
         return null;
     }
+
+    fn partitionsForAlloca(alloca_slices: AllocaSlices, allocator: std.mem.Allocator, alloca_root: []const u8) !std.ArrayList(SlicePartition) {
+        var partitions: std.ArrayList(SlicePartition) = .empty;
+        errdefer partitions.deinit(allocator);
+
+        for (alloca_slices.slices.items) |slice| {
+            if (slice.kind != .aggregate_field) continue;
+            if (!std.mem.eql(u8, slice.alloca_root, alloca_root)) continue;
+            const partition = partitionFromSlice(slice);
+            if (partitionOverlapsDifferentField(partitions.items, partition)) return error.OverlappingSroaPartition;
+            try partitions.append(allocator, partition);
+        }
+
+        sortPartitions(partitions.items);
+        return partitions;
+    }
 };
+
+fn partitionFromSlice(slice: AllocaSlice) SlicePartition {
+    return .{
+        .kind = slice.kind,
+        .alloca_root = slice.alloca_root,
+        .value = slice.value,
+        .source_ty = slice.source_ty,
+        .offset = slice.offset,
+        .size = slice.size,
+        .zero_offset_compatible = slice.zero_offset_compatible,
+        .field_index = slice.field_index,
+        .field_ty = slice.field_ty,
+    };
+}
+
+fn partitionOverlapsDifferentField(partitions: []const SlicePartition, candidate: SlicePartition) bool {
+    const candidate_size = candidate.size orelse return true;
+    const candidate_end = candidate.offset + @as(i128, @intCast(candidate_size));
+    for (partitions) |partition| {
+        const size = partition.size orelse return true;
+        const end = partition.offset + @as(i128, @intCast(size));
+        const overlaps = candidate.offset < end and partition.offset < candidate_end;
+        if (overlaps and !optionalUsizeEql(partition.field_index, candidate.field_index)) return true;
+    }
+    return false;
+}
+
+fn sortPartitions(items: []SlicePartition) void {
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        const value = items[i];
+        var j = i;
+        while (j > 0 and items[j - 1].offset > value.offset) : (j -= 1) {
+            items[j] = items[j - 1];
+        }
+        items[j] = value;
+    }
+}
+
+fn optionalUsizeEql(a: ?usize, b: ?usize) bool {
+    if (a == null or b == null) return a == null and b == null;
+    return a.? == b.?;
+}
 
 fn allocaBase(function: ir.Function, gep: ir.GepInst) ?[]const u8 {
     if (!allIndicesAreZero(gep)) return null;
@@ -371,6 +451,21 @@ fn pointerAllocaRoot(function: ir.Function, ptr: ir.Value) ?[]const u8 {
                 .alloca => base_name,
                 .gep => |gep| pointerAllocaRoot(function, gep.ptr),
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => null,
+            };
+        }
+    }
+    return null;
+}
+
+fn rootAllocaType(function: ir.Function, alloca_root: []const u8) ?ir.Type {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const result = instruction.result orelse continue;
+            if (!std.mem.eql(u8, result, alloca_root)) continue;
+            return switch (instruction.kind) {
+                .alloca => |alloca| alloca.allocated_ty,
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
             };
         }
     }

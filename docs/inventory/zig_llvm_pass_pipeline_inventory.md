@@ -178,7 +178,7 @@ Status meanings:
 | `verify` / `VerifierPass` | mandatory | P0 | foundation: SSA dominance and phi predecessor checks for accepted IR | `llvm/lib/IR/Verifier.cpp` |
 | `always-inline` | mandatory IPO | P0 | placeholder | `llvm/lib/Transforms/IPO/AlwaysInliner.cpp` |
 | `mem2reg` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Utils/Mem2Reg.cpp` |
-| `sroa` | canonicalization / memory | P0 | fixture-equivalent for listed zero-GEP fixtures | `llvm/lib/Transforms/Scalar/SROA.cpp` |
+| `sroa` | canonicalization / memory | P0 | LLVM-shaped subset | `llvm/lib/Transforms/Scalar/SROA.cpp` |
 | `instcombine` | canonicalization | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/InstCombine/` |
 | `instsimplify` | canonicalization query | P0 | fixture-equivalent through InstCombine fixtures | `llvm/lib/Analysis/InstructionSimplify.cpp` |
 | `simplifycfg` | canonicalization / CFG | P0 | fixture-equivalent for listed fixtures | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` |

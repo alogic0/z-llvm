@@ -34,7 +34,7 @@ src/pipelines.zig
 
 | Layer | Passes | Status | Dependency |
 | --- | --- | --- | --- |
-| Canonical IR | `simplifycfg`, `instcombine`, `sroa`, `mem2reg` | closed in Epic 4 | verifier-clean SSA, simplified CFG, stack promotion |
+| Canonical IR | `simplifycfg`, `instcombine`, `sroa`, `mem2reg` | active LLVM-shaped subsets | verifier-clean SSA, simplified CFG, stack promotion |
 | Shared legality | memory-effect, alias/mod-ref, MemoryLocation | closed in Epic 5 | safe deletion, speculation, and memory clobber checks |
 | Dead code cleanup | `dce`, `adce` foundation | fixture-equivalent for listed fixtures | shared safe-to-delete rule |
 | Sparse constants | `sccp` foundation | fixture-equivalent for listed fixtures | InstSimplify, PHI simplification, SimplifyCFG cleanup |

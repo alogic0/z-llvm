@@ -90,7 +90,7 @@ Each slice is complete only when it has:
 
 ## Phase 4: SROA, InstCombine, And FP Parity
 
-- [ ] Slice 15: SROA slice partition builder.
+- [x] Slice 15: SROA slice partition builder.
       Replace one-off aggregate forwarding with an LLVM-shaped slice graph for
       fixed-size structs and arrays. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/SROA.cpp`.

@@ -31,6 +31,8 @@ LLVM entry points/classes:
   SROAPass::run
   SROA::splitAlloca
   SROA::rewritePartition
+  AllocaSlices::SliceBuilder
+  AllocaSlices::partition_iterator
   AllocaSlices
   PromoteMemToReg
 
@@ -48,11 +50,13 @@ Core LLVM algorithm data structures:
   PromoteMemToReg handoff for scalarized slots
 
 Local target status:
-  fixture-equivalent for listed fixtures
+  LLVM-shaped subset for listed fixtures
 
 Implemented subset:
   AllocaSlice records for GEP users rooted in an alloca
   SlicePartition lookup by GEP result
+  SlicePartition construction for accepted fixed struct/array field ranges
+  overlap rejection for partitions that cover different fields
   DataLayout-like offset/size facts through `src/analysis/memory_location.zig`
   Zero-offset partition forwarding to the base alloca
   Nested zero-offset partition forwarding to the base alloca
@@ -63,7 +67,8 @@ Implemented subset:
   Exact-cover scalar integer field/element alloca splitting for simple
   aggregate allocas
   DataLayout-backed pointer field splitting for simple aggregate allocas
-  Rewriting of matching scalar field loads/stores to replacement allocas
+  Rewriting of matching scalar field loads/stores to replacement allocas through
+  the partition builder
   mem2reg handoff after forwarding
 
 Intentional divergences:
@@ -118,7 +123,11 @@ Implemented subset:
 ```text
 recognize getelementptr instructions whose base pointer is an alloca
 recognize nested zero-offset getelementptr chains whose root is an alloca
-collect alloca-rooted GEPs as slices with offset, size, and compatibility state
+collect alloca-rooted GEPs as slices with offset, size, source type, and
+compatibility state
+build partitions for accepted struct/array fields by grouping exact field or
+element ranges
+reject overlapping partitions that refer to different fields
 look up the rewrite partition for each GEP result
 require every GEP index to be integer constant zero
 replace uses of that zero-offset GEP result with the base alloca pointer
@@ -132,9 +141,10 @@ rewrite exact-cover field loads/stores to those scalar allocas
 run the existing mem2reg promotion after forwarding
 ```
 
-This matches the first useful alloca-forwarding and scalar aggregate splitting
-cases needed before full LLVM SROA partitioning. It lets trivial zero-offset GEPs
-and a simple two-field integer struct alloca stop blocking stack promotion.
+This matches the first useful AllocaSlices-shaped alloca-forwarding and scalar
+aggregate splitting cases needed before full LLVM SROA rewriting. It lets
+trivial zero-offset GEPs and simple integer/pointer aggregate fields stop
+blocking stack promotion.
 
 Fixture coverage:
 
@@ -164,7 +174,8 @@ Known gaps:
 
 ```text
 no full aggregate type model
-no complete LLVM AllocaSlices partition builder
+no complete LLVM AllocaSlices partition iterator; the local builder only forms
+exact fixed struct/array field partitions
 no partial load/store rewriting
 no memcpy/memmove rewriting
 no padding, integer widening, vector, or packed-aggregate handling
