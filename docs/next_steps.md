@@ -142,6 +142,10 @@ Active cycle:
       `fptosi`/`fptoui` casts used by int-from-float safety checks without adding
       local FP-to-int folding semantics. Upstream mapping is recorded in
       [Scalar IR](ir_scalar.md).
+- [x] Source-backed Debug parser/verifier blocker: parse, verify, print, and
+      preserve fixed-vector global initializers and vector `fptosi`/`fptoui`
+      casts used by vector int-from-float safety checks. Upstream mapping is
+      recorded in [Vector IR Boundary](ir_vectors.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

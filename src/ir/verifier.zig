@@ -363,7 +363,12 @@ pub fn verify(module: core.Module) !void {
                     .undef, .poison, .zero_initializer => {},
                     .int, .fp, .named, .null_value, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
                 },
-                .void, .metadata, .vector => return error.UnsupportedGlobalVariable,
+                .vector => switch (value) {
+                    .vector => |text| try verifyVectorLiteral(global.ty, text),
+                    .undef, .poison, .zero_initializer => {},
+                    .int, .fp, .named, .null_value, .constant_expr => return error.UnsupportedGlobalVariable,
+                },
+                .void, .metadata => return error.UnsupportedGlobalVariable,
             },
             .array => |array| {
                 const array_ty = parseArrayType(global.ty) orelse return error.UnsupportedGlobalVariable;
@@ -467,7 +472,11 @@ pub fn verify(module: core.Module) !void {
                         }
                         switch (fcmp.operand_ty) {
                             .float, .double, .x86_fp80, .fp128 => {},
-                            .void, .int, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
+                            .vector => |vector| switch (vector.elem_ty) {
+                                .float, .double => {},
+                                .int, .ptr => return error.TypeMismatch,
+                            },
+                            .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
                         }
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.lhs, block_index, instruction_index);
                         try ctx.verifyValue(fcmp.operand_ty, fcmp.rhs, block_index, instruction_index);
@@ -1443,7 +1452,7 @@ fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
         const body = std.mem.trim(u8, text["splat (".len .. text.len - 1], " \t");
         const typed = try parseLeadingType(body);
         if (!typed.ty.eql(vector.elem_ty.toType())) return error.TypeMismatch;
-        _ = try parseValueForLiteral(std.mem.trim(u8, typed.after, " \t"));
+        try verifyLiteralValueForType(typed.ty, std.mem.trim(u8, typed.after, " \t"));
         return;
     }
     if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return error.InvalidValue;
@@ -1455,7 +1464,7 @@ fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
         const lane = std.mem.trim(u8, raw_lane, " \t");
         const typed = try parseLeadingType(lane);
         if (!typed.ty.eql(vector.elem_ty.toType())) return error.TypeMismatch;
-        _ = try parseValueForLiteral(std.mem.trim(u8, typed.after, " \t"));
+        try verifyLiteralValueForType(typed.ty, std.mem.trim(u8, typed.after, " \t"));
         lane_count += 1;
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
@@ -1548,11 +1557,26 @@ fn parseLeadingType(text: []const u8) !ParsedLeadingType {
     };
 }
 
-fn parseValueForLiteral(text: []const u8) !void {
+fn verifyLiteralValueForType(ty: core.Type, text: []const u8) !void {
     if (text.len == 0) return error.InvalidValue;
     if (std.mem.eql(u8, text, "undef") or std.mem.eql(u8, text, "poison") or std.mem.eql(u8, text, "null") or std.mem.eql(u8, text, "zeroinitializer")) return;
-    if (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false")) return;
-    _ = try std.fmt.parseInt(i128, text, 10);
+    switch (ty) {
+        .int => |bits| {
+            if (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false")) {
+                if (bits != 1) return error.TypeMismatch;
+                return;
+            }
+            _ = try std.fmt.parseInt(i128, text, 10);
+        },
+        .float, .double, .x86_fp80, .fp128 => {
+            _ = fp_semantics.classify(ty, text) catch return error.UnsupportedFloatingPointLiteral;
+        },
+        .ptr => {
+            if (std.mem.startsWith(u8, text, "@") or std.mem.startsWith(u8, text, "%")) return;
+            return error.TypeMismatch;
+        },
+        .void, .metadata, .aggregate, .vector => return error.TypeMismatch,
+    }
 }
 
 fn findMatchingAngle(text: []const u8, open_index: usize) ?usize {
@@ -1703,6 +1727,10 @@ fn verifyCast(cast: core.CastInst) !void {
             return;
         },
         .fptosi, .fptoui => {
+            if (cast.from_ty == .vector or cast.to_ty == .vector) {
+                try verifyVectorFloatToIntCast(cast);
+                return;
+            }
             _ = floatBits(cast.from_ty) orelse return error.InvalidCast;
             switch (cast.to_ty) {
                 .int => {},
@@ -1751,6 +1779,26 @@ fn verifyCast(cast: core.CastInst) !void {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
         .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => unreachable,
+    }
+}
+
+fn verifyVectorFloatToIntCast(cast: core.CastInst) !void {
+    const from_vector = switch (cast.from_ty) {
+        .vector => |vector| vector,
+        else => return error.TypeMismatch,
+    };
+    const to_vector = switch (cast.to_ty) {
+        .vector => |vector| vector,
+        else => return error.TypeMismatch,
+    };
+    if (from_vector.len != to_vector.len) return error.TypeMismatch;
+    switch (from_vector.elem_ty) {
+        .float, .double => {},
+        .int, .ptr => return error.TypeMismatch,
+    }
+    switch (to_vector.elem_ty) {
+        .int => {},
+        .float, .double, .ptr => return error.TypeMismatch,
     }
 }
 

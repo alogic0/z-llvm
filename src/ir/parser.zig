@@ -413,6 +413,9 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
 
     if (ty == .aggregate and std.mem.indexOfAny(u8, text, " \t") != null) return .{ .@"opaque" = text };
     if (isSupportedConstantExpr(text)) return .{ .scalar = .{ .constant_expr = text } };
+    if (ty == .vector and std.mem.startsWith(u8, text, "<") and std.mem.endsWith(u8, text, ">")) {
+        return .{ .scalar = .{ .vector = text } };
+    }
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {
@@ -1015,21 +1018,9 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
     }
 
     if (std.mem.eql(u8, op_text, "fcmp")) {
-        const fp_flags = try parseFastMathFlagsFromParts(&parts);
-        const predicate = core.FcmpPredicate.parse(parts.next() orelse return error.InvalidInstruction) orelse return error.UnsupportedPredicate;
-        const operand_ty = try parseType(parts.next() orelse return error.InvalidInstruction);
-        const lhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        const rhs = try parseValue(parts.next() orelse return error.InvalidInstruction);
-        if (parts.next() != null) return error.InvalidInstruction;
         return .{
             .result = result_text[1..],
-            .kind = .{ .fcmp = .{
-                .fp_flags = fp_flags,
-                .predicate = predicate,
-                .operand_ty = operand_ty,
-                .lhs = lhs,
-                .rhs = rhs,
-            } },
+            .kind = .{ .fcmp = try parseFcmp(rhs_text) },
         };
     }
 
@@ -1235,6 +1226,31 @@ fn parseIcmp(text: []const u8) !core.IcmpInst {
     return .{
         .predicate = predicate,
         .samesign = samesign,
+        .operand_ty = typed.ty,
+        .lhs = try parseValue(std.mem.trim(u8, rest[0..comma], " \t")),
+        .rhs = try parseValue(std.mem.trim(u8, rest[comma + 1 ..], " \t")),
+    };
+}
+
+fn parseFcmp(text: []const u8) !core.FcmpInst {
+    var rest = std.mem.trim(u8, text["fcmp".len..], " \t");
+    var fp_flags: core.FastMathFlags = .{};
+    while (firstToken(rest)) |token| {
+        if (!isFastMathFlagToken(token)) break;
+        try setFastMathFlag(&fp_flags, token);
+        rest = trimFirstToken(rest);
+    }
+
+    const predicate_text = firstToken(rest) orelse return error.InvalidInstruction;
+    const predicate = core.FcmpPredicate.parse(predicate_text) orelse return error.UnsupportedPredicate;
+    rest = trimFirstToken(rest);
+
+    const typed = try parseLeadingType(rest);
+    rest = std.mem.trim(u8, typed.after, " \t");
+    const comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
+    return .{
+        .fp_flags = fp_flags,
+        .predicate = predicate,
         .operand_ty = typed.ty,
         .lhs = try parseValue(std.mem.trim(u8, rest[0..comma], " \t")),
         .rhs = try parseValue(std.mem.trim(u8, rest[comma + 1 ..], " \t")),

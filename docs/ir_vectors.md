@@ -17,6 +17,7 @@ Implemented subset:
 <N x ptr>
 vector function parameters and returns
 undef, zeroinitializer, named vector values, and typed vector constants
+fixed-vector global initializers such as `<2 x float> <float ..., float ...>`
 LLVM splat vector constants such as `splat (i8 10)`, including instruction
 operands and call arguments
 integer and FP binary instructions with matching fixed-vector operand types
@@ -29,6 +30,8 @@ shufflevector with matching input vector types and integer vector masks
 bitcast from fixed-width integer/FP vectors to equal-width scalar integer/FP types
 lane-wise integer trunc/zext/sext casts when fixed-vector lane counts match and
 element widths satisfy the scalar cast rule
+lane-wise fptosi/fptoui casts from fixed-vector float/double values to
+fixed-vector integer values when lane counts match
 ```
 
 This is mostly a parser/verifier boundary. Cycle 17 enables a narrow optimizer
@@ -84,6 +87,7 @@ unit tests:
   vector-condition select with matching lane counts accepted and mismatched
   lane counts rejected
   vector mask bitcast to equal-width integer
+  vector global initializer and vector FP-to-int cast preservation
   scalar value rejected for vector return
   scalable vector rejected
   unsupported vector element rejected

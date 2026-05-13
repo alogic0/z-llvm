@@ -4245,6 +4245,40 @@ test "verifier accepts vector integer extension casts" {
     } }));
 }
 
+test "parser preserves vector global initializers and vector FP-to-int casts" {
+    const input =
+        \\@vec = private unnamed_addr global <2 x float> <float 1.000000e+02, float 5.120000e+02>, align 8
+        \\
+        \\define <2 x i10> @convert(<2 x float> %value) {
+        \\entry:
+        \\  %cmp = fcmp ole <2 x float> %value, <float 1.000000e+02, float 5.120000e+02>
+        \\  %int = fptosi <2 x float> %value to <2 x i10>
+        \\  ret <2 x i10> %int
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expect(module.globals.items[0].ty.eql(ir.Type{ .vector = .{
+        .len = 2,
+        .elem_ty = .float,
+    } }));
+    try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[0].kind.fcmp.operand_ty.eql(ir.Type{ .vector = .{
+        .len = 2,
+        .elem_ty = .float,
+    } }));
+    try std.testing.expectEqual(ir.CastOp.fptosi, module.functions.items[0].blocks.items[0].instructions.items[1].kind.cast.op);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "verifier rejects invalid scalar bitcast shapes" {
     const width_mismatch =
         \\define i32 @bad_width(double %x) {
@@ -4575,7 +4609,9 @@ test "parser keeps unsupported FP surface closed" {
     var integer_fast_math = try ir.Module.parse(std.testing.allocator, integer_fast_math_input);
     defer integer_fast_math.deinit();
     try std.testing.expectError(error.InvalidInstructionFlag, integer_fast_math.verify());
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, vector_fcmp_input));
+    var vector_fcmp = try ir.Module.parse(std.testing.allocator, vector_fcmp_input);
+    defer vector_fcmp.deinit();
+    try std.testing.expectError(error.TypeMismatch, vector_fcmp.verify());
 
     var vector_fp_binary = try ir.Module.parse(std.testing.allocator, vector_fp_binary_input);
     defer vector_fp_binary.deinit();
