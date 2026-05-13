@@ -229,7 +229,7 @@ Status meanings:
 | `inline` | IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/Inliner.cpp` |
 | `callsite-splitting` | IPO/scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp` |
 | `deadargelim` | IPO cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
-| `globalopt` | global optimization | P2 | placeholder; partial globals only | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
+| `globalopt` | global optimization | P2 | LLVM-shaped scalar direct-load cleanup slice | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |
 | `globaldce` | global cleanup | P2 | fixture-equivalent for listed graph fixtures | `llvm/lib/Transforms/IPO/GlobalDCE.cpp` |
 | `constmerge` | global cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/ConstantMerge.cpp` |
 | `mergefunc` | size IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/MergeFunctions.cpp` |

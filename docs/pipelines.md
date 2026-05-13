@@ -168,7 +168,7 @@ release-o3:
   dse placeholder
   adce
   licm
-  globalopt placeholder
+  globalopt
   globaldce placeholder
   mergefunc placeholder
   annotation-remarks placeholder

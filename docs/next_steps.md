@@ -11,25 +11,23 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 19: Fast-math CSE legality
+Active slice: Slice 20: `globalopt` for internal constant globals
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `Instruction::isIdenticalToWhenDefined`,
-      EarlyCSE `SimpleValue` equality/`combineIRFlags`, and GVN value-table
-      expression equality for FP operations.
-- [x] Define the accepted local IR surface: scalar non-constrained FP
-      `fadd`/`fsub`/`fmul`/`fdiv`/`frem` and `fcmp` with identical operands.
-- [x] Remove the local `fast`-only CSE gate for that accepted surface.
-- [x] Intersect retained leader fast-math flags when EarlyCSE/GVN replace a
-      duplicate FP expression.
-- [x] Keep constrained FP intrinsics, dynamic rounding, vectors, commuted FP
-      equality, min/max select matching, and full poison/debug salvage out of
-      scope and documented.
-- [x] Add `opt-22` comparison fixtures for strict, partial-FMF, and mixed-FMF
-      FP CSE.
-- [x] Update EarlyCSE/GVN/fast-math docs and parity docs, then mark Slice 19
-      complete.
+- [x] Map LLVM `GlobalOptPass::run`, `OptimizeGlobalVars`,
+      `processInternalGlobal`, and `CleanupConstantGlobalUsers`.
+- [x] Define the accepted local IR surface: local non-TLS scalar `global`
+      definitions with integer/FP/null/zero initializers and only direct
+      non-volatile loads.
+- [x] Replace eligible direct loads with the initializer value and delete the
+      global when all accepted uses are removed.
+- [x] Reject stores, calls, aliases, constant-expression pointer users,
+      aggregate initializers, externally visible globals, COMDAT, and TLS.
+- [x] Add `opt-22` fixtures for the positive scalar load cleanup and a
+      store/address-taken rejection boundary.
+- [x] Wire `globalopt` as a real pass and update global cleanup docs,
+      pipelines docs, parity docs, and roadmap status.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 19.
+- [x] Review and commit Slice 20.

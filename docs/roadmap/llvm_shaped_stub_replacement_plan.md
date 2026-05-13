@@ -113,7 +113,7 @@ Each slice is complete only when it has:
 
 ## Phase 5: IPO And Global Optimization
 
-- [ ] Slice 20: `globalopt` for internal constant globals.
+- [x] Slice 20: `globalopt` for internal constant globals.
       Implement one GlobalOpt rewrite for internal immutable globals with all
       constant uses. Required upstream mapping:
       `llvm/lib/Transforms/IPO/GlobalOpt.cpp`.

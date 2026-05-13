@@ -447,8 +447,8 @@ pipelines.
 - [x] Implement GlobalDCE for unreferenced internal/private globals/functions.
 - [x] Keep ConstantMerge as an explicit placeholder until identical scalar
       constant cases are represented.
-- [x] Keep GlobalOpt as an explicit placeholder until initializer semantics are
-      sufficient for rewriting.
+- [x] Replace the GlobalOpt placeholder with the first scalar direct-load
+      cleanup slice once initializer semantics are sufficient for that surface.
 - [x] Keep available_externally handling as an explicit placeholder until
       linkage semantics are solid.
 - [x] Keep GlobalsAA as an explicit placeholder until global memory identity can
