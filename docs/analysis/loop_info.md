@@ -69,6 +69,7 @@ lookup the innermost known loop for a block index
 classify a value as loop invariant from definition-block ownership
 recognize simple integer induction PHIs with an add step in source-backed loop
 fixtures
+keep self-latch loop preheaders outside the natural-loop block set
 insert simple scalar LCSSA PHIs for a single-exit accepted loop shape
 refuse simple LCSSA formation unless all loop exits are dedicated
 classify LoopRotate support status with explicit unsupported reasons
@@ -85,8 +86,8 @@ queried but not created: dedicated exits
 checked but not formed: LCSSA
 not canonicalized yet: multi-latch loops, irreducible loops, split exits,
 inserted preheaders, rotated loops
-recognized but not transformed yet: simple induction variables and
-side-effect-free deletion candidates
+recognized and transformed only by narrow pass slices: simple induction
+variables and side-effect-free deletion candidates
 implemented helper only: simple scalar LCSSA insertion for one exit block
 simple LCSSA insertion additionally requires dedicated exits so every inserted
 exit PHI has one incoming value for each predecessor of the exit block
@@ -103,12 +104,14 @@ unit-test only:
   simple scalar LCSSA formation and verifier-clean rewrite
   non-dedicated-exit rejection before simple LCSSA formation
   simple induction variable recognition for the reduced Zig corpus loop shape
+  self-latch natural loop keeps the preheader outside the loop
   side-effecting loop deletion candidate rejection
-  LoopRotate self-latch rejection and LoopDeletion eligible-but-not-implemented status
+  LoopRotate self-latch rejection and LoopDeletion eligible status
 
 opt-22 compared indirectly:
   LICM fixtures exercise the currently accepted loop shapes, including a nested
   memory-free scalar chain
+  loop-deletion and indvars fixtures exercise self-latch/preheader boundaries
 ```
 
 Known gaps:
@@ -117,6 +120,6 @@ Known gaps:
 no full LLVM loop forest mutation API
 no loop verification
 no LoopSimplify mutation beyond the simple LCSSA helper
-no LoopRotate, IndVarSimplify rewrite, or LoopDeletion mutation
+no full LoopRotate, IndVarSimplify, or LoopDeletion mutation
 no irreducible control-flow handling beyond natural-loop backedges
 ```

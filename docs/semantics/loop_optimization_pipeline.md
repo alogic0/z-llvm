@@ -107,7 +107,7 @@ loop depth 0.
 | `loop-simplifycfg` | LLVM-shaped subset | Constant loop-local branch folding and simple loop-block merging for accepted LCSSA/preheader/dedicated-exit loops |
 | `loop-rotate` | LLVM-shaped subset | Single-latch counted while loop rotated into guarded do-while shape with LCSSA repair |
 | `loop-deletion` | LLVM-shaped subset | `mustprogress` side-effect-free counted loop with no outside uses is deleted |
-| `indvars` | placeholder | Deferred until ScalarEvolution-shaped recurrence analysis and IV rewrite support exist |
+| `indvars` | LLVM-shaped subset | Self-latch affine derived-IV exit value rewritten through a small ScalarEvolution AddRec helper |
 | `simple-loop-unswitch` | placeholder | Deferred until branch duplication and dominance updates are robust |
 | `loop-unroll` | placeholder | Deferred until trip-count proof and code-size policy exist |
 | loop vectorization | out of scope | Requires LoopAccessAnalysis, SCEV, TTI, vector IR, and target lowering |
@@ -135,7 +135,9 @@ These LLVM analyses are intentionally not reproduced yet and remain blockers
 for broader loop optimization:
 
 ```text
-ScalarEvolution: trip counts, induction variables, deletion, unroll decisions
+ScalarEvolution: implemented only for the `indvars_derived_exit` affine AddRec
+slice; full trip counts, induction variables, deletion, and unroll decisions
+remain missing
 LoopAccessAnalysis: vectorization and memory dependence in loops
 MemorySSA: memory LICM, memory sinking, loop deletion legality
 TargetTransformInfo: rotate, unroll, vectorization, and profitability decisions

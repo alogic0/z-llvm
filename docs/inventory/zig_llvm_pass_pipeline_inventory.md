@@ -193,7 +193,7 @@ Status meanings:
 | `loop-simplifycfg` | loop canonicalization | P1 | LLVM-shaped subset | `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp` |
 | `loop-rotate` | loop canonicalization | P1 | LLVM-shaped subset | `llvm/lib/Transforms/Scalar/LoopRotation.cpp` |
 | `loop-deletion` | loop cleanup | P1 | LLVM-shaped subset | `llvm/lib/Transforms/Scalar/LoopDeletion.cpp` |
-| `indvars` | loop canonicalization | P2 | placeholder | `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` |
+| `indvars` | loop canonicalization | P2 | LLVM-shaped subset | `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` |
 | `simple-loop-unswitch` | loop optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp` |
 | `loop-idiom` | loop/memory optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp` |
 | `loop-unroll`, `loop-unroll-full` | loop optimization | P2 | placeholder | `llvm/lib/Transforms/Scalar/LoopUnrollPass.cpp` |

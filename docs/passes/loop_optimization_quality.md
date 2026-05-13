@@ -28,6 +28,9 @@ LLVM source files:
 
 LLVM entry points/classes:
   IndVarSimplifyPass::run
+  IndVarSimplify::rewriteLoopExitValues
+  IndVarSimplify::simplifyAndExtend
+  SCEVAddRecExpr
   SimpleLoopUnswitchPass::run
   LoopIdiomRecognizePass::run
   LoopSinkPass::run
@@ -51,25 +54,32 @@ Core LLVM algorithm data structures:
   MemorySSA or alias result sets for memory loop transforms.
 
 Local target status:
-  LICM foundation plus explicit placeholders for the remaining passes.
+  LICM foundation plus an LLVM-shaped IndVarSimplify exit-value rewrite slice.
+  The remaining loop quality passes are explicit placeholders.
 ```
 
 Implemented subset:
 
 ```text
-LICM remains the implemented loop optimization subset.
-indvars, simple-loop-unswitch, loop-idiom, loop-sink, loop-unroll,
-loop-unroll-full, loop-distribute, loop-load-elim, and
-extra-simple-loop-unswitch-passes are executable placeholders.
+LICM remains the broadest implemented loop optimization subset.
+indvars rewrites one accepted self-latch affine-IV exit-value shape by using a
+small ScalarEvolution-like AddRec record: canonical `{0,+,1}` IV, derived
+`{3,+,2}` IV, equality exit on the canonical post-inc value, and an exit `ret`
+of the derived post-inc value. The pass replaces the exit use with the same
+closed form produced by opt-22 for the fixture.
+simple-loop-unswitch, loop-idiom, loop-sink, loop-unroll, loop-unroll-full,
+loop-distribute, loop-load-elim, and extra-simple-loop-unswitch-passes are
+executable placeholders.
 ```
 
 Intentional divergences:
 
 ```text
-no ScalarEvolution yet
+only a narrow AddRec recognition helper, not full ScalarEvolution
 no target transform information or code-size profitability model
 no loop memory optimization beyond the current conservative LICM scalar subset
-no unrolling, unswitching, idiom recognition, sinking, or induction variable rewrite
+no IV widening, exit-count generality, non-self-latch rewrite, unrolling,
+unswitching, idiom recognition, or sinking
 ```
 
 Fixture coverage:
@@ -77,10 +87,12 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   LICM fixtures cover the implemented loop optimization subset.
+  indvars_derived_exit
 
 local-only conservative:
   LICM memory and canonical-shape rejection fixtures.
 
 unit-test only:
-  placeholder pass dispatch through named pass parsing.
+  placeholder pass dispatch through named pass parsing for the remaining loop
+  quality passes.
 ```

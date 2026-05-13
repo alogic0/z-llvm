@@ -10,6 +10,7 @@ const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
 const globaldce = @import("passes/globaldce.zig");
 const gvn = @import("passes/gvn.zig");
+const indvars = @import("passes/indvars.zig");
 const jump_threading = @import("passes/jump_threading.zig");
 const licm = @import("passes/licm.zig");
 const loop_instsimplify = @import("passes/loop_instsimplify.zig");
@@ -394,6 +395,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(loop_rotate.pass);
     } else if (std.mem.eql(u8, name, "loop-deletion")) {
         try pm.add(loop_deletion.pass);
+    } else if (std.mem.eql(u8, name, "indvars")) {
+        try pm.add(indvars.pass);
     } else if (std.mem.eql(u8, name, "simplifycfg")) {
         try pm.add(simplifycfg.pass);
     } else if (std.mem.eql(u8, name, "mem2reg")) {
@@ -426,7 +429,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "reassociate")) return placeholder.make("reassociate", .scalar, "llvm/lib/Transforms/Scalar/Reassociate.cpp");
     if (std.mem.eql(u8, name, "constraint-elimination")) return placeholder.make("constraint-elimination", .scalar, "llvm/lib/Transforms/Scalar/ConstraintElimination.cpp");
     if (std.mem.eql(u8, name, "speculative-execution")) return placeholder.make("speculative-execution", .scalar, "llvm/lib/Transforms/Scalar/SpeculativeExecution.cpp");
-    if (std.mem.eql(u8, name, "indvars")) return placeholder.make("indvars", .loop, "llvm/lib/Transforms/Scalar/IndVarSimplify.cpp");
     if (std.mem.eql(u8, name, "simple-loop-unswitch")) return placeholder.make("simple-loop-unswitch", .loop, "llvm/lib/Transforms/Scalar/SimpleLoopUnswitch.cpp");
     if (std.mem.eql(u8, name, "loop-idiom")) return placeholder.make("loop-idiom", .loop, "llvm/lib/Transforms/Scalar/LoopIdiomRecognize.cpp");
     if (std.mem.eql(u8, name, "loop-sink")) return placeholder.make("loop-sink", .loop, "llvm/lib/Transforms/Scalar/LoopSink.cpp");

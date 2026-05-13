@@ -738,7 +738,7 @@ fn buildNaturalLoop(allocator: std.mem.Allocator, graph: cfg.Graph, header: usiz
 
     var worklist: std.ArrayList(usize) = .empty;
     defer worklist.deinit(allocator);
-    try worklist.append(allocator, latch);
+    if (latch != header) try worklist.append(allocator, latch);
 
     while (worklist.pop()) |block| {
         for (graph.predecessors(block)) |predecessor| {

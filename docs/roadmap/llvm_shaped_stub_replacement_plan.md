@@ -78,7 +78,7 @@ Each slice is complete only when it has:
       Use ScalarEvolution-shaped trip-count facts only for simple counted loops.
       Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopDeletion.cpp`.
-- [ ] Slice 13: `indvars` canonical IV recognition and rewrite.
+- [x] Slice 13: `indvars` canonical IV recognition and rewrite.
       Introduce a small SCEV-like representation and rewrite one affine IV
       pattern. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/IndVarSimplify.cpp` and

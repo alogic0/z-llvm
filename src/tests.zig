@@ -8023,7 +8023,7 @@ test "loop info classifies reduced Zig corpus loop shape" {
 
     var exiting = try natural_loop.exitingBlocks(std.testing.allocator, graph);
     defer exiting.deinit(std.testing.allocator);
-    try std.testing.expectEqualSlices(usize, &.{ 0, 2 }, exiting.items);
+    try std.testing.expectEqualSlices(usize, &.{2}, exiting.items);
 
     var exits = try natural_loop.exitBlocks(std.testing.allocator, graph);
     defer exits.deinit(std.testing.allocator);
