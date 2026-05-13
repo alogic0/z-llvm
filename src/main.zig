@@ -7,7 +7,7 @@ const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,verify plus inventory placeholders
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
@@ -34,6 +34,7 @@ pub fn main(init: std.process.Init) !void {
     var pass_list: []const u8 = "instcombine,dce";
     var trace = false;
     var timing = false;
+    var quiet = false;
     var pass_limit: ?usize = null;
     var input_limit: usize = default_input_limit;
     var emit: Emit = .ir;
@@ -52,6 +53,8 @@ pub fn main(init: std.process.Init) !void {
             trace = true;
         } else if (std.mem.eql(u8, arg, "--time")) {
             timing = true;
+        } else if (std.mem.eql(u8, arg, "--quiet")) {
+            quiet = true;
         } else if (std.mem.startsWith(u8, arg, "--pass-limit=")) {
             pass_limit = try std.fmt.parseInt(usize, arg["--pass-limit=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--input-limit=")) {
@@ -115,7 +118,9 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    const stdout = &stdout_writer.interface;
+    var discard_buffer: [4096]u8 = undefined;
+    var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
+    const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
 
     if (emit == .@"asm" or emit == .obj) {
         const triple = target_triple orelse module.target_triple orelse {

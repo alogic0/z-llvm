@@ -24,6 +24,8 @@ const usage =
     \\  --max=N                 Stop after N candidate .zig files [0 means unlimited]
     \\  --progress-every=N      Write partial report and print progress every N files [25; 0 disables]
     \\  --local-trace           Pass --trace to z_llvm during local checks
+    \\  --local-quiet           Pass --quiet to z_llvm during local checks [default]
+    \\  --no-local-quiet        Keep local z_llvm check output
     \\  --no-strip              Do not pass -fstrip to Zig emission
     \\  --help                  Show this help
     \\
@@ -52,6 +54,7 @@ const Options = struct {
     max: usize = 0,
     progress_every: usize = 25,
     local_trace: bool = false,
+    local_quiet: bool = true,
     strip: bool = true,
 };
 
@@ -240,6 +243,10 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.progress_every = try std.fmt.parseInt(usize, arg["--progress-every=".len..], 10);
         } else if (std.mem.eql(u8, arg, "--local-trace")) {
             opts.local_trace = true;
+        } else if (std.mem.eql(u8, arg, "--local-quiet")) {
+            opts.local_quiet = true;
+        } else if (std.mem.eql(u8, arg, "--no-local-quiet")) {
+            opts.local_quiet = false;
         } else if (std.mem.eql(u8, arg, "--no-strip")) {
             opts.strip = false;
         } else {
@@ -389,6 +396,7 @@ fn runLocalCheck(
     try argv.append(allocator, passes_arg);
     try argv.append(allocator, input_limit_arg);
     if (opts.local_trace) try argv.append(allocator, "--trace");
+    if (opts.local_quiet) try argv.append(allocator, "--quiet");
     try argv.append(allocator, ir_path);
 
     return std.process.run(allocator, io, .{
@@ -553,6 +561,7 @@ fn writeProgress(
         \\local_zllvm_exe={s}
         \\local_build_optimize={s}
         \\local_trace={}
+        \\local_quiet={}
         \\test_root={s}
         \\mode={s}
         \\target={s}
@@ -577,6 +586,7 @@ fn writeProgress(
         opts.local_zllvm_exe orelse "",
         opts.local_build_optimize,
         opts.local_trace,
+        opts.local_quiet,
         test_root,
         opts.mode,
         opts.target,

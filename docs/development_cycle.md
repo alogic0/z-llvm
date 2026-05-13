@@ -36,6 +36,8 @@ For corpus discovery, keep the same split:
   by default;
 - use `--local-zllvm-exe=zig-out/bin/z_llvm` after an explicit
   `zig build -Doptimize=ReleaseFast` when repeating large sweeps;
+- keep the default `--local-quiet` behavior for large sweeps so local verify
+  checks do not print the whole normalized module for every row;
 - use `--local-trace` only for focused debugging, not full discovery sweeps.
 
 ## Required Upstream Mapping
