@@ -143,7 +143,7 @@ Each slice is complete only when it has:
       unsupported diagnostic before transformation. This is a planning slice,
       not a completed algorithm. Required upstream mapping:
       `llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp`.
-- [ ] Slice 27: PGO/profile metadata propagation for SimplifyCFG.
+- [x] Slice 27: PGO/profile metadata propagation for SimplifyCFG.
       Preserve or update branch weights for one CFG rewrite. Required upstream
       mapping: `SimplifyCFG.cpp` profile metadata update paths.
 

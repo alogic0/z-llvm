@@ -65,10 +65,12 @@ Implemented subset:
   Single-predecessor branch block merge
   Matching return block merge
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
+  `!prof` branch-weight propagation from a folded diamond branch to the new
+  select instruction
 
 Intentional divergences:
   No speculation, sinking, hoisting, switch lowering, invoke/EH handling,
-  profile metadata, or target transform info.
+  broad profile metadata rewriting, or target transform info.
   CorrelatedValuePropagation and TailCallElim are explicit placeholders until
   their algorithms are implemented. JumpThreading has a narrow branch-on-PHI
   predecessor-constant slice documented in `docs/passes/jump_threading.md`.
@@ -82,6 +84,7 @@ Fixture coverage:
   simplifycfg_thread_empty
   simplifycfg_common_ret
   simplifycfg_diamond_select
+  simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
   simplifycfg_loop_shape_reject
   simplifycfg_side_effect_diamond_reject
@@ -115,6 +118,8 @@ incoming values
 merge matching return blocks into the predecessor conditional block
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
+preserve `!prof` branch-weight metadata on that new select when the source
+conditional branch carried profile metadata
 ```
 
 Upstream mapping:
@@ -123,8 +128,10 @@ Upstream mapping:
 This reproduces constant branch folding, same-destination conditional branch
 folding with PHI edge repair, unreachable block removal, a small phi cleanup
 subset, a simple unconditional branch block merge, a PHI-safe empty-block
-threading subset, and a strict empty-diamond select formation subset.
-LLVM's implementation covers many more CFG folds, preserves analyses, updates metadata/profile data, and handles complex terminators.
+threading subset, and a strict empty-diamond select formation subset with
+branch-weight metadata propagation.
+LLVM's implementation covers many more CFG folds, preserves analyses, updates
+broader metadata/profile data, and handles complex terminators.
 The local implementation rebuilds graph facts around mutations and centralizes
 branch/PHI repair in `src/analysis/cfg_update.zig`.
 CFG updates account for duplicate CFG edges: when an edge rewrite reduces

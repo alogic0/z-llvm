@@ -140,6 +140,7 @@ fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !b
                     .true_value = shape.true_value,
                     .false_value = shape.false_value,
                 } },
+                .metadata = profileMetadata(condbr.metadata),
             });
             block.terminator = .{ .ret = .{
                 .ty = shape.ty,
@@ -153,6 +154,17 @@ fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !b
         }
     }
     return changed;
+}
+
+fn profileMetadata(metadata: ?[]const u8) ?[]const u8 {
+    var rest = std.mem.trim(u8, metadata orelse return null, " \t");
+    while (rest.len != 0) {
+        const comma = std.mem.indexOfScalar(u8, rest, ',');
+        const attachment = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
+        if (std.mem.startsWith(u8, attachment, "!prof ")) return attachment;
+        rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
+    }
+    return null;
 }
 
 fn diamondSelectName(allocator: std.mem.Allocator, shape: DiamondSelectReturn) ![]u8 {

@@ -25,6 +25,8 @@ function prefix attributes: minsize, optsize
 raw attribute groups containing minsize/optsize
 branch profile metadata attachments such as !prof
 opaque metadata records such as branch_weights
+SimplifyCFG diamond select formation propagates accepted `!prof`
+branch-weight metadata from the source branch to the new select
 module flag records when present
 target-cpu and target-features attribute strings for later target cycles
 ```
@@ -50,7 +52,8 @@ BlockFrequencyInfo, and size-aware profitability rules are represented.
 no PGO instrumentation insertion
 no profile-summary interpretation
 no BFI/BPI computation
-no branch probability updates in CFG transforms
+no general branch probability updates in CFG transforms beyond the
+SimplifyCFG diamond-select branch-weight propagation slice
 no size-cost model for inlining, loops, vectorization, or codegen
 ```
 
@@ -58,6 +61,7 @@ no size-cost model for inlining, loops, vectorization, or codegen
 
 ```text
 unit test: size attributes and branch profile metadata round-trip opaquely
+opt fixture: simplifycfg_diamond_select_prof
 corpus: tiny_scalar_release_small_captured
 corpus: integers_release_small, floats_math_release_small, float_compare_release_small
 pipeline placeholder test: require<branch-probability> and require<block-frequency>

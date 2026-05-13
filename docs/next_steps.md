@@ -11,20 +11,19 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 26: SLP vectorizer recognition-only pass
+Active slice: Slice 27: PGO/profile metadata propagation for SimplifyCFG
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `SLPVectorizerPass::run`, `collectSeedInstructions`,
-      `tryToVectorizeList`, and BoUpSLP tree/profitability boundaries.
-- [x] Define the accepted local recognition surface: same-block, straight-line,
-      same-op scalar binary instructions with matching flags and type.
-- [x] Replace the executable placeholder with a real recognition-only pass.
-- [x] Emit an explicit unsupported diagnostic through pass context when a
-      bundle is recognized but BoUpSLP rewriting is unavailable.
-- [x] Add fixture coverage proving the pass preserves IR while recognizing the
-      unsupported transformation boundary.
-- [x] Update vector, target-cost, parity, inventory, and roadmap docs.
+- [x] Map LLVM `SimplifyCFG.cpp` profile metadata update paths and
+      `ProfDataUtils` branch-weight helpers.
+- [x] Choose one accepted CFG rewrite: empty diamond `phi`/`ret` folding to
+      `select`/`ret`.
+- [x] Preserve `!prof` branch-weight metadata from the conditional branch on
+      the new select, matching LLVM's profile propagation for this shape.
+- [x] Add an `opt-22` equivalent fixture for the profile-preserving diamond
+      select rewrite.
+- [x] Update SimplifyCFG, PGO/size, parity, and roadmap docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 26.
+- [x] Review and commit Slice 27.
