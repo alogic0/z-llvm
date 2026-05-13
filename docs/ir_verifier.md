@@ -45,6 +45,13 @@ Required IR invariants:
   Direct call signatures and calling conventions match callee declarations or
   definitions
   Load/store memory attributes are valid for the local subset
+  Atomic load/store, `atomicrmw`, `cmpxchg`, and fence orderings follow LLVM's
+  verifier legality rules for the accepted IR surface
+  Atomic scalar integer/floating-point access sizes are byte-sized powers of two
+  `atomicrmw` operation names match the LLVM verifier's operand-type classes:
+  `xchg` accepts integer/floating/pointer, FP operations accept FP types, and
+  integer RMW operations require integer operands
+  `cmpxchg` operands are integer or pointer typed
   Target triples and DataLayout strings are syntactically valid
 
 Core LLVM algorithm data structures:
@@ -73,6 +80,8 @@ Intentional divergences:
   printer and pass pipeline treat them as deleted instructions.
   It validates target triple and DataLayout syntax, but does not verify full
   target ABI semantics, address-space-specific layouts, or GEP offset legality.
+  It accepts pointer atomics without DataLayout-backed size checking and treats
+  vector-pointer atomic access sizes as a current verifier boundary.
   It verifies a small known-DI-node debug metadata graph subset and keeps
   unknown metadata records opaque when references resolve.
   It does not verify full LLVM metadata semantics, debug salvage, attributes,

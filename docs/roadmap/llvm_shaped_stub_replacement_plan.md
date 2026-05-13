@@ -152,7 +152,7 @@ Each slice is complete only when it has:
 - [x] Slice 28: Debug location salvage for InstCombine.
       Salvage one replaced value's debug location instead of dropping it.
       Required upstream mapping: LLVM debug value salvage utilities.
-- [ ] Slice 29: Atomic ordering semantic verifier.
+- [x] Slice 29: Atomic ordering semantic verifier.
       Move from atomic-as-barrier only to LLVM-compatible validation of ordering
       and syncscope combinations. Required upstream mapping:
       `llvm/lib/IR/Verifier.cpp`.

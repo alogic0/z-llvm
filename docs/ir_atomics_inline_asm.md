@@ -15,11 +15,15 @@ cmpxchg [weak] ptr %p, iN %old, iN %new [syncscope("...")] <success> <failure>, 
 fence [syncscope("...")] <ordering>
 ```
 
-These forms are parsed and printed only as conservative memory barriers. The
-ordering text is preserved in the local `MemoryAttrs.atomic_ordering` field,
-and `syncscope("...")` text is preserved for supported atomic instructions.
+These forms are parsed and printed as conservative memory barriers. The verifier
+now checks the LLVM-shaped ordering and operand-type rules for the accepted
+surface: load cannot be release/acq_rel, store cannot be acquire/acq_rel,
+`atomicrmw` cannot be unordered, fence must be acquire/release/acq_rel/seq_cst,
+and `cmpxchg` failure ordering cannot be release/acq_rel or stronger than the
+success ordering. It also checks byte-sized power-of-two scalar access sizes,
+`atomicrmw` operation/type classes, and integer-or-pointer `cmpxchg` operands.
 No transform interprets acquire, release, monotonic, acq_rel, seq_cst, or
-syncscope semantics.
+syncscope semantics for optimization.
 
 ## Explicit Rejections
 
@@ -27,6 +31,9 @@ syncscope semantics.
 inline asm lowering and constraint validation
 malformed syncscope text
 invalid atomic ordering combinations
+invalid scalar atomic access sizes such as `i1` and non-power-of-two integers
+invalid `atomicrmw` operation/type pairs
+non-integer/non-pointer `cmpxchg` operand types
 ```
 
 `atomicrmw`, `cmpxchg`, and `fence` are accepted only as conservative
@@ -73,6 +80,8 @@ unit tests:
   reduced inline asm parse/print preservation as a side-effecting memory barrier
   syncscope preservation and malformed syncscope rejection
   invalid atomic ordering combination rejection
+  LLVM verifier-shaped atomic access-size, `atomicrmw` operation/type, and
+  `cmpxchg` operand-type rejection
   source-backed reduced inline-asm and atomicrmw fixtures from
   `atomics_inline_asm_debug_release_fast`
   memory-effect barrier classification
@@ -110,6 +119,8 @@ llvm-project-22/llvm/lib/Analysis/MemoryLocation.cpp
 
 LLVM models atomic ordering, sync scopes, volatile semantics, inline-asm
 constraints, and memory clobbers. This project preserves supported ordering and
-syncscope text and rejects invalid combinations, but still treats accepted
-atomic forms as hard optimizer barriers until the verifier, memory model, and
-optimizer legality rules can match LLVM's concurrency semantics.
+syncscope text, rejects invalid ordering/type combinations through
+`Verifier.cpp`-shaped checks, and still treats accepted atomic forms as hard
+optimizer barriers until the memory model and optimizer legality rules can match
+LLVM's concurrency semantics. Pointer and vector-pointer atomic access-size
+validation remains DataLayout-dependent and is documented as a local boundary.

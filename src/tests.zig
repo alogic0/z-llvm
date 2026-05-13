@@ -6011,6 +6011,28 @@ test "parser preserves atomic syncscope on supported atomic operations" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "verifier accepts LLVM-shaped atomic type surfaces" {
+    const input =
+        \\define ptr @atomic_pointer_xchg(ptr %p) {
+        \\entry:
+        \\  %v = atomicrmw xchg ptr %p, ptr null monotonic
+        \\  ret ptr %v
+        \\}
+        \\
+        \\define float @atomic_float_load_store(ptr %p, float %value) {
+        \\entry:
+        \\  store atomic float %value, ptr %p, release, align 4
+        \\  %loaded = load atomic float, ptr %p, acquire, align 4
+        \\  ret float %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
 test "verifier rejects invalid atomic ordering combinations" {
     const invalid_load =
         \\define i32 @bad_atomic_load(ptr %p) {
@@ -6059,6 +6081,68 @@ test "verifier rejects invalid atomic ordering combinations" {
     var cmpxchg_module = try ir.Module.parse(std.testing.allocator, invalid_cmpxchg);
     defer cmpxchg_module.deinit();
     try std.testing.expectError(error.InvalidAtomicMemory, cmpxchg_module.verify());
+}
+
+test "verifier rejects LLVM invalid atomic memory types" {
+    const invalid_load_i1 =
+        \\define i1 @bad_atomic_load_i1(ptr %p) {
+        \\entry:
+        \\  %v = load atomic i1, ptr %p, acquire, align 1
+        \\  ret i1 %v
+        \\}
+        \\
+    ;
+    var load_i1_module = try ir.Module.parse(std.testing.allocator, invalid_load_i1);
+    defer load_i1_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, load_i1_module.verify());
+
+    const invalid_store_i24 =
+        \\define void @bad_atomic_store_i24(ptr %p) {
+        \\entry:
+        \\  store atomic i24 1, ptr %p, release, align 4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var store_i24_module = try ir.Module.parse(std.testing.allocator, invalid_store_i24);
+    defer store_i24_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, store_i24_module.verify());
+
+    const invalid_rmw_add_ptr =
+        \\define ptr @bad_atomicrmw_add_ptr(ptr %p) {
+        \\entry:
+        \\  %v = atomicrmw add ptr %p, ptr null monotonic
+        \\  ret ptr %v
+        \\}
+        \\
+    ;
+    var rmw_add_ptr_module = try ir.Module.parse(std.testing.allocator, invalid_rmw_add_ptr);
+    defer rmw_add_ptr_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, rmw_add_ptr_module.verify());
+
+    const invalid_rmw_fadd_i32 =
+        \\define i32 @bad_atomicrmw_fadd_i32(ptr %p, i32 %value) {
+        \\entry:
+        \\  %v = atomicrmw fadd ptr %p, i32 %value monotonic
+        \\  ret i32 %v
+        \\}
+        \\
+    ;
+    var rmw_fadd_i32_module = try ir.Module.parse(std.testing.allocator, invalid_rmw_fadd_i32);
+    defer rmw_fadd_i32_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, rmw_fadd_i32_module.verify());
+
+    const invalid_cmpxchg_float =
+        \\define void @bad_cmpxchg_float(ptr %p, float %old, float %new) {
+        \\entry:
+        \\  %pair = cmpxchg ptr %p, float %old, float %new monotonic monotonic
+        \\  ret void
+        \\}
+        \\
+    ;
+    var cmpxchg_float_module = try ir.Module.parse(std.testing.allocator, invalid_cmpxchg_float);
+    defer cmpxchg_float_module.deinit();
+    try std.testing.expectError(error.InvalidAtomicMemory, cmpxchg_float_module.verify());
 }
 
 test "parser preserves inline asm calls as side-effecting barriers" {

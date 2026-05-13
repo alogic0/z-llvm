@@ -11,20 +11,21 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 28: Debug location salvage for InstCombine
+Active slice: Slice 29: Atomic ordering semantic verifier
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM InstCombine `replaceInstUsesWith` users and
-      `llvm/lib/Transforms/Utils/Local.cpp` debug salvage utilities.
-- [x] Choose one accepted local surface: a folded instruction with `!dbg`
-      whose later user has no metadata.
-- [x] Transfer the removed instruction `!dbg` attachment to the first
-      metadata-free user before operand replacement.
-- [x] Keep full `salvageDebugInfo` and variable-location rewriting documented
-      as unsupported.
-- [x] Add fixture coverage for the debug-location transfer.
-- [x] Update InstCombine, debug metadata, parity, and roadmap docs.
-- [x] Run focused comparison.
+- [x] Map LLVM `Verifier.cpp` atomic load/store, `cmpxchg`, `atomicrmw`,
+      and fence validation.
+- [x] Add LLVM-shaped atomic access type and byte-sized power-of-two checks
+      for the local scalar/vector surface.
+- [x] Add LLVM-shaped `atomicrmw` operation/type and `cmpxchg` operand-type
+      validation.
+- [x] Keep DataLayout-dependent pointer and vector-pointer sizing documented
+      as a local boundary.
+- [x] Add unit coverage for accepted ordering/syncscope forms and rejected
+      LLVM verifier cases.
+- [x] Update atomic/verifier/parity/roadmap docs.
+- [x] Run focused verifier tests.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 28.
+- [x] Review and commit Slice 29.

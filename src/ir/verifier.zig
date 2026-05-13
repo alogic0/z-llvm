@@ -584,14 +584,14 @@ pub fn verify(module: core.Module) !void {
                         saw_non_phi = true;
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try ctx.verifyValue(.ptr, load.ptr, block_index, instruction_index);
-                        try verifyLoadMemoryAttrs(load.attrs);
+                        try verifyLoadMemoryAccess(load.ty, load.attrs);
                     },
                     .store => |store| {
                         saw_non_phi = true;
                         if (instruction.result != null) return error.StoreHasResult;
                         try ctx.verifyValue(store.ty, store.value, block_index, instruction_index);
                         try ctx.verifyValue(.ptr, store.ptr, block_index, instruction_index);
-                        try verifyStoreMemoryAttrs(store.attrs);
+                        try verifyStoreMemoryAccess(store.ty, store.attrs);
                     },
                     .atomicrmw => |atomicrmw| {
                         saw_non_phi = true;
@@ -599,7 +599,7 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(.ptr, atomicrmw.ptr, block_index, instruction_index);
                         try ctx.verifyValue(atomicrmw.ty, atomicrmw.value, block_index, instruction_index);
                         try verifySyncScope(atomicrmw.syncscope);
-                        try verifyAtomicRmwOrdering(atomicrmw.ordering);
+                        try verifyAtomicRmw(atomicrmw);
                         if (atomicrmw.@"align") |alignment| try verifyAlignment(alignment);
                     },
                     .cmpxchg => |cmpxchg| {
@@ -609,7 +609,7 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(cmpxchg.ty, cmpxchg.expected, block_index, instruction_index);
                         try ctx.verifyValue(cmpxchg.ty, cmpxchg.replacement, block_index, instruction_index);
                         try verifySyncScope(cmpxchg.syncscope);
-                        try verifyCmpxchgOrderings(cmpxchg.success_ordering, cmpxchg.failure_ordering);
+                        try verifyCmpxchg(cmpxchg);
                         if (cmpxchg.@"align") |alignment| try verifyAlignment(alignment);
                     },
                     .fence => |fence| {
@@ -1989,14 +1989,20 @@ fn isKnownTlsModelToken(token: []const u8) bool {
     return false;
 }
 
-fn verifyLoadMemoryAttrs(attrs: core.MemoryAttrs) !void {
+fn verifyLoadMemoryAccess(ty: core.Type, attrs: core.MemoryAttrs) !void {
     try verifyMemoryAttrs(attrs);
-    if (attrs.atomic_ordering) |ordering| try verifyAtomicLoadOrdering(ordering);
+    if (attrs.atomic_ordering) |ordering| {
+        try verifyAtomicLoadOrdering(ordering);
+        try verifyAtomicMemoryAccessType(ty);
+    }
 }
 
-fn verifyStoreMemoryAttrs(attrs: core.MemoryAttrs) !void {
+fn verifyStoreMemoryAccess(ty: core.Type, attrs: core.MemoryAttrs) !void {
     try verifyMemoryAttrs(attrs);
-    if (attrs.atomic_ordering) |ordering| try verifyAtomicStoreOrdering(ordering);
+    if (attrs.atomic_ordering) |ordering| {
+        try verifyAtomicStoreOrdering(ordering);
+        try verifyAtomicMemoryAccessType(ty);
+    }
 }
 
 fn verifyAlignment(alignment: u64) !void {
@@ -2023,16 +2029,89 @@ fn verifyAtomicRmwOrdering(ordering: []const u8) !void {
     if (std.mem.eql(u8, ordering, "unordered")) return error.InvalidAtomicMemory;
 }
 
+fn verifyAtomicRmw(atomicrmw: core.AtomicRmwInst) !void {
+    try verifyAtomicRmwOrdering(atomicrmw.ordering);
+    try verifyAtomicRmwOperationType(atomicrmw.op, atomicrmw.ty);
+    try verifyAtomicMemoryAccessType(atomicrmw.ty);
+}
+
 fn verifyFenceOrdering(ordering: []const u8) !void {
     try verifyAtomicOrdering(ordering);
     if (std.mem.eql(u8, ordering, "unordered") or std.mem.eql(u8, ordering, "monotonic")) return error.InvalidAtomicMemory;
 }
 
-fn verifyCmpxchgOrderings(success: []const u8, failure: []const u8) !void {
-    try verifyAtomicRmwOrdering(success);
-    try verifyAtomicOrdering(failure);
-    if (std.mem.eql(u8, failure, "release") or std.mem.eql(u8, failure, "acq_rel")) return error.InvalidAtomicMemory;
-    if (atomicOrderingRank(failure) > atomicOrderingRank(success)) return error.InvalidAtomicMemory;
+fn verifyCmpxchg(cmpxchg: core.CmpxchgInst) !void {
+    try verifyCmpxchgOrderings(cmpxchg.success_ordering, cmpxchg.failure_ordering);
+    if (!isIntegerOrPointer(cmpxchg.ty)) return error.InvalidAtomicMemory;
+    try verifyAtomicMemoryAccessType(cmpxchg.ty);
+}
+
+fn verifyCmpxchgOrderings(success_ordering: []const u8, failure_ordering: []const u8) !void {
+    try verifyAtomicRmwOrdering(success_ordering);
+    try verifyAtomicOrdering(failure_ordering);
+    if (std.mem.eql(u8, failure_ordering, "release") or std.mem.eql(u8, failure_ordering, "acq_rel")) return error.InvalidAtomicMemory;
+    if (atomicOrderingRank(failure_ordering) > atomicOrderingRank(success_ordering)) return error.InvalidAtomicMemory;
+}
+
+fn verifyAtomicRmwOperationType(op: []const u8, ty: core.Type) !void {
+    if (std.mem.eql(u8, op, "xchg")) {
+        if (!isIntegerOrFloatingOrPointer(ty)) return error.InvalidAtomicMemory;
+        return;
+    }
+    if (std.mem.eql(u8, op, "fadd") or std.mem.eql(u8, op, "fsub")) {
+        if (!isFloatingOrFloatingVector(ty)) return error.InvalidAtomicMemory;
+        return;
+    }
+    if (!isIntegerScalar(ty)) return error.InvalidAtomicMemory;
+}
+
+fn verifyAtomicMemoryAccessType(ty: core.Type) !void {
+    switch (ty) {
+        .int => |bits| try verifyAtomicMemoryAccessBits(bits),
+        .float => try verifyAtomicMemoryAccessBits(32),
+        .double => try verifyAtomicMemoryAccessBits(64),
+        .fp128 => try verifyAtomicMemoryAccessBits(128),
+        .ptr => {},
+        .vector => |vector| {
+            if (vector.elem_ty == .ptr) return;
+            const elem_bits: u64 = switch (vector.elem_ty) {
+                .int => |bits| bits,
+                .float => 32,
+                .double => 64,
+                .ptr => unreachable,
+            };
+            try verifyAtomicMemoryAccessBits(@as(u64, vector.len) * elem_bits);
+        },
+        .x86_fp80, .void, .metadata, .aggregate => return error.InvalidAtomicMemory,
+    }
+}
+
+fn verifyAtomicMemoryAccessBits(bits: u64) !void {
+    if (bits < 8 or !std.math.isPowerOfTwo(bits)) return error.InvalidAtomicMemory;
+}
+
+fn isIntegerScalar(ty: core.Type) bool {
+    return ty == .int;
+}
+
+fn isIntegerOrPointer(ty: core.Type) bool {
+    return ty == .int or ty == .ptr;
+}
+
+fn isIntegerOrFloatingOrPointer(ty: core.Type) bool {
+    return isIntegerOrPointer(ty) or isFloatingScalar(ty);
+}
+
+fn isFloatingScalar(ty: core.Type) bool {
+    return ty == .float or ty == .double or ty == .x86_fp80 or ty == .fp128;
+}
+
+fn isFloatingOrFloatingVector(ty: core.Type) bool {
+    return switch (ty) {
+        .float, .double, .x86_fp80, .fp128 => true,
+        .vector => |vector| vector.elem_ty == .float or vector.elem_ty == .double,
+        .void, .int, .metadata, .ptr, .aggregate => false,
+    };
 }
 
 fn atomicOrderingRank(ordering: []const u8) u8 {
