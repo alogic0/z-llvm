@@ -189,8 +189,8 @@ fn canSimplifyFlaggedBinary(binary: ir.BinaryInst) bool {
     return switch (binary.op) {
         .add => isZero(binary.lhs) or isZero(binary.rhs),
         .sub => isZero(binary.rhs),
-        .mul => isOne(binary.lhs) or isOne(binary.rhs),
-        .shl, .lshr, .ashr => isZero(binary.rhs),
+        .mul => isOne(binary.lhs) or isOne(binary.rhs) or isZero(binary.lhs) or isZero(binary.rhs),
+        .shl, .lshr, .ashr => isZero(binary.rhs) or isZero(binary.lhs),
         .udiv, .sdiv => isOne(binary.rhs),
         .urem, .srem => isOne(binary.rhs),
         .fadd, .fsub, .fmul, .fdiv, .frem, .@"and", .@"or", .xor => false,

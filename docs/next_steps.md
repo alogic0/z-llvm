@@ -11,25 +11,25 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 16: SROA rewrite for debug-free aggregate allocas
+Active slice: Slice 17: InstCombine overflow-flag legality
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `SROA::splitAlloca`, `presplitLoadsAndStores`,
-      `SROA::rewritePartition`, and `AllocaSliceRewriter`.
-- [x] Define the accepted local IR surface: entry-block aggregate allocas,
-      whole-aggregate nonvolatile loads/stores, named aggregate store values,
-      scalar integer or DataLayout-backed pointer fields, and no debug declare.
-- [x] Build synthetic scalar field partitions for whole-aggregate load/store
-      users when no field GEP partitions exist.
-- [x] Rewrite aggregate stores into per-field `extractvalue` plus scalar stores.
-- [x] Rewrite aggregate loads into scalar loads plus `insertvalue`
-      reconstruction and replace uses of the old aggregate load.
-- [x] Keep PHI/select speculation, debug salvage, integer widening, vector
-      promotion, partial overlap splitting, volatile/atomic accesses, and
-      memcpy/memmove out of scope and documented.
-- [x] Add an `opt-22` comparison fixture for the aggregate load/store rewrite.
-- [x] Update SROA and parity docs.
+- [x] Map LLVM `InstructionSimplify` flagged binary folds,
+      `InstCombineAddSub.cpp`, `InstCombineMulDivRem.cpp`, and
+      `InstCombineShifts.cpp` flag handling.
+- [x] Define the accepted local IR surface: scalar integer `mul`, `shl`,
+      `lshr`, and `ashr` folds where the folded result is independent of the
+      poison-generating flag.
+- [x] Extend flagged multiply-by-zero folding for `nsw` and `nuw`.
+- [x] Extend flagged zero-shift-source folding for `shl nsw/nuw`,
+      `lshr exact`, and `ashr exact`.
+- [x] Keep reassociation, flag propagation to newly created instructions,
+      known-bits inference, non-zero shift amount reasoning, and vector flags
+      out of scope and documented.
+- [x] Add `opt-22` comparison fixtures for the accepted folds and rejected
+      overflow-sensitive folds.
+- [x] Update InstCombine docs and parity docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 16 complete in the roadmap.
+- [x] Review, commit, and mark Slice 17 complete in the roadmap.

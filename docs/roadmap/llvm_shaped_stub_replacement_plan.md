@@ -98,7 +98,7 @@ Each slice is complete only when it has:
       Rewrite alloca users through partitioned scalar allocas, then run mem2reg.
       Keep debug salvage as an explicit blocker. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/SROA.cpp`.
-- [ ] Slice 17: InstCombine overflow-flag legality.
+- [x] Slice 17: InstCombine overflow-flag legality.
       Preserve and drop `nsw`, `nuw`, and exact flags according to LLVM's
       legality checks for selected integer folds. Required upstream mapping:
       `llvm/lib/Transforms/InstCombine/`.

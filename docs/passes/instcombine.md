@@ -70,6 +70,8 @@ Implemented subset:
   scalar simplifications delegated to the InstSimplify helper
   Checked `nuw`/`nsw`/`exact` identity and constant folds for the listed
   integer fixtures
+  Checked `nuw`/`nsw`/`exact` zero-result folds for multiply and shifts when
+  the result is independent of the poison-generating flag
   Same-constant-lane extract-after-insert vector lane fold
   Target-independent identical-arm vector-valued select fold with scalar `i1`
   condition
@@ -95,6 +97,7 @@ Fixture coverage:
   instcombine_safe_scalar
   instcombine_flagged_identities
   instcombine_flagged_constants
+  instcombine_flagged_zero_results
   instcombine_flagged_overflow_reject is local-conservative: the local legality
   helper preserves an overflowing `nsw` constant expression rather than
   materializing LLVM poison.
@@ -165,6 +168,8 @@ select identical-arm folding
 select identical-vector-arm folding for scalar `i1` conditions
 fold selected `nsw`, `nuw`, and `exact` neutral identities when the flag cannot
 change overflow behavior
+fold selected `nsw`, `nuw`, and `exact` zero-result identities when the zero
+operand makes the result independent of overflow or exactness
 fold selected flagged integer constants only after checking signed/unsigned
 overflow in the local bit-width model
 preserve flagged integer constant expressions whose overflow legality is not
@@ -189,8 +194,8 @@ Upstream mapping:
 This reproduces a small identity-folding and constant-folding subset of InstCombine.
 LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, reassociation, casts, vectors, division/remainder transforms, and target-specific combines all matter upstream.
 The current implementation uses `nsw`, `nuw`, and `exact` only for explicitly
-listed neutral identities and checked constant folds. Overflow-sensitive cases
-remain preserved rather than producing poison.
+listed neutral identities, zero-result identities, and checked constant folds.
+Overflow-sensitive cases remain preserved rather than producing poison.
 Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
 than folded because NaN, signed-zero, rounding, and exception legality are not
 modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
@@ -218,8 +223,8 @@ after instcombine + dce:
 Known gaps:
 
 ```text
-no general use of nsw/nuw/exact for folds beyond the listed neutral identities
-and checked constants
+no general use of nsw/nuw/exact for folds beyond the listed neutral and
+zero-result identities and checked constants
 no materialized poison/undef simplification
 no non-constant freeze simplification
 no vector folds beyond same-constant-lane extract-after-insert; vectorizers and
