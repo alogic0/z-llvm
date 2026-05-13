@@ -36,7 +36,7 @@ epic closes for the currently accepted IR surface:
 | Pass | Local owner | Current status | Why it is P0 |
 | --- | --- | --- | --- |
 | `mem2reg` | `src/passes/mem2reg.zig` | `fixture-equivalent` for listed fixtures | Converts promotable stack slots into SSA values before scalar and loop passes reason about values. |
-| `sroa` | `src/passes/sroa.zig` | `LLVM-shaped subset` for listed fixtures | Removes trivial alloca/GEP shapes and partitions accepted aggregate fields that block `mem2reg`. |
+| `sroa` | `src/passes/sroa.zig` | `LLVM-shaped subset` for listed fixtures | Removes trivial alloca/GEP shapes and partitions accepted aggregate fields or whole-aggregate load/store users that block `mem2reg`. |
 | `instsimplify` | `src/passes/inst_simplify.zig` | `fixture-equivalent` through InstCombine fixtures | Shared query layer for safe scalar simplifications. |
 | `instcombine` | `src/passes/instcombine.zig` | `fixture-equivalent` for listed fixtures | Canonicalizes and folds local scalar expressions. |
 | `simplifycfg` | `src/passes/simplifycfg.zig` | `fixture-equivalent` for listed fixtures | Removes unreachable/trivial CFG shapes before SSA and loop reasoning. |
@@ -62,8 +62,9 @@ Rationale:
 
 - `simplifycfg` first removes unreachable predecessors and trivial branch shapes
   that would otherwise force extra PHI nodes.
-- `sroa` forwards zero-offset alloca GEPs and builds accepted fixed
-  struct/array field partitions so stack slots become visible to `mem2reg`.
+- `sroa` forwards zero-offset alloca GEPs, builds accepted fixed struct/array
+  field partitions, and rewrites debug-free whole-aggregate loads/stores so
+  stack slots become visible to `mem2reg`.
 - `mem2reg` promotes stack memory into SSA values, exposing scalar expressions
   to InstSimplify and InstCombine.
 - `instcombine` folds and canonicalizes scalar expressions after SSA promotion.
@@ -160,6 +161,7 @@ mem2reg_volatile_store
 gep_memory
 sroa_zero_gep
 sroa_nested_zero_gep
+sroa_aggregate_load_store
 ```
 
 Zig-originated fixtures:
@@ -180,8 +182,8 @@ verifier, memory, scalar, and loop epics.
 The following are not mismatches for Epic 4; they are documented unsupported
 LLVM behavior outside the current accepted IR surface:
 
-- full SROA alloca slice partition iteration, aggregate/vector rewrites, and
-  DataLayout-backed offset splitting;
+- full SROA alloca slice partition iteration, vector rewrites, debug salvage,
+  and complete DataLayout-backed offset splitting;
 - LLVM's complete poison, undef, freeze, and flag reasoning in InstSimplify and
   InstCombine;
 - target-specific InstCombine and TargetTransformInfo-dependent CFG transforms;

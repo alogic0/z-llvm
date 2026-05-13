@@ -65,10 +65,13 @@ fn tryScalarizeAggregateAlloca(
 
     var partitions = try slices.partitionsForAlloca(module.allocator, slot);
     defer partitions.deinit(module.allocator);
+    if (partitions.items.len == 0 and hasWholeAggregateAllocaAccess(function.*, slot, aggregate_ty)) {
+        if (!try appendWholeAggregatePartitions(module.allocator, moduleLayout(module.*), &partitions, slot, aggregate_ty)) return false;
+    }
 
     if (partitions.items.len == 0) return false;
     if (!try aggregateAllocaOnlyUsesPartitions(module.allocator, function.*, slot, aggregate_ty, partitions.items)) return false;
-    if (!validateAggregatePartitionConsumers(function.*, slot, partitions.items)) return false;
+    if (!validateAggregatePartitionConsumers(function.*, slot, aggregate_ty, partitions.items)) return false;
 
     var replacements: std.ArrayList(FieldReplacement) = .empty;
     defer replacements.deinit(module.allocator);
@@ -93,6 +96,8 @@ fn tryScalarizeAggregateAlloca(
         });
         insertion_index += 1;
     }
+
+    try rewriteWholeAggregateMemoryUses(module, function, slot, aggregate_ty, replacements.items);
 
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*inst| {
@@ -159,6 +164,21 @@ fn aggregateAllocaOnlyUsesPartitions(
                         return false;
                     }
                 },
+                .load => |load| {
+                    if (isNamed(load.ptr, slot)) {
+                        if (!load.ty.eql(aggregate_ty) or load.attrs.isBarrier()) return false;
+                    } else if (instructionUsesName(instruction, slot)) {
+                        return false;
+                    }
+                },
+                .store => |store| {
+                    if (isNamed(store.ptr, slot)) {
+                        if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier()) return false;
+                        if (isNamed(store.value, slot)) return false;
+                    } else if (instructionUsesName(instruction, slot)) {
+                        return false;
+                    }
+                },
                 else => if (instructionUsesName(instruction, slot)) return false,
             }
         }
@@ -210,7 +230,7 @@ fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
     };
 }
 
-fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, partitions: []const SlicePartition) bool {
+fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, aggregate_ty: ir.Type, partitions: []const SlicePartition) bool {
     for (partitions) |partition| {
         const field_ty = partition.field_ty orelse return false;
         var saw_memory_use = false;
@@ -223,12 +243,20 @@ fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, 
                 if (!instructionUsesName(instruction, partition.value)) continue;
                 switch (instruction.kind) {
                     .load => |load| {
+                        if (std.mem.eql(u8, partition.value, slot) and isNamed(load.ptr, slot) and load.ty.eql(aggregate_ty) and !load.attrs.isBarrier()) {
+                            saw_memory_use = true;
+                            continue;
+                        }
                         if (!isNamed(load.ptr, partition.value)) return false;
                         if (load.attrs.isBarrier()) return false;
                         if (!load.ty.eql(field_ty)) return false;
                         saw_memory_use = true;
                     },
                     .store => |store| {
+                        if (std.mem.eql(u8, partition.value, slot) and isNamed(store.ptr, slot) and store.ty.eql(aggregate_ty) and !store.attrs.isBarrier()) {
+                            saw_memory_use = true;
+                            continue;
+                        }
                         if (!isNamed(store.ptr, partition.value)) return false;
                         if (store.attrs.isBarrier()) return false;
                         if (!store.ty.eql(field_ty)) return false;
@@ -242,6 +270,177 @@ fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, 
         if (!saw_memory_use) return false;
     }
     return true;
+}
+
+fn hasWholeAggregateAllocaAccess(function: ir.Function, slot: []const u8, aggregate_ty: ir.Type) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .load => |load| if (isNamed(load.ptr, slot) and load.ty.eql(aggregate_ty)) return true,
+                .store => |store| if (isNamed(store.ptr, slot) and store.ty.eql(aggregate_ty)) return true,
+                else => {},
+            }
+        }
+    }
+    return false;
+}
+
+fn appendWholeAggregatePartitions(
+    allocator: std.mem.Allocator,
+    layout: ?target.DataLayout,
+    partitions: *std.ArrayList(SlicePartition),
+    slot: []const u8,
+    aggregate_ty: ir.Type,
+) !bool {
+    var field_index: usize = 0;
+    while (memory_location.aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
+        if (!isScalarizableAggregateField(field_ty, layout != null)) return false;
+        const offset = if (layout) |target_layout|
+            memory_location.aggregateFieldOffsetWithLayout(target_layout, aggregate_ty, field_index) orelse return false
+        else
+            memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return false;
+        const size = if (layout) |target_layout|
+            memory_location.typeSizeWithLayout(target_layout, field_ty) orelse return false
+        else
+            memory_location.typeSize(field_ty) orelse return false;
+        const partition: SlicePartition = .{
+            .kind = .aggregate_field,
+            .alloca_root = slot,
+            .value = slot,
+            .source_ty = aggregate_ty,
+            .offset = offset,
+            .size = size,
+            .zero_offset_compatible = false,
+            .field_index = field_index,
+            .field_ty = field_ty,
+        };
+        if (partitionOverlapsDifferentField(partitions.items, partition)) return false;
+        try partitions.append(allocator, partition);
+    }
+    return field_index != 0;
+}
+
+fn rewriteWholeAggregateMemoryUses(
+    module: *ir.Module,
+    function: *ir.Function,
+    slot: []const u8,
+    aggregate_ty: ir.Type,
+    replacements: []const FieldReplacement,
+) !void {
+    for (function.blocks.items) |*block| {
+        var instruction_index: usize = 0;
+        while (instruction_index < block.instructions.items.len) : (instruction_index += 1) {
+            const instruction = &block.instructions.items[instruction_index];
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .store => |store| {
+                    if (!isNamed(store.ptr, slot) or !store.ty.eql(aggregate_ty)) continue;
+                    const inserted = try rewriteWholeAggregateStore(module, block, instruction_index, aggregate_ty, store.value, replacements);
+                    block.instructions.items[instruction_index + inserted].removed = true;
+                    instruction_index += inserted;
+                },
+                .load => |load| {
+                    if (!isNamed(load.ptr, slot) or !load.ty.eql(aggregate_ty)) continue;
+                    const result = instruction.result orelse continue;
+                    const rewrite = try rewriteWholeAggregateLoad(module, block, instruction_index, result, aggregate_ty, replacements);
+                    replaceValue(function, result, .{ .named = rewrite.value });
+                    block.instructions.items[instruction_index + rewrite.inserted].removed = true;
+                    block.instructions.items[instruction_index + rewrite.inserted].replacement = .{ .named = rewrite.value };
+                    instruction_index += rewrite.inserted;
+                },
+                else => {},
+            }
+        }
+    }
+}
+
+fn rewriteWholeAggregateStore(
+    module: *ir.Module,
+    block: *ir.BasicBlock,
+    instruction_index: usize,
+    aggregate_ty: ir.Type,
+    aggregate_value: ir.Value,
+    replacements: []const FieldReplacement,
+) !usize {
+    var insert_index = instruction_index;
+    for (replacements) |replacement| {
+        const aggregate_name = switch (aggregate_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => replacement.alloca_name,
+        };
+        const extract_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.fca.{}.extract", .{ aggregate_name, replacement.field_index }));
+        const index_text = try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{replacement.field_index}));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = extract_name,
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .indices = index_text,
+                .result_ty = replacement.ty,
+            } },
+        });
+        insert_index += 1;
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = replacement.ty,
+                .value = .{ .named = extract_name },
+                .ptr = .{ .named = replacement.alloca_name },
+            } },
+        });
+        insert_index += 1;
+    }
+    return insert_index - instruction_index;
+}
+
+const AggregateLoadRewrite = struct {
+    value: []const u8,
+    inserted: usize,
+};
+
+fn rewriteWholeAggregateLoad(
+    module: *ir.Module,
+    block: *ir.BasicBlock,
+    instruction_index: usize,
+    load_name: []const u8,
+    aggregate_ty: ir.Type,
+    replacements: []const FieldReplacement,
+) !AggregateLoadRewrite {
+    var insert_index = instruction_index;
+    var aggregate_value: ir.Value = .poison;
+    var final_name: ?[]const u8 = null;
+    for (replacements) |replacement| {
+        const scalar_load_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.sroa.load.{}", .{ load_name, replacement.field_index }));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = scalar_load_name,
+            .kind = .{ .load = .{
+                .ty = replacement.ty,
+                .ptr = .{ .named = replacement.alloca_name },
+            } },
+        });
+        insert_index += 1;
+
+        const insert_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.fca.{}.insert", .{ load_name, replacement.field_index }));
+        const index_text = try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{replacement.field_index}));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = insert_name,
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .value_ty = replacement.ty,
+                .value = .{ .named = scalar_load_name },
+                .indices = index_text,
+            } },
+        });
+        insert_index += 1;
+        aggregate_value = .{ .named = insert_name };
+        final_name = insert_name;
+    }
+    return .{
+        .value = final_name orelse load_name,
+        .inserted = insert_index - instruction_index,
+    };
 }
 
 fn partitionForPointer(partitions: []const SlicePartition, ptr: ir.Value) ?SlicePartition {

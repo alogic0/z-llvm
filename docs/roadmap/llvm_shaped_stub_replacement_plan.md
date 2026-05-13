@@ -94,7 +94,7 @@ Each slice is complete only when it has:
       Replace one-off aggregate forwarding with an LLVM-shaped slice graph for
       fixed-size structs and arrays. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/SROA.cpp`.
-- [ ] Slice 16: SROA rewrite for debug-free aggregate allocas.
+- [x] Slice 16: SROA rewrite for debug-free aggregate allocas.
       Rewrite alloca users through partitioned scalar allocas, then run mem2reg.
       Keep debug salvage as an explicit blocker. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/SROA.cpp`.

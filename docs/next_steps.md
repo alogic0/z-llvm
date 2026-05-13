@@ -11,25 +11,25 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 15: SROA slice partition builder
+Active slice: Slice 16: SROA rewrite for debug-free aggregate allocas
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `AllocaSlices`, `SliceBuilder`, partition iteration,
-      `SROA::splitAlloca`, and `SROA::rewritePartition`.
+- [x] Map LLVM `SROA::splitAlloca`, `presplitLoadsAndStores`,
+      `SROA::rewritePartition`, and `AllocaSliceRewriter`.
 - [x] Define the accepted local IR surface: entry-block aggregate allocas,
-      constant struct/array GEPs, scalar integer or DataLayout-backed pointer
-      fields, exact field/element ranges, and nonvolatile load/store users.
-- [x] Replace the one-off aggregate GEP collection with an AllocaSlices-backed
-      partition builder for fixed structs and arrays.
-- [x] Use partitions to create replacement scalar allocas and rewrite exact
-      field/element load/store users.
-- [x] Keep partial overlaps, variable indexes, packed/vector aggregates,
-      volatile/atomic accesses, memcpy/memmove, debug salvage, and full
-      type-selection heuristics out of scope and documented.
-- [x] Add or reuse `opt-22` comparison fixture coverage for the partitioned
-      aggregate shape.
-- [x] Update SROA, inventory, parity, and optimizer prerequisite docs.
+      whole-aggregate nonvolatile loads/stores, named aggregate store values,
+      scalar integer or DataLayout-backed pointer fields, and no debug declare.
+- [x] Build synthetic scalar field partitions for whole-aggregate load/store
+      users when no field GEP partitions exist.
+- [x] Rewrite aggregate stores into per-field `extractvalue` plus scalar stores.
+- [x] Rewrite aggregate loads into scalar loads plus `insertvalue`
+      reconstruction and replace uses of the old aggregate load.
+- [x] Keep PHI/select speculation, debug salvage, integer widening, vector
+      promotion, partial overlap splitting, volatile/atomic accesses, and
+      memcpy/memmove out of scope and documented.
+- [x] Add an `opt-22` comparison fixture for the aggregate load/store rewrite.
+- [x] Update SROA and parity docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 15 complete in the roadmap.
+- [x] Review, commit, and mark Slice 16 complete in the roadmap.
