@@ -119,6 +119,10 @@ Active cycle:
 - [x] Full ReleaseSafe source-backed sweep with the optimized local checker:
       `processed=1474/1474`, `emit-ok=465`, `local-ok=465`, and zero
       input-size, parse, verify, or optimizer failures.
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      pointer global constants initialized by supported constant expressions
+      such as `inttoptr (...)`. Upstream mapping is recorded in
+      [Module-Level IR](ir_module.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

@@ -412,6 +412,7 @@ fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text: []c
     }
 
     if (ty == .aggregate and std.mem.indexOfAny(u8, text, " \t") != null) return .{ .@"opaque" = text };
+    if (isSupportedConstantExpr(text)) return .{ .scalar = .{ .constant_expr = text } };
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);
     return switch (value) {

@@ -4033,6 +4033,34 @@ test "parser preserves semicolons inside global C string literals" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves pointer global constant expression initializers" {
+    const input =
+        \\@vram = private unnamed_addr constant ptr inttoptr (i64 536870912 to ptr), align 8
+        \\
+        \\define void @write() {
+        \\entry:
+        \\  store volatile i8 88, ptr inttoptr (i64 536870912 to ptr), align 1
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectEqualStrings(
+        "inttoptr (i64 536870912 to ptr)",
+        module.globals.items[0].initializer.scalar.constant_expr,
+    );
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves scalar array global constants from switch tables" {
     const input =
         \\@switch.table = private unnamed_addr constant [3 x i32] [i32 11, i32 13, i32 17], align 4

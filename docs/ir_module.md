@@ -33,6 +33,7 @@ target triple = "..."
 $name = comdat <kind>
 scalar global definitions: @name = [linkage] global iN <int-or-undef>
 scalar constant global definitions: @name = [linkage] constant iN <int-or-undef>
+pointer global constants initialized by supported constant expressions such as inttoptr
 initializerless external/extern_weak global declarations for observed pointer constants
 aggregate undef global definitions for fixed array types
 named aggregate global type prefixes, including quoted names with spaces or `=`
@@ -92,6 +93,7 @@ unit-test only:
   COMDAT record and module flag metadata round-trip
   unknown COMDAT reference rejection
   weak linkage round-trip
+  pointer global constant expression initializer round-trip
   extern_weak declaration global round-trip
   aggregate undef global round-trip
   C string global round-trip

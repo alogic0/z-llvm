@@ -350,7 +350,8 @@ pub fn verify(module: core.Module) !void {
                 },
                 .ptr => switch (value) {
                     .undef, .poison, .null_value, .named => {},
-                    .int, .fp, .zero_initializer, .vector, .constant_expr => return error.UnsupportedGlobalVariable,
+                    .constant_expr => |text| try verifyConstantExprValue(global.ty, text),
+                    .int, .fp, .zero_initializer, .vector => return error.UnsupportedGlobalVariable,
                 },
                 .float, .double, .x86_fp80, .fp128 => switch (value) {
                     .fp => |text| {
