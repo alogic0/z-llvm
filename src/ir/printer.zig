@@ -181,14 +181,14 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     },
                     .alloca => |alloca| {
                         try writer.writeAll("alloca ");
-                        try alloca.allocated_ty.format(writer);
+                        try printTypeWithAddressSpace(alloca.allocated_ty, alloca.allocated_ty_addrspace, writer);
                         if (alloca.attrs) |attrs| try writer.print(", {s}", .{attrs});
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .load => |load| {
                         try writer.writeAll("load ");
                         try printMemoryPrefix(load.attrs, writer);
-                        try load.ty.format(writer);
+                        try printTypeWithAddressSpace(load.ty, load.ty_addrspace, writer);
                         try writer.writeAll(", ptr ");
                         if (load.ptr_addrspace) |addrspace_name| try writer.print("{s} ", .{addrspace_name});
                         try load.ptr.format(writer);
@@ -198,7 +198,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                     .store => |store| {
                         try writer.writeAll("store ");
                         try printMemoryPrefix(store.attrs, writer);
-                        try store.ty.format(writer);
+                        try printTypeWithAddressSpace(store.ty, store.ty_addrspace, writer);
                         try writer.writeByte(' ');
                         try store.value.format(writer);
                         try writer.writeAll(", ptr ");
@@ -442,6 +442,11 @@ fn printReturnType(ty: core.Type, attrs: ?[]const u8, writer: anytype) !void {
     }
     if (attrs) |text| try writer.print("{s} ", .{text});
     try ty.format(writer);
+}
+
+fn printTypeWithAddressSpace(ty: core.Type, addrspace_text: ?[]const u8, writer: anytype) !void {
+    try ty.format(writer);
+    if (addrspace_text) |text| try writer.print(" {s}", .{text});
 }
 
 fn startsWithAddressSpaceAttr(text: []const u8) bool {

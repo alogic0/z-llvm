@@ -1267,8 +1267,10 @@ fn parseAlloca(text: []const u8) !core.AllocaInst {
     const comma = findTopLevelComma(rest);
     const ty_text = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
     if (ty_text.len == 0) return error.InvalidInstruction;
+    const allocated_ty = try parseAddressSpaceQualifiedType(ty_text);
     return .{
-        .allocated_ty = try parseType(ty_text),
+        .allocated_ty = allocated_ty.ty,
+        .allocated_ty_addrspace = allocated_ty.addrspace_text,
         .attrs = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else null,
     };
 }
@@ -1816,9 +1818,16 @@ fn parseStore(line: []const u8) !core.Instruction {
     var attrs = try parseMemoryPrefixText(&rest);
 
     const stored = try parseLeadingType(rest);
-    const value_comma = findTopLevelComma(stored.after) orelse return error.InvalidInstruction;
-    const value = try parseValue(std.mem.trim(u8, stored.after[0..value_comma], " \t"));
-    rest = std.mem.trim(u8, stored.after[value_comma + 1 ..], " \t");
+    var value_text = std.mem.trim(u8, stored.after, " \t");
+    const stored_addrspace = if (stored.ty == .ptr) blk: {
+        const token = firstToken(value_text) orelse break :blk null;
+        if (!isAddressSpaceToken(token)) break :blk null;
+        value_text = trimFirstToken(value_text);
+        break :blk token;
+    } else null;
+    const value_comma = findTopLevelComma(value_text) orelse return error.InvalidInstruction;
+    const value = try parseValue(std.mem.trim(u8, value_text[0..value_comma], " \t"));
+    rest = std.mem.trim(u8, value_text[value_comma + 1 ..], " \t");
 
     const ptr_operand = try parseMemoryPointerOperand(rest, attrs);
     var suffix_parts = std.mem.tokenizeAny(u8, ptr_operand.suffix, " \t,");
@@ -1828,6 +1837,7 @@ fn parseStore(line: []const u8) !core.Instruction {
         .result = null,
         .kind = .{ .store = .{
             .ty = stored.ty,
+            .ty_addrspace = stored_addrspace,
             .value = value,
             .ptr = ptr_operand.ptr,
             .ptr_addrspace = ptr_operand.ptr_addrspace,
@@ -1841,7 +1851,7 @@ fn parseLoad(result: []const u8, text: []const u8) !core.Instruction {
     var attrs = try parseMemoryPrefixText(&rest);
 
     const ty_comma = findTopLevelComma(rest) orelse return error.InvalidInstruction;
-    const ty = try parseType(std.mem.trim(u8, rest[0..ty_comma], " \t"));
+    const loaded_ty = try parseAddressSpaceQualifiedType(std.mem.trim(u8, rest[0..ty_comma], " \t"));
     rest = std.mem.trim(u8, rest[ty_comma + 1 ..], " \t");
 
     const ptr_operand = try parseMemoryPointerOperand(rest, attrs);
@@ -1851,7 +1861,8 @@ fn parseLoad(result: []const u8, text: []const u8) !core.Instruction {
     return .{
         .result = result,
         .kind = .{ .load = .{
-            .ty = ty,
+            .ty = loaded_ty.ty,
+            .ty_addrspace = loaded_ty.addrspace_text,
             .ptr = ptr_operand.ptr,
             .ptr_addrspace = ptr_operand.ptr_addrspace,
             .attrs = attrs,
@@ -1864,6 +1875,21 @@ const MemoryPointerOperand = struct {
     ptr_addrspace: ?[]const u8 = null,
     suffix: []const u8,
 };
+
+const AddressSpaceQualifiedType = struct {
+    ty: core.Type,
+    addrspace_text: ?[]const u8 = null,
+};
+
+fn parseAddressSpaceQualifiedType(text: []const u8) !AddressSpaceQualifiedType {
+    const parsed = try parseLeadingType(text);
+    if (parsed.after.len == 0) return .{ .ty = parsed.ty };
+    if (parsed.ty != .ptr) return error.UnsupportedType;
+    const token = firstToken(parsed.after) orelse return error.UnsupportedType;
+    if (!isAddressSpaceToken(token)) return error.UnsupportedType;
+    if (trimFirstToken(parsed.after).len != 0) return error.UnsupportedType;
+    return .{ .ty = parsed.ty, .addrspace_text = token };
+}
 
 fn parseMemoryPointerOperand(text: []const u8, attrs: core.MemoryAttrs) !MemoryPointerOperand {
     var rest = std.mem.trim(u8, text, " \t");

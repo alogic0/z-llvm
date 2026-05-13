@@ -2120,8 +2120,11 @@ test "parser preserves address-space pointer function returns" {
     const input =
         \\define private fastcc ptr addrspace(256) @entry(ptr addrspace(256) align 4 %0) unnamed_addr #0 align 1 {
         \\entry:
-        \\  %1 = getelementptr [4 x i8], ptr addrspace(256) %0, i64 0
-        \\  ret ptr addrspace(256) %1
+        \\  %1 = alloca ptr addrspace(256), align 8
+        \\  store ptr addrspace(256) %0, ptr %1, align 8
+        \\  %2 = load ptr addrspace(256), ptr %1, align 8
+        \\  %3 = getelementptr [4 x i8], ptr addrspace(256) %2, i64 0
+        \\  ret ptr addrspace(256) %3
         \\}
         \\
         \\attributes #0 = { nounwind }
@@ -2134,7 +2137,10 @@ test "parser preserves address-space pointer function returns" {
 
     const function = module.functions.items[0];
     try std.testing.expectEqualStrings("addrspace(256)", function.ret_attrs.?);
-    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].instructions.items[0].kind.gep.ptr_addrspace.?);
+    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].instructions.items[0].kind.alloca.allocated_ty_addrspace.?);
+    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].instructions.items[1].kind.store.ty_addrspace.?);
+    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].instructions.items[2].kind.load.ty_addrspace.?);
+    try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].instructions.items[3].kind.gep.ptr_addrspace.?);
     try std.testing.expectEqualStrings("addrspace(256)", function.blocks.items[0].terminator.?.ret.ptr_addrspace.?);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);

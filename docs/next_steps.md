@@ -131,6 +131,10 @@ Active cycle:
       address-space pointer operands on `getelementptr`, avoiding misclassification
       of `addrspace(...)` as a floating-point value. Upstream mapping is recorded
       in [Memory IR Subset](ir_memory.md).
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      address-space pointer value types on `alloca`, `load`, and `store` while
+      keeping opaque-pointer semantics conservative. Upstream mapping is recorded
+      in [Memory IR Subset](ir_memory.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

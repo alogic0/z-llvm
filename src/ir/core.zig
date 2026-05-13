@@ -589,6 +589,7 @@ pub const PhiInst = struct {
 
 pub const AllocaInst = struct {
     allocated_ty: Type,
+    allocated_ty_addrspace: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
 };
 
@@ -609,6 +610,7 @@ pub const MemoryAttrs = struct {
 
 pub const LoadInst = struct {
     ty: Type,
+    ty_addrspace: ?[]const u8 = null,
     ptr: Value,
     ptr_addrspace: ?[]const u8 = null,
     attrs: MemoryAttrs = .{},
@@ -616,6 +618,7 @@ pub const LoadInst = struct {
 
 pub const StoreInst = struct {
     ty: Type,
+    ty_addrspace: ?[]const u8 = null,
     value: Value,
     ptr: Value,
     ptr_addrspace: ?[]const u8 = null,
