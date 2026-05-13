@@ -2239,6 +2239,36 @@ test "parser preserves tail direct calls" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "parser preserves musttail and notail direct calls" {
+    const input =
+        \\declare i32 @callee(i32)
+        \\
+        \\declare void @sink()
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = musttail call i32 @callee(i32 %a)
+        \\  notail call void @sink()
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const block = module.functions.items[0].blocks.items[0];
+    try std.testing.expectEqualStrings("musttail", block.instructions.items[0].kind.call.tail_kind.?);
+    try std.testing.expectEqualStrings("notail", block.instructions.items[1].kind.call.tail_kind.?);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser preserves raw module metadata records" {
     const input =
         \\define i32 @with_metadata(i32 %a) {
@@ -3729,16 +3759,6 @@ test "parser preserves indirect call form conservatively" {
 }
 
 test "parser rejects unsupported control-flow call forms" {
-    const musttail =
-        \\define i32 @caller(i32 %a) {
-        \\entry:
-        \\  %r = musttail call i32 @callee(i32 %a)
-        \\  ret i32 %r
-        \\}
-        \\
-    ;
-    try std.testing.expectError(error.UnsupportedCallAttribute, ir.Module.parse(std.testing.allocator, musttail));
-
     const invoke =
         \\define i32 @caller(i32 %a) {
         \\entry:

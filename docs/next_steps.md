@@ -146,6 +146,11 @@ Active cycle:
       preserve fixed-vector global initializers and vector `fptosi`/`fptoui`
       casts used by vector int-from-float safety checks. Upstream mapping is
       recorded in [Vector IR Boundary](ir_vectors.md).
+- [x] Source-backed Debug parser blocker: parse, verify, print, and preserve
+      Zig-emitted `musttail call`/`notail call` markers as call facts while
+      keeping full tail-call legality and lowering out of scope. Upstream
+      mapping is recorded in [Intrinsics And Call
+      Semantics](semantics/intrinsics_and_call_semantics.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

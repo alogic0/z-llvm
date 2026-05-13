@@ -15,8 +15,9 @@ semantics needed by Zig-emitted IR corpus rows.
 
 ## Implemented Slice
 
-- Preserve `tail call` on direct calls. `musttail` and `notail` remain
-  unsupported because their verifier and lowering semantics are stricter.
+- Preserve `tail`, `musttail`, and `notail` markers on direct calls as
+  parser/printer facts. Their strict LLVM verifier and lowering semantics are
+  not modeled yet.
 - Preserve return attributes before the return type on function headers and
   call sites, such as Zig-emitted `range(i32 ...)` and
   `call range(i16 0, 17) i16 @llvm.ctpop.i16(...)`, without interpreting them
@@ -76,8 +77,8 @@ bash scripts/compare_opt.sh
 - Indirect calls are represented only as conservative call boundaries; no
   devirtualization, signature refinement, inlining, or native lowering is
   modeled.
-- `invoke`, `callbr`, `musttail`, operand bundles, and inline asm lowering
-  remain unsupported.
+- `invoke`, `callbr`, full `musttail` legality/lowering, operand bundle
+  semantics, and inline asm lowering remain unsupported.
 - Attribute groups are parsed only as preserved IR records with conservative
   memory-effect extraction, not as a full LLVM attribute model.
 - Loop instruction metadata is accepted only as parser input and is not

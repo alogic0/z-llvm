@@ -145,6 +145,7 @@ vector/constrained `fcmp`; scalar `fcmp` predicates parse and verify only
 phi token/blockaddress values
 indirect call signature refinement/lowering
 call attributes beyond the supported calling convention spelling
+full musttail/notail legality and lowering
 inline asm lowering and constraint validation
 invoke/callbr
 bitcast/fptrunc/fpext/fptoui/fptosi/uitofp/sitofp/addrspacecast

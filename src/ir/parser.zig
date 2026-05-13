@@ -913,8 +913,7 @@ fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
 fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.Instruction {
     if (std.mem.startsWith(u8, line, "store ")) return parseStore(line);
     if (std.mem.startsWith(u8, line, "call ")) return parseCall(allocator, null, line);
-    if (std.mem.startsWith(u8, line, "tail ")) return parseCall(allocator, null, line);
-    if (std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, line, "tail ") or std.mem.startsWith(u8, line, "musttail ") or std.mem.startsWith(u8, line, "notail ")) return parseCall(allocator, null, line);
     if (std.mem.startsWith(u8, line, "invoke ") or std.mem.startsWith(u8, line, "callbr ")) return error.UnsupportedCallTerminator;
 
     const eq_index = findAssignmentSeparator(line) orelse return error.InvalidInstruction;
@@ -923,8 +922,7 @@ fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !core.In
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
     if (std.mem.startsWith(u8, rhs_text, "call ")) return parseCall(allocator, result_text[1..], rhs_text);
-    if (std.mem.startsWith(u8, rhs_text, "tail ")) return parseCall(allocator, result_text[1..], rhs_text);
-    if (std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return error.UnsupportedCallAttribute;
+    if (std.mem.startsWith(u8, rhs_text, "tail ") or std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return parseCall(allocator, result_text[1..], rhs_text);
     if (std.mem.startsWith(u8, rhs_text, "invoke ") or std.mem.startsWith(u8, rhs_text, "callbr ")) return error.UnsupportedCallTerminator;
     if (isUnsupportedEhInstruction(rhs_text)) return error.UnsupportedExceptionHandling;
     if (std.mem.startsWith(u8, rhs_text, "phi ")) {
@@ -1361,6 +1359,12 @@ fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []const u8
     const tail_kind: ?[]const u8 = if (std.mem.startsWith(u8, call_text, "tail ")) blk: {
         call_text = std.mem.trim(u8, call_text["tail ".len..], " \t");
         break :blk "tail";
+    } else if (std.mem.startsWith(u8, call_text, "musttail ")) blk: {
+        call_text = std.mem.trim(u8, call_text["musttail ".len..], " \t");
+        break :blk "musttail";
+    } else if (std.mem.startsWith(u8, call_text, "notail ")) blk: {
+        call_text = std.mem.trim(u8, call_text["notail ".len..], " \t");
+        break :blk "notail";
     } else null;
     if (!std.mem.startsWith(u8, call_text, "call ")) return error.InvalidCall;
 
