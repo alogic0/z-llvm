@@ -222,7 +222,7 @@ Status meanings:
 | `annotation-remarks` | diagnostics/remarks | P3 | placeholder | `llvm/lib/Transforms/Scalar/AnnotationRemarks.cpp` |
 | `forceattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp` |
 | `inferattrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp` |
-| `function-attrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
+| `function-attrs` | attribute IPO | P2 | LLVM-shaped direct-call memory/norecurse inference slice | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
 | `rpo-function-attrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
 | `called-value-propagation` | IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/CalledValuePropagation.cpp` |
 | `argpromotion` | IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/ArgumentPromotion.cpp` |

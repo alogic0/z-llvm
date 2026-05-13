@@ -121,7 +121,7 @@ Each slice is complete only when it has:
       Merge identical private constants while preserving linkage and COMDAT
       constraints. Required upstream mapping:
       `llvm/lib/Transforms/IPO/ConstantMerge.cpp`.
-- [ ] Slice 22: `function-attrs` direct-call inference.
+- [x] Slice 22: `function-attrs` direct-call inference.
       Infer readonly/readnone/norecurse for local direct-call SCCs. Required
       upstream mapping: `llvm/lib/Transforms/IPO/FunctionAttrs.cpp`.
 - [ ] Slice 23: `inline` for one direct internal call shape.

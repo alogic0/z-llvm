@@ -5,6 +5,7 @@ const always_inline = @import("passes/always_inline.zig");
 const bdce = @import("passes/bdce.zig");
 const correlated_propagation = @import("passes/correlated_propagation.zig");
 const constmerge = @import("passes/constmerge.zig");
+const function_attrs = @import("passes/function_attrs.zig");
 const instcombine = @import("passes/instcombine.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
@@ -391,6 +392,8 @@ fn addPass(pm: *pass_manager.ModulePassManager, name: []const u8) !void {
         try pm.add(globaldce.pass);
     } else if (std.mem.eql(u8, name, "constmerge")) {
         try pm.add(constmerge.pass);
+    } else if (std.mem.eql(u8, name, "function-attrs")) {
+        try pm.add(function_attrs.pass);
     } else if (std.mem.eql(u8, name, "licm")) {
         try pm.add(licm.pass);
     } else if (std.mem.eql(u8, name, "loop-instsimplify")) {
@@ -467,7 +470,6 @@ fn placeholderPass(name: []const u8) ?pass_manager.ModulePass {
     if (std.mem.eql(u8, name, "openmp-opt-cgscc")) return placeholder.make("openmp-opt-cgscc", .ipo, "llvm/lib/Transforms/IPO/OpenMPOpt.cpp");
     if (std.mem.eql(u8, name, "forceattrs")) return placeholder.make("forceattrs", .ipo, "llvm/lib/Transforms/IPO/ForceFunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "inferattrs")) return placeholder.make("inferattrs", .ipo, "llvm/lib/Transforms/IPO/InferFunctionAttrs.cpp");
-    if (std.mem.eql(u8, name, "function-attrs")) return placeholder.make("function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "rpo-function-attrs")) return placeholder.make("rpo-function-attrs", .ipo, "llvm/lib/Transforms/IPO/FunctionAttrs.cpp");
     if (std.mem.eql(u8, name, "inline")) return placeholder.make("inline", .ipo, "llvm/lib/Transforms/IPO/Inliner.cpp");
     if (std.mem.eql(u8, name, "argpromotion")) return placeholder.make("argpromotion", .ipo, "llvm/lib/Transforms/IPO/ArgumentPromotion.cpp");

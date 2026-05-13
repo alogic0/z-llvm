@@ -8,6 +8,7 @@ llvm-project-22/llvm/lib/Transforms/IPO/Inliner.cpp
 llvm-project-22/llvm/lib/Transforms/IPO/ArgumentPromotion.cpp
 llvm-project-22/llvm/lib/Transforms/IPO/CalledValuePropagation.cpp
 llvm-project-22/llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp
+llvm-project-22/llvm/lib/Transforms/IPO/FunctionAttrs.cpp
 llvm-project-22/llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp
 ```
 
@@ -15,7 +16,8 @@ These passes operate across function boundaries. Most of this family remains
 placeholder-only until the local call graph, attributes, ABI constraints, and
 debug-info preservation are strong enough for broad body rewriting. The current
 exception is a narrow `always-inline` slice for direct calls to local
-single-block callees.
+single-block callees. `function-attrs` now has a direct-call inference slice
+for memory effects and `norecurse`.
 
 ## LLVM Algorithm Contract
 
@@ -26,6 +28,7 @@ LLVM source files:
   llvm-project-22/llvm/lib/Transforms/IPO/ArgumentPromotion.cpp
   llvm-project-22/llvm/lib/Transforms/IPO/CalledValuePropagation.cpp
   llvm-project-22/llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp
+  llvm-project-22/llvm/lib/Transforms/IPO/FunctionAttrs.cpp
 
 LLVM entry points/classes:
   AlwaysInlinerPass::run
@@ -33,6 +36,9 @@ LLVM entry points/classes:
   ArgumentPromotionPass::run
   CalledValuePropagationPass::run
   DeadArgumentEliminationPass::run
+  PostOrderFunctionAttrsPass::run
+  addMemoryAttrs
+  addNoRecurseAttrs
 
 Required analyses:
   Call graph or LazyCallGraph.
@@ -54,9 +60,11 @@ Core LLVM algorithm data structures:
 Local target status:
   always-inline is an LLVM-shaped subset for direct internal single-block
   callees.
+  function-attrs is an LLVM-shaped direct-call subset for `memory(none)`,
+  `memory(read)`, and `norecurse`.
   inline, argpromotion, called-value-propagation, callsite-splitting,
-  deadargelim, forceattrs, inferattrs, and function-attrs remain placeholders
-  or analysis foundations.
+  deadargelim, forceattrs, and inferattrs remain placeholders or analysis
+  foundations.
 ```
 
 Implemented subset:
@@ -78,6 +86,15 @@ direct-call graph foundations distinguish definitions from declarations.
 function/declaration attribute helpers resolve #N groups for IPO-relevant
 attributes such as alwaysinline, noinline, nofree, norecurse, nosync, nounwind,
 readnone, readonly, and cold.
+
+function-attrs:
+  walks function bodies like LLVM's FunctionAttrs memory-access scan, classifies
+  side-effect-free bodies as `memory(none)`, readonly bodies as `memory(read)`,
+  and leaves stores, volatile/atomic memory, inline asm, indirect calls, operand
+  bundles, recursive SCCs, and unknown calls unannotated.
+  The local norecurse inference mirrors LLVM's singleton-SCC guard by rejecting
+  direct recursion, mutual recursion, indirect calls, and unannotated external
+  calls before adding `norecurse`.
 ```
 
 Intentional divergences:
@@ -92,9 +109,11 @@ no exceptional-control-flow inlining
 no call-site cloning outside always-inline's supported direct-call shape
 no argument rewriting outside call-to-callee parameter substitution
 no dead argument removal
-no CGSCC iteration
+no full CGSCC iteration
 no general inline cost model
 debug-location salvage for inlined bodies is not modeled
+function-attrs does not infer writeonly, nofree, nosync, nounwind, willreturn,
+or other Attributor-derived facts yet
 ```
 
 Fixture coverage:
@@ -105,6 +124,8 @@ opt-22 equivalent:
   always_inline_noinline_call
 
 local-only conservative:
+  function_attrs_direct_calls
+  function_attrs_reject
   call graph declaration/definition reachability test
   IPO attribute group resolution test
 

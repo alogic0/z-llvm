@@ -11,23 +11,24 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 21: `constmerge` for identical private constants
+Active slice: Slice 22: `function-attrs` direct-call inference
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `ConstantMergePass::run`, `mergeConstants`,
-      `isUnmergeableGlobal`, `IsBetterCanonical`, and `makeMergeable`.
-- [x] Define the accepted local IR surface: local non-TLS scalar `constant`
-      globals with `unnamed_addr`, matching type/initializer/attrs, and no
-      COMDAT.
-- [x] Merge duplicates into the later canonical private constant and rewrite
-      accepted global value operands.
-- [x] Reject non-constant globals, externally visible globals, TLS, COMDAT,
-      aggregate initializers, non-unnamed constants, and mismatched attrs.
-- [x] Add `opt-22` fixtures for an unnamed private scalar merge and a
-      no-unnamed rejection boundary.
-- [x] Wire `constmerge` as a real pass and update global cleanup docs,
-      pipelines docs, parity docs, and roadmap status.
+- [x] Map LLVM `addMemoryAttrs`, `checkFunctionMemoryAccess`,
+      `addNoRecurseAttrs`, and `mayHaveRecursiveCallee`.
+- [x] Define the accepted local IR surface: function definitions with direct
+      calls to local definitions or already annotated declarations.
+- [x] Infer `memory(none)` or `memory(read)` from acyclic direct-call bodies
+      while rejecting stores, volatile/atomic memory, inline asm, operand
+      bundles, indirect calls, and unknown calls.
+- [x] Infer `norecurse` for acyclic direct-call bodies while rejecting direct
+      recursion, mutual recursion, indirect calls, and unannotated external
+      calls.
+- [x] Add `opt-22` fixtures for a direct-call inference case and recursive or
+      unknown-call rejection boundaries.
+- [x] Wire `function-attrs` as a real pass and update function-attribute docs,
+      pipeline docs, parity docs, inventory, and roadmap status.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review and commit Slice 21.
+- [x] Review and commit Slice 22.

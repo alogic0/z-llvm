@@ -22,6 +22,10 @@ LLVM source files:
 LLVM entry points/classes:
   PostOrderFunctionAttrsPass::run
   ReversePostOrderFunctionAttrsPass::run
+  addMemoryAttrs
+  checkFunctionMemoryAccess
+  addNoRecurseAttrs
+  mayHaveRecursiveCallee
   ForceFunctionAttrsPass::run
   AttributeList
   AAResults::getModRefInfo
@@ -41,6 +45,7 @@ Core LLVM algorithm data structures:
 
 Local target status:
   Raw and attribute-group parsing plus conservative call memory classification.
+  function-attrs is an LLVM-shaped direct-call inference subset.
 ```
 
 Implemented subset:
@@ -59,16 +64,22 @@ classify memory(none), memory(read), and memory(argmem: read) from Zig-emitted
 attribute groups for local mod/ref legality
 classify memory(write) and memory(argmem: write) as write-only memory effects
 feed call memory classification into alias/mod-ref and MemorySSA clobber checks
+infer memory(none), memory(read), and norecurse for acyclic direct-call
+function definitions
 classify all other calls as unknown
 ```
 
 Intentional divergences:
 
 ```text
-no inference pass yet
+inference is limited to direct calls over local definitions and annotated
+declarations
 no parameter attribute semantics beyond parser/printer preservation
 no call-site attributes
-no CGSCC propagation
+no full CGSCC propagation or LazyCallGraph RefSCC traversal
+no writeonly inference
+no inference through indirect calls, operand bundles, inline asm, recursive SCCs,
+unknown external calls, volatile/atomic memory, or unknown memory effects
 no target feature, CPU model, frame-pointer, unwind-table, or size-attribute
 semantics beyond textual preservation
 ```
@@ -81,6 +92,8 @@ opt-22 equivalent:
   gvn_unknown_call_clobber_reject
 
 local-only conservative:
+  function_attrs_direct_calls
+  function_attrs_reject
   readnone, readonly, writeonly, and unknown direct-call memory effect unit test
   function/declaration IPO attribute group resolution test
 
