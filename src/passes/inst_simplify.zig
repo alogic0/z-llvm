@@ -324,6 +324,7 @@ fn simplifyFcmp(fcmp: ir.FcmpInst) ?ir.Value {
             .oeq, .oge, .ole, .ord, .ueq, .uge, .ule, .true => .{ .int = 1 },
         };
     }
+    if (simplifyFcmpConstants(fcmp)) |value| return value;
     return switch (fcmp.predicate) {
         .false => .{ .int = 0 },
         .true => .{ .int = 1 },
@@ -342,6 +343,34 @@ fn simplifyFcmpOrderedness(fcmp: ir.FcmpInst) ?ir.Value {
         .uno => if (unordered) 1 else 0,
         .false, .oeq, .ogt, .oge, .olt, .ole, .one, .ueq, .ugt, .uge, .ult, .ule, .une, .true => return null,
     } };
+}
+
+fn simplifyFcmpConstants(fcmp: ir.FcmpInst) ?ir.Value {
+    if (fcmp.lhs != .fp or fcmp.rhs != .fp) return null;
+    if (fcmp.operand_ty != .float and fcmp.operand_ty != .double) return null;
+    const lhs_class = fp_semantics.classify(fcmp.operand_ty, fcmp.lhs.fp) catch return null;
+    const rhs_class = fp_semantics.classify(fcmp.operand_ty, fcmp.rhs.fp) catch return null;
+    const unordered = lhs_class.category == .nan or rhs_class.category == .nan;
+    if (unordered) {
+        return .{ .int = @intFromBool(switch (fcmp.predicate) {
+            .false, .oeq, .ogt, .oge, .olt, .ole, .one, .ord => false,
+            .ueq, .ugt, .uge, .ult, .ule, .une, .uno, .true => true,
+        }) };
+    }
+    const lhs = std.fmt.parseFloat(f64, fcmp.lhs.fp) catch return null;
+    const rhs = std.fmt.parseFloat(f64, fcmp.rhs.fp) catch return null;
+    return .{ .int = @intFromBool(switch (fcmp.predicate) {
+        .false => false,
+        .oeq, .ueq => lhs == rhs,
+        .ogt, .ugt => lhs > rhs,
+        .oge, .uge => lhs >= rhs,
+        .olt, .ult => lhs < rhs,
+        .ole, .ule => lhs <= rhs,
+        .one, .une => lhs != rhs,
+        .ord => true,
+        .uno => false,
+        .true => true,
+    }) };
 }
 
 fn simplifySelect(select: ir.SelectInst) ?ir.Value {

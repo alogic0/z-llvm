@@ -32,6 +32,14 @@ pub fn classify(ty: ir.Type, spelling: []const u8) !Classification {
     if (std.mem.eql(u8, text, "-nan")) {
         return .{ .ty = ty, .spelling = spelling, .category = .nan, .negative = true };
     }
+    if (isKnownNanHexSpelling(text)) {
+        return .{
+            .ty = ty,
+            .spelling = spelling,
+            .category = .nan,
+            .negative = std.mem.startsWith(u8, text, "-"),
+        };
+    }
     if (std.mem.eql(u8, text, "inf") or std.mem.eql(u8, text, "+inf")) {
         return .{ .ty = ty, .spelling = spelling, .category = .infinity };
     }
@@ -95,4 +103,12 @@ fn isKnownSubnormalHexSpelling(text: []const u8) bool {
     return std.mem.eql(u8, unsigned, "0x0000000000000001") or
         std.mem.eql(u8, unsigned, "0x000FFFFFFFFFFFFF") or
         std.mem.eql(u8, unsigned, "0x00000001");
+}
+
+fn isKnownNanHexSpelling(text: []const u8) bool {
+    const unsigned = if (std.mem.startsWith(u8, text, "-") or std.mem.startsWith(u8, text, "+")) text[1..] else text;
+    return std.mem.eql(u8, unsigned, "0x7FF8000000000000") or
+        std.mem.eql(u8, unsigned, "0xFFF8000000000000") or
+        std.mem.eql(u8, unsigned, "0x7FC00000") or
+        std.mem.eql(u8, unsigned, "0xFFC00000");
 }
