@@ -117,6 +117,7 @@ Fixture coverage:
   some strict identities such as `fsub x, 0.0`, `fmul x, 1.0`, `fdiv x, 1.0`,
   and rewrites self-compare to orderedness, but the local implementation keeps
   them until the exact LLVM legality proof is reproduced.
+  fp_strict_arith_constants
   fp_strict_fcmp_fold
   fp_strict_fcmp_constants
   fp_strict_orderedness_fold is local-conservative: the local APFloat-shaped
@@ -185,6 +186,9 @@ strict `fcmp false` -> false
 strict `fcmp true` -> true
 strict scalar `float`/`double` literal `fcmp` predicates fold for finite values
 and NaN ordered/unordered behavior
+strict scalar `float`/`double` literal `fadd` and `fmul` fold for selected
+positive-zero and one identities when the result reuses an existing literal
+spelling
 strict `fcmp ord` and `fcmp uno` for classified scalar FP constants
 `fadd nsz x, +0.0` -> x
 `fcmp nnan oeq x, x` -> true
@@ -203,7 +207,9 @@ Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
 than folded because NaN, signed-zero, rounding, and exception legality are not
 modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
 first enabled strict FP literal comparison folds use APFloat-shaped
-ordered/unordered semantics for scalar `float` and `double` constants. Parsed
+ordered/unordered semantics for scalar `float` and `double` constants. Strict
+`fadd` and `fmul` constant folds are limited to identities where the result can
+reuse one operand spelling until a full APFloat result printer exists. Parsed
 fast-math flags are interpreted only through `docs/analysis/fast_math.md`; the
 first enabled fast-math folds are `fadd nsz x, +0.0` and `fcmp nnan oeq x, x`.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
@@ -229,8 +235,9 @@ Known gaps:
 ```text
 no general use of nsw/nuw/exact for folds beyond the listed neutral and
 zero-result identities and checked constants
-no strict FP result-producing arithmetic folds yet; `fadd` and `fmul` need an
-APFloat-compatible result spelling before they can be made opt-equivalent
+no general strict FP result-producing arithmetic folds yet; `fadd 1.0, 2.0`
+and similar cases need an APFloat-compatible result spelling before they can be
+made opt-equivalent
 no materialized poison/undef simplification
 no non-constant freeze simplification
 no vector folds beyond same-constant-lane extract-after-insert; vectorizers and

@@ -100,7 +100,8 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
     if (binary.flags.any() and !isFpBinary(binary.op) and !canSimplifyFlaggedBinary(binary)) return null;
     return switch (binary.op) {
         .fadd => simplifyFadd(binary),
-        .fsub, .fmul, .fdiv, .frem => null,
+        .fmul => simplifyFmul(binary),
+        .fsub, .fdiv, .frem => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -198,10 +199,53 @@ fn canSimplifyFlaggedBinary(binary: ir.BinaryInst) bool {
 }
 
 fn simplifyFadd(binary: ir.BinaryInst) ?ir.Value {
+    if (simplifyStrictFaddConstants(binary)) |value| return value;
     if (!fast_math.allowAddZeroFold(binary.fp_flags)) return null;
     if (isFpPositiveZero(binary.rhs)) return binary.lhs;
     if (isFpPositiveZero(binary.lhs)) return binary.rhs;
     return null;
+}
+
+fn simplifyFmul(binary: ir.BinaryInst) ?ir.Value {
+    return simplifyStrictFmulConstants(binary);
+}
+
+fn simplifyStrictFaddConstants(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.lhs != .fp or binary.rhs != .fp) return null;
+    const lhs = fp_semantics.classify(binary.ty, binary.lhs.fp) catch return null;
+    const rhs = fp_semantics.classify(binary.ty, binary.rhs.fp) catch return null;
+    if (lhs.category == .zero and isNonNegativeFiniteNonZero(rhs)) return binary.rhs;
+    if (rhs.category == .zero and isNonNegativeFiniteNonZero(lhs)) return binary.lhs;
+    return null;
+}
+
+fn simplifyStrictFmulConstants(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.lhs != .fp or binary.rhs != .fp) return null;
+    const lhs = fp_semantics.classify(binary.ty, binary.lhs.fp) catch return null;
+    const rhs = fp_semantics.classify(binary.ty, binary.rhs.fp) catch return null;
+    if (isFpOne(lhs)) return binary.rhs;
+    if (isFpOne(rhs)) return binary.lhs;
+    if (lhs.category == .zero and isNonNegativeFiniteNonZero(rhs)) return binary.lhs;
+    if (rhs.category == .zero and isNonNegativeFiniteNonZero(lhs)) return binary.rhs;
+    return null;
+}
+
+fn isFpOne(classification: fp_semantics.Classification) bool {
+    const text = std.mem.trim(u8, classification.spelling, " \t");
+    return !classification.negative and
+        classification.category == .normal and
+        (std.mem.eql(u8, text, "1.0") or
+            std.mem.eql(u8, text, "+1.0") or
+            std.mem.eql(u8, text, "1.000000e+00") or
+            std.mem.eql(u8, text, "+1.000000e+00"));
+}
+
+fn isNonNegativeFiniteNonZero(classification: fp_semantics.Classification) bool {
+    if (classification.negative) return false;
+    return switch (classification.category) {
+        .normal, .subnormal => true,
+        .zero, .negative_zero, .nan, .infinity => false,
+    };
 }
 
 const DivRem = enum { div, rem };

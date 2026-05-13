@@ -102,7 +102,7 @@ Each slice is complete only when it has:
       Preserve and drop `nsw`, `nuw`, and exact flags according to LLVM's
       legality checks for selected integer folds. Required upstream mapping:
       `llvm/lib/Transforms/InstCombine/`.
-- [ ] Slice 18: APFloat-backed strict FP folds.
+- [x] Slice 18: APFloat-backed strict FP folds.
       Replace conservative FP pass-through with APFloat-equivalent constant
       folding for selected `fadd`, `fmul`, and `fcmp` cases. Required upstream
       mapping: `llvm/lib/Analysis/InstructionSimplify.cpp` and APFloat users.
