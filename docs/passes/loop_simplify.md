@@ -27,6 +27,10 @@ LLVM entry points/classes:
   LoopSimplifyPass::run
   simplifyLoop
   LoopSimplifyCFGPass::run
+  simplifyLoopCFG
+  constantFoldTerminators
+  ConstantTerminatorFoldingImpl::run
+  ConstantTerminatorFoldingImpl::foldTerminators
   LoopRotatePass::run
   LoopDeletionPass::run
   formLCSSA
@@ -51,7 +55,8 @@ Core LLVM algorithm data structures:
   Side-effect and trip-count facts for deletion.
 
 Local target status:
-  LoopInfo foundation plus explicit placeholders.
+  LoopInfo foundation plus LLVM-shaped LoopSimplifyCFG subset and explicit
+  placeholders for rotation/deletion.
 ```
 
 Implemented subset:
@@ -60,7 +65,13 @@ Implemented subset:
 LoopInfo exposes headers, latches, preheaders, exiting blocks, exit blocks,
 dedicated-exit checks, containment, backedges, parent indexes, loop depth, and
 loop-invariant value classification.
-loop-simplifycfg, loop-rotate, and loop-deletion are executable placeholders.
+loop-simplifycfg folds a constant conditional branch in a non-header,
+non-latch loop block when the loop has a preheader, dedicated exits, and
+existing LCSSA form. It removes newly unreachable blocks and then applies the
+same LLVM-shaped block-into-predecessor cleanup used by
+`simplifyLoopCFG`/`mergeBlocksIntoPredecessors` for the accepted loop-local
+surface.
+loop-rotate and loop-deletion are executable placeholders.
 Cycle 17 added LoopInfo-side recognition for simple induction variables and
 side-effect-free loop-deletion candidates, but it still does not rotate loops,
 insert LCSSA PHIs, or delete loop blocks.
@@ -78,6 +89,9 @@ no preheader creation
 no latch canonicalization
 no dedicated-exit splitting
 no LCSSA formation for non-dedicated exits or multi-exit loops
+no LoopSimplifyCFG support for current-loop deletion, dead exit deletion,
+switch folding, indirect entries, irreducible CFG, nested-loop LoopInfo
+updates, MemorySSA updates, or ScalarEvolution invalidation
 no loop rotation
 no side-effect-free loop deletion
 ```
@@ -87,6 +101,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   LICM fixtures exercise the current accepted canonical loop shape.
+  loop_simplifycfg_const_body_branch
 
 local-only conservative:
   LICM negative fixtures document no-preheader and multi-latch rejection.

@@ -66,7 +66,7 @@ Each slice is complete only when it has:
 
 ## Phase 3: Loop Pipeline Placeholders
 
-- [ ] Slice 10: `loop-simplifycfg` for loop-local dead branches.
+- [x] Slice 10: `loop-simplifycfg` for loop-local dead branches.
       Implement CFG cleanup that preserves loop canonical structure and updates
       LoopInfo/LCSSA. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp`.
