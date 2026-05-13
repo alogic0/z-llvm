@@ -14,9 +14,9 @@ llvm-project-22/llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp
 
 These passes operate across function boundaries. Most of this family remains
 placeholder-only until the local call graph, attributes, ABI constraints, and
-debug-info preservation are strong enough for broad body rewriting. The current
-exception is a narrow `always-inline` slice for direct calls to local
-single-block callees. `function-attrs` now has a direct-call inference slice
+debug-info preservation are strong enough for broad body rewriting. Current
+exceptions are narrow `always-inline` and `inline` slices for direct calls to
+local single-block callees. `function-attrs` has a direct-call inference slice
 for memory effects and `norecurse`.
 
 ## LLVM Algorithm Contract
@@ -33,6 +33,9 @@ LLVM source files:
 LLVM entry points/classes:
   AlwaysInlinerPass::run
   InlinerPass::run
+  InlineAdvisor::getAdvice
+  InlineCostCallAnalyzer
+  InlineFunction
   ArgumentPromotionPass::run
   CalledValuePropagationPass::run
   DeadArgumentEliminationPass::run
@@ -60,10 +63,12 @@ Core LLVM algorithm data structures:
 Local target status:
   always-inline is an LLVM-shaped subset for direct internal single-block
   callees.
+  inline is an LLVM-shaped cost-gated subset for direct internal single-block
+  callees.
   function-attrs is an LLVM-shaped direct-call subset for `memory(none)`,
   `memory(read)`, and `norecurse`.
-  inline, argpromotion, called-value-propagation, callsite-splitting,
-  deadargelim, forceattrs, and inferattrs remain placeholders or analysis
+  argpromotion, called-value-propagation, callsite-splitting, deadargelim,
+  forceattrs, and inferattrs remain placeholders or analysis
   foundations.
 ```
 
@@ -78,9 +83,19 @@ always-inline:
   the inlined return value, removes the call, and removes now-dead local
   alwaysinline definitions when they have no remaining direct call uses.
 
+inline:
+  direct calls to internal/private function definitions are cloned when the
+  callee has one basic block ending in ret and fits the local instruction cost
+  budget.
+  The local pass rejects noinline, recursive, indirect, declaration,
+  multi-block, side-effecting, operand-bundle, unsupported call-site attribute,
+  and over-budget calls.
+  It reuses the same InlineFunction-shaped clone/substitute path as
+  always-inline and deletes only local callees made dead by this pass.
+
 remaining IPO passes:
-  inline, argpromotion, called-value-propagation, callsite-splitting, and
-  deadargelim are executable placeholders.
+  argpromotion, called-value-propagation, callsite-splitting, and deadargelim
+  are executable placeholders.
 
 direct-call graph foundations distinguish definitions from declarations.
 function/declaration attribute helpers resolve #N groups for IPO-relevant
@@ -111,6 +126,8 @@ no argument rewriting outside call-to-callee parameter substitution
 no dead argument removal
 no full CGSCC iteration
 no general inline cost model
+inline cost is a small local instruction budget, not LLVM's full InlineCost
+model with TTI, profile, SROA bonuses, and call penalties
 debug-location salvage for inlined bodies is not modeled
 function-attrs does not infer writeonly, nofree, nosync, nounwind, willreturn,
 or other Attributor-derived facts yet
@@ -122,8 +139,10 @@ Fixture coverage:
 opt-22 equivalent:
   always_inline_direct
   always_inline_noinline_call
+  inline_direct_small
 
 local-only conservative:
+  inline_noinline_call
   function_attrs_direct_calls
   function_attrs_reject
   call graph declaration/definition reachability test
@@ -175,4 +194,50 @@ Fixtures and comparison:
   bash scripts/compare_opt.sh test/opt/fixtures.tsv
   always_inline_direct compares with opt-22 -passes=always-inline
   always_inline_noinline_call compares with opt-22 -passes=always-inline
+```
+
+## Inline Upstream Mapping
+
+```text
+LLVM source files:
+  llvm-project-22/llvm/lib/Transforms/IPO/Inliner.cpp
+  llvm-project-22/llvm/lib/Transforms/Utils/InlineFunction.cpp
+  llvm-project-22/llvm/lib/Analysis/InlineCost.cpp
+
+LLVM entry points/classes:
+  InlinerPass::run
+  InlineAdvisor::getAdvice
+  InlineCostCallAnalyzer
+  InlineFunction
+
+Reproduced behavior:
+  The local pass scans direct calls to defined local callees, rejects noinline
+  and unsupported call-site forms, applies a small instruction-budget cost
+  check, clones the callee body into the caller, replaces the call result with
+  the returned value, and removes callees made dead by this pass.
+
+Accepted local IR surface:
+  internal/private callee definitions
+  direct calls only
+  matching argument count, return type, and calling convention
+  one callee basic block ending in ret
+  no callee PHIs, calls, stores, atomics, fences, allocas, or EH
+  no recursive calls
+  no call-site attributes except as a rejection boundary
+
+Known missing behavior:
+  no LazyCallGraph/CGSCC update model
+  no full InlineAdvisor or InlineCost model
+  no multi-block inlining
+  no invoke/callbr support
+  no operand-bundle support
+  no call-site attribute merge beyond preserving rejected calls
+  no debug-location salvage
+
+Fixtures and comparison:
+  bash scripts/compare_opt.sh test/opt/fixtures.tsv
+  inline_direct_small compares with opt-22 -passes=cgscc(inline)
+  inline_noinline_call is local-conservative because LLVM prints the call-site
+  noinline attribute through an attribute group while the local parser preserves
+  the source-backed group.
 ```

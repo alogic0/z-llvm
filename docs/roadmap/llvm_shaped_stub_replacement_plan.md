@@ -124,7 +124,7 @@ Each slice is complete only when it has:
 - [x] Slice 22: `function-attrs` direct-call inference.
       Infer readonly/readnone/norecurse for local direct-call SCCs. Required
       upstream mapping: `llvm/lib/Transforms/IPO/FunctionAttrs.cpp`.
-- [ ] Slice 23: `inline` for one direct internal call shape.
+- [x] Slice 23: `inline` for one direct internal call shape.
       Build on `always-inline`, but add basic cost gating and call-site
       attribute preservation. Required upstream mapping:
       `llvm/lib/Transforms/IPO/Inliner.cpp`.

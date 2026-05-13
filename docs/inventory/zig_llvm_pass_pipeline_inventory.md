@@ -226,7 +226,7 @@ Status meanings:
 | `rpo-function-attrs` | attribute IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/FunctionAttrs.cpp` |
 | `called-value-propagation` | IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/CalledValuePropagation.cpp` |
 | `argpromotion` | IPO | P3 | placeholder | `llvm/lib/Transforms/IPO/ArgumentPromotion.cpp` |
-| `inline` | IPO | P2 | placeholder | `llvm/lib/Transforms/IPO/Inliner.cpp` |
+| `inline` | IPO | P2 | LLVM-shaped cost-gated direct-call inlining slice | `llvm/lib/Transforms/IPO/Inliner.cpp` |
 | `callsite-splitting` | IPO/scalar | P3 | placeholder | `llvm/lib/Transforms/Scalar/CallSiteSplitting.cpp` |
 | `deadargelim` | IPO cleanup | P3 | placeholder | `llvm/lib/Transforms/IPO/DeadArgumentElimination.cpp` |
 | `globalopt` | global optimization | P2 | LLVM-shaped scalar direct-load cleanup slice | `llvm/lib/Transforms/IPO/GlobalOpt.cpp` |

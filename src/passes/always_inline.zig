@@ -21,7 +21,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     return if (changed) .changed else .unchanged;
 }
 
-const CallSite = struct {
+pub const CallSite = struct {
     block_index: usize,
     instruction_index: usize,
     callee_index: usize,
@@ -79,11 +79,11 @@ fn inlineableCalleeIndex(module: ir.Module, caller_name: []const u8, call: ir.Ca
     return null;
 }
 
-fn isLocalLinkage(linkage: ir.FunctionLinkage) bool {
+pub fn isLocalLinkage(linkage: ir.FunctionLinkage) bool {
     return linkage == .internal or linkage == .private;
 }
 
-fn isSupportedCalleeBody(function: ir.Function) bool {
+pub fn isSupportedCalleeBody(function: ir.Function) bool {
     if (function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
     for (block.instructions.items) |instruction| {
@@ -97,7 +97,7 @@ fn isSupportedCalleeBody(function: ir.Function) bool {
     return terminator == .ret;
 }
 
-fn inlineCall(module: *ir.Module, caller_index: usize, site: CallSite) !void {
+pub fn inlineCall(module: *ir.Module, caller_index: usize, site: CallSite) !void {
     var aliases = std.StringHashMap(ir.Value).init(module.allocator);
     defer aliases.deinit();
 
@@ -353,7 +353,7 @@ fn removeDeadAlwaysInlineFunctions(module: *ir.Module) bool {
     return changed;
 }
 
-fn hasDirectCallUse(module: ir.Module, function_name: []const u8) bool {
+pub fn hasDirectCallUse(module: ir.Module, function_name: []const u8) bool {
     for (module.functions.items) |function| {
         for (function.blocks.items) |block| {
             for (block.instructions.items) |instruction| {
@@ -370,7 +370,7 @@ fn hasDirectCallUse(module: ir.Module, function_name: []const u8) bool {
     return false;
 }
 
-fn hasNonCallFunctionUse(module: ir.Module, function_name: []const u8) bool {
+pub fn hasNonCallFunctionUse(module: ir.Module, function_name: []const u8) bool {
     for (module.aliases.items) |alias| {
         if (std.mem.eql(u8, alias.target, function_name)) return true;
     }
@@ -493,7 +493,7 @@ fn isIdentifierByte(byte: u8) bool {
     return std.ascii.isAlphanumeric(byte) or byte == '_' or byte == '.' or byte == '$' or byte == '-';
 }
 
-fn hasAttribute(module: ir.Module, text: ?[]const u8, attr: []const u8) bool {
+pub fn hasAttribute(module: ir.Module, text: ?[]const u8, attr: []const u8) bool {
     const attr_text = text orelse return false;
     var it = std.mem.tokenizeAny(u8, attr_text, " \t,");
     while (it.next()) |token| {
