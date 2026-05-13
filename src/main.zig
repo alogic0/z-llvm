@@ -163,7 +163,7 @@ pub fn main(init: std.process.Init) !void {
         .timing = timing,
         .pass_limit = pass_limit,
     });
-    if (!trace) try module.print(stdout);
+    if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
 }
 
