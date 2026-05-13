@@ -159,6 +159,31 @@ docs/codegen.md
 
 If the upstream mapping is incomplete, the implementation can land only if the doc explicitly says what still needs to be checked.
 
+## LLVM-Shaped Fix Rule
+
+When a bug or missing feature corresponds to LLVM behavior, the fix must
+implement the LLVM-shaped behavior for the selected slice, not a conservative
+stub that merely avoids the failing case.
+
+Before editing code, identify the LLVM source entry point and the accepted IR
+preconditions for the slice. The implementation should reproduce that behavior
+for the local supported IR surface, with fixtures that compare against LLVM
+when LLVM accepts the input.
+
+A conservative result is allowed only when it is the actual LLVM-compatible
+boundary for the current IR surface, or when LLVM needs infrastructure this
+project does not yet have. In that case, the code, fixture classification, and
+docs must say so explicitly:
+
+```text
+local-conservative: reason, missing infrastructure, and upstream behavior
+```
+
+Do not land placeholder behavior as a completed fix. If the LLVM-shaped slice
+is too large for one cycle, reduce the selected slice until it can be
+implemented with upstream mapping, focused fixtures, known unsupported behavior,
+and a reviewable diff.
+
 ## Step Completion Rule
 
 A checkbox in `docs/next_steps.md` can be marked complete only after:
