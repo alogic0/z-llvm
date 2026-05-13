@@ -105,6 +105,7 @@ loop depth 0.
 | `loop-instsimplify` | LLVM-shaped subset | Applies local InstSimplify only inside recognized loop blocks |
 | `licm` | fixture-equivalent for listed fixtures | Hoists pure scalar invariant instructions to an existing preheader |
 | `loop-simplifycfg` | LLVM-shaped subset | Constant loop-local branch folding and simple loop-block merging for accepted LCSSA/preheader/dedicated-exit loops |
+| `loop-rotate` | LLVM-shaped subset | Single-latch counted while loop rotated into guarded do-while shape with LCSSA repair |
 | `loop-rotate` | placeholder | Deferred until loop-shape invariants and phi rewrites are robust |
 | `simple-loop-unswitch` | placeholder | Deferred until branch duplication and dominance updates are robust |
 | `loop-unroll` | placeholder | Deferred until trip-count proof and code-size policy exist |

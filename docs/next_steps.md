@@ -11,27 +11,24 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Source roadmap: [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Active slice: Slice 10: `loop-simplifycfg` for loop-local dead branches
+Active slice: Slice 11: `loop-rotate` for single-latch counted loops
 
 Goal: replace placeholder/local-conservative behavior with LLVM-shaped behavior.
 
-- [x] Map LLVM `LoopSimplifyCFGPass::run`, `simplifyLoopCFG`,
-      `constantFoldTerminators`, `ConstantTerminatorFoldingImpl::run`, and
-      `foldTerminators`.
-- [x] Define the accepted local IR surface: one natural loop with preheader,
-      dedicated exits, existing LCSSA form, and a non-header loop block whose
-      conditional branch has a constant condition.
-- [x] Replace the `loop-simplifycfg` placeholder with a real loop pass for that
+- [x] Map LLVM `LoopRotatePass::run`, `LoopRotate.cpp`, `LoopRotationUtils`,
+      `Loop::getLoopPreheader`, `Loop::getLoopLatch`, and PHI repair behavior.
+- [x] Define the accepted local IR surface: preheader, header, body, latch, and
+      exit blocks; one latch; one dedicated exit; header condition branches to
+      body or exit; latch unconditionally branches back to the header.
+- [x] Replace the `loop-rotate` placeholder with a real loop pass for that
       surface.
-- [x] Fold the loop-local constant conditional branch to an unconditional branch
-      and repair PHI predecessor lists through CFG update helpers.
-- [x] Remove newly unreachable loop-local blocks when the current loop header
-      and latch remain reachable.
-- [x] Add an `opt-22` comparison fixture for a loop body branch with a dead
-      loop-local successor.
-- [x] Keep current loop deletion, non-dedicated exits, indirect entry, switch,
-      and LCSSA repair out of scope and documented.
-- [x] Update loop simplify and parity docs.
+- [x] Rotate the accepted while-shaped loop into the LLVM-compatible
+      do-while-shaped loop for a simple counted integer induction pattern.
+- [x] Repair PHI incoming blocks and exit LCSSA PHIs for the accepted shape.
+- [x] Add an `opt-22` comparison fixture for the accepted counted loop.
+- [x] Keep multi-latch loops, side exits, nested loops, metadata, debug salvage,
+      MemorySSA updates, and general PHI duplication out of scope and documented.
+- [x] Update loop simplify/rotation and parity docs.
 - [x] Run focused comparison.
 - [x] Run readiness checks.
-- [x] Review, commit, and mark Slice 10 complete in the roadmap.
+- [x] Review, commit, and mark Slice 11 complete in the roadmap.

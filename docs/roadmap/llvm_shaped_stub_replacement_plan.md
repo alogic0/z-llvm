@@ -70,7 +70,7 @@ Each slice is complete only when it has:
       Implement CFG cleanup that preserves loop canonical structure and updates
       LoopInfo/LCSSA. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopSimplifyCFG.cpp`.
-- [ ] Slice 11: `loop-rotate` for single-latch counted loops.
+- [x] Slice 11: `loop-rotate` for single-latch counted loops.
       Reproduce the smallest LLVM loop-rotation shape with preheader, header,
       latch, and dedicated exits. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/LoopRotation.cpp`.

@@ -32,6 +32,8 @@ LLVM entry points/classes:
   ConstantTerminatorFoldingImpl::run
   ConstantTerminatorFoldingImpl::foldTerminators
   LoopRotatePass::run
+  LoopRotate.cpp
+  LoopRotationUtils
   LoopDeletionPass::run
   formLCSSA
 
@@ -55,8 +57,8 @@ Core LLVM algorithm data structures:
   Side-effect and trip-count facts for deletion.
 
 Local target status:
-  LoopInfo foundation plus LLVM-shaped LoopSimplifyCFG subset and explicit
-  placeholders for rotation/deletion.
+  LoopInfo foundation plus LLVM-shaped LoopSimplifyCFG and LoopRotate subsets
+  with an explicit placeholder for deletion.
 ```
 
 Implemented subset:
@@ -71,7 +73,11 @@ existing LCSSA form. It removes newly unreachable blocks and then applies the
 same LLVM-shaped block-into-predecessor cleanup used by
 `simplifyLoopCFG`/`mergeBlocksIntoPredecessors` for the accepted loop-local
 surface.
-loop-rotate and loop-deletion are executable placeholders.
+loop-rotate rotates the accepted single-latch counted while-loop shape into the
+LLVM-compatible guarded do-while form: a preheader guard, a `.lr.ph` block, a
+rotated body PHI, a latch condition on the incremented induction value, a split
+exit critical edge, and repaired LCSSA exit PHIs.
+loop-deletion is an executable placeholder.
 Cycle 17 added LoopInfo-side recognition for simple induction variables and
 side-effect-free loop-deletion candidates, but it still does not rotate loops,
 insert LCSSA PHIs, or delete loop blocks.
@@ -92,7 +98,7 @@ no LCSSA formation for non-dedicated exits or multi-exit loops
 no LoopSimplifyCFG support for current-loop deletion, dead exit deletion,
 switch folding, indirect entries, irreducible CFG, nested-loop LoopInfo
 updates, MemorySSA updates, or ScalarEvolution invalidation
-no loop rotation
+no loop rotation beyond the accepted single-latch counted while-loop shape
 no side-effect-free loop deletion
 ```
 
@@ -102,11 +108,12 @@ Fixture coverage:
 opt-22 equivalent:
   LICM fixtures exercise the current accepted canonical loop shape.
   loop_simplifycfg_const_body_branch
+  loop_rotate_counted
 
 local-only conservative:
   LICM negative fixtures document no-preheader and multi-latch rejection.
 
 unit-test only:
   LoopInfo natural-loop queries, simple LCSSA formation, non-dedicated-exit
-  LCSSA rejection, and release-o3 loop placeholder dispatch
+  LCSSA rejection, and release-o3 loop dispatch
 ```
