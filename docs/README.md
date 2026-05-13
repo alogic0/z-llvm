@@ -12,7 +12,8 @@ corpus expansion cycles are complete and archived under
 source-backed roadmap cycles are complete and archived under
 `roadmap/historical/completed_source_backed_cycles/`. The finish-oriented
 roadmap cycles are complete and archived under
-`roadmap/historical/completed_finish_oriented_cycles/`.
+`roadmap/historical/completed_finish_oriented_cycles/`. Completed tooling
+cycles are archived under `roadmap/historical/completed_tooling_cycles/`.
 
 The purpose is to keep the project aligned with Zig's upstream LLVM-removal
 path:
@@ -169,9 +170,13 @@ work should be selected from the backlog or a new source-backed blocker.
 
 The active work queue is kept short in [next_steps.md](next_steps.md).
 
-## Active Tooling Cycle
+## Completed Tooling Cycles
 
-- [ ] [Cycle 01: Input Size Tooling](roadmap/01_input_size_tooling_cycle.md)
+- [x] [Completed Tooling Cycles](roadmap/historical/completed_tooling_cycles/README.md)
+
+## Completed Stub Replacement Plan
+
+- [x] [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
 ## Completed Discovery Cycles
 
@@ -180,10 +185,9 @@ The active work queue is kept short in [next_steps.md](next_steps.md).
 ## Future Backlog
 
 - [ ] [Future Optimizer Backlog](roadmap/future_optimizer_backlog.md)
-- [ ] [LLVM-Shaped Stub Replacement Plan](roadmap/llvm_shaped_stub_replacement_plan.md)
 
-Use [Stub Replacement Cycle](stub_replacement_cycle.md) when pulling slices
-from the LLVM-shaped stub replacement plan.
+Use [Stub Replacement Cycle](stub_replacement_cycle.md) only if a future audit
+adds new slices to the LLVM-shaped stub replacement plan.
 
 ## Operating Rule
 

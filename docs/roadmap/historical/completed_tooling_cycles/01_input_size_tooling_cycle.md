@@ -32,7 +32,7 @@ failures under the current CLI input limit:
       corpus sweep.
 - [x] Document the exact command for rerunning the 122 `input-too-large` rows
       with a larger limit.
-- [ ] Reclassify any failures exposed after the larger-limit sweep into normal
+- [x] Reclassify any failures exposed after the larger-limit sweep into normal
       bug packets.
 
 ## Rerun Command
