@@ -116,6 +116,7 @@ Fixture coverage:
   local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
+  opt fixture: dse_partial_overwrite_lattice
 
 opt-22 comparison command:
   covered indirectly through GVN and EarlyCSE memory fixtures in

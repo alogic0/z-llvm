@@ -323,6 +323,7 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
     if (memory_effect.classify(store_instruction) == .volatile_or_atomic_barrier) return false;
 
     const location = accessLocation(function, layout, store.ptr, store.ty) orelse return false;
+    var partial_overwrites: IntervalSet = .{};
 
     for (block.instructions.items[store_index + 1 ..]) |instruction| {
         if (instruction.removed) continue;
@@ -332,7 +333,12 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
                 const later = accessLocation(function, layout, later_store.ptr, later_store.ty) orelse return false;
                 switch (alias.aliasLocations(later, location)) {
                     .must_alias => return fullyOverwrites(later, location),
-                    .partial_alias, .may_alias => return false,
+                    .partial_alias => {
+                        const overlap = overlapInterval(later, location) orelse return false;
+                        if (!partial_overwrites.add(overlap)) return false;
+                        if (partial_overwrites.covers(location)) return true;
+                    },
+                    .may_alias => return false,
                     .no_alias => {},
                 }
             },
@@ -346,6 +352,66 @@ pub fn storeOverwrittenInBlock(function: ir.Function, layout: ?target.DataLayout
         }
     }
     return false;
+}
+
+const Interval = struct {
+    start: i128,
+    end: i128,
+};
+
+const IntervalSet = struct {
+    const max_intervals = 8;
+
+    intervals: [max_intervals]Interval = undefined,
+    len: usize = 0,
+
+    fn add(set: *IntervalSet, interval: Interval) bool {
+        if (interval.end <= interval.start) return false;
+        var merged = interval;
+        var index: usize = 0;
+        while (index < set.len) {
+            const existing = set.intervals[index];
+            if (existing.end < merged.start or existing.start > merged.end) {
+                index += 1;
+                continue;
+            }
+            merged.start = @min(merged.start, existing.start);
+            merged.end = @max(merged.end, existing.end);
+            set.remove(index);
+        }
+        if (set.len >= max_intervals) return false;
+        set.intervals[set.len] = merged;
+        set.len += 1;
+        return true;
+    }
+
+    fn covers(set: IntervalSet, location: memory_location.MemoryLocation) bool {
+        const start = location.offset orelse return false;
+        const end = location.rangeEnd() orelse return false;
+        for (set.intervals[0..set.len]) |interval| {
+            if (interval.start <= start and interval.end >= end) return true;
+        }
+        return false;
+    }
+
+    fn remove(set: *IntervalSet, index: usize) void {
+        var current = index;
+        while (current + 1 < set.len) : (current += 1) {
+            set.intervals[current] = set.intervals[current + 1];
+        }
+        set.len -= 1;
+    }
+};
+
+fn overlapInterval(later: memory_location.MemoryLocation, earlier: memory_location.MemoryLocation) ?Interval {
+    const later_start = later.offset orelse return null;
+    const earlier_start = earlier.offset orelse return null;
+    const later_end = later.rangeEnd() orelse return null;
+    const earlier_end = earlier.rangeEnd() orelse return null;
+    const start = @max(later_start, earlier_start);
+    const end = @min(later_end, earlier_end);
+    if (end <= start) return null;
+    return .{ .start = start, .end = end };
 }
 
 fn fullyOverwrites(later: memory_location.MemoryLocation, earlier: memory_location.MemoryLocation) bool {

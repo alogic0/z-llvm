@@ -55,7 +55,7 @@ Each slice is complete only when it has:
       Implement one LLVM-shaped load PRE slice for a diamond where all required
       values are available or safely insertable. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/GVN.cpp`.
-- [ ] Slice 8: DSE overwrite lattice for partial stores.
+- [x] Slice 8: DSE overwrite lattice for partial stores.
       Replace reject-only partial overwrite behavior with a byte-interval
       lattice for selected integer stores. Required upstream mapping:
       `llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp`.

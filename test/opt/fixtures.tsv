@@ -93,6 +93,7 @@ licm_atomic_store_barrier_reject	licm	loop-mssa(licm)	test/opt/inputs/licm_atomi
 dse_atomic_store_barrier_reject	dse	dse	test/opt/inputs/dse_atomic_store_barrier_reject.ll	test/opt/expected/z_llvm/dse_atomic_store_barrier_reject.ll	local-conservative	dse	atomic store is a barrier for later store elimination
 dse_overwrite	dse	dse	test/opt/inputs/dse_overwrite.ll	test/opt/expected/z_llvm/dse_overwrite.ll	opt-equivalent	dse	overwritten stack store removed
 dse_partial_overwrite_reject	dse	dse	test/opt/inputs/dse_partial_overwrite_reject.ll	test/opt/expected/z_llvm/dse_partial_overwrite_reject.ll	opt-equivalent	dse	partial overwrite at the same offset does not remove the wider earlier store
+dse_partial_overwrite_lattice	dse	dse	test/opt/inputs/dse_partial_overwrite_lattice.ll	test/opt/expected/z_llvm/dse_partial_overwrite_lattice.ll	opt-equivalent	dse	two later byte stores fully cover and remove an earlier wider integer store
 dse_load_barrier	dse	dse	test/opt/inputs/dse_load_barrier.ll	test/opt/expected/z_llvm/dse_load_barrier.ll	opt-equivalent	dse	intervening load keeps earlier store alive
 dse_volatile_barrier	dse	dse	test/opt/inputs/dse_volatile_barrier.ll	test/opt/expected/z_llvm/dse_volatile_barrier.ll	opt-equivalent	dse	volatile load is a DSE barrier
 dse_disjoint_field_overwrite	dse	dse	test/opt/inputs/dse_disjoint_field_overwrite.ll	test/opt/expected/z_llvm/dse_disjoint_field_overwrite.ll	opt-equivalent	dse	Disjoint field store does not block same-field complete overwrite elimination
