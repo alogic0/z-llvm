@@ -9,14 +9,14 @@ compare with LLVM where possible, document the upstream mapping, then commit.
 
 Each slice is complete only when it has:
 
-- [ ] LLVM source file and entry-point mapping.
-- [ ] Accepted local IR preconditions.
-- [ ] Implementation that follows the LLVM-shaped algorithm for that surface.
-- [ ] `opt-22` fixture comparison, or a documented reason LLVM comparison is
-      not applicable.
-- [ ] Updated pass or analysis docs with missing behavior.
-- [ ] No completed placeholder behavior. If infrastructure is missing, the
-      slice must say which LLVM algorithm is still blocked and why.
+- LLVM source file and entry-point mapping.
+- Accepted local IR preconditions.
+- Implementation that follows the LLVM-shaped algorithm for that surface.
+- `opt-22` fixture comparison, or a documented reason LLVM comparison is not
+  applicable.
+- Updated pass or analysis docs with missing behavior.
+- No completed placeholder behavior. If infrastructure is missing, the slice
+  must say which LLVM algorithm is still blocked and why.
 
 ## Phase 1: Mandatory Scalar Pipeline Stubs
 
