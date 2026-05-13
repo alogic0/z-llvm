@@ -311,6 +311,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll("getelementptr ");
                         try gep.source_ty.format(writer);
                         try writer.writeAll(", ptr ");
+                        if (gep.ptr_addrspace) |addrspace_text| try writer.print("{s} ", .{addrspace_text});
                         try gep.ptr.format(writer);
                         for (gep.indices.items) |index| {
                             try writer.writeAll(", ");

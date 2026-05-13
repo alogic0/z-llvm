@@ -127,6 +127,10 @@ Active cycle:
       address-space pointer function return spellings such as
       `ptr addrspace(256)`. Upstream mapping is recorded in
       [Module-Level IR](ir_module.md).
+- [x] Source-backed Debug verifier blocker: parse, verify, print, and preserve
+      address-space pointer operands on `getelementptr`, avoiding misclassification
+      of `addrspace(...)` as a floating-point value. Upstream mapping is recorded
+      in [Memory IR Subset](ir_memory.md).
 
 The Cycle 02-08 finish burn-down wave is complete. Discovery Cycles 01-07 are
 archived under [Completed Discovery

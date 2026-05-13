@@ -41,6 +41,7 @@ store volatile iN %value, ptr %slot, align N
 store atomic iN %value, ptr %slot, <ordering>, align N
 store atomic iN %value, ptr getelementptr inbounds ... (...) <ordering>, align N
 %derived = getelementptr iN, ptr %slot, iN <index>
+%derived = getelementptr <source-ty>, ptr addrspace(N) %base, iN <index>
 %old = atomicrmw <op> ptr %slot, iN %value, <ordering>, align N
 %old = atomicrmw <op> ptr getelementptr inbounds ... (...), iN %value <ordering>, align N
 %pair = cmpxchg ptr %slot, iN %expected, iN %replacement, <success-ordering> <failure-ordering>, align N
@@ -52,6 +53,8 @@ verification that load/store pointer operands have ptr type
 verification that store value operands match the stored type
 verification that parsed memory alignment is nonzero
 verification that getelementptr base operands have ptr type and at least one typed index
+address-space pointer operands on getelementptr are preserved for source-backed
+Debug rows
 verification that accepted atomicrmw/cmpxchg/fence orderings and alignments are well formed
 ```
 

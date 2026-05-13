@@ -1289,8 +1289,16 @@ fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
     const ptr_text = std.mem.trim(u8, rest[0..ptr_end], " \t");
     const ptr_arg = try parseLeadingType(ptr_text);
     if (ptr_arg.ty != .ptr) return error.ExpectedPointerType;
-    if (ptr_arg.after.len == 0) return error.InvalidGetElementPtr;
-    gep.ptr = try parseValue(ptr_arg.after);
+    var ptr_value_text = std.mem.trim(u8, ptr_arg.after, " \t");
+    if (ptr_value_text.len == 0) return error.InvalidGetElementPtr;
+    if (firstToken(ptr_value_text)) |token| {
+        if (isAddressSpaceToken(token)) {
+            gep.ptr_addrspace = token;
+            ptr_value_text = trimFirstToken(ptr_value_text);
+        }
+    }
+    if (ptr_value_text.len == 0) return error.InvalidGetElementPtr;
+    gep.ptr = try parseValue(ptr_value_text);
 
     rest = std.mem.trim(u8, rest[ptr_end + 1 ..], " \t");
     while (rest.len != 0) {

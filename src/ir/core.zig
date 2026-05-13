@@ -704,6 +704,7 @@ pub const GepIndex = struct {
 pub const GepInst = struct {
     source_ty: Type,
     ptr: Value,
+    ptr_addrspace: ?[]const u8 = null,
     indices: std.ArrayList(GepIndex),
 
     pub fn deinit(gep: *GepInst, allocator: std.mem.Allocator) void {
