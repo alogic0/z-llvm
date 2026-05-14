@@ -19,6 +19,34 @@ current corpus proves and which next blockers should drive future slices.
       `zig_emitter` and `zig_source_revision` columns record row provenance;
       current captures use `0.17.0-dev.304+9787df942` and `9787df9421`.
 
+## Accepted Optimizer Discovery Evidence
+
+The accepted optimizer pipelines were rerun across all Zig optimization modes
+with stage4 Zig emitting LLVM IR and the local ReleaseFast `z_llvm` checker
+running the corresponding accepted pipeline. All four sweeps completed without
+parse, verify, optimizer, or input-size failures:
+
+```text
+Debug        tmp/zig_ir/optimizer_discovery_03_debug
+ReleaseFast  tmp/zig_ir/optimizer_discovery_05_releasefast
+ReleaseSafe  tmp/zig_ir/optimizer_discovery_06_releasesafe
+ReleaseSmall tmp/zig_ir/optimizer_discovery_07_releasesmall
+```
+
+Each sweep produced the same accepted-corpus counts:
+
+```text
+candidates=1474
+processed=1474
+compile_skip=1009
+emit_ok=465
+local_ok=465
+input_too_large=0
+parse_fail=0
+verify_fail=0
+optimizer_fail=0
+```
+
 ## Blocker Inventory
 
 Parser:

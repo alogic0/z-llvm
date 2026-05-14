@@ -25,6 +25,36 @@ summary accepted=33 unsupported=0 future=4 debug-info-only=0
 ok readiness checks
 ```
 
+Accepted optimizer discovery was also rerun across all Zig optimization modes
+against the current `../ziglang` stage4 emitter and local ReleaseFast
+`z_llvm` checker:
+
+```text
+tmp/zig_ir/optimizer_discovery_03_debug
+  mode=Debug
+  passes=zig-debug-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/optimizer_discovery_05_releasefast
+  mode=ReleaseFast
+  passes=zig-release-fast-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/optimizer_discovery_06_releasesafe
+  mode=ReleaseSafe
+  passes=zig-release-safe-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/optimizer_discovery_07_releasesmall
+  mode=ReleaseSmall
+  passes=zig-release-small-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+```
+
 ## Non-Goals
 
 - Full LLVM clone.
