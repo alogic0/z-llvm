@@ -10,7 +10,7 @@ parser or optimizer behavior.
 
 - Zig source checkout: `../ziglang`
 - Current corpus docs: `docs/fixtures/zig_ir/README.md`
-- Upstream path: `docs/roadmap/zig_upstream_llvm_removal_path.md`
+- Upstream path: `docs/LLVM_replace.md`
 - Readiness report: `docs/upstream_integration_readiness.md`
 
 ## Plan

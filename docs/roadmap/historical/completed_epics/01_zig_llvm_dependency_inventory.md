@@ -10,7 +10,7 @@ compares anything?
 
 ## Inputs
 
-- `zig_upstream_llvm_removal_path.md`
+- `docs/LLVM_replace.md`
 - `../inventory/zig_llvm_api_inventory.md`
 - `../inventory/zig_llvm_pass_pipeline_inventory.md`
 - Zig source files that call into LLVM, LLD, Clang, or LLVM IR emission

@@ -9,7 +9,7 @@ that align with Zig's native LLVM-removal plan.
 ## Source Anchors
 
 - Zig upstream LLVM-removal docs and issues already collected in
-  `docs/roadmap/zig_upstream_llvm_removal_path.md`
+  `docs/LLVM_replace.md`
 - Local roadmap and inventory docs
 - Accepted corpus and opt comparison fixtures
 

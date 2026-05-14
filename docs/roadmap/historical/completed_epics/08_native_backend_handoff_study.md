@@ -7,7 +7,7 @@ Zig's native backends without becoming a competing full backend project.
 
 ## Inputs
 
-- `zig_upstream_llvm_removal_path.md`
+- `docs/LLVM_replace.md`
 - `zig_aligned_llvm_removal_plan.md`
 - Zig native backend architecture notes from local source analysis
 - Existing bounded codegen and MC/object epics

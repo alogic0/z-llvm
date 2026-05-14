@@ -9,7 +9,7 @@ These tracks are important, but each can become a project of its own.
 
 ## Inputs
 
-- `zig_upstream_llvm_removal_path.md`
+- `docs/LLVM_replace.md`
 - Dependency inventory from `01_zig_llvm_dependency_inventory.md`
 - Zig-emitted IR corpus from `02_zig_emitted_ir_corpus.md`
 
