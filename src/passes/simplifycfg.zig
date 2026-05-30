@@ -550,18 +550,28 @@ fn hoistDiamondPhiBinaryReturn(module: *ir.Module, function: *ir.Function) !bool
 
             var removed_phi = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
             removed_phi.deinit(module.allocator);
-            var merge_binary = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
-            switch (merge_binary.kind) {
+            var first_binary = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
+            switch (first_binary.kind) {
                 .binary => |*binary| {
                     binary.lhs = replaceOperand(binary.lhs, shape.phi_name, .{ .named = hoisted.result.? });
                     binary.rhs = replaceOperand(binary.rhs, shape.phi_name, .{ .named = hoisted.result.? });
                 },
                 .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => unreachable,
             }
-            try block.instructions.append(module.allocator, merge_binary);
+            const first_result = first_binary.result.?;
+            try block.instructions.append(module.allocator, first_binary);
+
+            const ret_value = if (shape.merge_binary_count == 1) ret: {
+                break :ret first_result;
+            } else ret: {
+                const second_binary = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
+                const second_result = second_binary.result.?;
+                try block.instructions.append(module.allocator, second_binary);
+                break :ret second_result;
+            };
             block.terminator = .{ .ret = .{
                 .ty = shape.ret_ty,
-                .value = .{ .named = merge_binary.result.? },
+                .value = .{ .named = ret_value },
             } };
 
             removeBlocksDescending(module.allocator, function, &.{ shape.merge_index, shape.else_index, shape.then_index });
@@ -578,6 +588,7 @@ const DiamondPhiBinaryReturn = struct {
     else_index: usize,
     merge_index: usize,
     phi_name: []const u8,
+    merge_binary_count: usize,
     ret_ty: ir.Type,
 };
 
@@ -610,7 +621,7 @@ fn diamondPhiBinaryReturn(module: ir.Module, function: ir.Function, graph: cfg.G
     if ((uses.counts.get(else_result) orelse 0) != 1) return null;
 
     const merge = function.blocks.items[merge_index];
-    if (merge.instructions.items.len != 2) return null;
+    if (merge.instructions.items.len != 2 and merge.instructions.items.len != 3) return null;
     const phi_inst = merge.instructions.items[0];
     if (phi_inst.removed or phi_inst.kind != .phi) return null;
     const phi_name = phi_inst.result orelse return null;
@@ -625,20 +636,37 @@ fn diamondPhiBinaryReturn(module: ir.Module, function: ir.Function, graph: cfg.G
     const merge_user_result = merge_user.result orelse return null;
     const merge_binary = binaryInstruction(merge_user) orelse return null;
     if (isFpBinary(merge_binary.op)) return null;
+    if (!binaryUsesValue(merge_binary, phi_name)) return null;
     if ((uses.counts.get(merge_user_result) orelse 0) != 1) return null;
+
+    const ret_ty = if (merge.instructions.items.len == 2) merge_binary.ty else ret: {
+        const second_binary = binaryInstruction(merge.instructions.items[2]) orelse return null;
+        break :ret second_binary.ty;
+    };
+    const ret_result = if (merge.instructions.items.len == 2) merge_user_result else ret: {
+        const second_user = merge.instructions.items[2];
+        if (second_user.removed or second_user.metadata != null) return null;
+        const second_user_result = second_user.result orelse return null;
+        const second_binary = binaryInstruction(second_user) orelse return null;
+        if (isFpBinary(second_binary.op)) return null;
+        if (!binaryUsesValue(second_binary, merge_user_result)) return null;
+        if ((uses.counts.get(second_user_result) orelse 0) != 1) return null;
+        break :ret second_user_result;
+    };
 
     const ret = switch (merge.terminator orelse return null) {
         .ret => |ret| ret,
         .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
     };
-    if (!ret.ty.eql(merge_binary.ty)) return null;
-    if (!retReturnsValue(ret, merge_user_result)) return null;
+    if (!ret.ty.eql(ret_ty)) return null;
+    if (!retReturnsValue(ret, ret_result)) return null;
 
     return .{
         .then_index = then_index,
         .else_index = else_index,
         .merge_index = merge_index,
         .phi_name = phi_name,
+        .merge_binary_count = merge.instructions.items.len - 1,
         .ret_ty = ret.ty,
     };
 }
@@ -943,6 +971,10 @@ fn valueNamesResult(value: ir.Value, result: []const u8) bool {
         .named => |name| std.mem.eql(u8, name, result),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn binaryUsesValue(binary: ir.BinaryInst, name: []const u8) bool {
+    return valueNamesResult(binary.lhs, name) or valueNamesResult(binary.rhs, name);
 }
 
 fn phiValueForBlock(phi: ir.PhiInst, block_name: []const u8) ?ir.Value {

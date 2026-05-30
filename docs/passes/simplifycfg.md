@@ -79,8 +79,8 @@ Implemented subset:
   Hoist matching two-instruction integer binary chains from two unique diamond
   arms when the merge block immediately returns the PHI of the chain results
   Hoist one identical pure scalar instruction, non-volatile load, or readnone
-  call from two unique diamond arms when the merge PHI has one integer binary
-  user that is returned immediately
+  call from two unique diamond arms when the merge PHI feeds one or two integer
+  binary instructions returned immediately
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
@@ -111,6 +111,7 @@ Fixture coverage:
   simplifycfg_hoist_commuted_diamond_phi_ret
   simplifycfg_hoist_two_inst_diamond_phi_ret
   simplifycfg_hoist_diamond_phi_binary_ret
+  simplifycfg_hoist_diamond_phi_two_binary_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -161,8 +162,8 @@ hoist matching two-instruction integer binary chains from two unique conditional
 successors that reconverge at a returned PHI and select between the hoisted
 chain results
 hoist one identical pure scalar instruction, non-volatile load, or readnone call
-from two unique conditional successors when their merge PHI feeds one integer
-binary instruction that is returned immediately
+from two unique conditional successors when their merge PHI feeds one or two
+integer binary instructions returned immediately
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -209,6 +210,7 @@ opt-22 equivalent:
   simplifycfg_hoist_commuted_diamond_phi_ret
   simplifycfg_hoist_two_inst_diamond_phi_ret
   simplifycfg_hoist_diamond_phi_binary_ret
+  simplifycfg_hoist_diamond_phi_two_binary_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -265,8 +267,8 @@ return value and commuted operands only for commutative binary opcodes, plus
 one identical pure scalar instruction, non-volatile load, or readnone call
 feeding a returned two-entry PHI, with commuted operands only for commutative
 integer binary opcodes, plus matching two-instruction integer binary chains
-feeding a returned two-entry PHI, plus one merge-local integer binary user of a
-two-entry PHI returned immediately
+feeding a returned two-entry PHI, plus one or two merge-local integer binary
+users of a two-entry PHI returned immediately
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```
