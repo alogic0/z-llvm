@@ -1,5 +1,6 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
+const cfg_update = @import("../analysis/cfg_update.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -379,7 +380,9 @@ fn propagateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     defer solver.deinit();
 
     try solver.solve();
-    return try solver.rewrite();
+    var changed = try solver.rewrite();
+    changed = try cfg_update.removeUnreachableBlocks(allocator, function) or changed;
+    return changed;
 }
 
 fn instructionFallback(instruction: ir.Instruction) Lattice {

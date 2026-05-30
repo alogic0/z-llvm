@@ -53,6 +53,7 @@ supported scalar instruction visitor using the InstSimplify helper
 select simplification where an overdefined condition still permits folding
 identical constant arms
 conditional branch edge marking and branch folding when the condition is constant
+unreachable block removal after SCCP rewrites a branch to one executable edge
 direct call folding when the callee is a known local function that always returns the same constant
 FP constants flow through the lattice and can feed already-legal InstSimplify
 folds, such as `fadd nsz x, +0.0` and constant `fcmp ord`/`uno`
@@ -79,10 +80,7 @@ opt-22 equivalent:
   sccp_select_same_arms
   fp_sccp_preserve
   fp_extended_sccp_preserve
-
-local-only conservative:
-  fp_sccp_lattice folds the local FP lattice and branch condition, while
-  unreachable block cleanup remains SimplifyCFG-owned locally.
+  fp_sccp_lattice
 
 unit-test only:
   pipeline inclusion and pass dispatch
@@ -103,6 +101,5 @@ no constant range lattice
 no general APFloat arithmetic lattice
 no semantic FP constant canonicalization beyond preserving accepted literal text
 no IPSCCP argument/return lattice summaries
-no branch unreachable removal beyond what SimplifyCFG removes after SCCP
 no IPSCCP
 ```

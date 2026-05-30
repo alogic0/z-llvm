@@ -8,6 +8,4 @@ entry:
   br label %then
 then:
   ret i32 1
-else:
-  ret i32 2
 }
