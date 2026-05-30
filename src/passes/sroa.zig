@@ -70,7 +70,8 @@ fn tryScalarizeAggregateAlloca(
     }
 
     if (partitions.items.len == 0) return false;
-    if (!try aggregateAllocaOnlyUsesPartitions(module.allocator, function.*, slot, aggregate_ty, partitions.items)) return false;
+    const layout = moduleLayout(module.*);
+    if (!try aggregateAllocaOnlyUsesPartitions(module.allocator, layout, function.*, slot, aggregate_ty, partitions.items)) return false;
     if (!validateAggregatePartitionConsumers(function.*, slot, aggregate_ty, partitions.items)) return false;
 
     var replacements: std.ArrayList(FieldReplacement) = .empty;
@@ -98,6 +99,7 @@ fn tryScalarizeAggregateAlloca(
     }
 
     try rewriteWholeAggregateMemoryUses(module, function, slot, aggregate_ty, replacements.items);
+    try rewriteAggregateSubobjectStores(module, function, slot, partitions.items, replacements.items);
 
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*inst| {
@@ -143,6 +145,7 @@ fn tryScalarizeAggregateAlloca(
 
 fn aggregateAllocaOnlyUsesPartitions(
     allocator: std.mem.Allocator,
+    layout: ?target.DataLayout,
     function: ir.Function,
     slot: []const u8,
     aggregate_ty: ir.Type,
@@ -166,7 +169,7 @@ fn aggregateAllocaOnlyUsesPartitions(
                 .gep => |gep| {
                     if (isNamed(gep.ptr, slot)) {
                         const result = instruction.result orelse return false;
-                        if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(function, result, &partition_values)) return false;
+                        if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(layout, function, result, partitions, &partition_values)) return false;
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
                     }
@@ -193,7 +196,13 @@ fn aggregateAllocaOnlyUsesPartitions(
     return true;
 }
 
-fn gepResultFeedsOnlyPartitions(function: ir.Function, value: []const u8, partition_values: *const std.StringHashMap(void)) bool {
+fn gepResultFeedsOnlyPartitions(
+    layout: ?target.DataLayout,
+    function: ir.Function,
+    value: []const u8,
+    partitions: []const SlicePartition,
+    partition_values: *const std.StringHashMap(void),
+) bool {
     var saw_use = false;
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
@@ -202,13 +211,37 @@ fn gepResultFeedsOnlyPartitions(function: ir.Function, value: []const u8, partit
                 if (std.mem.eql(u8, result, value)) continue;
             }
             if (!instructionUsesName(instruction, value)) continue;
-            if (instruction.kind != .gep) return false;
-            const result = instruction.result orelse return false;
-            if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(function, result, partition_values)) return false;
+            switch (instruction.kind) {
+                .gep => {
+                    const result = instruction.result orelse return false;
+                    if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(layout, function, result, partitions, partition_values)) return false;
+                },
+                .store => |store| {
+                    if (!isNamed(store.ptr, value)) return false;
+                    if (!aggregateSubobjectAccessHasPartition(layout, function, value, store.ty, partitions)) return false;
+                },
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => return false,
+            }
             saw_use = true;
         }
     }
     return saw_use;
+}
+
+fn aggregateSubobjectAccessHasPartition(
+    layout: ?target.DataLayout,
+    function: ir.Function,
+    ptr: []const u8,
+    aggregate_ty: ir.Type,
+    partitions: []const SlicePartition,
+) bool {
+    if (aggregate_ty != .aggregate) return false;
+    const location = pointerLocation(layout, function, .{ .named = ptr }) orelse return false;
+    const base_offset = location.offset orelse return false;
+    for (partitions) |partition| {
+        if (sourceFieldIndexForPartition(layout, aggregate_ty, base_offset, partition) != null) return true;
+    }
+    return false;
 }
 
 fn moduleLayout(module: ir.Module) ?target.DataLayout {
@@ -502,6 +535,108 @@ fn rewriteWholeAggregateLoad(
         .value = final_name orelse load_name,
         .inserted = insert_index - instruction_index,
     };
+}
+
+const AggregateStoreField = struct {
+    source_field_index: usize,
+    ty: ir.Type,
+    alloca_name: []const u8,
+};
+
+fn rewriteAggregateSubobjectStores(
+    module: *ir.Module,
+    function: *ir.Function,
+    slot: []const u8,
+    partitions: []const SlicePartition,
+    replacements: []const FieldReplacement,
+) !void {
+    const layout = moduleLayout(module.*);
+    for (function.blocks.items) |*block| {
+        var instruction_index: usize = 0;
+        while (instruction_index < block.instructions.items.len) : (instruction_index += 1) {
+            const instruction = &block.instructions.items[instruction_index];
+            if (instruction.removed or instruction.kind != .store) continue;
+            const store = instruction.kind.store;
+            if (store.ty != .aggregate or store.attrs.isBarrier()) continue;
+            const location = pointerLocation(layout, function.*, store.ptr) orelse continue;
+            if (location.root_kind != .stack or !std.mem.eql(u8, location.root, slot)) continue;
+            const base_offset = location.offset orelse continue;
+
+            var fields: std.ArrayList(AggregateStoreField) = .empty;
+            defer fields.deinit(module.allocator);
+            for (partitions) |partition| {
+                const source_field_index = sourceFieldIndexForPartition(layout, store.ty, base_offset, partition) orelse continue;
+                const replacement = fieldReplacementFor(replacements, partition.field_index orelse continue) orelse continue;
+                try fields.append(module.allocator, .{
+                    .source_field_index = source_field_index,
+                    .ty = partition.field_ty orelse continue,
+                    .alloca_name = replacement.alloca_name,
+                });
+            }
+            if (fields.items.len == 0) continue;
+
+            const inserted = try rewriteAggregateSubobjectStore(module, block, instruction_index, store.ty, store.value, fields.items);
+            block.instructions.items[instruction_index + inserted].removed = true;
+            instruction_index += inserted;
+        }
+    }
+}
+
+fn rewriteAggregateSubobjectStore(
+    module: *ir.Module,
+    block: *ir.BasicBlock,
+    instruction_index: usize,
+    aggregate_ty: ir.Type,
+    aggregate_value: ir.Value,
+    fields: []const AggregateStoreField,
+) !usize {
+    var insert_index = instruction_index;
+    for (fields) |field| {
+        const aggregate_name = switch (aggregate_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => field.alloca_name,
+        };
+        const extract_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.fca.{}.extract", .{ aggregate_name, field.source_field_index }));
+        const index_text = try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{field.source_field_index}));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = extract_name,
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .indices = index_text,
+                .result_ty = field.ty,
+            } },
+        });
+        insert_index += 1;
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = field.ty,
+                .value = .{ .named = extract_name },
+                .ptr = .{ .named = field.alloca_name },
+            } },
+        });
+        insert_index += 1;
+    }
+    return insert_index - instruction_index;
+}
+
+fn sourceFieldIndexForPartition(layout: ?target.DataLayout, aggregate_ty: ir.Type, base_offset: i128, partition: SlicePartition) ?usize {
+    var field_index: usize = 0;
+    while (memory_location.aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
+        if (!field_ty.eql(partition.field_ty orelse return null)) continue;
+        const field_offset = if (layout) |target_layout|
+            memory_location.aggregateFieldOffsetWithLayout(target_layout, aggregate_ty, field_index) orelse return null
+        else
+            memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return null;
+        if (base_offset + field_offset == partition.offset) return field_index;
+    }
+    return null;
+}
+
+fn pointerLocation(layout: ?target.DataLayout, function: ir.Function, ptr: ir.Value) ?memory_location.MemoryLocation {
+    if (layout) |target_layout| return memory_location.forPointerWithLayout(function, target_layout, ptr);
+    return memory_location.forPointer(function, ptr);
 }
 
 fn partitionForPointer(partitions: []const SlicePartition, ptr: ir.Value) ?SlicePartition {

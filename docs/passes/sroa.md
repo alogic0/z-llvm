@@ -70,6 +70,8 @@ Implemented subset:
   Chained aggregate GEP slicing when intermediate aggregate GEP results feed
   only scalar leaf partitions
   Array-element GEP offset calculation for constant element indices
+  Splitting aggregate subobject stores into scalar stores for covered leaf
+  partitions
   Exact-cover scalar integer field/element alloca splitting for simple
   aggregate allocas
   DataLayout-backed pointer field splitting for simple aggregate allocas,
@@ -102,6 +104,7 @@ Fixture coverage:
   sroa_array_three_i32
   sroa_nested_struct_sibling
   sroa_chained_nested_struct
+  sroa_inner_aggregate_store
   sroa_struct_one_field
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject
@@ -149,6 +152,8 @@ slice nested constant struct-field GEPs when the reached leaf field is scalar
 slice chained aggregate GEPs when intermediate aggregate GEP results only feed
 scalar leaf partitions
 calculate constant fixed-array element GEP offsets
+split aggregate subobject stores into scalar stores when every covered leaf
+partition has a matching scalar replacement
 split simple integer struct-field/array-element partitions into scalar allocas
 split DataLayout-backed pointer struct-field partitions into scalar allocas,
 using the opt-22 default layout when a module has no DataLayout
@@ -176,6 +181,7 @@ opt-22 equivalent:
   sroa_array_three_i32
   sroa_nested_struct_sibling
   sroa_chained_nested_struct
+  sroa_inner_aggregate_store
   sroa_struct_one_field
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject
@@ -199,8 +205,9 @@ Known gaps:
 no full aggregate type model
 no complete LLVM AllocaSlices partition iterator; the local builder only forms
 exact fixed struct/array field partitions
-no partial load/store rewriting beyond the exact whole-aggregate load/store
-shape listed above
+no partial load rewriting beyond the exact whole-aggregate load/store shape
+listed above
+no aggregate subobject store rewriting beyond covered scalar leaf partitions
 no memcpy/memmove rewriting
 no padding, integer widening, vector, packed-aggregate, or aggregate-field
 atomic handling
