@@ -115,6 +115,7 @@ opt-22 equivalent:
   gvn_atomic_load_barrier_reject
   gvn_diamond_load_no_memory_phi
   gvn_vector_lane_not_clobber
+  gvn_tls_store_clobber_reject
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_gvn_flags
@@ -152,7 +153,7 @@ Known gaps:
 ```text
 load PRE is limited to one direct two-predecessor diamond shape
 no MemorySSA-backed memory value numbering beyond the accepted path-aware
-walker query
+walker query and same-block store-to-load forwarding
 no general PHI translation beyond exact phi expression matching and the simple
 load-PRE PHI insertion
 no congruence-class iteration

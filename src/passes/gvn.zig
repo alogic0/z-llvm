@@ -335,6 +335,16 @@ fn visitBlock(
             continue;
         }
 
+        if (forwardSameBlockStoreToLoad(table.module, function.*, block_index, instruction_index, instruction.*)) |replacement| {
+            instruction.removed = true;
+            instruction.replacement = replacement;
+            const result = instruction.result orelse return error.InstructionWithoutResult;
+            try aliases.put(result, replacement);
+            replaceValue(function, result, replacement);
+            changed = true;
+            continue;
+        }
+
         if (!isCandidate(table.module, instruction.*)) continue;
 
         const number = try table.numberFor(instruction.*);
@@ -393,6 +403,49 @@ fn simplifyMappedSelect(instruction: ir.Instruction) ?ir.Value {
         .select => inst_simplify.simplify(instruction),
         .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
     };
+}
+
+fn forwardSameBlockStoreToLoad(
+    module: ir.Module,
+    function: ir.Function,
+    block_index: usize,
+    instruction_index: usize,
+    instruction: ir.Instruction,
+) ?ir.Value {
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
+    };
+    if (load.attrs.isBarrier()) return null;
+
+    const block = function.blocks.items[block_index];
+    var index = instruction_index;
+    while (index > 0) {
+        index -= 1;
+        const candidate = block.instructions.items[index];
+        if (candidate.removed) continue;
+        switch (candidate.kind) {
+            .store => |store| {
+                if (store.attrs.isBarrier()) return null;
+                if (store.ty.eql(load.ty)) {
+                    switch (alias.accessAliasInModule(module, function, store.ptr, store.ty, load.ptr, load.ty)) {
+                        .must_alias => return store.value,
+                        .no_alias => continue,
+                        .may_alias, .partial_alias => return null,
+                    }
+                }
+                if (memory_ssa.isBarrierForAccess(module, function, candidate, load.ptr, load.ty)) return null;
+            },
+            .call, .atomicrmw, .cmpxchg, .fence => {
+                if (memory_ssa.isBarrierForAccess(module, function, candidate, load.ptr, load.ty)) return null;
+            },
+            .load => |candidate_load| {
+                if (candidate_load.attrs.isBarrier()) return null;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+        }
+    }
+    return null;
 }
 
 fn findLeader(
