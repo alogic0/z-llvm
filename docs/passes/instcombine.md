@@ -76,6 +76,9 @@ Implemented subset:
   Target-independent identical-arm vector-valued select fold with scalar `i1`
   condition
   Constant-on-RHS canonicalization for supported commutative binary ops
+  Strict `fsub x, +0.0`, `fmul x, 1.0`, and `fdiv x, 1.0` folds for the
+  covered scalar FP spelling surface
+  Strict `fcmp oeq x, x` canonicalization to `fcmp ord x, +0.0`
 
 Intentional divergences:
   The local pass is a linear scan, not LLVM's full fixed-point worklist.
@@ -117,10 +120,6 @@ Fixture coverage:
   fp_extended_instcombine_preserve
   fp_fast_math_preserve
   fp_strict_sensitive_preserve
-  fp_strict_sensitive_preserve is local-conservative after Cycle 05: LLVM folds
-  some strict identities such as `fsub x, 0.0`, `fmul x, 1.0`, `fdiv x, 1.0`,
-  and rewrites self-compare to orderedness, but the local implementation keeps
-  them until the exact LLVM legality proof is reproduced.
   fp_strict_arith_constants
   fp_strict_fcmp_fold
   fp_strict_fcmp_constants
@@ -128,9 +127,7 @@ Fixture coverage:
   classifier folds only ord/uno constant orderedness and avoids general FP
   comparison arithmetic.
   fp_fast_math_flags_boundary
-  fp_fast_math_sensitive_conservative is local-conservative: LLVM may fold
-  fast-math-sensitive identities after proving flag semantics, but the local
-  optimizer preserves them until the FP legality model exists.
+  fp_fast_math_sensitive_conservative
 
 opt-22 comparison command:
   bash scripts/compare_opt.sh
@@ -192,7 +189,9 @@ and NaN ordered/unordered behavior
 strict scalar `float`/`double` literal `fadd` and `fmul` fold for selected
 positive-zero and one identities when the result reuses an existing literal
 spelling
+strict scalar `fsub x, +0.0`, `fmul x, 1.0`, and `fdiv x, 1.0` fold to `x`
 strict `fcmp ord` and `fcmp uno` for classified scalar FP constants
+strict `fcmp oeq x, x` rewrites to `fcmp ord x, +0.0`
 `fadd nsz x, +0.0` -> x
 `fcmp nnan oeq x, x` -> true
 preserve `freeze` instructions
@@ -206,15 +205,14 @@ LLVM's InstCombine is much broader: flags, poison semantics, canonicalization, r
 The current implementation uses `nsw`, `nuw`, and `exact` only for explicitly
 listed neutral identities, zero-result identities, and selected APInt-shaped
 constant folds.
-Floating-point `fadd`, `fsub`, `fmul`, `fdiv`, and `frem` are preserved rather
-than folded because NaN, signed-zero, rounding, and exception legality are not
-modeled. `fcmp false`/`true` and constant `ord`/`uno` orderedness folds are the
-first enabled strict FP literal comparison folds use APFloat-shaped
-ordered/unordered semantics for scalar `float` and `double` constants. Strict
-`fadd` and `fmul` constant folds are limited to identities where the result can
-reuse one operand spelling until a full APFloat result printer exists. Parsed
-fast-math flags are interpreted only through `docs/analysis/fast_math.md`; the
-first enabled fast-math folds are `fadd nsz x, +0.0` and `fcmp nnan oeq x, x`.
+Floating-point transforms remain limited to identities whose result can reuse
+an existing operand spelling or canonical `fcmp` orderedness. `frem` and general
+FP arithmetic are preserved because NaN, signed-zero, rounding, and exception
+legality are not fully modeled. `fcmp false`/`true`, constant `ord`/`uno`, and
+self-`oeq` orderedness folds use the local APFloat-shaped classification surface
+for scalar `float` and `double` constants. Parsed fast-math flags are
+interpreted only through `docs/analysis/fast_math.md`; the first enabled
+fast-math folds are `fadd nsz x, +0.0` and `fcmp nnan oeq x, x`.
 Common local folds now live in [inst_simplify.md](inst_simplify.md) so GVN and EarlyCSE can share scalar expression equivalence with InstCombine.
 Debug-location-only folds may remove an instruction carrying `!dbg`; the
 local pass now transfers that location to the first later metadata-free user of

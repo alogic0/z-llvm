@@ -101,7 +101,9 @@ fn simplifyBinary(binary: ir.BinaryInst) ?ir.Value {
     return switch (binary.op) {
         .fadd => simplifyFadd(binary),
         .fmul => simplifyFmul(binary),
-        .fsub, .fdiv, .frem => null,
+        .fsub => simplifyFsub(binary),
+        .fdiv => simplifyFdiv(binary),
+        .frem => null,
         .add => if (isZero(binary.rhs))
             binary.lhs
         else if (isZero(binary.lhs))
@@ -219,7 +221,19 @@ fn simplifyFadd(binary: ir.BinaryInst) ?ir.Value {
 }
 
 fn simplifyFmul(binary: ir.BinaryInst) ?ir.Value {
+    if (isFpOneValue(binary.ty, binary.lhs)) return binary.rhs;
+    if (isFpOneValue(binary.ty, binary.rhs)) return binary.lhs;
     return simplifyStrictFmulConstants(binary);
+}
+
+fn simplifyFsub(binary: ir.BinaryInst) ?ir.Value {
+    if (isFpPositiveZero(binary.rhs)) return binary.lhs;
+    return null;
+}
+
+fn simplifyFdiv(binary: ir.BinaryInst) ?ir.Value {
+    if (isFpOneValue(binary.ty, binary.rhs)) return binary.lhs;
+    return null;
 }
 
 fn simplifyStrictFaddConstants(binary: ir.BinaryInst) ?ir.Value {
@@ -250,6 +264,12 @@ fn isFpOne(classification: fp_semantics.Classification) bool {
             std.mem.eql(u8, text, "+1.0") or
             std.mem.eql(u8, text, "1.000000e+00") or
             std.mem.eql(u8, text, "+1.000000e+00"));
+}
+
+fn isFpOneValue(ty: ir.Type, value: ir.Value) bool {
+    if (value != .fp) return false;
+    const classification = fp_semantics.classify(ty, value.fp) catch return false;
+    return isFpOne(classification);
 }
 
 fn isNonNegativeFiniteNonZero(classification: fp_semantics.Classification) bool {

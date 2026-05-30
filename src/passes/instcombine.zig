@@ -158,8 +158,22 @@ fn debugMetadata(metadata: ?[]const u8) ?[]const u8 {
 fn canonicalize(instruction: *ir.Instruction) bool {
     return switch (instruction.kind) {
         .binary => |*binary| inst_simplify.canonicalizeCommutativeConstantRhs(binary),
-        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+        .fcmp => |*fcmp| canonicalizeStrictSelfFcmp(fcmp),
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
     };
+}
+
+fn canonicalizeStrictSelfFcmp(fcmp: *ir.FcmpInst) bool {
+    if (fcmp.predicate != .oeq) return false;
+    if (!fcmp.lhs.eql(fcmp.rhs)) return false;
+    if (fcmp.fp_flags.any()) return false;
+    const zero = switch (fcmp.operand_ty) {
+        .float, .double => ir.Value{ .fp = "0.000000e+00" },
+        .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+    };
+    fcmp.predicate = .ord;
+    fcmp.rhs = zero;
+    return true;
 }
 
 fn resolveValue(aliases: std.StringHashMap(ir.Value), value: ir.Value) ir.Value {

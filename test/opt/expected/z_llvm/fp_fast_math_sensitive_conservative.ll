@@ -10,12 +10,11 @@ entry:
 
 define float @fp_mul_one_local_conservative(float %a) {
 entry:
-  %r = fmul float %a, 1.000000e+00
-  ret float %r
+  ret float %a
 }
 
 define i1 @fp_compare_self_local_conservative(float %a) {
 entry:
-  %r = fcmp oeq float %a, %a
+  %r = fcmp ord float %a, 0.000000e+00
   ret i1 %r
 }
