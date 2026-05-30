@@ -73,6 +73,9 @@ opt-22 equivalent:
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_extended_early_cse_no_cse
+  fp_early_cse_no_cse
+  fp_fast_early_cse
+  fp_fast_cse_reject
   fp_fast_gvn
 
 local-only conservative:
@@ -81,10 +84,7 @@ local-only conservative:
   fp_strict_sensitive_preserve
   fp_fast_math_sensitive_conservative
   fp_strict_orderedness_fold
-  fp_early_cse_no_cse
-  fp_fast_early_cse
   fp_sccp_lattice
-  fp_fast_cse_reject
 
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze

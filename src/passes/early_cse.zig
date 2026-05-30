@@ -1,5 +1,6 @@
 const std = @import("std");
 const alias = @import("../analysis/alias.zig");
+const def_use = @import("../analysis/def_use.zig");
 const dominator = @import("../analysis/dominator.zig");
 const expression_key = @import("../analysis/expression_key.zig");
 const fast_math = @import("../analysis/fast_math.zig");
@@ -101,6 +102,10 @@ fn visitBlock(
         if (isCseCandidate(module, instruction.*)) {
             if (findAvailableEquivalent(module, function.*, walker, available.items, block_index, instruction_index, instruction.*)) |available_index| {
                 const candidate = available.items[available_index];
+                if (try removeUnusedSameBlockLeader(allocator, function, &available.items[available_index], block_index, instruction_index, instruction.*)) {
+                    changed = true;
+                    continue;
+                }
                 expression_key.intersectRetainedFpFlags(&function.blocks.items[candidate.block_index].instructions.items[candidate.instruction_index], instruction.*);
                 available.items[available_index].instruction = function.blocks.items[candidate.block_index].instructions.items[candidate.instruction_index];
                 instruction.removed = true;
@@ -255,6 +260,42 @@ fn sameAvailableExpression(
         );
     }
     return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
+}
+
+fn removeUnusedSameBlockLeader(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    available: *AvailableInstruction,
+    block_index: usize,
+    instruction_index: usize,
+    instruction: ir.Instruction,
+) !bool {
+    if (available.block_index != block_index) return false;
+    const leader_result = available.instruction.result orelse return false;
+    const current_result = instruction.result orelse return false;
+    if (std.mem.eql(u8, leader_result, current_result)) return false;
+    if (!isFpExpression(instruction)) return false;
+
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+    if (uses.isUsed(leader_result)) return false;
+
+    var leader_instruction = &function.blocks.items[block_index].instructions.items[available.instruction_index];
+    const current_instruction = &function.blocks.items[block_index].instructions.items[instruction_index];
+    expression_key.intersectRetainedFpFlags(current_instruction, leader_instruction.*);
+    leader_instruction.removed = true;
+    available.instruction = current_instruction.*;
+    available.instruction_index = instruction_index;
+    available.hash = expression_key.hash(current_instruction.*);
+    return true;
+}
+
+fn isFpExpression(instruction: ir.Instruction) bool {
+    return switch (instruction.kind) {
+        .binary => |binary| isFpBinary(binary.op),
+        .fcmp => true,
+        .cast, .freeze, .icmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+    };
 }
 
 fn isSameMemoryGeneration(walker: memory_ssa.Walker, earlier: memory_ssa.InstRef, later: memory_ssa.InstRef, ptr: ir.Value, ty: ir.Type) bool {

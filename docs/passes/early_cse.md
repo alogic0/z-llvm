@@ -109,19 +109,15 @@ opt-22 equivalent:
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
   fp_early_cse_flags
+  fp_early_cse_no_cse
   fp_extended_early_cse_no_cse
+  fp_fast_early_cse
+  fp_fast_cse_reject
 
 local-only conservative:
   readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
   declaration attributes into attribute groups that the current parser rejects,
   so this case is not in `fixtures.tsv` yet.
-  fp_early_cse_no_cse now CSEs strict FP binary/fcmp expressions and folds the
-  same-arm select, but remains local-conservative because the dead compare
-  leader name differs from opt-22.
-  fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
-  name differs from opt-22, so the fixture is local-conservative.
-  fp_fast_cse_reject documents an adjacent partial-FMF case where local
-  EarlyCSE keeps the earlier leader while opt-22 first removes the dead leader.
   early_cse_unreachable_store_not_clobber proves the path-aware local
   MemorySSA query can ignore a side-exit store. `opt-22` preserves this shape,
   so the fixture documents a local precision boundary rather than full EarlyCSE
