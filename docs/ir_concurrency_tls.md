@@ -40,11 +40,9 @@ classified through the conservative atomics/inline-asm barrier boundary in
 ## Fixture Coverage
 
 ```text
-local-only conservative opt fixture:
-  globaldce_tls_concurrency_root
-
 opt-equivalent fixture:
   globaldce_tls_root
+  globaldce_tls_concurrency_root
   globaldce_tls_model_root
   dce_tls_store_preserve
   gvn_tls_store_clobber_reject

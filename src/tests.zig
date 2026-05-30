@@ -3652,6 +3652,32 @@ test "normalizer accepts empty modules after comparison noise stripping" {
     try std.testing.expectEqualStrings("", normalized);
 }
 
+test "normalizer canonicalizes numeric local SSA names" {
+    const input =
+        \\define i32 @renumber(i32 %0) {
+        \\entry:
+        \\  %2 = add i32 %0, 1
+        \\  %3 = add i32 %2, 1
+        \\  ret i32 %3
+        \\}
+        \\
+    ;
+
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator, input);
+    defer std.testing.allocator.free(normalized);
+
+    const expected =
+        \\define i32 @renumber(i32 %0) {
+        \\entry:
+        \\  %1 = add i32 %0, 1
+        \\  %2 = add i32 %1, 1
+        \\  ret i32 %2
+        \\}
+        \\
+    ;
+    try std.testing.expectEqualStrings(expected, normalized);
+}
+
 test "verifier rejects use before definition in the same block" {
     const input =
         \\define i32 @bad(i32 %a) {
