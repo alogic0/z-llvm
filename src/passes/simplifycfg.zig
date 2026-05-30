@@ -20,6 +20,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         changed = simplifyTerminators(function) or changed;
         changed = try hoistTwoInstructionReturnArms(module, function) or changed;
         changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
+        changed = try hoistTwoInstructionDiamondPhiReturn(module, function) or changed;
         changed = try hoistIdenticalDiamondPhiReturn(module, function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try mergeReturnsToCommonBlock(module, function) or changed;
@@ -358,6 +359,134 @@ fn retReturnsValue(ret: anytype, result: []const u8) bool {
 
 fn sameHoistableReturnInstruction(module: ir.Module, function: ir.Function, then_instruction: ir.Instruction, else_instruction: ir.Instruction) bool {
     return expression_key.sameValueExpression(module, function, then_instruction, else_instruction);
+}
+
+fn hoistTwoInstructionDiamondPhiReturn(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(module.allocator, function.*);
+        defer graph.deinit();
+        var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+        defer uses.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
+            };
+            if (condbr.metadata != null or !condbr.cond_ty.eql(.{ .int = 1 })) continue;
+
+            const shape = twoInstructionDiamondPhiReturn(function.*, graph, uses, block_index, condbr) orelse continue;
+            const left_first = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            const left_second = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            const right_first = function.blocks.items[shape.else_index].instructions.orderedRemove(0);
+            const right_second = function.blocks.items[shape.else_index].instructions.orderedRemove(0);
+            try block.instructions.append(module.allocator, left_first);
+            try block.instructions.append(module.allocator, left_second);
+            try block.instructions.append(module.allocator, right_first);
+            try block.instructions.append(module.allocator, right_second);
+
+            const select_name_text = try std.fmt.allocPrint(module.allocator, "{s}", .{shape.phi_name});
+            const select_name = try module.ownString(select_name_text);
+            try block.instructions.append(module.allocator, .{
+                .result = select_name,
+                .kind = .{ .select = .{
+                    .cond_ty = .{ .int = 1 },
+                    .cond = condbr.cond,
+                    .ty = shape.ret_ty,
+                    .true_value = .{ .named = left_second.result.? },
+                    .false_value = .{ .named = right_second.result.? },
+                } },
+            });
+            block.terminator = .{ .ret = .{
+                .ty = shape.ret_ty,
+                .value = .{ .named = select_name },
+            } };
+
+            removeBlocksDescending(module.allocator, function, &.{ shape.merge_index, shape.else_index, shape.then_index });
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+const TwoInstructionDiamondPhiReturn = struct {
+    then_index: usize,
+    else_index: usize,
+    merge_index: usize,
+    phi_name: []const u8,
+    ret_ty: ir.Type,
+};
+
+fn twoInstructionDiamondPhiReturn(function: ir.Function, graph: cfg.Graph, uses: def_use.UseCounts, block_index: usize, condbr: anytype) ?TwoInstructionDiamondPhiReturn {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+    if (function.blocks.items[then_index].instructions.items.len != 2) return null;
+    if (function.blocks.items[else_index].instructions.items.len != 2) return null;
+
+    const then_target = branchTarget(function.blocks.items[then_index]) orelse return null;
+    const else_target = branchTarget(function.blocks.items[else_index]) orelse return null;
+    if (!std.mem.eql(u8, then_target, else_target)) return null;
+
+    const merge_index = function.blockIndex(then_target) orelse return null;
+    if (merge_index == block_index or merge_index == then_index or merge_index == else_index) return null;
+    const merge_preds = graph.predecessors(merge_index);
+    if (merge_preds.len != 2) return null;
+    if (!containsIndex(merge_preds, then_index) or !containsIndex(merge_preds, else_index)) return null;
+
+    const left_first = function.blocks.items[then_index].instructions.items[0];
+    const left_second = function.blocks.items[then_index].instructions.items[1];
+    const right_first = function.blocks.items[else_index].instructions.items[0];
+    const right_second = function.blocks.items[else_index].instructions.items[1];
+    if (left_first.removed or left_second.removed or right_first.removed or right_second.removed) return null;
+    if (left_first.metadata != null or left_second.metadata != null or right_first.metadata != null or right_second.metadata != null) return null;
+    const left_first_result = left_first.result orelse return null;
+    const left_second_result = left_second.result orelse return null;
+    const right_first_result = right_first.result orelse return null;
+    const right_second_result = right_second.result orelse return null;
+    if ((uses.counts.get(left_first_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(left_second_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(right_first_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(right_second_result) orelse 0) != 1) return null;
+
+    const left_first_binary = binaryInstruction(left_first) orelse return null;
+    const left_second_binary = binaryInstruction(left_second) orelse return null;
+    const right_first_binary = binaryInstruction(right_first) orelse return null;
+    const right_second_binary = binaryInstruction(right_second) orelse return null;
+    if (!sameIntegerBinary(left_first_binary, right_first_binary)) return null;
+    if (!sameIntegerBinaryMapped(left_second_binary, right_second_binary, left_first_result, right_first_result)) return null;
+
+    const merge = function.blocks.items[merge_index];
+    if (merge.instructions.items.len != 1) return null;
+    const phi_inst = merge.instructions.items[0];
+    if (phi_inst.removed or phi_inst.kind != .phi) return null;
+    const phi_name = phi_inst.result orelse return null;
+    const phi = phi_inst.kind.phi;
+    if (phi.incoming.items.len != 2) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.then_target) orelse return null, left_second_result)) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.else_target) orelse return null, right_second_result)) return null;
+    if ((uses.counts.get(phi_name) orelse 0) != 1) return null;
+
+    const ret = switch (merge.terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    const ret_value = ret.value orelse return null;
+    if (!ret.ty.eql(phi.ty) or !ret_value.eql(.{ .named = phi_name })) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .merge_index = merge_index,
+        .phi_name = phi_name,
+        .ret_ty = ret.ty,
+    };
 }
 
 fn hoistIdenticalDiamondPhiReturn(module: *ir.Module, function: *ir.Function) !bool {
