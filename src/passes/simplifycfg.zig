@@ -233,20 +233,19 @@ fn binaryInstruction(instruction: ir.Instruction) ?ir.BinaryInst {
 
 fn sameIntegerBinary(left: ir.BinaryInst, right: ir.BinaryInst) bool {
     if (isFpBinary(left.op) or isFpBinary(right.op)) return false;
-    return left.op == right.op and
-        sameBinaryFlags(left.flags, right.flags) and
-        left.ty.eql(right.ty) and
-        left.lhs.eql(right.lhs) and
-        left.rhs.eql(right.rhs);
+    if (left.op != right.op or !sameBinaryFlags(left.flags, right.flags) or !left.ty.eql(right.ty)) return false;
+    if (left.lhs.eql(right.lhs) and left.rhs.eql(right.rhs)) return true;
+    return isCommutativeBinary(left.op) and left.lhs.eql(right.rhs) and left.rhs.eql(right.lhs);
 }
 
 fn sameIntegerBinaryMapped(left: ir.BinaryInst, right: ir.BinaryInst, left_name: []const u8, right_name: []const u8) bool {
     if (isFpBinary(left.op) or isFpBinary(right.op)) return false;
-    return left.op == right.op and
-        sameBinaryFlags(left.flags, right.flags) and
-        left.ty.eql(right.ty) and
-        valueEqlMapped(left.lhs, right.lhs, left_name, right_name) and
-        valueEqlMapped(left.rhs, right.rhs, left_name, right_name);
+    if (left.op != right.op or !sameBinaryFlags(left.flags, right.flags) or !left.ty.eql(right.ty)) return false;
+    if (valueEqlMapped(left.lhs, right.lhs, left_name, right_name) and
+        valueEqlMapped(left.rhs, right.rhs, left_name, right_name)) return true;
+    return isCommutativeBinary(left.op) and
+        valueEqlMapped(left.lhs, right.rhs, left_name, right_name) and
+        valueEqlMapped(left.rhs, right.lhs, left_name, right_name);
 }
 
 fn sameBinaryFlags(left: ir.BinaryFlags, right: ir.BinaryFlags) bool {
@@ -266,6 +265,10 @@ fn valueEqlMapped(left: ir.Value, right: ir.Value, left_name: []const u8, right_
 
 fn isFpBinary(op: ir.BinaryOp) bool {
     return op == .fadd or op == .fsub or op == .fmul or op == .fdiv or op == .frem;
+}
+
+fn isCommutativeBinary(op: ir.BinaryOp) bool {
+    return op == .add or op == .mul or op == .@"and" or op == .@"or" or op == .xor;
 }
 
 fn hoistIdenticalTwoArmReturn(module: *ir.Module, function: *ir.Function) !bool {
