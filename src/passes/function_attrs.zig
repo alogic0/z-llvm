@@ -81,6 +81,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         if (try inferParameterAttributes(module, function)) changed = true;
     }
 
+    if (try materializeAttributeGroups(module)) changed = true;
+
     return if (changed) .changed else .unchanged;
 }
 
@@ -547,6 +549,143 @@ fn terminatorUsesNamedValue(terminator: ir.Terminator, name: []const u8) bool {
         .indirectbr => |indirectbr| isNamedValue(indirectbr.addr, name),
         .br, .@"unreachable" => false,
     };
+}
+
+fn materializeAttributeGroups(module: *ir.Module) !bool {
+    if (module.attribute_groups.items.len != 0) return false;
+
+    var changed = false;
+    var groups: std.ArrayList([]const u8) = .empty;
+    defer groups.deinit(module.allocator);
+
+    for (module.declarations.items) |*decl| {
+        const attrs = decl.attrs orelse continue;
+        const body = try canonicalFunctionAttrBody(module.allocator, attrs) orelse continue;
+        defer module.allocator.free(body);
+        const group_ref = try ensureAttributeGroup(module, &groups, body);
+        decl.attrs = group_ref;
+        changed = true;
+    }
+
+    for (module.functions.items) |*function| {
+        const attrs = function.attrs orelse continue;
+        const body = try canonicalFunctionAttrBody(module.allocator, attrs) orelse continue;
+        defer module.allocator.free(body);
+        const group_ref = try ensureAttributeGroup(module, &groups, body);
+        function.attrs = group_ref;
+        changed = true;
+    }
+
+    return changed;
+}
+
+fn ensureAttributeGroup(module: *ir.Module, groups: *std.ArrayList([]const u8), body: []const u8) ![]const u8 {
+    for (groups.items, 0..) |existing, index| {
+        if (std.mem.eql(u8, existing, body)) {
+            return module.ownString(try std.fmt.allocPrint(module.allocator, "#{}", .{index}));
+        }
+    }
+
+    const index = groups.items.len;
+    const owned_body = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}", .{body}));
+    try groups.append(module.allocator, owned_body);
+    const group_line = try module.ownString(try std.fmt.allocPrint(module.allocator, "attributes #{} = {{ {s} }}", .{ index, body }));
+    try module.attribute_groups.append(module.allocator, group_line);
+    return module.ownString(try std.fmt.allocPrint(module.allocator, "#{}", .{index}));
+}
+
+fn canonicalFunctionAttrBody(allocator: std.mem.Allocator, attrs_text: []const u8) !?[]u8 {
+    if (hasUnknownFunctionAttr(attrs_text)) return null;
+    var out: std.Io.Writer.Allocating = .init(allocator);
+    defer out.deinit();
+    var first = true;
+
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "mustprogress"), "mustprogress");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "nofree"), "nofree");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "norecurse"), "norecurse");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "nosync"), "nosync");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "nounwind"), "nounwind");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "willreturn"), "willreturn");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "readnone"), "readnone");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "readonly"), "readonly");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "writeonly"), "writeonly");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "argmemonly"), "argmemonly");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "inaccessiblememonly"), "inaccessiblememonly");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "alwaysinline"), "alwaysinline");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "noinline"), "noinline");
+    try appendCanonicalAttr(&out.writer, &first, rawHasFunctionAttr(attrs_text, "cold"), "cold");
+    if (memoryAttrText(attrs_text)) |memory_attr| try appendCanonicalAttr(&out.writer, &first, true, memory_attr);
+
+    if (first) return null;
+    return try out.toOwnedSlice();
+}
+
+fn appendCanonicalAttr(writer: *std.Io.Writer, first: *bool, enabled: bool, attr: []const u8) !void {
+    if (!enabled) return;
+    if (!first.*) try writer.writeByte(' ');
+    try writer.writeAll(attr);
+    first.* = false;
+}
+
+fn hasUnknownFunctionAttr(attrs_text: []const u8) bool {
+    var index: usize = 0;
+    while (nextFunctionAttr(attrs_text, &index)) |attr| {
+        if (isKnownFunctionAttr(attr)) continue;
+        return true;
+    }
+    return false;
+}
+
+fn rawHasFunctionAttr(attrs_text: []const u8, needle: []const u8) bool {
+    var index: usize = 0;
+    while (nextFunctionAttr(attrs_text, &index)) |attr| {
+        if (std.mem.eql(u8, attr, needle)) return true;
+    }
+    return false;
+}
+
+fn memoryAttrText(attrs_text: []const u8) ?[]const u8 {
+    var index: usize = 0;
+    while (nextFunctionAttr(attrs_text, &index)) |attr| {
+        if (std.mem.startsWith(u8, attr, "memory(")) return attr;
+    }
+    return null;
+}
+
+fn nextFunctionAttr(attrs_text: []const u8, index: *usize) ?[]const u8 {
+    while (index.* < attrs_text.len and std.ascii.isWhitespace(attrs_text[index.*])) : (index.* += 1) {}
+    if (index.* >= attrs_text.len) return null;
+    const start = index.*;
+    if (std.mem.startsWith(u8, attrs_text[start..], "memory(")) {
+        const end = std.mem.indexOfScalarPos(u8, attrs_text, start, ')') orelse attrs_text.len - 1;
+        index.* = @min(end + 1, attrs_text.len);
+        return attrs_text[start..index.*];
+    }
+    while (index.* < attrs_text.len and !std.ascii.isWhitespace(attrs_text[index.*])) : (index.* += 1) {}
+    return attrs_text[start..index.*];
+}
+
+fn isKnownFunctionAttr(attr: []const u8) bool {
+    if (std.mem.startsWith(u8, attr, "memory(")) return true;
+    inline for (.{
+        "mustprogress",
+        "nofree",
+        "norecurse",
+        "nosync",
+        "nounwind",
+        "willreturn",
+        "readnone",
+        "readonly",
+        "writeonly",
+        "argmemonly",
+        "inaccessiblememonly",
+        "alwaysinline",
+        "noinline",
+        "cold",
+    }) |known| {
+        if (std.mem.eql(u8, attr, known)) return true;
+    }
+    return false;
 }
 
 fn appendFunctionAttr(module: *ir.Module, function: *ir.Function, attr: []const u8) !bool {

@@ -71,6 +71,8 @@ infer nofree, nosync, nounwind, mustprogress, and willreturn for bounded
 no-call or direct-call bodies where the local IR surface proves the attribute
 infer readonly/writeonly captures(none), initializes((0, N)), and returned
 parameter attributes for simple direct parameter uses
+synthesize opt-style attribute groups for modules that do not already contain
+attribute groups and whose inferred function attrs are all locally known
 classify all other calls as unknown
 ```
 
@@ -89,6 +91,8 @@ no full CGSCC propagation or LazyCallGraph RefSCC traversal
 recursive SCC memory effects remain conservative, so recursive readnone-style
 memory(none) inference is still not reproduced
 no general writeonly inference beyond simple parameter stores
+attribute-group synthesis is skipped for modules that already carry groups, and
+for functions with unknown raw function attrs
 no inference through indirect calls, operand bundles, inline asm, recursive SCCs,
 unknown external calls, volatile/atomic memory, or unknown memory effects
 no target feature, CPU model, frame-pointer, unwind-table, or size-attribute
@@ -101,13 +105,9 @@ Fixture coverage:
 opt-22 equivalent:
   gvn_readonly_call_no_clobber
   gvn_unknown_call_clobber_reject
+  function_attrs_direct_calls
 
 local-only conservative:
-  function_attrs_direct_calls
-    local output now infers LLVM's simple memory, nofree, norecurse, nosync,
-    nounwind, willreturn, and parameter attrs for this fixture, but preserves
-    inline attribute spelling instead of synthesizing opt-style attribute
-    groups.
   function_attrs_reject
     stores gain simple argmem/writeonly/returned attrs and recursive SCCs gain
     nofree/nosync/nounwind, while recursive SCC memory(none) inference remains
