@@ -5,8 +5,9 @@ left:
   %x = add i32 %a, %b
   br label %join
 right:
+  %.pre = add i32 %a, %b
   br label %join
 join:
-  %y = add i32 %a, %b
-  ret i32 %y
+  %y.pre-phi = phi i32 [ %.pre, %right ], [ %x, %left ]
+  ret i32 %y.pre-phi
 }

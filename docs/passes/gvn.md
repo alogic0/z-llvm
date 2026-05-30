@@ -82,6 +82,10 @@ simple load PRE for one two-predecessor join shape:
   one predecessor has an available must-alias load
   one direct predecessor can receive one inserted load before its terminator
   the join load is replaced by a PHI with incoming available/inserted values
+simple scalar PRE for one two-predecessor join shape:
+  one predecessor has an available matching integer binary expression
+  one direct predecessor can receive one inserted expression before its terminator
+  the join expression is replaced by a PHI with incoming available/inserted values
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
@@ -95,9 +99,8 @@ This is intentionally closer to a small value-table seed than to full LLVM GVN.
 It is enough to prove the project can move beyond same-block `early-cse` while
 still relying on the existing dominator analysis.
 
-Scalar PRE is still deferred. Load PRE is implemented only for the accepted
-two-predecessor diamond surface and does not split critical edges or perform
-general PHI translation.
+Load and scalar PRE are implemented only for accepted two-predecessor diamond
+surfaces and do not split critical edges or perform general PHI translation.
 
 Fixture coverage:
 
@@ -112,6 +115,7 @@ opt-22 equivalent:
   gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
+  gvn_scalar_pre_reject
   gvn_atomic_load_barrier_reject
   gvn_diamond_load_no_memory_phi
   gvn_vector_lane_not_clobber
@@ -127,8 +131,6 @@ local-only conservative:
   gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
   ignore a side-exit store outside the queried path. `opt-22` preserves this
   shape, so full load-placement parity remains future work.
-  gvn_scalar_pre_reject keeps partially available scalar expressions unchanged
-  because scalar PRE insertion is not implemented.
   readnone call GVN is unit-tested locally. Readonly calls and accepted
   argmem-only noalias calls are trusted as non-clobbering memory accesses for
   repeated loads, matching the local `memory(read)` and `memory(argmem: write)`
@@ -152,10 +154,11 @@ Known gaps:
 
 ```text
 load PRE is limited to one direct two-predecessor diamond shape
+scalar PRE is limited to one direct two-predecessor integer-binary diamond shape
 no MemorySSA-backed memory value numbering beyond the accepted path-aware
 walker query and same-block store-to-load forwarding
 no general PHI translation beyond exact phi expression matching and the simple
-load-PRE PHI insertion
+load/scalar PRE PHI insertion
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no dead-leader replacement beyond same-block redundant loads and the simple

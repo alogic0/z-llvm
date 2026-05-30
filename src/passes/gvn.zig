@@ -82,6 +82,7 @@ const ValueTable = struct {
 
 fn eliminateFunction(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function) !bool {
     var changed = try performSimpleLoadPre(allocator, module, function);
+    changed = try performSimpleScalarPre(allocator, module, function) or changed;
 
     var dom = try dominator.Dominators.build(allocator, function.*);
     defer dom.deinit();
@@ -171,6 +172,63 @@ fn performSimpleLoadPre(allocator: std.mem.Allocator, module: *ir.Module, functi
     return false;
 }
 
+fn performSimpleScalarPre(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function) !bool {
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
+    var dom = try dominator.Dominators.build(allocator, function.*);
+    defer dom.deinit();
+
+    var block_index: usize = 0;
+    while (block_index < function.blocks.items.len) : (block_index += 1) {
+        const predecessors = graph.predecessors(block_index);
+        if (predecessors.len != 2) continue;
+
+        const scalar_index = firstPreScalarCandidateIndex(module.*, function.blocks.items[block_index]) orelse continue;
+        const scalar_instruction = function.blocks.items[block_index].instructions.items[scalar_index];
+        const scalar_result = scalar_instruction.result orelse continue;
+        const scalar_ty = scalarResultType(scalar_instruction) orelse continue;
+        if (!scalarOperandsAvailableAtPredecessors(function.*, dom, scalar_instruction, predecessors)) continue;
+
+        var incoming: std.ArrayList(PreIncoming) = .empty;
+        defer incoming.deinit(allocator);
+        var insertions: std.ArrayList(usize) = .empty;
+        defer insertions.deinit(allocator);
+
+        var existing_count: usize = 0;
+        for (predecessors) |predecessor| {
+            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
+                incoming.clearRetainingCapacity();
+                break;
+            }
+            if (findAvailablePredecessorScalar(function.*, predecessor, scalar_instruction)) |value| {
+                try incoming.append(allocator, .{ .block_index = predecessor, .value = value });
+                existing_count += 1;
+                continue;
+            }
+            try incoming.append(allocator, .{ .block_index = predecessor, .value = .undef });
+            try insertions.append(allocator, predecessor);
+        }
+
+        if (incoming.items.len != predecessors.len) continue;
+        if (existing_count == 0 or insertions.items.len != 1) continue;
+
+        const inserted_value = try insertPreScalar(allocator, module, function, insertions.items[0], scalar_instruction);
+        for (incoming.items) |*entry| {
+            if (entry.block_index == insertions.items[0]) {
+                entry.value = inserted_value;
+                break;
+            }
+        }
+
+        const phi_result = try uniqueScalarPrePhiName(allocator, module, function.*, scalar_result);
+        try replaceScalarWithPhi(allocator, function, block_index, scalar_index, scalar_result, phi_result, scalar_ty, incoming.items, insertions.items[0]);
+        return true;
+    }
+
+    return false;
+}
+
 fn firstPreloadCandidateIndex(block: ir.BasicBlock) ?usize {
     for (block.instructions.items, 0..) |instruction, index| {
         if (instruction.removed) continue;
@@ -178,6 +236,21 @@ fn firstPreloadCandidateIndex(block: ir.BasicBlock) ?usize {
             .phi => continue,
             .load => return index,
             .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
+        }
+    }
+    return null;
+}
+
+fn firstPreScalarCandidateIndex(module: ir.Module, block: ir.BasicBlock) ?usize {
+    for (block.instructions.items, 0..) |instruction, index| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => continue,
+            .binary => |binary| {
+                if (isFpBinary(binary.op) or binary.ty.isVector()) return null;
+                return if (isCandidate(module, instruction)) index else null;
+            },
+            .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return null,
         }
     }
     return null;
@@ -225,11 +298,34 @@ fn findAvailablePredecessorLoad(module: ir.Module, function: ir.Function, block_
     return null;
 }
 
+fn findAvailablePredecessorScalar(function: ir.Function, block_index: usize, instruction: ir.Instruction) ?ir.Value {
+    const block = function.blocks.items[block_index];
+    var index = block.instructions.items.len;
+    while (index > 0) {
+        index -= 1;
+        const candidate = block.instructions.items[index];
+        if (candidate.removed) continue;
+        if (expression_key.sameScalarExpression(candidate, instruction)) {
+            return .{ .named = candidate.result orelse return null };
+        }
+    }
+    return null;
+}
+
 fn insertPreLoad(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function, block_index: usize, base: []const u8, load: ir.LoadInst) !ir.Value {
     const name = try uniquePreResultName(allocator, module, function.*, base);
     try function.blocks.items[block_index].instructions.append(allocator, .{
         .result = name,
         .kind = .{ .load = load },
+    });
+    return .{ .named = name };
+}
+
+fn insertPreScalar(allocator: std.mem.Allocator, module: *ir.Module, function: *ir.Function, block_index: usize, instruction: ir.Instruction) !ir.Value {
+    const name = try uniqueScalarPreInsertName(allocator, module, function.*);
+    try function.blocks.items[block_index].instructions.append(allocator, .{
+        .result = name,
+        .kind = instruction.kind,
     });
     return .{ .named = name };
 }
@@ -259,6 +355,42 @@ fn replaceLoadWithPhi(
     _ = function.blocks.items[block_index].instructions.orderedRemove(instruction_index + 1);
 }
 
+fn replaceScalarWithPhi(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    block_index: usize,
+    instruction_index: usize,
+    old_result: []const u8,
+    phi_result: []const u8,
+    ty: ir.Type,
+    values: []const PreIncoming,
+    inserted_block_index: usize,
+) !void {
+    var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+    errdefer incoming.deinit(allocator);
+    for (values) |value| {
+        if (value.block_index != inserted_block_index) continue;
+        try incoming.append(allocator, .{
+            .value = value.value,
+            .block = function.blocks.items[value.block_index].name,
+        });
+    }
+    for (values) |value| {
+        if (value.block_index == inserted_block_index) continue;
+        try incoming.append(allocator, .{
+            .value = value.value,
+            .block = function.blocks.items[value.block_index].name,
+        });
+    }
+    const phi_instruction: ir.Instruction = .{
+        .result = phi_result,
+        .kind = .{ .phi = .{ .ty = ty, .incoming = incoming } },
+    };
+    try function.blocks.items[block_index].instructions.insert(allocator, 0, phi_instruction);
+    _ = function.blocks.items[block_index].instructions.orderedRemove(instruction_index + 1);
+    replaceValue(function, old_result, .{ .named = phi_result });
+}
+
 fn uniquePreResultName(allocator: std.mem.Allocator, module: *ir.Module, function: ir.Function, base: []const u8) ![]const u8 {
     var suffix: usize = 0;
     while (true) : (suffix += 1) {
@@ -266,6 +398,32 @@ fn uniquePreResultName(allocator: std.mem.Allocator, module: *ir.Module, functio
             try std.fmt.allocPrint(allocator, "{s}.pre", .{base})
         else
             try std.fmt.allocPrint(allocator, "{s}.pre{}", .{ base, suffix });
+        errdefer allocator.free(candidate);
+        if (!hasResultName(function, candidate)) return try module.ownString(candidate);
+        allocator.free(candidate);
+    }
+}
+
+fn uniqueScalarPreInsertName(allocator: std.mem.Allocator, module: *ir.Module, function: ir.Function) ![]const u8 {
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try allocator.dupe(u8, ".pre")
+        else
+            try std.fmt.allocPrint(allocator, ".pre{}", .{suffix});
+        errdefer allocator.free(candidate);
+        if (!hasResultName(function, candidate)) return try module.ownString(candidate);
+        allocator.free(candidate);
+    }
+}
+
+fn uniqueScalarPrePhiName(allocator: std.mem.Allocator, module: *ir.Module, function: ir.Function, base: []const u8) ![]const u8 {
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try std.fmt.allocPrint(allocator, "{s}.pre-phi", .{base})
+        else
+            try std.fmt.allocPrint(allocator, "{s}.pre-phi{}", .{ base, suffix });
         errdefer allocator.free(candidate);
         if (!hasResultName(function, candidate)) return try module.ownString(candidate);
         allocator.free(candidate);
@@ -284,6 +442,26 @@ fn hasResultName(function: ir.Function, name: []const u8) bool {
         }
     }
     return false;
+}
+
+fn scalarResultType(instruction: ir.Instruction) ?ir.Type {
+    return switch (instruction.kind) {
+        .binary => |binary| binary.ty,
+        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
+    };
+}
+
+fn scalarOperandsAvailableAtPredecessors(function: ir.Function, dom: dominator.Dominators, instruction: ir.Instruction, predecessors: []const usize) bool {
+    switch (instruction.kind) {
+        .binary => |binary| {
+            for (predecessors) |predecessor| {
+                if (!valueAvailableAtEndOfBlock(function, dom, binary.lhs, predecessor)) return false;
+                if (!valueAvailableAtEndOfBlock(function, dom, binary.rhs, predecessor)) return false;
+            }
+            return true;
+        },
+        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return false,
+    }
 }
 
 fn valueAvailableAtEndOfBlock(function: ir.Function, dom: dominator.Dominators, value: ir.Value, block_index: usize) bool {
