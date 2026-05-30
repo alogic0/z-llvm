@@ -46,11 +46,10 @@ weak functions and globals are externally visible live roots
 non-local function definitions are roots
 direct calls from live functions mark local function definitions live
 exported aliases mark their target functions/globals live
-local functions/globals with raw COMDAT attributes are treated as conservative
-roots
-thread-local globals are treated as conservative roots
-thread-local globals with known TLS model spellings are preserved as
-conservative roots
+local functions/globals with raw COMDAT attributes are removed when unreachable,
+along with dead COMDAT records
+thread-local globals are removed when unreachable and preserved when reached
+through live functions, aliases, or externally visible roots
 unreached internal/private functions are removed
 scalar global initializer references are represented in the graph if the parser
 accepts them
@@ -62,8 +61,6 @@ Intentional divergences:
 
 ```text
 no ifuncs or metadata dependency graph
-COMDAT selection semantics are not interpreted; members are kept
-conservatively instead
 no available_externally handling yet
 the parser still rejects most global-as-value and aggregate initializer forms,
 so global initializer edges are limited to the accepted scalar surface
@@ -76,19 +73,19 @@ opt-22 equivalent:
   globaldce_basic
   globaldce_alias_root
   globaldce_weak_root
+  globaldce_comdat_root
+  globaldce_tls_root
   globaldce_tls_model_root
   globaldce_switch_table_root
 
 local-only conservative:
-  globaldce_comdat_root
-  globaldce_tls_root
   globaldce_tls_concurrency_root
 
 unit-test only:
   globaldce removes unreferenced local functions and globals
   exported alias keeps a private target function live
   weak linkage is preserved and rooted
-  COMDAT members are preserved conservatively
-  thread-local globals are preserved conservatively
+  unreferenced local COMDAT members and COMDAT records are removed
+  unreferenced local thread-local globals are removed
   known TLS model spellings are preserved and unknown models fail verifier checks
 ```

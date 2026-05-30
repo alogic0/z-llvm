@@ -47,7 +47,7 @@ const GlobalDependencyGraph = struct {
             const ref: NodeRef = .{ .kind = .function, .name = function.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
-            if (!isLocal(function.linkage) or hasComdat(function.attrs)) try graph.roots.append(allocator, ref);
+            if (!isLocal(function.linkage)) try graph.roots.append(allocator, ref);
             const callees = calls.calleesOf(function.name) orelse &.{};
             for (callees) |callee| {
                 if (!hasFunctionDefinition(module, callee)) continue;
@@ -61,7 +61,7 @@ const GlobalDependencyGraph = struct {
             const ref: NodeRef = .{ .kind = .global, .name = global.name };
             var node: Node = .{ .ref = ref, .edges = .empty };
             errdefer node.deinit(allocator);
-            if (!isLocal(global.linkage) or hasComdat(global.attrs) or isThreadLocal(global)) try graph.roots.append(allocator, ref);
+            if (!isLocal(global.linkage)) try graph.roots.append(allocator, ref);
             try addInitializerEdges(allocator, module, &node.edges, global.initializer);
             try graph.nodes.append(allocator, node);
         }
@@ -208,7 +208,8 @@ fn run(module: *ir.Module, context: *pass_manager.Context) !pass_manager.PassRes
     const removed_functions = removeDeadFunctions(module, live.items);
     const removed_globals = removeDeadGlobals(module, live.items);
     const removed_aliases = removeDeadAliases(module, live.items);
-    return if (removed_functions or removed_globals or removed_aliases) .changed else .unchanged;
+    const removed_comdats = removeDeadComdats(module);
+    return if (removed_functions or removed_globals or removed_aliases or removed_comdats) .changed else .unchanged;
 }
 
 fn removeDeadFunctions(module: *ir.Module, live: []const NodeRef) bool {
@@ -216,7 +217,7 @@ fn removeDeadFunctions(module: *ir.Module, live: []const NodeRef) bool {
     var index: usize = 0;
     while (index < module.functions.items.len) {
         const function = module.functions.items[index];
-        if (!isLocal(function.linkage) or hasComdat(function.attrs) or containsRef(live, .{ .kind = .function, .name = function.name })) {
+        if (!isLocal(function.linkage) or containsRef(live, .{ .kind = .function, .name = function.name })) {
             index += 1;
             continue;
         }
@@ -233,7 +234,7 @@ fn removeDeadGlobals(module: *ir.Module, live: []const NodeRef) bool {
     var index: usize = 0;
     while (index < module.globals.items.len) {
         const global = module.globals.items[index];
-        if (!isLocal(global.linkage) or hasComdat(global.attrs) or isThreadLocal(global) or containsRef(live, .{ .kind = .global, .name = global.name })) {
+        if (!isLocal(global.linkage) or containsRef(live, .{ .kind = .global, .name = global.name })) {
             index += 1;
             continue;
         }
@@ -273,6 +274,52 @@ fn markLive(
 fn appendUniqueEdge(allocator: std.mem.Allocator, edges: *std.ArrayList(NodeRef), ref: NodeRef) !void {
     if (containsRef(edges.items, ref)) return;
     try edges.append(allocator, ref);
+}
+
+fn removeDeadComdats(module: *ir.Module) bool {
+    var changed = false;
+    var index: usize = 0;
+    while (index < module.comdats.items.len) {
+        const name = comdatRecordName(module.comdats.items[index]) orelse {
+            index += 1;
+            continue;
+        };
+        if (comdatReferenced(module.*, name)) {
+            index += 1;
+            continue;
+        }
+        _ = module.comdats.orderedRemove(index);
+        changed = true;
+    }
+    return changed;
+}
+
+fn comdatReferenced(module: ir.Module, name: []const u8) bool {
+    for (module.globals.items) |global| {
+        if (attrsReferenceComdat(global.attrs, name)) return true;
+    }
+    for (module.functions.items) |function| {
+        if (attrsReferenceComdat(function.attrs, name)) return true;
+    }
+    return false;
+}
+
+fn attrsReferenceComdat(attrs: ?[]const u8, name: []const u8) bool {
+    const text = attrs orelse return false;
+    var rest = text;
+    while (std.mem.indexOf(u8, rest, "comdat(")) |relative_start| {
+        const start = relative_start + "comdat(".len;
+        const after_start = rest[start..];
+        const close = std.mem.indexOfScalar(u8, after_start, ')') orelse return false;
+        if (std.mem.eql(u8, after_start[0..close], name)) return true;
+        rest = after_start[close + 1 ..];
+    }
+    return false;
+}
+
+fn comdatRecordName(record: []const u8) ?[]const u8 {
+    const eq_index = std.mem.indexOfScalar(u8, record, '=') orelse return null;
+    return std.mem.trim(u8, record[0..eq_index], " \t");
 }
 
 fn containsRef(refs: []const NodeRef, ref: NodeRef) bool {

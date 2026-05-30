@@ -12,9 +12,9 @@ drop thread-visible state.
 ```
 
 The `thread_local` spelling is preserved as a raw global address attribute.
-GlobalDCE treats thread-local globals as conservative roots, even when their
-linkage is local, because TLS allocation and access can be target/linker
-visible.
+GlobalDCE treats thread-local globals like other globals for reachability:
+unreferenced local TLS definitions are removable, while externally visible or
+live-function-referenced TLS definitions remain live.
 
 Known TLS model spellings are preserved textually:
 
@@ -41,10 +41,10 @@ classified through the conservative atomics/inline-asm barrier boundary in
 
 ```text
 local-only conservative opt fixture:
-  globaldce_tls_root
   globaldce_tls_concurrency_root
 
 opt-equivalent fixture:
+  globaldce_tls_root
   globaldce_tls_model_root
   dce_tls_store_preserve
   gvn_tls_store_clobber_reject
@@ -52,7 +52,7 @@ opt-equivalent fixture:
   dse_tls_load_barrier
 
 unit tests:
-  thread-local global preservation through GlobalDCE
+  thread-local global reachability through GlobalDCE
   known TLS model preservation and unknown TLS model rejection
   fence, atomicrmw, cmpxchg, and inline asm barrier preservation
   atomic syncscope preservation through the atomic parser boundary

@@ -1,5 +1,4 @@
 @tls_concurrency.tls_counter = private thread_local unnamed_addr global i32 1, align 4
-@unused_tls = private thread_local unnamed_addr global i32 2, align 4
 
 @bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls
 @read_tls = alias i32 (), ptr @tls_concurrency.read_tls

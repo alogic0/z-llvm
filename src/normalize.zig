@@ -5,6 +5,8 @@ pub fn llvmCompatibleIr(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
     const filtered = try stripComparisonNoise(allocator, text);
     defer allocator.free(filtered);
 
+    if (std.mem.trim(u8, filtered, " \t\r\n").len == 0) return try allocator.dupe(u8, "");
+
     var module = try ir.Module.parse(allocator, filtered);
     defer module.deinit();
     try module.verify();
@@ -28,6 +30,7 @@ pub fn stripComparisonNoise(allocator: std.mem.Allocator, text: []const u8) ![]u
             try output.writer.writeByte('\n');
             continue;
         }
+        if (std.mem.startsWith(u8, trimmed, ";")) continue;
         if (std.mem.startsWith(u8, trimmed, "source_filename = ")) continue;
         if (std.mem.startsWith(u8, trimmed, "target datalayout = ")) continue;
         if (std.mem.startsWith(u8, trimmed, "target triple = ")) continue;

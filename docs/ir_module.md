@@ -71,10 +71,11 @@ globals, and C string constants are preserved at module level. They are not yet
 visible to load/store analysis, constant folding, linker resolution, or codegen
 semantics beyond the documented GlobalDCE roots.
 COMDAT records are preserved, references to modeled COMDAT records are verified,
-and members are treated conservatively by GlobalDCE when referenced from raw
-global/function attributes.
-Thread-local globals are preserved and treated conservatively by GlobalDCE as
-concurrency-visible roots.
+and dead COMDAT records are removed by GlobalDCE once no live global/function
+attributes reference them.
+Thread-local globals keep their textual TLS attributes, but GlobalDCE removes
+unreferenced local TLS definitions and preserves live or externally visible TLS
+definitions.
 ```
 
 Fixture coverage:
@@ -82,8 +83,6 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   globaldce_weak_root
-
-local-only conservative:
   globaldce_comdat_root
 
 unit-test only:

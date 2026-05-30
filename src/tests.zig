@@ -3579,7 +3579,7 @@ test "globaldce removes unreferenced local functions and globals" {
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
-test "globaldce preserves comdat members conservatively" {
+test "globaldce removes unreferenced local comdat members" {
     const input =
         \\$grp = comdat any
         \\
@@ -3613,21 +3613,10 @@ test "globaldce preserves comdat members conservatively" {
     defer output.deinit();
     try module.print(&output.writer);
 
-    const expected =
-        \\$grp = comdat any
-        \\
-        \\@member = internal global i32 1, comdat($grp)
-        \\
-        \\define internal i32 @helper(i32 %x) comdat($grp) {
-        \\entry:
-        \\  ret i32 %x
-        \\}
-        \\
-    ;
-    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+    try std.testing.expectEqualStrings("", output.writer.buffered());
 }
 
-test "globaldce preserves thread local globals conservatively" {
+test "globaldce removes unreferenced local thread local globals" {
     const input =
         \\@tls = internal thread_local global i32 1
         \\@dead = internal global i32 2
@@ -3649,11 +3638,18 @@ test "globaldce preserves thread local globals conservatively" {
     defer output.deinit();
     try module.print(&output.writer);
 
-    const expected =
-        \\@tls = internal thread_local global i32 1
+    try std.testing.expectEqualStrings("", output.writer.buffered());
+}
+
+test "normalizer accepts empty modules after comparison noise stripping" {
+    const normalized = try normalize.llvmCompatibleIr(std.testing.allocator,
+        \\; ModuleID = 'empty.ll'
+        \\source_filename = "empty.ll"
         \\
-    ;
-    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+    );
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqualStrings("", normalized);
 }
 
 test "verifier rejects use before definition in the same block" {
