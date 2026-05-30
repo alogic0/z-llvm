@@ -102,9 +102,10 @@ preserve division by zero, signed min / -1, and non-exact exact division cases
 safe variable div/rem identities: x / 1 -> x and x % 1 -> 0
 selected flagged integer identities when `nuw`, `nsw`, or `exact` does not
 change overflow behavior
-checked flagged add/sub/mul constants when signed and unsigned overflow cannot
-occur in the local bit-width model
-preserve flagged integer constants when overflow would be required
+flagged add/sub/mul and in-range shift constants fold to the APInt-wrapped
+integer result, matching LLVM's constant-folding spelling for the covered
+scalar widths
+constant shifts with counts outside the type bit width fold to `poison`
 freeze of an integer constant -> that same constant
 strict fcmp false -> false
 strict fcmp true -> true
@@ -129,13 +130,14 @@ opt-22 equivalent:
   instcombine_cast_bitpatterns
   instcombine_flagged_identities
   instcombine_flagged_constants
+  instcombine_flagged_shl_constants
+  instcombine_shift_constants
+  instcombine_shift_oversized_poison
   instcombine_pointer_compare
   fp_strict_fcmp_fold
   fp_fast_math_flags_boundary
 
 local-only conservative:
-  instcombine_flagged_overflow_reject preserves a case where LLVM can reason in
-  terms of poison, which the local IR does not yet materialize.
   unsafe division cases are preserved in unit tests
   fp_strict_orderedness_fold covers local APFloat-shaped orderedness folds
 

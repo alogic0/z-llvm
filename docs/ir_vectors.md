@@ -103,14 +103,14 @@ opt-22 equivalent:
   vector_lane_preserve
   vector_lane_dead_dce
   vector_extract_insert_fold
+  vector_extract_insert_mismatch_reject
   vector_combine_extract_insert_same
+  vector_combine_extract_insert_mismatch
   vector_select_same_arms
   early_cse_vector_lane_store_forward
   dse_vector_lane_not_barrier
 
 local-only conservative:
-  vector_extract_insert_mismatch_reject
-  vector_combine_extract_insert_mismatch
   slp_vectorizer_recognition
   vector_shuffle_undef_mask_preserve
   gvn_vector_lane_not_clobber

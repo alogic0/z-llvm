@@ -68,6 +68,7 @@ fn foldExtractAfterInsert(
         replaceValue(function, result, insert.value);
     } else {
         extract.vector = insert.vector;
+        extract.index_ty = .{ .int = 64 };
     }
 
     removeInsertIfDead(function, record);

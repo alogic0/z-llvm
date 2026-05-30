@@ -23,6 +23,37 @@ tiny_scalar_release_small: future
 vector_future_release_fast: parse,verify,future
 ```
 
+Latest accepted-pipeline freshness sweep:
+
+```text
+tmp/zig_ir/next_discovery_debug
+  mode=Debug
+  passes=zig-debug-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/next_discovery_releasefast
+  mode=ReleaseFast
+  passes=zig-release-fast-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/next_discovery_releasesafe
+  mode=ReleaseSafe
+  passes=zig-release-safe-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/next_discovery_releasesmall
+  mode=ReleaseSmall
+  passes=zig-release-small-accepted
+  processed=1474 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+```
+
+No backlog item is promoted from this sweep because it found no measured
+source-backed blocker, no opt-22 mismatch, and no readiness-gate failure.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete

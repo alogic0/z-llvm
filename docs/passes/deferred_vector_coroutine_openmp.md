@@ -91,9 +91,9 @@ Fixture coverage:
 opt-22 equivalent:
   vector_lane_preserve
   vector_combine_extract_insert_same
+  vector_combine_extract_insert_mismatch
 
 local-only conservative:
-  vector_combine_extract_insert_mismatch
   slp_vectorizer_recognition
   future vector fixture classified as parse/verify/future
   accepted corpus pipeline test excludes vector placeholders

@@ -165,12 +165,7 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
         .@"and" => if (!binary.flags.any()) .{ .int = lhs & rhs } else null,
         .@"or" => if (!binary.flags.any()) .{ .int = lhs | rhs } else null,
         .xor => if (!binary.flags.any()) .{ .int = lhs ^ rhs } else null,
-        .shl, .lshr, .ashr => if (!binary.flags.any() and rhs == 0)
-            .{ .int = lhs }
-        else if (!binary.flags.any() and lhs == 0)
-            .{ .int = 0 }
-        else
-            null,
+        .shl, .lshr, .ashr => foldShiftConstant(binary),
         .udiv => foldUnsignedDivRem(binary, .div),
         .urem => foldUnsignedDivRem(binary, .rem),
         .sdiv => foldSignedDivRem(binary, .div),
@@ -179,11 +174,28 @@ fn simplifyBinaryConstants(binary: ir.BinaryInst) ?ir.Value {
 }
 
 fn foldCheckedAddSubMul(binary: ir.BinaryInst, result: i128) ?ir.Value {
-    if (!binary.flags.any()) return .{ .int = result };
+    const folded = canonicalIntegerConstant(result, binary.ty) orelse return null;
+    if (!binary.flags.any()) return .{ .int = folded };
     if (binary.flags.exact or binary.flags.disjoint) return null;
-    if (binary.flags.nuw and !unsignedOperationInRange(binary)) return null;
-    if (binary.flags.nsw and !signedOperationInRange(binary, result)) return null;
-    return .{ .int = result };
+    return .{ .int = folded };
+}
+
+fn foldShiftConstant(binary: ir.BinaryInst) ?ir.Value {
+    if (binary.flags.disjoint) return null;
+    const bits = intBits(binary.ty) orelse return null;
+    if (bits == 0 or bits >= 128) return null;
+    if (binary.rhs.int < 0 or binary.rhs.int >= bits) return .poison;
+
+    const mask = (@as(u128, 1) << @intCast(bits)) - 1;
+    const shift: u7 = @intCast(binary.rhs.int);
+    const lhs_bits = unsignedLowBits(binary.lhs.int, bits);
+    const shifted = switch (binary.op) {
+        .shl => (lhs_bits << shift) & mask,
+        .lshr => lhs_bits >> shift,
+        .ashr => arithmeticShiftRight(lhs_bits, bits, shift),
+        .fadd, .fsub, .fmul, .fdiv, .frem, .add, .sub, .mul, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return null,
+    };
+    return .{ .int = signedFromUnsignedBits(shifted, bits) };
 }
 
 fn canSimplifyFlaggedBinary(binary: ir.BinaryInst) bool {
@@ -517,6 +529,38 @@ fn unsignedMax(ty: ir.Type) ?u128 {
 fn signedResultInRange(ty: ir.Type, result: i128) bool {
     const range = signedRange(ty) orelse return false;
     return result >= range.min and result <= range.max;
+}
+
+fn canonicalIntegerConstant(value: i128, ty: ir.Type) ?i128 {
+    const bits = intBits(ty) orelse return null;
+    if (bits == 0 or bits >= 128) return null;
+    const modulus = @as(i128, 1) << @intCast(bits);
+    const sign_bit = @as(i128, 1) << @intCast(bits - 1);
+    var wrapped = @mod(value, modulus);
+    if (wrapped >= sign_bit) wrapped -= modulus;
+    return wrapped;
+}
+
+fn signedFromUnsignedBits(value: u128, bits: u16) i128 {
+    const sign_bit = @as(u128, 1) << @intCast(bits - 1);
+    if ((value & sign_bit) == 0) return @intCast(value);
+    const modulus = @as(u128, 1) << @intCast(bits);
+    return -@as(i128, @intCast(modulus - value));
+}
+
+fn unsignedLowBits(value: i128, bits: u16) u128 {
+    const mask = (@as(u128, 1) << @intCast(bits)) - 1;
+    const raw: u128 = @bitCast(value);
+    return raw & mask;
+}
+
+fn arithmeticShiftRight(value: u128, bits: u16, shift: u7) u128 {
+    const shifted = value >> shift;
+    const sign_bit = @as(u128, 1) << @intCast(bits - 1);
+    if ((value & sign_bit) == 0 or shift == 0) return shifted;
+    const mask = (@as(u128, 1) << @intCast(bits)) - 1;
+    const retained_bits = (@as(u128, 1) << @intCast(bits - shift)) - 1;
+    return shifted | (mask ^ retained_bits);
 }
 
 const SignedRange = struct {

@@ -4,11 +4,12 @@ const pass_manager = @import("../pass_manager.zig");
 
 const likely_weight: i64 = 2000;
 const unlikely_weight: i64 = 1;
+const expect_intrinsic_attrs = "nocallback nofree nosync nounwind willreturn memory(none)";
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "lower-expect",
     .category = .codegen_prep,
-    .target_status = "LLVM-shaped subset for llvm.expect.i1 branch metadata",
+    .target_status = "LLVM-shaped subset for llvm.expect.i1 branch metadata and scalar integer passthrough",
     .upstream_owner = "llvm/lib/Transforms/Scalar/LowerExpectIntrinsic.cpp",
     .run = run,
 };
@@ -45,7 +46,8 @@ fn lowerFunction(module: *ir.Module, function: *ir.Function) !bool {
                 .call => |call| call,
                 .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => continue,
             };
-            if (!isSupportedExpectI1(call)) continue;
+            if (!isSupportedExpectScalar(call)) continue;
+            try annotateExpectDeclaration(module, call.callee);
             replaceValue(function, result, call.args.items[0].value);
             instruction.removed = true;
             changed = true;
@@ -79,12 +81,84 @@ fn findExpectI1ByResult(block: ir.BasicBlock, cond: ir.Value) ?ExpectCall {
 }
 
 fn isSupportedExpectI1(call: ir.CallInst) bool {
-    if (!std.mem.eql(u8, call.callee, "llvm.expect.i1")) return false;
-    if (!call.ret_ty.eql(.{ .int = 1 })) return false;
+    return call.ret_ty.eql(.{ .int = 1 }) and isSupportedExpectScalar(call);
+}
+
+fn isSupportedExpectScalar(call: ir.CallInst) bool {
+    if (!isExpectIntrinsicName(call.callee, call.ret_ty)) return false;
     if (call.callee_value != null or call.inline_asm != null or call.operand_bundle != null) return false;
     if (call.args.items.len != 2) return false;
-    if (!call.args.items[0].ty.eql(.{ .int = 1 }) or !call.args.items[1].ty.eql(.{ .int = 1 })) return false;
+    if (!call.args.items[0].ty.eql(call.ret_ty) or !call.args.items[1].ty.eql(call.ret_ty)) return false;
     return call.args.items[1].value == .int;
+}
+
+fn isExpectIntrinsicName(name: []const u8, ret_ty: ir.Type) bool {
+    const bits = switch (ret_ty) {
+        .int => |bits| bits,
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+    };
+    if (!std.mem.startsWith(u8, name, "llvm.expect.i")) return false;
+    const suffix = name["llvm.expect.i".len..];
+    if (suffix.len == 0) return false;
+    for (suffix) |byte| {
+        if (byte < '0' or byte > '9') return false;
+    }
+    const parsed_bits = std.fmt.parseUnsigned(u16, suffix, 10) catch return false;
+    return parsed_bits == bits;
+}
+
+fn annotateExpectDeclaration(module: *ir.Module, callee: []const u8) !void {
+    const decl_index = findDeclarationIndex(module.*, callee) orelse return;
+    if (module.declarations.items[decl_index].attrs != null) return;
+    module.declarations.items[decl_index].attrs = try ensureAttributeGroup(module, expect_intrinsic_attrs);
+}
+
+fn findDeclarationIndex(module: ir.Module, name: []const u8) ?usize {
+    for (module.declarations.items, 0..) |decl, index| {
+        if (std.mem.eql(u8, decl.name, name)) return index;
+    }
+    return null;
+}
+
+fn ensureAttributeGroup(module: *ir.Module, body: []const u8) ![]const u8 {
+    for (module.attribute_groups.items) |record| {
+        const record_body = attributeGroupBody(record) orelse continue;
+        if (std.mem.eql(u8, record_body, body)) {
+            const id = attributeGroupId(record) orelse continue;
+            return try module.ownString(try std.fmt.allocPrint(module.allocator, "#{}", .{id}));
+        }
+    }
+
+    const id = nextAttributeGroupId(module.*);
+    const record = try module.ownString(try std.fmt.allocPrint(module.allocator, "attributes #{} = {{ {s} }}", .{ id, body }));
+    try module.attribute_groups.append(module.allocator, record);
+    return try module.ownString(try std.fmt.allocPrint(module.allocator, "#{}", .{id}));
+}
+
+fn nextAttributeGroupId(module: ir.Module) usize {
+    var max_id: ?usize = null;
+    for (module.attribute_groups.items) |record| {
+        const id = attributeGroupId(record) orelse continue;
+        if (max_id == null or id > max_id.?) max_id = id;
+    }
+    return if (max_id) |id| id + 1 else 0;
+}
+
+fn attributeGroupId(record: []const u8) ?usize {
+    const trimmed = std.mem.trim(u8, record, " \t");
+    if (!std.mem.startsWith(u8, trimmed, "attributes #")) return null;
+    const id_start = "attributes #".len;
+    var id_end = id_start;
+    while (id_end < trimmed.len and trimmed[id_end] >= '0' and trimmed[id_end] <= '9') : (id_end += 1) {}
+    if (id_end == id_start) return null;
+    return std.fmt.parseUnsigned(usize, trimmed[id_start..id_end], 10) catch null;
+}
+
+fn attributeGroupBody(record: []const u8) ?[]const u8 {
+    const trimmed = std.mem.trim(u8, record, " \t");
+    if (trimmed.len == 0 or trimmed[trimmed.len - 1] != '}') return null;
+    const open = std.mem.indexOfScalar(u8, trimmed, '{') orelse return null;
+    return std.mem.trim(u8, trimmed[open + 1 .. trimmed.len - 1], " \t");
 }
 
 fn branchWeightMetadata(module: *ir.Module, expected: i128) ![]const u8 {
@@ -160,7 +234,21 @@ fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value)
                     cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
                     cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
                 },
-                .fence, .extractelement, .insertelement, .shufflevector => {},
+                .fence => {},
+                .extractelement => |*extract| {
+                    extract.vector = replaceOperand(extract.vector, name, replacement);
+                    extract.index = replaceOperand(extract.index, name, replacement);
+                },
+                .insertelement => |*insert| {
+                    insert.vector = replaceOperand(insert.vector, name, replacement);
+                    insert.value = replaceOperand(insert.value, name, replacement);
+                    insert.index = replaceOperand(insert.index, name, replacement);
+                },
+                .shufflevector => |*shuffle| {
+                    shuffle.lhs = replaceOperand(shuffle.lhs, name, replacement);
+                    shuffle.rhs = replaceOperand(shuffle.rhs, name, replacement);
+                    shuffle.mask = replaceOperand(shuffle.mask, name, replacement);
+                },
                 .extractvalue => |*extract| extract.aggregate = replaceOperand(extract.aggregate, name, replacement),
                 .insertvalue => |*insert| {
                     insert.aggregate = replaceOperand(insert.aggregate, name, replacement);

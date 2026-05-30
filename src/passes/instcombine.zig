@@ -1,4 +1,5 @@
 const std = @import("std");
+const def_use = @import("../analysis/def_use.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -11,6 +12,12 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
+const InsertRecord = struct {
+    block_index: usize,
+    instruction_index: usize,
+    insert: ir.InsertElementInst,
+};
+
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
@@ -18,15 +25,17 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         defer aliases.deinit();
         var debug_aliases = std.StringHashMap([]const u8).init(module.allocator);
         defer debug_aliases.deinit();
-        var inserted_vectors = std.StringHashMap(ir.InsertElementInst).init(module.allocator);
+        var inserted_vectors = std.StringHashMap(InsertRecord).init(module.allocator);
         defer inserted_vectors.deinit();
 
-        for (function.blocks.items) |*block| {
-            for (block.instructions.items) |*instruction| {
+        for (function.blocks.items, 0..) |*block, block_index| {
+            for (block.instructions.items, 0..) |*instruction, instruction_index| {
                 salvageDebugMetadata(instruction, debug_aliases);
                 instruction.mapOperands(aliases);
 
                 if (canonicalize(instruction)) changed = true;
+
+                if (try rewriteWithContext(module.allocator, function, instruction, inserted_vectors)) changed = true;
 
                 if (foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
                     instruction.removed = true;
@@ -40,7 +49,11 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
                 if (instruction.kind == .insertelement) {
                     if (instruction.result) |result| {
-                        try inserted_vectors.put(result, instruction.kind.insertelement);
+                        try inserted_vectors.put(result, .{
+                            .block_index = block_index,
+                            .instruction_index = instruction_index,
+                            .insert = instruction.kind.insertelement,
+                        });
                     }
                 }
             }
@@ -160,16 +173,28 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
     return inst_simplify.simplify(instruction);
 }
 
-fn foldWithContext(instruction: ir.Instruction, inserted_vectors: std.StringHashMap(ir.InsertElementInst)) ?ir.Value {
+fn rewriteWithContext(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    instruction: *ir.Instruction,
+    inserted_vectors: std.StringHashMap(InsertRecord),
+) !bool {
+    return switch (instruction.kind) {
+        .extractelement => |*extract| try rewriteExtractAfterInsert(allocator, function, extract, inserted_vectors),
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+    };
+}
+
+fn foldWithContext(instruction: ir.Instruction, inserted_vectors: std.StringHashMap(InsertRecord)) ?ir.Value {
     return switch (instruction.kind) {
         .extractelement => |extract| foldExtractAfterInsert(extract, inserted_vectors),
         .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
     };
 }
 
-fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.StringHashMap(ir.InsertElementInst)) ?ir.Value {
+fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.StringHashMap(InsertRecord)) ?ir.Value {
     if (extract.vector != .named) return null;
-    const insert = inserted_vectors.get(extract.vector.named) orelse return null;
+    const insert = (inserted_vectors.get(extract.vector.named) orelse return null).insert;
     if (extract.index != .int or insert.index != .int) return null;
     if (extract.index.int != insert.index.int) return null;
     if (!extract.vector_ty.eql(insert.vector_ty)) return null;
@@ -179,4 +204,35 @@ fn foldExtractAfterInsert(extract: ir.ExtractElementInst, inserted_vectors: std.
     };
     if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return null;
     return insert.value;
+}
+
+fn rewriteExtractAfterInsert(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    extract: *ir.ExtractElementInst,
+    inserted_vectors: std.StringHashMap(InsertRecord),
+) !bool {
+    if (extract.vector != .named) return false;
+    const record = inserted_vectors.get(extract.vector.named) orelse return false;
+    const insert = record.insert;
+    if (extract.index != .int or insert.index != .int) return false;
+    if (extract.index.int == insert.index.int) return false;
+    if (!extract.vector_ty.eql(insert.vector_ty)) return false;
+    const vector_ty = switch (extract.vector_ty) {
+        .vector => |vector_ty| vector_ty,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+    };
+    if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return false;
+
+    extract.vector = insert.vector;
+    extract.index_ty = .{ .int = 64 };
+    try removeInsertIfDead(allocator, function, record);
+    return true;
+}
+
+fn removeInsertIfDead(allocator: std.mem.Allocator, function: *ir.Function, record: InsertRecord) !void {
+    const result = function.blocks.items[record.block_index].instructions.items[record.instruction_index].result orelse return;
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+    if (!uses.isUsed(result)) function.blocks.items[record.block_index].instructions.items[record.instruction_index].removed = true;
 }
