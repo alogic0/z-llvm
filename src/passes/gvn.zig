@@ -103,6 +103,29 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: *ir.Module, function:
     defer leaders.deinit(allocator);
 
     changed = try visitBlock(allocator, function, dom, graph, &aliases, &table, memory, &leaders, 0) or changed;
+    changed = try removeUnusedLoads(allocator, function) or changed;
+    return changed;
+}
+
+fn removeUnusedLoads(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+
+    var changed = false;
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .load => {
+                    const result = instruction.result orelse continue;
+                    if (uses.isUsed(result) or !memory_effect.isSafeToDelete(instruction.*)) continue;
+                    instruction.removed = true;
+                    changed = true;
+                },
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
+            }
+        }
+    }
     return changed;
 }
 

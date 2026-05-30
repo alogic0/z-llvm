@@ -78,6 +78,7 @@ load availability queries use the persisted local MemorySSA walker-shaped API
 cross-block load availability is path-aware for the accepted access-list slice:
 endpoint instruction order is used, and interior clobbers must be reachable on a
 CFG path between the leader load and the later load
+unused non-volatile loads are removed when their result has no uses
 simple load PRE for one two-predecessor join shape:
   predecessors have available must-alias load/store values, or one predecessor
   has an available must-alias load
@@ -126,6 +127,7 @@ opt-22 equivalent:
   gvn_vector_lane_not_clobber
   gvn_tls_store_clobber_reject
   gvn_scalar_pre_critical_edge
+  gvn_unused_load
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_gvn_flags
@@ -167,6 +169,7 @@ no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no dead-leader replacement beyond same-block redundant loads and the simple
 diamond load shape
+no general dead-code cleanup beyond unused non-volatile loads
 no load critical-edge splitting or general partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, constrained FP,
 vector, or memory value numbering
