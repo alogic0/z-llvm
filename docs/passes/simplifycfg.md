@@ -64,6 +64,8 @@ Implemented subset:
   Phi incoming pruning and trivial phi replacement
   Single-predecessor branch block merge
   Matching return block merge
+  Common return block merge with a PHI for one existing empty `common.ret`
+  block and one other same-typed return
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
@@ -83,6 +85,7 @@ Fixture coverage:
   simplifycfg
   simplifycfg_thread_empty
   simplifycfg_common_ret
+  simplifycfg_common_ret_phi
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -116,6 +119,8 @@ has no live phi nodes, or when the empty block has one predecessor and phi
 incoming labels can be rewritten to that predecessor without merging distinct
 incoming values
 merge matching return blocks into the predecessor conditional block
+merge one same-typed return into an existing empty `common.ret` block by
+creating a return-value PHI
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -192,6 +197,8 @@ no general block merging
 no switch support
 no invoke/landingpad support
 no metadata/profile preservation
+no general return-block tail merging beyond the accepted matching-return and
+single-common-ret PHI shapes
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```

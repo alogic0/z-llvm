@@ -17,6 +17,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
+        changed = try mergeReturnsToCommonBlock(module, function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
         changed = simplifyTerminators(function) or changed;
         changed = try cfg_update.prunePhiIncomingToPredecessors(module.allocator, function) or changed;
@@ -154,6 +155,113 @@ fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !b
         }
     }
     return changed;
+}
+
+fn mergeReturnsToCommonBlock(module: *ir.Module, function: *ir.Function) !bool {
+    var graph = try cfg.Graph.build(module.allocator, function.*);
+    defer graph.deinit();
+
+    const common_index = findRetOnlyBlock(function.*, "common.ret") orelse return false;
+    const common_block = &function.blocks.items[common_index];
+    const common_ret = switch (common_block.terminator orelse return false) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return false,
+    };
+    const common_value = common_ret.value orelse return false;
+    if (common_block.instructions.items.len != 0) return false;
+
+    var other_index: ?usize = null;
+    var other_value: ?ir.Value = null;
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (block_index == common_index) continue;
+        const ret = switch (block.terminator orelse continue) {
+            .ret => |ret| ret,
+            .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => continue,
+        };
+        if (!ret.ty.eql(common_ret.ty)) continue;
+        if (ret.value == null) continue;
+        if (other_index != null) return false;
+        other_index = block_index;
+        other_value = ret.value;
+    }
+    const return_index = other_index orelse return false;
+
+    const old_common_name = common_block.name;
+    const new_common_name = try uniqueCommonReturnBlockName(module, function.*);
+    common_block.name = new_common_name;
+    _ = cfg_update.retargetBranches(function, old_common_name, new_common_name);
+
+    const phi_name = try uniqueCommonReturnValueName(module, function.*, new_common_name);
+    var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+    errdefer incoming.deinit(module.allocator);
+    try incoming.append(module.allocator, .{
+        .value = other_value.?,
+        .block = function.blocks.items[return_index].name,
+    });
+    for (graph.predecessors(common_index)) |predecessor| {
+        try incoming.append(module.allocator, .{
+            .value = common_value,
+            .block = function.blocks.items[predecessor].name,
+        });
+    }
+
+    try common_block.instructions.insert(module.allocator, 0, .{
+        .result = phi_name,
+        .kind = .{ .phi = .{ .ty = common_ret.ty, .incoming = incoming } },
+    });
+    common_block.terminator = .{ .ret = .{
+        .ty = common_ret.ty,
+        .value = .{ .named = phi_name },
+    } };
+    function.blocks.items[return_index].terminator = .{ .br = .{ .target = common_block.name } };
+    return true;
+}
+
+fn findRetOnlyBlock(function: ir.Function, name: []const u8) ?usize {
+    const block_index = function.blockIndex(name) orelse return null;
+    const block = function.blocks.items[block_index];
+    if (block.instructions.items.len != 0) return null;
+    switch (block.terminator orelse return null) {
+        .ret => return block_index,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    }
+}
+
+fn uniqueCommonReturnBlockName(module: *ir.Module, function: ir.Function) ![]const u8 {
+    var suffix: usize = 1;
+    while (true) : (suffix += 1) {
+        const candidate = try std.fmt.allocPrint(module.allocator, "common.ret{}", .{suffix});
+        errdefer module.allocator.free(candidate);
+        if (function.blockIndex(candidate) == null) return try module.ownString(candidate);
+        module.allocator.free(candidate);
+    }
+}
+
+fn uniqueCommonReturnValueName(module: *ir.Module, function: ir.Function, block_name: []const u8) ![]const u8 {
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try std.fmt.allocPrint(module.allocator, "{s}.op", .{block_name})
+        else
+            try std.fmt.allocPrint(module.allocator, "{s}.op{}", .{ block_name, suffix });
+        errdefer module.allocator.free(candidate);
+        if (!hasResultName(function, candidate)) return try module.ownString(candidate);
+        module.allocator.free(candidate);
+    }
+}
+
+fn hasResultName(function: ir.Function, name: []const u8) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return true;
+    }
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, name)) return true;
+            }
+        }
+    }
+    return false;
 }
 
 fn profileMetadata(metadata: ?[]const u8) ?[]const u8 {
