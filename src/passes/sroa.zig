@@ -136,6 +136,7 @@ fn tryScalarizeAggregateAlloca(
             }
         }
     }
+    removeDeadAllocaRootedGeps(function, slot);
     function.blocks.items[alloca_block_index].instructions.items[alloca_instruction_index].removed = true;
     return true;
 }
@@ -165,7 +166,7 @@ fn aggregateAllocaOnlyUsesPartitions(
                 .gep => |gep| {
                     if (isNamed(gep.ptr, slot)) {
                         const result = instruction.result orelse return false;
-                        if (!partition_values.contains(result)) return false;
+                        if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(function, result, &partition_values)) return false;
                     } else if (instructionUsesName(instruction, slot)) {
                         return false;
                     }
@@ -192,6 +193,24 @@ fn aggregateAllocaOnlyUsesPartitions(
     return true;
 }
 
+fn gepResultFeedsOnlyPartitions(function: ir.Function, value: []const u8, partition_values: *const std.StringHashMap(void)) bool {
+    var saw_use = false;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, value)) continue;
+            }
+            if (!instructionUsesName(instruction, value)) continue;
+            if (instruction.kind != .gep) return false;
+            const result = instruction.result orelse return false;
+            if (!partition_values.contains(result) and !gepResultFeedsOnlyPartitions(function, result, partition_values)) return false;
+            saw_use = true;
+        }
+    }
+    return saw_use;
+}
+
 fn moduleLayout(module: ir.Module) ?target.DataLayout {
     const text = module.target_datalayout orelse default_data_layout;
     return target.DataLayout.parse(text) catch null;
@@ -199,18 +218,23 @@ fn moduleLayout(module: ir.Module) ?target.DataLayout {
 
 const default_data_layout = "e-m:e-p:64:64-i64:64-n8:16:32:64-S128";
 
-fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_root: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AllocaSlice {
-    if (!gep.source_ty.eql(aggregate_ty)) return null;
+fn aggregateFieldSlice(layout: ?target.DataLayout, function: ir.Function, result: []const u8, alloca_root: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AllocaSlice {
     if (gep.indices.items.len < 2) return null;
     const base_index = gep.indices.items[0].value;
     if (base_index != .int or base_index.int != 0) return null;
     const path = aggregateFieldPath(gep) orelse return null;
-    const field_ty = aggregateLeafFieldType(aggregate_ty, path) orelse return null;
+    const field_ty = aggregateLeafFieldType(gep.source_ty, path) orelse return null;
     if (!isScalarizableAggregateField(field_ty, layout != null)) return null;
-    const offset = if (layout) |target_layout|
-        memory_location.gepOffsetWithLayout(target_layout, gep) orelse return null
+    const base_location = if (layout) |target_layout|
+        memory_location.forPointerWithLayout(function, target_layout, gep.ptr) orelse return null
     else
-        memory_location.gepOffset(gep) orelse return null;
+        memory_location.forPointer(function, gep.ptr) orelse return null;
+    if (base_location.root_kind != .stack or !std.mem.eql(u8, base_location.root, alloca_root)) return null;
+    const base_offset = base_location.offset orelse return null;
+    const offset = if (layout) |target_layout|
+        base_offset + (memory_location.gepOffsetWithLayout(target_layout, gep) orelse return null)
+    else
+        base_offset + (memory_location.gepOffset(gep) orelse return null);
     const size = if (layout) |target_layout|
         memory_location.typeSizeWithLayout(target_layout, field_ty) orelse return null
     else
@@ -220,7 +244,7 @@ fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_ro
         .alloca_root = alloca_root,
         .value = result,
         .source_ty = aggregate_ty,
-        .field_index = aggregateFieldPathId(path) orelse return null,
+        .field_index = aggregateFieldPathId(aggregate_ty, gep.source_ty, path, offset) orelse return null,
         .field_ty = field_ty,
         .offset = offset,
         .size = size,
@@ -245,17 +269,14 @@ fn aggregateLeafFieldType(root_ty: ir.Type, path: []const ir.GepIndex) ?ir.Type 
     return current_ty;
 }
 
-fn aggregateFieldPathId(path: []const ir.GepIndex) ?usize {
+fn aggregateFieldPathId(root_ty: ir.Type, source_ty: ir.Type, path: []const ir.GepIndex, offset: i128) ?usize {
     if (path.len == 0) return null;
-    if (path.len == 1) return @intCast(path[0].value.int);
+    if (source_ty.eql(root_ty) and path.len == 1) return @intCast(path[0].value.int);
 
-    var id: usize = 4096;
-    for (path) |index| {
-        const field_index: usize = @intCast(index.value.int);
-        if (id > (std.math.maxInt(usize) - field_index) / 257) return null;
-        id = id * 257 + field_index;
-    }
-    return id;
+    if (offset < 0) return null;
+    const offset_id: usize = @intCast(offset);
+    if (offset_id > std.math.maxInt(usize) - 4096) return null;
+    return 4096 + offset_id;
 }
 
 fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
@@ -501,6 +522,40 @@ fn fieldReplacementFor(replacements: []const FieldReplacement, field_index: usiz
     return null;
 }
 
+fn removeDeadAllocaRootedGeps(function: *ir.Function, slot: []const u8) void {
+    var changed = true;
+    while (changed) {
+        changed = false;
+        for (function.blocks.items) |*block| {
+            for (block.instructions.items) |*instruction| {
+                if (instruction.removed or instruction.kind != .gep) continue;
+                const result = instruction.result orelse continue;
+                const root = gepAllocaRoot(function.*, instruction.kind.gep) orelse continue;
+                if (!std.mem.eql(u8, root, slot)) continue;
+                if (valueHasUses(function.*, result)) continue;
+                instruction.removed = true;
+                changed = true;
+            }
+        }
+    }
+}
+
+fn valueHasUses(function: ir.Function, name: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instruction.result) |result| {
+                if (std.mem.eql(u8, result, name)) continue;
+            }
+            if (instructionUsesName(instruction, name)) return true;
+        }
+        if (block.terminator) |terminator| {
+            if (terminatorUsesName(terminator, name)) return true;
+        }
+    }
+    return false;
+}
+
 fn forwardZeroOffsetGeps(allocator: std.mem.Allocator, function: *ir.Function) !bool {
     var slices = try AllocaSlices.collect(allocator, null, function.*);
     defer slices.deinit();
@@ -569,7 +624,7 @@ const AllocaSlices = struct {
                 const base = gepAllocaRoot(function, gep) orelse continue;
                 if (rootAllocaType(function, base)) |root_ty| {
                     if (root_ty == .aggregate) {
-                        if (aggregateFieldSlice(layout, result, base, root_ty, gep)) |slice| {
+                        if (aggregateFieldSlice(layout, function, result, base, root_ty, gep)) |slice| {
                             try slices.append(allocator, slice);
                         }
                     }
@@ -860,6 +915,22 @@ fn instructionUsesName(instruction: ir.Instruction, name: []const u8) bool {
             return false;
         },
     }
+}
+
+fn terminatorUsesName(terminator: ir.Terminator, name: []const u8) bool {
+    return switch (terminator) {
+        .ret => |ret| if (ret.value) |value| isNamed(value, name) else false,
+        .br, .@"unreachable" => false,
+        .condbr => |condbr| isNamed(condbr.cond, name),
+        .indirectbr => |indirectbr| isNamed(indirectbr.addr, name),
+        .@"switch" => |switch_term| {
+            if (isNamed(switch_term.cond, name)) return true;
+            for (switch_term.cases.items) |case| {
+                if (isNamed(case.value, name)) return true;
+            }
+            return false;
+        },
+    };
 }
 
 fn isNamed(value: ir.Value, name: []const u8) bool {
