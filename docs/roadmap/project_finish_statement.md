@@ -1,11 +1,14 @@
 # Project Finish Statement
 
 This repository has reached the finish line defined by the current
-Zig-aligned LLVM replacement experiment.
+Zig-aligned effort to replace the LLVM library dependency used by Zig's
+distribution.
 
 ## Finished Scope
 
 - The readiness gate passes for the selected corpus and validation matrix.
+- The implemented scope is tied to LLVM behavior that Zig's distribution needs,
+  not to a full LLVM clone.
 - The Zig IR manifest has no unsupported rows in the finish corpus.
 - Remaining future rows are explicit boundaries, not unowned blockers.
 - Accepted rows document the local pipeline they exercise.

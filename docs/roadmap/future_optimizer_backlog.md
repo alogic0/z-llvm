@@ -1,8 +1,9 @@
 # Future Optimizer Backlog
 
-This file holds optional follow-up work after the completed finish burn-down.
-It is not an active roadmap. Promote one item only after selecting a concrete
-source-backed fixture, opt-22 delta, or readiness-gate failure.
+This file holds optional follow-up work after the completed finish burn-down
+for replacing Zig's LLVM library dependency. It is not an active roadmap.
+Promote one item only after selecting a concrete source-backed fixture,
+opt-22 delta, or readiness-gate failure.
 
 The current finish state has no active source-backed blocker:
 

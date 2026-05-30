@@ -1,7 +1,12 @@
 # Zig LLVM Removal Roadmap
 
-This document is the main roadmap entrypoint. The initial Zig LLVM removal
-epics are complete and archived under `roadmap/historical/completed_epics/`.
+This document is the main roadmap entrypoint for replacing the LLVM library
+dependency that Zig uses in its distribution. The local replacement is scoped
+around the LLVM IR, optimizer, target, and backend handoff behavior Zig
+actually exercises, rather than around cloning all of LLVM.
+
+The initial Zig LLVM removal epics are complete and archived under
+`roadmap/historical/completed_epics/`.
 The first optimizer cycle slices are complete and archived under
 `roadmap/historical/completed_cycle_slices/`. The first larger optimizer cycles
 are complete and archived under `roadmap/historical/completed_big_cycles/`.

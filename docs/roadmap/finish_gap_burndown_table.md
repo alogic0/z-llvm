@@ -1,9 +1,10 @@
 # Finish Criteria and Gap Burn-Down Table
 
-This is the durable finish table for the current Zig-aligned LLVM replacement
-experiment. It defines what this repository can honestly call finished and
-links every remaining gap to source-backed evidence, an opt fixture, a
-conservative accepted boundary, or an explicit non-goal.
+This is the durable finish table for the current Zig-aligned effort to replace
+the LLVM library dependency used by Zig's distribution. It defines what this
+repository can honestly call finished and links every remaining gap to
+source-backed evidence, an opt fixture, a conservative accepted boundary, or an
+explicit non-goal.
 
 ## Finish Definition
 
