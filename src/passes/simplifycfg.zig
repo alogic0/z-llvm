@@ -171,7 +171,7 @@ fn identicalTwoArmReturn(function: ir.Function, graph: cfg.Graph, uses: def_use.
     if (then_instruction.metadata != null or else_instruction.metadata != null) return null;
     const then_result = then_instruction.result orelse return null;
     const else_result = else_instruction.result orelse return null;
-    if (!expression_key.sameScalarExpression(then_instruction, else_instruction)) return null;
+    if (!sameHoistableReturnInstruction(function, then_instruction, else_instruction)) return null;
     if ((uses.counts.get(then_result) orelse 0) != 1) return null;
     if ((uses.counts.get(else_result) orelse 0) != 1) return null;
 
@@ -199,6 +199,11 @@ fn retReturnsValue(ret: anytype, result: []const u8) bool {
         .named => |name| std.mem.eql(u8, name, result),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn sameHoistableReturnInstruction(function: ir.Function, then_instruction: ir.Instruction, else_instruction: ir.Instruction) bool {
+    if (expression_key.sameScalarExpression(then_instruction, else_instruction)) return true;
+    return expression_key.sameLoadExpression(function, then_instruction, else_instruction);
 }
 
 fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !bool {

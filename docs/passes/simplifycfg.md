@@ -66,8 +66,8 @@ Implemented subset:
   Matching return block merge
   Common return block merge with a PHI for one existing empty `common.ret`
   block and one other same-typed return
-  Hoist one identical pure scalar instruction from two unique return successors
-  into the predecessor branch block
+  Hoist one identical pure scalar instruction or non-volatile load from two
+  unique return successors into the predecessor branch block
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
@@ -90,6 +90,7 @@ Fixture coverage:
   simplifycfg_common_ret
   simplifycfg_common_ret_phi
   simplifycfg_hoist_same_add_ret
+  simplifycfg_hoist_same_load_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -125,8 +126,9 @@ incoming values
 merge matching return blocks into the predecessor conditional block
 merge one same-typed return into an existing empty `common.ret` block by
 creating a return-value PHI
-hoist one identical pure scalar instruction from two unique conditional
-successors when each instruction feeds only that successor's return
+hoist one identical pure scalar instruction or non-volatile load from two
+unique conditional successors when each instruction feeds only that successor's
+return
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -161,6 +163,7 @@ opt-22 equivalent:
   simplifycfg_common_ret
   simplifycfg_common_ret_phi
   simplifycfg_hoist_same_add_ret
+  simplifycfg_hoist_same_load_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -211,7 +214,7 @@ no metadata/profile preservation
 no general return-block tail merging beyond the accepted matching-return and
 single-common-ret PHI shapes
 no general common-code hoisting beyond one identical metadata-free scalar
-instruction feeding two unique return successors
+instruction or non-volatile load feeding two unique return successors
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```
