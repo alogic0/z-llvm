@@ -113,6 +113,7 @@ opt-22 equivalent:
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
   gvn_atomic_load_barrier_reject
+  gvn_vector_lane_not_clobber
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_gvn_flags
@@ -157,6 +158,7 @@ no general PHI translation beyond exact phi expression matching and the simple
 load-PRE PHI insertion
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
+no dead-leader replacement beyond same-block redundant loads
 no critical-edge splitting or general partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, constrained FP,
 vector, or memory value numbering

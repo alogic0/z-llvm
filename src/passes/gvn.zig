@@ -1,6 +1,7 @@
 const std = @import("std");
 const alias = @import("../analysis/alias.zig");
 const cfg = @import("../analysis/cfg.zig");
+const def_use = @import("../analysis/def_use.zig");
 const dominator = @import("../analysis/dominator.zig");
 const expression_key = @import("../analysis/expression_key.zig");
 const fast_math = @import("../analysis/fast_math.zig");
@@ -335,6 +336,10 @@ fn visitBlock(
         const number = try table.numberFor(instruction.*);
         if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |leader_index| {
             const leader = leaders.items[leader_index];
+            if (try replaceUnusedSameBlockLoadLeader(allocator, function, leaders, leader_index, block_index, instruction_index, instruction.*)) {
+                changed = true;
+                continue;
+            }
             expression_key.intersectRetainedFpFlags(&function.blocks.items[leader.block_index].instructions.items[leader.instruction_index], instruction.*);
             leaders.items[leader_index].instruction = function.blocks.items[leader.block_index].instructions.items[leader.instruction_index];
             const replacement: ir.Value = .{ .named = leader.instruction.result orelse return error.InstructionWithoutResult };
@@ -405,6 +410,47 @@ fn findLeader(
         return index;
     }
     return null;
+}
+
+fn replaceUnusedSameBlockLoadLeader(
+    allocator: std.mem.Allocator,
+    function: *ir.Function,
+    leaders: *std.ArrayList(Leader),
+    leader_index: usize,
+    block_index: usize,
+    instruction_index: usize,
+    instruction: ir.Instruction,
+) !bool {
+    const leader = leaders.items[leader_index];
+    if (leader.block_index != block_index) return false;
+    const leader_result = leader.instruction.result orelse return false;
+    const current_result = instruction.result orelse return false;
+    if (std.mem.eql(u8, leader_result, current_result)) return false;
+    if (leader.instruction.kind != .load or instruction.kind != .load) return false;
+    if (!hasVectorLaneOperationBetween(function.*, block_index, leader.instruction_index, instruction_index)) return false;
+
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+    if (uses.isUsed(leader_result)) return false;
+
+    function.blocks.items[block_index].instructions.items[leader.instruction_index].removed = true;
+    leaders.items[leader_index].block_index = block_index;
+    leaders.items[leader_index].instruction_index = instruction_index;
+    leaders.items[leader_index].instruction = instruction;
+    return true;
+}
+
+fn hasVectorLaneOperationBetween(function: ir.Function, block_index: usize, earlier_index: usize, later_index: usize) bool {
+    if (earlier_index + 1 >= later_index) return false;
+    const block = function.blocks.items[block_index];
+    for (block.instructions.items[earlier_index + 1 .. later_index]) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .extractelement, .insertelement, .shufflevector => return true,
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractvalue, .insertvalue, .gep, .call => {},
+        }
+    }
+    return false;
 }
 
 fn isCandidate(module: ir.Module, instruction: ir.Instruction) bool {
