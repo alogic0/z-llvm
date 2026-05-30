@@ -27,7 +27,12 @@ fn eliminateFunction(allocator: std.mem.Allocator, function: *ir.Function) !bool
     while (try removeDeadControlFlow(allocator, function)) {
         changed = true;
     }
-    changed = try removeDeadInstructions(allocator, function) or changed;
+    if (try removeDeadInstructions(allocator, function)) {
+        changed = true;
+        while (try removeDeadControlFlow(allocator, function)) {
+            changed = true;
+        }
+    }
     return changed;
 }
 

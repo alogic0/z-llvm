@@ -63,6 +63,8 @@ start from current def-use counts
 walk instructions backward
 remove unused side-effect-free instructions
 repeat until dependent dead instruction chains disappear
+rerun dead control-flow cleanup after dead instruction removal so a dead PHI at
+a join can stop blocking the accepted diamond rewrite
 preserve stores, volatile/atomic memory barriers, unknown memory effects, and terminators
 use the shared `isSafeToDelete` helper for the local removal boundary
 remove unused side-effect-free FP instructions through the same liveness path as
@@ -86,6 +88,7 @@ opt-22 equivalent:
   adce_chain
   adce_dead_branch
   adce_dead_diamond
+  adce_dead_phi_diamond
   adce_nested_dead_diamond
   adce_store_branch_reject
   adce_live_call_branch_reject
@@ -106,7 +109,8 @@ Known gaps:
 ```text
 no full optimistic block/instruction liveness worklist
 no live-terminator propagation through arbitrary control dependence
-no PHI-aware deletion beyond shared stale-incoming pruning after supported edge deletion
+no live PHI-aware deletion beyond shared stale-incoming pruning after supported
+edge deletion and the dead-PHI cleanup that unlocks the accepted diamond rewrite
 no general loop/cyclic dead-region rewriting beyond the opt-equivalent
 preservation boundary covered by `adce_infinite_loop_reject`
 no debug info salvage
