@@ -201,6 +201,7 @@ fn performSimpleScalarPre(allocator: std.mem.Allocator, module: *ir.Module, func
         defer incoming.deinit(allocator);
         var insertions: std.ArrayList(usize) = .empty;
         defer insertions.deinit(allocator);
+        var split_predecessor: ?usize = null;
 
         var existing_count: usize = 0;
         for (predecessors) |predecessor| {
@@ -210,8 +211,11 @@ fn performSimpleScalarPre(allocator: std.mem.Allocator, module: *ir.Module, func
                 continue;
             }
             if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
-                incoming.clearRetainingCapacity();
-                break;
+                if (split_predecessor != null or !canSplitCriticalScalarPreEdge(function.*, predecessor, block_index)) {
+                    incoming.clearRetainingCapacity();
+                    break;
+                }
+                split_predecessor = predecessor;
             }
             try incoming.append(allocator, .{ .block_index = predecessor, .value = .undef });
             try insertions.append(allocator, predecessor);
@@ -220,16 +224,30 @@ fn performSimpleScalarPre(allocator: std.mem.Allocator, module: *ir.Module, func
         if (incoming.items.len != predecessors.len) continue;
         if (existing_count == 0 or insertions.items.len != 1) continue;
 
-        const inserted_value = try insertPreScalar(allocator, module, function, insertions.items[0], scalar_instruction);
+        var inserted_block_index = insertions.items[0];
+        var phi_block_index = block_index;
+        if (split_predecessor) |predecessor| {
+            inserted_block_index = try splitCriticalScalarPreEdge(allocator, module, function, predecessor, block_index);
+            const insertion_index = inserted_block_index;
+            if (insertion_index <= phi_block_index) phi_block_index += 1;
+            for (incoming.items) |*entry| {
+                if (entry.block_index >= insertion_index) entry.block_index += 1;
+                if (entry.block_index == predecessor) {
+                    entry.block_index = inserted_block_index;
+                }
+            }
+        }
+
+        const inserted_value = try insertPreScalar(allocator, module, function, inserted_block_index, scalar_instruction);
         for (incoming.items) |*entry| {
-            if (entry.block_index == insertions.items[0]) {
+            if (entry.block_index == inserted_block_index) {
                 entry.value = inserted_value;
                 break;
             }
         }
 
         const phi_result = try uniqueScalarPrePhiName(allocator, module, function.*, scalar_result);
-        try replaceScalarWithPhi(allocator, function, block_index, scalar_index, scalar_result, phi_result, scalar_ty, incoming.items, insertions.items[0]);
+        try replaceScalarWithPhi(allocator, function, phi_block_index, scalar_index, scalar_result, phi_result, scalar_ty, incoming.items, inserted_block_index);
         return true;
     }
 
@@ -266,6 +284,84 @@ fn firstPreScalarCandidateIndex(module: ir.Module, block: ir.BasicBlock) ?usize 
 fn hasSingleSuccessorTo(graph: cfg.Graph, predecessor: usize, block_index: usize) bool {
     const successors = graph.successors(predecessor);
     return successors.len == 1 and successors[0] == block_index;
+}
+
+fn canSplitCriticalScalarPreEdge(function: ir.Function, predecessor: usize, block_index: usize) bool {
+    const target_name = function.blocks.items[block_index].name;
+    const terminator = function.blocks.items[predecessor].terminator orelse return false;
+    return switch (terminator) {
+        .condbr => |condbr| {
+            const then_matches = std.mem.eql(u8, condbr.then_target, target_name);
+            const else_matches = std.mem.eql(u8, condbr.else_target, target_name);
+            return then_matches != else_matches;
+        },
+        .ret, .br, .@"switch", .indirectbr, .@"unreachable" => false,
+    };
+}
+
+fn splitCriticalScalarPreEdge(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    function: *ir.Function,
+    predecessor: usize,
+    block_index: usize,
+) !usize {
+    const predecessor_name = function.blocks.items[predecessor].name;
+    const target_name = function.blocks.items[block_index].name;
+    const split_name = try uniqueCriticalEdgeBlockName(allocator, module, function.*, predecessor_name, target_name);
+
+    switch (function.blocks.items[predecessor].terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |*condbr| {
+            if (std.mem.eql(u8, condbr.then_target, target_name)) {
+                condbr.then_target = split_name;
+            } else if (std.mem.eql(u8, condbr.else_target, target_name)) {
+                condbr.else_target = split_name;
+            } else {
+                return error.InvalidBranchTarget;
+            }
+        },
+        .ret, .br, .@"switch", .indirectbr, .@"unreachable" => return error.InvalidBranchTarget,
+    }
+
+    rewritePhiIncomingBlock(&function.blocks.items[block_index], predecessor_name, split_name);
+
+    var split_block = ir.BasicBlock.init(split_name);
+    errdefer split_block.deinit(allocator);
+    split_block.terminator = .{ .br = .{ .target = target_name } };
+    const insertion_index = predecessor + 1;
+    try function.blocks.insert(allocator, insertion_index, split_block);
+    return insertion_index;
+}
+
+fn uniqueCriticalEdgeBlockName(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    function: ir.Function,
+    predecessor_name: []const u8,
+    target_name: []const u8,
+) ![]const u8 {
+    var suffix: usize = 0;
+    while (true) : (suffix += 1) {
+        const candidate = if (suffix == 0)
+            try std.fmt.allocPrint(allocator, "{s}.{s}_crit_edge", .{ predecessor_name, target_name })
+        else
+            try std.fmt.allocPrint(allocator, "{s}.{s}_crit_edge{}", .{ predecessor_name, target_name, suffix });
+        errdefer allocator.free(candidate);
+        if (function.blockIndex(candidate) == null) return try module.ownString(candidate);
+        allocator.free(candidate);
+    }
+}
+
+fn rewritePhiIncomingBlock(block: *ir.BasicBlock, old_name: []const u8, new_name: []const u8) void {
+    for (block.instructions.items) |*instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .phi => |*phi| for (phi.incoming.items) |*incoming| {
+                if (std.mem.eql(u8, incoming.block, old_name)) incoming.block = new_name;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return,
+        }
+    }
 }
 
 fn joinPrefixClobbers(module: ir.Module, function: ir.Function, block_index: usize, load_index: usize, load: ir.LoadInst) bool {

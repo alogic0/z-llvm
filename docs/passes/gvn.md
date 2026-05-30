@@ -86,6 +86,7 @@ simple load PRE for one two-predecessor join shape:
 simple scalar PRE for one two-predecessor join shape:
   one predecessor has an available matching integer binary expression
   one direct predecessor can receive one inserted expression before its terminator
+  or one conditional-branch critical edge can be split for that inserted expression
   the join expression is replaced by a PHI with incoming available/inserted values
 same-block and cross-block availability through scoped leaders
 replacement of dominated redundant expression uses
@@ -100,8 +101,10 @@ This is intentionally closer to a small value-table seed than to full LLVM GVN.
 It is enough to prove the project can move beyond same-block `early-cse` while
 still relying on the existing dominator analysis.
 
-Load and scalar PRE are implemented only for accepted two-predecessor diamond
-surfaces and do not split critical edges or perform general PHI translation.
+Load PRE is implemented only for accepted two-predecessor diamond surfaces.
+Scalar PRE handles the accepted direct diamond surface plus one conditional
+branch critical-edge split for a two-predecessor join. Neither PRE path performs
+general PHI translation.
 
 Fixture coverage:
 
@@ -122,6 +125,7 @@ opt-22 equivalent:
   gvn_diamond_load_no_memory_phi
   gvn_vector_lane_not_clobber
   gvn_tls_store_clobber_reject
+  gvn_scalar_pre_critical_edge
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_gvn_flags
@@ -153,7 +157,8 @@ Known gaps:
 
 ```text
 load PRE is limited to one direct two-predecessor diamond shape
-scalar PRE is limited to one direct two-predecessor integer-binary diamond shape
+scalar PRE is limited to one two-predecessor integer-binary join with either a
+direct missing predecessor or one split conditional-branch critical edge
 no MemorySSA-backed memory value numbering beyond the accepted path-aware
 walker query and same-block store-to-load forwarding
 no general PHI translation beyond exact phi expression matching and the simple
@@ -162,7 +167,7 @@ no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
 no dead-leader replacement beyond same-block redundant loads and the simple
 diamond load shape
-no critical-edge splitting or general partial redundancy handling
+no load critical-edge splitting or general partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, constrained FP,
 vector, or memory value numbering
 no FP commutative operand canonicalization
