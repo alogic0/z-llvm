@@ -76,6 +76,7 @@ readnone call CSE when callee attributes prove no memory effects
 unknown calls and volatile/atomic accesses clear local memory availability
 candidate legality goes through the shared memory-effect safe-to-delete helper
 later dominated uses are rewritten to the earlier value
+unused safe non-FP CSE candidates are deleted after the scoped walk
 scalar, load, and readnone-call expression equivalence shared with GVN
 FP binary ops and fcmp use the shared fast-math legality helper and are admitted
 for scalar non-constrained FP expressions
@@ -108,6 +109,7 @@ opt-22 equivalent:
   early_cse_diamond_no_memory_phi
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
+  early_cse_unused_candidates
   fp_early_cse_flags
   fp_early_cse_no_cse
   fp_extended_early_cse_no_cse
@@ -161,5 +163,7 @@ no freeze CSE because undef/poison semantics need more modeling first
 no constrained-FP CSE for dynamic rounding or strict exceptions
 no FP commutative operand canonicalization
 no target-library knowledge
+no full iterative dead-code cleanup beyond one post-walk unused non-FP
+CSE-candidate deletion pass
 no debug-info salvage beyond preserving the leader instruction location
 ```

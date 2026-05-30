@@ -60,7 +60,28 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     var graph = try cfg.Graph.build(allocator, function.*);
     defer graph.deinit();
 
-    return try visitBlock(allocator, module, function, dom, graph, memory.getWalker(), &aliases, &available, &stores, 0);
+    var changed = try visitBlock(allocator, module, function, dom, graph, memory.getWalker(), &aliases, &available, &stores, 0);
+    changed = try removeUnusedCseCandidates(allocator, module, function) or changed;
+    return changed;
+}
+
+fn removeUnusedCseCandidates(allocator: std.mem.Allocator, module: ir.Module, function: *ir.Function) !bool {
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+
+    var changed = false;
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            const result = instruction.result orelse continue;
+            if (uses.isUsed(result) or !memory_effect.isSafeToDelete(instruction.*)) continue;
+            if (isFpExpression(instruction.*)) continue;
+            if (!isCseCandidate(module, instruction.*)) continue;
+            instruction.removed = true;
+            changed = true;
+        }
+    }
+    return changed;
 }
 
 fn visitBlock(
