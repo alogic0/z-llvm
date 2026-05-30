@@ -66,6 +66,7 @@ Implemented subset:
   Textual struct aggregate parsing for the narrow `{ iN, iN, ... }` surface
   Fixed array aggregate parsing for the narrow `[N x iM]` surface
   Struct-field GEP offset calculation for constant field indices
+  Nested struct-field GEP slicing for constant scalar leaf fields
   Array-element GEP offset calculation for constant element indices
   Exact-cover scalar integer field/element alloca splitting for simple
   aggregate allocas
@@ -97,6 +98,7 @@ Fixture coverage:
   sroa_nested_zero_gep
   sroa_struct_two_i32
   sroa_array_three_i32
+  sroa_nested_struct_sibling
   sroa_struct_one_field
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject
@@ -140,6 +142,7 @@ replace uses of that zero-offset GEP result with the base alloca pointer
 parse small textual struct aggregate types
 parse small textual fixed array aggregate types
 calculate constant struct-field GEP offsets
+slice nested constant struct-field GEPs when the reached leaf field is scalar
 calculate constant fixed-array element GEP offsets
 split simple integer struct-field/array-element partitions into scalar allocas
 split DataLayout-backed pointer struct-field partitions into scalar allocas,
@@ -166,6 +169,7 @@ opt-22 equivalent:
   sroa_nested_zero_gep
   sroa_struct_two_i32
   sroa_array_three_i32
+  sroa_nested_struct_sibling
   sroa_struct_one_field
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject

@@ -201,18 +201,16 @@ const default_data_layout = "e-m:e-p:64:64-i64:64-n8:16:32:64-S128";
 
 fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_root: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AllocaSlice {
     if (!gep.source_ty.eql(aggregate_ty)) return null;
-    if (gep.indices.items.len != 2) return null;
+    if (gep.indices.items.len < 2) return null;
     const base_index = gep.indices.items[0].value;
     if (base_index != .int or base_index.int != 0) return null;
-    const field_value = gep.indices.items[1].value;
-    if (field_value != .int or field_value.int < 0) return null;
-    const field_index: usize = @intCast(field_value.int);
-    const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return null;
+    const path = aggregateFieldPath(gep) orelse return null;
+    const field_ty = aggregateLeafFieldType(aggregate_ty, path) orelse return null;
     if (!isScalarizableAggregateField(field_ty, layout != null)) return null;
     const offset = if (layout) |target_layout|
-        memory_location.aggregateFieldOffsetWithLayout(target_layout, aggregate_ty, field_index) orelse return null
+        memory_location.gepOffsetWithLayout(target_layout, gep) orelse return null
     else
-        memory_location.aggregateFieldOffset(aggregate_ty, field_index) orelse return null;
+        memory_location.gepOffset(gep) orelse return null;
     const size = if (layout) |target_layout|
         memory_location.typeSizeWithLayout(target_layout, field_ty) orelse return null
     else
@@ -222,12 +220,42 @@ fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_ro
         .alloca_root = alloca_root,
         .value = result,
         .source_ty = aggregate_ty,
-        .field_index = field_index,
+        .field_index = aggregateFieldPathId(path) orelse return null,
         .field_ty = field_ty,
         .offset = offset,
         .size = size,
         .zero_offset_compatible = false,
     };
+}
+
+fn aggregateFieldPath(gep: ir.GepInst) ?[]const ir.GepIndex {
+    if (gep.indices.items.len < 2) return null;
+    for (gep.indices.items[1..]) |index| {
+        if (index.value != .int or index.value.int < 0) return null;
+    }
+    return gep.indices.items[1..];
+}
+
+fn aggregateLeafFieldType(root_ty: ir.Type, path: []const ir.GepIndex) ?ir.Type {
+    var current_ty = root_ty;
+    for (path) |index| {
+        const field_index: usize = @intCast(index.value.int);
+        current_ty = memory_location.aggregateFieldType(current_ty, field_index) orelse return null;
+    }
+    return current_ty;
+}
+
+fn aggregateFieldPathId(path: []const ir.GepIndex) ?usize {
+    if (path.len == 0) return null;
+    if (path.len == 1) return @intCast(path[0].value.int);
+
+    var id: usize = 4096;
+    for (path) |index| {
+        const field_index: usize = @intCast(index.value.int);
+        if (id > (std.math.maxInt(usize) - field_index) / 257) return null;
+        id = id * 257 + field_index;
+    }
+    return id;
 }
 
 fn isScalarizableAggregateField(field_ty: ir.Type, has_layout: bool) bool {
