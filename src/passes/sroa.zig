@@ -100,6 +100,7 @@ fn tryScalarizeAggregateAlloca(
 
     try rewriteWholeAggregateMemoryUses(module, function, slot, aggregate_ty, replacements.items);
     try rewriteAggregateSubobjectStores(module, function, slot, partitions.items, replacements.items);
+    try rewriteAggregateSubobjectLoads(module, function, slot, partitions.items, replacements.items);
 
     for (function.blocks.items) |*block| {
         for (block.instructions.items) |*inst| {
@@ -220,7 +221,12 @@ fn gepResultFeedsOnlyPartitions(
                     if (!isNamed(store.ptr, value)) return false;
                     if (!aggregateSubobjectAccessHasPartition(layout, function, value, store.ty, partitions)) return false;
                 },
-                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => return false,
+                .load => |load| {
+                    if (!isNamed(load.ptr, value)) return false;
+                    if (load.attrs.isBarrier()) return false;
+                    if (!aggregateSubobjectAccessHasPartition(layout, function, value, load.ty, partitions)) return false;
+                },
+                .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .call => return false,
             }
             saw_use = true;
         }
@@ -619,6 +625,92 @@ fn rewriteAggregateSubobjectStore(
         insert_index += 1;
     }
     return insert_index - instruction_index;
+}
+
+fn rewriteAggregateSubobjectLoads(
+    module: *ir.Module,
+    function: *ir.Function,
+    slot: []const u8,
+    partitions: []const SlicePartition,
+    replacements: []const FieldReplacement,
+) !void {
+    const layout = moduleLayout(module.*);
+    for (function.blocks.items) |*block| {
+        var instruction_index: usize = 0;
+        while (instruction_index < block.instructions.items.len) : (instruction_index += 1) {
+            const instruction = &block.instructions.items[instruction_index];
+            if (instruction.removed or instruction.kind != .load) continue;
+            const load = instruction.kind.load;
+            if (load.ty != .aggregate or load.attrs.isBarrier()) continue;
+            const result = instruction.result orelse continue;
+            const location = pointerLocation(layout, function.*, load.ptr) orelse continue;
+            if (location.root_kind != .stack or !std.mem.eql(u8, location.root, slot)) continue;
+            const base_offset = location.offset orelse continue;
+
+            var fields: std.ArrayList(AggregateStoreField) = .empty;
+            defer fields.deinit(module.allocator);
+            for (partitions) |partition| {
+                const source_field_index = sourceFieldIndexForPartition(layout, load.ty, base_offset, partition) orelse continue;
+                const replacement = fieldReplacementFor(replacements, partition.field_index orelse continue) orelse continue;
+                try fields.append(module.allocator, .{
+                    .source_field_index = source_field_index,
+                    .ty = partition.field_ty orelse continue,
+                    .alloca_name = replacement.alloca_name,
+                });
+            }
+            if (fields.items.len == 0) continue;
+
+            const rewrite = try rewriteAggregateSubobjectLoad(module, block, instruction_index, result, load.ty, fields.items);
+            replaceValue(function, result, .{ .named = rewrite.value });
+            block.instructions.items[instruction_index + rewrite.inserted].removed = true;
+            block.instructions.items[instruction_index + rewrite.inserted].replacement = .{ .named = rewrite.value };
+            instruction_index += rewrite.inserted;
+        }
+    }
+}
+
+fn rewriteAggregateSubobjectLoad(
+    module: *ir.Module,
+    block: *ir.BasicBlock,
+    instruction_index: usize,
+    load_name: []const u8,
+    aggregate_ty: ir.Type,
+    fields: []const AggregateStoreField,
+) !AggregateLoadRewrite {
+    var insert_index = instruction_index;
+    var aggregate_value: ir.Value = .poison;
+    var final_name: ?[]const u8 = null;
+    for (fields) |field| {
+        const scalar_load_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.sroa.load.{}", .{ load_name, field.source_field_index }));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = scalar_load_name,
+            .kind = .{ .load = .{
+                .ty = field.ty,
+                .ptr = .{ .named = field.alloca_name },
+            } },
+        });
+        insert_index += 1;
+
+        const insert_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.fca.{}.insert", .{ load_name, field.source_field_index }));
+        const index_text = try module.ownString(try std.fmt.allocPrint(module.allocator, "{}", .{field.source_field_index}));
+        try block.instructions.insert(module.allocator, insert_index, .{
+            .result = insert_name,
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .value_ty = field.ty,
+                .value = .{ .named = scalar_load_name },
+                .indices = index_text,
+            } },
+        });
+        insert_index += 1;
+        aggregate_value = .{ .named = insert_name };
+        final_name = insert_name;
+    }
+    return .{
+        .value = final_name orelse load_name,
+        .inserted = insert_index - instruction_index,
+    };
 }
 
 fn sourceFieldIndexForPartition(layout: ?target.DataLayout, aggregate_ty: ir.Type, base_offset: i128, partition: SlicePartition) ?usize {
