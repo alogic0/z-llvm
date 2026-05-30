@@ -66,6 +66,11 @@ classify memory(write) and memory(argmem: write) as write-only memory effects
 feed call memory classification into alias/mod-ref and MemorySSA clobber checks
 infer memory(none), memory(read), and norecurse for acyclic direct-call
 function definitions
+infer memory(argmem: read/write) for simple parameter-only load/store bodies
+infer nofree, nosync, nounwind, mustprogress, and willreturn for bounded
+no-call or direct-call bodies where the local IR surface proves the attribute
+infer readonly/writeonly captures(none), initializes((0, N)), and returned
+parameter attributes for simple direct parameter uses
 classify all other calls as unknown
 ```
 
@@ -74,10 +79,16 @@ Intentional divergences:
 ```text
 inference is limited to direct calls over local definitions and annotated
 declarations
-no parameter attribute semantics beyond parser/printer preservation
+no broader parameter attribute semantics beyond parser/printer preservation and
+the bounded inference listed above
+parameter attribute inference is limited to direct named-parameter loads,
+stores, and returns; no GEP slice, capture tracking, or alias-aware argument
+propagation is modeled
 no call-site attributes
 no full CGSCC propagation or LazyCallGraph RefSCC traversal
-no writeonly inference
+recursive SCC memory effects remain conservative, so recursive readnone-style
+memory(none) inference is still not reproduced
+no general writeonly inference beyond simple parameter stores
 no inference through indirect calls, operand bundles, inline asm, recursive SCCs,
 unknown external calls, volatile/atomic memory, or unknown memory effects
 no target feature, CPU model, frame-pointer, unwind-table, or size-attribute
@@ -93,7 +104,14 @@ opt-22 equivalent:
 
 local-only conservative:
   function_attrs_direct_calls
+    local output now infers LLVM's simple memory, nofree, norecurse, nosync,
+    nounwind, willreturn, and parameter attrs for this fixture, but preserves
+    inline attribute spelling instead of synthesizing opt-style attribute
+    groups.
   function_attrs_reject
+    stores gain simple argmem/writeonly/returned attrs and recursive SCCs gain
+    nofree/nosync/nounwind, while recursive SCC memory(none) inference remains
+    conservative.
   readnone, readonly, writeonly, and unknown direct-call memory effect unit test
   function/declaration IPO attribute group resolution test
 

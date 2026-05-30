@@ -17,7 +17,7 @@ placeholder-only until the local call graph, attributes, ABI constraints, and
 debug-info preservation are strong enough for broad body rewriting. Current
 exceptions are narrow `always-inline` and `inline` slices for direct calls to
 local single-block callees. `function-attrs` has a direct-call inference slice
-for memory effects and `norecurse`.
+for memory effects, simple call attributes, and bounded parameter attributes.
 
 ## LLVM Algorithm Contract
 
@@ -66,7 +66,8 @@ Local target status:
   inline is an LLVM-shaped cost-gated subset for direct internal single-block
   callees.
   function-attrs is an LLVM-shaped direct-call subset for `memory(none)`,
-  `memory(read)`, and `norecurse`.
+  `memory(read)`, `memory(argmem: read/write)`, `norecurse`, simple
+  nofree/nosync/nounwind/willreturn facts, and direct parameter attributes.
   argpromotion, called-value-propagation, callsite-splitting, deadargelim,
   forceattrs, and inferattrs remain placeholders or analysis
   foundations.
@@ -105,11 +106,17 @@ readnone, readonly, and cold.
 function-attrs:
   walks function bodies like LLVM's FunctionAttrs memory-access scan, classifies
   side-effect-free bodies as `memory(none)`, readonly bodies as `memory(read)`,
-  and leaves stores, volatile/atomic memory, inline asm, indirect calls, operand
-  bundles, recursive SCCs, and unknown calls unannotated.
+  parameter-only loads/stores as `memory(argmem: read/write)`, and leaves
+  volatile/atomic memory, inline asm, indirect calls, operand bundles, recursive
+  SCC memory effects, and unknown calls unannotated.
   The local norecurse inference mirrors LLVM's singleton-SCC guard by rejecting
   direct recursion, mutual recursion, indirect calls, and unannotated external
   calls before adding `norecurse`.
+  The local simple-attribute slice infers nofree/nosync/nounwind for bodies
+  whose direct calls also prove those facts, mustprogress/willreturn for
+  no-call all-return bodies, and readonly/writeonly/captures(none),
+  initializes((0, N)), and returned parameter attrs for direct named-parameter
+  uses.
 ```
 
 Intentional divergences:
@@ -129,8 +136,9 @@ no general inline cost model
 inline cost is a small local instruction budget, not LLVM's full InlineCost
 model with TTI, profile, SROA bonuses, and call penalties
 debug-location salvage for inlined bodies is not modeled
-function-attrs does not infer writeonly, nofree, nosync, nounwind, willreturn,
-or other Attributor-derived facts yet
+function-attrs still does not synthesize opt-style attribute groups, does not
+infer recursive SCC memory(none), and does not model broader Attributor-derived
+facts
 ```
 
 Fixture coverage:
