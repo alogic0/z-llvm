@@ -140,9 +140,9 @@ opt-22 equivalent:
   always_inline_direct
   always_inline_noinline_call
   inline_direct_small
+  inline_noinline_call
 
 local-only conservative:
-  inline_noinline_call
   function_attrs_direct_calls
   function_attrs_reject
   call graph declaration/definition reachability test
@@ -237,7 +237,6 @@ Known missing behavior:
 Fixtures and comparison:
   bash scripts/compare_opt.sh test/opt/fixtures.tsv
   inline_direct_small compares with opt-22 -passes=cgscc(inline)
-  inline_noinline_call is local-conservative because LLVM prints the call-site
-  noinline attribute through an attribute group while the local parser preserves
-  the source-backed group.
+  inline_noinline_call compares with opt-22 -passes=cgscc(inline); both
+  preserve the noinline call-site attribute group and leave the call in place.
 ```
