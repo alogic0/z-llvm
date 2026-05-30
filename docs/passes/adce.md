@@ -57,6 +57,8 @@ Implemented foundation subset:
 build accepted-CFG postdominance and control-dependence facts
 start from dead branch regions whose successors reconverge at an immediate postdominator
 rewrite branch control when all outgoing regions are acyclic and side-effect free
+rewrite dead switch control to the default successor when all outgoing regions
+are acyclic and side-effect free
 reject phi joins and non-linear regions for now
 repair PHI incoming lists through the shared CFG update helper after supported edge deletion
 start from current def-use counts
@@ -89,6 +91,7 @@ opt-22 equivalent:
   adce_dead_branch
   adce_dead_diamond
   adce_dead_phi_diamond
+  adce_dead_switch
   adce_nested_dead_diamond
   adce_store_branch_reject
   adce_live_call_branch_reject

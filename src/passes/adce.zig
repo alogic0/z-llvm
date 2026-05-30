@@ -226,28 +226,48 @@ fn removeDeadControlFlow(allocator: std.mem.Allocator, function: *ir.Function) !
 
     var changed = false;
     for (function.blocks.items, 0..) |*block, block_index| {
-        const condbr = switch (block.terminator orelse continue) {
-            .condbr => |condbr| condbr,
-            .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
-        };
+        const terminator = block.terminator orelse continue;
 
         const ipdom_index = postdom.immediatePostDominator(block_index) orelse continue;
         if (hasPhi(function.blocks.items[ipdom_index])) continue;
 
-        const then_index = function.blockIndex(condbr.then_target) orelse continue;
-        const else_index = function.blockIndex(condbr.else_target) orelse continue;
+        const target = switch (terminator) {
+            .condbr => |condbr| blk: {
+                const then_index = function.blockIndex(condbr.then_target) orelse continue;
+                const else_index = function.blockIndex(condbr.else_target) orelse continue;
 
-        const then_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, then_index, ipdom_index);
-        const else_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, else_index, ipdom_index);
-        if (!then_safe or !else_safe) continue;
+                const then_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, then_index, ipdom_index);
+                const else_safe = try regionIsDeadAndAcyclic(allocator, function.*, graph, else_index, ipdom_index);
+                if (!then_safe or !else_safe) continue;
 
-        const target = if (then_index == ipdom_index)
-            condbr.then_target
-        else if (else_index == ipdom_index)
-            condbr.else_target
-        else
-            condbr.then_target;
+                break :blk if (then_index == ipdom_index)
+                    condbr.then_target
+                else if (else_index == ipdom_index)
+                    condbr.else_target
+                else
+                    condbr.then_target;
+            },
+            .@"switch" => |switch_term| blk: {
+                const default_index = function.blockIndex(switch_term.default_target) orelse continue;
+                if (!try regionIsDeadAndAcyclic(allocator, function.*, graph, default_index, ipdom_index)) continue;
+                var all_cases_safe = true;
+                for (switch_term.cases.items) |case| {
+                    const case_index = function.blockIndex(case.target) orelse {
+                        all_cases_safe = false;
+                        break;
+                    };
+                    if (!try regionIsDeadAndAcyclic(allocator, function.*, graph, case_index, ipdom_index)) {
+                        all_cases_safe = false;
+                        break;
+                    }
+                }
+                if (!all_cases_safe) continue;
+                break :blk switch_term.default_target;
+            },
+            .ret, .br, .indirectbr, .@"unreachable" => continue,
+        };
 
+        if (block.terminator) |*old_terminator| old_terminator.deinit(allocator);
         block.terminator = .{ .br = .{ .target = target } };
         _ = try cfg_update.prunePhiIncomingToPredecessors(allocator, function);
         changed = true;

@@ -58,6 +58,7 @@ fp_extended_adce_preserve	adce	adce	test/opt/inputs/fp_extended_ops_preserve.ll	
 adce_dead_branch	adce	adce	test/opt/inputs/adce_dead_branch.ll	test/opt/expected/z_llvm/adce_dead_branch.ll	opt-equivalent	adce	dead conditional branch control rewritten to live successor
 adce_dead_diamond	adce	adce	test/opt/inputs/adce_dead_diamond.ll	test/opt/expected/z_llvm/adce_dead_diamond.ll	opt-equivalent	adce	dead diamond branch control rewritten like LLVM ADCE
 adce_dead_phi_diamond	adce	adce	test/opt/inputs/adce_dead_phi_diamond.ll	test/opt/expected/z_llvm/adce_dead_phi_diamond.ll	opt-equivalent	adce	dead PHI removal unlocks a second ADCE control-flow rewrite through the diamond
+adce_dead_switch	adce	adce	test/opt/inputs/adce_dead_switch.ll	test/opt/expected/z_llvm/adce_dead_switch.ll	opt-equivalent	adce	dead switch control rewrites to the default successor when every outgoing region is removable
 adce_nested_dead_diamond	adce	adce	test/opt/inputs/adce_nested_dead_diamond.ll	test/opt/expected/z_llvm/adce_nested_dead_diamond.ll	opt-equivalent	adce	nested acyclic dead branch regions are rewritten through postdominator joins
 adce_store_branch_reject	adce	adce	test/opt/inputs/adce_store_branch_reject.ll	test/opt/expected/z_llvm/adce_store_branch_reject.ll	opt-equivalent	adce	side-effecting store keeps branch control live
 adce_live_call_branch_reject	adce	adce	test/opt/inputs/adce_live_call_branch_reject.ll	test/opt/expected/z_llvm/adce_live_call_branch_reject.ll	opt-equivalent	adce	side-effecting call keeps branch control live
