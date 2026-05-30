@@ -68,8 +68,180 @@ fn hoistFunction(allocator: std.mem.Allocator, module: *ir.Module, function: *ir
                 }
             }
         }
+        if (try sinkLoopExitComputations(module, function, graph, natural_loop)) return true;
     }
     return changed;
+}
+
+fn sinkLoopExitComputations(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop) !bool {
+    if (natural_loop.header != natural_loop.latch) return false;
+    if (!try natural_loop.hasDedicatedExits(module.allocator, graph)) return false;
+    var exits = try natural_loop.exitBlocks(module.allocator, graph);
+    defer exits.deinit(module.allocator);
+    if (exits.items.len != 1) return false;
+    const exit_index = exits.items[0];
+
+    return try sinkExitOnlyBinary(module, function, graph, natural_loop, exit_index) or
+        try sinkExitOnlyGepLoad(module, function, graph, natural_loop, exit_index);
+}
+
+fn sinkExitOnlyBinary(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop, exit_index: usize) !bool {
+    for (natural_loop.blocks.items) |block_index| {
+        if (block_index >= function.blocks.items.len) continue;
+        var instruction_index: usize = 0;
+        while (instruction_index < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
+            const instruction = function.blocks.items[block_index].instructions.items[instruction_index];
+            const result = instruction.result orelse continue;
+            const binary = switch (instruction.kind) {
+                .binary => |binary| binary,
+                else => continue,
+            };
+            if (isFpBinary(binary.op)) continue;
+            if (!memory_effect.isSafeToSpeculativelyExecute(instruction)) continue;
+            if (!outsideUseIsOnlyExitRet(function.*, natural_loop, exit_index, result)) continue;
+
+            var map = try buildExitLcssaMap(module, function, graph, natural_loop, exit_index, &.{ binary.lhs, binary.rhs });
+            defer map.deinit(module.allocator);
+
+            var sunk_binary = binary;
+            sunk_binary.lhs = map.translate(binary.lhs);
+            sunk_binary.rhs = map.translate(binary.rhs);
+            try function.blocks.items[exit_index].instructions.append(module.allocator, .{
+                .result = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{result})),
+                .kind = .{ .binary = sunk_binary },
+            });
+            replaceValue(function, result, .{ .named = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{result})) });
+            removeInstructionAt(module.allocator, &function.blocks.items[block_index], instruction_index);
+            return true;
+        }
+    }
+    return false;
+}
+
+fn sinkExitOnlyGepLoad(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop, exit_index: usize) !bool {
+    for (natural_loop.blocks.items) |block_index| {
+        if (block_index >= function.blocks.items.len) continue;
+        var instruction_index: usize = 0;
+        while (instruction_index + 1 < function.blocks.items[block_index].instructions.items.len) : (instruction_index += 1) {
+            const gep_instruction = function.blocks.items[block_index].instructions.items[instruction_index];
+            const gep_result = gep_instruction.result orelse continue;
+            const gep = switch (gep_instruction.kind) {
+                .gep => |gep| gep,
+                else => continue,
+            };
+            const load_instruction = function.blocks.items[block_index].instructions.items[instruction_index + 1];
+            const load_result = load_instruction.result orelse continue;
+            const load = switch (load_instruction.kind) {
+                .load => |load| load,
+                else => continue,
+            };
+            if (!valueMatchesName(load.ptr, gep_result)) continue;
+            if (load.attrs.isBarrier()) continue;
+            if (!outsideUseIsOnlyExitRet(function.*, natural_loop, exit_index, load_result)) continue;
+            if (hasMemoryClobberInLoop(module.*, function.*, natural_loop, load_instruction, load)) continue;
+
+            var values: std.ArrayList(ir.Value) = .empty;
+            defer values.deinit(module.allocator);
+            try values.append(module.allocator, gep.ptr);
+            for (gep.indices.items) |index| try values.append(module.allocator, index.value);
+            var map = try buildExitLcssaMap(module, function, graph, natural_loop, exit_index, values.items);
+            defer map.deinit(module.allocator);
+
+            var new_indices: std.ArrayList(ir.GepIndex) = .empty;
+            errdefer new_indices.deinit(module.allocator);
+            for (gep.indices.items) |index| {
+                try new_indices.append(module.allocator, .{
+                    .ty = index.ty,
+                    .value = map.translate(index.value),
+                });
+            }
+            const sunk_gep_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{gep_result}));
+            try function.blocks.items[exit_index].instructions.append(module.allocator, .{
+                .result = sunk_gep_name,
+                .kind = .{ .gep = .{
+                    .source_ty = gep.source_ty,
+                    .ptr = map.translate(gep.ptr),
+                    .ptr_addrspace = gep.ptr_addrspace,
+                    .indices = new_indices,
+                } },
+            });
+            const sunk_load_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.le", .{load_result}));
+            try function.blocks.items[exit_index].instructions.append(module.allocator, .{
+                .result = sunk_load_name,
+                .kind = .{ .load = .{
+                    .ty = load.ty,
+                    .ty_addrspace = load.ty_addrspace,
+                    .ptr = .{ .named = sunk_gep_name },
+                    .ptr_addrspace = load.ptr_addrspace,
+                    .attrs = load.attrs,
+                } },
+            });
+            replaceValue(function, load_result, .{ .named = sunk_load_name });
+            removeInstructionAt(module.allocator, &function.blocks.items[block_index], instruction_index + 1);
+            removeInstructionAt(module.allocator, &function.blocks.items[block_index], instruction_index);
+            return true;
+        }
+    }
+    return false;
+}
+
+const LcssaMap = struct {
+    entries: std.ArrayList(Entry),
+
+    const Entry = struct {
+        original: []const u8,
+        replacement: []const u8,
+    };
+
+    fn deinit(map: *LcssaMap, allocator: std.mem.Allocator) void {
+        map.entries.deinit(allocator);
+    }
+
+    fn translate(map_data: LcssaMap, value: ir.Value) ir.Value {
+        const name = valueName(value) orelse return value;
+        for (map_data.entries.items) |entry| {
+            if (std.mem.eql(u8, entry.original, name)) return .{ .named = entry.replacement };
+        }
+        return value;
+    }
+};
+
+fn buildExitLcssaMap(module: *ir.Module, function: *ir.Function, graph: cfg.Graph, natural_loop: loop_info.NaturalLoop, exit_index: usize, values: []const ir.Value) !LcssaMap {
+    var map = LcssaMap{ .entries = .empty };
+    errdefer map.deinit(module.allocator);
+
+    for (natural_loop.blocks.items) |block_index| {
+        if (block_index >= function.blocks.items.len) continue;
+        for (function.blocks.items[block_index].instructions.items) |instruction| {
+            const result = instruction.result orelse continue;
+            if (!valueListContainsName(values, result)) continue;
+            if (mapContains(map, result)) continue;
+            const ty = instruction.resultType() orelse continue;
+            const phi_name = try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.lcssa", .{result}));
+            var incoming: std.ArrayList(ir.PhiIncoming) = .empty;
+            errdefer incoming.deinit(module.allocator);
+            for (graph.predecessors(exit_index)) |predecessor| {
+                if (!natural_loop.contains(predecessor)) continue;
+                try incoming.append(module.allocator, .{
+                    .value = .{ .named = result },
+                    .block = function.blocks.items[predecessor].name,
+                });
+            }
+            if (incoming.items.len == 0) return error.MissingPhiIncoming;
+            try insertAfterExitPhis(module.allocator, &function.blocks.items[exit_index], .{
+                .result = phi_name,
+                .kind = .{ .phi = .{
+                    .ty = ty,
+                    .incoming = incoming,
+                } },
+            });
+            try map.entries.append(module.allocator, .{
+                .original = result,
+                .replacement = phi_name,
+            });
+        }
+    }
+    return map;
 }
 
 const PromotionCandidate = struct {
@@ -280,6 +452,96 @@ fn removeInstructionPair(allocator: std.mem.Allocator, block: *ir.BasicBlock, fi
 fn removeInstructionAt(allocator: std.mem.Allocator, block: *ir.BasicBlock, index: usize) void {
     var removed = block.instructions.orderedRemove(index);
     removed.deinit(allocator);
+}
+
+fn insertAfterExitPhis(allocator: std.mem.Allocator, block: *ir.BasicBlock, instruction: ir.Instruction) !void {
+    var index: usize = 0;
+    while (index < block.instructions.items.len and block.instructions.items[index].kind == .phi) : (index += 1) {}
+    try block.instructions.insert(allocator, index, instruction);
+}
+
+fn outsideUseIsOnlyExitRet(function: ir.Function, natural_loop: loop_info.NaturalLoop, exit_index: usize, result: []const u8) bool {
+    var saw_exit_ret = false;
+    for (function.blocks.items, 0..) |block, block_index| {
+        if (natural_loop.contains(block_index)) continue;
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (instructionUsesValue(instruction, result)) return false;
+        }
+        const terminator = block.terminator orelse continue;
+        if (!terminatorUsesValue(terminator, result)) continue;
+        if (block_index != exit_index) return false;
+        const ret = switch (terminator) {
+            .ret => |ret| ret,
+            .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return false,
+        };
+        if (ret.value == null or !valueMatchesName(ret.value.?, result)) return false;
+        saw_exit_ret = true;
+    }
+    return saw_exit_ret;
+}
+
+fn instructionUsesValue(instruction: ir.Instruction, result: []const u8) bool {
+    return switch (instruction.kind) {
+        .binary => |binary| valueMatchesName(binary.lhs, result) or valueMatchesName(binary.rhs, result),
+        .cast => |cast| valueMatchesName(cast.value, result),
+        .freeze => |freeze| valueMatchesName(freeze.value, result),
+        .icmp => |icmp| valueMatchesName(icmp.lhs, result) or valueMatchesName(icmp.rhs, result),
+        .fcmp => |fcmp| valueMatchesName(fcmp.lhs, result) or valueMatchesName(fcmp.rhs, result),
+        .select => |select| valueMatchesName(select.cond, result) or valueMatchesName(select.true_value, result) or valueMatchesName(select.false_value, result),
+        .phi => |phi| {
+            for (phi.incoming.items) |incoming| {
+                if (valueMatchesName(incoming.value, result)) return true;
+            }
+            return false;
+        },
+        .load => |load| valueMatchesName(load.ptr, result),
+        .store => |store| valueMatchesName(store.value, result) or valueMatchesName(store.ptr, result),
+        .atomicrmw => |atomicrmw| valueMatchesName(atomicrmw.ptr, result) or valueMatchesName(atomicrmw.value, result),
+        .cmpxchg => |cmpxchg| valueMatchesName(cmpxchg.ptr, result) or valueMatchesName(cmpxchg.expected, result) or valueMatchesName(cmpxchg.replacement, result),
+        .extractvalue => |extract| valueMatchesName(extract.aggregate, result),
+        .insertvalue => |insert| valueMatchesName(insert.aggregate, result) or valueMatchesName(insert.value, result),
+        .gep => |gep| {
+            if (valueMatchesName(gep.ptr, result)) return true;
+            for (gep.indices.items) |index| {
+                if (valueMatchesName(index.value, result)) return true;
+            }
+            return false;
+        },
+        .call => |call| {
+            for (call.args.items) |arg| {
+                if (valueMatchesName(arg.value, result)) return true;
+            }
+            return false;
+        },
+        .alloca, .fence, .extractelement, .insertelement, .shufflevector => false,
+    };
+}
+
+fn hasMemoryClobberInLoop(module: ir.Module, function: ir.Function, natural_loop: loop_info.NaturalLoop, load_instruction: ir.Instruction, load: ir.LoadInst) bool {
+    for (natural_loop.blocks.items) |loop_block_index| {
+        const block = function.blocks.items[loop_block_index];
+        for (block.instructions.items) |candidate| {
+            if (candidate.removed) continue;
+            if (candidate.result != null and load_instruction.result != null and std.mem.eql(u8, candidate.result.?, load_instruction.result.?)) continue;
+            if (memory_ssa.isBarrierForAccess(module, function, candidate, load.ptr, load.ty)) return true;
+        }
+    }
+    return false;
+}
+
+fn valueListContainsName(values: []const ir.Value, result: []const u8) bool {
+    for (values) |value| {
+        if (valueMatchesName(value, result)) return true;
+    }
+    return false;
+}
+
+fn mapContains(map: LcssaMap, result: []const u8) bool {
+    for (map.entries.items) |entry| {
+        if (std.mem.eql(u8, entry.original, result)) return true;
+    }
+    return false;
 }
 
 fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value) void {

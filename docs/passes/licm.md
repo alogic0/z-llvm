@@ -94,6 +94,9 @@ loop has exactly one nonvolatile load and one nonvolatile store to that pointer,
 one self-latch, one dedicated exit, and no other memory effects
 insert the promoted preheader load, loop PHI, exit LCSSA PHI, and exit writeback
 store in the same shape as LLVM's `LoopPromoter` for the accepted fixture
+sink two exit-only self-latch loop shapes through dedicated exits:
+  scalar binary results are recomputed in the exit with LCSSA operands
+  variant GEP plus load chains are recomputed in the exit with LCSSA indices
 ```
 
 Current legality boundary:
@@ -107,12 +110,15 @@ not hoistable: freeze, phi, alloca, store, getelementptr, volatile or atomic
 barriers, trapping division, non-header loads, variant-pointer loads, and loads
 with loop clobbers
 not represented yet and therefore not hoistable: calls and unknown memory effects
+sinking is limited to exit-ret-only binary and GEP/load shapes with one
+self-latch loop and one dedicated exit
 ```
 
 LLVM's full LICM uses `canSinkOrHoistInst`, alias analysis, MemorySSA, and
 speculation-safety checks to decide whether memory operations can move. This
 project implements only one promotion shape from `promoteLoopAccessesToScalars`;
-general promotion, sinking, and MemorySSA updater precision remain missing.
+general promotion, broader sinking, and MemorySSA updater precision remain
+missing.
 
 Fixture coverage:
 
@@ -120,10 +126,8 @@ Fixture coverage:
 opt-22 compared: invariant scalar hoist, variant-operand rejection,
 dominance-preserving scalar-chain hoist, nested memory-free scalar-chain hoist,
 header load hoist, stack-slot memory promotion
-local only: may-alias store rejection for memory LICM because opt-22 may still
-perform other loop rewrites around that shape
-local only: variant load-pointer rejection because opt-22 may sink/LCSSA-rewrite
-the load while the local pass simply refuses to move it
+exit-only sinking with LCSSA operands for a may-alias store/load loop and a
+variant GEP/load loop
 opt-22 compared memory legality: scalar hoisting beside volatile memory
 opt-22 compared atomic legality: atomic store barriers still block memory LICM
 while unrelated pure scalar invariants may hoist
@@ -141,11 +145,12 @@ Known gaps:
 
 ```text
 no store/call hoisting or sinking
+no general sinking beyond the two exit-only self-latch patterns listed above
 no general MemorySSA updater use in LICM or memory promotion
 no memory promotion beyond the accepted one-load/one-store alloca-backed
 self-latch fixture
 no poison or freeze speculation safety checks beyond the current trapping-division guard
 no multi-latch loop hoisting
 no preheader creation
-no LCSSA, metadata, debug-info, or analysis preservation updates
+no general LCSSA, metadata, debug-info, or analysis preservation updates
 ```
