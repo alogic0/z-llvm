@@ -3,7 +3,7 @@ entry:
   br label %header
 header:
   %x = add i32 %a, 1
-  store atomic i32 %a, ptr %p, release, align 4
+  store atomic i32 %a, ptr %p release, align 4
   %c = icmp sgt i32 %x, 0
   br i1 %c, label %body, label %exit
 body:

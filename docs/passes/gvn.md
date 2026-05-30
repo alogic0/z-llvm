@@ -110,6 +110,7 @@ opt-22 equivalent:
   gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
+  gvn_atomic_load_barrier_reject
   fp_extended_gvn_no_cse
   fp_gvn_flags
 

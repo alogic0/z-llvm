@@ -77,6 +77,7 @@ Fixture coverage:
   dse_partial_overwrite_lattice
   dse_load_barrier
   dse_volatile_barrier
+  dse_atomic_store_barrier_reject
   dse_disjoint_field_overwrite
   dse_unknown_call_barrier
 

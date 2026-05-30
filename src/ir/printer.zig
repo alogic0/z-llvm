@@ -528,7 +528,7 @@ fn printMemorySuffix(attrs: core.MemoryAttrs, writer: anytype) !void {
         try writer.print(" {s}", .{syncscope});
         if (attrs.atomic_ordering) |ordering| try writer.print(" {s}", .{ordering});
     } else if (attrs.atomic_ordering) |ordering| {
-        try writer.print(", {s}", .{ordering});
+        try writer.print(" {s}", .{ordering});
     }
     if (attrs.@"align") |alignment| try writer.print(", align {}", .{alignment});
 }

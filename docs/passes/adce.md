@@ -90,6 +90,7 @@ opt-22 equivalent:
   adce_store_branch_reject
   adce_live_call_branch_reject
   adce_infinite_loop_reject
+  adce_atomic_barrier_reject
   fp_adce_dead
   fp_extended_adce_preserve
 

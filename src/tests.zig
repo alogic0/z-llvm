@@ -5716,8 +5716,8 @@ test "parser preserves atomic memory through constant-expression gep pointer" {
         \\
         \\define i32 @atomic_gep_constexpr(i32 %value) {
         \\entry:
-        \\  store atomic i32 %value, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4), unordered, align 4
-        \\  %v = load atomic i32, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4), unordered, align 4
+        \\  store atomic i32 %value, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4) unordered, align 4
+        \\  %v = load atomic i32, ptr getelementptr inbounds nuw (i8, ptr @global, i64 4) unordered, align 4
         \\  ret i32 %v
         \\}
         \\
@@ -5739,8 +5739,8 @@ test "parser accepts narrow atomic load and store spelling as barriers" {
         \\define i32 @memory_atomic(i32 %a) {
         \\entry:
         \\  %slot = alloca i32
-        \\  store atomic i32 %a, ptr %slot, release, align 4
-        \\  %v = load atomic i32, ptr %slot, acquire, align 4
+        \\  store atomic i32 %a, ptr %slot release, align 4
+        \\  %v = load atomic i32, ptr %slot acquire, align 4
         \\  ret i32 %v
         \\}
         \\
@@ -6021,8 +6021,8 @@ test "verifier accepts LLVM-shaped atomic type surfaces" {
         \\
         \\define float @atomic_float_load_store(ptr %p, float %value) {
         \\entry:
-        \\  store atomic float %value, ptr %p, release, align 4
-        \\  %loaded = load atomic float, ptr %p, acquire, align 4
+        \\  store atomic float %value, ptr %p release, align 4
+        \\  %loaded = load atomic float, ptr %p acquire, align 4
         \\  ret float %loaded
         \\}
         \\
@@ -6037,7 +6037,7 @@ test "verifier rejects invalid atomic ordering combinations" {
     const invalid_load =
         \\define i32 @bad_atomic_load(ptr %p) {
         \\entry:
-        \\  %v = load atomic i32, ptr %p, release, align 4
+        \\  %v = load atomic i32, ptr %p release, align 4
         \\  ret i32 %v
         \\}
         \\
@@ -6049,7 +6049,7 @@ test "verifier rejects invalid atomic ordering combinations" {
     const invalid_store =
         \\define void @bad_atomic_store(ptr %p) {
         \\entry:
-        \\  store atomic i32 1, ptr %p, acquire, align 4
+        \\  store atomic i32 1, ptr %p acquire, align 4
         \\  ret void
         \\}
         \\
@@ -6087,7 +6087,7 @@ test "verifier rejects LLVM invalid atomic memory types" {
     const invalid_load_i1 =
         \\define i1 @bad_atomic_load_i1(ptr %p) {
         \\entry:
-        \\  %v = load atomic i1, ptr %p, acquire, align 1
+        \\  %v = load atomic i1, ptr %p acquire, align 1
         \\  ret i1 %v
         \\}
         \\
@@ -6099,7 +6099,7 @@ test "verifier rejects LLVM invalid atomic memory types" {
     const invalid_store_i24 =
         \\define void @bad_atomic_store_i24(ptr %p) {
         \\entry:
-        \\  store atomic i24 1, ptr %p, release, align 4
+        \\  store atomic i24 1, ptr %p release, align 4
         \\  ret void
         \\}
         \\
@@ -6693,7 +6693,7 @@ test "memory effect and mod-ref classify memory instructions conservatively" {
         \\  %load = load i32, ptr %left
         \\  %volatile_load = load volatile i32, ptr %arg
         \\  store i32 %pure, ptr %right
-        \\  store atomic i32 %pure, ptr %arg, release, align 4
+        \\  store atomic i32 %pure, ptr %arg release, align 4
         \\  ret i32 %load
         \\}
         \\
@@ -7373,7 +7373,7 @@ test "mem2reg rejects atomic alloca users as local barriers" {
         \\define i32 @atomic_alloca(i32 %a) {
         \\entry:
         \\  %slot = alloca i32
-        \\  store atomic i32 %a, ptr %slot, release, align 4
+        \\  store atomic i32 %a, ptr %slot release, align 4
         \\  %v = load i32, ptr %slot
         \\  ret i32 %v
         \\}
@@ -8421,7 +8421,7 @@ test "dce preserves atomic memory barriers" {
     const input =
         \\define i32 @memory_atomic_barrier_reject(i32 %a, ptr %p) {
         \\entry:
-        \\  store atomic i32 %a, ptr %p, release, align 4
+        \\  store atomic i32 %a, ptr %p release, align 4
         \\  ret i32 %a
         \\}
         \\

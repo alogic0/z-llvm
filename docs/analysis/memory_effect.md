@@ -78,11 +78,11 @@ opt-22 equivalent:
   vector_lane_dead_dce
   inline_asm_barrier_preserve
   inline_asm_sideeffect_preserve
+  memory_atomic_barrier_reject
   atomic_rmw_cmpxchg_fence_barrier
 
 local-only conservative:
   licm_aligned_load_reject
-  memory_atomic_barrier_reject
 
 unit-test only:
   memory effect classification for pure instruction, vector lane instruction,

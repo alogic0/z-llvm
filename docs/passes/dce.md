@@ -52,6 +52,9 @@ opt-22 equivalent:
   memory_dce
   dce_scalar_with_memory
   dce_volatile_load_reject
+  memory_atomic_barrier_reject
+  atomic_ordering_syncscope_preserve
+  atomic_rmw_cmpxchg_fence_barrier
   fp_dce_dead
   fp_extended_dce_preserve
   fp_fast_math_preserve

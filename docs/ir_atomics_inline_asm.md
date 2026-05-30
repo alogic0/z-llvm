@@ -7,8 +7,8 @@ numbering before LLVM's atomic and inline-asm semantics are reproduced.
 ## Implemented Atomic Surface
 
 ```text
-load atomic iN, ptr %p, <ordering>, align N
-store atomic iN %v, ptr %p, <ordering>, align N
+load atomic iN, ptr %p <ordering>, align N
+store atomic iN %v, ptr %p <ordering>, align N
 load/store with `syncscope("...")` before the ordering
 atomicrmw <op> ptr %p, iN %v [syncscope("...")] <ordering>, align N
 cmpxchg [weak] ptr %p, iN %old, iN %new [syncscope("...")] <success> <failure>, align N
@@ -69,7 +69,7 @@ helper.
 ## Fixture Coverage
 
 ```text
-local-only conservative opt fixture:
+opt-equivalent fixtures:
   memory_atomic_barrier_reject
   atomic_ordering_syncscope_preserve
   adce_atomic_barrier_reject

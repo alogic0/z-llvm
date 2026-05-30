@@ -4,7 +4,7 @@ entry:
   %c = icmp sgt i32 %x, 0
   br label %header
 header:
-  store atomic i32 %a, ptr %p, release, align 4
+  store atomic i32 %a, ptr %p release, align 4
   br i1 %c, label %body, label %exit
 body:
   br label %latch

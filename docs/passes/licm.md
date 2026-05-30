@@ -125,7 +125,9 @@ perform other loop rewrites around that shape
 local only: variant load-pointer rejection because opt-22 may sink/LCSSA-rewrite
 the load while the local pass simply refuses to move it
 opt-22 compared memory legality: scalar hoisting beside volatile memory
-local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, atomic barrier rejection, multi-latch rejection
+opt-22 compared atomic legality: atomic store barriers still block memory LICM
+while unrelated pure scalar invariants may hoist
+local only: no-preheader rejection, side-effecting store rejection, memory-load rejection, aligned-load rejection, trapping-division rejection, multi-latch rejection
 ```
 
 The local-only cases are intentional current-scope boundaries. LLVM's LICM

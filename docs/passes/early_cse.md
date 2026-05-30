@@ -101,6 +101,7 @@ opt-22 equivalent:
   early_cse_volatile_load_reject
   early_cse_load_call_clobber_reject
   early_cse_load_branch_clobber_reject
+  early_cse_atomic_load_barrier_reject
   early_cse_param_gep_partial_alias_reject
   early_cse_unreachable_store_not_clobber
   early_cse_unknown_call_reject

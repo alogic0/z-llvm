@@ -35,12 +35,12 @@ opaque ptr type parsing and printing
 %slot = alloca ptr addrspace(N), align N
 %value = load iN, ptr %slot
 %value = load volatile iN, ptr %slot, align N
-%value = load atomic iN, ptr %slot, <ordering>, align N
+%value = load atomic iN, ptr %slot <ordering>, align N
 %value = load iN, ptr getelementptr inbounds ... (...), align N
 %value = load ptr addrspace(N), ptr %slot, align N
 store iN %value, ptr %slot
 store volatile iN %value, ptr %slot, align N
-store atomic iN %value, ptr %slot, <ordering>, align N
+store atomic iN %value, ptr %slot <ordering>, align N
 store atomic iN %value, ptr getelementptr inbounds ... (...) <ordering>, align N
 store ptr addrspace(N) %value, ptr %slot, align N
 %derived = getelementptr iN, ptr %slot, iN <index>
@@ -83,8 +83,8 @@ no full volatile or atomic memory model
 no syncscope or atomic ordering semantics beyond parser/verifier preservation
 inline asm and broader atomic semantics are tracked in
 `docs/ir_atomics_inline_asm.md`
-atomic load/store without syncscope currently print the local comma-normalized
-ordering form even when source-backed LLVM IR omits that comma
+atomic load/store print LLVM's canonical ordering form, with the ordering token
+after the pointer operand and before the optional alignment
 no datalayout-aware getelementptr offset computation beyond scalar integer element sizes
 no lifetime intrinsics
 no datalayout checks
