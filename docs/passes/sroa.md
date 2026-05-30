@@ -72,7 +72,7 @@ Implemented subset:
   DataLayout-backed pointer field splitting for simple aggregate allocas,
   using the opt-22 default layout when a module has no DataLayout
   Rewriting of matching scalar field loads/stores to replacement allocas through
-  the partition builder
+  the partition builder, preserving volatile field loads/stores
   Rewriting of debug-free whole-aggregate loads/stores through scalar field
   extract/store and load/insertvalue reconstruction
   mem2reg handoff after forwarding
@@ -84,10 +84,8 @@ Intentional divergences:
   Replacement allocas are created only for scalar integer fields and
   DataLayout-backed pointer fields reached by constant two-index struct/array
   GEPs.
-  Volatile, atomic, escaped, variable-index, vector, packed, and unknown-size
-  cases are rejected locally for now. LLVM SROA can scalarize some
-  volatile field cases more precisely; this project keeps that as a documented
-  conservative gap until memory-use rewriting is stronger.
+  Atomic, escaped, variable-index, vector, packed, and unknown-size cases are
+  rejected locally for now.
 
 Analysis preservation/invalidation:
   SROA mutates pointer uses and then runs mem2reg, so it invalidates analyses
@@ -103,8 +101,8 @@ Fixture coverage:
   sroa_struct_ptr_field
   sroa_struct_ptr_field_no_layout_reject
   sroa_aggregate_load_store
-  sroa_struct_volatile_reject
   sroa_struct_escape_reject
+  sroa_struct_volatile_reject
   debug_sroa_dbg_drop
   sroa_debug_declare_reject
   sroa_byval_param_boundary
@@ -146,7 +144,8 @@ calculate constant fixed-array element GEP offsets
 split simple integer struct-field/array-element partitions into scalar allocas
 split DataLayout-backed pointer struct-field partitions into scalar allocas,
 using the opt-22 default layout when a module has no DataLayout
-rewrite exact-cover field loads/stores to those scalar allocas
+rewrite exact-cover field loads/stores to those scalar allocas while preserving
+volatile field loads/stores
 create synthetic scalar field partitions for debug-free whole-aggregate
 load/store users
 rewrite whole-aggregate stores into per-field extractvalue plus scalar stores
@@ -172,15 +171,15 @@ opt-22 equivalent:
   sroa_struct_ptr_field_no_layout_reject
   sroa_aggregate_load_store
   sroa_struct_escape_reject
+  sroa_struct_volatile_reject
   sroa_byval_param_boundary
 
 local-only conservative:
   debug_sroa_dbg_drop
-  sroa_struct_volatile_reject
   sroa_debug_declare_reject
 
 unit-test only:
-  sroa rejects volatile aggregate field accesses locally
+  sroa preserves volatile aggregate field accesses during scalarization
   memory location aggregate helpers classify array elements as fields
 ```
 
@@ -193,7 +192,8 @@ exact fixed struct/array field partitions
 no partial load/store rewriting beyond the exact whole-aggregate load/store
 shape listed above
 no memcpy/memmove rewriting
-no padding, integer widening, vector, or packed-aggregate handling
+no padding, integer widening, vector, packed-aggregate, or aggregate-field
+atomic handling
 pointer-field scalarization uses module-level target DataLayout or the same
 default layout used by opt-22 for modules with no DataLayout, but the local type
 model still covers only the current integer and pointer struct/array subset

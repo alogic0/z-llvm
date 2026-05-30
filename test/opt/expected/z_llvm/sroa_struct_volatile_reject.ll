@@ -1,8 +1,7 @@
 define i32 @sroa_struct_volatile_reject(i32 %a) {
 entry:
-  %agg = alloca { i32, i32 }
-  %p0 = getelementptr { i32, i32 }, ptr %agg, i32 0, i32 0
-  store volatile i32 %a, ptr %p0
-  %x = load i32, ptr %p0
-  ret i32 %x
+  %agg.sroa.0 = alloca i32
+  store volatile i32 %a, ptr %agg.sroa.0
+  %agg.sroa.0.0.agg.sroa.0.0.x = load i32, ptr %agg.sroa.0
+  ret i32 %agg.sroa.0.0.agg.sroa.0.0.x
 }

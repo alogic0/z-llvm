@@ -106,7 +106,13 @@ fn tryScalarizeAggregateAlloca(
                 .load => |*load| {
                     const partition = partitionForPointer(partitions.items, load.ptr) orelse continue;
                     const replacement = fieldReplacementFor(replacements.items, partition.field_index orelse continue) orelse continue;
+                    const old_result = inst.result;
                     load.ptr = .{ .named = replacement.alloca_name };
+                    if (old_result) |result| {
+                        const new_result = try sroaLoadName(module, replacement.alloca_name, result);
+                        inst.result = new_result;
+                        replaceValue(function, result, .{ .named = new_result });
+                    }
                 },
                 .store => |*store| {
                     const partition = partitionForPointer(partitions.items, store.ptr) orelse continue;
@@ -250,7 +256,7 @@ fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, 
                             continue;
                         }
                         if (!isNamed(load.ptr, partition.value)) return false;
-                        if (load.attrs.isBarrier()) return false;
+                        if (load.attrs.isAtomic()) return false;
                         if (!load.ty.eql(field_ty)) return false;
                         saw_memory_use = true;
                     },
@@ -260,7 +266,7 @@ fn validateAggregatePartitionConsumers(function: ir.Function, slot: []const u8, 
                             continue;
                         }
                         if (!isNamed(store.ptr, partition.value)) return false;
-                        if (store.attrs.isBarrier()) return false;
+                        if (store.attrs.isAtomic()) return false;
                         if (!store.ty.eql(field_ty)) return false;
                         if (isNamed(store.value, slot)) return false;
                         saw_memory_use = true;
@@ -394,6 +400,10 @@ fn rewriteWholeAggregateStore(
         insert_index += 1;
     }
     return insert_index - instruction_index;
+}
+
+fn sroaLoadName(module: *ir.Module, alloca_name: []const u8, original_name: []const u8) ![]const u8 {
+    return try module.ownString(try std.fmt.allocPrint(module.allocator, "{s}.0.{s}.0.{s}", .{ alloca_name, alloca_name, original_name }));
 }
 
 const AggregateLoadRewrite = struct {
