@@ -20,6 +20,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         changed = simplifyTerminators(function) or changed;
         changed = try hoistTwoInstructionReturnArms(module, function) or changed;
         changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
+        changed = try hoistIdenticalDiamondPhiReturn(module, function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try mergeReturnsToCommonBlock(module, function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
@@ -359,6 +360,101 @@ fn sameHoistableReturnInstruction(module: ir.Module, function: ir.Function, then
     return expression_key.sameValueExpression(module, function, then_instruction, else_instruction);
 }
 
+fn hoistIdenticalDiamondPhiReturn(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(module.allocator, function.*);
+        defer graph.deinit();
+        var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+        defer uses.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
+            };
+            if (condbr.metadata != null) continue;
+
+            const shape = identicalDiamondPhiReturn(module.*, function.*, graph, uses, block_index, condbr) orelse continue;
+            const hoisted = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            try block.instructions.append(module.allocator, hoisted);
+            block.terminator = .{ .ret = .{
+                .ty = shape.ret_ty,
+                .value = .{ .named = hoisted.result.? },
+            } };
+
+            removeBlocksDescending(module.allocator, function, &.{ shape.merge_index, shape.else_index, shape.then_index });
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+const IdenticalDiamondPhiReturn = struct {
+    then_index: usize,
+    else_index: usize,
+    merge_index: usize,
+    ret_ty: ir.Type,
+};
+
+fn identicalDiamondPhiReturn(module: ir.Module, function: ir.Function, graph: cfg.Graph, uses: def_use.UseCounts, block_index: usize, condbr: anytype) ?IdenticalDiamondPhiReturn {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+    if (function.blocks.items[then_index].instructions.items.len != 1) return null;
+    if (function.blocks.items[else_index].instructions.items.len != 1) return null;
+
+    const then_target = branchTarget(function.blocks.items[then_index]) orelse return null;
+    const else_target = branchTarget(function.blocks.items[else_index]) orelse return null;
+    if (!std.mem.eql(u8, then_target, else_target)) return null;
+
+    const merge_index = function.blockIndex(then_target) orelse return null;
+    if (merge_index == block_index or merge_index == then_index or merge_index == else_index) return null;
+    const merge_preds = graph.predecessors(merge_index);
+    if (merge_preds.len != 2) return null;
+    if (!containsIndex(merge_preds, then_index) or !containsIndex(merge_preds, else_index)) return null;
+
+    const then_instruction = function.blocks.items[then_index].instructions.items[0];
+    const else_instruction = function.blocks.items[else_index].instructions.items[0];
+    if (then_instruction.removed or else_instruction.removed) return null;
+    if (then_instruction.metadata != null or else_instruction.metadata != null) return null;
+    const then_result = then_instruction.result orelse return null;
+    const else_result = else_instruction.result orelse return null;
+    if (!sameHoistableReturnInstruction(module, function, then_instruction, else_instruction)) return null;
+    if ((uses.counts.get(then_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(else_result) orelse 0) != 1) return null;
+
+    const merge = function.blocks.items[merge_index];
+    if (merge.instructions.items.len != 1) return null;
+    const phi_inst = merge.instructions.items[0];
+    if (phi_inst.removed or phi_inst.kind != .phi) return null;
+    const phi_name = phi_inst.result orelse return null;
+    const phi = phi_inst.kind.phi;
+    if (phi.incoming.items.len != 2) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.then_target) orelse return null, then_result)) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.else_target) orelse return null, else_result)) return null;
+    if ((uses.counts.get(phi_name) orelse 0) != 1) return null;
+
+    const ret = switch (merge.terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    const ret_value = ret.value orelse return null;
+    if (!ret.ty.eql(phi.ty) or !ret_value.eql(.{ .named = phi_name })) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .merge_index = merge_index,
+        .ret_ty = ret.ty,
+    };
+}
+
 fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !bool {
     const allocator = module.allocator;
     var changed = false;
@@ -583,9 +679,20 @@ fn simpleDiamondSelectReturn(function: ir.Function, graph: cfg.Graph, block_inde
 
 fn emptyBranchTarget(block: ir.BasicBlock) ?[]const u8 {
     if (block.instructions.items.len != 0) return null;
+    return branchTarget(block);
+}
+
+fn branchTarget(block: ir.BasicBlock) ?[]const u8 {
     return switch (block.terminator orelse return null) {
         .br => |br| br.target,
         .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => null,
+    };
+}
+
+fn valueNamesResult(value: ir.Value, result: []const u8) bool {
+    return switch (value) {
+        .named => |name| std.mem.eql(u8, name, result),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }
 

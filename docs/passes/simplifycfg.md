@@ -71,6 +71,9 @@ Implemented subset:
   Hoist matching two-instruction integer binary chains, including commuted
   operands, from two unique return successors and select between the hoisted
   return values
+  Hoist one identical pure scalar instruction, non-volatile load, or readnone
+  call from two unique diamond arms when the merge block immediately returns
+  the PHI of those two results
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
@@ -97,6 +100,7 @@ Fixture coverage:
   simplifycfg_hoist_same_readnone_call_ret
   simplifycfg_hoist_two_inst_ret
   simplifycfg_hoist_commuted_two_inst_ret
+  simplifycfg_hoist_diamond_phi_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -138,6 +142,9 @@ successor's return
 hoist matching two-instruction integer binary chains, including commuted
 operands, from two unique conditional successors and select between the hoisted
 return values
+hoist one identical pure scalar instruction, non-volatile load, or readnone call
+from two unique conditional successors that reconverge at a returned PHI of the
+two instruction results
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -161,6 +168,10 @@ CFG updates account for duplicate CFG edges: when an edge rewrite reduces
 incoming edge multiplicity, duplicate PHI incoming entries are pruned only when
 their values are identical; when threading through a PHI target would merge
 distinct incoming values for one predecessor, the local transform is rejected.
+Zig distribution path or fallback boundary affected: this is an optimizer
+quality parity slice for the accepted ReleaseFast, ReleaseSafe, and ReleaseSmall
+pipelines that include SimplifyCFG; it adds opt-equivalent coverage but does
+not by itself remove an additional LLVM fallback.
 ```
 
 Fixture coverage:
@@ -176,6 +187,7 @@ opt-22 equivalent:
   simplifycfg_hoist_same_readnone_call_ret
   simplifycfg_hoist_two_inst_ret
   simplifycfg_hoist_commuted_two_inst_ret
+  simplifycfg_hoist_diamond_phi_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -228,7 +240,9 @@ single-common-ret PHI shapes
 no general common-code hoisting beyond one identical metadata-free scalar
 instruction, non-volatile load, or readnone call feeding two unique return
 successors, plus matching two-instruction integer binary chains with a selected
-return value and commuted operands only for commutative binary opcodes
+return value and commuted operands only for commutative binary opcodes, plus
+one identical pure scalar instruction, non-volatile load, or readnone call
+feeding a returned two-entry PHI
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```
