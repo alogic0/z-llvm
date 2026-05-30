@@ -79,6 +79,8 @@ Implemented subset:
   Strict `fsub x, +0.0`, `fmul x, 1.0`, and `fdiv x, 1.0` folds for the
   covered scalar FP spelling surface
   Strict `fcmp oeq x, x` canonicalization to `fcmp ord x, +0.0`
+  Fixed-point removal of unused non-effecting instructions in the local
+  InstCombine candidate set
 
 Intentional divergences:
   The local pass is a linear scan, not LLVM's full fixed-point worklist.
@@ -110,6 +112,7 @@ Fixture coverage:
   instcombine_shift_oversized_poison folds constant shifts with counts outside
   the type bit width to `poison` like `opt-22`.
   instcombine_pointer_compare
+  instcombine_unused_chain
   vector_extract_insert_fold
   vector_extract_insert_mismatch_reject rewrites extract-after-insert to
   extract from the original vector when constant lanes differ.
@@ -195,6 +198,7 @@ strict `fcmp oeq x, x` rewrites to `fcmp ord x, +0.0`
 `fadd nsz x, +0.0` -> x
 `fcmp nnan oeq x, x` -> true
 preserve `freeze` instructions
+remove unused non-effecting instructions to a fixed point
 ```
 
 Upstream mapping:
@@ -241,7 +245,7 @@ no general strict FP result-producing arithmetic folds yet; `fadd 1.0, 2.0`
 and similar cases need an APFloat-compatible result spelling before they can be
 made opt-equivalent
 no materialized poison/undef simplification beyond oversized constant shifts
-no non-constant freeze simplification
+no non-constant freeze simplification beyond deleting unused freeze instructions
 no vector folds beyond same-constant-lane extract-after-insert; vectorizers and
 target-cost-sensitive vector combines remain placeholders
 non-constant and demanded-bits-driven shift simplification remains unsupported

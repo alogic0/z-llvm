@@ -1,5 +1,6 @@
 const std = @import("std");
 const def_use = @import("../analysis/def_use.zig");
+const memory_effect = @import("../analysis/memory_effect.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
@@ -74,8 +75,42 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                 },
             };
         }
+        changed = try removeTriviallyDeadInstructions(module.allocator, function) or changed;
     }
     return if (changed) .changed else .unchanged;
+}
+
+fn removeTriviallyDeadInstructions(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var changed = false;
+    while (try removeOneDeadInstructionLayer(allocator, function)) {
+        changed = true;
+    }
+    return changed;
+}
+
+fn removeOneDeadInstructionLayer(allocator: std.mem.Allocator, function: *ir.Function) !bool {
+    var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
+    defer uses.deinit();
+
+    var changed = false;
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*instruction| {
+            if (instruction.removed) continue;
+            const result = instruction.result orelse continue;
+            if (uses.isUsed(result) or !isTriviallyDeadInstCombineInstruction(instruction.*)) continue;
+            instruction.removed = true;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+fn isTriviallyDeadInstCombineInstruction(instruction: ir.Instruction) bool {
+    if (!memory_effect.isSafeToDelete(instruction)) return false;
+    return switch (instruction.kind) {
+        .binary, .cast, .freeze, .icmp, .fcmp, .select, .load, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => true,
+        .phi, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .call => false,
+    };
 }
 
 fn salvageDebugMetadata(instruction: *ir.Instruction, debug_aliases: std.StringHashMap([]const u8)) void {
