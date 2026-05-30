@@ -113,6 +113,7 @@ opt-22 equivalent:
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
   gvn_atomic_load_barrier_reject
+  gvn_diamond_load_no_memory_phi
   gvn_vector_lane_not_clobber
   fp_gvn_no_cse
   fp_extended_gvn_no_cse
@@ -127,8 +128,6 @@ local-only conservative:
   shape, so full load-placement parity remains future work.
   gvn_scalar_pre_reject keeps partially available scalar expressions unchanged
   because scalar PRE insertion is not implemented.
-  gvn_diamond_load_no_memory_phi is local-conservative because local leader
-  naming differs from opt-22 while MemorySSA proves the same load redundancy.
   readnone call GVN is unit-tested locally. Readonly calls and accepted
   argmem-only noalias calls are trusted as non-clobbering memory accesses for
   repeated loads, matching the local `memory(read)` and `memory(argmem: write)`
@@ -158,7 +157,8 @@ no general PHI translation beyond exact phi expression matching and the simple
 load-PRE PHI insertion
 no congruence-class iteration
 linear local ValueTable lookup instead of LLVM's richer hashing
-no dead-leader replacement beyond same-block redundant loads
+no dead-leader replacement beyond same-block redundant loads and the simple
+diamond load shape
 no critical-edge splitting or general partial redundancy handling
 no assume, readonly call return-value numbering, GEP, freeze, constrained FP,
 vector, or memory value numbering

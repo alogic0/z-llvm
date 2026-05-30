@@ -95,10 +95,13 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: *ir.Module, function:
     var memory = try memory_ssa.MemorySSA.build(allocator, module.*, function.*);
     defer memory.deinit();
 
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
     var leaders: std.ArrayList(Leader) = .empty;
     defer leaders.deinit(allocator);
 
-    changed = try visitBlock(allocator, function, dom, &aliases, &table, memory, &leaders, 0) or changed;
+    changed = try visitBlock(allocator, function, dom, graph, &aliases, &table, memory, &leaders, 0) or changed;
     return changed;
 }
 
@@ -306,6 +309,7 @@ fn visitBlock(
     allocator: std.mem.Allocator,
     function: *ir.Function,
     dom: dominator.Dominators,
+    graph: cfg.Graph,
     aliases: *std.StringHashMap(ir.Value),
     table: *ValueTable,
     memory: memory_ssa.MemorySSA,
@@ -336,7 +340,7 @@ fn visitBlock(
         const number = try table.numberFor(instruction.*);
         if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |leader_index| {
             const leader = leaders.items[leader_index];
-            if (try replaceUnusedSameBlockLoadLeader(allocator, function, leaders, leader_index, block_index, instruction_index, instruction.*)) {
+            if (try replaceUnusedLoadLeader(allocator, function, graph, leaders, leader_index, block_index, instruction_index, instruction.*)) {
                 changed = true;
                 continue;
             }
@@ -378,7 +382,7 @@ fn visitBlock(
 
     for (0..function.blocks.items.len) |child_index| {
         if (dom.immediateDominator(child_index) != block_index) continue;
-        changed = try visitBlock(allocator, function, dom, aliases, table, memory, leaders, child_index) or changed;
+        changed = try visitBlock(allocator, function, dom, graph, aliases, table, memory, leaders, child_index) or changed;
     }
 
     return changed;
@@ -412,9 +416,10 @@ fn findLeader(
     return null;
 }
 
-fn replaceUnusedSameBlockLoadLeader(
+fn replaceUnusedLoadLeader(
     allocator: std.mem.Allocator,
     function: *ir.Function,
+    graph: cfg.Graph,
     leaders: *std.ArrayList(Leader),
     leader_index: usize,
     block_index: usize,
@@ -422,21 +427,48 @@ fn replaceUnusedSameBlockLoadLeader(
     instruction: ir.Instruction,
 ) !bool {
     const leader = leaders.items[leader_index];
-    if (leader.block_index != block_index) return false;
     const leader_result = leader.instruction.result orelse return false;
     const current_result = instruction.result orelse return false;
     if (std.mem.eql(u8, leader_result, current_result)) return false;
     if (leader.instruction.kind != .load or instruction.kind != .load) return false;
-    if (!hasVectorLaneOperationBetween(function.*, block_index, leader.instruction_index, instruction_index)) return false;
+    if (leader.block_index == block_index) {
+        if (!hasVectorLaneOperationBetween(function.*, block_index, leader.instruction_index, instruction_index)) return false;
+    } else {
+        if (!isSimpleDiamondJoin(graph, leader.block_index, block_index)) return false;
+    }
 
     var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
     defer uses.deinit();
     if (uses.isUsed(leader_result)) return false;
 
-    function.blocks.items[block_index].instructions.items[leader.instruction_index].removed = true;
+    function.blocks.items[leader.block_index].instructions.items[leader.instruction_index].removed = true;
     leaders.items[leader_index].block_index = block_index;
     leaders.items[leader_index].instruction_index = instruction_index;
     leaders.items[leader_index].instruction = instruction;
+    return true;
+}
+
+fn isSimpleDiamondJoin(graph: cfg.Graph, leader_block_index: usize, join_block_index: usize) bool {
+    const successors = graph.successors(leader_block_index);
+    if (successors.len != 2) return false;
+
+    const predecessors = graph.predecessors(join_block_index);
+    if (predecessors.len != successors.len) return false;
+
+    for (successors) |successor| {
+        const successor_successors = graph.successors(successor);
+        if (successor_successors.len != 1 or successor_successors[0] != join_block_index) return false;
+
+        var is_predecessor = false;
+        for (predecessors) |predecessor| {
+            if (predecessor == successor) {
+                is_predecessor = true;
+                break;
+            }
+        }
+        if (!is_predecessor) return false;
+    }
+
     return true;
 }
 
