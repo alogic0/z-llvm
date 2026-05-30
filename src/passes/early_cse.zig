@@ -1,5 +1,6 @@
 const std = @import("std");
 const alias = @import("../analysis/alias.zig");
+const cfg = @import("../analysis/cfg.zig");
 const def_use = @import("../analysis/def_use.zig");
 const dominator = @import("../analysis/dominator.zig");
 const expression_key = @import("../analysis/expression_key.zig");
@@ -56,7 +57,10 @@ fn eliminateFunction(allocator: std.mem.Allocator, module: ir.Module, function: 
     var memory = try memory_ssa.MemorySSA.build(allocator, module, function.*);
     defer memory.deinit();
 
-    return try visitBlock(allocator, module, function, dom, memory.getWalker(), &aliases, &available, &stores, 0);
+    var graph = try cfg.Graph.build(allocator, function.*);
+    defer graph.deinit();
+
+    return try visitBlock(allocator, module, function, dom, graph, memory.getWalker(), &aliases, &available, &stores, 0);
 }
 
 fn visitBlock(
@@ -64,6 +68,7 @@ fn visitBlock(
     module: ir.Module,
     function: *ir.Function,
     dom: dominator.Dominators,
+    graph: cfg.Graph,
     walker: memory_ssa.Walker,
     aliases: *std.StringHashMap(ir.Value),
     available: *std.ArrayList(AvailableInstruction),
@@ -102,7 +107,7 @@ fn visitBlock(
         if (isCseCandidate(module, instruction.*)) {
             if (findAvailableEquivalent(module, function.*, walker, available.items, block_index, instruction_index, instruction.*)) |available_index| {
                 const candidate = available.items[available_index];
-                if (try removeUnusedSameBlockLeader(allocator, function, &available.items[available_index], block_index, instruction_index, instruction.*)) {
+                if (try removeUnusedLeader(allocator, function, graph, &available.items[available_index], block_index, instruction_index, instruction.*)) {
                     changed = true;
                     continue;
                 }
@@ -145,7 +150,7 @@ fn visitBlock(
 
     for (0..function.blocks.items.len) |child_index| {
         if (dom.immediateDominator(child_index) != block_index) continue;
-        changed = try visitBlock(allocator, module, function, dom, walker, aliases, available, stores, child_index) or changed;
+        changed = try visitBlock(allocator, module, function, dom, graph, walker, aliases, available, stores, child_index) or changed;
     }
 
     return changed;
@@ -262,31 +267,62 @@ fn sameAvailableExpression(
     return expression_key.sameValueExpression(module, function, candidate.instruction, instruction);
 }
 
-fn removeUnusedSameBlockLeader(
+fn removeUnusedLeader(
     allocator: std.mem.Allocator,
     function: *ir.Function,
+    graph: cfg.Graph,
     available: *AvailableInstruction,
     block_index: usize,
     instruction_index: usize,
     instruction: ir.Instruction,
 ) !bool {
-    if (available.block_index != block_index) return false;
     const leader_result = available.instruction.result orelse return false;
     const current_result = instruction.result orelse return false;
     if (std.mem.eql(u8, leader_result, current_result)) return false;
-    if (!isFpExpression(instruction)) return false;
+    const same_block = available.block_index == block_index;
+    if (same_block) {
+        if (!isFpExpression(instruction)) return false;
+    } else {
+        if (available.instruction.kind != .load or instruction.kind != .load) return false;
+        if (!isSimpleDiamondJoin(graph, available.block_index, block_index)) return false;
+    }
 
     var uses = try def_use.UseCounts.collectFunction(allocator, function.*);
     defer uses.deinit();
     if (uses.isUsed(leader_result)) return false;
 
-    var leader_instruction = &function.blocks.items[block_index].instructions.items[available.instruction_index];
+    var leader_instruction = &function.blocks.items[available.block_index].instructions.items[available.instruction_index];
     const current_instruction = &function.blocks.items[block_index].instructions.items[instruction_index];
-    expression_key.intersectRetainedFpFlags(current_instruction, leader_instruction.*);
+    if (same_block) expression_key.intersectRetainedFpFlags(current_instruction, leader_instruction.*);
     leader_instruction.removed = true;
     available.instruction = current_instruction.*;
+    available.block_index = block_index;
     available.instruction_index = instruction_index;
     available.hash = expression_key.hash(current_instruction.*);
+    return true;
+}
+
+fn isSimpleDiamondJoin(graph: cfg.Graph, leader_block_index: usize, join_block_index: usize) bool {
+    const successors = graph.successors(leader_block_index);
+    if (successors.len != 2) return false;
+
+    const predecessors = graph.predecessors(join_block_index);
+    if (predecessors.len != successors.len) return false;
+
+    for (successors) |successor| {
+        const successor_successors = graph.successors(successor);
+        if (successor_successors.len != 1 or successor_successors[0] != join_block_index) return false;
+
+        var is_predecessor = false;
+        for (predecessors) |predecessor| {
+            if (predecessor == successor) {
+                is_predecessor = true;
+                break;
+            }
+        }
+        if (!is_predecessor) return false;
+    }
+
     return true;
 }
 

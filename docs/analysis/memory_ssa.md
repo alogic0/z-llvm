@@ -117,9 +117,9 @@ Fixture coverage:
   opt fixture: gvn_argmemonly_call_no_clobber
   opt fixtures: early_cse_load_branch_clobber_reject
   opt fixture: early_cse_unreachable_store_not_clobber
+  opt fixture: early_cse_diamond_no_memory_phi
   opt fixtures: gvn_vector_lane_not_clobber,
     early_cse_vector_lane_store_forward, dse_vector_lane_not_barrier
-  local-only opt fixture: early_cse_diamond_no_memory_phi
   local-only opt fixture: early_cse_param_gep_noalias_forward
   local-only opt fixture: gvn_load_branch_clobber_reject
   opt fixtures: dse_overwrite, dse_load_barrier, dse_volatile_barrier
