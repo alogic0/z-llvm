@@ -18,6 +18,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
+        changed = try hoistTwoInstructionReturnArms(module, function) or changed;
         changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try mergeReturnsToCommonBlock(module, function) or changed;
@@ -115,6 +116,156 @@ fn collapseDuplicatePhiIncoming(function: *ir.Function, target_name: []const u8,
         }
     }
     return changed;
+}
+
+fn hoistTwoInstructionReturnArms(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(module.allocator, function.*);
+        defer graph.deinit();
+        var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+        defer uses.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
+            };
+            if (condbr.metadata != null or !condbr.cond_ty.eql(.{ .int = 1 })) continue;
+
+            const shape = twoInstructionReturnArms(function.*, graph, uses, block_index, condbr) orelse continue;
+            const left_first = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            const left_second = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            const right_first = function.blocks.items[shape.else_index].instructions.orderedRemove(0);
+            const right_second = function.blocks.items[shape.else_index].instructions.orderedRemove(0);
+            try block.instructions.append(module.allocator, left_first);
+            try block.instructions.append(module.allocator, left_second);
+            try block.instructions.append(module.allocator, right_first);
+            try block.instructions.append(module.allocator, right_second);
+
+            const select_name = try uniqueCommonReturnValueName(module, function.*, "common.ret");
+            try block.instructions.append(module.allocator, .{
+                .result = select_name,
+                .kind = .{ .select = .{
+                    .cond_ty = .{ .int = 1 },
+                    .cond = condbr.cond,
+                    .ty = shape.ret_ty,
+                    .true_value = .{ .named = left_second.result.? },
+                    .false_value = .{ .named = right_second.result.? },
+                } },
+            });
+            block.terminator = .{ .ret = .{
+                .ty = shape.ret_ty,
+                .value = .{ .named = select_name },
+            } };
+
+            removeTwoBlocksDescending(module.allocator, function, shape.then_index, shape.else_index);
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+const TwoInstructionReturnArms = struct {
+    then_index: usize,
+    else_index: usize,
+    ret_ty: ir.Type,
+};
+
+fn twoInstructionReturnArms(function: ir.Function, graph: cfg.Graph, uses: def_use.UseCounts, block_index: usize, condbr: anytype) ?TwoInstructionReturnArms {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+    if (function.blocks.items[then_index].instructions.items.len != 2) return null;
+    if (function.blocks.items[else_index].instructions.items.len != 2) return null;
+
+    const left_first = function.blocks.items[then_index].instructions.items[0];
+    const left_second = function.blocks.items[then_index].instructions.items[1];
+    const right_first = function.blocks.items[else_index].instructions.items[0];
+    const right_second = function.blocks.items[else_index].instructions.items[1];
+    if (left_first.removed or left_second.removed or right_first.removed or right_second.removed) return null;
+    if (left_first.metadata != null or left_second.metadata != null or right_first.metadata != null or right_second.metadata != null) return null;
+    const left_first_result = left_first.result orelse return null;
+    const left_second_result = left_second.result orelse return null;
+    const right_first_result = right_first.result orelse return null;
+    const right_second_result = right_second.result orelse return null;
+    if ((uses.counts.get(left_first_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(left_second_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(right_first_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(right_second_result) orelse 0) != 1) return null;
+
+    const left_first_binary = binaryInstruction(left_first) orelse return null;
+    const left_second_binary = binaryInstruction(left_second) orelse return null;
+    const right_first_binary = binaryInstruction(right_first) orelse return null;
+    const right_second_binary = binaryInstruction(right_second) orelse return null;
+    if (!sameIntegerBinary(left_first_binary, right_first_binary)) return null;
+    if (!sameIntegerBinaryMapped(left_second_binary, right_second_binary, left_first_result, right_first_result)) return null;
+
+    const then_ret = switch (function.blocks.items[then_index].terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    const else_ret = switch (function.blocks.items[else_index].terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    if (!then_ret.ty.eql(else_ret.ty)) return null;
+    if (!retReturnsValue(then_ret, left_second_result) or !retReturnsValue(else_ret, right_second_result)) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .ret_ty = then_ret.ty,
+    };
+}
+
+fn binaryInstruction(instruction: ir.Instruction) ?ir.BinaryInst {
+    return switch (instruction.kind) {
+        .binary => |binary| binary,
+        .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
+    };
+}
+
+fn sameIntegerBinary(left: ir.BinaryInst, right: ir.BinaryInst) bool {
+    if (isFpBinary(left.op) or isFpBinary(right.op)) return false;
+    return left.op == right.op and
+        sameBinaryFlags(left.flags, right.flags) and
+        left.ty.eql(right.ty) and
+        left.lhs.eql(right.lhs) and
+        left.rhs.eql(right.rhs);
+}
+
+fn sameIntegerBinaryMapped(left: ir.BinaryInst, right: ir.BinaryInst, left_name: []const u8, right_name: []const u8) bool {
+    if (isFpBinary(left.op) or isFpBinary(right.op)) return false;
+    return left.op == right.op and
+        sameBinaryFlags(left.flags, right.flags) and
+        left.ty.eql(right.ty) and
+        valueEqlMapped(left.lhs, right.lhs, left_name, right_name) and
+        valueEqlMapped(left.rhs, right.rhs, left_name, right_name);
+}
+
+fn sameBinaryFlags(left: ir.BinaryFlags, right: ir.BinaryFlags) bool {
+    return left.nsw == right.nsw and
+        left.nuw == right.nuw and
+        left.exact == right.exact and
+        left.disjoint == right.disjoint;
+}
+
+fn valueEqlMapped(left: ir.Value, right: ir.Value, left_name: []const u8, right_name: []const u8) bool {
+    const mapped_right = switch (right) {
+        .named => |name| if (std.mem.eql(u8, name, right_name)) ir.Value{ .named = left_name } else right,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => right,
+    };
+    return left.eql(mapped_right);
+}
+
+fn isFpBinary(op: ir.BinaryOp) bool {
+    return op == .fadd or op == .fsub or op == .fmul or op == .fdiv or op == .frem;
 }
 
 fn hoistIdenticalTwoArmReturn(module: *ir.Module, function: *ir.Function) !bool {

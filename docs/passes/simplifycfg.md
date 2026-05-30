@@ -68,6 +68,8 @@ Implemented subset:
   block and one other same-typed return
   Hoist one identical pure scalar instruction, non-volatile load, or readnone
   call from two unique return successors into the predecessor branch block
+  Hoist matching two-instruction integer binary chains from two unique return
+  successors and select between the hoisted return values
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
@@ -92,6 +94,7 @@ Fixture coverage:
   simplifycfg_hoist_same_add_ret
   simplifycfg_hoist_same_load_ret
   simplifycfg_hoist_same_readnone_call_ret
+  simplifycfg_hoist_two_inst_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -130,6 +133,8 @@ creating a return-value PHI
 hoist one identical pure scalar instruction, non-volatile load, or readnone call
 from two unique conditional successors when each instruction feeds only that
 successor's return
+hoist matching two-instruction integer binary chains from two unique conditional
+successors and select between the hoisted return values
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -166,6 +171,7 @@ opt-22 equivalent:
   simplifycfg_hoist_same_add_ret
   simplifycfg_hoist_same_load_ret
   simplifycfg_hoist_same_readnone_call_ret
+  simplifycfg_hoist_two_inst_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -217,7 +223,8 @@ no general return-block tail merging beyond the accepted matching-return and
 single-common-ret PHI shapes
 no general common-code hoisting beyond one identical metadata-free scalar
 instruction, non-volatile load, or readnone call feeding two unique return
-successors
+successors, plus matching two-instruction integer binary chains with a selected
+return value
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```
