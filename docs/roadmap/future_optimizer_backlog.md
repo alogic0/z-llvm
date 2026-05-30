@@ -83,8 +83,9 @@ These are quality improvements, not finish blockers. Pick one only when a
 fixture shows the current local behavior is too conservative for a Zig-backed
 case.
 
-- SROA: extend DataLayout-backed aggregate slicing beyond the current simple
-  pointer-field case.
+- SROA: extend aggregate rewriting only when a new fixture shows pressure
+  beyond covered scalar leaf partitions, such as memcpy/memmove, padding,
+  widening, packed aggregates, or vector fields.
 - GVN: add one measured PRE or load-availability slice beyond the current
   MemorySSA-backed fixtures.
 - ADCE: improve one measured control-dependence case beyond the current acyclic
