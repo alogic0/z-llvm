@@ -72,7 +72,42 @@ fn storeOverwrittenInSingleSuccessor(module: ir.Module, function: ir.Function, g
     const successor_index = successors[0];
     if (graph.predecessors(successor_index).len != 1) return false;
 
-    return successorStartsWithOverwrite(module, function, function.blocks.items[successor_index], store);
+    var visited_storage: [64]bool = undefined;
+    if (function.blocks.items.len > visited_storage.len) return false;
+    const visited = visited_storage[0..function.blocks.items.len];
+    @memset(visited, false);
+    return successorChainFindsOverwrite(module, function, graph, successor_index, store, visited);
+}
+
+fn successorChainFindsOverwrite(module: ir.Module, function: ir.Function, graph: cfg.Graph, block_index: usize, store: ir.StoreInst, visited: []bool) bool {
+    if (visited[block_index]) return false;
+    visited[block_index] = true;
+
+    if (graph.predecessors(block_index).len != 1) return false;
+
+    const block = function.blocks.items[block_index];
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .store => |later_store| {
+                if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return false;
+                if (later_store.ty.eql(store.ty) and
+                    alias.accessAliasInModule(module, function, later_store.ptr, later_store.ty, store.ptr, store.ty) == .must_alias)
+                {
+                    return true;
+                }
+                if (accessBlocksDse(module, function, instruction, store)) return false;
+            },
+            .load, .atomicrmw, .cmpxchg, .fence, .call => {
+                if (accessBlocksDse(module, function, instruction, store)) return false;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+        }
+    }
+
+    const successors = graph.successors(block_index);
+    if (successors.len != 1) return false;
+    return successorChainFindsOverwrite(module, function, graph, successors[0], store, visited);
 }
 
 fn suffixHasNoBlockingAccess(module: ir.Module, function: ir.Function, block: ir.BasicBlock, start_index: usize, store: ir.StoreInst) bool {
@@ -81,27 +116,6 @@ fn suffixHasNoBlockingAccess(module: ir.Module, function: ir.Function, block: ir
         if (accessBlocksDse(module, function, instruction, store)) return false;
     }
     return true;
-}
-
-fn successorStartsWithOverwrite(module: ir.Module, function: ir.Function, block: ir.BasicBlock, store: ir.StoreInst) bool {
-    for (block.instructions.items) |instruction| {
-        if (instruction.removed) continue;
-        switch (instruction.kind) {
-            .store => |later_store| {
-                if (memory_effect.classify(instruction) == .volatile_or_atomic_barrier) return false;
-                if (!later_store.ty.eql(store.ty)) {
-                    if (accessBlocksDse(module, function, instruction, store)) return false;
-                    continue;
-                }
-                return alias.accessAliasInModule(module, function, later_store.ptr, later_store.ty, store.ptr, store.ty) == .must_alias;
-            },
-            .load, .atomicrmw, .cmpxchg, .fence, .call => {
-                if (accessBlocksDse(module, function, instruction, store)) return false;
-            },
-            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
-        }
-    }
-    return false;
 }
 
 fn accessBlocksDse(module: ir.Module, function: ir.Function, instruction: ir.Instruction, store: ir.StoreInst) bool {
