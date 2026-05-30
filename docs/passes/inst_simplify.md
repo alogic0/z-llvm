@@ -150,7 +150,7 @@ Known gaps:
 ```text
 no DataLayout
 no KnownBits
-no poison-aware reasoning
+no poison-aware reasoning beyond oversized constant shifts
 no vector simplification beyond scalar-condition identical-arm vector selects
 no pointer cast simplification
 no general FP arithmetic folding

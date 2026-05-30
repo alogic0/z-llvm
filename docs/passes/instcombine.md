@@ -242,12 +242,11 @@ zero-result identities and APInt-shaped constants
 no general strict FP result-producing arithmetic folds yet; `fadd 1.0, 2.0`
 and similar cases need an APFloat-compatible result spelling before they can be
 made opt-equivalent
-no materialized poison/undef simplification
+no materialized poison/undef simplification beyond oversized constant shifts
 no non-constant freeze simplification
 no vector folds beyond same-constant-lane extract-after-insert; vectorizers and
 target-cost-sensitive vector combines remain placeholders
-no width-aware constant folding for non-zero shifts
-no materialized poison/undef simplification beyond oversized constant shifts
+non-constant and demanded-bits-driven shift simplification remains unsupported
 no demanded-bits cleanup in InstCombine; the first source-backed integer mask
 quality case is implemented in the separate `bdce` pass
 unsigned constant folding is limited to integer widths below 128 bits
