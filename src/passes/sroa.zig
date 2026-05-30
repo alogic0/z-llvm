@@ -187,9 +187,11 @@ fn aggregateAllocaOnlyUsesPartitions(
 }
 
 fn moduleLayout(module: ir.Module) ?target.DataLayout {
-    const text = module.target_datalayout orelse return null;
+    const text = module.target_datalayout orelse default_data_layout;
     return target.DataLayout.parse(text) catch null;
 }
+
+const default_data_layout = "e-m:e-p:64:64-i64:64-n8:16:32:64-S128";
 
 fn aggregateFieldSlice(layout: ?target.DataLayout, result: []const u8, alloca_root: []const u8, aggregate_ty: ir.Type, gep: ir.GepInst) ?AllocaSlice {
     if (!gep.source_ty.eql(aggregate_ty)) return null;

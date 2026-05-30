@@ -69,7 +69,8 @@ Implemented subset:
   Array-element GEP offset calculation for constant element indices
   Exact-cover scalar integer field/element alloca splitting for simple
   aggregate allocas
-  DataLayout-backed pointer field splitting for simple aggregate allocas
+  DataLayout-backed pointer field splitting for simple aggregate allocas,
+  using the opt-22 default layout when a module has no DataLayout
   Rewriting of matching scalar field loads/stores to replacement allocas through
   the partition builder
   Rewriting of debug-free whole-aggregate loads/stores through scalar field
@@ -100,8 +101,8 @@ Fixture coverage:
   sroa_array_three_i32
   sroa_struct_one_field
   sroa_struct_ptr_field
-  sroa_aggregate_load_store
   sroa_struct_ptr_field_no_layout_reject
+  sroa_aggregate_load_store
   sroa_struct_volatile_reject
   sroa_struct_escape_reject
   debug_sroa_dbg_drop
@@ -143,7 +144,8 @@ parse small textual fixed array aggregate types
 calculate constant struct-field GEP offsets
 calculate constant fixed-array element GEP offsets
 split simple integer struct-field/array-element partitions into scalar allocas
-split DataLayout-backed pointer struct-field partitions into scalar allocas
+split DataLayout-backed pointer struct-field partitions into scalar allocas,
+using the opt-22 default layout when a module has no DataLayout
 rewrite exact-cover field loads/stores to those scalar allocas
 create synthetic scalar field partitions for debug-free whole-aggregate
 load/store users
@@ -167,13 +169,13 @@ opt-22 equivalent:
   sroa_array_three_i32
   sroa_struct_one_field
   sroa_struct_ptr_field
+  sroa_struct_ptr_field_no_layout_reject
   sroa_aggregate_load_store
   sroa_struct_escape_reject
   sroa_byval_param_boundary
 
 local-only conservative:
   debug_sroa_dbg_drop
-  sroa_struct_ptr_field_no_layout_reject
   sroa_struct_volatile_reject
   sroa_debug_declare_reject
 
@@ -192,11 +194,9 @@ no partial load/store rewriting beyond the exact whole-aggregate load/store
 shape listed above
 no memcpy/memmove rewriting
 no padding, integer widening, vector, or packed-aggregate handling
-pointer-field scalarization requires module-level target DataLayout; no-layout
-pointer aggregates are still rejected locally
-module-level target DataLayout is used for supported aggregate offsets, but the
-local type model still covers only the current integer and pointer struct/array
-subset
+pointer-field scalarization uses module-level target DataLayout or the same
+default layout used by opt-22 for modules with no DataLayout, but the local type
+model still covers only the current integer and pointer struct/array subset
 debug declare salvage blocks aggregate rewriting until variable-location update
 semantics are modeled
 debug-location-only aggregate rewrites may drop `!dbg` locations attached to
