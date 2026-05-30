@@ -89,12 +89,12 @@ opt-22 equivalent:
   adce_nested_dead_diamond
   adce_store_branch_reject
   adce_live_call_branch_reject
+  adce_infinite_loop_reject
   fp_adce_dead
   fp_extended_adce_preserve
 
 local-only conservative:
-  adce_infinite_loop_reject keeps cyclic dead regions unchanged until full
-  LLVM-style block liveness and control-dependence rewriting exists.
+  none currently
 
 unit-test only:
   none currently
@@ -106,7 +106,8 @@ Known gaps:
 no full optimistic block/instruction liveness worklist
 no live-terminator propagation through arbitrary control dependence
 no PHI-aware deletion beyond shared stale-incoming pruning after supported edge deletion
-no loop/cyclic dead-region rewriting
+no general loop/cyclic dead-region rewriting beyond the opt-equivalent
+preservation boundary covered by `adce_infinite_loop_reject`
 no debug info salvage
 no musttail, EH, calls, or volatile/atomic removal
 ```

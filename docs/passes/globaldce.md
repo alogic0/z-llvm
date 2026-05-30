@@ -76,12 +76,13 @@ opt-22 equivalent:
   globaldce_basic
   globaldce_alias_root
   globaldce_weak_root
+  globaldce_tls_model_root
+  globaldce_switch_table_root
 
 local-only conservative:
   globaldce_comdat_root
   globaldce_tls_root
   globaldce_tls_concurrency_root
-  globaldce_tls_model_root
 
 unit-test only:
   globaldce removes unreferenced local functions and globals

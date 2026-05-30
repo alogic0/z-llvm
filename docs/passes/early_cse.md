@@ -106,6 +106,7 @@ opt-22 equivalent:
   early_cse_unknown_call_reject
   early_cse_ambiguous_alias_reject
   fp_early_cse_flags
+  fp_extended_early_cse_no_cse
 
 local-only conservative:
   readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
@@ -114,8 +115,6 @@ local-only conservative:
   fp_early_cse_no_cse now CSEs strict FP binary/fcmp expressions, but remains
   local-conservative because the local pipeline lacks LLVM's later select
   simplification for that fixture.
-  fp_extended_early_cse_no_cse preserves non-redundant scalar `fsub`, `fdiv`,
-  and `frem` syntax.
   fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
   name differs from opt-22, so the fixture is local-conservative.
   fp_fast_cse_reject documents an adjacent partial-FMF case where local

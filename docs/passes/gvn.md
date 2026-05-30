@@ -110,6 +110,7 @@ opt-22 equivalent:
   gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
+  fp_extended_gvn_no_cse
   fp_gvn_flags
 
 local-only conservative:
@@ -130,8 +131,6 @@ local-only conservative:
   fp_gvn_no_cse now value-numbers strict FP binary/fcmp expressions, but remains
   local-conservative because the local pipeline lacks LLVM's later select
   simplification for that fixture.
-  fp_extended_gvn_no_cse preserves non-redundant scalar `fsub`, `fdiv`, and
-  `frem` syntax.
   fp_fast_gvn admits repeated `fadd fast` expressions and matches opt-22 for
   the accepted dominator-tree value-numbering shape.
   debug_gvn_dbg_preserve preserves the leader instruction location and drops
