@@ -44,6 +44,9 @@ Demanded low-bit cleanup for a narrow integer `and` mask chain:
 
 When C2 demands only bits already preserved by C1 and `%wide` has one use, the
 local pass rewrites `%narrow` to use `%x` directly and removes `%wide`.
+
+Unused non-effecting instructions are removed to a fixed point because no bits
+of their result are demanded.
 ```
 
 Intentional divergences:
@@ -54,6 +57,8 @@ No KnownBits analysis, AssumptionCache, vector handling, poison-sensitive
 reasoning, or multi-user propagation.
 Only integer widths up to 64 bits are accepted in the current fixture-backed
 rule.
+No partial demanded-bits propagation beyond the accepted mask-chain rule and
+whole-result unused cleanup.
 ```
 
 Fixture coverage:
@@ -61,6 +66,7 @@ Fixture coverage:
 ```text
 opt-22 equivalent:
   bdce_and_mask
+  bdce_unused_chain
 
 local-only conservative:
   none currently
