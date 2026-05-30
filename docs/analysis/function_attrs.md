@@ -69,6 +69,8 @@ function definitions
 infer memory(argmem: read/write) for simple parameter-only load/store bodies
 infer nofree, nosync, nounwind, mustprogress, and willreturn for bounded
 no-call or direct-call bodies where the local IR surface proves the attribute
+infer memory(none) for local recursive SCCs whose reachable local call cycle
+contains no memory effects and no unknown external calls
 infer readonly/writeonly captures(none), initializes((0, N)), and returned
 parameter attributes for simple direct parameter uses
 synthesize opt-style attribute groups for modules that do not already contain
@@ -88,8 +90,8 @@ stores, and returns; no GEP slice, capture tracking, or alias-aware argument
 propagation is modeled
 no call-site attributes
 no full CGSCC propagation or LazyCallGraph RefSCC traversal
-recursive SCC memory effects remain conservative, so recursive readnone-style
-memory(none) inference is still not reproduced
+recursive SCC memory inference is limited to proving memory(none) for cycles
+with only local direct calls and side-effect-free instructions
 no general writeonly inference beyond simple parameter stores
 attribute-group synthesis is skipped for modules that already carry groups, and
 for functions with unknown raw function attrs
@@ -106,12 +108,9 @@ opt-22 equivalent:
   gvn_readonly_call_no_clobber
   gvn_unknown_call_clobber_reject
   function_attrs_direct_calls
+  function_attrs_reject
 
 local-only conservative:
-  function_attrs_reject
-    stores gain simple argmem/writeonly/returned attrs and recursive SCCs gain
-    nofree/nosync/nounwind, while recursive SCC memory(none) inference remains
-    conservative.
   readnone, readonly, writeonly, and unknown direct-call memory effect unit test
   function/declaration IPO attribute group resolution test
 

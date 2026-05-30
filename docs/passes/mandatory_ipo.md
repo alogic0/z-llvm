@@ -117,6 +117,8 @@ function-attrs:
   no-call all-return bodies, and readonly/writeonly/captures(none),
   initializes((0, N)), and returned parameter attrs for direct named-parameter
   uses.
+  It infers `memory(none)` for local recursive SCCs when the reachable local
+  call cycle contains only side-effect-free instructions and local direct calls.
   It materializes opt-style attribute groups only for modules without existing
   groups and only when the function attrs are all known to the local model.
 ```
@@ -139,8 +141,7 @@ inline cost is a small local instruction budget, not LLVM's full InlineCost
 model with TTI, profile, SROA bonuses, and call penalties
 debug-location salvage for inlined bodies is not modeled
 function-attrs still does not rewrite existing attribute-group tables, does not
-infer recursive SCC memory(none), and does not model broader Attributor-derived
-facts
+run full CGSCC propagation, and does not model broader Attributor-derived facts
 ```
 
 Fixture coverage:
@@ -152,9 +153,9 @@ opt-22 equivalent:
   inline_direct_small
   inline_noinline_call
   function_attrs_direct_calls
+  function_attrs_reject
 
 local-only conservative:
-  function_attrs_reject
   call graph declaration/definition reachability test
   IPO attribute group resolution test
 

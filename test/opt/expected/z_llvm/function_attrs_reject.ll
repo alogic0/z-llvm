@@ -31,4 +31,4 @@ entry:
 }
 
 attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(argmem: write) }
-attributes #1 = { nofree nosync nounwind }
+attributes #1 = { nofree nosync nounwind memory(none) }

@@ -78,6 +78,11 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
             if (try appendFunctionAttr(module, function, "willreturn")) changed = true;
         }
 
+        @memset(simple_attr_state, .unvisited);
+        if (canInferNoMemoryThroughLocalCycle(module.*, index, simple_attr_state)) {
+            if (try appendMemoryNoneAttr(module, function)) changed = true;
+        }
+
         if (try inferParameterAttributes(module, function)) changed = true;
     }
 
@@ -399,6 +404,36 @@ fn canInferMustProgressWillReturn(function: ir.Function) bool {
     return function.blocks.items.len != 0;
 }
 
+fn canInferNoMemoryThroughLocalCycle(module: ir.Module, function_index: usize, state: []VisitState) bool {
+    if (state[function_index] == .visiting) return true;
+    if (state[function_index] == .done) return true;
+    state[function_index] = .visiting;
+
+    const function = module.functions.items[function_index];
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .call => |call| {
+                    if (!callCanInferNoMemory(module, call, state)) return false;
+                },
+                else => if (memory_effect.classify(instruction) != .none) return false,
+            }
+        }
+    }
+
+    state[function_index] = .done;
+    return true;
+}
+
+fn callCanInferNoMemory(module: ir.Module, call: ir.CallInst, state: []VisitState) bool {
+    if (call.inline_asm != null or call.operand_bundle != null or call.callee_value != null) return false;
+    if (findFunctionIndex(module, call.callee)) |index| return canInferNoMemoryThroughLocalCycle(module, index, state);
+    const attrs = function_attrs.resolvedCalleeAttributes(module, call.callee) orelse return false;
+    const effects = attrs.memory_effects orelse return attrs.readnone;
+    return effects.overall() == .no_mod_ref;
+}
+
 fn inferParameterAttributes(module: *ir.Module, function: *ir.Function) !bool {
     var changed = false;
     for (function.params.items, 0..) |param, index| {
@@ -696,6 +731,12 @@ fn appendFunctionAttr(module: *ir.Module, function: *ir.Function, attr: []const 
         try std.fmt.allocPrint(module.allocator, "{s}", .{attr});
     function.attrs = try module.ownString(new_attrs);
     return true;
+}
+
+fn appendMemoryNoneAttr(module: *ir.Module, function: *ir.Function) !bool {
+    const attrs = function_attrs.resolvedFunctionAttributes(module.*, function.*);
+    if (attrs.memory_effects != null or attrs.readnone or attrs.readonly or attrs.writeonly) return false;
+    return appendFunctionAttr(module, function, "memory(none)");
 }
 
 fn appendParamAttr(module: *ir.Module, function: *ir.Function, param_index: usize, attr: []const u8) !bool {
