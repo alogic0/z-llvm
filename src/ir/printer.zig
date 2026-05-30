@@ -284,7 +284,7 @@ pub fn print(module: core.Module, writer: anytype) !void {
                         try writer.writeAll(", ");
                         try shuffle.mask_ty.format(writer);
                         try writer.writeByte(' ');
-                        try shuffle.mask.format(writer);
+                        try printShuffleMask(shuffle.mask, writer);
                         try printInstructionMetadata(instruction.metadata, writer);
                     },
                     .extractvalue => |extract| {
@@ -472,6 +472,36 @@ fn printCastFlags(flags: core.CastFlags, writer: anytype) !void {
     if (flags.nneg) try writer.writeAll("nneg ");
     if (flags.nsw) try writer.writeAll("nsw ");
     if (flags.nuw) try writer.writeAll("nuw ");
+}
+
+fn printShuffleMask(mask: core.Value, writer: anytype) !void {
+    switch (mask) {
+        .vector => |text| try printShuffleMaskVector(text, writer),
+        .int, .fp, .named, .undef, .poison, .null_value, .zero_initializer, .constant_expr => try mask.format(writer),
+    }
+}
+
+fn printShuffleMaskVector(text: []const u8, writer: anytype) !void {
+    var index: usize = 0;
+    while (index < text.len) {
+        if (std.mem.startsWith(u8, text[index..], "undef") and isTokenBoundary(text, index, "undef".len)) {
+            try writer.writeAll("poison");
+            index += "undef".len;
+            continue;
+        }
+        try writer.writeByte(text[index]);
+        index += 1;
+    }
+}
+
+fn isTokenBoundary(text: []const u8, start: usize, len: usize) bool {
+    if (start != 0 and isIdentifierByte(text[start - 1])) return false;
+    const end = start + len;
+    return end == text.len or !isIdentifierByte(text[end]);
+}
+
+fn isIdentifierByte(byte: u8) bool {
+    return std.ascii.isAlphanumeric(byte) or byte == '_' or byte == '-' or byte == '.';
 }
 
 fn printFastMathFlags(flags: core.FastMathFlags, writer: anytype) !void {
