@@ -108,10 +108,10 @@ opt-22 equivalent:
   vector_combine_extract_insert_mismatch
   vector_shuffle_undef_mask_preserve
   vector_select_same_arms
+  slp_vectorizer_recognition
   early_cse_vector_lane_store_forward
   dse_vector_lane_not_barrier
 
 local-only conservative:
-  slp_vectorizer_recognition
   gvn_vector_lane_not_clobber
 ```

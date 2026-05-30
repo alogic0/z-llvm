@@ -70,13 +70,13 @@ opt-22 equivalent:
   fp_fast_math_preserve
   fp_strict_fcmp_fold
   fp_fast_math_flags_boundary
+  fp_extended_gvn_no_cse
+  fp_extended_early_cse_no_cse
   fp_fast_gvn
 
 local-only conservative:
   flagged arithmetic and division are intentionally not folded by instcombine yet
   FP literals are classified and preserved but not folded
-  fp_extended_gvn_no_cse
-  fp_extended_early_cse_no_cse
   fp_strict_sensitive_preserve
   fp_fast_math_sensitive_conservative
   fp_strict_orderedness_fold
