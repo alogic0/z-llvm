@@ -26,25 +26,25 @@ vector_future_release_fast: parse,verify,future
 Latest accepted-pipeline freshness sweep:
 
 ```text
-tmp/zig_ir/next_discovery_debug
+tmp/zig_ir/continuous_20260530_151319_debug
   mode=Debug
   passes=zig-debug-accepted
   processed=1474 emit_ok=465 local_ok=465
   parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
 
-tmp/zig_ir/next_discovery_releasefast
+tmp/zig_ir/continuous_20260530_151319_releasefast
   mode=ReleaseFast
   passes=zig-release-fast-accepted
   processed=1474 emit_ok=465 local_ok=465
   parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
 
-tmp/zig_ir/next_discovery_releasesafe
+tmp/zig_ir/continuous_20260530_151319_releasesafe
   mode=ReleaseSafe
   passes=zig-release-safe-accepted
   processed=1474 emit_ok=465 local_ok=465
   parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
 
-tmp/zig_ir/next_discovery_releasesmall
+tmp/zig_ir/continuous_20260530_151319_releasesmall
   mode=ReleaseSmall
   passes=zig-release-small-accepted
   processed=1474 emit_ok=465 local_ok=465
