@@ -3,7 +3,7 @@ entry:
   %first = load i32, ptr %p
   br i1 %cond, label %store, label %join
 join:
-  %second = load i32, ptr %p
+  %second = phi i32 [ %v, %store ], [ %first, %entry ]
   %sum = add i32 %first, %second
   ret i32 %sum
 store:

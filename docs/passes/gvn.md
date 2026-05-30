@@ -79,7 +79,8 @@ cross-block load availability is path-aware for the accepted access-list slice:
 endpoint instruction order is used, and interior clobbers must be reachable on a
 CFG path between the leader load and the later load
 simple load PRE for one two-predecessor join shape:
-  one predecessor has an available must-alias load
+  predecessors have available must-alias load/store values, or one predecessor
+  has an available must-alias load
   one direct predecessor can receive one inserted load before its terminator
   the join load is replaced by a PHI with incoming available/inserted values
 simple scalar PRE for one two-predecessor join shape:
@@ -115,6 +116,7 @@ opt-22 equivalent:
   gvn_argmemonly_call_no_clobber
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
+  gvn_load_branch_clobber_reject
   gvn_scalar_pre_reject
   gvn_atomic_load_barrier_reject
   gvn_diamond_load_no_memory_phi
@@ -125,9 +127,6 @@ opt-22 equivalent:
   fp_gvn_flags
 
 local-only conservative:
-  gvn_load_branch_clobber_reject keeps the later load because a store in a
-  different CFG block may reach the join. LLVM GVN can perform a stronger PRE
-  transform for this shape, so this fixture checks the local safety boundary.
   gvn_side_exit_store_not_clobber proves the path-aware local MemorySSA query can
   ignore a side-exit store outside the queried path. `opt-22` preserves this
   shape, so full load-placement parity remains future work.

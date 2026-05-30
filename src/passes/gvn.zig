@@ -141,27 +141,34 @@ fn performSimpleLoadPre(allocator: std.mem.Allocator, module: *ir.Module, functi
 
         var existing_count: usize = 0;
         for (predecessors) |predecessor| {
-            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
-                incoming.clearRetainingCapacity();
-                break;
-            }
             if (findAvailablePredecessorLoad(module.*, function.*, predecessor, load)) |value| {
                 try incoming.append(allocator, .{ .block_index = predecessor, .value = value });
                 existing_count += 1;
                 continue;
+            }
+            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
+                incoming.clearRetainingCapacity();
+                break;
             }
             try incoming.append(allocator, .{ .block_index = predecessor, .value = .undef });
             try insertions.append(allocator, predecessor);
         }
 
         if (incoming.items.len != predecessors.len) continue;
-        if (existing_count == 0 or insertions.items.len != 1) continue;
+        if (existing_count == 0 or insertions.items.len > 1) continue;
 
-        const inserted_value = try insertPreLoad(allocator, module, function, insertions.items[0], load_instruction.result orelse continue, load);
-        for (incoming.items) |*entry| {
-            if (entry.block_index == insertions.items[0]) {
-                entry.value = inserted_value;
-                break;
+        if (insertions.items.len == 1) {
+            const inserted_value = try insertPreLoad(allocator, module, function, insertions.items[0], load_instruction.result orelse continue, load);
+            for (incoming.items) |*entry| {
+                if (entry.block_index == insertions.items[0]) {
+                    entry.value = inserted_value;
+                    break;
+                }
+            }
+        } else if (findStoreIncomingIndex(module.*, function.*, incoming.items, load)) |store_index| {
+            if (store_index != 0) {
+                const store_incoming = incoming.orderedRemove(store_index);
+                try incoming.insert(allocator, 0, store_incoming);
             }
         }
 
@@ -197,14 +204,14 @@ fn performSimpleScalarPre(allocator: std.mem.Allocator, module: *ir.Module, func
 
         var existing_count: usize = 0;
         for (predecessors) |predecessor| {
-            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
-                incoming.clearRetainingCapacity();
-                break;
-            }
             if (findAvailablePredecessorScalar(function.*, predecessor, scalar_instruction)) |value| {
                 try incoming.append(allocator, .{ .block_index = predecessor, .value = value });
                 existing_count += 1;
                 continue;
+            }
+            if (!hasSingleSuccessorTo(graph, predecessor, block_index)) {
+                incoming.clearRetainingCapacity();
+                break;
             }
             try incoming.append(allocator, .{ .block_index = predecessor, .value = .undef });
             try insertions.append(allocator, predecessor);
@@ -290,12 +297,66 @@ fn findAvailablePredecessorLoad(module: ir.Module, function: ir.Function, block_
                 if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return null;
             },
             .store, .atomicrmw, .cmpxchg, .fence, .call => {
+                switch (instruction.kind) {
+                    .store => |store| {
+                        if (store.attrs.isBarrier()) return null;
+                        if (store.ty.eql(load.ty)) {
+                            switch (alias.accessAliasInModule(module, function, store.ptr, store.ty, load.ptr, load.ty)) {
+                                .must_alias => return store.value,
+                                .no_alias => continue,
+                                .may_alias, .partial_alias => return null,
+                            }
+                        }
+                    },
+                    .atomicrmw, .cmpxchg, .fence, .call => {},
+                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => unreachable,
+                }
                 if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return null;
             },
             .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
         }
     }
     return null;
+}
+
+fn findStoreIncomingIndex(module: ir.Module, function: ir.Function, values: []const PreIncoming, load: ir.LoadInst) ?usize {
+    for (values, 0..) |incoming, index| {
+        if (predecessorProvidesAvailableStore(module, function, incoming.block_index, load)) return index;
+    }
+    return null;
+}
+
+fn predecessorProvidesAvailableStore(module: ir.Module, function: ir.Function, block_index: usize, load: ir.LoadInst) bool {
+    const block = function.blocks.items[block_index];
+    var index = block.instructions.items.len;
+    while (index > 0) {
+        index -= 1;
+        const instruction = block.instructions.items[index];
+        if (instruction.removed) continue;
+        switch (instruction.kind) {
+            .store => |store| {
+                if (store.attrs.isBarrier()) return false;
+                if (store.ty.eql(load.ty)) {
+                    switch (alias.accessAliasInModule(module, function, store.ptr, store.ty, load.ptr, load.ty)) {
+                        .must_alias => return true,
+                        .no_alias => continue,
+                        .may_alias, .partial_alias => return false,
+                    }
+                }
+                if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return false;
+            },
+            .load => |candidate| {
+                if (candidate.attrs.isBarrier()) return false;
+                if (candidate.ty.eql(load.ty) and alias.accessAliasInModule(module, function, candidate.ptr, candidate.ty, load.ptr, load.ty) == .must_alias) return false;
+                if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return false;
+            },
+            .call, .atomicrmw, .cmpxchg, .fence => {
+                if (memory_ssa.isBarrierForAccess(module, function, instruction, load.ptr, load.ty)) return false;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .gep, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => {},
+        }
+    }
+    return false;
 }
 
 fn findAvailablePredecessorScalar(function: ir.Function, block_index: usize, instruction: ir.Instruction) ?ir.Value {
