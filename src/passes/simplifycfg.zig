@@ -22,6 +22,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
         changed = try hoistTwoInstructionDiamondPhiReturn(module, function) or changed;
         changed = try hoistIdenticalDiamondPhiReturn(module, function) or changed;
+        changed = try hoistDiamondPhiBinaryReturn(module, function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try mergeReturnsToCommonBlock(module, function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
@@ -524,6 +525,122 @@ fn hoistIdenticalDiamondPhiReturn(module: *ir.Module, function: *ir.Function) !b
         }
     }
     return changed;
+}
+
+fn hoistDiamondPhiBinaryReturn(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(module.allocator, function.*);
+        defer graph.deinit();
+        var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+        defer uses.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
+            };
+            if (condbr.metadata != null) continue;
+
+            const shape = diamondPhiBinaryReturn(module.*, function.*, graph, uses, block_index, condbr) orelse continue;
+            const hoisted = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            try block.instructions.append(module.allocator, hoisted);
+
+            var removed_phi = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
+            removed_phi.deinit(module.allocator);
+            var merge_binary = function.blocks.items[shape.merge_index].instructions.orderedRemove(0);
+            switch (merge_binary.kind) {
+                .binary => |*binary| {
+                    binary.lhs = replaceOperand(binary.lhs, shape.phi_name, .{ .named = hoisted.result.? });
+                    binary.rhs = replaceOperand(binary.rhs, shape.phi_name, .{ .named = hoisted.result.? });
+                },
+                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => unreachable,
+            }
+            try block.instructions.append(module.allocator, merge_binary);
+            block.terminator = .{ .ret = .{
+                .ty = shape.ret_ty,
+                .value = .{ .named = merge_binary.result.? },
+            } };
+
+            removeBlocksDescending(module.allocator, function, &.{ shape.merge_index, shape.else_index, shape.then_index });
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+const DiamondPhiBinaryReturn = struct {
+    then_index: usize,
+    else_index: usize,
+    merge_index: usize,
+    phi_name: []const u8,
+    ret_ty: ir.Type,
+};
+
+fn diamondPhiBinaryReturn(module: ir.Module, function: ir.Function, graph: cfg.Graph, uses: def_use.UseCounts, block_index: usize, condbr: anytype) ?DiamondPhiBinaryReturn {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+    if (function.blocks.items[then_index].instructions.items.len != 1) return null;
+    if (function.blocks.items[else_index].instructions.items.len != 1) return null;
+
+    const then_target = branchTarget(function.blocks.items[then_index]) orelse return null;
+    const else_target = branchTarget(function.blocks.items[else_index]) orelse return null;
+    if (!std.mem.eql(u8, then_target, else_target)) return null;
+
+    const merge_index = function.blockIndex(then_target) orelse return null;
+    if (merge_index == block_index or merge_index == then_index or merge_index == else_index) return null;
+    const merge_preds = graph.predecessors(merge_index);
+    if (merge_preds.len != 2) return null;
+    if (!containsIndex(merge_preds, then_index) or !containsIndex(merge_preds, else_index)) return null;
+
+    const then_instruction = function.blocks.items[then_index].instructions.items[0];
+    const else_instruction = function.blocks.items[else_index].instructions.items[0];
+    if (then_instruction.removed or else_instruction.removed) return null;
+    if (then_instruction.metadata != null or else_instruction.metadata != null) return null;
+    const then_result = then_instruction.result orelse return null;
+    const else_result = else_instruction.result orelse return null;
+    if (!sameHoistableReturnInstruction(module, function, then_instruction, else_instruction)) return null;
+    if ((uses.counts.get(then_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(else_result) orelse 0) != 1) return null;
+
+    const merge = function.blocks.items[merge_index];
+    if (merge.instructions.items.len != 2) return null;
+    const phi_inst = merge.instructions.items[0];
+    if (phi_inst.removed or phi_inst.kind != .phi) return null;
+    const phi_name = phi_inst.result orelse return null;
+    const phi = phi_inst.kind.phi;
+    if (phi.incoming.items.len != 2) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.then_target) orelse return null, then_result)) return null;
+    if (!valueNamesResult(phiValueForBlock(phi, condbr.else_target) orelse return null, else_result)) return null;
+    if ((uses.counts.get(phi_name) orelse 0) != 1) return null;
+
+    const merge_user = merge.instructions.items[1];
+    if (merge_user.removed or merge_user.metadata != null) return null;
+    const merge_user_result = merge_user.result orelse return null;
+    const merge_binary = binaryInstruction(merge_user) orelse return null;
+    if (isFpBinary(merge_binary.op)) return null;
+    if ((uses.counts.get(merge_user_result) orelse 0) != 1) return null;
+
+    const ret = switch (merge.terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    if (!ret.ty.eql(merge_binary.ty)) return null;
+    if (!retReturnsValue(ret, merge_user_result)) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .merge_index = merge_index,
+        .phi_name = phi_name,
+        .ret_ty = ret.ty,
+    };
 }
 
 const IdenticalDiamondPhiReturn = struct {

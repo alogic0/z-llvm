@@ -62,10 +62,10 @@ Opt fixture counts from `test/opt/fixtures.tsv`:
 
 | Fixture kind | Count | Meaning |
 | --- | ---: | --- |
-| `opt-equivalent` | 214 | Normalized local output matches `opt-22` for the listed pass pipeline. |
+| `opt-equivalent` | 215 | Normalized local output matches `opt-22` for the listed pass pipeline. |
 | `local-conservative` | 12 | Local output is deliberately narrower or named differently while preserving a documented safety boundary. |
 | `parse-preserve-only` | 12 | Fixture proves parser/verifier/printer preservation without transform parity. |
-| Total | 238 | Current opt fixture table size. |
+| Total | 239 | Current opt fixture table size. |
 
 Pass status counts from the active pass pipeline inventory:
 
