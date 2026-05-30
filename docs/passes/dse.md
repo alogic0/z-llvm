@@ -49,6 +49,9 @@ Implemented subset:
   Track later partial integer-store byte intervals and remove the earlier store
   when their union covers the full earlier store
   Skip disjoint byte-range stores while searching for a later killing store
+  Remove a store in a block with one successor when that successor has one
+  predecessor and immediately overwrites the same location before any
+  intervening read or barrier
   Preserve stores when a load, call, volatile/atomic access, unknown pointer, or
   may-alias access intervenes
   Verify MemorySSA consistency after deleting stores
@@ -57,7 +60,8 @@ Intentional divergences:
   No full optimized MemorySSA walker/updater; only the first walker-shaped
   clobber API and simple access deletion/replacement helpers exist in the
   analysis layer.
-  No cross-block DSE.
+  Cross-block DSE is limited to a single-successor/single-predecessor immediate
+  overwrite shape.
   Partial-overwrite DSE is limited to same-block fixed-size integer stores with
   known byte offsets. The interval set is intentionally small and rejects on
   unknown or excessive overlap complexity.
@@ -73,6 +77,8 @@ Analysis preservation/invalidation:
 
 Fixture coverage:
   dse_overwrite
+  dse_cross_block_overwrite
+  dse_cross_block_load_barrier
   dse_partial_overwrite_reject
   dse_partial_overwrite_lattice
   dse_load_barrier
@@ -92,7 +98,8 @@ Known gaps:
 
 ```text
 no full optimized MemorySSA walker/updater
-no post-dominator or cross-block reasoning
+no post-dominator or general cross-block reasoning beyond the accepted
+single-successor/single-predecessor overwrite shape
 partial-overlap elimination is limited to same-block fixed-size integer stores
 no target-library memory intrinsic handling
 no lifetime marker handling
