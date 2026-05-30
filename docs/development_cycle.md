@@ -2,7 +2,112 @@
 
 Each implementation cycle uses `docs/next_steps.md` as the active checklist.
 
+The development cycle exists to replace the LLVM library dependency used by
+Zig's distribution. Work should therefore be selected and closed by evidence
+from Zig's actual LLVM use: Zig-emitted IR, Zig's PassBuilder configuration,
+target/backend handoff requirements, or a measured gap in the current local
+replacement.
+
 For every future step that reproduces LLVM behavior, completion requires an upstream mapping before the step is committed.
+
+## Work Selection Priority
+
+Pick work in this order:
+
+1.  A source-backed Zig IR row that fails to parse, verify, optimize, or hand
+    off through the local replacement.
+2.  A Zig distribution mode or target requirement that still needs an LLVM
+    library fallback.
+3.  A concrete `opt-22` mismatch for a pass or pipeline that Zig actually
+    invokes.
+4.  A backend, object, ABI, debug, sanitizer, LTO, or target-feature gap that
+    blocks removing LLVM from a named Zig distribution configuration.
+5.  Optional optimizer-quality work only when it is tied to source-backed Zig
+    IR or an accepted pipeline fixture.
+
+Do not promote a pass just because it appears in LLVM's generic pipeline. If
+the pass is not exercised by Zig's configured LLVM path, or if the current
+finish definition deliberately treats it as a boundary, keep it in the backlog
+until a measured replacement need appears.
+
+Each active checklist in `docs/next_steps.md` should state:
+
+```text
+Replacement goal:
+Zig evidence:
+LLVM fallback removed or reduced:
+Distribution mode/target affected:
+Validation gate:
+```
+
+Use `unknown` only while selecting the slice. Before implementation is marked
+complete, replace `unknown` with a concrete answer or document why the slice is
+only preparatory infrastructure.
+
+## Distribution Replacement Matrix
+
+Roadmap and cycle docs should keep progress visible as a replacement matrix,
+not only as a pass list. For each promoted slice, identify the affected row:
+
+```text
+mode: Debug | ReleaseFast | ReleaseSafe | ReleaseSmall | LTO pre-link
+target: x86_64-linux-gnu | x86_64-linux-musl | aarch64-linux-gnu | wasm32-wasi | other named target
+stage: parse | verify | optimize | codegen handoff | asm/object | link/LTO handoff
+status: local replacement | local conservative boundary | LLVM fallback required | out of scope
+```
+
+A task moves the project toward the goal only if it changes one of those rows,
+adds evidence for a row, or explains why the row is not part of the current
+replacement milestone.
+
+## Initial Target Policy
+
+Start the distribution replacement effort with one hardware target. The default
+initial target is:
+
+```text
+x86_64
+```
+
+Use `x86_64-linux-gnu` as the primary validation triple unless a cycle is
+explicitly about another OS/ABI boundary. Other targets stay documented as
+future or conservative boundaries until the x86_64 replacement path has enough
+parse, verify, optimize, codegen handoff, asm/object, and link/LTO evidence to
+justify expanding the matrix.
+
+Do not require every cycle to prove every Zig mode and target. A non-x86_64
+check belongs in a cycle only when the selected work changes target parsing,
+DataLayout, ABI classification, target features, object format, calling
+convention behavior, or backend lowering that can plausibly differ by target.
+
+## Validation Scope
+
+Use the smallest validation gate that proves the selected slice:
+
+```text
+docs-only change
+  -> no test run required; inspect the rendered diff
+
+single pass or analysis fixture
+  -> run the focused opt fixture or unit test for that pass
+
+parser, verifier, printer, pass manager, or shared analysis change
+  -> run the focused fixture plus the local readiness gate
+
+target, ABI, codegen, object, or handoff change
+  -> run the focused x86_64 handoff/codegen gate
+
+corpus manifest or Zig-emitted fixture change
+  -> run the affected mode sweep only
+
+release milestone or replacement-matrix status upgrade
+  -> run the broader readiness and discovery gates
+```
+
+Full Debug, ReleaseFast, ReleaseSafe, ReleaseSmall, and multi-target sweeps are
+milestone evidence, not default per-cycle work. If a focused gate is skipped,
+the completion note must say why the touched surface is docs-only,
+fixture-only, or otherwise covered by a narrower check.
 
 ## Compiler Selection
 
@@ -146,6 +251,7 @@ LLVM classes/functions used as reference entry points
 reproduced behavior
 known missing behavior
 test fixtures or opt commands used for comparison
+Zig distribution path or fallback boundary affected
 ```
 
 The mapping belongs in the relevant document:
@@ -192,7 +298,13 @@ A checkbox in `docs/next_steps.md` can be marked complete only after:
 2.  tests or fixtures are added;
 3.  the relevant upstream LLVM mapping is documented;
 4.  the known unsupported behavior is documented;
-5.  the step is committed separately using the commit policy.
+5.  the affected Zig distribution mode, target, or fallback boundary is
+    recorded;
+6.  the step is committed separately using the commit policy.
+
+If a step improves local quality but does not remove or reduce an LLVM fallback,
+the completion note must say that explicitly and point to the source-backed
+reason for doing it anyway.
 
 ## Discovery Fix Review Loop
 
