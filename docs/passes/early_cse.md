@@ -81,6 +81,8 @@ FP binary ops and fcmp use the shared fast-math legality helper and are admitted
 for scalar non-constrained FP expressions
 retained FP leaders intersect fast-math flags with the removed instruction,
 matching LLVM's `combineIRFlags` category for CSE
+same-arm select cleanup is applied after local value replacements expose an
+InstSimplify-equivalent select
 ```
 
 Upstream mapping:
@@ -113,9 +115,9 @@ local-only conservative:
   readnone call CSE is unit-tested locally. `opt-22` rewrites readnone
   declaration attributes into attribute groups that the current parser rejects,
   so this case is not in `fixtures.tsv` yet.
-  fp_early_cse_no_cse now CSEs strict FP binary/fcmp expressions, but remains
-  local-conservative because the local pipeline lacks LLVM's later select
-  simplification for that fixture.
+  fp_early_cse_no_cse now CSEs strict FP binary/fcmp expressions and folds the
+  same-arm select, but remains local-conservative because the dead compare
+  leader name differs from opt-22.
   fp_fast_early_cse admits repeated `fadd fast` expressions. The local result
   name differs from opt-22, so the fixture is local-conservative.
   fp_fast_cse_reject documents an adjacent partial-FMF case where local

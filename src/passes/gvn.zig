@@ -8,6 +8,7 @@ const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const memory_ssa = @import("../analysis/memory_ssa.zig");
 const ir = @import("../ir.zig");
+const inst_simplify = @import("inst_simplify.zig");
 const pass_manager = @import("../pass_manager.zig");
 
 pub const pass: pass_manager.ModulePass = .{
@@ -317,7 +318,19 @@ fn visitBlock(
     const block = &function.blocks.items[block_index];
     for (block.instructions.items, 0..) |*instruction, instruction_index| {
         instruction.mapOperands(aliases.*);
-        if (instruction.removed or !isCandidate(table.module, instruction.*)) continue;
+        if (instruction.removed) continue;
+
+        if (simplifyMappedSelect(instruction.*)) |replacement| {
+            instruction.removed = true;
+            instruction.replacement = replacement;
+            const result = instruction.result orelse return error.InstructionWithoutResult;
+            try aliases.put(result, replacement);
+            replaceValue(function, result, replacement);
+            changed = true;
+            continue;
+        }
+
+        if (!isCandidate(table.module, instruction.*)) continue;
 
         const number = try table.numberFor(instruction.*);
         if (findLeader(table.module, function.*, memory, leaders.items, number, block_index, instruction_index, instruction.*)) |leader_index| {
@@ -364,6 +377,13 @@ fn visitBlock(
     }
 
     return changed;
+}
+
+fn simplifyMappedSelect(instruction: ir.Instruction) ?ir.Value {
+    return switch (instruction.kind) {
+        .select => inst_simplify.simplify(instruction),
+        .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
+    };
 }
 
 fn findLeader(

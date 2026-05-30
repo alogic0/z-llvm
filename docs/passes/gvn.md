@@ -87,6 +87,8 @@ replacement of dominated redundant expression uses
 scalar, load, and readnone-call expression equivalence shared with EarlyCSE
 FP binary ops and fcmp use the shared fast-math legality helper and are admitted
 for scalar non-constrained FP expressions
+same-arm select cleanup is applied after local value replacements expose an
+InstSimplify-equivalent select
 ```
 
 This is intentionally closer to a small value-table seed than to full LLVM GVN.
@@ -111,6 +113,7 @@ opt-22 equivalent:
   gvn_load_pre_diamond
   gvn_unknown_call_clobber_reject
   gvn_atomic_load_barrier_reject
+  fp_gvn_no_cse
   fp_extended_gvn_no_cse
   fp_gvn_flags
 
@@ -129,9 +132,6 @@ local-only conservative:
   argmem-only noalias calls are trusted as non-clobbering memory accesses for
   repeated loads, matching the local `memory(read)` and `memory(argmem: write)`
   fixtures.
-  fp_gvn_no_cse now value-numbers strict FP binary/fcmp expressions, but remains
-  local-conservative because the local pipeline lacks LLVM's later select
-  simplification for that fixture.
   fp_fast_gvn admits repeated `fadd fast` expressions and matches opt-22 for
   the accepted dominator-tree value-numbering shape.
   debug_gvn_dbg_preserve preserves the leader instruction location and drops

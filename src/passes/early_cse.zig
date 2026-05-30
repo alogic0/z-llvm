@@ -7,6 +7,7 @@ const function_attrs = @import("../analysis/function_attrs.zig");
 const memory_effect = @import("../analysis/memory_effect.zig");
 const memory_ssa = @import("../analysis/memory_ssa.zig");
 const ir = @import("../ir.zig");
+const inst_simplify = @import("inst_simplify.zig");
 const pass_manager = @import("../pass_manager.zig");
 
 pub const pass: pass_manager.ModulePass = .{
@@ -79,6 +80,15 @@ fn visitBlock(
         instruction.mapOperands(aliases.*);
         if (instruction.removed) continue;
 
+        if (simplifyMappedSelect(instruction.*)) |replacement| {
+            instruction.removed = true;
+            instruction.replacement = replacement;
+            const result = instruction.result orelse return error.InstructionWithoutResult;
+            try aliases.put(result, replacement);
+            changed = true;
+            continue;
+        }
+
         if (forwardStoreToLoad(module, function.*, stores.items, instruction)) |replacement| {
             instruction.removed = true;
             instruction.replacement = replacement;
@@ -134,6 +144,13 @@ fn visitBlock(
     }
 
     return changed;
+}
+
+fn simplifyMappedSelect(instruction: ir.Instruction) ?ir.Value {
+    return switch (instruction.kind) {
+        .select => inst_simplify.simplify(instruction),
+        .binary, .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => null,
+    };
 }
 
 fn forwardStoreToLoad(module: ir.Module, function: ir.Function, stores: []const AvailableStore, instruction: *ir.Instruction) ?ir.Value {
