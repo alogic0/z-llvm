@@ -67,13 +67,15 @@ Implemented subset:
   Common return block merge with a PHI for one existing empty `common.ret`
   block and one other same-typed return
   Hoist one identical pure scalar instruction, non-volatile load, or readnone
-  call from two unique return successors into the predecessor branch block
+  call from two unique return successors into the predecessor branch block,
+  including commuted operands for commutative integer binary opcodes
   Hoist matching two-instruction integer binary chains, including commuted
   operands, from two unique return successors and select between the hoisted
   return values
   Hoist one identical pure scalar instruction, non-volatile load, or readnone
   call from two unique diamond arms when the merge block immediately returns
-  the PHI of those two results
+  the PHI of those two results, including commuted operands for commutative
+  integer binary opcodes
   Hoist matching two-instruction integer binary chains from two unique diamond
   arms when the merge block immediately returns the PHI of the chain results
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
@@ -103,6 +105,7 @@ Fixture coverage:
   simplifycfg_hoist_two_inst_ret
   simplifycfg_hoist_commuted_two_inst_ret
   simplifycfg_hoist_diamond_phi_ret
+  simplifycfg_hoist_commuted_diamond_phi_ret
   simplifycfg_hoist_two_inst_diamond_phi_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
@@ -141,13 +144,15 @@ merge one same-typed return into an existing empty `common.ret` block by
 creating a return-value PHI
 hoist one identical pure scalar instruction, non-volatile load, or readnone call
 from two unique conditional successors when each instruction feeds only that
-successor's return
+successor's return, including commuted operands for commutative integer binary
+opcodes
 hoist matching two-instruction integer binary chains, including commuted
 operands, from two unique conditional successors and select between the hoisted
 return values
 hoist one identical pure scalar instruction, non-volatile load, or readnone call
 from two unique conditional successors that reconverge at a returned PHI of the
-two instruction results
+two instruction results, including commuted operands for commutative integer
+binary opcodes
 hoist matching two-instruction integer binary chains from two unique conditional
 successors that reconverge at a returned PHI and select between the hoisted
 chain results
@@ -194,6 +199,7 @@ opt-22 equivalent:
   simplifycfg_hoist_two_inst_ret
   simplifycfg_hoist_commuted_two_inst_ret
   simplifycfg_hoist_diamond_phi_ret
+  simplifycfg_hoist_commuted_diamond_phi_ret
   simplifycfg_hoist_two_inst_diamond_phi_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
@@ -249,8 +255,9 @@ instruction, non-volatile load, or readnone call feeding two unique return
 successors, plus matching two-instruction integer binary chains with a selected
 return value and commuted operands only for commutative binary opcodes, plus
 one identical pure scalar instruction, non-volatile load, or readnone call
-feeding a returned two-entry PHI, plus matching two-instruction integer binary
-chains feeding a returned two-entry PHI
+feeding a returned two-entry PHI, with commuted operands only for commutative
+integer binary opcodes, plus matching two-instruction integer binary chains
+feeding a returned two-entry PHI
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```

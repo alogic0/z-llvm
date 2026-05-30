@@ -358,6 +358,9 @@ fn retReturnsValue(ret: anytype, result: []const u8) bool {
 }
 
 fn sameHoistableReturnInstruction(module: ir.Module, function: ir.Function, then_instruction: ir.Instruction, else_instruction: ir.Instruction) bool {
+    const then_binary = binaryInstruction(then_instruction);
+    const else_binary = binaryInstruction(else_instruction);
+    if (then_binary != null and else_binary != null and sameIntegerBinary(then_binary.?, else_binary.?)) return true;
     return expression_key.sameValueExpression(module, function, then_instruction, else_instruction);
 }
 
