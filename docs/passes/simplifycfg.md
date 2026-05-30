@@ -66,13 +66,16 @@ Implemented subset:
   Matching return block merge
   Common return block merge with a PHI for one existing empty `common.ret`
   block and one other same-typed return
+  Hoist one identical pure scalar instruction from two unique return successors
+  into the predecessor branch block
   Strict empty diamond `phi`/`ret` folding to `select`/`ret`
   `!prof` branch-weight propagation from a folded diamond branch to the new
   select instruction
 
 Intentional divergences:
-  No speculation, sinking, hoisting, switch lowering, invoke/EH handling,
-  broad profile metadata rewriting, or target transform info.
+  No speculation, sinking, broad common-code hoisting, switch lowering,
+  invoke/EH handling, broad profile metadata rewriting, or target transform
+  info.
   CorrelatedValuePropagation and TailCallElim are explicit placeholders until
   their algorithms are implemented. JumpThreading has a narrow branch-on-PHI
   predecessor-constant slice documented in `docs/passes/jump_threading.md`.
@@ -86,6 +89,7 @@ Fixture coverage:
   simplifycfg_thread_empty
   simplifycfg_common_ret
   simplifycfg_common_ret_phi
+  simplifycfg_hoist_same_add_ret
   simplifycfg_diamond_select
   simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
@@ -121,6 +125,8 @@ incoming values
 merge matching return blocks into the predecessor conditional block
 merge one same-typed return into an existing empty `common.ret` block by
 creating a return-value PHI
+hoist one identical pure scalar instruction from two unique conditional
+successors when each instruction feeds only that successor's return
 fold an empty two-arm diamond with a single merge phi returned immediately into
 a select returned from the branch block
 preserve `!prof` branch-weight metadata on that new select when the source
@@ -133,8 +139,9 @@ Upstream mapping:
 This reproduces constant branch folding, same-destination conditional branch
 folding with PHI edge repair, unreachable block removal, a small phi cleanup
 subset, a simple unconditional branch block merge, a PHI-safe empty-block
-threading subset, and a strict empty-diamond select formation subset with
-branch-weight metadata propagation.
+threading subset, a strict two-arm common-code hoist through
+`hoistCommonCodeFromSuccessors`, and a strict empty-diamond select formation
+subset with branch-weight metadata propagation.
 LLVM's implementation covers many more CFG folds, preserves analyses, updates
 broader metadata/profile data, and handles complex terminators.
 The local implementation rebuilds graph facts around mutations and centralizes
@@ -151,7 +158,11 @@ Fixture coverage:
 opt-22 equivalent:
   simplifycfg
   simplifycfg_thread_empty
+  simplifycfg_common_ret
+  simplifycfg_common_ret_phi
+  simplifycfg_hoist_same_add_ret
   simplifycfg_diamond_select
+  simplifycfg_diamond_select_prof
   simplifycfg_same_target_phi
   simplifycfg_loop_shape_reject
   simplifycfg_side_effect_diamond_reject
@@ -199,6 +210,8 @@ no invoke/landingpad support
 no metadata/profile preservation
 no general return-block tail merging beyond the accepted matching-return and
 single-common-ret PHI shapes
+no general common-code hoisting beyond one identical metadata-free scalar
+instruction feeding two unique return successors
 no speculative diamond folding when either arm has instructions
 no select formation for merge blocks with multiple live instructions
 ```

@@ -1,6 +1,8 @@
 const std = @import("std");
 const cfg = @import("../analysis/cfg.zig");
 const cfg_update = @import("../analysis/cfg_update.zig");
+const def_use = @import("../analysis/def_use.zig");
+const expression_key = @import("../analysis/expression_key.zig");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 
@@ -16,6 +18,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
         changed = simplifyTerminators(function) or changed;
+        changed = try hoistIdenticalTwoArmReturn(module, function) or changed;
         changed = try foldSimpleDiamondSelectReturns(module, function) or changed;
         changed = try mergeReturnsToCommonBlock(module, function) or changed;
         changed = try threadEmptyBranchBlocks(module.allocator, function) or changed;
@@ -112,6 +115,90 @@ fn collapseDuplicatePhiIncoming(function: *ir.Function, target_name: []const u8,
         }
     }
     return changed;
+}
+
+fn hoistIdenticalTwoArmReturn(module: *ir.Module, function: *ir.Function) !bool {
+    var changed = false;
+    var local_changed = true;
+    while (local_changed) {
+        local_changed = false;
+        var graph = try cfg.Graph.build(module.allocator, function.*);
+        defer graph.deinit();
+        var uses = try def_use.UseCounts.collectFunction(module.allocator, function.*);
+        defer uses.deinit();
+
+        for (function.blocks.items, 0..) |*block, block_index| {
+            const condbr = switch (block.terminator orelse continue) {
+                .condbr => |condbr| condbr,
+                .ret, .br, .@"switch", .indirectbr, .@"unreachable" => continue,
+            };
+            if (condbr.metadata != null) continue;
+
+            const shape = identicalTwoArmReturn(function.*, graph, uses, block_index, condbr) orelse continue;
+            const hoisted = function.blocks.items[shape.then_index].instructions.orderedRemove(0);
+            try block.instructions.append(module.allocator, hoisted);
+            block.terminator = .{ .ret = .{
+                .ty = shape.ret_ty,
+                .value = .{ .named = hoisted.result.? },
+            } };
+
+            removeTwoBlocksDescending(module.allocator, function, shape.then_index, shape.else_index);
+            changed = true;
+            local_changed = true;
+            break;
+        }
+    }
+    return changed;
+}
+
+const IdenticalTwoArmReturn = struct {
+    then_index: usize,
+    else_index: usize,
+    ret_ty: ir.Type,
+};
+
+fn identicalTwoArmReturn(function: ir.Function, graph: cfg.Graph, uses: def_use.UseCounts, block_index: usize, condbr: anytype) ?IdenticalTwoArmReturn {
+    const then_index = function.blockIndex(condbr.then_target) orelse return null;
+    const else_index = function.blockIndex(condbr.else_target) orelse return null;
+    if (then_index == else_index or then_index == block_index or else_index == block_index) return null;
+    if (graph.predecessors(then_index).len != 1 or graph.predecessors(else_index).len != 1) return null;
+    if (function.blocks.items[then_index].instructions.items.len != 1) return null;
+    if (function.blocks.items[else_index].instructions.items.len != 1) return null;
+
+    const then_instruction = function.blocks.items[then_index].instructions.items[0];
+    const else_instruction = function.blocks.items[else_index].instructions.items[0];
+    if (then_instruction.removed or else_instruction.removed) return null;
+    if (then_instruction.metadata != null or else_instruction.metadata != null) return null;
+    const then_result = then_instruction.result orelse return null;
+    const else_result = else_instruction.result orelse return null;
+    if (!expression_key.sameScalarExpression(then_instruction, else_instruction)) return null;
+    if ((uses.counts.get(then_result) orelse 0) != 1) return null;
+    if ((uses.counts.get(else_result) orelse 0) != 1) return null;
+
+    const then_ret = switch (function.blocks.items[then_index].terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    const else_ret = switch (function.blocks.items[else_index].terminator orelse return null) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return null,
+    };
+    if (!then_ret.ty.eql(else_ret.ty)) return null;
+    if (!retReturnsValue(then_ret, then_result) or !retReturnsValue(else_ret, else_result)) return null;
+
+    return .{
+        .then_index = then_index,
+        .else_index = else_index,
+        .ret_ty = then_ret.ty,
+    };
+}
+
+fn retReturnsValue(ret: anytype, result: []const u8) bool {
+    const value = ret.value orelse return false;
+    return switch (value) {
+        .named => |name| std.mem.eql(u8, name, result),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
 }
 
 fn foldSimpleDiamondSelectReturns(module: *ir.Module, function: *ir.Function) !bool {
@@ -371,6 +458,16 @@ fn removeBlocksDescending(allocator: std.mem.Allocator, function: *ir.Function, 
         var removed = function.blocks.orderedRemove(index);
         removed.deinit(allocator);
     }
+}
+
+fn removeTwoBlocksDescending(allocator: std.mem.Allocator, function: *ir.Function, first: usize, second: usize) void {
+    std.debug.assert(first != second);
+    const high = @max(first, second);
+    const low = @min(first, second);
+    var removed_high = function.blocks.orderedRemove(high);
+    removed_high.deinit(allocator);
+    var removed_low = function.blocks.orderedRemove(low);
+    removed_low.deinit(allocator);
 }
 
 const RetInfo = struct {
