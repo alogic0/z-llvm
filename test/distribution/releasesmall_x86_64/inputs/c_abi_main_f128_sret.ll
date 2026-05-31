@@ -32,6 +32,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_u8 = alias i8 (), ptr @main.zig_ret_u8
 @zig_ret_bool = alias i1 (), ptr @main.zig_ret_bool
 @zig_multiple_struct_floats = alias void (<2 x float>, <2 x float>, <2 x float>, <2 x float>), ptr @main.zig_multiple_struct_floats
+@zig_multiple_struct_ints = alias void (i64, i64, i64, i64), ptr @main.zig_multiple_struct_ints
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -261,6 +262,67 @@ define private void @main.zig_multiple_struct_floats(<2 x float> %0, <2 x float>
 27:
   ret void
 28:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_multiple_struct_ints(i64 %0, i64 %1, i64 %2, i64 %3) unnamed_addr align 1 {
+4:
+  %5 = and i64 %0, 4294967295
+  %6 = icmp eq i64 %5, 1
+  br i1 %6, label %7, label %9
+7:
+  %.sroa.24.0.extract.shift.mask = and i64 %0, -4294967296
+  %8 = icmp eq i64 %.sroa.24.0.extract.shift.mask, 90194313216
+  br i1 %8, label %10, label %13
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  %11 = and i64 %1, 4294967295
+  %12 = icmp eq i64 %11, 16
+  br i1 %12, label %14, label %16
+13:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+14:
+  %.sroa.5.8.extract.shift.mask = and i64 %1, -4294967296
+  %15 = icmp eq i64 %.sroa.5.8.extract.shift.mask, 17179869184
+  br i1 %15, label %17, label %20
+16:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+17:
+  %18 = and i64 %2, 4294967295
+  %19 = icmp eq i64 %18, 178
+  br i1 %19, label %21, label %23
+20:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+21:
+  %.sroa.26.0.extract.shift.mask = and i64 %2, -4294967296
+  %22 = icmp eq i64 %.sroa.26.0.extract.shift.mask, 811748818944
+  br i1 %22, label %24, label %27
+23:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+24:
+  %25 = and i64 %3, 4294967295
+  %26 = icmp eq i64 %25, 21
+  br i1 %26, label %28, label %30
+27:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+28:
+  %.sroa.58.8.extract.shift.mask = and i64 %3, -4294967296
+  %29 = icmp eq i64 %.sroa.58.8.extract.shift.mask, 64424509440
+  br i1 %29, label %31, label %32
+30:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+31:
+  ret void
+32:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }

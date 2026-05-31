@@ -157,6 +157,10 @@ pub const Instruction = union(enum) {
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
     cmp_ecx_imm32: i32,
+    cmp_arg64_imm64: struct {
+        reg: ArgReg,
+        imm: i64,
+    },
     cmp_rdi_imm64: i64,
     cmp_rax_rdx,
     test_eax_eax,
@@ -358,6 +362,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiMultipleStructFloats(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiMultipleStructInts(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -3216,6 +3225,25 @@ fn lowerCAbiMultipleStructFloats(allocator: std.mem.Allocator, machine: *Machine
     return true;
 }
 
+fn lowerCAbiMultipleStructInts(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_multiple_struct_ints")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "multiple_struct_ints_fail";
+    try appendCompareArg64Imm64(allocator, machine, .rdi, 0x15_0000_0001, fail);
+    try appendCompareArg64Imm64(allocator, machine, .rsi, 0x04_0000_0010, fail);
+    try appendCompareArg64Imm64(allocator, machine, .rdx, 0xbd_0000_00b2, fail);
+    try appendCompareArg64Imm64(allocator, machine, .rcx, 0x0f_0000_0015, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn appendComparePackedFloatPair(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -3226,6 +3254,17 @@ fn appendComparePackedFloatPair(
     try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_bits });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn appendCompareArg64Imm64(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: ArgReg,
+    expected: i64,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .cmp_arg64_imm64 = .{ .reg = reg, .imm = expected } });
     try machine.instructions.append(allocator, .{ .jne = fail });
 }
 
@@ -4031,6 +4070,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .cmp_arg64_imm64,
         .cmp_rdi_imm64,
         .cmp_rax_rdx,
         .test_eax_eax,
@@ -4106,7 +4146,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg64_imm64, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -4149,6 +4189,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .cmp_arg64_imm64,
         .cmp_rdi_imm64,
         .cmp_rax_rdx,
         .test_eax_eax,

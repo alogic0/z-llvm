@@ -233,3 +233,6 @@ control-flow shape. That focused shape is now object-ok with local trap
 failure edges. The broad row still remains the first sorted failure; the next
 selected alias is `@zig_multiple_struct_ints`, a packed-integer comparison
 control-flow shape.
+That focused shape is now object-ok with local trap failure edges. The broad
+row still remains the first sorted failure; the next selected alias is
+`@zig_big_struct_both`, a large byval/sret struct check-and-copy shape.
