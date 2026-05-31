@@ -53,6 +53,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_struct_f32f32_f32 = alias { <2 x float>, float } (), ptr @main.zig_ret_struct_f32_f32f32
 @zig_struct_f32a8_f32a8 = alias void (<2 x float>, float, float), ptr @main.zig_struct_f32a8_f32a8
 @zig_ret_struct_f32a8_f32a8 = alias { <2 x float>, float } (), ptr @main.zig_ret_struct_f32a8_f32a8
+@zig_struct_f32a8 = alias void (float, float), ptr @main.zig_struct_f32a8
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -116,6 +117,23 @@ define private void @main.zig_struct_f32a8_f32a8(<2 x float> %0, float %1, float
 define private { <2 x float>, float } @main.zig_ret_struct_f32a8_f32a8() unnamed_addr align 1 {
 0:
   ret { <2 x float>, float } { <2 x float> <float 1.250000e+00, float undef>, float 2.750000e+00 }
+}
+
+define private void @main.zig_struct_f32a8(float %0, float %1) unnamed_addr align 1 {
+2:
+  %3 = fcmp oeq float %0, 2.750000e+00
+  br i1 %3, label %4, label %6
+4:
+  %5 = fcmp oeq float %1, 3.500000e+00
+  br i1 %5, label %7, label %8
+6:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+7:
+  ret void
+8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
 }
 
 define private { fp128 } @main.zig_f128_struct(fp128 %0) unnamed_addr align 1 {

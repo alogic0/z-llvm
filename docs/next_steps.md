@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_struct_f32a8` scalar float struct control-flow lowering from
+`@zig_ret_struct_f32a8` scalar float struct return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -234,11 +234,15 @@ object-ok with selected `%xmm0`/`%xmm1` return materialization while leaving
 the undef vector lane unconstrained. The broad row still remains the first
 object failure; the next selected public shape is `@zig_struct_f32a8 = alias
 void (float, float), ptr @main.zig_struct_f32a8`, a two-scalar float
-comparison control-flow shape.
+comparison control-flow shape. That focused shape is now object-ok with local
+trap failure edges and selected low-lane float register checks. The broad row
+still remains the first object failure; the next selected public shape is
+`@zig_ret_struct_f32a8 = alias { float } (), ptr @main.zig_ret_struct_f32a8`,
+a scalar float struct return shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_struct_f32a8` scalar float struct control-flow shape. This
+`@zig_ret_struct_f32a8` scalar float struct return shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -254,13 +258,13 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-scalar float struct control-flow shape, also map against SelectionDAG aggregate
-argument assignment, scalar float comparison, and branch lowering in
+scalar float struct return shape, also map against SelectionDAG aggregate
+return assignment and scalar floating-point return register materialization in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_struct_f32a8` ReleaseSmall scalar float
-struct control-flow shape from the `c_abi_main` optimized output.
+Implement only the selected `@zig_ret_struct_f32a8` ReleaseSmall scalar float
+struct return shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.
