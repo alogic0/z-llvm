@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_big_packed_struct` packed i128 struct control-flow lowering from
+`@zig_small_packed_struct` packed i8 struct control-flow lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -174,11 +174,16 @@ trap failure edges and an exact selected packed integer register payload check.
 The broad row still remains the first object failure; the next selected public
 shape is `@zig_big_packed_struct = alias void (i128), ptr
 @main.zig_big_packed_struct`, a packed i128 struct control-flow shape that
-checks low and high fields.
+checks low and high fields. That focused shape is now object-ok with local
+trap failure edges and selected low/high register checks. The broad row still
+remains the first object failure; the next selected public shape is
+`@zig_small_packed_struct = alias void (i8), ptr
+@main.zig_small_packed_struct`, a packed i8 struct control-flow shape with
+masked sub-field checks and an unsigned high-bit comparison.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_big_packed_struct` packed i128 struct control-flow shape. This
+`@zig_small_packed_struct` packed i8 struct control-flow shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -194,12 +199,12 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-packed i128 control-flow shape, also map against SelectionDAG aggregate
-argument assignment, integer masking, i128 comparison decomposition, and branch lowering in
+packed i8 control-flow shape, also map against SelectionDAG aggregate
+argument assignment, byte masking, unsigned byte comparison, and branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_big_packed_struct` ReleaseSmall packed i128
+Implement only the selected `@zig_small_packed_struct` ReleaseSmall packed i8
 struct control-flow shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
