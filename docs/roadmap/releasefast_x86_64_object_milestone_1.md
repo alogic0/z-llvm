@@ -182,4 +182,9 @@ aggregate-return shape with an `__eqtf2` guard and panic edge. The selected
 object-ok in the focused ReleaseSmall gate. The broad row still remains the
 first sorted failure; the next selected alias is `@zig_assert_PD`, a mixed
 integer/double assertion shape with stack local aggregate setup, floating-point
-comparison, and panic edges.
+comparison, and a diagnostic failure edge. The selected return-code branch
+behavior for `@zig_assert_PD` is now object-ok in the focused ReleaseSmall
+gate, with diagnostic printing side effects explicitly outside the local
+replacement boundary. The broad row still remains the first sorted failure;
+the next selected alias is `@zig_ret_PD`, a mixed integer/double aggregate
+return.

@@ -1,6 +1,7 @@
 target triple = "x86_64-unknown-linux-gnu"
 
 %main.f128_f128_struct = type { fp128, fp128 }
+%main.PD = type { ptr, double }
 
 @__zllvm_f128_cmp0 = private unnamed_addr constant fp128 0xL00000000000000004002A00000000000, align 16
 @__zllvm_f128_cmp1 = private unnamed_addr constant fp128 0xL00000000000000004004C80000000000, align 16
@@ -14,9 +15,11 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_f128_f128_struct = alias void (ptr, ptr), ptr @main.zig_f128_f128_struct
 @zig_f128_struct = alias { fp128 } (fp128), ptr @main.zig_f128_struct
 @zig_f128 = alias fp128 (fp128), ptr @main.zig_f128
+@zig_assert_PD = alias i32 (i64, double), ptr @main.zig_assert_PD
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
+declare fastcc void @debug.print__anon_14634(ptr)
 
 define private void @main.zig_f128_f128_struct(ptr noalias nonnull writeonly sret(%main.f128_f128_struct) captures(none) %0, ptr nonnull readonly byval(%main.f128_f128_struct) align 16 captures(none) %1) unnamed_addr align 1 {
 2:
@@ -65,4 +68,23 @@ define private fp128 @main.zig_f128(fp128 %0) unnamed_addr align 1 {
 5:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
+}
+
+define private i32 @main.zig_assert_PD(i64 %0, double %1) unnamed_addr align 1 {
+2:
+  %3 = alloca { %main.PD }, align 8
+  %.not = icmp ne i64 %0, 0
+  %spec.store.select = zext i1 %.not to i32
+  %4 = fcmp une double %1, 5.000000e-01
+  %.0 = select i1 %4, i32 2, i32 %spec.store.select
+  %.not6 = icmp eq i32 %.0, 0
+  br i1 %.not6, label %5, label %6
+5:
+  ret i32 %.0
+6:
+  store i64 %0, ptr %3, align 8
+  %.sroa.3.0..sroa_idx2 = getelementptr i8, ptr %3, i64 8
+  store double %1, ptr %.sroa.3.0..sroa_idx2, align 8
+  call fastcc void @debug.print__anon_14634(ptr nonnull readonly align 8 %3)
+  br label %5
 }

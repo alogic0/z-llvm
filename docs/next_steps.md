@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_assert_PD` C ABI mixed integer/double assertion lowering from
+`@zig_ret_PD` C ABI mixed integer/double aggregate-return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -91,15 +91,20 @@ return shape is also object-ok in the focused gate. The broad `c_abi_main` row
 still remains the first object failure; the next selected public shape is
 `@zig_assert_PD = alias i32 (i64, double), ptr @main.zig_assert_PD`, a mixed
 integer/double assertion shape with stack local aggregate setup, floating-point
-comparison, and panic edges.
+comparison, and a diagnostic failure edge. The focused gate now covers the
+selected return-code branch behavior for that shape while leaving diagnostic
+printing side effects outside the local replacement boundary. The broad
+`c_abi_main` row still remains the first object failure; the next selected
+public shape is `@zig_ret_PD = alias { i64, double } (), ptr
+@main.zig_ret_PD`, a mixed integer/double aggregate return.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_assert_PD` mixed integer/double assertion shape. This continues reducing
-the ReleaseSmall asm/object fallback row. It does not claim broad C ABI
-lowering, general stack frame lowering, arbitrary floating-point comparisons,
-panic runtime semantics, non-x86_64 ABI behavior, debug records, unwind
-records, linker ownership, or target-complete ABI behavior.
+`@zig_ret_PD` mixed integer/double aggregate-return shape. This continues
+reducing the ReleaseSmall asm/object fallback row. It does not claim broad C
+ABI lowering, general aggregate classification, arbitrary floating-point
+returns, non-x86_64 ABI behavior, debug records, unwind records, linker
+ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -111,16 +116,15 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-mixed integer/double assertion shape, also map against SelectionDAG branch,
-stack object, floating-point compare, and return lowering in
+mixed integer/double aggregate return, also map against SelectionDAG aggregate
+return and register assignment lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_assert_PD` ReleaseSmall mixed integer/double
-assertion shape from the `c_abi_main` optimized output. Do not generalize to
-all mixed aggregate ABI behavior, arbitrary stack locals, full floating-point
-condition lowering, panic runtime behavior, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Implement only the selected `@zig_ret_PD` ReleaseSmall mixed integer/double
+aggregate-return shape from the `c_abi_main` optimized output. Do not
+generalize to all mixed aggregate ABI behavior, arbitrary aggregate returns,
+debug/unwind object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

@@ -80,11 +80,17 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendU64(&bytes, allocator, value);
                 try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x6e, 0xc0 });
             },
+            .mov_imm64_xmm1 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
+                try appendU64(&bytes, allocator, value);
+                try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x6e, 0xc8 });
+            },
             .mov_imm32_xmm0 => |value| {
                 try bytes.append(allocator, 0xb8);
                 try appendU32(&bytes, allocator, value);
                 try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc0 });
             },
+            .ucomisd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc1 }),
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
@@ -142,6 +148,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x80 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jp => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x8a });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .js => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
                 const next = offset + instructionSize(instruction);
@@ -190,7 +204,9 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .divsd_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0 => 4,
         .mov_imm64_xmm0 => 15,
+        .mov_imm64_xmm1 => 15,
         .mov_imm32_xmm0 => 9,
+        .ucomisd_xmm1_xmm0 => 4,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
         .sub_rsp_24, .add_rsp_24 => 4,
@@ -215,7 +231,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
         .ud2 => 2,
-        .je, .jne, .jo, .js => 6,
+        .je, .jne, .jo, .jp, .js => 6,
         .ret => 1,
     };
 }
