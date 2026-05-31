@@ -197,8 +197,8 @@ The first named no-LLVM-codegen x86_64 distribution subset gate is:
 bash scripts/run_distribution_no_llvm_codegen_subset.sh
   target=x86_64-unknown-linux-gnu
   includes=ReleaseFast object/executable gates, ReleaseSafe object gate,
-           selected ReleaseSmall object gate, selected Debug object gate,
-           handoff validation
+           selected ReleaseSmall object gate, selected Debug object/executable
+           gates, handoff validation
   result=pass
 ```
 

@@ -12,10 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Select one explicit x86_64 conservative-boundary exclusion and decide whether
-it can be closed as a bounded implementation slice. Prefer a shared exclusion
-that affects the replacement matrix, such as the Debug/ReleaseSmall
-float-format helper or base64 table-decoder boundary.
+Select the next source-backed replacement task after adding executable proof
+for the stable Debug `mathtest.add` ABI fixture. Prefer measured target or ABI
+expansion only if it advances the distribution replacement matrix.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -207,16 +206,20 @@ selected source-backed shape, not general Debug backend parity.
 Known boundary:
 DWARF/unwind emission, full O0 codegen, variable-location salvage,
 target-complete ABI lowering, the Debug float-format helper, and the Debug
-base64 table decoder remain outside this slice.
+base64 table decoder remain outside this slice. The float-format helper and
+base64 table decoder were re-inspected and remain too broad for a one-slice
+closure: the former is a large decimal conversion helper with extensive i128
+math, phis, loops, and helper calls; the latter is a table-driven decoder with
+loop-carried state, i128 stores, and table constants.
 
 Validation gate:
-Inspect the excluded row's source-backed IR, existing direct probe summary, and
-nearby lowering families. Promote exactly one implementation slice only if the
-selected public shape is narrow enough to validate with a focused fixture.
+Inspect the current x86_64 matrix and select one measured target, ABI, or
+explicit boundary task. Do not reopen the float-format or base64 exclusions
+unless new evidence narrows the selected public shape.
 
 Commit:
-Commit the link/LTO boundary update first, then commit the next selected
-exclusion task separately.
+Commit the Debug executable gate update first, then commit the next selected
+task separately.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:
@@ -741,9 +744,9 @@ asm/object is now a conservative boundary for the named captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is now
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh`. It composes the
 ReleaseFast object and executable gates, the ReleaseSafe object gate, the
-selected ReleaseSmall object gate, the selected Debug object gate, and
-`bash scripts/run_handoff_validation.sh`. The gate passed locally for
-`TARGET=x86_64-unknown-linux-gnu`.
+selected ReleaseSmall object gate, the selected Debug object and executable
+gates, and `bash scripts/run_handoff_validation.sh`. The gate passed locally
+for `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` originally found 2 object successes and
