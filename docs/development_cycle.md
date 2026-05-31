@@ -212,8 +212,8 @@ scripts/capture_zig_ir.sh test/zig/inputs/<group>.zig ReleaseFast
 scripts/lint_zig_ir_manifest.sh
 ```
 
-Readiness checks run manifest linting through the Zig-backed shell shim but do
-not regenerate fixtures.
+Readiness checks run manifest linting and accepted corpus validation through
+Zig-backed shell shims, but do not regenerate fixtures.
 
 For corpus discovery, use `tools/zig_corpus_discovery.zig` and keep the same
 compiler split:
