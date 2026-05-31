@@ -272,6 +272,10 @@ That focused shape is now object-ok with local trap failure edges and selected
 packed mixed integer/float register checks. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_big_union`, a byval
 aggregate comparison control-flow shape.
+That focused shape is now object-ok with local trap failure edges and selected
+byval field-load checks. The broad row still remains the first sorted blocker;
+the next selected alias is `@zig_big_struct`, a byval aggregate comparison
+control-flow shape.
 
 ## Activation Rule
 

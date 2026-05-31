@@ -4,6 +4,7 @@ target triple = "x86_64-unknown-linux-gnu"
 %main.PD = type { ptr, double }
 %Io.LockedStderr = type { ptr }
 %main.BigStruct = type { i64, i64, i64, i64, i8, [7 x i8] }
+%main.BigUnion = type { %main.BigStruct }
 
 @__zllvm_f128_cmp0 = private unnamed_addr constant fp128 0xL00000000000000004002A00000000000, align 16
 @__zllvm_f128_cmp1 = private unnamed_addr constant fp128 0xL00000000000000004004C80000000000, align 16
@@ -43,6 +44,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_med_struct_ints = alias void (i64, i32), ptr @main.zig_med_struct_ints
 @zig_small_struct_ints = alias void (i32), ptr @main.zig_small_struct_ints
 @zig_med_struct_mixed = alias void (i64, i64), ptr @main.zig_med_struct_mixed
+@zig_big_union = alias void (ptr), ptr @main.zig_big_union
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -493,6 +495,50 @@ define private void @main.zig_med_struct_mixed(i64 %0, i64 %1) unnamed_addr alig
 13:
   ret void
 14:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_big_union(ptr nonnull readonly byval(%main.BigUnion) align 8 %0) unnamed_addr align 1 {
+1:
+  %.sroa.0.0.copyload = load i64, ptr %0, align 8
+  %.sroa.3.0..sroa_idx = getelementptr i8, ptr %0, i64 16
+  %.sroa.3.0.copyload = load i64, ptr %.sroa.3.0..sroa_idx, align 8
+  %.sroa.4.0..sroa_idx = getelementptr i8, ptr %0, i64 24
+  %.sroa.4.0.copyload = load i64, ptr %.sroa.4.0..sroa_idx, align 8
+  %.sroa.5.0..sroa_idx = getelementptr i8, ptr %0, i64 32
+  %.sroa.5.0.copyload = load i8, ptr %.sroa.5.0..sroa_idx, align 8
+  %2 = icmp eq i64 %.sroa.0.0.copyload, 1
+  br i1 %2, label %3, label %5
+3:
+  %.sroa.2.0..sroa_idx = getelementptr i8, ptr %0, i64 8
+  %.sroa.2.0.copyload = load i64, ptr %.sroa.2.0..sroa_idx, align 8
+  %4 = icmp eq i64 %.sroa.2.0.copyload, 2
+  br i1 %4, label %6, label %8
+5:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+6:
+  %7 = icmp eq i64 %.sroa.3.0.copyload, 3
+  br i1 %7, label %9, label %11
+8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+9:
+  %10 = icmp eq i64 %.sroa.4.0.copyload, 4
+  br i1 %10, label %12, label %14
+11:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+12:
+  %13 = icmp eq i8 %.sroa.5.0.copyload, 5
+  br i1 %13, label %15, label %16
+14:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+15:
+  ret void
+16:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }
