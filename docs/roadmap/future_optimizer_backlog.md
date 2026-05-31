@@ -454,6 +454,9 @@ That focused shape is now object-ok with a selected 8-bit argument comparison
 and a local trap failure edge. The broad row still remains the first sorted
 blocker; the next selected alias is `@zig_u64`, a u64 equality
 branch-to-return-or-trap shape.
+That focused shape is now object-ok through the selected 64-bit scalar branch
+path. The broad row still remains the first sorted blocker; the next selected
+alias is `@zig_u32`, a u32 equality branch-to-return-or-trap shape.
 
 ## Activation Rule
 

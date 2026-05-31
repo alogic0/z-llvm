@@ -4432,7 +4432,8 @@ fn lowerCAbiStructI128(allocator: std.mem.Allocator, machine: *MachineFunction, 
 }
 
 fn lowerCAbiI64(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_i64")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_i64") and
+        !std.mem.eql(u8, function.name, "main.zig_u64")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 1) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
