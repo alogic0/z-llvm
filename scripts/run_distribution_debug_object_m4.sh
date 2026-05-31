@@ -172,4 +172,28 @@ rg -q '[[:space:]]test\.foo$' "$issue_339_summary"
 rg -q '[[:space:]]ret' "$issue_339_dump"
 printf 'ok distribution debug object issue_339_error_success_o0\n'
 
+libfuzzer_fixture="test/distribution/debug_x86_64/inputs/libfuzzer_runner_o0.ll"
+libfuzzer_object="$tmp_dir/libfuzzer_runner_o0.o"
+libfuzzer_summary="$tmp_dir/libfuzzer_runner_o0.readelf.txt"
+libfuzzer_dump="$tmp_dir/libfuzzer_runner_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$libfuzzer_fixture" > "$libfuzzer_object"
+readelf -W -h -S -s -r "$libfuzzer_object" > "$libfuzzer_summary"
+objdump -dr "$libfuzzer_object" > "$libfuzzer_dump"
+
+check_common_object "$libfuzzer_summary" runner_test_run
+rg -q '[[:space:]]runner_broadcast_input$' "$libfuzzer_summary"
+rg -q '[[:space:]]runner_futex_wake$' "$libfuzzer_summary"
+rg -q '[[:space:]]runner_futex_wait$' "$libfuzzer_summary"
+rg -q '[[:space:]]runner_stop_input_poller$' "$libfuzzer_summary"
+rg -q '[[:space:]]runner_start_input_poller$' "$libfuzzer_summary"
+rg -q '[[:space:]]runner_test_name$' "$libfuzzer_summary"
+rg -q '[[:space:]]main\.runner_test_run$' "$libfuzzer_summary"
+rg -q 'R_X86_64_PC32.*main\.testOne' "$libfuzzer_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_set_test' "$libfuzzer_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_new_input' "$libfuzzer_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_start_test' "$libfuzzer_summary"
+rg -q '[[:space:]]ret' "$libfuzzer_dump"
+printf 'ok distribution debug object libfuzzer_runner_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

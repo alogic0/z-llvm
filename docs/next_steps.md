@@ -14,7 +14,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 Replacement goal:
 Advance the continuous Debug prefix-400 object probe past the next measured
 source-backed failure:
-`standalone_libfuzzer_main.zig.Debug.x86_64.ll`.
+`standalone_load_dynamic_library_add.zig.Debug.x86_64.ll`.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -60,6 +60,26 @@ excluded_row=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
 excluded_reason=debug-float-format-helper-boundary
 first_failure=standalone_libfuzzer_main.zig.Debug.x86_64.ll
 first_failure_category=unsupported-instruction
+```
+
+The selected libfuzzer Debug/O0 shape is now object-ok through the tracked
+fixture `test/distribution/debug_x86_64/inputs/libfuzzer_runner_o0.ll` and
+`bash scripts/run_distribution_debug_object_m4.sh`. It covers the public
+runner aliases for broadcast/futex/test-name/test-run, the O0 alloca,
+`extractvalue`, `llvm.memcpy`, and `Build.abi.fuzz.Slice.fromSlice` slice
+materialization sequence, and the external `fuzzer_*` call relocations. The
+refreshed prefix-400 probe is now:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/object_probe_summary_after_libfuzzer.txt
+total=400
+ok=397
+fail=2
+excluded=1
+excluded_row=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+excluded_reason=debug-float-format-helper-boundary
+first_failure=standalone_load_dynamic_library_add.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
 ```
 
 The broad ReleaseFast optimized-output object probe over

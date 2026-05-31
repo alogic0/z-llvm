@@ -27,7 +27,7 @@ Current automated summaries:
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
-| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 396 | 3 | 1 | `standalone_libfuzzer_main.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 397 | 2 | 1 | `standalone_load_dynamic_library_add.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -53,7 +53,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_executable_m1.sh` | selected ReleaseFast executable ABI checks | pass |
 | `bash scripts/run_distribution_releasesafe_object_m2.sh` | selected ReleaseSafe safety/runtime-call objects | pass |
 | `bash scripts/run_distribution_releasesmall_object_m3.sh` | selected ReleaseSmall object subset | pass |
-| `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects | pass |
+| `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage | pass |
 | `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset | pass |
 
@@ -64,7 +64,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call objects |
 | ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions |
-| Debug | LLVM fallback required | reduced 9-fixture object subset plus selected broad raw and continuous-prefix object proof; broader Debug std rows remain unproven |
+| Debug | LLVM fallback required | reduced object subset plus selected broad raw and continuous-prefix object proof; broader Debug std rows remain unproven |
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
 in [x86_64_distribution_replacement_matrix.md](x86_64_distribution_replacement_matrix.md)
@@ -124,6 +124,13 @@ Debug broad:
     probe is 396 object successes, 3 object failures, and 1 excluded row, with
     standalone_libfuzzer_main.zig.Debug.x86_64.ll as the first remaining
     failure
+  continuous Debug prefix 400 now advances past
+    standalone_libfuzzer_main.zig.Debug.x86_64.ll after the selected Debug/O0
+    libfuzzer runner alias fixture covers alloca/extractvalue slice
+    materialization, llvm.memcpy, and fuzzer_* call relocations; the refreshed
+    prefix-400 probe is 397 object successes, 2 object failures, and 1
+    excluded row, with standalone_load_dynamic_library_add.zig.Debug.x86_64.ll
+    as the first remaining failure
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage
