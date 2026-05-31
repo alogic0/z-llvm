@@ -13,25 +13,27 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@replace_low` and `@read_flag` i8 bit
-lowering in `packed_bits.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected `@volatile_roundtrip` and `@load_store`
+pointer memory lowering in `pointers_memory.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now has 17 rows:
-14 pass local object emission and 3 remain blocked. The newly closed row is
-`integers.zig.ReleaseFast.x86_64.optimized.ll`, including `@add_wrap`,
-`@cmp_select`, and `@shift_mix`. The next sorted failure is
-`packed_bits.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases are
-`@replace_low = alias i8 (i8, i8)` and `@read_flag = alias i1 (i8)`.
+15 pass local object emission and 2 remain blocked. The newly closed row is
+`packed_bits.zig.ReleaseFast.x86_64.optimized.ll`, including `@replace_low` and
+`@read_flag`. The next sorted failure is
+`pointers_memory.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases
+are `@volatile_roundtrip = alias i32 (ptr, i32)` and
+`@load_store = alias i32 (ptr, ptr)`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected
-`packed_bits` shapes. The source-backed optimized output masks and replaces the
-low three bits of an i8 value, and reads the sign bit through `icmp slt i8 %0,
-0`. This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
-optimized-output row only; it does not claim general sub-i32 lowering, arbitrary
-bitfields, vectors, or target-complete ABI coverage.
+`pointers_memory` shapes. The source-backed optimized output contains a volatile
+store/load roundtrip through a pointer argument and a non-volatile load/add/store
+between two pointer arguments. This reduces the ReleaseFast x86_64 asm/object
+fallback for the next broad optimized-output row only; it does not claim general
+alias analysis, memory ordering, volatile completeness, aggregate memory, or
+target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -45,10 +47,10 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@replace_low` and `@read_flag` shapes from the
-`packed_bits` optimized output. Do not generalize to arbitrary sub-i32
-operations, bitfield layout, vectors, TLS, floating point, or non-x86_64 ABI
-behavior in this slice.
+Implement only the selected `@volatile_roundtrip` and `@load_store` shapes from
+the `pointers_memory` optimized output. Do not generalize to arbitrary pointer
+memory, aliasing, volatile ordering, vectors, TLS, floating point, or non-x86_64
+ABI behavior in this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh`,

@@ -104,10 +104,10 @@ The current broad object probe is:
 ```text
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 rows=17
-object_ok=14
-object_fail=3
-first_failure=packed_bits.zig.ReleaseFast.x86_64.optimized.ll
-first_missing_shape=selected @replace_low and @read_flag i8 bit lowering
+object_ok=15
+object_fail=2
+first_failure=pointers_memory.zig.ReleaseFast.x86_64.optimized.ll
+first_missing_shape=selected @volatile_roundtrip and @load_store pointer memory lowering
 ```
 
 The compact running dashboard is

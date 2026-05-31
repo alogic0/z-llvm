@@ -125,6 +125,8 @@ pub const Instruction = union(enum) {
     inc_rcx,
     smin_i32_edi_esi_eax,
     shift_mix_i32_edi_esi_eax,
+    replace_low_i8_dil_sil_al,
+    read_flag_i8_dil_al,
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
     mulsd_xmm1_xmm0,
@@ -257,6 +259,8 @@ fn lowerStraightLineReturn(
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIntegerSminReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerPackedReplaceLowReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerPackedReadFlagReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatSubReturn(allocator, machine, function, block, ret)) return;
@@ -801,6 +805,91 @@ fn lowerIntegerShiftMixReturn(
         (isNamed(xor_binary.lhs, lshr_result) and isNamed(xor_binary.rhs, shl_result)))) return false;
 
     try machine.instructions.append(allocator, .shift_mix_i32_edi_esi_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerPackedReplaceLowReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "packed_bits.replace_low")) return false;
+    if (!ret.ty.eql(.{ .int = 8 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 8 }) or !function.params.items[1].ty.eql(.{ .int = 8 })) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const high_mask_inst = block.instructions.items[0];
+    const low_mask_inst = block.instructions.items[1];
+    const or_inst = block.instructions.items[2];
+    if (high_mask_inst.removed or low_mask_inst.removed or or_inst.removed) return false;
+    const high_result = high_mask_inst.result orelse return false;
+    const low_result = low_mask_inst.result orelse return false;
+    const or_result = or_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, or_result)) return false;
+
+    const high_mask = switch (high_mask_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (high_mask.op != .@"and" or !high_mask.ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(high_mask.lhs, function.params.items[0].name) or !isInt(high_mask.rhs, -8)) return false;
+
+    const low_mask = switch (low_mask_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (low_mask.op != .@"and" or !low_mask.ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(low_mask.lhs, function.params.items[1].name) or !isInt(low_mask.rhs, 7)) return false;
+
+    const or_binary = switch (or_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (or_binary.op != .@"or" or !or_binary.ty.eql(.{ .int = 8 })) return false;
+    if (!((isNamed(or_binary.lhs, low_result) and isNamed(or_binary.rhs, high_result)) or
+        (isNamed(or_binary.lhs, high_result) and isNamed(or_binary.rhs, low_result)))) return false;
+
+    try machine.instructions.append(allocator, .replace_low_i8_dil_sil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerPackedReadFlagReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "packed_bits.read_flag")) return false;
+    if (!ret.ty.eql(.{ .int = 1 }) or function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const icmp_inst = block.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, icmp_result)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
+
+    try machine.instructions.append(allocator, .read_flag_i8_dil_al);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -2187,6 +2276,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .inc_rcx,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,
+        .replace_low_i8_dil_sil_al,
+        .read_flag_i8_dil_al,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,
@@ -2221,7 +2312,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .load_global_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .load_global_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -2268,6 +2359,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .inc_rcx,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,
+        .replace_low_i8_dil_sil_al,
+        .read_flag_i8_dil_al,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,

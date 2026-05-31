@@ -381,6 +381,32 @@ zig cc "$optional_ptr_harness" "$optional_ptr_object" -o "$optional_ptr_exe"
 "$optional_ptr_exe"
 printf 'ok distribution executable optional_ptr_value\n'
 
+packed_bits_fixture="test/distribution/releasefast_x86_64/inputs/packed_bits_basic.ll"
+packed_bits_object="$tmp_dir/packed_bits_basic.o"
+packed_bits_harness="$tmp_dir/packed_bits_harness.c"
+packed_bits_exe="$tmp_dir/packed_bits_harness"
+
+zig build run -- --emit=obj --target="$target" "$packed_bits_fixture" > "$packed_bits_object"
+
+cat > "$packed_bits_harness" <<'C'
+#include <stdbool.h>
+
+extern unsigned char replace_low(unsigned char high, unsigned char low);
+extern bool read_flag(unsigned char value);
+
+int main(void) {
+    if (replace_low(0xf8, 0x05) != 0xfd) return 1;
+    if (replace_low(0xab, 0x02) != 0xaa) return 2;
+    if (read_flag(0x80) != true) return 3;
+    if (read_flag(0x7f) != false) return 4;
+    return 0;
+}
+C
+
+zig cc "$packed_bits_harness" "$packed_bits_object" -o "$packed_bits_exe"
+"$packed_bits_exe"
+printf 'ok distribution executable packed_bits\n'
+
 dense_switch_fixture="test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll"
 dense_switch_object="$tmp_dir/switch_control_dense_switch.o"
 dense_switch_harness="$tmp_dir/dense_switch_harness.c"
