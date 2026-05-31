@@ -52,14 +52,16 @@ Run the milestone gate with:
 
 ```sh
 bash scripts/run_distribution_object_m1.sh
+bash scripts/run_distribution_executable_m1.sh
 bash scripts/run_handoff_validation.sh
 ```
 
 `scripts/run_distribution_object_m1.sh` emits local x86_64 ELF relocatable
 objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 `.symtab` records, including the selected public alias symbol for each fixture.
-Executable checks are not used yet; stable callable ABI validation is the next
-object-replacement blocker.
+`scripts/run_distribution_executable_m1.sh` links the selected `@add_wrap`
+object with a tiny host harness and validates deterministic return values.
+Executable checks beyond that first scalar alias remain Milestone 2 work.
 
 ## Matrix Result
 
@@ -79,6 +81,7 @@ integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission beyond selected local function aliases
 pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch-table lowering beyond the selected dense constant-return shape
+executable validation beyond the selected `@add_wrap` scalar alias
 debug/unwind records
 linker behavior
 target-complete ABI lowering
@@ -86,7 +89,6 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The next source-backed blocker is executable callable ABI validation for the
-selected ReleaseFast object subset. Milestone 2 should add only the smallest
-link-and-run check for one stable public alias first, then broaden fixture by
-fixture.
+The next source-backed blocker is executable callable ABI validation beyond
+`@add_wrap`. Milestone 2 should broaden one stable public alias at a time,
+starting with `@branch_mix`.
