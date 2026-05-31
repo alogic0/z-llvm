@@ -80,6 +80,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_cmultd_comp = alias { double, double } (double, double, double, double), ptr @main.zig_cmultd_comp
 @zig_cmultf_comp = alias { <2 x float> } (float, float, float, float), ptr @main.zig_cmultf_comp
 @zig_cmultd = alias { double, double } (double, double, double, double), ptr @main.zig_cmultd
+@zig_cmultf = alias { <2 x float> } (<2 x float>, <2 x float>), ptr @main.zig_cmultf
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -594,6 +595,39 @@ define private { double, double } @main.zig_cmultd(double %0, double %1, double 
 15:
   ret { double, double } { double 1.500000e+00, double 1.350000e+01 }
 16:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private { <2 x float> } @main.zig_cmultf(<2 x float> %0, <2 x float> %1) unnamed_addr align 1 {
+2:
+  %.sroa.02.0.vec.extract = extractelement <2 x float> %0, i64 0
+  %3 = fcmp oeq float %.sroa.02.0.vec.extract, 1.250000e+00
+  br i1 %3, label %4, label %6
+4:
+  %.sroa.02.4.vec.extract = extractelement <2 x float> %0, i64 1
+  %5 = fcmp oeq float %.sroa.02.4.vec.extract, 0x4004CCCCC0000000
+  br i1 %5, label %7, label %9
+6:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+7:
+  %.sroa.03.0.vec.extract = extractelement <2 x float> %1, i64 0
+  %8 = fcmp oeq float %.sroa.03.0.vec.extract, 0x40269999A0000000
+  br i1 %8, label %10, label %12
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  %.sroa.03.4.vec.extract = extractelement <2 x float> %1, i64 1
+  %11 = fcmp oeq float %.sroa.03.4.vec.extract, -1.500000e+00
+  br i1 %11, label %13, label %14
+12:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+13:
+  ret { <2 x float> } { <2 x float> <float 1.500000e+00, float 1.350000e+01> }
+14:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }

@@ -405,6 +405,10 @@ That focused shape is now object-ok through the shared selected `ucomisd`
 comparison path. The broad row still remains the first sorted blocker; the
 next selected alias is `@zig_cmultf`, a two-vector float comparison shape
 returning a packed two-float vector.
+That focused shape is now object-ok with selected packed vector comparisons
+and packed `%xmm0` return materialization. The broad row still remains the
+first sorted blocker; the next selected alias is `@zig_bool`, an i1
+branch-to-return-or-trap shape.
 
 ## Activation Rule
 

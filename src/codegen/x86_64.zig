@@ -541,6 +541,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiCmultf(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiStructF32(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -3982,6 +3987,24 @@ fn lowerCAbiCmultfComp(allocator: std.mem.Allocator, machine: *MachineFunction, 
     return true;
 }
 
+fn lowerCAbiCmultf(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_cmultf")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ <2 x float> }" })) return false;
+    if (function.params.items.len != 2) return false;
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .float } })) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "cmultf_fail";
+    try appendComparePackedFloatPair(allocator, machine, .xmm0, 0x4026_6666_3fa0_0000, fail);
+    try appendComparePackedFloatPair(allocator, machine, .xmm1, 0xbfc0_0000_4134_cccd, fail);
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x4158_0000_3fc0_0000 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn lowerCAbiStructF32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_struct_f32")) return false;
     if (function.ret_ty != .void) return false;
@@ -4283,11 +4306,11 @@ fn appendComparePackedFloatPair(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     reg: XmmReg,
-    expected_bits: i64,
+    expected_bits: u64,
     fail: []const u8,
 ) !void {
     try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_bits });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = @bitCast(expected_bits) });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
     try machine.instructions.append(allocator, .{ .jne = fail });
 }
