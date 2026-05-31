@@ -146,7 +146,7 @@ fn runObjdumpCase(
     const z_argv = [_][]const u8{ "zig", "build", "run", "--", "--emit=obj", target_arg, input };
     try common.runToFile(allocator, io, &z_argv, "zig build run", object);
 
-    try writeObjdumpTextSection(allocator, io, object, actual);
+    try common.writeObjdumpTextSection(allocator, io, object, actual);
     try common.diffFiles(allocator, io, expected, actual);
 }
 
@@ -185,23 +185,6 @@ fn expectedPath(allocator: std.mem.Allocator, mode: Mode, id: []const u8) ![]con
         .objdump => std.fmt.allocPrint(allocator, "test/codegen/expected/objdump/{s}.txt", .{id}),
         .readelf => unreachable,
     };
-}
-
-fn writeObjdumpTextSection(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    object: []const u8,
-    output_path: []const u8,
-) !void {
-    const argv = [_][]const u8{ "objdump", "-dr", object };
-    const result = try common.runCapture(allocator, io, &argv, "objdump");
-    defer common.freeRunResult(allocator, result);
-
-    const marker = "Disassembly of section .text:";
-    const start = std.mem.indexOf(u8, result.stdout, marker) orelse {
-        try common.validationError(io, "objdump output missing .text disassembly for {s}\n", .{object});
-    };
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = result.stdout[start..] });
 }
 
 fn stringLessThan(_: void, lhs: []const u8, rhs: []const u8) bool {

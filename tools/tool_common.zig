@@ -122,6 +122,23 @@ pub fn diffFiles(allocator: std.mem.Allocator, io: std.Io, expected: []const u8,
     std.process.exit(1);
 }
 
+pub fn writeObjdumpTextSection(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    object: []const u8,
+    output_path: []const u8,
+) !void {
+    const argv = [_][]const u8{ "objdump", "-dr", object };
+    const result = try runCapture(allocator, io, &argv, "objdump");
+    defer freeRunResult(allocator, result);
+
+    const marker = "Disassembly of section .text:";
+    const start = std.mem.indexOf(u8, result.stdout, marker) orelse {
+        try validationError(io, "objdump output missing .text disassembly for {s}\n", .{object});
+    };
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = result.stdout[start..] });
+}
+
 pub fn commandExists(allocator: std.mem.Allocator, io: std.Io, command: []const u8) !bool {
     const argv = [_][]const u8{ "which", command };
     const result = try std.process.run(allocator, io, .{
