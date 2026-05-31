@@ -283,6 +283,15 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
+            .load_global_i32_eax, .store_eax_global_i32 => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 2,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
+                    .addend = -4,
+                });
+            },
             else => {},
         }
         offset += encoding.instructionSize(instruction);

@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is globals_comptime
-missing capability=selected update_global and read_global private i32 global lowering
+current blocker=first broad optimized-output object failure is integers
+missing capability=selected cmp_select and shift_mix integer lowering
 ```

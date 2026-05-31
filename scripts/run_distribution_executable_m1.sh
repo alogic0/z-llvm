@@ -297,6 +297,31 @@ zig cc "$comptime_const_harness" "$comptime_const_object" -o "$comptime_const_ex
 "$comptime_const_exe"
 printf 'ok distribution executable comptime_const\n'
 
+globals_counter_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_global_counter.ll"
+globals_counter_object="$tmp_dir/globals_comptime_global_counter.o"
+globals_counter_harness="$tmp_dir/globals_comptime_global_counter_harness.c"
+globals_counter_exe="$tmp_dir/globals_comptime_global_counter_harness"
+
+zig build run -- --emit=obj --target="$target" "$globals_counter_fixture" > "$globals_counter_object"
+
+cat > "$globals_counter_harness" <<'C'
+extern int update_global(int delta);
+extern int read_global(void);
+
+int main(void) {
+    if (read_global() != 3) return 1;
+    if (update_global(4) != 7) return 2;
+    if (read_global() != 7) return 3;
+    if (update_global(-2) != 5) return 4;
+    if (read_global() != 5) return 5;
+    return 0;
+}
+C
+
+zig cc "$globals_counter_harness" "$globals_counter_object" -o "$globals_counter_exe"
+"$globals_counter_exe"
+printf 'ok distribution executable globals_comptime_counter\n'
+
 optional_ptr_fixture="test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll"
 optional_ptr_object="$tmp_dir/optional_pointer_value.o"
 optional_ptr_harness="$tmp_dir/optional_ptr_harness.c"

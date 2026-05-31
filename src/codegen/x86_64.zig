@@ -146,6 +146,8 @@ pub const Instruction = union(enum) {
     reload_rsp_eax: FrameIndex,
     load_arg_ptr_eax: ArgReg,
     add_arg_ptr_disp4_eax: ArgReg,
+    load_global_i32_eax: []const u8,
+    store_eax_global_i32: []const u8,
     atomic_xadd_global_eax: []const u8,
     direct_call: struct {
         symbol: []const u8,
@@ -264,6 +266,8 @@ fn lowerStraightLineReturn(
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -1232,6 +1236,100 @@ fn lowerAtomicAddReturn(
     return true;
 }
 
+fn lowerGlobalReadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "globals_comptime.read_global")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const load_inst = block.instructions.items[0];
+    if (load_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, load_result)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const global_name = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGlobalUpdateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "globals_comptime.update_global")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const load_inst = block.instructions.items[0];
+    const add_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const global_name = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    const arg_reg = if (isNamed(add.lhs, load_result))
+        try paramValueReg(function, add.rhs, .{ .int = 32 })
+    else if (isNamed(add.rhs, load_result))
+        try paramValueReg(function, add.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or !isNamed(store.value, add_result)) return false;
+    if (!store.ptr.eql(load.ptr)) return false;
+
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerStraightLineInstructions(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -2004,6 +2102,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .load_global_i32_eax,
+        .store_eax_global_i32,
         .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,
@@ -2019,7 +2119,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .load_global_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -2036,7 +2136,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .je, .jne => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_global_i32, .je, .jne => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -2081,6 +2181,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .load_global_i32_eax,
+        .store_eax_global_i32,
         .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,

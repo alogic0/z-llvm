@@ -15,6 +15,8 @@ fp_extended_ops_float_rem	test/distribution/releasefast_x86_64/inputs/fp_extende
 fp_extended_ops_double_div	test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll	object-readelf	object-ok	fp_extended_ops.zig	double division return	double_div
 fp_extended_ops_float_sub	test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll	object-readelf	object-ok	fp_extended_ops.zig	float subtraction return	float_sub
 globals_comptime_const	test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll	object-readelf	object-ok	globals_comptime.zig	mul by constant	comptime_const
+globals_comptime_update_global	test/distribution/releasefast_x86_64/inputs/globals_comptime_global_counter.ll	object-readelf	object-ok	globals_comptime.zig	private i32 global load add store	update_global
+globals_comptime_read_global	test/distribution/releasefast_x86_64/inputs/globals_comptime_global_counter.ll	object-readelf	object-ok	globals_comptime.zig	private i32 global load	read_global
 optional_pointer_value	test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll	object-readelf	object-ok	optional_pointer.zig	null branch and pointer load	optional_ptr_value
 switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll	object-readelf	object-ok	switch_control.zig	switch table load and phi merge	dense_switch
 aggregate_abi_pair_first	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair first truncation	pair_first
