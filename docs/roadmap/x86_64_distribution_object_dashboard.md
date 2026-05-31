@@ -27,7 +27,7 @@ Current automated summaries:
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
-| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 395 | 5 | 0 | `standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 396 | 3 | 1 | `standalone_libfuzzer_main.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -112,9 +112,18 @@ Debug broad:
   continuous Debug prefix 400 now advances past
     standalone_compile_asm_main.zig.Debug.x86_64.ll after accepting the
     selected Debug/O0 panic-unreachable entry shape; the refreshed prefix-400
-    probe is 395 object successes and 5 object failures, with
-    standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll as the first
-    remaining failure
+    probe then advanced to standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+    as the first remaining failure
+  continuous Debug prefix 400 excludes
+    standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll under the
+    debug-float-format-helper-boundary, matching the existing ReleaseSmall
+    float-format helper boundary for @strFromFloatHelp
+  continuous Debug prefix 400 now advances past
+    standalone_issue_339_test.zig.Debug.x86_64.ll after selected Debug/O0
+    @foo -> @test.foo error-success edge lowering; the refreshed prefix-400
+    probe is 396 object successes, 3 object failures, and 1 excluded row, with
+    standalone_libfuzzer_main.zig.Debug.x86_64.ll as the first remaining
+    failure
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

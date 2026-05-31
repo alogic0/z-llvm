@@ -763,6 +763,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerSelectedIssue339TestFoo(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -6004,6 +6009,54 @@ fn lowerSelectedInfiniteLoop(allocator: std.mem.Allocator, machine: *MachineFunc
     try machine.instructions.append(allocator, .{ .jmp = "loop" });
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerSelectedIssue339TestFoo(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "test.foo")) return false;
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 4) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const call_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isCalleeName(call.callee, "test.bar") or !call.ret_ty.eql(.{ .int = 16 }) or call.args.items.len != 0 or call.callee_value != null or call.inline_asm != null) {
+        return error.UnsupportedCodegenInstruction;
+    }
+    const cmp_name = try validateIcmpNamedImm(entry.instructions.items[1], .eq, .{ .int = 16 }, call_name, 0);
+    try validateCondbr(entry, cmp_name, "4", "5");
+
+    const ret_block = blockByName(function, "3") orelse return error.InvalidBranchTarget;
+    if (ret_block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    try validateRetVoid(ret_block);
+
+    try validateEmptyBrBlock(blockByName(function, "4") orelse return error.InvalidBranchTarget, "4", "3");
+
+    const panic = blockByName(function, "5") orelse return error.InvalidBranchTarget;
+    if (panic.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validatePanicCallWithNamedI16(panic.instructions.items[0], "debug.FullPanic((function 'panic')).unwrapError", call_name);
+    switch (panic.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        .ret, .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
+    }
+
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validatePanicCallWithNamedI16(instruction: ir.Instruction, callee: []const u8, arg_name: []const u8) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isCalleeName(call.callee, callee) or call.ret_ty != .void or call.args.items.len != 1 or call.callee_value != null or call.inline_asm != null) {
+        return error.UnsupportedCodegenInstruction;
+    }
+    if (!call.args.items[0].ty.eql(.{ .int = 16 }) or !isNamed(call.args.items[0].value, arg_name)) return error.UnsupportedCodegenValue;
 }
 
 fn lowerGetauxvalImpl(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

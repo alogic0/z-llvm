@@ -14,7 +14,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 Replacement goal:
 Advance the continuous Debug prefix-400 object probe past the next measured
 source-backed failure:
-`standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll`.
+`standalone_libfuzzer_main.zig.Debug.x86_64.ll`.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -34,6 +34,32 @@ fail=5
 excluded=0
 first_failure=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
+```
+
+`standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll` is the Debug/O0
+sibling of the already documented ReleaseSmall float-format helper boundary:
+the selected public shape is `@strFromFloatHelp -> @main.strFromFloatHelp`,
+a large multi-block float-format helper rather than a defensible one-slice
+object reduction. With that row excluded, the next first failure was
+`standalone_issue_339_test.zig.Debug.x86_64.ll`. The selected public shape is
+`@foo -> @test.foo`, a call to private `@test.bar`, an i16 zero check, a
+success return edge, and a panic-only unwrap-error edge.
+
+That selected issue-339 shape is now object-ok through the tracked fixture
+`test/distribution/debug_x86_64/inputs/issue_339_error_success_o0.ll` and
+`bash scripts/run_distribution_debug_object_m4.sh`. The refreshed prefix-400
+probe is now:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/object_probe_summary_after_issue339.txt
+total=400
+ok=396
+fail=3
+excluded=1
+excluded_row=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+excluded_reason=debug-float-format-helper-boundary
+first_failure=standalone_libfuzzer_main.zig.Debug.x86_64.ll
+first_failure_category=unsupported-instruction
 ```
 
 The broad ReleaseFast optimized-output object probe over

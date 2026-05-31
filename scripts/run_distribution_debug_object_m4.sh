@@ -158,4 +158,18 @@ rg -q '[[:space:]]main\.main$' "$compile_asm_summary"
 rg -q 'ud2' "$compile_asm_dump"
 printf 'ok distribution debug object compile_asm_panic_o0\n'
 
+issue_339_fixture="test/distribution/debug_x86_64/inputs/issue_339_error_success_o0.ll"
+issue_339_object="$tmp_dir/issue_339_error_success_o0.o"
+issue_339_summary="$tmp_dir/issue_339_error_success_o0.readelf.txt"
+issue_339_dump="$tmp_dir/issue_339_error_success_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$issue_339_fixture" > "$issue_339_object"
+readelf -W -h -S -s -r "$issue_339_object" > "$issue_339_summary"
+objdump -dr "$issue_339_object" > "$issue_339_dump"
+
+check_common_object "$issue_339_summary" foo
+rg -q '[[:space:]]test\.foo$' "$issue_339_summary"
+rg -q '[[:space:]]ret' "$issue_339_dump"
+printf 'ok distribution debug object issue_339_error_success_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"
