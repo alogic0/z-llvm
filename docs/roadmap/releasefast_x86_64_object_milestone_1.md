@@ -65,7 +65,7 @@ with tiny host harnesses and validates deterministic return values, including
 `@comptime_const`, `@optional_ptr_value`, `@dense_switch`, `@pair_first`, and
 `@make_pair`, plus `@error_union_payload` and `@optional_payload`.
 `@slice_sum`, `@struct_sum`, and `@array_sum` are also covered by the broader
-ReleaseFast object executable gate.
+ReleaseFast object executable gate, as is `@debug_location`.
 
 ## Matrix Result
 
@@ -98,4 +98,5 @@ probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
 now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
 `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted object failure
 is `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`, currently
-blocked first on `@debug_location` adding an i32 parameter and an immediate.
+blocked on `@inline_asm_barrier`, a side-effecting empty inline asm memory
+barrier that returns its i32 argument.

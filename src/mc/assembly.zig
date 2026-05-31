@@ -11,6 +11,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
+            .add_eax_imm32 => |value| try writer.print("\taddl ${}, %eax\n", .{value}),
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),

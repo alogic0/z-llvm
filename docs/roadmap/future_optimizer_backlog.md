@@ -118,11 +118,11 @@ this baseline does not promote a handoff/codegen gate by itself.
 Milestone 1 for `ReleaseFast / x86_64-linux-gnu / asm-object` now records a
 conservative boundary for the selected Zig-backed object subset in
 `docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The first remaining
-uncovered blocker is selected `@debug_location` add-immediate lowering from
-`atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`; object
-generation, selected alias symbol emission, and executable validation now
-succeed for every selected Milestone 1 fixture and the selected `aggregate_abi`
-and `aggregates` fixtures.
+uncovered blocker is selected `@inline_asm_barrier` side-effecting empty inline
+asm lowering from `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`;
+object generation, selected alias symbol emission, and executable validation now
+succeed for every selected Milestone 1 fixture, the selected `aggregate_abi` and
+`aggregates` fixtures, and `@debug_location`.
 
 ## Activation Rule
 

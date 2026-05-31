@@ -113,6 +113,7 @@ pub const Instruction = union(enum) {
         op: MachineBinaryOp,
         reg: ArgReg,
     },
+    add_eax_imm32: i32,
     shl_eax_imm5: u5,
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
@@ -227,6 +228,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
@@ -493,6 +495,55 @@ fn lowerIcmpSelectConstReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = true_label });
     try appendSelectedI32Return(allocator, machine, true_value);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerAddImmReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const add_inst = block.instructions.items[0];
+    if (add_inst.removed) return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+
+    const AddImm = struct {
+        reg: ArgReg,
+        imm: i32,
+    };
+    const selected: AddImm = switch (add.lhs) {
+        .int => |value| .{
+            .reg = try paramValueReg(function, add.rhs, .{ .int = 32 }),
+            .imm = try i32Value(value),
+        },
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (add.rhs) {
+            .int => |value| .{
+                .reg = try paramValueReg(function, add.lhs, .{ .int = 32 }),
+                .imm = try i32Value(value),
+            },
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        },
+    };
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = selected.imm });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1529,6 +1580,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
+        .add_eax_imm32,
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,
@@ -1559,7 +1611,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1594,6 +1646,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
+        .add_eax_imm32,
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,

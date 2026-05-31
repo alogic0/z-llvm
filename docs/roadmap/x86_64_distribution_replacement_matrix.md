@@ -117,5 +117,5 @@ starts from the first remaining blocker:
 ```text
 broader ReleaseFast object coverage
 current blocker=first broad optimized-output object failure is atomics_inline_asm_debug
-missing capability=selected debug_location add-immediate lowering
+missing capability=selected inline_asm_barrier side-effect call lowering
 ```

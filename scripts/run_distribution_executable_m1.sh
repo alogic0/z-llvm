@@ -313,3 +313,25 @@ C
 zig cc "$aggregates_array_harness" "$aggregates_array_object" -o "$aggregates_array_exe"
 "$aggregates_array_exe"
 printf 'ok distribution executable aggregates_array_sum\n'
+
+atomics_debug_fixture="test/distribution/releasefast_x86_64/inputs/atomics_debug_location.ll"
+atomics_debug_object="$tmp_dir/atomics_debug_location.o"
+atomics_debug_harness="$tmp_dir/atomics_debug_location_harness.c"
+atomics_debug_exe="$tmp_dir/atomics_debug_location_harness"
+
+zig build run -- --emit=obj --target="$target" "$atomics_debug_fixture" > "$atomics_debug_object"
+
+cat > "$atomics_debug_harness" <<'C'
+extern int debug_location(int value);
+
+int main(void) {
+    if (debug_location(0) != 1) return 1;
+    if (debug_location(41) != 42) return 2;
+    if (debug_location(-2) != -1) return 3;
+    return 0;
+}
+C
+
+zig cc "$atomics_debug_harness" "$atomics_debug_object" -o "$atomics_debug_exe"
+"$atomics_debug_exe"
+printf 'ok distribution executable atomics_debug_location\n'

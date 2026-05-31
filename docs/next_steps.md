@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@debug_location` add-immediate lowering in
+optimized-output capture: selected `@inline_asm_barrier` lowering in
 `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -21,14 +21,17 @@ The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now passes
 `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
 `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted failure is
-`atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`; the first shape
-is `@debug_location = alias i32 (i32)`, which returns `%0 + 1`.
+`atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`; the first shape,
+`@debug_location`, is now covered. The next shape is `@inline_asm_barrier =
+alias i32 (i32)`, which contains a side-effecting empty inline asm memory
+barrier and returns its i32 argument.
 
 LLVM fallback removed or reduced:
-Add the smallest x86_64 lowering needed for selected i32 add-immediate returns.
-This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
-optimized-output row only; it does not claim inline asm, atomicrmw, global data,
-memory ordering, or target-complete ABI coverage.
+Add the smallest x86_64 lowering needed for the selected empty side-effecting
+inline asm memory barrier shape. This reduces the ReleaseFast x86_64 asm/object
+fallback for the next broad optimized-output row only; it does not claim general
+inline asm constraints, non-empty asm templates, atomicrmw, global data, memory
+ordering, or target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -42,8 +45,8 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@debug_location` shape from the
-atomics/inline-asm optimized output. Do not generalize to inline asm barriers,
+Implement only the selected `@inline_asm_barrier` shape from the
+atomics/inline-asm optimized output. Do not generalize to non-empty inline asm,
 atomic operations, global storage, vectors, floating point, or non-x86_64 ABI
 behavior in this slice.
 
