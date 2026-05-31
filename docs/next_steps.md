@@ -12,10 +12,10 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Define the next x86_64 distribution matrix row after selected parse, verify,
-optimize, handoff, and asm/object rows are all local or conservative
-boundaries. The likely next row is link/LTO handoff, but promote it only with
-source-backed Zig evidence.
+Select one explicit x86_64 conservative-boundary exclusion and decide whether
+it can be closed as a bounded implementation slice. Prefer a shared exclusion
+that affects the replacement matrix, such as the Debug/ReleaseSmall
+float-format helper or base64 table-decoder boundary.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -210,13 +210,13 @@ target-complete ABI lowering, the Debug float-format helper, and the Debug
 base64 table decoder remain outside this slice.
 
 Validation gate:
-Inspect existing Zig link/LTO evidence, scripts, and roadmap notes. Promote
-exactly one measured link/LTO handoff blocker or boundary closure into this
-file before implementation.
+Inspect the excluded row's source-backed IR, existing direct probe summary, and
+nearby lowering families. Promote exactly one implementation slice only if the
+selected public shape is narrow enough to validate with a focused fixture.
 
 Commit:
-Commit the Debug handoff gate update first, then commit the next selected task
-separately.
+Commit the link/LTO boundary update first, then commit the next selected
+exclusion task separately.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:

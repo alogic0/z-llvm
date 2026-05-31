@@ -163,6 +163,7 @@ Global exclusions:
   broad register allocation
   scheduling
   linker ownership
+  bitcode/LTO linker handoff until activation criteria are met
   dynamic TLS models
   non-x86_64 object formats
 ```

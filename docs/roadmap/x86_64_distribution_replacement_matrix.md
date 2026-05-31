@@ -202,6 +202,21 @@ bash scripts/run_distribution_no_llvm_codegen_subset.sh
   result=pass
 ```
 
+Link/LTO handoff remains a deferred boundary rather than an implementation row
+for the selected x86_64 distribution subset:
+
+```text
+source=docs/bitcode/lto_compatibility_decision.md
+source=docs/bitcode/construct_inventory.md
+source=docs/lto/behavior_gaps.md
+validation=zig build test
+covered=LTO pre-link pipeline descriptors, text-IR optimizer surface
+not_covered=bitcode writer/parser, LTO linker handoff bitcode, ThinLTO
+            summaries, combined indexes, import/export, WPD, CFI, post-link LTO
+status=deferred until a source-backed activation criterion requires bitcode or
+       linker LTO handoff
+```
+
 Automated broad object probing is now available through:
 
 ```text
