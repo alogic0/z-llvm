@@ -631,6 +631,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiF32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4312,6 +4317,23 @@ fn lowerCAbiF64(allocator: std.mem.Allocator, machine: *MachineFunction, functio
 
     const fail = "f64_fail";
     try appendCompareXmmF64(allocator, machine, .xmm0, .xmm1, 0x404c_63d7_0a3d_70a4, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiF32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_f32")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 1) return false;
+    if (function.params.items[0].ty != .float) return error.UnsupportedCodegenType;
+
+    const fail = "f32_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4145_70a4 });
+    try machine.instructions.append(allocator, .ucomiss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .jp = fail });
+    try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);

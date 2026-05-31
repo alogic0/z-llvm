@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_f32` float equality branch lowering from
+`@zig_five_floats` float equality ladder lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -370,11 +370,16 @@ next selected public shape is `@zig_f64 = alias void (double), ptr
 focused shape is now object-ok with selected `ucomisd` equality comparison and
 local trap failure edge. The broad row still remains the first object failure;
 the next selected public shape is `@zig_f32 = alias void (float), ptr
-@main.zig_f32`, a float equality branch-to-return-or-trap shape.
+@main.zig_f32`, a float equality branch-to-return-or-trap shape. That focused
+shape is now object-ok with selected `ucomiss` equality comparison and local
+trap failure edge. The broad row still remains the first object failure; the
+next selected public shape is `@zig_five_floats = alias void (float, float,
+float, float, float), ptr @main.zig_five_floats`, a five-argument float
+equality ladder ending in return-or-trap.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_f32` float equality branch-to-return-or-trap shape. This
+`@zig_five_floats` float equality ladder return-or-trap shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -390,13 +395,13 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-float equality branch shape, also map against SelectionDAG floating argument
-assignment, floating comparison, and conditional branch lowering in
+float equality ladder shape, also map against SelectionDAG floating argument
+assignment, floating comparison, and chained conditional branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_f32` ReleaseSmall float equality
-branch-to-return-or-trap shape from the `c_abi_main` optimized output.
+Implement only the selected `@zig_five_floats` ReleaseSmall float equality
+ladder return-or-trap shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.
