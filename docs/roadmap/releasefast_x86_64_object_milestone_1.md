@@ -453,3 +453,6 @@ branch-to-return-or-trap shape.
 That focused shape is now object-ok through the selected 64-bit scalar branch
 path. The broad row still remains the first sorted failure; the next selected
 alias is `@zig_u32`, a u32 equality branch-to-return-or-trap shape.
+That focused shape is now object-ok through the selected 32-bit scalar branch
+path. The broad row still remains the first sorted failure; the next selected
+alias is `@zig_u16`, a u16 equality branch-to-return-or-trap shape.
