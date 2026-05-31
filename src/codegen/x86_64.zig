@@ -3704,7 +3704,8 @@ fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction,
             .call => |call| call,
             else => return false,
         };
-        if (!isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).reachedUnreachable") or
+        if ((!isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).reachedUnreachable") and
+            !isCalleeName(call.callee, "debug.FullPanic((function 'panic')).reachedUnreachable")) or
             call.ret_ty != .void or
             call.args.items.len != 0 or
             call.callee_value != null or

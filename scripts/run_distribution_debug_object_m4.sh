@@ -144,4 +144,18 @@ rg -q 'movabs[[:alpha:]]*[[:space:]]+\$0x0,%rax' "$unchecked_arith_dump"
 rg -q '[[:space:]]ret' "$unchecked_arith_dump"
 printf 'ok distribution debug object no_compile_panic_unchecked_arith_o0\n'
 
+compile_asm_fixture="test/distribution/debug_x86_64/inputs/compile_asm_panic_o0.ll"
+compile_asm_object="$tmp_dir/compile_asm_panic_o0.o"
+compile_asm_summary="$tmp_dir/compile_asm_panic_o0.readelf.txt"
+compile_asm_dump="$tmp_dir/compile_asm_panic_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$compile_asm_fixture" > "$compile_asm_object"
+readelf -W -h -S -s -r "$compile_asm_object" > "$compile_asm_summary"
+objdump -dr "$compile_asm_object" > "$compile_asm_dump"
+
+check_common_object "$compile_asm_summary" main
+rg -q '[[:space:]]main\.main$' "$compile_asm_summary"
+rg -q 'ud2' "$compile_asm_dump"
+printf 'ok distribution debug object compile_asm_panic_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

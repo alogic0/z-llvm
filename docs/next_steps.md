@@ -12,12 +12,30 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Expand the continuous Debug object evidence beyond the now-clean prefix-300
-boundary by probing the next bounded optimizer-ok prefix. Promote only the
-first measured source-backed failure, or record the clean prefix if no failure
-appears.
+Advance the continuous Debug prefix-400 object probe past the next measured
+source-backed failure:
+`standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll`.
 
 Zig evidence:
+The continuous Debug prefix-400 object probe at
+`tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` originally
+found 394 object successes and 6 object failures. The first failure was
+`standalone_compile_asm_main.zig.Debug.x86_64.ll`, a selected Debug/O0
+panic-unreachable shape. That shape is now object-ok through the tracked
+fixture `test/distribution/debug_x86_64/inputs/compile_asm_panic_o0.ll` and
+`bash scripts/run_distribution_debug_object_m4.sh`. The refreshed prefix-400
+probe is now:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/object_probe_summary_after_compile_asm.txt
+total=400
+ok=395
+fail=5
+excluded=0
+first_failure=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
+```
+
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:
 17 rows, 17 local object successes, 0 failures.

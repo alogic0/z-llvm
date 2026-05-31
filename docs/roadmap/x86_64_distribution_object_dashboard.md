@@ -27,6 +27,7 @@ Current automated summaries:
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
+| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 395 | 5 | 0 | `standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -108,6 +109,12 @@ Debug broad:
     ABI-visible i64 return value
   continuous Debug prefix 200 is object-clean
   continuous Debug prefix 300 is object-clean
+  continuous Debug prefix 400 now advances past
+    standalone_compile_asm_main.zig.Debug.x86_64.ll after accepting the
+    selected Debug/O0 panic-unreachable entry shape; the refreshed prefix-400
+    probe is 395 object successes and 5 object failures, with
+    standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll as the first
+    remaining failure
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage
