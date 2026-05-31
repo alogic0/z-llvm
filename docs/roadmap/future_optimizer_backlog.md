@@ -358,6 +358,10 @@ That focused shape is now object-ok with selected register checks and local
 trap failure edges. The broad row still remains the first sorted blocker; the
 next selected alias is `@zig_struct_u64_u64_0`, a split u64 pair struct
 control-flow shape entirely in argument registers.
+That focused shape is now object-ok with selected register checks and local
+trap failure edges. The broad row still remains the first sorted blocker; the
+next selected alias is `@zig_ret_struct_u64_u64`, a two-register u64 pair
+return shape.
 
 ## Activation Rule
 
