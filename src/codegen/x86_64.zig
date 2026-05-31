@@ -171,6 +171,7 @@ fn lowerStraightLineReturn(
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -309,6 +310,76 @@ fn lowerSingleStackSlotReturn(
     } });
     try machine.instructions.append(allocator, .{ .reload_rsp_eax = .slot0 });
     try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSelectAddSubReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const neg_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    const add_inst = block.instructions.items[2];
+    if (neg_inst.removed or select_inst.removed or add_inst.removed) return false;
+
+    const neg_result = neg_inst.result orelse return false;
+    const select_result = select_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const neg = switch (neg_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (neg.op != .sub or !neg.ty.eql(.{ .int = 32 })) return false;
+    switch (neg.lhs) {
+        .int => |value| if (value != 0) return false,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+    const neg_param = try paramValueReg(function, neg.rhs, .{ .int = 32 });
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.ty.eql(.{ .int = 32 })) return false;
+    const cond_reg = try paramValueReg(function, select.cond, .{ .int = 1 });
+    const true_reg = try paramValueReg(function, select.true_value, .{ .int = 32 });
+    if (true_reg != neg_param) return false;
+    if (!isNamed(select.false_value, neg_result)) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    const base_reg = if (isNamed(add.lhs, select_result))
+        try paramValueReg(function, add.rhs, .{ .int = 32 })
+    else if (isNamed(add.rhs, select_result))
+        try paramValueReg(function, add.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    const false_label = "select_false";
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = true_reg } });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = neg_param } });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
