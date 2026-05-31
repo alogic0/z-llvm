@@ -25,6 +25,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
             .cmp_arg8_imm8 => |cmp| try writer.print("\tcmpb ${}, {s}\n", .{ cmp.imm, cmp.reg.name8() }),
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),
+            .test_arg32 => |reg| try writer.print("\ttestl {s}, {s}\n", .{ reg.name32(), reg.name32() }),
             .test_arg64 => |reg| try writer.print("\ttestq {s}, {s}\n", .{ reg.name64(), reg.name64() }),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),

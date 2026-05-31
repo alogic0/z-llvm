@@ -139,6 +139,7 @@ pub const Instruction = union(enum) {
         imm: u8,
     },
     test_arg8: ArgReg,
+    test_arg32: ArgReg,
     test_arg64: ArgReg,
     je: []const u8,
     ret,
@@ -209,6 +210,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
@@ -420,6 +422,65 @@ fn lowerSelectAddSubReturn(
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = neg_param } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerIcmpSelectConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const icmp_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (icmp_inst.removed or select_inst.removed) return false;
+
+    const icmp_result = icmp_inst.result orelse return false;
+    const select_result = select_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_result)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const cmp_reg = if (isInt(icmp.lhs, 0))
+        try paramValueReg(function, icmp.rhs, .{ .int = 32 })
+    else if (isInt(icmp.rhs, 0))
+        try paramValueReg(function, icmp.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 }) or !isNamed(select.cond, icmp_result)) return false;
+    const true_value = switch (select.true_value) {
+        .int => |value| try i32Value(value),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const false_value = switch (select.false_value) {
+        .int => |value| try i32Value(value),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const true_label = "icmp_select_true";
+    try machine.instructions.append(allocator, .{ .test_arg32 = cmp_reg });
+    try machine.instructions.append(allocator, .{ .je = true_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = false_value });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = true_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = true_value });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1298,6 +1359,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,
+        .test_arg32,
         .test_arg64,
         .ret,
         => {},
@@ -1325,7 +1387,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .cmp_arg8_imm8, .test_arg8, .test_arg64, .je => {},
+        .mov_arg_arg, .shl_rdx_imm6, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -1357,6 +1419,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,
+        .test_arg32,
         .test_arg64,
         .je,
         .ret,

@@ -63,7 +63,7 @@ objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 with tiny host harnesses and validates deterministic return values, including
 `@sideEffectFree`, `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`,
 `@comptime_const`, `@optional_ptr_value`, `@dense_switch`, `@pair_first`, and
-`@make_pair`.
+`@make_pair`, plus `@error_union_payload`.
 
 ## Matrix Result
 
@@ -94,5 +94,6 @@ target-complete ABI lowering
 The next source-backed blocker is broader ReleaseFast object coverage. A broad
 probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
 now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted
-object failure is `aggregates.zig.ReleaseFast.x86_64.optimized.ll`, currently
-blocked first on selected scalar `icmp`/`select` lowering.
+object failure is `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The first
+selected scalar constant `icmp`/`select` shape is covered; the next blocker is
+`@optional_payload`, which selects between a constant and an i32 parameter.

@@ -58,6 +58,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             },
             .cmp_arg8_imm8 => |cmp| try encodeCmp8Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
+            .test_arg32 => |reg| try encodeTest32(&bytes, allocator, reg),
             .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
@@ -95,6 +96,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .direct_call => 5,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
+        .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
         .je => 6,
         .ret => 1,
@@ -169,6 +171,17 @@ fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86
     }
     const code: u8 = @intCast(reg.lowCode());
     try bytes.append(allocator, 0x84);
+    try bytes.append(allocator, 0xc0 | (code << 3) | code);
+}
+
+fn encodeTest32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    if (reg.rexR()) {
+        var rex: u8 = 0x40;
+        rex |= 0x05;
+        try bytes.append(allocator, rex);
+    }
+    const code: u8 = @intCast(reg.lowCode());
+    try bytes.append(allocator, 0x85);
     try bytes.append(allocator, 0xc0 | (code << 3) | code);
 }
 

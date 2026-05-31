@@ -194,3 +194,25 @@ C
 zig cc "$aggregate_abi_harness" "$aggregate_abi_object" -o "$aggregate_abi_exe"
 "$aggregate_abi_exe"
 printf 'ok distribution executable aggregate_abi_pair\n'
+
+aggregates_error_fixture="test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll"
+aggregates_error_object="$tmp_dir/aggregates_error_union_payload.o"
+aggregates_error_harness="$tmp_dir/aggregates_error_union_payload_harness.c"
+aggregates_error_exe="$tmp_dir/aggregates_error_union_payload_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregates_error_fixture" > "$aggregates_error_object"
+
+cat > "$aggregates_error_harness" <<'C'
+extern int error_union_payload(int tag);
+
+int main(void) {
+    if (error_union_payload(0) != 7) return 1;
+    if (error_union_payload(1) != -1) return 2;
+    if (error_union_payload(-3) != -1) return 3;
+    return 0;
+}
+C
+
+zig cc "$aggregates_error_harness" "$aggregates_error_object" -o "$aggregates_error_exe"
+"$aggregates_error_exe"
+printf 'ok distribution executable aggregates_error_union_payload\n'
