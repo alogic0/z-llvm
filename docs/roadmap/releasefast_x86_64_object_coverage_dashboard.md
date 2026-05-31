@@ -95,7 +95,7 @@ closed_failure_20=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimi
 closed_aliases_20=@_start -> @main._start
 current_adjusted_object_probe=461 object-ok, 3 object-fail, 1 excluded
 first_adjusted_failure=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
-closed_aliases_in_failure=@runner_futex_wait -> @main.runner_futex_wait
-selected_alias=@runner_test_name -> @main.runner_test_name
-missing_capability=selected ReleaseSmall string-slice aggregate return lowering
+closed_aliases_in_failure=@runner_futex_wait -> @main.runner_futex_wait,@runner_test_name -> @main.runner_test_name
+selected_alias=@runner_test_run -> @main.runner_test_run
+missing_capability=selected ReleaseSmall libfuzzer runtime-call lowering
 ```

@@ -83,6 +83,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .volatile_roundtrip_rdi_esi_eax => try writer.writeAll("\tmovl %esi, (%rdi)\n\tmovl (%rdi), %eax\n"),
             .load_global_i32_eax => |symbol| try writer.print("\tmovl {s}(%rip), %eax\n", .{symbol}),
             .load_global_ptr_rax => |symbol| try writer.print("\tmovq {s}(%rip), %rax\n", .{symbol}),
+            .lea_global_rax => |symbol| try writer.print("\tleaq {s}(%rip), %rax\n", .{symbol}),
             .store_eax_global_i32 => |symbol| try writer.print("\tmovl %eax, {s}(%rip)\n", .{symbol}),
             .load_tls_i32_eax => |symbol| try writer.print("\tmovl %fs:{s}@TPOFF, %eax\n", .{symbol}),
             .store_eax_tls_i32 => |symbol| try writer.print("\tmovl %eax, %fs:{s}@TPOFF\n", .{symbol}),

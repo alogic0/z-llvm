@@ -528,7 +528,10 @@ alias is `@runner_futex_wait -> @main.runner_futex_wait`, an i1 constant
 return. That focused shape is now object-ok, but the broad row still fails on
 the next selected public alias:
 `@runner_test_name -> @main.runner_test_name`, a string-slice aggregate return
-for the `"test"` name.
+for the `"test"` name. That focused shape is now object-ok, but the broad row
+still fails on the next selected public alias:
+`@runner_test_run -> @main.runner_test_run`, a selected libfuzzer runtime-call
+shape.
 
 ## Activation Rule
 

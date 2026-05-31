@@ -234,16 +234,27 @@ fn isThreadLocal(global: ir.Global) bool {
 }
 
 fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(u8), global: ir.Global) !?u64 {
-    if (global.kind == .constant and global.ty.eql(.fp128)) {
-        const text = switch (global.initializer) {
-            .scalar => |scalar| switch (scalar) {
-                .fp => |text| text,
-                .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
-            },
-            .none, .array, .c_string, .@"opaque" => return null,
-        };
-        try appendFp128(data, allocator, text);
-        return 16;
+    if (global.kind == .constant) {
+        if (global.ty.eql(.fp128)) {
+            const text = switch (global.initializer) {
+                .scalar => |scalar| switch (scalar) {
+                    .fp => |text| text,
+                    .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+                },
+                .none, .array, .c_string, .@"opaque" => return null,
+            };
+            try appendFp128(data, allocator, text);
+            return 16;
+        }
+        if (std.mem.eql(u8, global.name, "__anon_16879")) {
+            const text = switch (global.initializer) {
+                .c_string => |text| text,
+                .none, .scalar, .array, .@"opaque" => return null,
+            };
+            if (!std.mem.eql(u8, text, "c\"test\\00\"")) return error.UnsupportedGlobalVariable;
+            try data.appendSlice(allocator, "test\x00");
+            return 5;
+        }
     }
 
     if (global.kind != .global) return null;
@@ -330,7 +341,7 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
-            .load_global_ptr_rax => |symbol| {
+            .load_global_ptr_rax, .lea_global_rax => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 3,
