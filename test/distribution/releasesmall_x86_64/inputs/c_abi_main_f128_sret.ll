@@ -3,6 +3,7 @@ target triple = "x86_64-unknown-linux-gnu"
 %main.f128_f128_struct = type { fp128, fp128 }
 %main.PD = type { ptr, double }
 %Io.LockedStderr = type { ptr }
+%main.BigStruct = type { i64, i64, i64, i64, i8, [7 x i8] }
 
 @__zllvm_f128_cmp0 = private unnamed_addr constant fp128 0xL00000000000000004002A00000000000, align 16
 @__zllvm_f128_cmp1 = private unnamed_addr constant fp128 0xL00000000000000004004C80000000000, align 16
@@ -13,6 +14,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @__zllvm_f128_scalar_cmp0 = private unnamed_addr constant fp128 0xL00000000000000004002800000000000, align 16
 @__zllvm_f128_scalar_ret0 = private unnamed_addr constant fp128 0xL00000000000000004004100000000000, align 16
 @__anon_762 = private unnamed_addr constant [13 x i8] c"test failure\00", align 1
+@__anon_15510 = private unnamed_addr constant %main.BigStruct { i64 20, i64 21, i64 22, i64 23, i8 24, [7 x i8] undef }, align 8
 @zig_f128_f128_struct = alias void (ptr, ptr), ptr @main.zig_f128_f128_struct
 @zig_f128_struct = alias { fp128 } (fp128), ptr @main.zig_f128_struct
 @zig_f128 = alias fp128 (fp128), ptr @main.zig_f128
@@ -33,10 +35,12 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_bool = alias i1 (), ptr @main.zig_ret_bool
 @zig_multiple_struct_floats = alias void (<2 x float>, <2 x float>, <2 x float>, <2 x float>), ptr @main.zig_multiple_struct_floats
 @zig_multiple_struct_ints = alias void (i64, i64, i64, i64), ptr @main.zig_multiple_struct_ints
+@zig_big_struct_both = alias void (ptr, ptr), ptr @main.zig_big_struct_both
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
 declare fastcc void @debug.print__anon_14634(ptr)
+declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 define private void @main.zig_f128_f128_struct(ptr noalias nonnull writeonly sret(%main.f128_f128_struct) captures(none) %0, ptr nonnull readonly byval(%main.f128_f128_struct) align 16 captures(none) %1) unnamed_addr align 1 {
 2:
@@ -323,6 +327,51 @@ define private void @main.zig_multiple_struct_ints(i64 %0, i64 %1, i64 %2, i64 %
 31:
   ret void
 32:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_big_struct_both(ptr noalias nonnull writeonly sret(%main.BigStruct) %0, ptr nonnull readonly byval(%main.BigStruct) align 8 %1) unnamed_addr align 1 {
+2:
+  %.sroa.0.0.copyload = load i64, ptr %1, align 8
+  %.sroa.3.0..sroa_idx = getelementptr i8, ptr %1, i64 16
+  %.sroa.3.0.copyload = load i64, ptr %.sroa.3.0..sroa_idx, align 8
+  %.sroa.4.0..sroa_idx = getelementptr i8, ptr %1, i64 24
+  %.sroa.4.0.copyload = load i64, ptr %.sroa.4.0..sroa_idx, align 8
+  %.sroa.5.0..sroa_idx = getelementptr i8, ptr %1, i64 32
+  %.sroa.5.0.copyload = load i8, ptr %.sroa.5.0..sroa_idx, align 8
+  %3 = icmp eq i64 %.sroa.0.0.copyload, 30
+  br i1 %3, label %4, label %6
+4:
+  %.sroa.2.0..sroa_idx = getelementptr i8, ptr %1, i64 8
+  %.sroa.2.0.copyload = load i64, ptr %.sroa.2.0..sroa_idx, align 8
+  %5 = icmp eq i64 %.sroa.2.0.copyload, 31
+  br i1 %5, label %7, label %9
+6:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+7:
+  %8 = icmp eq i64 %.sroa.3.0.copyload, 32
+  br i1 %8, label %10, label %12
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  %11 = icmp eq i64 %.sroa.4.0.copyload, 33
+  br i1 %11, label %13, label %15
+12:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+13:
+  %14 = icmp eq i8 %.sroa.5.0.copyload, 34
+  br i1 %14, label %16, label %17
+15:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+16:
+  tail call void @llvm.memcpy.p0.p0.i64(ptr %0, ptr @__anon_15510, i64 40, i1 0)
+  ret void
+17:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }

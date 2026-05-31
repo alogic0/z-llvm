@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_big_struct_both` large byval/sret struct check-and-copy lowering from
+`@zig_split_struct_mixed` split mixed integer/float control-flow lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -159,14 +159,19 @@ control-flow shape. That focused shape is now object-ok with local trap
 failure edges. The broad row still remains the first object failure; the next
 selected public shape is `@zig_big_struct_both = alias void (ptr, ptr), ptr
 @main.zig_big_struct_both`, a large byval/sret struct check-and-copy shape.
+That focused shape is now object-ok with local trap failure edges and selected
+sret stores. The broad row still remains the first object failure; the next
+selected public shape is `@zig_split_struct_mixed = alias void (i64, i64), ptr
+@main.zig_split_struct_mixed`, a split mixed integer/float comparison
+control-flow shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_big_struct_both` large byval/sret struct check-and-copy shape. This
+`@zig_split_struct_mixed` split mixed integer/float control-flow shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
-broad aggregate ABI lowering, general memcpy lowering, panic side-effect
-lowering, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+broad aggregate ABI lowering, arbitrary floating-point comparison control
+flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
+unwind records, linker ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -178,16 +183,17 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-large byval/sret shape, also map against SelectionDAG aggregate argument,
-aggregate return, load/compare, memcpy, and branch lowering in
+split mixed control-flow shape, also map against SelectionDAG aggregate
+argument assignment, integer masking, bitcast-to-float comparison, and branch
+lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_big_struct_both` ReleaseSmall large
-byval/sret check-and-copy shape from the `c_abi_main` optimized output. Do not
-generalize to all aggregate ABI behavior, arbitrary memcpy lowering, panic
-side effects, debug/unwind object records, or non-x86_64 ABI behavior in this
-slice.
+Implement only the selected `@zig_split_struct_mixed` ReleaseSmall split
+mixed integer/float control-flow shape from the `c_abi_main` optimized output.
+Do not generalize to all aggregate ABI behavior, arbitrary floating-point
+comparison graphs, panic side effects, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
