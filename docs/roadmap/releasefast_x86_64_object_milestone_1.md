@@ -219,4 +219,6 @@ the adjacent existing `@zig_ret_i32` return. The broad row still remains the
 first sorted failure; the next selected alias is `@zig_ret_i16`, a
 straight-line i16 return. That focused shape is now object-ok. The broad row
 still remains the first sorted failure; the next selected alias is
-`@zig_ret_i8`, a straight-line i8 return.
+`@zig_ret_i8`, a straight-line i8 return. That focused shape is now object-ok.
+The broad row still remains the first sorted failure; the next selected alias
+is `@zig_ret_u16`, a straight-line zero-extended u16 return.

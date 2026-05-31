@@ -27,6 +27,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_med_struct_ints = alias { i64, i32 } (), ptr @main.zig_ret_med_struct_ints
 @zig_ret_i64 = alias i64 (), ptr @main.zig_ret_i64
 @zig_ret_i16 = alias i16 (), ptr @main.zig_ret_i16
+@zig_ret_i8 = alias i8 (), ptr @main.zig_ret_i8
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -177,4 +178,9 @@ define private i64 @main.zig_ret_i64() unnamed_addr align 1 {
 define private i16 @main.zig_ret_i16() unnamed_addr align 1 {
 0:
   ret i16 -1
+}
+
+define private i8 @main.zig_ret_i8() unnamed_addr align 1 {
+0:
+  ret i8 -1
 }

@@ -76,7 +76,7 @@ closed_failure_11=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.l
 closed_aliases_11=@c_fopen,@c_ftell,@c_fputs,@c_printf
 next_object_probe=265 object-ok, 200 object-fail
 first_failure=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
-closed_aliases_in_first_failure=@zig_f128_f128_struct,@zig_f128_struct,@zig_f128,@zig_assert_PD,@zig_ret_PD,@zig_ret_CFF,@zig_assert_CFF,@zig_ret_DC,@zig_assert_DC,@zig_ret_split_struct_mixed,@zig_ret_med_struct_mixed,@zig_ret_med_struct_ints,@zig_ret_small_struct_ints,@zig_ret_i64,@zig_ret_i32,@zig_ret_i16
-selected_alias=@zig_ret_i8
-missing_capability=ReleaseSmall straight-line i8 return lowering
+closed_aliases_in_first_failure=@zig_f128_f128_struct,@zig_f128_struct,@zig_f128,@zig_assert_PD,@zig_ret_PD,@zig_ret_CFF,@zig_assert_CFF,@zig_ret_DC,@zig_assert_DC,@zig_ret_split_struct_mixed,@zig_ret_med_struct_mixed,@zig_ret_med_struct_ints,@zig_ret_small_struct_ints,@zig_ret_i64,@zig_ret_i32,@zig_ret_i16,@zig_ret_i8
+selected_alias=@zig_ret_u16
+missing_capability=ReleaseSmall straight-line zero-extended u16 return lowering
 ```

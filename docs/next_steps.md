@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_ret_i8` straight-line i8 return lowering from
+`@zig_ret_u16` straight-line zero-extended u16 return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -137,14 +137,17 @@ remains the first object failure; the next selected public shape is
 `@zig_ret_i16 = alias i16 (), ptr @main.zig_ret_i16`, a straight-line i16
 return. That focused shape is now object-ok. The broad row still remains the
 first object failure; the next selected public shape is `@zig_ret_i8 = alias
-i8 (), ptr @main.zig_ret_i8`, a straight-line i8 return.
+i8 (), ptr @main.zig_ret_i8`, a straight-line i8 return. That focused shape
+is now object-ok. The broad row still remains the first object failure; the
+next selected public shape is `@zig_ret_u16 = alias i16 (), ptr
+@main.zig_ret_u16`, a straight-line zero-extended u16 return.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_ret_i8` straight-line i8 return shape. This continues reducing the
-ReleaseSmall asm/object fallback row. It does not claim broad scalar return
-coverage, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+`@zig_ret_u16` straight-line zero-extended u16 return shape. This continues
+reducing the ReleaseSmall asm/object fallback row. It does not claim broad
+scalar return coverage, non-x86_64 ABI behavior, debug records, unwind records,
+linker ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -156,15 +159,15 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-straight-line i8 return, also map against SelectionDAG integer return and
+straight-line zero-extended u16 return, also map against SelectionDAG integer return and
 register assignment lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_ret_i8` ReleaseSmall straight-line i8
-return shape from the `c_abi_main` optimized output. Do not generalize to all
-scalar return attributes, debug/unwind object records, or non-x86_64 ABI
-behavior in this slice.
+Implement only the selected `@zig_ret_u16` ReleaseSmall straight-line
+zero-extended u16 return shape from the `c_abi_main` optimized output. Do not
+generalize to all scalar return attributes, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
