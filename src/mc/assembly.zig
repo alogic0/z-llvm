@@ -13,6 +13,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
+            .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
             .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),

@@ -100,6 +100,7 @@ pub const Instruction = union(enum) {
     },
     shl_eax_imm5: u5,
     or_eax_imm32: i32,
+    imul_eax_imm32: i32,
     sub_rsp_8,
     add_rsp_8,
     spill_arg_rsp: struct {
@@ -175,6 +176,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -441,6 +443,56 @@ fn lowerShiftOrConstReturn(
     try machine.instructions.append(allocator, .{ .mov_arg_eax = src_reg });
     try machine.instructions.append(allocator, .{ .shl_eax_imm5 = shift_amount });
     try machine.instructions.append(allocator, .{ .or_eax_imm32 = or_value });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerMulConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const mul_inst = block.instructions.items[0];
+    if (mul_inst.removed) return false;
+
+    const mul_result = mul_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, mul_result)) return false;
+
+    const mul = switch (mul_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (mul.op != .mul or !mul.ty.eql(.{ .int = 32 })) return false;
+
+    const SelectedMul = struct {
+        reg: ArgReg,
+        multiplier: i32,
+    };
+    const selected: SelectedMul = switch (mul.lhs) {
+        .int => |value| .{
+            .reg = try paramValueReg(function, mul.rhs, .{ .int = 32 }),
+            .multiplier = try i32Value(value),
+        },
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (mul.rhs) {
+            .int => |value| .{
+                .reg = try paramValueReg(function, mul.lhs, .{ .int = 32 }),
+                .multiplier = try i32Value(value),
+            },
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        },
+    };
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
+    try machine.instructions.append(allocator, .{ .imul_eax_imm32 = selected.multiplier });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -829,6 +881,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .binary_arg_eax,
         .shl_eax_imm5,
         .or_eax_imm32,
+        .imul_eax_imm32,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,
@@ -845,7 +898,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32 => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32 => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -882,6 +935,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .binary_arg_eax,
         .shl_eax_imm5,
         .or_eax_imm32,
+        .imul_eax_imm32,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,
