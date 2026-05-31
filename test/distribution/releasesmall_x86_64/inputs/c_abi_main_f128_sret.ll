@@ -83,6 +83,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_cmultf = alias { <2 x float> } (<2 x float>, <2 x float>), ptr @main.zig_cmultf
 @zig_bool = alias void (i1), ptr @main.zig_bool
 @zig_ptr = alias void (ptr), ptr @main.zig_ptr
+@zig_f64 = alias void (double), ptr @main.zig_f64
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -647,6 +648,17 @@ define private void @main.zig_bool(i1 %0) unnamed_addr align 1 {
 define private void @main.zig_ptr(ptr %0) unnamed_addr align 1 {
 1:
   %2 = icmp eq ptr %0, inttoptr (i64 3735928559 to ptr)
+  br i1 %2, label %3, label %4
+3:
+  ret void
+4:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_f64(double %0) unnamed_addr align 1 {
+1:
+  %2 = fcmp oeq double %0, 5.678000e+01
   br i1 %2, label %3, label %4
 3:
   ret void

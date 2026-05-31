@@ -418,6 +418,10 @@ local trap failure edge. `@zig_longdouble` is already object-ok through
 existing straight-line void return lowering. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_f64`, a double equality
 branch-to-return-or-trap shape.
+That focused shape is now object-ok with selected `ucomisd` equality
+comparison and local trap failure edge. The broad row still remains the first
+sorted blocker; the next selected alias is `@zig_f32`, a float equality
+branch-to-return-or-trap shape.
 
 ## Activation Rule
 
