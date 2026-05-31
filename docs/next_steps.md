@@ -13,23 +13,23 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected i64 aggregate ABI lowering in
-`aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected scalar `icmp`/`select` lowering in
+`aggregates.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` reports
-`aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` as the first sorted object
-failure with `UnsupportedCodegenInstruction`. The fixture contains
-`@pair_first = alias i32 (i64)` and `@make_pair = alias i64 (i32, i32)`.
+`aggregates.zig.ReleaseFast.x86_64.optimized.ll` as the first sorted object
+failure after the selected `aggregate_abi` i64 pair fixture. The first bounded
+shape is `@error_union_payload = alias i32 (i32)`, which lowers `icmp eq i32
+%0, 0` plus `select` into either `7` or `-1`.
 
 LLVM fallback removed or reduced:
-Add the smallest x86_64 lowering needed for the selected aggregate ABI shape:
-`trunc i64 -> i32` return for `@pair_first`, and i64 zext/shift/or packing for
-`@make_pair`. This reduces the ReleaseFast x86_64 asm/object fallback for the
-next broad optimized-output row only; it does not claim general aggregate ABI,
-struct returns, memory-passed aggregates, vector values, or target-complete ABI
-coverage.
+Add the smallest x86_64 lowering needed for the selected scalar compare/select
+shape. This reduces the ReleaseFast x86_64 asm/object fallback for the next
+broad optimized-output row only; it does not claim general select lowering,
+condition-code optimization, loops, pointer aggregate loads, vector values, or
+target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -43,10 +43,9 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the two selected private functions in the aggregate ABI optimized
-output. Do not generalize to arbitrary i64 arithmetic, memory aggregates,
-multi-register returns, stack arguments, vectors, or non-x86_64 ABI behavior in
-this slice.
+Implement only the selected `@error_union_payload` shape from the aggregates
+optimized output. Do not generalize to loops, slice/struct memory loads,
+multi-block control flow, vectors, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh`,

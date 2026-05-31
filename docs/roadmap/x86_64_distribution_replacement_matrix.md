@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is aggregate_abi
-missing capability=selected i64 aggregate ABI lowering
+current blocker=first broad optimized-output object failure is aggregates
+missing capability=selected scalar icmp/select lowering
 ```

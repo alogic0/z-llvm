@@ -14,6 +14,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
+            .shl_rdx_imm6 => |amount| try writer.print("\tshlq ${}, %rdx\n", .{amount}),
+            .or_rdx_rax => try writer.writeAll("\torq %rdx, %rax\n"),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
             .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),

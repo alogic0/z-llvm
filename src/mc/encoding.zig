@@ -41,6 +41,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x69, 0xc0 });
                 try appendI32(&bytes, allocator, value);
             },
+            .shl_rdx_imm6 => |amount| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xc1, 0xe2 });
+                try bytes.append(allocator, amount);
+            },
+            .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
@@ -80,6 +85,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shl_eax_imm5 => 3,
         .or_eax_imm32 => 5,
         .imul_eax_imm32 => 6,
+        .shl_rdx_imm6 => 4,
+        .or_rdx_rax => 3,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,

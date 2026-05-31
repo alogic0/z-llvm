@@ -116,6 +116,8 @@ pub const Instruction = union(enum) {
     shl_eax_imm5: u5,
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
+    shl_rdx_imm6: u6,
+    or_rdx_rax,
     sub_rsp_8,
     add_rsp_8,
     spill_arg_rsp: struct {
@@ -209,6 +211,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -525,6 +528,110 @@ fn lowerMulConstReturn(
 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
     try machine.instructions.append(allocator, .{ .imul_eax_imm32 = selected.multiplier });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerAggregateAbiReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
+fn lowerTruncI64ArgReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const trunc_inst = block.instructions.items[0];
+    if (trunc_inst.removed) return false;
+    const trunc_result = trunc_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, trunc_result)) return false;
+
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 })) return false;
+    const reg = try paramValueReg(function, trunc.value, .{ .int = 64 });
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerMakePairReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const high_zext_inst = block.instructions.items[0];
+    const shift_inst = block.instructions.items[1];
+    const low_zext_inst = block.instructions.items[2];
+    const or_inst = block.instructions.items[3];
+    if (high_zext_inst.removed or shift_inst.removed or low_zext_inst.removed or or_inst.removed) return false;
+
+    const high_zext_result = high_zext_inst.result orelse return false;
+    const shift_result = shift_inst.result orelse return false;
+    const low_zext_result = low_zext_inst.result orelse return false;
+    const or_result = or_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, or_result)) return false;
+
+    const high_zext = switch (high_zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (high_zext.op != .zext or !high_zext.from_ty.eql(.{ .int = 32 }) or !high_zext.to_ty.eql(.{ .int = 64 })) return false;
+    const high_reg = try paramValueReg(function, high_zext.value, .{ .int = 32 });
+
+    const shift = switch (shift_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shift.op != .shl or !shift.ty.eql(.{ .int = 64 }) or !isNamed(shift.lhs, high_zext_result) or !isInt(shift.rhs, 32)) return false;
+
+    const low_zext = switch (low_zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (low_zext.op != .zext or !low_zext.from_ty.eql(.{ .int = 32 }) or !low_zext.to_ty.eql(.{ .int = 64 })) return false;
+    const low_reg = try paramValueReg(function, low_zext.value, .{ .int = 32 });
+
+    const or_binary = switch (or_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (or_binary.op != .@"or" or !or_binary.ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(or_binary.lhs, shift_result) or !isNamed(or_binary.rhs, low_zext_result)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+    try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+    try machine.instructions.append(allocator, .or_rdx_rax);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1180,6 +1287,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,
+        .shl_rdx_imm6,
+        .or_rdx_rax,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,
@@ -1199,7 +1308,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .load_arg_ptr_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .load_arg_ptr_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1216,7 +1325,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .cmp_arg8_imm8, .test_arg8, .test_arg64, .je => {},
+        .mov_arg_arg, .shl_rdx_imm6, .cmp_arg8_imm8, .test_arg8, .test_arg64, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -1237,6 +1346,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,
+        .shl_rdx_imm6,
+        .or_rdx_rax,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,

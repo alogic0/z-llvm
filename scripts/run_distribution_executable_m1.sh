@@ -170,3 +170,27 @@ C
 zig cc "$dense_switch_harness" "$dense_switch_object" -o "$dense_switch_exe"
 "$dense_switch_exe"
 printf 'ok distribution executable dense_switch\n'
+
+aggregate_abi_fixture="test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll"
+aggregate_abi_object="$tmp_dir/aggregate_abi_pair.o"
+aggregate_abi_harness="$tmp_dir/aggregate_abi_harness.c"
+aggregate_abi_exe="$tmp_dir/aggregate_abi_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregate_abi_fixture" > "$aggregate_abi_object"
+
+cat > "$aggregate_abi_harness" <<'C'
+extern int pair_first(long long pair);
+extern long long make_pair(int first, int second);
+
+int main(void) {
+    if (pair_first(0x000000020000002aLL) != 42) return 1;
+    if (pair_first(-1LL) != -1) return 2;
+    if (make_pair(0x11223344, 0x55667788) != ((0x55667788LL << 32) | 0x11223344LL)) return 3;
+    if (make_pair(-1, 0) != 0x00000000ffffffffLL) return 4;
+    return 0;
+}
+C
+
+zig cc "$aggregate_abi_harness" "$aggregate_abi_object" -o "$aggregate_abi_exe"
+"$aggregate_abi_exe"
+printf 'ok distribution executable aggregate_abi_pair\n'
