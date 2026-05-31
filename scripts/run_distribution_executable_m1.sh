@@ -73,3 +73,25 @@ C
 zig cc "$call_chain_harness" "$call_chain_object" -o "$call_chain_exe"
 "$call_chain_exe"
 printf 'ok distribution executable call_chain\n'
+
+comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
+comptime_const_object="$tmp_dir/globals_comptime_const.o"
+comptime_const_harness="$tmp_dir/comptime_const_harness.c"
+comptime_const_exe="$tmp_dir/comptime_const_harness"
+
+zig build run -- --emit=obj --target="$target" "$comptime_const_fixture" > "$comptime_const_object"
+
+cat > "$comptime_const_harness" <<'C'
+extern int comptime_const(int value);
+
+int main(void) {
+    if (comptime_const(0) != 0) return 1;
+    if (comptime_const(7) != 35) return 2;
+    if (comptime_const(-3) != -15) return 3;
+    return 0;
+}
+C
+
+zig cc "$comptime_const_harness" "$comptime_const_object" -o "$comptime_const_exe"
+"$comptime_const_exe"
+printf 'ok distribution executable comptime_const\n'

@@ -60,9 +60,9 @@ bash scripts/run_handoff_validation.sh
 objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 `.symtab` records, including the selected public alias symbol for each fixture.
 `scripts/run_distribution_executable_m1.sh` links the selected `@add_wrap`,
-`@branch_mix`, and `@call_chain` objects with tiny host harnesses and validates
-deterministic return values. Executable checks beyond those aliases remain
-Milestone 2 work.
+`@branch_mix`, `@call_chain`, and `@comptime_const` objects with tiny host
+harnesses and validates deterministic return values. Executable checks beyond
+those aliases remain Milestone 2 work.
 
 ## Matrix Result
 
@@ -82,7 +82,7 @@ integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission beyond selected local function aliases
 pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch-table lowering beyond the selected dense constant-return shape
-executable validation beyond the selected `@add_wrap`, `@branch_mix`, and `@call_chain` aliases
+executable validation beyond the selected `@add_wrap`, `@branch_mix`, `@call_chain`, and `@comptime_const` aliases
 debug/unwind records
 linker behavior
 target-complete ABI lowering
@@ -91,5 +91,6 @@ target-complete ABI lowering
 ## Milestone 2
 
 The next source-backed blocker is executable callable ABI validation beyond
-`@add_wrap`, `@branch_mix`, and `@call_chain`. Milestone 2 should broaden one
-stable public alias at a time, starting with `@comptime_const`.
+`@add_wrap`, `@branch_mix`, `@call_chain`, and `@comptime_const`. Milestone 2
+should broaden one stable public alias at a time, starting with
+`@optional_ptr_value`.
