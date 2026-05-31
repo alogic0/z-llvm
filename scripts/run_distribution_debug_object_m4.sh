@@ -62,4 +62,10 @@ emit_and_check debug_value_intrinsic.reduced debug_value
 rg -q '[[:space:]]mov[[:space:]]+%edi,%eax' "$tmp_dir/debug_value_intrinsic.reduced.objdump.txt"
 printf 'ok distribution debug object debug_value_intrinsic\n'
 
+emit_and_check debug_pointers_volatile_roundtrip.reduced volatile_roundtrip
+rg -q 'There are no relocations in this file' "$tmp_dir/debug_pointers_volatile_roundtrip.reduced.readelf.txt"
+rg -q 'mov[[:alpha:]]*[[:space:]]+%esi,\(%rdi\)' "$tmp_dir/debug_pointers_volatile_roundtrip.reduced.objdump.txt"
+rg -q 'mov[[:alpha:]]*[[:space:]]+\(%rdi\),%eax' "$tmp_dir/debug_pointers_volatile_roundtrip.reduced.objdump.txt"
+printf 'ok distribution debug object debug_pointers_volatile_roundtrip\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

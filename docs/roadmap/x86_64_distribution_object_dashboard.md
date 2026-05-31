@@ -19,8 +19,11 @@ Current automated summaries:
 | ReleaseFast | `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
 | ReleaseSafe | `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
 | ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 465 | 463 | 0 | 2 | `-` |
-| Debug reduced | `test/zig/expected/debug_*.reduced.ll` | 6 | 6 | 0 | 0 | `-` |
+| Debug reduced | `test/zig/expected/debug_*.reduced.ll` | 7 | 7 | 0 | 0 | `-` |
 | Debug broad tiny scalar | `tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
+| Debug broad control flow calls | `tmp/zig_ir/debug_object_probe_control_flow_calls_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
+| Debug broad pointers memory | `tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
+| Debug broad tiny scalar plain | `tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 
 ReleaseSmall exclusions:
 
@@ -53,7 +56,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call objects |
 | ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions |
-| Debug | LLVM fallback required | reduced 6-fixture object subset plus broad `tiny_scalar` object proof; broader Debug remains unproven |
+| Debug | LLVM fallback required | reduced 7-fixture object subset plus four selected broad raw object proofs; broader Debug std rows remain unproven |
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
 in [x86_64_distribution_replacement_matrix.md](x86_64_distribution_replacement_matrix.md)
@@ -68,7 +71,10 @@ ReleaseSmall excluded:
 
 Debug broad:
   tiny_scalar.Debug.x86_64.ll object-clean as a selected broad row
-  control_flow_calls.Debug.ll is the next broad source-backed row to probe
+  control_flow_calls.Debug.ll object-clean as a selected broad row
+  pointers_memory.Debug.ll object-clean after the selected O0 alloca debug
+    prologue plus volatile roundtrip fixture
+  tiny_scalar.Debug.ll object-clean as the remaining selected raw row
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

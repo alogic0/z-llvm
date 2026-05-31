@@ -12,10 +12,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Probe the next broad Debug x86_64 asm/object row, starting with
-`control_flow_calls.Debug.ll`, and either reduce one concrete object blocker
-into a tracked fixture or reaffirm broad Debug as an LLVM fallback with
-measured evidence.
+Reduce the first remaining x86_64 ReleaseSmall asm/object exclusion,
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`, into
+one bounded source-backed fixture if the float-format helper shape is local, or
+keep the exclusion explicit with measured evidence if it requires broader
+formatting/runtime lowering.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -556,35 +557,51 @@ The unified dashboard is
 `docs/roadmap/x86_64_distribution_object_dashboard.md`. It records ReleaseFast
 and ReleaseSafe as 17/17 object-clean captured subsets, ReleaseSmall as an
 adjusted 463/465 object-clean subset with two explicit exclusions, and Debug as
-a reduced 6-fixture object-clean subset while broad Debug remains unproven.
+a reduced 7-fixture object-clean subset plus four selected broad raw
+object-clean rows while broad Debug std rows remain unproven.
 
 The first broad Debug row from the fixture manifest,
 `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, originally failed before object
 emission on Debug/O0 parser and verifier boundaries: LLVM `#dbg_declare`
 records, `unreachable` and `ret` terminator metadata, sizeless
 `DIBasicType`, and columnless `DILocation(line: 0, scope: ...)` nodes. Those
-metadata forms are now accepted as conservative object-readiness boundaries.
-The focused object probe is clean:
+metadata forms are now accepted as conservative object-readiness boundaries,
+and the selected `pointers_memory` row also closes the O0 alloca debug
+prologue before volatile pointer roundtrip lowering. The selected broad raw
+object probes are clean:
 
 ```text
 input=tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir
 summary total=1 ok=1 fail=0 excluded=0 first_failure=-
 source=tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll
+
+input=tmp/zig_ir/debug_object_probe_control_flow_calls_20260531/ir
+summary total=1 ok=1 fail=0 excluded=0 first_failure=-
+source=tmp/zig_ir/raw/control_flow_calls.Debug.ll
+
+input=tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir
+summary total=1 ok=1 fail=0 excluded=0 first_failure=-
+source=tmp/zig_ir/raw/pointers_memory.Debug.ll
+
+input=tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir
+summary total=1 ok=1 fail=0 excluded=0 first_failure=-
+source=tmp/zig_ir/raw/tiny_scalar.Debug.ll
 ```
 
 LLVM fallback removed or reduced:
-Advance broad Debug asm/object evidence from the manifest's `tiny_scalar`
-source row to the next source-backed row. If the next blocker is small and
-source-backed, reduce it. If it is broad DWARF/O0/backend infrastructure,
-record that boundary explicitly and keep broad Debug as LLVM fallback.
+Advance the adjusted ReleaseSmall asm/object subset by revisiting the first
+explicit exclusion. If the selected float-format helper contains one bounded
+lowering or ELF feature, add a tracked fixture and focused validation. If it
+requires broad formatting/runtime infrastructure, keep it excluded and record
+the exact first blocker.
 
 Mode/target/stage row:
-`mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=LLVM fallback required outside the reduced object subset`.
+`mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`status=conservative boundary with two explicit exclusions`.
 
 Upstream mapping:
-Use LLVM x86_64 Debug/O0 codegen, MC/object emission, diagnostics, and
-object-file handoff behavior as the reference boundary:
+Use LLVM x86_64 Oz codegen, MC/object emission, diagnostics, and object-file
+handoff behavior as the reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
@@ -594,15 +611,16 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not claim broad Debug replacement from reduced fixtures. The next probe must
-select the next broad source-backed Debug row, record the exact command and
-first failure, and only create a fixture if the first blocker is a bounded
-codegen/object shape.
+Do not remove the ReleaseSmall exclusion without a source-backed fixture or a
+reproducible object probe. Keep formatting/runtime helper support outside the
+local boundary unless the selected shape proves it can be reduced to a bounded
+lowering slice.
 
 Validation gate:
-Run the smallest broad `control_flow_calls.Debug.ll` probe possible, record
-exact counts and first failure, and keep
-`bash scripts/run_distribution_debug_object_m4.sh` plus
+Run a focused probe for
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`, then
+keep `bash scripts/run_distribution_releasesmall_object_m3.sh`,
+`bash scripts/run_distribution_debug_object_m4.sh`, and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:

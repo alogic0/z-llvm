@@ -565,11 +565,12 @@ ReleaseSmall object gate, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
-`test/zig/expected/debug_*.reduced.ll` is clean: 6 object successes and 0
+`test/zig/expected/debug_*.reduced.ll` is clean: 7 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
 selected blockers are call-result plus immediate-add lowering,
 `llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
-shape, and the reduced Debug scope-branch phi shape. Broad Debug asm/object
+shape, the reduced Debug scope-branch phi shape, and the selected O0 alloca
+debug prologue before a volatile pointer roundtrip. Broad Debug asm/object
 still requires LLVM fallback because DWARF/unwind emission, full O0 codegen,
 variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
@@ -581,13 +582,16 @@ categories. The helper reproduced the current release-mode evidence:
 ReleaseFast 17 ok / 0 fail, ReleaseSafe 17 ok / 0 fail, and adjusted
 ReleaseSmall 463 ok / 0 fail / 2 excluded.
 
-The first broad Debug manifest row,
-`tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, is now object-clean as a selected
-source-backed row. The closed broad-Debug parser/verifier boundaries are
-LLVM `#dbg_*` debug records, `ret`/`unreachable` metadata, sizeless
-`DIBasicType`, and columnless `DILocation` nodes. This does not promote broad
-Debug asm/object; `tmp/zig_ir/raw/control_flow_calls.Debug.ll` is the next
-measured broad Debug row.
+The selected broad Debug raw rows are now object-clean:
+`tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
+`tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
+`tmp/zig_ir/raw/pointers_memory.Debug.ll`, and
+`tmp/zig_ir/raw/tiny_scalar.Debug.ll`. The closed broad-Debug parser/verifier
+boundaries are LLVM `#dbg_*` debug records, `ret`/`unreachable` metadata,
+sizeless `DIBasicType`, and columnless `DILocation` nodes. The selected
+`pointers_memory` row also closes the bounded O0 local-variable alloca/store
+prologue in front of volatile pointer roundtrip lowering. This does not
+promote broad Debug asm/object beyond the selected rows.
 
 ## Activation Rule
 

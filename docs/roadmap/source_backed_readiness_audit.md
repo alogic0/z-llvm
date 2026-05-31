@@ -153,15 +153,18 @@ Debug:
 
 - Compile-unit, subprogram, lexical block, and location metadata survive the
       accepted reduced fixtures.
-- The reduced Debug x86_64 object gate is clean for six selected fixtures:
+- The reduced Debug x86_64 object gate is clean for seven selected fixtures:
       `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
-      for call-chain, declare/value intrinsic, loop, metadata, and scope-branch
-      shapes.
-- The first broad Debug manifest row,
-      `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, now emits a local object
-      after accepting source-backed Debug/O0 metadata forms: `#dbg_*` records,
-      terminator metadata, sizeless `DIBasicType`, and columnless
-      `DILocation`.
+      for call-chain, declare/value intrinsic, loop, metadata, scope-branch,
+      and O0 volatile-pointer roundtrip shapes.
+- The selected broad Debug raw rows now emit local objects:
+      `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
+      `tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
+      `tmp/zig_ir/raw/pointers_memory.Debug.ll`, and
+      `tmp/zig_ir/raw/tiny_scalar.Debug.ll`. The closed source-backed Debug/O0
+      forms are `#dbg_*` records, terminator metadata, sizeless `DIBasicType`,
+      columnless `DILocation`, and selected local-variable alloca/stores before
+      volatile pointer roundtrip lowering.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 

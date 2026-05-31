@@ -1717,35 +1717,77 @@ fn lowerPointerVolatileRoundtripReturn(
     if (!std.mem.eql(u8, function.name, "pointers_memory.volatile_roundtrip")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
-    if (block.instructions.items.len != 2) return false;
 
-    const store_inst = block.instructions.items[0];
-    const load_inst = block.instructions.items[1];
-    if (store_inst.removed or load_inst.removed) return false;
-    const load_result = load_inst.result orelse return false;
+    var alloca_names: [8][]const u8 = undefined;
+    var alloca_count: usize = 0;
+    var volatile_store: ?ir.StoreInst = null;
+    var volatile_load: ?ir.LoadInst = null;
+    var volatile_load_result: ?[]const u8 = null;
+
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .alloca => {
+                if (alloca_count == alloca_names.len) return false;
+                alloca_names[alloca_count] = instruction.result orelse return false;
+                alloca_count += 1;
+            },
+            .store => |store| {
+                if (store.attrs.is_volatile) {
+                    if (volatile_store != null) return false;
+                    volatile_store = store;
+                } else if (!isO0ParamStoreToAlloca(function, store, alloca_names[0..alloca_count])) {
+                    return false;
+                }
+            },
+            .load => |load| {
+                if (!load.attrs.is_volatile or volatile_load != null) return false;
+                volatile_load = load;
+                volatile_load_result = instruction.result orelse return false;
+            },
+            .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return false,
+        }
+    }
+
+    const store = volatile_store orelse return false;
+    const load = volatile_load orelse return false;
+    const load_result = volatile_load_result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
     if (!std.mem.eql(u8, ret_name, load_result)) return false;
 
-    const store = switch (store_inst.kind) {
-        .store => |store| store,
-        else => return false,
-    };
     if (!store.ty.eql(.{ .int = 32 }) or !store.attrs.is_volatile) return false;
     if (!isNamed(store.ptr, function.params.items[0].name) or !isNamed(store.value, function.params.items[1].name)) return false;
 
-    const load = switch (load_inst.kind) {
-        .load => |load| load,
-        else => return false,
-    };
     if (!load.ty.eql(.{ .int = 32 }) or !load.attrs.is_volatile) return false;
     if (!isNamed(load.ptr, function.params.items[0].name)) return false;
 
     try machine.instructions.append(allocator, .volatile_roundtrip_rdi_esi_eax);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn isO0ParamStoreToAlloca(function: ir.Function, store: ir.StoreInst, alloca_names: []const []const u8) bool {
+    if (store.attrs.isBarrier()) return false;
+    const ptr_name = switch (store.ptr) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    var points_to_alloca = false;
+    for (alloca_names) |alloca_name| {
+        if (std.mem.eql(u8, ptr_name, alloca_name)) {
+            points_to_alloca = true;
+            break;
+        }
+    }
+    if (!points_to_alloca) return false;
+
+    for (function.params.items) |param| {
+        if (store.ty.eql(param.ty) and isNamed(store.value, param.name)) return true;
+    }
+    return false;
 }
 
 fn lowerPointerLoadStoreReturn(

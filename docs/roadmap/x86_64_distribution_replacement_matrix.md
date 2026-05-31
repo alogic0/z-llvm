@@ -54,14 +54,15 @@ reduced object probe is now clean for selected Debug fixtures:
 bash scripts/run_distribution_debug_object_m4.sh
   target=x86_64-unknown-linux-gnu
   inputs=test/zig/expected/debug_*.reduced.ll
-  object_probe=6 ok, 0 fail
+  object_probe=7 ok, 0 fail
   covered_shapes=call-chain add-immediate, dbg.declare/dbg.value no-op object
-                 lowering, simple loop sum, metadata add, scope branch phi
+                 lowering, simple loop sum, metadata add, scope branch phi,
+                 O0 alloca debug prologue plus volatile pointer roundtrip
   excluded=DWARF/unwind emission, full O0 codegen, variable-location salvage,
            broad Debug std rows, target-complete ABI lowering
 ```
 
-The first broad Debug manifest row also has selected object evidence:
+The selected broad raw Debug rows also have object evidence:
 
 ```text
 source=tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll
@@ -70,7 +71,20 @@ object_probe=1 ok, 0 fail
 closed_boundaries=#dbg_* records dropped as non-semantic object records,
                   ret/unreachable metadata accepted, sizeless DIBasicType,
                   columnless DILocation
-next_broad_debug_row=tmp/zig_ir/raw/control_flow_calls.Debug.ll
+
+source=tmp/zig_ir/raw/control_flow_calls.Debug.ll
+probe=tmp/zig_ir/debug_object_probe_control_flow_calls_20260531/ir
+object_probe=1 ok, 0 fail
+
+source=tmp/zig_ir/raw/pointers_memory.Debug.ll
+probe=tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir
+object_probe=1 ok, 0 fail
+closed_boundary=selected O0 alloca debug prologue before volatile pointer
+                store/load roundtrip
+
+source=tmp/zig_ir/raw/tiny_scalar.Debug.ll
+probe=tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir
+object_probe=1 ok, 0 fail
 ```
 
 Handoff is conservative for release modes because
