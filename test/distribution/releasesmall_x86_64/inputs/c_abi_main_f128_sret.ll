@@ -18,6 +18,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_assert_PD = alias i32 (i64, double), ptr @main.zig_assert_PD
 @zig_ret_PD = alias { i64, double } (), ptr @main.zig_ret_PD
 @zig_ret_CFF = alias { i64, float } (), ptr @main.zig_ret_CFF
+@zig_assert_CFF = alias i32 (i64, float), ptr @main.zig_assert_CFF
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -99,4 +100,26 @@ define private { i64, double } @main.zig_ret_PD() unnamed_addr align 1 {
 define private { i64, float } @main.zig_ret_CFF() unnamed_addr align 1 {
 0:
   ret { i64, float } { i64 4566650022153682983, float 1.000000e+00 }
+}
+
+define private i32 @main.zig_assert_CFF(i64 %0, float %1) unnamed_addr align 1 {
+2:
+  %3 = alloca %main.PD, align 8
+  %4 = alloca [64 x i8], align 1
+  %.sroa.0.sroa.3.0.extract.shift = lshr i64 %0, 32
+  %.sroa.0.sroa.3.0.extract.trunc = trunc nuw i64 %.sroa.0.sroa.3.0.extract.shift to i32
+  %5 = bitcast i32 %.sroa.0.sroa.3.0.extract.trunc to float
+  %6 = and i64 %0, 255
+  %.not = icmp ne i64 %6, 39
+  %spec.store.select = zext i1 %.not to i32
+  %7 = fcmp une float %5, 8.750000e-01
+  %.0 = select i1 %7, i32 2, i32 %spec.store.select
+  %8 = fcmp une float %1, 1.000000e+00
+  %.1 = select i1 %8, i32 3, i32 %.0
+  %.not8 = icmp eq i32 %.1, 0
+  br i1 %.not8, label %9, label %10
+9:
+  ret i32 %.1
+10:
+  br label %9
 }

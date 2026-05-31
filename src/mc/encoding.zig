@@ -73,6 +73,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x81, 0xf9 });
                 try appendI32(&bytes, allocator, value);
             },
+            .cmp_rdi_imm64 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
+                try appendU64(&bytes, allocator, @bitCast(value));
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x39, 0xc7 });
+            },
             .test_eax_eax => try bytes.appendSlice(allocator, &.{ 0x85, 0xc0 }),
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
@@ -94,7 +99,13 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendU32(&bytes, allocator, value);
                 try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc0 });
             },
+            .mov_imm32_xmm1 => |value| {
+                try bytes.append(allocator, 0xb8);
+                try appendU32(&bytes, allocator, value);
+                try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc8 });
+            },
             .ucomisd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc1 }),
+            .ucomiss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc1 }),
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
@@ -202,6 +213,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .cmp_ecx_imm32 => 6,
+        .cmp_rdi_imm64 => 13,
         .test_eax_eax => 2,
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
@@ -211,7 +223,9 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm64_xmm0 => 15,
         .mov_imm64_xmm1 => 15,
         .mov_imm32_xmm0 => 9,
+        .mov_imm32_xmm1 => 9,
         .ucomisd_xmm1_xmm0 => 4,
+        .ucomiss_xmm1_xmm0 => 3,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
         .sub_rsp_24, .add_rsp_24 => 4,

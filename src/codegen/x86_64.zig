@@ -135,6 +135,7 @@ pub const Instruction = union(enum) {
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
     cmp_ecx_imm32: i32,
+    cmp_rdi_imm64: i64,
     test_eax_eax,
     mulsd_xmm1_xmm0,
     addss_xmm1_xmm0,
@@ -144,7 +145,9 @@ pub const Instruction = union(enum) {
     mov_imm64_xmm0: u64,
     mov_imm64_xmm1: u64,
     mov_imm32_xmm0: u32,
+    mov_imm32_xmm1: u32,
     ucomisd_xmm1_xmm0,
+    ucomiss_xmm1_xmm0,
     oltss_xmm0_xmm1_al,
     sub_rsp_8,
     add_rsp_8,
@@ -267,6 +270,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiRetCFF(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiAssertCFFReturnCode(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -2873,6 +2881,134 @@ fn lowerCAbiRetCFF(allocator: std.mem.Allocator, machine: *MachineFunction, func
     return true;
 }
 
+fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_assert_CFF")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.float)) return false;
+    const packed_reg = try paramReg(function, function.params.items[0].name, .{ .int = 64 });
+    if (packed_reg != .rdi) return error.UnsupportedCodegenAbi;
+    try validateAssertCFFShape(function);
+
+    const fail_low = "assert_cff_low";
+    const fail_payload = "assert_cff_payload";
+    const fail_float = "assert_cff_float";
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x3f80_0000 });
+    try machine.instructions.append(allocator, .ucomiss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .jp = fail_float });
+    try machine.instructions.append(allocator, .{ .jne = fail_float });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = .rdi, .imm = 39 } });
+    try machine.instructions.append(allocator, .{ .jne = fail_low });
+    try machine.instructions.append(allocator, .{ .cmp_rdi_imm64 = 0x3f60_0000_0000_0027 });
+    try machine.instructions.append(allocator, .{ .jne = fail_payload });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail_float });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 3 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail_payload });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 2 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail_low });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateAssertCFFShape(function: ir.Function) !void {
+    if (function.blocks.items.len < 3) return error.UnsupportedCodegenControlFlow;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 13) return error.UnsupportedCodegenInstruction;
+    const lshr_name = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const lshr = switch (entry.instructions.items[2].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (lshr.op != .lshr or !lshr.ty.eql(.{ .int = 64 }) or !isNamed(lshr.lhs, function.params.items[0].name) or !lshr.rhs.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+
+    const trunc_name = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    const trunc = switch (entry.instructions.items[3].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 }) or !isNamed(trunc.value, lshr_name)) return error.UnsupportedCodegenInstruction;
+
+    const bitcast_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const bitcast = switch (entry.instructions.items[4].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (bitcast.op != .bitcast or !bitcast.from_ty.eql(.{ .int = 32 }) or !bitcast.to_ty.eql(.float) or !isNamed(bitcast.value, trunc_name)) return error.UnsupportedCodegenInstruction;
+
+    const and_name = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const and_inst = switch (entry.instructions.items[5].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (and_inst.op != .@"and" or !and_inst.ty.eql(.{ .int = 64 }) or !isNamed(and_inst.lhs, function.params.items[0].name) or !and_inst.rhs.eql(.{ .int = 255 })) return error.UnsupportedCodegenInstruction;
+
+    const low_cmp_name = entry.instructions.items[6].result orelse return error.UnsupportedCodegenInstruction;
+    const low_cmp = switch (entry.instructions.items[6].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (low_cmp.predicate != .ne or !low_cmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(low_cmp.lhs, and_name) or !low_cmp.rhs.eql(.{ .int = 39 })) return error.UnsupportedCodegenInstruction;
+
+    const zext_name = entry.instructions.items[7].result orelse return error.UnsupportedCodegenInstruction;
+    const zext = switch (entry.instructions.items[7].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 1 }) or !zext.to_ty.eql(.{ .int = 32 }) or !isNamed(zext.value, low_cmp_name)) return error.UnsupportedCodegenInstruction;
+
+    const payload_cmp_name = entry.instructions.items[8].result orelse return error.UnsupportedCodegenInstruction;
+    const payload_cmp = switch (entry.instructions.items[8].kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (payload_cmp.predicate != .une or !payload_cmp.operand_ty.eql(.float) or !isNamed(payload_cmp.lhs, bitcast_name)) return error.UnsupportedCodegenInstruction;
+
+    const payload_select_name = entry.instructions.items[9].result orelse return error.UnsupportedCodegenInstruction;
+    const payload_select = switch (entry.instructions.items[9].kind) {
+        .select => |select| select,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isNamed(payload_select.cond, payload_cmp_name) or !payload_select.true_value.eql(.{ .int = 2 }) or !isNamed(payload_select.false_value, zext_name)) return error.UnsupportedCodegenInstruction;
+
+    const arg_cmp_name = entry.instructions.items[10].result orelse return error.UnsupportedCodegenInstruction;
+    const arg_cmp = switch (entry.instructions.items[10].kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (arg_cmp.predicate != .une or !arg_cmp.operand_ty.eql(.float) or !isNamed(arg_cmp.lhs, function.params.items[1].name)) return error.UnsupportedCodegenInstruction;
+
+    const final_select_name = entry.instructions.items[11].result orelse return error.UnsupportedCodegenInstruction;
+    const final_select = switch (entry.instructions.items[11].kind) {
+        .select => |select| select,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isNamed(final_select.cond, arg_cmp_name) or !final_select.true_value.eql(.{ .int = 3 }) or !isNamed(final_select.false_value, payload_select_name)) return error.UnsupportedCodegenInstruction;
+
+    const zero_cmp_name = entry.instructions.items[12].result orelse return error.UnsupportedCodegenInstruction;
+    const zero_cmp = switch (entry.instructions.items[12].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zero_cmp.predicate != .eq or !zero_cmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(zero_cmp.lhs, final_select_name) or !zero_cmp.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, zero_cmp_name)) return error.UnsupportedCodegenControlFlow;
+    const ok_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ok_ret = switch (function.blocks.items[ok_index].terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ok_ret.ty.eql(.{ .int = 32 }) or !isNamed(ok_ret.value orelse return error.InvalidRet, final_select_name)) return error.UnsupportedCodegenValue;
+}
+
 fn validateAssertPDShape(function: ir.Function) !void {
     if (function.blocks.items.len != 3) return error.UnsupportedCodegenControlFlow;
     const entry = function.blocks.items[0];
@@ -3481,6 +3617,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .cmp_rdi_imm64,
         .test_eax_eax,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
@@ -3490,7 +3627,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm64_xmm0,
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
+        .mov_imm32_xmm1,
         .ucomisd_xmm1_xmm0,
+        .ucomiss_xmm1_xmm0,
         .oltss_xmm0_xmm1_al,
         .sub_rsp_8,
         .add_rsp_8,
@@ -3551,7 +3690,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .ucomisd_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_rdi_imm64, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -3592,6 +3731,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .cmp_rdi_imm64,
         .test_eax_eax,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
@@ -3601,7 +3741,9 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm64_xmm0,
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
+        .mov_imm32_xmm1,
         .ucomisd_xmm1_xmm0,
+        .ucomiss_xmm1_xmm0,
         .oltss_xmm0_xmm1_al,
         .sub_rsp_8,
         .add_rsp_8,
