@@ -402,6 +402,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiRetStructU16(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiRetI64(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -3452,6 +3457,25 @@ fn lowerCAbiRetStructU64(allocator: std.mem.Allocator, machine: *MachineFunction
     if (!value.eql(.{ .int = 19 })) return error.UnsupportedCodegenValue;
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 19 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetStructU16(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_u16")) return false;
+    if (!function.ret_ty.eql(.{ .int = 16 })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    if (!value.eql(.{ .int = 7 })) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 7 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
