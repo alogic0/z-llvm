@@ -95,3 +95,29 @@ C
 zig cc "$comptime_const_harness" "$comptime_const_object" -o "$comptime_const_exe"
 "$comptime_const_exe"
 printf 'ok distribution executable comptime_const\n'
+
+optional_ptr_fixture="test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll"
+optional_ptr_object="$tmp_dir/optional_pointer_value.o"
+optional_ptr_harness="$tmp_dir/optional_ptr_harness.c"
+optional_ptr_exe="$tmp_dir/optional_ptr_harness"
+
+zig build run -- --emit=obj --target="$target" "$optional_ptr_fixture" > "$optional_ptr_object"
+
+cat > "$optional_ptr_harness" <<'C'
+#include <stddef.h>
+
+extern int optional_ptr_value(const int *value);
+
+int main(void) {
+    int positive = 42;
+    int negative = -9;
+    if (optional_ptr_value(&positive) != 42) return 1;
+    if (optional_ptr_value(&negative) != -9) return 2;
+    if (optional_ptr_value(NULL) != -1) return 3;
+    return 0;
+}
+C
+
+zig cc "$optional_ptr_harness" "$optional_ptr_object" -o "$optional_ptr_exe"
+"$optional_ptr_exe"
+printf 'ok distribution executable optional_ptr_value\n'

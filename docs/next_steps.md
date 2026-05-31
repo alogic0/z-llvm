@@ -22,16 +22,16 @@ The Milestone 1 fixtures under
 `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`,
 `@optional_ptr_value`, and `@dense_switch`. Local object generation and selected
 alias symbol emission succeed for the subset. `@add_wrap`, `@branch_mix`, and
-`@call_chain`, plus `@comptime_const` have link-and-run checks. The next
-concrete validation gap is a link-and-run check for `@optional_ptr_value` from
-`optional_pointer_value.ll`.
+`@call_chain`, `@comptime_const`, plus `@optional_ptr_value` have link-and-run
+checks. The next concrete validation gap is a link-and-run check for
+`@dense_switch` from `switch_control_dense_switch.ll`.
 
 LLVM fallback removed or reduced:
-Extend the executable validation harness to `@optional_ptr_value`: emit the local
+Extend the executable validation harness to `@dense_switch`: emit the local
 object, link it with a tiny host harness, and validate deterministic return
-values for the selected nullable pointer ABI shape. This reduces the
-ReleaseFast x86_64 asm/object fallback for the named Milestone 1 subset only; it
-does not claim broad linker ownership, startup runtime, libc replacement,
+values for the selected dense-switch ABI shape. This reduces the ReleaseFast
+x86_64 asm/object fallback for the named Milestone 1 subset only; it does not
+claim broad linker ownership, startup runtime, libc replacement,
 cross-target execution, or exhaustive ABI coverage.
 
 Mode/target/stage row:
@@ -46,10 +46,10 @@ handoff as the reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`.
 
 Known boundary:
-Implement only an `@optional_ptr_value` executable check for the selected ReleaseFast
-x86_64 object. Do not generalize to pointer arguments, calls, switch behavior,
-global data, cross-compilation execution, or target-complete ABI validation in
-this slice.
+Implement only an `@dense_switch` executable check for the selected ReleaseFast
+x86_64 object. Do not generalize to broader switch behavior, pointer arguments,
+calls, global data, cross-compilation execution, or target-complete ABI
+validation in this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh` and
