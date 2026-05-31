@@ -12,11 +12,12 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the first continuous Debug prefix-200 object blocker,
-`c_abi_main.zig.Debug.x86_64.ll`, into one bounded source-backed fixture if it
-exposes a selected ABI/control-flow shape. If the first public shape is broad
-O0 ABI infrastructure, record that boundary and keep broader Debug asm/object
-as LLVM fallback.
+Reduce the current continuous Debug prefix-200 object blocker,
+`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll`,
+into one bounded source-backed fixture if it exposes a selected address-space
+pointer/control-flow shape. If the first public shape is broad O0 address-space
+infrastructure, record that boundary and keep broader Debug asm/object as LLVM
+fallback.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -616,20 +617,19 @@ summary total=100 ok=100 fail=0 excluded=0 first_failure=-
 closed_boundary=behavior_sizeof_and_typeof Debug/O0 c_* panic-call unreachable stubs
 
 input=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
-summary total=200 ok=149 fail=51 excluded=0
-first_failure=c_abi_main.zig.Debug.x86_64.ll
+summary total=200 ok=150 fail=50 excluded=0
+first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
-closed_alias_in_blocker=@zig_f128_f128_struct -> @main.zig_f128_f128_struct
-next_alias_in_blocker=@zig_f128_struct -> @main.zig_f128_struct
+closed_blocker=c_abi_main.zig.Debug.x86_64.ll
 ```
 
 LLVM fallback removed or reduced:
 Advance Debug asm/object evidence beyond the first 100 continuous rows by
-reducing the next selected `c_abi_main` public alias,
-`@zig_f128_struct -> @main.zig_f128_struct`, only if it stays bounded. Keep O0
-C ABI breadth, full register allocation, and runtime/debug infrastructure
-outside the local replacement boundary unless the selected shape proves
-otherwise.
+reducing the next selected address-space pointer public shape from
+`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll`,
+only if it stays bounded. Keep broad O0 address-space pointer semantics, full
+register allocation, and runtime/debug infrastructure outside the local
+replacement boundary unless the selected shape proves otherwise.
 
 Mode/target/stage row:
 `mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -648,12 +648,13 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 
 Known boundary:
 Do not promote broad Debug asm/object from the clean prefix alone. Record each
-`c_abi_main` public alias, its optimized IR shape, and whether it maps to an
-already selected ReleaseSmall C ABI lowering or to broader Debug/O0
-infrastructure.
+selected public shape, its Debug/O0 IR form, and whether it maps to an already
+selected lowering family or to broader Debug/O0 infrastructure.
 
 Validation gate:
-Run a focused probe for `c_abi_main.zig.Debug.x86_64.ll`, then keep
+Run a focused probe for
+`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll`,
+then keep
 `bash scripts/run_distribution_debug_object_m4.sh` and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 

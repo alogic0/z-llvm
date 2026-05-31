@@ -251,7 +251,7 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
                 .c_string => |text| text,
                 .none, .scalar, .array, .@"opaque" => return null,
             };
-            if (!std.mem.eql(u8, text, "c\"test\\00\"")) return error.UnsupportedGlobalVariable;
+            if (!std.mem.eql(u8, text, "c\"test\\00\"")) return null;
             try data.appendSlice(allocator, "test\x00");
             return 5;
         }
@@ -269,7 +269,7 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
                 .c_string => |text| text,
                 .none, .scalar, .array, .@"opaque" => return null,
             };
-            if (!std.mem.eql(u8, text, "c\"hello\\00\"")) return error.UnsupportedGlobalVariable;
+            if (!std.mem.eql(u8, text, "c\"hello\\00\"")) return null;
             try data.appendSlice(allocator, "hello\x00");
             return 6;
         }
@@ -278,7 +278,7 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
                 .c_string => |text| text,
                 .none, .scalar, .array, .@"opaque" => return null,
             };
-            if (!std.mem.eql(u8, text, "c\"negative int\\00\"")) return error.UnsupportedGlobalVariable;
+            if (!std.mem.eql(u8, text, "c\"negative int\\00\"")) return null;
             try data.appendSlice(allocator, "negative int\x00");
             return 13;
         }

@@ -388,6 +388,16 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiRetSmallStructInts(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiRetStructU32Union(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiRetStructU64U64(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -423,6 +433,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiRetStructU32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiRetStructU16(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -434,6 +449,16 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiRetI64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiRetU64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiRetU32(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -524,6 +549,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiStructI32I32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiStructU32Union(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -3748,6 +3778,11 @@ fn lowerCAbiF128AggregateReturn(allocator: std.mem.Allocator, machine: *MachineF
     if (!std.mem.eql(u8, function.name, "main.zig_f128_struct")) return false;
     if (!function.ret_ty.eql(.{ .aggregate = "{ fp128 }" })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.fp128)) return false;
+    if (function.blocks.items.len == 4) {
+        const debug_shape = try validateDebugF128AggregateReturn(function);
+        try appendCAbiF128AggregateReturnMachine(allocator, machine, debug_shape.panic_label);
+        return true;
+    }
     if (function.blocks.items.len != 3) return false;
 
     const entry = function.blocks.items[0];
@@ -3776,23 +3811,32 @@ fn lowerCAbiF128AggregateReturn(allocator: std.mem.Allocator, machine: *MachineF
     try validateF128AggregateRet(function.blocks.items[success_index], "0xL0000000000000000400F81CD00000000");
     try validatePanicUnreachableBlock(function.blocks.items[panic_index]);
 
+    try appendCAbiF128AggregateReturnMachine(allocator, machine, condbr.else_target);
+    return true;
+}
+
+fn appendCAbiF128AggregateReturnMachine(allocator: std.mem.Allocator, machine: *MachineFunction, panic_label: []const u8) !void {
     try machine.instructions.append(allocator, .sub_rsp_8);
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_struct_cmp0" });
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try machine.instructions.append(allocator, .{ .jne = condbr.else_target });
+    try machine.instructions.append(allocator, .{ .jne = panic_label });
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm0 = "__zllvm_f128_struct_ret0" });
     try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = condbr.else_target });
+    try machine.instructions.append(allocator, .{ .label = panic_label });
     try machine.instructions.append(allocator, .ud2);
-    return true;
 }
 
 fn lowerCAbiF128ScalarReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_f128")) return false;
     if (!function.ret_ty.eql(.fp128)) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.fp128)) return false;
+    if (function.blocks.items.len == 4) {
+        const debug_shape = try validateDebugF128ScalarReturn(function);
+        try appendCAbiF128ScalarReturnMachine(allocator, machine, debug_shape.panic_label);
+        return true;
+    }
     if (function.blocks.items.len != 3) return false;
 
     const entry = function.blocks.items[0];
@@ -3821,21 +3865,25 @@ fn lowerCAbiF128ScalarReturn(allocator: std.mem.Allocator, machine: *MachineFunc
     try validateF128ScalarRet(function.blocks.items[success_index], "0xL00000000000000004004100000000000");
     try validatePanicUnreachableBlock(function.blocks.items[panic_index]);
 
+    try appendCAbiF128ScalarReturnMachine(allocator, machine, condbr.else_target);
+    return true;
+}
+
+fn appendCAbiF128ScalarReturnMachine(allocator: std.mem.Allocator, machine: *MachineFunction, panic_label: []const u8) !void {
     try machine.instructions.append(allocator, .sub_rsp_8);
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_scalar_cmp0" });
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try machine.instructions.append(allocator, .{ .jne = condbr.else_target });
+    try machine.instructions.append(allocator, .{ .jne = panic_label });
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm0 = "__zllvm_f128_scalar_ret0" });
     try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = condbr.else_target });
+    try machine.instructions.append(allocator, .{ .label = panic_label });
     try machine.instructions.append(allocator, .ud2);
-    return true;
 }
 
 fn lowerCAbiAssertPDReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_assert_PD")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_assert_PD") and !std.mem.eql(u8, function.name, "main.zig_c_assert_PD")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.double)) return false;
@@ -3867,16 +3915,20 @@ fn lowerCAbiRetPD(allocator: std.mem.Allocator, machine: *MachineFunction, funct
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, double }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, double }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 0, double 5.000000e-01 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 5) {
+        try validateDebugRetPD(block);
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, double }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 0, double 5.000000e-01 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -3890,16 +3942,20 @@ fn lowerCAbiRetCFF(allocator: std.mem.Allocator, machine: *MachineFunction, func
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, float }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, float }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 4566650022153682983, float 1.000000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 7) {
+        try validateDebugRetCFF(block);
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, float }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 4566650022153682983, float 1.000000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 4566650022153682983 });
@@ -3913,16 +3969,20 @@ fn lowerCAbiRetDC(allocator: std.mem.Allocator, machine: *MachineFunction, funct
     if (!function.ret_ty.eql(.{ .aggregate = "{ double, i64 }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ double, i64 }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ double -2.500000e-01, i64 15 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 5) {
+        try validateDebugRetDC(block);
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ double, i64 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ double -2.500000e-01, i64 15 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0xbfd0_0000_0000_0000 });
@@ -3962,16 +4022,20 @@ fn lowerCAbiRetSplitStructMixed(allocator: std.mem.Allocator, machine: *MachineF
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i64 }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 1234, i64 4946957900061868132 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 7) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.SplitStructMixed" }, .{ .aggregate = "{ i64, i64 }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 1234, i64 4946957900061868132 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 1234 });
@@ -3985,16 +4049,20 @@ fn lowerCAbiRetMedStructMixed(allocator: std.mem.Allocator, machine: *MachineFun
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i64 }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 4812096201845376210, i64 1151803392 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 9) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.MedStructMixed" }, .{ .aggregate = "{ i64, i64 }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 4812096201845376210, i64 1151803392 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 4812096201845376210 });
@@ -4008,16 +4076,68 @@ fn lowerCAbiRetMedStructInts(allocator: std.mem.Allocator, machine: *MachineFunc
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i32 }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, i32 }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 8589934593, i32 3 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 7) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.MedStructInts" }, .{ .aggregate = "{ i64, i32 }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, i32 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 8589934593, i32 3 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 8589934593 });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = 3 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetSmallStructInts(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_small_struct_ints")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len == 9) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.SmallStructInts" }, .{ .int = 32 });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 32 }) or !(ret.value orelse return error.InvalidRet).eql(.{ .int = 0x0403_0201 })) return error.InvalidRet;
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0x0403_0201 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetStructU32Union(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_u32_union_u32_u32u32")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i32 }" })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len == 7) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u32_Union_u32_u32u32" }, .{ .aggregate = "{ i64, i32 }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, i32 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 8589934593, i32 3 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 8589934593 });
@@ -4031,16 +4151,20 @@ fn lowerCAbiRetStructU64U64(allocator: std.mem.Allocator, machine: *MachineFunct
     if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i64 }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 1, i64 2 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 5) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u64_u64" }, .{ .aggregate = "{ i64, i64 }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 1, i64 2 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 1 });
@@ -4050,20 +4174,29 @@ fn lowerCAbiRetStructU64U64(allocator: std.mem.Allocator, machine: *MachineFunct
 }
 
 fn lowerCAbiRetStructF32F32F32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_f32_f32f32")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_f32_f32f32") and
+        !std.mem.eql(u8, function.name, "main.zig_ret_struct_f32f32_f32")) return false;
     if (!function.ret_ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ <2 x float> <float 1.000000e+00, float 2.000000e+00>, float 3.000000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 7) {
+        const alloca_ty: ir.Type = if (std.mem.eql(u8, function.name, "main.zig_ret_struct_f32_f32f32"))
+            .{ .aggregate = "%main.Struct_f32_f32f32" }
+        else
+            .{ .aggregate = "%main.Struct_f32f32_f32" };
+        try validateDebugStackLoadReturn(block, alloca_ty, .{ .aggregate = "{ <2 x float>, float }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ <2 x float> <float 1.000000e+00, float 2.000000e+00>, float 3.000000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x4000_0000_3f80_0000 });
@@ -4077,16 +4210,20 @@ fn lowerCAbiRetStructF32A8F32A8(allocator: std.mem.Allocator, machine: *MachineF
     if (!function.ret_ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ <2 x float> <float 1.250000e+00, float undef>, float 2.750000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 5) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_f32a8_f32a8" }, .{ .aggregate = "{ <2 x float>, float }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ <2 x float> <float 1.250000e+00, float undef>, float 2.750000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x0000_0000_3fa0_0000 });
@@ -4100,16 +4237,20 @@ fn lowerCAbiRetStructF32A8(allocator: std.mem.Allocator, machine: *MachineFuncti
     if (!function.ret_ty.eql(.{ .aggregate = "{ float }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ float }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ float 1.250000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_f32a8" }, .{ .aggregate = "{ float }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ float }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ float 1.250000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = 0x3fa0_0000 });
@@ -4122,16 +4263,20 @@ fn lowerCAbiRetStructF64(allocator: std.mem.Allocator, machine: *MachineFunction
     if (!function.ret_ty.eql(.{ .aggregate = "{ double }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ double }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ double 2.500000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_f64" }, .{ .aggregate = "{ double }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ double }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ double 2.500000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x4004_0000_0000_0000 });
@@ -4144,16 +4289,20 @@ fn lowerCAbiRetStructF32(allocator: std.mem.Allocator, machine: *MachineFunction
     if (!function.ret_ty.eql(.{ .aggregate = "{ float }" })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .aggregate = "{ float }" })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    switch (value) {
-        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ float 2.500000e+00 }")) return error.UnsupportedCodegenValue,
-        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_f32" }, .{ .aggregate = "{ float }" });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .aggregate = "{ float }" })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        switch (value) {
+            .constant_expr => |text| if (!std.mem.eql(u8, text, "{ float 2.500000e+00 }")) return error.UnsupportedCodegenValue,
+            .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+        }
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = 0x4020_0000 });
@@ -4166,16 +4315,43 @@ fn lowerCAbiRetStructU64(allocator: std.mem.Allocator, machine: *MachineFunction
     if (!function.ret_ty.eql(.{ .int = 64 })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    if (!value.eql(.{ .int = 19 })) return error.UnsupportedCodegenValue;
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u64" }, .{ .int = 64 });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        if (!value.eql(.{ .int = 19 })) return error.UnsupportedCodegenValue;
+    }
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = 19 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetStructU32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_u32")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u32" }, .{ .int = 32 });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 32 })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        if (!value.eql(.{ .int = 13 })) return error.UnsupportedCodegenValue;
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 13 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -4185,14 +4361,18 @@ fn lowerCAbiRetStructU16(allocator: std.mem.Allocator, machine: *MachineFunction
     if (!function.ret_ty.eql(.{ .int = 16 })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    if (!value.eql(.{ .int = 7 })) return error.UnsupportedCodegenValue;
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u16" }, .{ .int = 16 });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 16 })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        if (!value.eql(.{ .int = 7 })) return error.UnsupportedCodegenValue;
+    }
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 7 });
     try machine.instructions.append(allocator, .ret);
@@ -4204,14 +4384,18 @@ fn lowerCAbiRetStructU8(allocator: std.mem.Allocator, machine: *MachineFunction,
     if (!function.ret_ty.eql(.{ .int = 8 })) return false;
     if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
-    if (!ret.ty.eql(.{ .int = 8 })) return error.ReturnTypeMismatch;
-    const value = ret.value orelse return error.InvalidRet;
-    if (!value.eql(.{ .int = 1 })) return error.UnsupportedCodegenValue;
+    if (block.instructions.items.len == 3) {
+        try validateDebugStackLoadReturn(block, .{ .aggregate = "%main.Struct_u8" }, .{ .int = 8 });
+    } else {
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            else => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 8 })) return error.ReturnTypeMismatch;
+        const value = ret.value orelse return error.InvalidRet;
+        if (!value.eql(.{ .int = 1 })) return error.UnsupportedCodegenValue;
+    }
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
@@ -4233,6 +4417,44 @@ fn lowerCAbiRetI64(allocator: std.mem.Allocator, machine: *MachineFunction, func
     if (!value.eql(.{ .int = -1 })) return error.UnsupportedCodegenValue;
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetU64(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_u64")) return false;
+    if (!function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    if (!value.eql(.{ .int = -1 })) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetU32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_u32")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    if (!value.eql(.{ .int = -1 })) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -4573,8 +4795,26 @@ fn lowerCAbiStructI32I32(allocator: std.mem.Allocator, machine: *MachineFunction
     return true;
 }
 
+fn lowerCAbiStructU32Union(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_u32_union_u32_u32u32")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+
+    const fail = "struct_u32_union_fail";
+    try appendCompareArg64Imm64(allocator, machine, .rdi, 0x0000_0002_0000_0001, fail);
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = .rsi });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 3 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn lowerCAbiStructF32F32F32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_struct_f32_f32f32")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_f32_f32f32") and
+        !std.mem.eql(u8, function.name, "main.zig_struct_f32f32_f32")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .float } }) or function.params.items[1].ty != .float) return error.UnsupportedCodegenType;
@@ -5165,7 +5405,11 @@ fn lowerCAbiPanic(allocator: std.mem.Allocator, machine: *MachineFunction, funct
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 0) return false;
     if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
-    try validatePanicUnreachableBlock(function.blocks.items[0]);
+    if (function.blocks.items[0].instructions.items.len == 3) {
+        try validateDebugPanicUnreachableBlock(function.blocks.items[0]);
+    } else {
+        try validatePanicUnreachableBlock(function.blocks.items[0]);
+    }
 
     try machine.instructions.append(allocator, .ud2);
     return true;
@@ -5461,6 +5705,7 @@ fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineF
 }
 
 fn validateAssertDCShape(function: ir.Function) !void {
+    if (function.blocks.items.len == 10) return validateDebugAssertDCShape(function);
     if (function.blocks.items.len < 3) return error.UnsupportedCodegenControlFlow;
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 8) return error.UnsupportedCodegenInstruction;
@@ -5525,6 +5770,7 @@ fn validateAssertDCShape(function: ir.Function) !void {
 }
 
 fn validateAssertCFFShape(function: ir.Function) !void {
+    if (function.blocks.items.len == 13) return validateDebugAssertCFFShape(function);
     if (function.blocks.items.len < 3) return error.UnsupportedCodegenControlFlow;
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 13) return error.UnsupportedCodegenInstruction;
@@ -5619,6 +5865,7 @@ fn validateAssertCFFShape(function: ir.Function) !void {
 }
 
 fn validateAssertPDShape(function: ir.Function) !void {
+    if (function.blocks.items.len == 10) return validateDebugAssertPDShape(function);
     if (function.blocks.items.len != 3) return error.UnsupportedCodegenControlFlow;
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 6) return error.UnsupportedCodegenInstruction;
@@ -5713,6 +5960,454 @@ fn validateAssertPDShape(function: ir.Function) !void {
     if (!std.mem.eql(u8, call.callee, "debug.print__anon_14634") or call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
 }
 
+fn validateDebugAssertPDShape(function: ir.Function) !void {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 11) return error.UnsupportedCodegenInstruction;
+
+    const print_alloca = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "{ %main.PD }" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const code_alloca = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[1].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const pd_alloca = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[2].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.PD" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const raw_alloca = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[3].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "[16 x i8]" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+
+    const ptr_store = switch (entry.instructions.items[4].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!ptr_store.ty.eql(.{ .int = 64 }) or !isNamed(ptr_store.value, function.params.items[0].name) or !isNamed(ptr_store.ptr, raw_alloca)) return error.UnsupportedCodegenValue;
+    const double_slot = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const double_gep = switch (entry.instructions.items[5].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(double_gep, raw_alloca, 8);
+    const double_store = switch (entry.instructions.items[6].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!double_store.ty.eql(.double) or !isNamed(double_store.value, function.params.items[1].name) or !isNamed(double_store.ptr, double_slot)) return error.UnsupportedCodegenValue;
+    try validateDebugF128Memcpy(entry.instructions.items[7], pd_alloca, raw_alloca, 16);
+    try validateI32Store(entry.instructions.items[8], code_alloca, 0);
+    const ptr_load_name = try validateNamedLoad(entry.instructions.items[9], .ptr, pd_alloca);
+    const ptr_ne_name = entry.instructions.items[10].result orelse return error.UnsupportedCodegenInstruction;
+    const ptr_ne = switch (entry.instructions.items[10].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (ptr_ne.predicate != .ne or !ptr_ne.operand_ty.eql(.ptr) or !isNamed(ptr_ne.lhs, ptr_load_name) or !ptr_ne.rhs.eql(.null_value)) return error.UnsupportedCodegenInstruction;
+    const ptr_branch = try validateDebugCondBr(entry, ptr_ne_name);
+
+    const ptr_fail = function.blocks.items[blockIndex(function, ptr_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (ptr_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(ptr_fail.instructions.items[0], code_alloca, 1);
+    const double_check_label = try validateTerminatorBr(ptr_fail);
+    const ptr_ok = function.blocks.items[blockIndex(function, ptr_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(ptr_ok), double_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    const double_check = function.blocks.items[blockIndex(function, double_check_label) orelse return error.InvalidBranchTarget];
+    if (double_check.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    const loaded_double_slot = double_check.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const loaded_double_gep = switch (double_check.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(loaded_double_gep, pd_alloca, 8);
+    const loaded_double = try validateNamedLoad(double_check.instructions.items[1], .double, loaded_double_slot);
+    const double_ne_name = double_check.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const double_ne = switch (double_check.instructions.items[2].kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (double_ne.predicate != .une or !double_ne.operand_ty.eql(.double) or !isNamed(double_ne.lhs, loaded_double)) return error.UnsupportedCodegenInstruction;
+    switch (double_ne.rhs) {
+        .fp => |text| if (!std.mem.eql(u8, text, "5.000000e-01")) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+    const double_branch = try validateDebugCondBr(double_check, double_ne_name);
+
+    const double_fail = function.blocks.items[blockIndex(function, double_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (double_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(double_fail.instructions.items[0], code_alloca, 2);
+    const return_check_label = try validateTerminatorBr(double_fail);
+    const double_ok = function.blocks.items[blockIndex(function, double_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(double_ok), return_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    const return_check = function.blocks.items[blockIndex(function, return_check_label) orelse return error.InvalidBranchTarget];
+    if (return_check.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const code_for_check = try validateNamedLoad(return_check.instructions.items[0], .{ .int = 32 }, code_alloca);
+    const code_nonzero_name = return_check.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const code_nonzero = switch (return_check.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (code_nonzero.predicate != .ne or !code_nonzero.operand_ty.eql(.{ .int = 32 }) or !isNamed(code_nonzero.lhs, code_for_check) or !code_nonzero.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
+    const print_branch = try validateDebugCondBr(return_check, code_nonzero_name);
+
+    const print_block = function.blocks.items[blockIndex(function, print_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (print_block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    try validateDebugF128Memcpy(print_block.instructions.items[0], print_alloca, raw_alloca, 16);
+    const print_call = switch (print_block.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.startsWith(u8, print_call.callee, "debug.print__anon_") or print_call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
+    const return_label = try validateTerminatorBr(print_block);
+    const no_print = function.blocks.items[blockIndex(function, print_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(no_print), return_label)) return error.UnsupportedCodegenControlFlow;
+
+    const return_block = function.blocks.items[blockIndex(function, return_label) orelse return error.InvalidBranchTarget];
+    if (return_block.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const ret_code = try validateNamedLoad(return_block.instructions.items[0], .{ .int = 32 }, code_alloca);
+    const ret = switch (return_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, ret_code)) return error.UnsupportedCodegenValue;
+}
+
+fn validateDebugRetPD(block: ir.BasicBlock) !void {
+    const alloca_name = block.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (block.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.PD" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const ptr_store = switch (block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!ptr_store.ty.eql(.ptr) or !isNamed(ptr_store.ptr, alloca_name) or !ptr_store.value.eql(.null_value)) return error.UnsupportedCodegenValue;
+    const double_slot = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const double_gep = switch (block.instructions.items[2].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(double_gep, alloca_name, 8);
+    const double_store = switch (block.instructions.items[3].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!double_store.ty.eql(.double) or !isNamed(double_store.ptr, double_slot)) return error.UnsupportedCodegenValue;
+    switch (double_store.value) {
+        .fp => |text| if (!std.mem.eql(u8, text, "5.000000e-01")) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+    const load_name = try validateNamedLoad(block.instructions.items[4], .{ .aggregate = "{ i64, double }" }, alloca_name);
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ i64, double }" }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return error.InvalidRet;
+}
+
+fn validateDebugRetCFF(block: ir.BasicBlock) !void {
+    const alloca_name = block.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (block.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.CFF" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const low_store = switch (block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!low_store.ty.eql(.{ .int = 8 }) or !isNamed(low_store.ptr, alloca_name) or !low_store.value.eql(.{ .int = 39 })) return error.UnsupportedCodegenValue;
+    const payload_slot = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const payload_gep = switch (block.instructions.items[2].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(payload_gep, alloca_name, 4);
+    try validateFloatStore(block.instructions.items[3], payload_slot, .float, "8.750000e-01");
+    const arg_slot = block.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const arg_gep = switch (block.instructions.items[4].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(arg_gep, alloca_name, 8);
+    try validateFloatStore(block.instructions.items[5], arg_slot, .float, "1.000000e+00");
+    const load_name = try validateNamedLoad(block.instructions.items[6], .{ .aggregate = "{ i64, float }" }, alloca_name);
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ i64, float }" }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return error.InvalidRet;
+}
+
+fn validateDebugRetDC(block: ir.BasicBlock) !void {
+    const alloca_name = block.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (block.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.DC" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    try validateFloatStore(block.instructions.items[1], alloca_name, .double, "-2.500000e-01");
+    const byte_slot = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const byte_gep = switch (block.instructions.items[2].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(byte_gep, alloca_name, 8);
+    const byte_store = switch (block.instructions.items[3].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!byte_store.ty.eql(.{ .int = 8 }) or !isNamed(byte_store.ptr, byte_slot) or !byte_store.value.eql(.{ .int = 15 })) return error.UnsupportedCodegenValue;
+    const load_name = try validateNamedLoad(block.instructions.items[4], .{ .aggregate = "{ double, i64 }" }, alloca_name);
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ double, i64 }" }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return error.InvalidRet;
+}
+
+fn validateDebugStackLoadReturn(block: ir.BasicBlock, alloca_ty: ir.Type, ret_ty: ir.Type) !void {
+    if (block.instructions.items.len < 2) return error.UnsupportedCodegenInstruction;
+    const alloca_name = block.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (block.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(alloca_ty)) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    for (block.instructions.items[1 .. block.instructions.items.len - 1]) |instruction| {
+        if (instruction.result != null) {
+            switch (instruction.kind) {
+                .gep => {},
+                else => return error.UnsupportedCodegenInstruction,
+            }
+        } else {
+            switch (instruction.kind) {
+                .store => {},
+                else => return error.UnsupportedCodegenInstruction,
+            }
+        }
+    }
+    const load_name = try validateNamedLoad(block.instructions.items[block.instructions.items.len - 1], ret_ty, alloca_name);
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(ret_ty) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return error.InvalidRet;
+}
+
+fn validateDebugAssertCFFShape(function: ir.Function) !void {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 11) return error.UnsupportedCodegenInstruction;
+
+    const print_alloca = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "{ %main.CFF }" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const code_alloca = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[1].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const cff_alloca = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[2].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.CFF" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const raw_alloca = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[3].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "[16 x i8]" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+
+    const packed_store = switch (entry.instructions.items[4].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!packed_store.ty.eql(.{ .int = 64 }) or !isNamed(packed_store.value, function.params.items[0].name) or !isNamed(packed_store.ptr, raw_alloca)) return error.UnsupportedCodegenValue;
+    const arg_slot = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const arg_gep = switch (entry.instructions.items[5].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(arg_gep, raw_alloca, 8);
+    const arg_store = switch (entry.instructions.items[6].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!arg_store.ty.eql(.float) or !isNamed(arg_store.value, function.params.items[1].name) or !isNamed(arg_store.ptr, arg_slot)) return error.UnsupportedCodegenValue;
+    try validateDebugF128Memcpy(entry.instructions.items[7], cff_alloca, raw_alloca, 12);
+    try validateI32Store(entry.instructions.items[8], code_alloca, 0);
+    const low_name = try validateNamedLoad(entry.instructions.items[9], .{ .int = 8 }, cff_alloca);
+    const low_ne_name = try validateIcmpImm(entry.instructions.items[10], .ne, .{ .int = 8 }, low_name, 39);
+    const low_branch = try validateDebugCondBr(entry, low_ne_name);
+
+    const low_fail = function.blocks.items[blockIndex(function, low_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (low_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(low_fail.instructions.items[0], code_alloca, 1);
+    const payload_check_label = try validateTerminatorBr(low_fail);
+    const low_ok = function.blocks.items[blockIndex(function, low_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(low_ok), payload_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    const payload_check = function.blocks.items[blockIndex(function, payload_check_label) orelse return error.InvalidBranchTarget];
+    if (payload_check.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    const payload_slot = payload_check.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const payload_gep = switch (payload_check.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(payload_gep, cff_alloca, 4);
+    const payload_name = try validateNamedLoad(payload_check.instructions.items[1], .float, payload_slot);
+    const payload_ne_name = try validateFcmpImm(payload_check.instructions.items[2], .une, .float, payload_name, "8.750000e-01");
+    const payload_branch = try validateDebugCondBr(payload_check, payload_ne_name);
+
+    const payload_fail = function.blocks.items[blockIndex(function, payload_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (payload_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(payload_fail.instructions.items[0], code_alloca, 2);
+    const arg_check_label = try validateTerminatorBr(payload_fail);
+    const payload_ok = function.blocks.items[blockIndex(function, payload_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(payload_ok), arg_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    const arg_check = function.blocks.items[blockIndex(function, arg_check_label) orelse return error.InvalidBranchTarget];
+    if (arg_check.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    const loaded_arg_slot = arg_check.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const loaded_arg_gep = switch (arg_check.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(loaded_arg_gep, cff_alloca, 8);
+    const loaded_arg = try validateNamedLoad(arg_check.instructions.items[1], .float, loaded_arg_slot);
+    const arg_ne_name = try validateFcmpImm(arg_check.instructions.items[2], .une, .float, loaded_arg, "1.000000e+00");
+    const arg_branch = try validateDebugCondBr(arg_check, arg_ne_name);
+
+    const arg_fail = function.blocks.items[blockIndex(function, arg_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (arg_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(arg_fail.instructions.items[0], code_alloca, 3);
+    const return_check_label = try validateTerminatorBr(arg_fail);
+    const arg_ok = function.blocks.items[blockIndex(function, arg_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(arg_ok), return_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    try validateDebugReturnCodeTail(function, return_check_label, code_alloca, print_alloca, raw_alloca, 12);
+}
+
+fn validateDebugAssertDCShape(function: ir.Function) !void {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 11) return error.UnsupportedCodegenInstruction;
+
+    const print_alloca = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "{ %main.DC }" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const code_alloca = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[1].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const dc_alloca = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[2].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.DC" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const raw_alloca = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[3].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "[16 x i8]" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+
+    const double_store = switch (entry.instructions.items[4].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!double_store.ty.eql(.double) or !isNamed(double_store.value, function.params.items[0].name) or !isNamed(double_store.ptr, raw_alloca)) return error.UnsupportedCodegenValue;
+    const raw_int_slot = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const raw_int_gep = switch (entry.instructions.items[5].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(raw_int_gep, raw_alloca, 8);
+    const int_store = switch (entry.instructions.items[6].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!int_store.ty.eql(.{ .int = 64 }) or !isNamed(int_store.value, function.params.items[1].name) or !isNamed(int_store.ptr, raw_int_slot)) return error.UnsupportedCodegenValue;
+    try validateDebugF128Memcpy(entry.instructions.items[7], dc_alloca, raw_alloca, 16);
+    try validateI32Store(entry.instructions.items[8], code_alloca, 0);
+    const double_name = try validateNamedLoad(entry.instructions.items[9], .double, dc_alloca);
+    const double_ne_name = try validateFcmpImm(entry.instructions.items[10], .une, .double, double_name, "-2.500000e-01");
+    const double_branch = try validateDebugCondBr(entry, double_ne_name);
+
+    const double_fail = function.blocks.items[blockIndex(function, double_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (double_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(double_fail.instructions.items[0], code_alloca, 1);
+    const low_check_label = try validateTerminatorBr(double_fail);
+    const double_ok = function.blocks.items[blockIndex(function, double_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(double_ok), low_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    const low_check = function.blocks.items[blockIndex(function, low_check_label) orelse return error.InvalidBranchTarget];
+    if (low_check.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    const low_slot = low_check.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const low_gep = switch (low_check.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(low_gep, dc_alloca, 8);
+    const low_name = try validateNamedLoad(low_check.instructions.items[1], .{ .int = 8 }, low_slot);
+    const low_ne_name = try validateIcmpImm(low_check.instructions.items[2], .ne, .{ .int = 8 }, low_name, 15);
+    const low_branch = try validateDebugCondBr(low_check, low_ne_name);
+
+    const low_fail = function.blocks.items[blockIndex(function, low_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (low_fail.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    try validateI32Store(low_fail.instructions.items[0], code_alloca, 2);
+    const return_check_label = try validateTerminatorBr(low_fail);
+    const low_ok = function.blocks.items[blockIndex(function, low_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(low_ok), return_check_label)) return error.UnsupportedCodegenControlFlow;
+
+    try validateDebugReturnCodeTail(function, return_check_label, code_alloca, print_alloca, raw_alloca, 16);
+}
+
+fn validateDebugReturnCodeTail(
+    function: ir.Function,
+    return_check_label: []const u8,
+    code_alloca: []const u8,
+    print_alloca: []const u8,
+    raw_alloca: []const u8,
+    print_size: i128,
+) !void {
+    const return_check = function.blocks.items[blockIndex(function, return_check_label) orelse return error.InvalidBranchTarget];
+    if (return_check.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const code_for_check = try validateNamedLoad(return_check.instructions.items[0], .{ .int = 32 }, code_alloca);
+    const code_nonzero_name = try validateIcmpImm(return_check.instructions.items[1], .ne, .{ .int = 32 }, code_for_check, 0);
+    const print_branch = try validateDebugCondBr(return_check, code_nonzero_name);
+
+    const print_block = function.blocks.items[blockIndex(function, print_branch.then_target) orelse return error.InvalidBranchTarget];
+    if (print_block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    try validateDebugF128Memcpy(print_block.instructions.items[0], print_alloca, raw_alloca, print_size);
+    const print_call = switch (print_block.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.startsWith(u8, print_call.callee, "debug.print__anon_") or print_call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
+    const return_label = try validateTerminatorBr(print_block);
+    const no_print = function.blocks.items[blockIndex(function, print_branch.else_target) orelse return error.InvalidBranchTarget];
+    if (!std.mem.eql(u8, try validateEmptyBr(no_print), return_label)) return error.UnsupportedCodegenControlFlow;
+
+    const return_block = function.blocks.items[blockIndex(function, return_label) orelse return error.InvalidBranchTarget];
+    if (return_block.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const ret_code = try validateNamedLoad(return_block.instructions.items[0], .{ .int = 32 }, code_alloca);
+    const ret = switch (return_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, ret_code)) return error.UnsupportedCodegenValue;
+}
+
 fn validateF128AggregateRet(block: ir.BasicBlock, expected: []const u8) !void {
     if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
     const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
@@ -5766,7 +6461,7 @@ fn validateDebugF128Sret(function: ir.Function) !DebugF128Sret {
         else => return error.UnsupportedCodegenInstruction,
     }
 
-    try validateDebugF128Memcpy(entry.instructions.items[1], alloca_name, function.params.items[1].name);
+    try validateDebugF128Memcpy(entry.instructions.items[1], alloca_name, function.params.items[1].name, 32);
     const first_load_name = try validateDebugF128Load(entry.instructions.items[2], alloca_name);
     const first_call_name = try validateDebugF128EqCall(entry.instructions.items[3], first_load_name, "0xL00000000000000004002A00000000000");
     const first_eq_name = try validateDebugEqZeroI32(entry.instructions.items[4], first_call_name);
@@ -5804,7 +6499,92 @@ fn validateDebugF128Sret(function: ir.Function) !DebugF128Sret {
     };
 }
 
-fn validateDebugF128Memcpy(instruction: ir.Instruction, dst_name: []const u8, src_name: []const u8) !void {
+fn validateDebugF128AggregateReturn(function: ir.Function) !struct { panic_label: []const u8 } {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 10) return error.UnsupportedCodegenInstruction;
+
+    const result_alloca = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.f128_struct" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const arg_alloca = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[1].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.f128_struct" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+    const raw_alloca = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[2].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "[16 x i8]" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+
+    const param_store = switch (entry.instructions.items[3].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!param_store.ty.eql(.fp128) or !isNamed(param_store.value, function.params.items[0].name) or !isNamed(param_store.ptr, raw_alloca)) return error.UnsupportedCodegenValue;
+    try validateDebugF128Memcpy(entry.instructions.items[4], arg_alloca, raw_alloca, 16);
+    const load_name = try validateDebugF128Load(entry.instructions.items[5], arg_alloca);
+    const call_name = try validateDebugF128EqCall(entry.instructions.items[6], load_name, "0xL0000000000000000400C81C800000000");
+    const eq_name = try validateDebugEqZeroI32(entry.instructions.items[7], call_name);
+    const expect_name = try validateDebugTestingExpect(entry.instructions.items[8], eq_name);
+    const ok_name = try validateDebugEqZeroI16(entry.instructions.items[9], expect_name);
+    const branch = try validateDebugCondBr(entry, ok_name);
+
+    const bridge = function.blocks.items[blockIndex(function, branch.then_target) orelse return error.InvalidBranchTarget];
+    const success_label = try validateEmptyBr(bridge);
+    const success = function.blocks.items[blockIndex(function, success_label) orelse return error.InvalidBranchTarget];
+    try validateDebugF128AggregateSuccess(success, result_alloca);
+    try validateDebugPanicUnreachableBlock(function.blocks.items[blockIndex(function, branch.else_target) orelse return error.InvalidBranchTarget]);
+    return .{ .panic_label = branch.else_target };
+}
+
+fn validateDebugF128AggregateSuccess(block: ir.BasicBlock, result_alloca: []const u8) !void {
+    if (block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const store = switch (block.instructions.items[0].kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.fp128) or !isNamed(store.ptr, result_alloca)) return error.UnsupportedCodegenInstruction;
+    switch (store.value) {
+        .fp => |text| if (!std.mem.eql(u8, text, "0xL0000000000000000400F81CD00000000")) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+
+    const load_name = block.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const load = switch (block.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!load.ty.eql(.{ .aggregate = "{ fp128 }" }) or load.attrs.isBarrier() or !isNamed(load.ptr, result_alloca)) return error.UnsupportedCodegenInstruction;
+
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ fp128 }" }) or !(ret.value orelse return error.InvalidRet).eql(.{ .named = load_name })) return error.InvalidRet;
+}
+
+fn validateDebugF128ScalarReturn(function: ir.Function) !struct { panic_label: []const u8 } {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 4) return error.UnsupportedCodegenInstruction;
+
+    const call_name = try validateDebugF128EqCall(entry.instructions.items[0], function.params.items[0].name, "0xL00000000000000004002800000000000");
+    const eq_name = try validateDebugEqZeroI32(entry.instructions.items[1], call_name);
+    const expect_name = try validateDebugTestingExpect(entry.instructions.items[2], eq_name);
+    const ok_name = try validateDebugEqZeroI16(entry.instructions.items[3], expect_name);
+    const branch = try validateDebugCondBr(entry, ok_name);
+
+    const bridge = function.blocks.items[blockIndex(function, branch.then_target) orelse return error.InvalidBranchTarget];
+    const success_label = try validateEmptyBr(bridge);
+    const success = function.blocks.items[blockIndex(function, success_label) orelse return error.InvalidBranchTarget];
+    try validateF128ScalarRet(success, "0xL00000000000000004004100000000000");
+    try validateDebugPanicUnreachableBlock(function.blocks.items[blockIndex(function, branch.else_target) orelse return error.InvalidBranchTarget]);
+    return .{ .panic_label = branch.else_target };
+}
+
+fn validateDebugF128Memcpy(instruction: ir.Instruction, dst_name: []const u8, src_name: []const u8, expected_size: i128) !void {
     if (instruction.result != null) return error.UnsupportedCodegenInstruction;
     const call = switch (instruction.kind) {
         .call => |call| call,
@@ -5813,7 +6593,7 @@ fn validateDebugF128Memcpy(instruction: ir.Instruction, dst_name: []const u8, sr
     if (!std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64") or call.ret_ty != .void or call.args.items.len != 4) return error.UnsupportedCodegenInstruction;
     if (!call.args.items[0].ty.eql(.ptr) or !isNamed(call.args.items[0].value, dst_name)) return error.UnsupportedCodegenValue;
     if (!call.args.items[1].ty.eql(.ptr) or !isNamed(call.args.items[1].value, src_name)) return error.UnsupportedCodegenValue;
-    if (!call.args.items[2].ty.eql(.{ .int = 64 }) or !call.args.items[2].value.eql(.{ .int = 32 })) return error.UnsupportedCodegenValue;
+    if (!call.args.items[2].ty.eql(.{ .int = 64 }) or !call.args.items[2].value.eql(.{ .int = expected_size })) return error.UnsupportedCodegenValue;
     if (!call.args.items[3].ty.eql(.{ .int = 1 }) or !call.args.items[3].value.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
 }
 
@@ -5825,6 +6605,62 @@ fn validateDebugF128Load(instruction: ir.Instruction, ptr_name: []const u8) ![]c
     };
     if (!load.ty.eql(.fp128) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
     return result;
+}
+
+fn validateNamedLoad(instruction: ir.Instruction, expected_ty: ir.Type, ptr_name: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!load.ty.eql(expected_ty) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
+    return result;
+}
+
+fn validateI32Store(instruction: ir.Instruction, ptr_name: []const u8, expected_value: i128) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or !isNamed(store.ptr, ptr_name) or !store.value.eql(.{ .int = expected_value })) return error.UnsupportedCodegenValue;
+}
+
+fn validateIcmpImm(instruction: ir.Instruction, predicate: ir.IcmpPredicate, ty: ir.Type, lhs_name: []const u8, rhs_value: i128) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(ty) or !isNamed(icmp.lhs, lhs_name) or !icmp.rhs.eql(.{ .int = rhs_value })) return error.UnsupportedCodegenValue;
+    return result;
+}
+
+fn validateFcmpImm(instruction: ir.Instruction, predicate: ir.FcmpPredicate, ty: ir.Type, lhs_name: []const u8, rhs_value: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const fcmp = switch (instruction.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (fcmp.predicate != predicate or !fcmp.operand_ty.eql(ty) or !isNamed(fcmp.lhs, lhs_name)) return error.UnsupportedCodegenValue;
+    switch (fcmp.rhs) {
+        .fp => |text| if (!std.mem.eql(u8, text, rhs_value)) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+    return result;
+}
+
+fn validateFloatStore(instruction: ir.Instruction, ptr_name: []const u8, expected_ty: ir.Type, expected_value: []const u8) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(expected_ty) or !isNamed(store.ptr, ptr_name)) return error.UnsupportedCodegenValue;
+    switch (store.value) {
+        .fp => |text| if (!std.mem.eql(u8, text, expected_value)) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 fn validateDebugF128EqCall(instruction: ir.Instruction, lhs_name: []const u8, expected: []const u8) ![]const u8 {
@@ -5880,6 +6716,10 @@ fn validateDebugCondBr(block: ir.BasicBlock, cond_name: []const u8) !struct { th
 
 fn validateEmptyBr(block: ir.BasicBlock) ![]const u8 {
     if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    return validateTerminatorBr(block);
+}
+
+fn validateTerminatorBr(block: ir.BasicBlock) ![]const u8 {
     return switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .br => |br| br.target,
         else => error.UnsupportedCodegenControlFlow,

@@ -95,11 +95,13 @@ closed_boundary=Debug/O0 sizeof_and_typeof c_* panic-call unreachable stubs
 
 source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv first 200 optimizer-ok rows
 probe=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
-object_probe=149 ok, 51 fail
-first_failure=c_abi_main.zig.Debug.x86_64.ll
+object_probe=150 ok, 50 fail
+first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
-closed_alias_in_blocker=@zig_f128_f128_struct -> @main.zig_f128_f128_struct
-next_alias_in_blocker=@zig_f128_struct -> @main.zig_f128_struct
+closed_blocker=c_abi_main.zig.Debug.x86_64.ll
+closed_boundary=selected Debug/O0 C ABI aliases, stack-materialized aggregate
+                returns, scalar returns, packed struct/union checks, and
+                panic-call stubs
 ```
 
 Handoff is conservative for release modes because

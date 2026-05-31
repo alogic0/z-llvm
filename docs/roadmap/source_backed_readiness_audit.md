@@ -168,11 +168,12 @@ Debug:
       volatile pointer roundtrip lowering.
 - The continuous Debug first-100 optimizer-ok prefix is object-clean at
       `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir`. The
-      first-200 prefix reports 149 object successes and 51 failures, with
-      `c_abi_main.zig.Debug.x86_64.ll` as the first unsupported-control-flow
-      blocker. The first selected alias in that blocker,
-      `@zig_f128_f128_struct`, is now fixture-clean; the next public shape is
-      `@zig_f128_struct`.
+      first-200 prefix now reports 150 object successes and 50 failures. The
+      previous first blocker, `c_abi_main.zig.Debug.x86_64.ll`, is object-clean
+      after selected Debug/O0 C ABI aliases, stack-materialized aggregate
+      returns, scalar returns, packed struct/union checks, and panic-call
+      stubs. The current first unsupported-control-flow blocker is
+      `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll`.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 
