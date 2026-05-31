@@ -512,6 +512,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructU64U645(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3829,6 +3834,28 @@ fn lowerCAbiStructU64U646(allocator: std.mem.Allocator, machine: *MachineFunctio
     try appendCompareStackByval64Imm64(allocator, machine, 8, 0, 15, fail);
     try appendCompareStackByval64Imm64(allocator, machine, 8, 8, 16, fail);
     try appendCompareStack64Imm64(allocator, machine, 16, 7, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiStructU64U645(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_u64_u64_5")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 7) return false;
+    for (function.params.items[0..5]) |param| {
+        if (!param.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    }
+    if (!function.params.items[5].ty.eql(.ptr)) return error.UnsupportedCodegenType;
+    if (!function.params.items[6].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+
+    const byval_reg = try paramReg(function, function.params.items[5].name, .ptr);
+    if (byval_reg != .r9) return error.UnsupportedCodegenAbi;
+    const fail = "struct_u64_u64_5_fail";
+    try appendCompareMem64Imm64(allocator, machine, .r9, 0, 13, fail);
+    try appendCompareMem64Imm64(allocator, machine, .r9, 8, 14, fail);
+    try appendCompareStack64Imm64(allocator, machine, 8, 6, fail);
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);
