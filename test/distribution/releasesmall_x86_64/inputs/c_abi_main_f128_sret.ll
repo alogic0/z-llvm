@@ -96,6 +96,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_u32 = alias void (i32), ptr @main.zig_u32
 @zig_u16 = alias void (i16), ptr @main.zig_u16
 @zig_u8 = alias void (i8), ptr @main.zig_u8
+@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -839,6 +840,41 @@ define private void @main.zig_u8(i8 %0) unnamed_addr align 1 {
 3:
   ret void
 4:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_five_integers(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4) unnamed_addr align 1 {
+5:
+  %6 = icmp eq i32 %0, 12
+  br i1 %6, label %7, label %9
+7:
+  %8 = icmp eq i32 %1, 34
+  br i1 %8, label %10, label %12
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  %11 = icmp eq i32 %2, 56
+  br i1 %11, label %13, label %15
+12:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+13:
+  %14 = icmp eq i32 %3, 78
+  br i1 %14, label %16, label %18
+15:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+16:
+  %17 = icmp eq i32 %4, 90
+  br i1 %17, label %19, label %20
+18:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+19:
+  ret void
+20:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }

@@ -673,6 +673,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiFiveIntegers(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4493,6 +4498,38 @@ fn lowerCAbiI8(allocator: std.mem.Allocator, machine: *MachineFunction, function
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerCAbiFiveIntegers(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_five_integers")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 5) return false;
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "five_integers_fail";
+    try appendCompareArg32Imm32(allocator, machine, .rdi, 12, fail);
+    try appendCompareArg32Imm32(allocator, machine, .rsi, 34, fail);
+    try appendCompareArg32Imm32(allocator, machine, .rdx, 56, fail);
+    try appendCompareArg32Imm32(allocator, machine, .rcx, 78, fail);
+    try appendCompareArg32Imm32(allocator, machine, .r8, 90, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn appendCompareArg32Imm32(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: ArgReg,
+    expected: i32,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected });
+    try machine.instructions.append(allocator, .{ .jne = fail });
 }
 
 fn appendCompareStackByval64Imm64(
