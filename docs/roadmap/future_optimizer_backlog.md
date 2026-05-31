@@ -118,10 +118,10 @@ this baseline does not promote a handoff/codegen gate by itself.
 Milestone 1 for `ReleaseFast / x86_64-linux-gnu / asm-object` now records a
 conservative boundary for the selected Zig-backed object subset in
 `docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The first remaining
-uncovered blocker is executable callable ABI validation for `@dense_switch`;
-object generation and selected alias symbol emission now succeed for every
-selected Milestone 1 fixture, and `@add_wrap`, `@branch_mix`, `@call_chain`,
-`@comptime_const`, plus `@optional_ptr_value` have link-and-run checks.
+uncovered blocker is executable callable ABI validation for the `tiny_scalar`
+aliases; object generation and selected alias symbol emission now succeed for
+every selected Milestone 1 fixture, and every selected non-`tiny_scalar` alias
+has a link-and-run check.
 
 ## Activation Rule
 

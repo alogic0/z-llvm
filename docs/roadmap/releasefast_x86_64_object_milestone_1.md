@@ -61,8 +61,9 @@ objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 `.symtab` records, including the selected public alias symbol for each fixture.
 `scripts/run_distribution_executable_m1.sh` links the selected `@add_wrap`,
 `@branch_mix`, `@call_chain`, `@comptime_const`, and `@optional_ptr_value`
-objects with tiny host harnesses and validates deterministic return values.
-Executable checks beyond those aliases remain Milestone 2 work.
+objects, plus `@dense_switch`, with tiny host harnesses and validates
+deterministic return values. Executable checks beyond those aliases remain
+Milestone 2 work.
 
 ## Matrix Result
 
@@ -82,7 +83,7 @@ integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission beyond selected local function aliases
 pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch-table lowering beyond the selected dense constant-return shape
-executable validation beyond the selected `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`, and `@optional_ptr_value` aliases
+executable validation beyond the selected `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`, `@optional_ptr_value`, and `@dense_switch` aliases
 debug/unwind records
 linker behavior
 target-complete ABI lowering
@@ -92,5 +93,5 @@ target-complete ABI lowering
 
 The next source-backed blocker is executable callable ABI validation beyond
 `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`, and
-`@optional_ptr_value`. Milestone 2 should broaden one stable public alias at a
-time, starting with `@dense_switch`.
+`@optional_ptr_value`, plus `@dense_switch`. Milestone 2 should close the
+remaining selected `tiny_scalar` aliases, starting with `@add`.

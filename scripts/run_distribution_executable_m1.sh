@@ -121,3 +121,29 @@ C
 zig cc "$optional_ptr_harness" "$optional_ptr_object" -o "$optional_ptr_exe"
 "$optional_ptr_exe"
 printf 'ok distribution executable optional_ptr_value\n'
+
+dense_switch_fixture="test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll"
+dense_switch_object="$tmp_dir/switch_control_dense_switch.o"
+dense_switch_harness="$tmp_dir/dense_switch_harness.c"
+dense_switch_exe="$tmp_dir/dense_switch_harness"
+
+zig build run -- --emit=obj --target="$target" "$dense_switch_fixture" > "$dense_switch_object"
+
+cat > "$dense_switch_harness" <<'C'
+extern int dense_switch(unsigned char value);
+
+int main(void) {
+    if (dense_switch(0) != 11) return 1;
+    if (dense_switch(1) != 13) return 2;
+    if (dense_switch(2) != 17) return 3;
+    if (dense_switch(3) != 19) return 4;
+    if (dense_switch(5) != 19) return 5;
+    if (dense_switch(6) != 23) return 6;
+    if (dense_switch(255) != 23) return 7;
+    return 0;
+}
+C
+
+zig cc "$dense_switch_harness" "$dense_switch_object" -o "$dense_switch_exe"
+"$dense_switch_exe"
+printf 'ok distribution executable dense_switch\n'
