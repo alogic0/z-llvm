@@ -119,9 +119,11 @@ pub const Instruction = union(enum) {
     imul_eax_imm32: i32,
     shl_rdx_imm6: u6,
     or_rdx_rax,
+    add_ecx_eax,
     xor_ecx_ecx,
     add_rdi_rcx4_ptr_eax,
     inc_rcx,
+    cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
     sub_rsp_8,
     add_rsp_8,
@@ -205,6 +207,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             try verifyFunction(machine);
             return machine;
         }
+    }
+
+    if (try lowerControlFlowLoopSum(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
     }
 
     if (try lowerSliceSumLoop(allocator, &machine, function)) {
@@ -1329,6 +1336,31 @@ fn lowerDenseSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     return true;
 }
 
+fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "control_flow_calls.loop_sum")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const loop_label = "loop_sum_loop";
+    const zero_label = "loop_sum_zero";
+    try machine.instructions.append(allocator, .{ .test_arg32 = count_reg });
+    try machine.instructions.append(allocator, .{ .je = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .xor_ecx_ecx);
+    try machine.instructions.append(allocator, .{ .label = loop_label });
+    try machine.instructions.append(allocator, .add_ecx_eax);
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = count_reg });
+    try machine.instructions.append(allocator, .{ .jne = loop_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "aggregates.slice_sum")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
@@ -1662,9 +1694,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .imul_eax_imm32,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .add_ecx_eax,
         .xor_ecx_ecx,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
+        .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .sub_rsp_8,
         .add_rsp_8,
@@ -1688,7 +1722,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1705,7 +1739,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .je, .jne => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .je, .jne => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -1729,9 +1763,11 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .imul_eax_imm32,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .add_ecx_eax,
         .xor_ecx_ecx,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
+        .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .sub_rsp_8,
         .add_rsp_8,

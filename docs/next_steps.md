@@ -13,27 +13,26 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@loop_sum` multi-block unrolled loop
-lowering in `control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected `@error_switch` i8 branch plus phi/select
+lowering in `error_switch.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now has 17 rows:
-6 pass local object emission and 11 remain blocked. The newly closed row is
-`atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`, including
-`@debug_location`, `@inline_asm_barrier`, and `@atomic_add`. The next sorted
-failure is `control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll`, where
-`@call_chain` is already covered by the selected fixture and `@loop_sum` is the
-remaining uncovered public alias.
+7 pass local object emission and 10 remain blocked. The newly closed row is
+`control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll`, including
+`@call_chain` and `@loop_sum`. The next sorted failure is
+`error_switch.zig.ReleaseFast.x86_64.optimized.ll`, where the only public alias
+is `@error_switch = alias i32 (i8)`.
 
 LLVM fallback removed or reduced:
-Add the smallest object/codegen support needed for the selected unrolled
-`@loop_sum` shape. The source-backed optimized output uses multi-block integer
-loop control flow, PHIs, loop-carried accumulation, `llvm.assume` calls, and an
-unrolled eight-at-a-time body with a scalar epilogue. This reduces the
-ReleaseFast x86_64 asm/object fallback for the next broad optimized-output row
-only; it does not claim general loop lowering, vector loops, arbitrary
-intrinsics, register allocation, scheduling, or target-complete ABI coverage.
+Add the smallest object/codegen support needed for the selected
+`@error_switch` shape. The source-backed optimized output branches on `i8 == 0`,
+then uses a second `i8 == 1` compare plus `select` to produce `0`, `-1`, or
+`-2`. This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
+optimized-output row only; it does not claim general switch lowering, arbitrary
+error unions, jump tables, ABI-complete integer extension, or target-complete
+control-flow lowering.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -47,10 +46,10 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@loop_sum` shape from the `control_flow_calls`
-optimized output. Do not generalize to other multi-block loops, arbitrary PHI
-webs, indirect calls, vectors, floating point, TLS, or non-x86_64 ABI behavior
-in this slice.
+Implement only the selected `@error_switch` shape from the `error_switch`
+optimized output. Do not generalize to other branch/phi/select forms, sparse
+switch lowering, error-set ABI modeling, vectors, floating point, TLS, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh`,

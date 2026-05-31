@@ -97,6 +97,30 @@ zig cc "$call_chain_harness" "$call_chain_object" -o "$call_chain_exe"
 "$call_chain_exe"
 printf 'ok distribution executable call_chain\n'
 
+loop_sum_fixture="test/distribution/releasefast_x86_64/inputs/control_flow_calls_loop_sum.ll"
+loop_sum_object="$tmp_dir/control_flow_calls_loop_sum.o"
+loop_sum_harness="$tmp_dir/loop_sum_harness.c"
+loop_sum_exe="$tmp_dir/loop_sum_harness"
+
+zig build run -- --emit=obj --target="$target" "$loop_sum_fixture" > "$loop_sum_object"
+
+cat > "$loop_sum_harness" <<'C'
+extern int loop_sum(int count);
+
+int main(void) {
+    if (loop_sum(0) != 0) return 1;
+    if (loop_sum(1) != 0) return 2;
+    if (loop_sum(5) != 10) return 3;
+    if (loop_sum(8) != 28) return 4;
+    if (loop_sum(13) != 78) return 5;
+    return 0;
+}
+C
+
+zig cc "$loop_sum_harness" "$loop_sum_object" -o "$loop_sum_exe"
+"$loop_sum_exe"
+printf 'ok distribution executable loop_sum\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"

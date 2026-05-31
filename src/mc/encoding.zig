@@ -50,9 +50,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, amount);
             },
             .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
+            .add_ecx_eax => try bytes.appendSlice(allocator, &.{ 0x01, 0xc8 }),
             .xor_ecx_ecx => try bytes.appendSlice(allocator, &.{ 0x31, 0xc9 }),
             .add_rdi_rcx4_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x03, 0x04, 0x8f }),
             .inc_rcx => try bytes.appendSlice(allocator, &.{ 0x48, 0xff, 0xc1 }),
+            .cmp_ecx_arg32 => |reg| try encodeCmpEcxToArg32(&bytes, allocator, reg),
             .cmp_rcx_arg64 => |reg| try encodeCmpRcxToArg64(&bytes, allocator, reg),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
@@ -107,9 +109,11 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .imul_eax_imm32 => 6,
         .shl_rdx_imm6 => 4,
         .or_rdx_rax => 3,
+        .add_ecx_eax => 2,
         .xor_ecx_ecx => 2,
         .add_rdi_rcx4_ptr_eax => 3,
         .inc_rcx => 3,
+        .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
@@ -199,6 +203,12 @@ fn encodeCmpRcxToArg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, 
     var rex: u8 = 0x48;
     if (reg.rexB()) rex |= 0x01;
     try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0x39);
+    try bytes.append(allocator, 0xc0 | (@as(u8, x86_64.ArgReg.rcx.lowCode()) << 3) | @as(u8, reg.lowCode()));
+}
+
+fn encodeCmpEcxToArg32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
     try bytes.append(allocator, 0x39);
     try bytes.append(allocator, 0xc0 | (@as(u8, x86_64.ArgReg.rcx.lowCode()) << 3) | @as(u8, reg.lowCode()));
 }

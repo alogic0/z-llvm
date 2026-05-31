@@ -104,10 +104,10 @@ The current broad object probe is:
 ```text
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 rows=17
-object_ok=6
-object_fail=11
-first_failure=control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll
-first_missing_shape=selected @loop_sum multi-block unrolled loop lowering
+object_ok=7
+object_fail=10
+first_failure=error_switch.zig.ReleaseFast.x86_64.optimized.ll
+first_missing_shape=selected @error_switch i8 branch plus phi/select lowering
 ```
 
 The compact running dashboard is

@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is control_flow_calls
-missing capability=selected loop_sum multi-block unrolled loop lowering
+current blocker=first broad optimized-output object failure is error_switch
+missing capability=selected error_switch i8 branch plus phi/select lowering
 ```
