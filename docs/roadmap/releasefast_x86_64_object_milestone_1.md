@@ -64,6 +64,7 @@ with tiny host harnesses and validates deterministic return values, including
 `@sideEffectFree`, `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`,
 `@comptime_const`, `@optional_ptr_value`, `@dense_switch`, `@pair_first`, and
 `@make_pair`, plus `@error_union_payload` and `@optional_payload`.
+`@slice_sum` is also covered by the broader ReleaseFast object executable gate.
 
 ## Matrix Result
 
@@ -96,5 +97,5 @@ probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
 now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted
 object failure is `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The first
 selected scalar `icmp`/`select` shapes are covered; the next blocker is
-`@slice_sum`, which starts the first multi-block loop/control-flow shape in that
-row.
+`@struct_sum`, which starts the first straight-line pointer GEP/load aggregate
+shape in that row.

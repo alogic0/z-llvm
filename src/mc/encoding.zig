@@ -46,6 +46,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, amount);
             },
             .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
+            .xor_ecx_ecx => try bytes.appendSlice(allocator, &.{ 0x31, 0xc9 }),
+            .add_rdi_rcx4_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x03, 0x04, 0x8f }),
+            .inc_rcx => try bytes.appendSlice(allocator, &.{ 0x48, 0xff, 0xc1 }),
+            .cmp_rcx_arg64 => |reg| try encodeCmpRcxToArg64(&bytes, allocator, reg),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
@@ -68,6 +72,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x84 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jne => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x85 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .ret => try bytes.append(allocator, 0xc3),
         }
         offset += instructionSize(instruction);
@@ -88,6 +100,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .imul_eax_imm32 => 6,
         .shl_rdx_imm6 => 4,
         .or_rdx_rax => 3,
+        .xor_ecx_ecx => 2,
+        .add_rdi_rcx4_ptr_eax => 3,
+        .inc_rcx => 3,
+        .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
@@ -98,7 +114,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
-        .je => 6,
+        .je, .jne => 6,
         .ret => 1,
     };
 }
@@ -161,6 +177,14 @@ fn encodeCmp8Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x
     try bytes.append(allocator, 0x80);
     try bytes.append(allocator, 0xf8 | @as(u8, reg.lowCode()));
     try bytes.append(allocator, imm);
+}
+
+fn encodeCmpRcxToArg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (reg.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0x39);
+    try bytes.append(allocator, 0xc0 | (@as(u8, x86_64.ArgReg.rcx.lowCode()) << 3) | @as(u8, reg.lowCode()));
 }
 
 fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

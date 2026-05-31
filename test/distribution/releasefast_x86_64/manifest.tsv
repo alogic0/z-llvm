@@ -10,3 +10,4 @@ aggregate_abi_pair_first	test/distribution/releasefast_x86_64/inputs/aggregate_a
 aggregate_abi_make_pair	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair packing	make_pair
 aggregates_error_union_payload	test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select	error_union_payload
 aggregates_optional_payload	test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select parameter	optional_payload
+aggregates_slice_sum	test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll	object-readelf	object-ok	aggregates.zig	slice sum loop	slice_sum

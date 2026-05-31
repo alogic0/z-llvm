@@ -238,3 +238,29 @@ C
 zig cc "$aggregates_optional_harness" "$aggregates_optional_object" -o "$aggregates_optional_exe"
 "$aggregates_optional_exe"
 printf 'ok distribution executable aggregates_optional_payload\n'
+
+aggregates_slice_fixture="test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll"
+aggregates_slice_object="$tmp_dir/aggregates_slice_sum.o"
+aggregates_slice_harness="$tmp_dir/aggregates_slice_sum_harness.c"
+aggregates_slice_exe="$tmp_dir/aggregates_slice_sum_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregates_slice_fixture" > "$aggregates_slice_object"
+
+cat > "$aggregates_slice_harness" <<'C'
+#include <stddef.h>
+
+extern int slice_sum(const int *values, long long len);
+
+int main(void) {
+    int values[] = { 4, -2, 9, 1 };
+    if (slice_sum(values, 0) != 0) return 1;
+    if (slice_sum(values, 1) != 4) return 2;
+    if (slice_sum(values, 3) != 11) return 3;
+    if (slice_sum(values, 4) != 12) return 4;
+    return 0;
+}
+C
+
+zig cc "$aggregates_slice_harness" "$aggregates_slice_object" -o "$aggregates_slice_exe"
+"$aggregates_slice_exe"
+printf 'ok distribution executable aggregates_slice_sum\n'

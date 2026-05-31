@@ -16,6 +16,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
             .shl_rdx_imm6 => |amount| try writer.print("\tshlq ${}, %rdx\n", .{amount}),
             .or_rdx_rax => try writer.writeAll("\torq %rdx, %rax\n"),
+            .xor_ecx_ecx => try writer.writeAll("\txorl %ecx, %ecx\n"),
+            .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
+            .inc_rcx => try writer.writeAll("\tincq %rcx\n"),
+            .cmp_rcx_arg64 => |reg| try writer.print("\tcmpq %rcx, {s}\n", .{reg.name64()}),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),
             .add_rsp_8 => try writer.writeAll("\taddq $8, %rsp\n"),
             .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),
@@ -28,6 +32,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .test_arg32 => |reg| try writer.print("\ttestl {s}, {s}\n", .{ reg.name32(), reg.name32() }),
             .test_arg64 => |reg| try writer.print("\ttestq {s}, {s}\n", .{ reg.name64(), reg.name64() }),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
+            .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),
         }
     }
