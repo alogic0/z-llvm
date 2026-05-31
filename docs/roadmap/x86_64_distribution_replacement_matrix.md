@@ -259,6 +259,19 @@ boundary=no local executable emission, CRT/start-file policy, libc integration,
          dynamic loader behavior, archive ownership, or linker script handling
 ```
 
+AArch64 object emission is an explicit target boundary for the current
+distribution matrix:
+
+```text
+gate=bash scripts/run_distribution_aarch64_object_boundary.sh
+target=aarch64-unknown-linux-gnu
+source_fixture=test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll
+result=pass, rejected with unsupported codegen target
+boundary=local object emission is x86_64-linux only; AArch64 parse/verify/
+         optimize evidence does not imply backend, ABI, relocation, or object
+         ownership
+```
+
 Automated broad object probing is now available through:
 
 ```text

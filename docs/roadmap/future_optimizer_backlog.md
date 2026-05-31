@@ -581,6 +581,13 @@ The linker/CRT boundary is also validated by
 stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
 validation remains an explicit `zig cc -target "$cc_target"` handoff.
 
+The first non-x86_64 object target boundary is validated by
+`bash scripts/run_distribution_aarch64_object_boundary.sh`: a source-backed
+ReleaseFast fixture rejects `--emit=obj --target=aarch64-unknown-linux-gnu`
+with the explicit unsupported-codegen-target diagnostic. AArch64 backend,
+ABI, relocation, and object ownership remain outside the current local
+distribution subset.
+
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
