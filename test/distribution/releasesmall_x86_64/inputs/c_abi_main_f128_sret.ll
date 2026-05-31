@@ -23,6 +23,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_DC = alias { double, i64 } (), ptr @main.zig_ret_DC
 @zig_assert_DC = alias i32 (double, i64), ptr @main.zig_assert_DC
 @zig_ret_split_struct_mixed = alias { i64, i64 } (), ptr @main.zig_ret_split_struct_mixed
+@zig_ret_med_struct_mixed = alias { i64, i64 } (), ptr @main.zig_ret_med_struct_mixed
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -153,4 +154,9 @@ define private i32 @main.zig_assert_DC(double %0, i64 %1) unnamed_addr align 1 {
 define private { i64, i64 } @main.zig_ret_split_struct_mixed() unnamed_addr align 1 {
 0:
   ret { i64, i64 } { i64 1234, i64 4946957900061868132 }
+}
+
+define private { i64, i64 } @main.zig_ret_med_struct_mixed() unnamed_addr align 1 {
+0:
+  ret { i64, i64 } { i64 4812096201845376210, i64 1151803392 }
 }
