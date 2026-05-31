@@ -148,3 +148,38 @@ C
 zig cc "$control_flow_harness" "$control_flow_object" -o "$control_flow_exe"
 "$control_flow_exe"
 printf 'ok distribution releasesafe object control_flow_calls_checked\n'
+
+error_switch_fixture="test/distribution/releasesafe_x86_64/inputs/error_switch_select.ll"
+error_switch_object="$tmp_dir/error_switch_select.o"
+error_switch_summary="$tmp_dir/error_switch_select.readelf.txt"
+error_switch_dump="$tmp_dir/error_switch_select.objdump.txt"
+error_switch_harness="$tmp_dir/error_switch_select_harness.c"
+error_switch_exe="$tmp_dir/error_switch_select_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$error_switch_fixture" > "$error_switch_object"
+readelf -W -h -S -s -r "$error_switch_object" > "$error_switch_summary"
+objdump -dr "$error_switch_object" > "$error_switch_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$error_switch_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$error_switch_summary"
+rg -q '[[:space:]]error_switch$' "$error_switch_summary"
+rg -q 'cmp[[:space:]].*0x0' "$error_switch_dump"
+rg -q 'cmp[[:space:]].*0x1' "$error_switch_dump"
+
+cat > "$error_switch_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t error_switch(uint8_t tag);
+
+int main(void) {
+    if (error_switch(0) != 0) return 1;
+    if (error_switch(1) != -1) return 2;
+    if (error_switch(2) != -2) return 3;
+    if (error_switch(255) != -2) return 4;
+    return 0;
+}
+C
+
+zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
+"$error_switch_exe"
+printf 'ok distribution releasesafe object error_switch_select\n'

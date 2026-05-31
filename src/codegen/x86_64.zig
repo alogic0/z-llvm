@@ -281,6 +281,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerErrorSwitchSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
@@ -569,6 +570,56 @@ fn lowerIcmpSelectConstReturn(
     try machine.instructions.append(allocator, .{ .label = true_label });
     try appendSelectedI32Return(allocator, machine, true_value);
     try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerErrorSwitchSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "error_switch.error_switch")) return false;
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const cmp_one_inst = block.instructions.items[0];
+    const cmp_zero_inst = block.instructions.items[1];
+    const first_select_inst = block.instructions.items[2];
+    const second_select_inst = block.instructions.items[3];
+    if (cmp_one_inst.removed or cmp_zero_inst.removed or first_select_inst.removed or second_select_inst.removed) return false;
+
+    const cmp_one_result = cmp_one_inst.result orelse return false;
+    const cmp_zero_result = cmp_zero_inst.result orelse return false;
+    const first_select_result = first_select_inst.result orelse return false;
+    const second_select_result = second_select_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, second_select_result)) return false;
+
+    const tag_name = function.params.items[0].name;
+    if (!matchIcmpEqParamImm(cmp_one_inst, tag_name, .{ .int = 8 }, 1)) return false;
+    if (!matchIcmpEqParamImm(cmp_zero_inst, tag_name, .{ .int = 8 }, 0)) return false;
+
+    const first_select = switch (first_select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!first_select.cond_ty.eql(.{ .int = 1 }) or !first_select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_select.cond, cmp_one_result) or !isInt(first_select.true_value, -1) or !isInt(first_select.false_value, -2)) return false;
+
+    const second_select = switch (second_select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!second_select.cond_ty.eql(.{ .int = 1 }) or !second_select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(second_select.cond, cmp_zero_result) or !isInt(second_select.true_value, 0) or !isNamed(second_select.false_value, first_select_result)) return false;
+
+    try appendErrorSwitchReturns(allocator, machine, try paramReg(function, tag_name, .{ .int = 8 }));
     return true;
 }
 
@@ -1863,6 +1914,11 @@ fn lowerErrorSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
     const tag_reg = try paramReg(function, function.params.items[0].name, .{ .int = 8 });
 
+    try appendErrorSwitchReturns(allocator, machine, tag_reg);
+    return true;
+}
+
+fn appendErrorSwitchReturns(allocator: std.mem.Allocator, machine: *MachineFunction, tag_reg: ArgReg) !void {
     const zero_label = "error_switch_zero";
     const one_label = "error_switch_one";
     try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = tag_reg, .imm = 0 } });
@@ -1877,7 +1933,6 @@ fn lowerErrorSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     try machine.instructions.append(allocator, .{ .label = zero_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
-    return true;
 }
 
 fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -2557,6 +2612,16 @@ fn isInt(value: ir.Value, expected: i128) bool {
         .int => |actual| actual == expected,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn matchIcmpEqParamImm(instruction: ir.Instruction, param_name: []const u8, ty: ir.Type, imm: i128) bool {
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(ty)) return false;
+    return (isNamed(icmp.lhs, param_name) and isInt(icmp.rhs, imm)) or
+        (isNamed(icmp.rhs, param_name) and isInt(icmp.lhs, imm));
 }
 
 fn isCommutative(op: ir.BinaryOp) bool {
