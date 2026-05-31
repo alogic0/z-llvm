@@ -244,3 +244,7 @@ That focused shape is now object-ok with local trap failure edges and an exact
 selected packed bit-pattern check. The broad row still remains the first
 sorted failure; the next selected alias is `@zig_split_struct_ints`, a split
 integer struct comparison control-flow shape.
+That focused shape is now object-ok with local trap failure edges and an exact
+selected packed integer register payload check. The broad row still remains
+the first sorted failure; the next selected alias is `@zig_big_packed_struct`,
+a packed i128 struct comparison control-flow shape.
