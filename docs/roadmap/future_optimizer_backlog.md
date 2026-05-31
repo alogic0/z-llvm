@@ -214,7 +214,11 @@ remains the first sorted blocker; the next selected alias is
 `@zig_ret_med_struct_mixed`, another two-register aggregate return with
 different constant bit patterns. That focused shape is now object-ok. The
 broad row still remains the first sorted blocker; the next selected alias is
-`@zig_ret_med_struct_ints`, an integer aggregate return.
+`@zig_ret_med_struct_ints`, an integer aggregate return. That focused shape is
+now object-ok. The broad row also advances past the adjacent existing
+`@zig_ret_small_struct_ints` i32 return. The broad row still remains the first
+sorted blocker; the next selected alias is `@zig_ret_i64`, a straight-line i64
+return.
 
 ## Activation Rule
 
