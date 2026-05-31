@@ -239,6 +239,42 @@ zig cc "$fp_constants_harness" "$fp_constants_object" -o "$fp_constants_exe"
 "$fp_constants_exe"
 printf 'ok distribution executable fp_constants\n'
 
+fp_extended_fixture="test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll"
+fp_extended_object="$tmp_dir/fp_extended_ops_basic.o"
+fp_extended_harness="$tmp_dir/fp_extended_ops_harness.c"
+fp_extended_exe="$tmp_dir/fp_extended_ops_harness"
+
+zig build run -- --emit=obj --target="$target" "$fp_extended_fixture" > "$fp_extended_object"
+
+cat > "$fp_extended_harness" <<'C'
+extern float float_rem(float a, float b);
+extern double double_div(double a, double b);
+extern float float_sub(float a, float b);
+
+static int close_to_double(double actual, double expected) {
+    double delta = actual - expected;
+    if (delta < 0.0) delta = -delta;
+    return delta < 0.000001;
+}
+
+static int close_to_float(float actual, float expected) {
+    float delta = actual - expected;
+    if (delta < 0.0f) delta = -delta;
+    return delta < 0.0001f;
+}
+
+int main(void) {
+    if (!close_to_float(float_rem(7.5f, 2.0f), 1.5f)) return 1;
+    if (!close_to_double(double_div(9.0, 4.0), 2.25)) return 2;
+    if (!close_to_float(float_sub(7.0f, 2.5f), 4.5f)) return 3;
+    return 0;
+}
+C
+
+zig cc "$fp_extended_harness" "$fp_extended_object" -lm -o "$fp_extended_exe"
+"$fp_extended_exe"
+printf 'ok distribution executable fp_extended_ops\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"

@@ -25,6 +25,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .cmp_rcx_arg64 => |reg| try writer.print("\tcmpq %rcx, {s}\n", .{reg.name64()}),
             .mulsd_xmm1_xmm0 => try writer.writeAll("\tmulsd %xmm1, %xmm0\n"),
             .addss_xmm1_xmm0 => try writer.writeAll("\taddss %xmm1, %xmm0\n"),
+            .subss_xmm1_xmm0 => try writer.writeAll("\tsubss %xmm1, %xmm0\n"),
+            .divsd_xmm1_xmm0 => try writer.writeAll("\tdivsd %xmm1, %xmm0\n"),
             .movapd_xmm1_xmm0 => try writer.writeAll("\tmovapd %xmm1, %xmm0\n"),
             .mov_imm64_xmm0 => |bits| try writer.print("\tmovabsq ${x}, %rax\n\tmovq %rax, %xmm0\n", .{bits}),
             .mov_imm32_xmm0 => |bits| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, %xmm0\n", .{bits}),

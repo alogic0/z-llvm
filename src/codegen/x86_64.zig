@@ -127,6 +127,8 @@ pub const Instruction = union(enum) {
     cmp_rcx_arg64: ArgReg,
     mulsd_xmm1_xmm0,
     addss_xmm1_xmm0,
+    subss_xmm1_xmm0,
+    divsd_xmm1_xmm0,
     movapd_xmm1_xmm0,
     mov_imm64_xmm0: u64,
     mov_imm32_xmm0: u32,
@@ -251,6 +253,9 @@ fn lowerStraightLineReturn(
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerFloatSubReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerDoubleDivReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerFloatRemReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatLessReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatLiteralReturn(allocator, machine, function, ret)) return;
@@ -759,6 +764,81 @@ fn lowerFloatAddReturn(
 
     try machine.instructions.append(allocator, .addss_xmm1_xmm0);
     try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerFloatSubReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!try matchesFpBinaryReturn(function, block, ret, .float, .fsub)) return false;
+    try machine.instructions.append(allocator, .subss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerDoubleDivReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!try matchesFpBinaryReturn(function, block, ret, .double, .fdiv)) return false;
+    try machine.instructions.append(allocator, .divsd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerFloatRemReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "fp_extended_ops.float_rem")) return false;
+    if (!try matchesFpBinaryReturn(function, block, ret, .float, .frem)) return false;
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .direct_call = .{
+        .symbol = "fmodf",
+        .ret_ty = .float,
+    } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn matchesFpBinaryReturn(
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    ty: ir.Type,
+    op: ir.BinaryOp,
+) !bool {
+    if (function.params.items.len != 2) return false;
+    if (!function.ret_ty.eql(ty) or !ret.ty.eql(ty)) return false;
+    if (!function.params.items[0].ty.eql(ty) or !function.params.items[1].ty.eql(ty)) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const binary_inst = block.instructions.items[0];
+    if (binary_inst.removed) return false;
+    const binary_result = binary_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, binary_result)) return false;
+
+    const binary = switch (binary_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != op or !binary.ty.eql(ty)) return false;
+    if (!isNamed(binary.lhs, function.params.items[0].name) or !isNamed(binary.rhs, function.params.items[1].name)) return false;
     return true;
 }
 
@@ -1911,6 +1991,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
+        .subss_xmm1_xmm0,
+        .divsd_xmm1_xmm0,
         .movapd_xmm1_xmm0,
         .mov_imm64_xmm0,
         .mov_imm32_xmm0,
@@ -1937,7 +2019,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1986,6 +2068,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
+        .subss_xmm1_xmm0,
+        .divsd_xmm1_xmm0,
         .movapd_xmm1_xmm0,
         .mov_imm64_xmm0,
         .mov_imm32_xmm0,

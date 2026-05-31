@@ -58,6 +58,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .cmp_rcx_arg64 => |reg| try encodeCmpRcxToArg64(&bytes, allocator, reg),
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
+            .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
+            .divsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5e, 0xc1 }),
             .movapd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x28, 0xc1 }),
             .mov_imm64_xmm0 => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
@@ -131,6 +133,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
+        .subss_xmm1_xmm0 => 4,
+        .divsd_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0 => 4,
         .mov_imm64_xmm0 => 15,
         .mov_imm32_xmm0 => 9,
