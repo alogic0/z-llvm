@@ -617,9 +617,10 @@ variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
 
 Broad object probes are now reproducible with
-`bash scripts/probe_distribution_objects.sh`. It reports stable per-row
+`bash scripts/probe_distribution_objects.sh`, a compatibility shim over
+`tools/probe_distribution_objects.zig`. It reports stable per-row
 ok/fail/excluded lines, first failure, failure categories, and exclusion
-categories. The helper reproduced the current release-mode evidence:
+categories. The Zig helper reproduced the current release-mode evidence:
 ReleaseFast 17 ok / 0 fail, ReleaseSafe 17 ok / 0 fail, and adjusted
 ReleaseSmall 463 ok / 0 fail / 2 excluded.
 

@@ -778,9 +778,10 @@ a reduced conservative object subset, not DWARF/unwind or full O0 codegen
 ownership.
 
 Object-probe automation is now tracked as
-`bash scripts/probe_distribution_objects.sh`. It emits stable per-row
-ok/fail/excluded lines, first-failure data, and category counts. It reproduced
-the current x86_64 release-mode object evidence:
+`bash scripts/probe_distribution_objects.sh`, a compatibility shim over
+`tools/probe_distribution_objects.zig`. It emits stable per-row ok/fail/
+excluded lines, first-failure data, and category counts. It reproduced the
+current x86_64 release-mode object evidence:
 
 ```text
 ReleaseFast  input=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir

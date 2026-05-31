@@ -14,7 +14,8 @@ bash scripts/probe_distribution_objects.sh
 
 The helper builds `z_llvm` once and invokes `zig-out/bin/z_llvm` directly, so
 failure logs preserve the local codegen diagnostic and function name for
-source-backed blocker selection.
+source-backed blocker selection. The public shell command is a compatibility
+shim over `tools/probe_distribution_objects.zig`.
 
 Current automated summaries:
 

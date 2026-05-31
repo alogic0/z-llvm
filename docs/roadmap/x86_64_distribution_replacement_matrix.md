@@ -305,6 +305,7 @@ Automated broad object probing is now available through:
 
 ```text
 bash scripts/probe_distribution_objects.sh
+  implementation=tools/probe_distribution_objects.zig
   ReleaseFast:  total=17  ok=17  fail=0 excluded=0 first_failure=-
   ReleaseSafe:  total=17  ok=17  fail=0 excluded=0 first_failure=-
   ReleaseSmall: total=465 ok=463 fail=0 excluded=2 first_failure=-
