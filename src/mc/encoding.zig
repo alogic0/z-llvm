@@ -88,6 +88,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 const modrm = @as(u8, 0xc0) + cmp.reg.lowCode();
                 if (cmp.reg.rexB()) try bytes.appendSlice(allocator, &.{ 0x49, 0x39, modrm }) else try bytes.appendSlice(allocator, &.{ 0x48, 0x39, modrm });
             },
+            .cmp_arg16_imm16 => |cmp| try encodeCmp16Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .cmp_rdi_imm64 => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
                 try appendU64(&bytes, allocator, @bitCast(value));
@@ -250,6 +251,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_ecx_imm32 => 6,
         .cmp_eax_imm32 => 5,
         .cmp_arg64_imm64 => |cmp| if (cmp.reg.rexB()) 14 else 13,
+        .cmp_arg16_imm16 => |cmp| if (cmp.reg.rexB()) 6 else 5,
         .cmp_rdi_imm64 => 13,
         .cmp_rax_rdx => 3,
         .test_eax_eax => 2,
@@ -433,6 +435,14 @@ fn encodeCmp8Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x
     try bytes.append(allocator, imm);
 }
 
+fn encodeCmp16Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, imm: u16) !void {
+    try bytes.append(allocator, 0x66);
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.append(allocator, 0x81);
+    try bytes.append(allocator, 0xf8 | @as(u8, reg.lowCode()));
+    try appendU16(bytes, allocator, imm);
+}
+
 fn encodeCmpRcxToArg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
     var rex: u8 = 0x48;
     if (reg.rexB()) rex |= 0x01;
@@ -482,6 +492,11 @@ fn encodeTest64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x8
 fn appendI32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: i32) !void {
     const raw: u32 = @bitCast(value);
     try appendU32(bytes, allocator, raw);
+}
+
+fn appendU16(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u16) !void {
+    try bytes.append(allocator, @intCast(value & 0xff));
+    try bytes.append(allocator, @intCast((value >> 8) & 0xff));
 }
 
 fn appendU32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u32) !void {

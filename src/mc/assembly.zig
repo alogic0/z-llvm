@@ -34,6 +34,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .cmp_ecx_imm32 => |value| try writer.print("\tcmpl ${}, %ecx\n", .{value}),
             .cmp_eax_imm32 => |value| try writer.print("\tcmpl ${}, %eax\n", .{value}),
             .cmp_arg64_imm64 => |cmp| try writer.print("\tmovabsq ${}, %rax\n\tcmpq %rax, {s}\n", .{ cmp.imm, cmp.reg.name64() }),
+            .cmp_arg16_imm16 => |cmp| try writer.print("\tcmpw ${}, {s}\n", .{ cmp.imm, cmp.reg.name16() }),
             .cmp_rdi_imm64 => |value| try writer.print("\tmovabsq ${}, %rax\n\tcmpq %rax, %rdi\n", .{value}),
             .cmp_rax_rdx => try writer.writeAll("\tcmpq %rdx, %rax\n"),
             .test_eax_eax => try writer.writeAll("\ttestl %eax, %eax\n"),

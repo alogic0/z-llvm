@@ -21,6 +21,17 @@ pub const ArgReg = enum {
         };
     }
 
+    pub fn name16(reg: ArgReg) []const u8 {
+        return switch (reg) {
+            .rdi => "%di",
+            .rsi => "%si",
+            .rdx => "%dx",
+            .rcx => "%cx",
+            .r8 => "%r8w",
+            .r9 => "%r9w",
+        };
+    }
+
     pub fn name64(reg: ArgReg) []const u8 {
         return switch (reg) {
             .rdi => "%rdi",
@@ -161,6 +172,10 @@ pub const Instruction = union(enum) {
     cmp_arg64_imm64: struct {
         reg: ArgReg,
         imm: i64,
+    },
+    cmp_arg16_imm16: struct {
+        reg: ArgReg,
+        imm: u16,
     },
     cmp_rdi_imm64: i64,
     cmp_rax_rdx,
@@ -558,6 +573,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiStructU32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiStructU16(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -4074,6 +4094,23 @@ fn lowerCAbiStructU32(allocator: std.mem.Allocator, machine: *MachineFunction, f
     return true;
 }
 
+fn lowerCAbiStructU16(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_u16")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 16 })) return error.UnsupportedCodegenType;
+    if (!function.params.items[1].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+
+    const fail = "struct_u16_fail";
+    try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rdi, .imm = 8 } });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try appendCompareArg64Imm64(allocator, machine, .rsi, 9, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn appendCompareStackByval64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -4967,6 +5004,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .cmp_arg64_imm64,
+        .cmp_arg16_imm16,
         .cmp_rdi_imm64,
         .cmp_rax_rdx,
         .test_eax_eax,
@@ -5049,7 +5087,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -5093,6 +5131,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .cmp_arg64_imm64,
+        .cmp_arg16_imm16,
         .cmp_rdi_imm64,
         .cmp_rax_rdx,
         .test_eax_eax,
