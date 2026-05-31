@@ -273,6 +273,15 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
             try data.appendSlice(allocator, "hello\x00");
             return 6;
         }
+        if (std.mem.eql(u8, global.name, "__anon_14658")) {
+            const text = switch (global.initializer) {
+                .c_string => |text| text,
+                .none, .scalar, .array, .@"opaque" => return null,
+            };
+            if (!std.mem.eql(u8, text, "c\"negative int\\00\"")) return error.UnsupportedGlobalVariable;
+            try data.appendSlice(allocator, "negative int\x00");
+            return 13;
+        }
     }
 
     if (global.kind != .global) return null;

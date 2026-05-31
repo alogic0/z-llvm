@@ -163,9 +163,12 @@ closed_blocker=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll se
 closed_alias_in_blocker=@runner_futex_wait -> @main.runner_futex_wait i1 constant return
 closed_alias_in_blocker=@runner_test_name -> @main.runner_test_name string-slice aggregate return
 closed_alias_in_blocker=@runner_test_run -> @main.runner_test_run selected runtime-call lowering
-current_adjusted_object_probe=462 ok, 2 fail, 1 excluded with --input-limit=67108864
-first_adjusted_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
+intermediate_adjusted_object_probe=462 ok, 2 fail, 1 excluded with --input-limit=67108864
+closed_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll selected mix-C aliases
 closed_alias_in_blocker=@add_zig -> @main.add_zig mixed Zig/C global-add i32 return
-selected_alias=@add_may_panic -> @main.add_may_panic
-missing capability=selected checked add/panic branch lowering
+closed_alias_in_blocker=@add_may_panic -> @main.add_may_panic checked add/panic branch
+current_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit=67108864
+first_adjusted_blocker=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@decode_base_64 -> @base64.decode_base_64
+missing capability=table-driven multi-block base64 decoder object lowering or boundary classification
 ```

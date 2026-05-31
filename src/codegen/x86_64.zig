@@ -720,6 +720,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (function.blocks.items.len == 3) {
+        if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
         if (try lowerConditionalReturn(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -2489,6 +2493,100 @@ fn lowerSelectedMixCFilesAddZig(
     try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerSelectedMixCFilesAddMayPanic(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main.add_may_panic")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const icmp_name = entry.instructions.items[0].result orelse return false;
+    const icmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return false;
+    const panic_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ok_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    try validateMixCFilesNegativePanicBlock(function.blocks.items[panic_index]);
+
+    const ok = function.blocks.items[ok_index];
+    if (ok.instructions.items.len != 2) return false;
+    const load_result = ok.instructions.items[0].result orelse return false;
+    const add_result = ok.instructions.items[1].result orelse return false;
+    const load = switch (ok.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, "@main.zig_k")) return false;
+    const add = switch (ok.instructions.items[1].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    const arg_reg = if (isNamed(add.lhs, load_result))
+        try paramValueReg(function, add.rhs, .{ .int = 32 })
+    else if (isNamed(add.rhs, load_result))
+        try paramValueReg(function, add.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    const ret = switch (ok.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, add_result)) return false;
+
+    try machine.instructions.append(allocator, .{ .test_arg32 = arg_reg });
+    try machine.instructions.append(allocator, .{ .js = condbr.then_target });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = condbr.then_target });
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_14658" });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "debug.defaultPanic", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn validateMixCFilesNegativePanicBlock(block: ir.BasicBlock) !void {
+    if (block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const assume = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, assume.callee, "llvm.assume") or assume.ret_ty != .void or assume.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!assume.args.items[0].ty.eql(.{ .int = 1 }) or !assume.args.items[0].value.eql(.{ .int = 1 })) return error.UnsupportedCodegenValue;
+
+    const panic = switch (block.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, panic.callee, "debug.defaultPanic") or panic.ret_ty != .void or panic.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (panic.args.items[0].ty != .ptr or !panic.args.items[0].value.eql(.{ .named = "@__anon_14658" })) return error.UnsupportedCodegenValue;
+    if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !panic.args.items[1].value.eql(.{ .int = 12 })) return error.UnsupportedCodegenValue;
+
+    switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return error.UnsupportedCodegenControlFlow,
+    }
 }
 
 fn lowerExternExportsGetHidden(

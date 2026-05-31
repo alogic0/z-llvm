@@ -523,3 +523,30 @@ rg -q 'add[[:alpha:]]*[[:space:]]+%fs:0x0,%eax' "$mix_c_add_dump"
 rg -q '[[:space:]]ret' "$mix_c_add_dump"
 
 printf 'ok distribution releasesmall object standalone_mix_c_files_add_zig\n'
+
+mix_c_panic_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll"
+mix_c_panic_object="$tmp_dir/standalone_mix_c_files_add_may_panic.o"
+mix_c_panic_summary="$tmp_dir/standalone_mix_c_files_add_may_panic.readelf.txt"
+mix_c_panic_dump="$tmp_dir/standalone_mix_c_files_add_may_panic.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$mix_c_panic_fixture" > "$mix_c_panic_object"
+readelf -W -h -S -s -r "$mix_c_panic_object" > "$mix_c_panic_summary"
+objdump -dr "$mix_c_panic_object" > "$mix_c_panic_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$mix_c_panic_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$mix_c_panic_summary"
+rg -q '[[:space:]]add_may_panic$' "$mix_c_panic_summary"
+rg -q '[[:space:]]main\.add_may_panic$' "$mix_c_panic_summary"
+rg -q '[[:space:]]main\.zig_k$' "$mix_c_panic_summary"
+rg -q '[[:space:]]__anon_14658$' "$mix_c_panic_summary"
+rg -q 'R_X86_64_PC32.*main\.zig_k' "$mix_c_panic_summary"
+rg -q 'R_X86_64_PC32.*__anon_14658' "$mix_c_panic_summary"
+rg -q 'R_X86_64_PLT32.*debug\.defaultPanic' "$mix_c_panic_summary"
+rg -q 'test[[:alpha:]]*[[:space:]]+%edi,%edi' "$mix_c_panic_dump"
+rg -q 'js[[:space:]]+' "$mix_c_panic_dump"
+rg -q 'lea[[:alpha:]]*[[:space:]]+0x0\(%rip\),%rdi' "$mix_c_panic_dump"
+rg -q 'movabs[[:space:]]+\$0xc,%rsi' "$mix_c_panic_dump"
+rg -q 'call' "$mix_c_panic_dump"
+rg -q 'ud2' "$mix_c_panic_dump"
+
+printf 'ok distribution releasesmall object standalone_mix_c_files_add_may_panic\n'

@@ -96,9 +96,11 @@ closed_aliases_20=@_start -> @main._start
 intermediate_adjusted_object_probe=461 object-ok, 3 object-fail, 1 excluded
 closed_failure_21=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_21=@runner_futex_wait -> @main.runner_futex_wait,@runner_test_name -> @main.runner_test_name,@runner_test_run -> @main.runner_test_run
-current_adjusted_object_probe=462 object-ok, 2 object-fail, 1 excluded
-first_adjusted_failure=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
-closed_aliases_in_failure=@add_zig -> @main.add_zig
-selected_alias=@add_may_panic -> @main.add_may_panic
-missing_capability=selected checked add/panic branch lowering
+intermediate_adjusted_object_probe=462 object-ok, 2 object-fail, 1 excluded
+closed_failure_22=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_22=@add_zig -> @main.add_zig,@add_may_panic -> @main.add_may_panic
+current_adjusted_object_probe=463 object-ok, 1 object-fail, 1 excluded
+first_adjusted_failure=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@decode_base_64 -> @base64.decode_base_64
+missing_capability=table-driven multi-block base64 decoder object lowering or boundary classification
 ```

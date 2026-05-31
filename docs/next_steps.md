@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@add_may_panic` alias / `@main.add_may_panic` checked add/panic branch from
-`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@decode_base_64` alias / `@base64.decode_base_64` table-driven decoder from
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -495,38 +495,50 @@ failures, and 1 excluded row. The next selected public shape in that row is
 `%0 < 0`, calls `@debug.defaultPanic` on the cold edge, and otherwise loads
 `@main.zig_k`, adds the i32 argument, and returns the result.
 
+That focused `@add_may_panic` shape is now object-ok through selected signed
+negative branch lowering, panic-edge call relocation, selected panic string
+data, and the existing private global add return path. The
+`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll` row is now
+object-clean. The adjusted ReleaseSmall object probe advanced to 463 object
+successes, 1 object failure, and 1 excluded row. The next sorted
+implementation failure is
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected public shape is `@decode_base_64 = alias i64 (ptr, i64, ptr, i64),
+ptr @base64.decode_base_64`, a large table-driven base64 decoder with
+multi-block control flow, table constants, input/output pointer loops, and
+error return paths.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@add_may_panic` checked add/panic branch shape. This continues reducing the
-ReleaseSmall asm/object fallback row. It does not claim broad checked
-arithmetic lowering, panic formatting/runtime ownership, arbitrary branch
-selection, complete C object/linker integration, non-x86_64 ABI behavior,
-debug records, unwind records, linker ownership, or target-complete ABI
-behavior.
+`@decode_base_64` base64 decoder row. First decide whether this is a
+defensible bounded lowering slice or a conservative boundary exclusion for the
+current ReleaseSmall object subset. It does not claim broad table-driven loop
+lowering, complete pointer-loop/data-movement ownership, generated decoder
+semantics, non-x86_64 ABI behavior, debug records, unwind records, linker
+ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 branch lowering, panic-edge call lowering, global address
-materialization, relocation selection, and integer add lowering behavior as the
-reference boundary:
+Use LLVM x86_64 loop/control-flow lowering, table-constant addressing,
+integer/pointer addressing, and relocation selection as the reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-checked branch shape, also map PC-relative global-load and PLT32 panic-call
-relocations against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`
-and `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
+decoder shape, also map constant table and data relocations against
+`llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
+`llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@add_may_panic` alias to `@main.add_may_panic`
-ReleaseSmall shape with one i32 parameter, one `icmp slt` guard, a selected
-panic call edge, one private i32 Zig global load, and straight-line i32 add on
-the return edge. Do not generalize to arbitrary checked arithmetic, panic
-runtime semantics, C compilation/linking, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Do not start by claiming the full base64 decoder as local replacement. Either
+extract a small source-backed object fixture from the row if a bounded missing
+lowering capability is visible, or classify this row as an explicit
+ReleaseSmall object boundary exclusion for the current subset. Do not
+generalize to arbitrary table-driven loops, decoder runtime semantics,
+debug/unwind object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

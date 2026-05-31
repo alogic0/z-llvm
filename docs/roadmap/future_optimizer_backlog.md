@@ -545,6 +545,14 @@ support. The adjusted broad row still fails in
 adjusted ReleaseSmall object probe remains 462 successes, 2 failures, and 1
 excluded row. The next selected public alias in that row is
 `@add_may_panic -> @main.add_may_panic`, a checked add/panic branch shape.
+That focused shape is now object-ok through selected negative-branch lowering,
+panic-edge call relocation, selected panic string data, and private global add
+return lowering. The `standalone_mix_c_files_main` row is object-clean. The
+adjusted ReleaseSmall object probe is 463 successes, 1 failure, and 1 excluded
+row. The next sorted implementation blocker is
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected alias is `@decode_base_64 -> @base64.decode_base_64`, a large
+table-driven base64 decoder.
 
 ## Activation Rule
 
