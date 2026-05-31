@@ -196,7 +196,7 @@ The first named no-LLVM-codegen x86_64 distribution subset gate is:
 ```text
 bash scripts/run_distribution_no_llvm_codegen_subset.sh
   target=x86_64-unknown-linux-gnu
-  includes=ReleaseFast object/executable gates, ReleaseSafe object gate,
+  includes=ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
            selected ReleaseSmall object gate, selected Debug object/executable
            gates, handoff validation
   result=pass
@@ -217,8 +217,9 @@ status=deferred until a source-backed activation criterion requires bitcode or
        linker LTO handoff
 ```
 
-The selected x86_64 musl object subset is a target-boundary proof only. It does
-not claim executable or linker replacement for musl:
+The selected x86_64 musl object subset is a target-boundary proof. It also
+inherits the selected ReleaseSafe executable harnesses embedded in the M2 gate,
+but does not claim broad executable or linker replacement for musl:
 
 ```text
 gate=bash scripts/run_distribution_x86_64_musl_object_subset.sh
@@ -226,8 +227,8 @@ target=x86_64-unknown-linux-musl
 includes=ReleaseFast object gate, ReleaseSafe object gate,
          ReleaseSmall object gate, selected Debug object gate
 result=pass
-boundary=object emission only; no musl executable harnesses, linker ownership,
-         CRT/start files, libc integration, or dynamic loader behavior
+boundary=no broad musl executable harnesses, linker ownership, CRT/start files,
+         libc integration, or dynamic loader behavior
 ```
 
 The selected x86_64 musl executable subset is also target-backed for stable ABI
@@ -237,11 +238,13 @@ fixtures:
 gate=bash scripts/run_distribution_x86_64_musl_executable_subset.sh
 target=x86_64-unknown-linux-musl
 cc_target=x86_64-linux-musl
-includes=ReleaseFast executable gate, selected Debug mathtest executable gate
+includes=ReleaseFast executable gate, selected ReleaseSafe M2
+         safety/runtime-call executable harnesses, selected Debug mathtest
+         executable gate
 result=pass
-boundary=no ReleaseSafe or ReleaseSmall musl executable expansion yet; no
-         linker ownership, CRT policy, libc integration, or dynamic loader
-         behavior beyond the selected harnesses
+boundary=no ReleaseSmall musl executable expansion yet; no linker ownership,
+         CRT policy, libc integration, or dynamic loader behavior beyond the
+         selected harnesses
 ```
 
 Automated broad object probing is now available through:

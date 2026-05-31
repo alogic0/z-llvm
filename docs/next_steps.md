@@ -9,13 +9,15 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 ## Active Cycle
 
-Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
+Source roadmap: [x86_64 Distribution Object Dashboard](roadmap/x86_64_distribution_object_dashboard.md#focused-gates)
 
 Replacement goal:
-Select the next measured x86_64 target or ABI boundary after selected
-`x86_64-unknown-linux-musl` object and executable subset gates are recorded.
-Prefer ReleaseSafe/ReleaseSmall executable expansion only if it has stable ABI
-fixtures; otherwise record the linker boundary explicitly.
+Promote the next stable executable proof from the selected x86_64 distribution
+subset. The selected ReleaseSafe safety/runtime-call M2 harnesses are now
+target-aware for both GNU and musl, so the next slice is ReleaseSmall executable
+expansion for ABI-stable fixtures, or an explicit ReleaseSmall executable
+boundary if the selected fixtures are not runnable without broad linker or ABI
+work.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at

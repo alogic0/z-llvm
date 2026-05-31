@@ -2,6 +2,11 @@
 set -euo pipefail
 
 target="${TARGET:-x86_64-unknown-linux-gnu}"
+case "$target" in
+    x86_64-unknown-linux-gnu) cc_target="${CC_TARGET:-x86_64-linux-gnu}" ;;
+    x86_64-unknown-linux-musl) cc_target="${CC_TARGET:-x86_64-linux-musl}" ;;
+    *) cc_target="${CC_TARGET:-$target}" ;;
+esac
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -54,7 +59,7 @@ int main(void) {
 }
 C
 
-zig cc "$harness" "$object" -o "$exe"
+zig cc -target "$cc_target" "$harness" "$object" -o "$exe"
 "$exe"
 printf 'ok distribution releasesafe object aggregates_checked_sums\n'
 
@@ -93,7 +98,7 @@ int main(void) {
 }
 C
 
-zig cc "$atomics_harness" "$atomics_object" -o "$atomics_exe"
+zig cc -target "$cc_target" "$atomics_harness" "$atomics_object" -o "$atomics_exe"
 "$atomics_exe"
 printf 'ok distribution releasesafe object atomics_debug_location_checked\n'
 
@@ -145,7 +150,7 @@ int main(void) {
 }
 C
 
-zig cc "$control_flow_harness" "$control_flow_object" -o "$control_flow_exe"
+zig cc -target "$cc_target" "$control_flow_harness" "$control_flow_object" -o "$control_flow_exe"
 "$control_flow_exe"
 printf 'ok distribution releasesafe object control_flow_calls_checked\n'
 
@@ -180,7 +185,7 @@ int main(void) {
 }
 C
 
-zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
+zig cc -target "$cc_target" "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
 "$error_switch_exe"
 printf 'ok distribution releasesafe object error_switch_select\n'
 
@@ -230,7 +235,7 @@ int main(void) {
 }
 C
 
-zig cc "$globals_harness" "$globals_object" -o "$globals_exe"
+zig cc -target "$cc_target" "$globals_harness" "$globals_object" -o "$globals_exe"
 "$globals_exe"
 printf 'ok distribution releasesafe object globals_comptime_checked\n'
 
@@ -273,7 +278,7 @@ int main(void) {
 }
 C
 
-zig cc "$pointers_harness" "$pointers_object" -o "$pointers_exe"
+zig cc -target "$cc_target" "$pointers_harness" "$pointers_object" -o "$pointers_exe"
 "$pointers_exe"
 printf 'ok distribution releasesafe object pointers_memory_checked\n'
 
@@ -315,7 +320,7 @@ int main(void) {
 }
 C
 
-zig cc "$switch_harness" "$switch_object" -o "$switch_exe"
+zig cc -target "$cc_target" "$switch_harness" "$switch_object" -o "$switch_exe"
 "$switch_exe"
 printf 'ok distribution releasesafe object switch_control_branch_mix_checked\n'
 
@@ -357,7 +362,7 @@ int main(void) {
 }
 C
 
-zig cc "$tiny_harness" "$tiny_object" -o "$tiny_exe"
+zig cc -target "$cc_target" "$tiny_harness" "$tiny_object" -o "$tiny_exe"
 "$tiny_exe"
 printf 'ok distribution releasesafe object tiny_scalar_checked_add\n'
 
@@ -403,6 +408,6 @@ int main(void) {
 }
 C
 
-zig cc "$tls_harness" "$tls_object" -o "$tls_exe"
+zig cc -target "$cc_target" "$tls_harness" "$tls_object" -o "$tls_exe"
 "$tls_exe"
 printf 'ok distribution releasesafe object tls_concurrency_checked\n'
