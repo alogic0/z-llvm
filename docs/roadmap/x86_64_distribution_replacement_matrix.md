@@ -158,10 +158,13 @@ boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.opti
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
-current_adjusted_object_probe=461 ok, 3 fail, 1 excluded with --input-limit=67108864
-first_adjusted_blocker=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
+intermediate_adjusted_object_probe=461 ok, 3 fail, 1 excluded with --input-limit=67108864
+closed_blocker=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll selected libfuzzer runner aliases
 closed_alias_in_blocker=@runner_futex_wait -> @main.runner_futex_wait i1 constant return
 closed_alias_in_blocker=@runner_test_name -> @main.runner_test_name string-slice aggregate return
-selected_alias=@runner_test_run -> @main.runner_test_run
-missing capability=selected libfuzzer runtime-call lowering
+closed_alias_in_blocker=@runner_test_run -> @main.runner_test_run selected runtime-call lowering
+current_adjusted_object_probe=462 ok, 2 fail, 1 excluded with --input-limit=67108864
+first_adjusted_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@add_zig -> @main.add_zig
+missing capability=selected mixed Zig/C global-add i32 return lowering
 ```

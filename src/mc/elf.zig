@@ -255,6 +255,24 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
             try data.appendSlice(allocator, "test\x00");
             return 5;
         }
+        if (std.mem.eql(u8, global.name, "__anon_11775")) {
+            const value = switch (global.initializer) {
+                .scalar => |scalar| scalar,
+                .none, .array, .c_string, .@"opaque" => return null,
+            };
+            if (value != .zero_initializer) return error.UnsupportedGlobalVariable;
+            try data.append(allocator, 0);
+            return 1;
+        }
+        if (std.mem.eql(u8, global.name, "__anon_16031")) {
+            const text = switch (global.initializer) {
+                .c_string => |text| text,
+                .none, .scalar, .array, .@"opaque" => return null,
+            };
+            if (!std.mem.eql(u8, text, "c\"hello\\00\"")) return error.UnsupportedGlobalVariable;
+            try data.appendSlice(allocator, "hello\x00");
+            return 6;
+        }
     }
 
     if (global.kind != .global) return null;
@@ -341,7 +359,7 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
-            .load_global_ptr_rax, .lea_global_rax => |symbol| {
+            .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 3,

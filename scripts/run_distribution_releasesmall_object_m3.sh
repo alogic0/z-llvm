@@ -470,3 +470,31 @@ rg -q 'movabs[[:space:]]+\$0x4,%rdx' "$libfuzzer_name_dump"
 rg -q '[[:space:]]ret' "$libfuzzer_name_dump"
 
 printf 'ok distribution releasesmall object standalone_libfuzzer_runner_test_name\n'
+
+libfuzzer_run_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll"
+libfuzzer_run_object="$tmp_dir/standalone_libfuzzer_runner_test_run.o"
+libfuzzer_run_summary="$tmp_dir/standalone_libfuzzer_runner_test_run.readelf.txt"
+libfuzzer_run_dump="$tmp_dir/standalone_libfuzzer_runner_test_run.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$libfuzzer_run_fixture" > "$libfuzzer_run_object"
+readelf -W -h -S -s -r "$libfuzzer_run_object" > "$libfuzzer_run_summary"
+objdump -dr "$libfuzzer_run_object" > "$libfuzzer_run_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$libfuzzer_run_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$libfuzzer_run_summary"
+rg -q '[[:space:]]runner_test_run$' "$libfuzzer_run_summary"
+rg -q '[[:space:]]main\.runner_test_run$' "$libfuzzer_run_summary"
+rg -q '[[:space:]]__anon_11775$' "$libfuzzer_run_summary"
+rg -q '[[:space:]]__anon_16031$' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PC32.*main\.testOne' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PC32.*__anon_11775' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PC32.*__anon_16031' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_set_test' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_new_input' "$libfuzzer_run_summary"
+rg -q 'R_X86_64_PLT32.*fuzzer_start_test' "$libfuzzer_run_summary"
+rg -q 'lea[[:alpha:]]*[[:space:]]+0x0\(%rip\),%rdi' "$libfuzzer_run_dump"
+rg -q 'movabs[[:space:]]+\$0x5,%rsi' "$libfuzzer_run_dump"
+rg -q 'call' "$libfuzzer_run_dump"
+rg -q '[[:space:]]ret' "$libfuzzer_run_dump"
+
+printf 'ok distribution releasesmall object standalone_libfuzzer_runner_test_run\n'

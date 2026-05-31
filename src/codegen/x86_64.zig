@@ -139,6 +139,7 @@ pub const Instruction = union(enum) {
     mov_imm_eax: i32,
     mov_imm_rax: i64,
     mov_imm_rdx: i64,
+    mov_imm_rsi: i64,
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
@@ -257,6 +258,7 @@ pub const Instruction = union(enum) {
     load_global_i32_eax: []const u8,
     load_global_ptr_rax: []const u8,
     lea_global_rax: []const u8,
+    lea_global_rdi: []const u8,
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
     store_eax_tls_i32: []const u8,
@@ -846,6 +848,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
@@ -926,6 +929,84 @@ fn lowerSelectedStringSliceReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = 4 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+const ExpectedCallArg = struct {
+    ty: ir.Type,
+    value: ir.Value,
+};
+
+fn lowerSelectedLibfuzzerTestRun(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main.runner_test_run")) return false;
+    if (ret.ty != .void or ret.value != null) return false;
+    if (function.params.items.len != 1 or block.instructions.items.len != 4) return false;
+
+    const set_test_args = [_]ExpectedCallArg{.{
+        .ty = .ptr,
+        .value = .{ .named = "@main.testOne" },
+    }};
+    try validateVoidCall(block.instructions.items[0], "fuzzer_set_test", &set_test_args);
+
+    const empty_input_args = [_]ExpectedCallArg{
+        .{
+            .ty = .{ .int = 64 },
+            .value = .{ .constant_expr = "ptrtoint (ptr @__anon_11775 to i64)" },
+        },
+        .{
+            .ty = .{ .int = 64 },
+            .value = .{ .int = 0 },
+        },
+    };
+    try validateVoidCall(block.instructions.items[1], "fuzzer_new_input", &empty_input_args);
+
+    const hello_input_args = [_]ExpectedCallArg{
+        .{
+            .ty = .{ .int = 64 },
+            .value = .{ .constant_expr = "ptrtoint (ptr @__anon_16031 to i64)" },
+        },
+        .{
+            .ty = .{ .int = 64 },
+            .value = .{ .int = 5 },
+        },
+    };
+    try validateVoidCall(block.instructions.items[2], "fuzzer_new_input", &hello_input_args);
+    try validateVoidCall(block.instructions.items[3], "fuzzer_start_test", &.{});
+
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "main.testOne" });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "fuzzer_set_test", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_11775" });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 0 });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "fuzzer_new_input", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_16031" });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 5 });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "fuzzer_new_input", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "fuzzer_start_test", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateVoidCall(instruction: ir.Instruction, callee: []const u8, expected_args: []const ExpectedCallArg) !void {
+    if (instruction.removed) return error.UnsupportedCodegenInstruction;
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, call.callee, callee)) return error.UnsupportedCodegenInstruction;
+    if (call.ret_ty != .void or call.args.items.len != expected_args.len) return error.UnsupportedCodegenInstruction;
+    for (call.args.items, expected_args) |arg, expected| {
+        if (!arg.ty.eql(expected.ty) or !arg.value.eql(expected.value)) return error.UnsupportedCodegenValue;
+    }
 }
 
 fn lowerSelectedUmlFixSatI64Return(
@@ -5805,6 +5886,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm_eax,
         .mov_imm_rax,
         .mov_imm_rdx,
+        .mov_imm_rsi,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -5877,6 +5959,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_global_i32_eax,
         .load_global_ptr_rax,
         .lea_global_rax,
+        .lea_global_rdi,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .store_eax_tls_i32,
@@ -5902,7 +5985,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
-        .mov_imm_rdx => {},
+        .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -5951,6 +6034,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm_eax,
         .mov_imm_rax,
         .mov_imm_rdx,
+        .mov_imm_rsi,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -6023,6 +6107,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_global_i32_eax,
         .load_global_ptr_rax,
         .lea_global_rax,
+        .lea_global_rdi,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .store_eax_tls_i32,

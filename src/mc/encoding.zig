@@ -34,6 +34,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xba });
                 try appendU64(&bytes, allocator, @bitCast(value));
             },
+            .mov_imm_rsi => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xbe });
+                try appendU64(&bytes, allocator, @bitCast(value));
+            },
             .movq_xmm_rax => |reg| try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x7e, @as(u8, 0xc0) + (@as(u8, reg.lowCode()) << 3) }),
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
@@ -169,6 +173,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_global_i32_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x05, 0, 0, 0, 0 }),
             .load_global_ptr_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x05, 0, 0, 0, 0 }),
             .lea_global_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x05, 0, 0, 0, 0 }),
+            .lea_global_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x3d, 0, 0, 0, 0 }),
             .store_eax_global_i32 => try bytes.appendSlice(allocator, &.{ 0x89, 0x05, 0, 0, 0, 0 }),
             .load_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
             .store_eax_tls_i32 => try bytes.appendSlice(allocator, &.{ 0x64, 0x89, 0x04, 0x25, 0, 0, 0, 0 }),
@@ -246,6 +251,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm_eax => 5,
         .mov_imm_rax => 10,
         .mov_imm_rdx => 10,
+        .mov_imm_rsi => 10,
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
@@ -313,7 +319,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_f128_xmm0_arg_ptr => |store| f128ArgPtrInstructionSize(store.reg, store.offset),
         .volatile_roundtrip_rdi_esi_eax => 4,
         .load_global_i32_eax, .store_eax_global_i32 => 6,
-        .load_global_ptr_rax, .lea_global_rax => 7,
+        .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi => 7,
         .load_tls_i32_eax, .store_eax_tls_i32 => 8,
         .atomic_xadd_global_eax => 8,
         .mov_rsp_rdi => 3,

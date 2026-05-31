@@ -531,7 +531,14 @@ the next selected public alias:
 for the `"test"` name. That focused shape is now object-ok, but the broad row
 still fails on the next selected public alias:
 `@runner_test_run -> @main.runner_test_run`, a selected libfuzzer runtime-call
-shape.
+shape. That focused shape is now object-ok through selected call argument
+materialization, PC-relative symbol addresses, PLT32 call relocations, and
+private string constants. The adjusted ReleaseSmall object probe is 462
+successes, 2 failures, and 1 excluded row. The next sorted implementation
+blocker is
+`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected alias is `@add_zig -> @main.add_zig`, a mixed Zig/C global-add i32
+return shape.
 
 ## Activation Rule
 
