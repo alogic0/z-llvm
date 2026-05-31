@@ -51,3 +51,25 @@ C
 zig cc "$branch_mix_harness" "$branch_mix_object" -o "$branch_mix_exe"
 "$branch_mix_exe"
 printf 'ok distribution executable branch_mix\n'
+
+call_chain_fixture="test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll"
+call_chain_object="$tmp_dir/control_flow_calls_call_chain.o"
+call_chain_harness="$tmp_dir/call_chain_harness.c"
+call_chain_exe="$tmp_dir/call_chain_harness"
+
+zig build run -- --emit=obj --target="$target" "$call_chain_fixture" > "$call_chain_object"
+
+cat > "$call_chain_harness" <<'C'
+extern int call_chain(int value);
+
+int main(void) {
+    if (call_chain(0) != 1) return 1;
+    if (call_chain(5) != 11) return 2;
+    if (call_chain(17) != 35) return 3;
+    return 0;
+}
+C
+
+zig cc "$call_chain_harness" "$call_chain_object" -o "$call_chain_exe"
+"$call_chain_exe"
+printf 'ok distribution executable call_chain\n'
