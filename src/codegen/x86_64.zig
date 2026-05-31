@@ -231,6 +231,7 @@ fn lowerStraightLineReturn(
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
             if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -783,6 +784,55 @@ fn lowerStructSumReturn(
 
     try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = base_reg });
     try machine.instructions.append(allocator, .{ .add_arg_ptr_disp4_eax = base_reg });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerAddChain3Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const first_add_inst = block.instructions.items[0];
+    const second_add_inst = block.instructions.items[1];
+    if (first_add_inst.removed or second_add_inst.removed) return false;
+
+    const first_add_result = first_add_inst.result orelse return false;
+    const second_add_result = second_add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, second_add_result)) return false;
+
+    const first_add = switch (first_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (first_add.op != .add or !first_add.ty.eql(.{ .int = 32 })) return false;
+    const first_lhs = try paramValueReg(function, first_add.lhs, .{ .int = 32 });
+    const first_rhs = try paramValueReg(function, first_add.rhs, .{ .int = 32 });
+
+    const second_add = switch (second_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (second_add.op != .add or !second_add.ty.eql(.{ .int = 32 })) return false;
+    const third_reg = if (isNamed(second_add.lhs, first_add_result))
+        try paramValueReg(function, second_add.rhs, .{ .int = 32 })
+    else if (isNamed(second_add.rhs, first_add_result))
+        try paramValueReg(function, second_add.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = first_lhs });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = first_rhs } });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = third_reg } });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is aggregates
-missing capability=selected array_sum add-chain lowering
+current blocker=first broad optimized-output object failure is atomics_inline_asm_debug
+missing capability=selected debug_location add-immediate lowering
 ```

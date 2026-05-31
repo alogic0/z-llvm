@@ -64,8 +64,8 @@ with tiny host harnesses and validates deterministic return values, including
 `@sideEffectFree`, `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`,
 `@comptime_const`, `@optional_ptr_value`, `@dense_switch`, `@pair_first`, and
 `@make_pair`, plus `@error_union_payload` and `@optional_payload`.
-`@slice_sum` and `@struct_sum` are also covered by the broader ReleaseFast
-object executable gate.
+`@slice_sum`, `@struct_sum`, and `@array_sum` are also covered by the broader
+ReleaseFast object executable gate.
 
 ## Matrix Result
 
@@ -95,8 +95,7 @@ target-complete ABI lowering
 
 The next source-backed blocker is broader ReleaseFast object coverage. A broad
 probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
-now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted
-object failure is `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The first
-selected scalar `icmp`/`select` shapes are covered; the next blocker is
-`@array_sum`, which is the remaining straight-line add-chain aggregate shape in
-that row.
+now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
+`aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted object failure
+is `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`, currently
+blocked first on `@debug_location` adding an i32 parameter and an immediate.

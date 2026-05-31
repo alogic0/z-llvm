@@ -292,3 +292,24 @@ C
 zig cc "$aggregates_struct_harness" "$aggregates_struct_object" -o "$aggregates_struct_exe"
 "$aggregates_struct_exe"
 printf 'ok distribution executable aggregates_struct_sum\n'
+
+aggregates_array_fixture="test/distribution/releasefast_x86_64/inputs/aggregates_array_sum.ll"
+aggregates_array_object="$tmp_dir/aggregates_array_sum.o"
+aggregates_array_harness="$tmp_dir/aggregates_array_sum_harness.c"
+aggregates_array_exe="$tmp_dir/aggregates_array_sum_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregates_array_fixture" > "$aggregates_array_object"
+
+cat > "$aggregates_array_harness" <<'C'
+extern int array_sum(int a, int b, int c);
+
+int main(void) {
+    if (array_sum(1, 2, 3) != 6) return 1;
+    if (array_sum(-4, 9, 5) != 10) return 2;
+    return 0;
+}
+C
+
+zig cc "$aggregates_array_harness" "$aggregates_array_object" -o "$aggregates_array_exe"
+"$aggregates_array_exe"
+printf 'ok distribution executable aggregates_array_sum\n'
