@@ -13,26 +13,27 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@error_switch` i8 branch plus phi/select
-lowering in `error_switch.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected `@float_mul` and `@float_less` floating-point
+return lowering in `float_compare.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now has 17 rows:
-7 pass local object emission and 10 remain blocked. The newly closed row is
-`control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll`, including
-`@call_chain` and `@loop_sum`. The next sorted failure is
-`error_switch.zig.ReleaseFast.x86_64.optimized.ll`, where the only public alias
-is `@error_switch = alias i32 (i8)`.
+8 pass local object emission and 9 remain blocked. The newly closed row is
+`error_switch.zig.ReleaseFast.x86_64.optimized.ll`, including
+`@error_switch`. The next sorted failure is
+`float_compare.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases
+are `@float_mul = alias double (double, double)` and
+`@float_less = alias i1 (float, float)`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected
-`@error_switch` shape. The source-backed optimized output branches on `i8 == 0`,
-then uses a second `i8 == 1` compare plus `select` to produce `0`, `-1`, or
-`-2`. This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
-optimized-output row only; it does not claim general switch lowering, arbitrary
-error unions, jump tables, ABI-complete integer extension, or target-complete
-control-flow lowering.
+`float_compare` shapes. The source-backed optimized output contains a straight
+line `fmul double` return and an ordered less-than `fcmp olt float` returning
+`i1`. This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
+optimized-output row only; it does not claim general floating-point arithmetic,
+NaN-policy completeness beyond the selected ordered compare, vector FP, libm,
+or target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -46,10 +47,10 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@error_switch` shape from the `error_switch`
-optimized output. Do not generalize to other branch/phi/select forms, sparse
-switch lowering, error-set ABI modeling, vectors, floating point, TLS, or
-non-x86_64 ABI behavior in this slice.
+Implement only the selected `@float_mul` and `@float_less` shapes from the
+`float_compare` optimized output. Do not generalize to other FP operations,
+integer/FP casts, vector FP, x87, libm calls, TLS, or non-x86_64 ABI behavior in
+this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh`,

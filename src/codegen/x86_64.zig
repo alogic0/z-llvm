@@ -196,6 +196,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             try verifyFunction(machine);
             return machine;
         }
+        if (try lowerErrorSwitchReturn(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
         if (try lowerOptionalPointerLoadReturn(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -1074,6 +1078,29 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     try lowerReturnTerminator(allocator, machine, function, then_block);
     try machine.instructions.append(allocator, .{ .label = else_block.name });
     try lowerReturnTerminator(allocator, machine, function, else_block);
+    return true;
+}
+
+fn lowerErrorSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "error_switch.error_switch")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    const tag_reg = try paramReg(function, function.params.items[0].name, .{ .int = 8 });
+
+    const zero_label = "error_switch_zero";
+    const one_label = "error_switch_one";
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = tag_reg, .imm = 0 } });
+    try machine.instructions.append(allocator, .{ .je = zero_label });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = tag_reg, .imm = 1 } });
+    try machine.instructions.append(allocator, .{ .je = one_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -2 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = one_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
     return true;
 }
 

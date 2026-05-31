@@ -4,6 +4,7 @@ integers_add_wrap	test/distribution/releasefast_x86_64/inputs/integers_add_wrap.
 switch_control_branch_mix	test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll	object-readelf	object-ok	switch_control.zig	branch/select lowered to select plus add	branch_mix
 control_flow_calls_call_chain	test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll	object-readelf	object-ok	control_flow_calls.zig	shift and or arithmetic	call_chain
 control_flow_calls_loop_sum	test/distribution/releasefast_x86_64/inputs/control_flow_calls_loop_sum.ll	object-readelf	object-ok	control_flow_calls.zig	multi-block unrolled loop sum	loop_sum
+error_switch_error_switch	test/distribution/releasefast_x86_64/inputs/error_switch_error_switch.ll	object-readelf	object-ok	error_switch.zig	i8 branch phi select error switch	error_switch
 globals_comptime_const	test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll	object-readelf	object-ok	globals_comptime.zig	mul by constant	comptime_const
 optional_pointer_value	test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll	object-readelf	object-ok	optional_pointer.zig	null branch and pointer load	optional_ptr_value
 switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll	object-readelf	object-ok	switch_control.zig	switch table load and phi merge	dense_switch

@@ -121,6 +121,29 @@ zig cc "$loop_sum_harness" "$loop_sum_object" -o "$loop_sum_exe"
 "$loop_sum_exe"
 printf 'ok distribution executable loop_sum\n'
 
+error_switch_fixture="test/distribution/releasefast_x86_64/inputs/error_switch_error_switch.ll"
+error_switch_object="$tmp_dir/error_switch_error_switch.o"
+error_switch_harness="$tmp_dir/error_switch_harness.c"
+error_switch_exe="$tmp_dir/error_switch_harness"
+
+zig build run -- --emit=obj --target="$target" "$error_switch_fixture" > "$error_switch_object"
+
+cat > "$error_switch_harness" <<'C'
+extern int error_switch(unsigned char tag);
+
+int main(void) {
+    if (error_switch(0) != 0) return 1;
+    if (error_switch(1) != -1) return 2;
+    if (error_switch(2) != -2) return 3;
+    if (error_switch(255) != -2) return 4;
+    return 0;
+}
+C
+
+zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
+"$error_switch_exe"
+printf 'ok distribution executable error_switch\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"
