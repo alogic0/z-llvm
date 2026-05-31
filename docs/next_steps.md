@@ -12,8 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Define the first named no-LLVM-codegen x86_64 distribution subset gate across
-ReleaseFast, ReleaseSafe, and selected ReleaseSmall asm/object evidence.
+Probe Debug x86_64 asm/object feasibility for a bounded optimized-output set
+and decide whether Debug remains a metadata-only boundary or becomes the next
+object milestone.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -516,43 +517,49 @@ float-format helper excluded, the adjusted ReleaseSmall object probe is clean:
 463 object successes, 0 object failures, and 2 excluded rows. ReleaseSmall
 asm/object is now a conservative boundary for the named captured subset.
 
+The first named no-LLVM-codegen x86_64 distribution subset gate is now
+`bash scripts/run_distribution_no_llvm_codegen_subset.sh`. It composes the
+ReleaseFast object and executable gates, the ReleaseSafe object gate, the
+selected ReleaseSmall object gate, and `bash scripts/run_handoff_validation.sh`.
+The gate passed locally for `TARGET=x86_64-unknown-linux-gnu`.
+
 LLVM fallback removed or reduced:
-Add a top-level distribution gate that proves the named x86_64 subset reaches
-local asm/object output without LLVM codegen for the final object stage. This
-reduces the remaining LLVM fallback from a mode-wide unknown to explicit named
-subsets plus documented exclusions. It does not claim complete Zig
-distribution replacement, Debug object support, broad linker ownership,
-debug/unwind records, LTO, sanitizer paths, non-x86_64 ABI behavior, or
-target-complete ABI behavior.
+Run the smallest Debug x86_64 object feasibility probe that can decide whether
+Debug stays outside the current object milestone because of metadata/O0
+surface area, or whether a named Debug object subset should become Milestone 4.
+This reduces the remaining LLVM fallback by turning Debug from an unmeasured
+fallback row into an explicit boundary or measured object target. It does not
+claim broad Debug metadata preservation, DWARF/unwind ownership, full O0
+pipeline parity, linker ownership, LTO, sanitizer paths, non-x86_64 ABI
+behavior, or target-complete ABI behavior.
 
 Mode/target/stage row:
-`mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=conservative boundary`. This gate should also include the existing
-ReleaseFast and ReleaseSafe conservative asm/object boundaries.
+`mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 object-emission and codegen handoff behavior as the reference
-boundary:
+Use LLVM x86_64 Debug/O0 object-emission and codegen handoff behavior as the
+reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-distribution gate, also map MC/object emission and relocations against
+Debug feasibility probe, also map MC/object emission, relocations, and debug
+record boundaries against
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Define only the named subset already backed by focused fixtures and broad
-object probes. The gate should include ReleaseFast, ReleaseSafe, and selected
-ReleaseSmall object fixtures, plus handoff validation. Do not include Debug,
-the ReleaseSmall float-format helper, the ReleaseSmall base64 decoder, broad
-linking, LTO, sanitizer paths, debug/unwind object records, or target-complete
-ABI behavior in this slice.
+Do not start by promising Debug object replacement. Capture or select a bounded
+Debug source-backed set, run local object emission, and record the first
+concrete blocker. If the first blocker is debug metadata/O0 infrastructure
+rather than a small codegen feature, keep Debug as a conservative/LLVM fallback
+boundary and document the exact reason.
 
 Validation gate:
-Add a top-level script that runs the focused ReleaseFast, ReleaseSafe, and
-ReleaseSmall object gates plus `bash scripts/run_handoff_validation.sh`.
-Validate that it does not invoke LLVM codegen for the final object stage.
+Run the bounded Debug capture/object probe and record exact counts, first
+failure, command, target, and exclusions. Keep
+`bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:
 Use the commit policy after the lowering, fixture classification, docs, and

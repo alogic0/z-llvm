@@ -554,3 +554,8 @@ lowering, not a defensible one-slice backend reduction. With that row and the
 existing float-format helper excluded, the adjusted ReleaseSmall object probe
 is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
 asm/object is now a conservative boundary for the named captured subset.
+The first named no-LLVM-codegen x86_64 distribution subset gate is
+`bash scripts/run_distribution_no_llvm_codegen_subset.sh`; it composes the
+ReleaseFast object/executable gates, ReleaseSafe object gate, selected
+ReleaseSmall object gate, and handoff validation, and it passes locally for
+`TARGET=x86_64-unknown-linux-gnu`.
