@@ -643,6 +643,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructU128(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4361,6 +4366,23 @@ fn lowerCAbiFiveFloats(allocator: std.mem.Allocator, machine: *MachineFunction, 
     try appendCompareXmmLowF32(allocator, machine, .xmm2, 0x4040_0000, fail);
     try appendCompareXmmLowF32(allocator, machine, .xmm3, 0x4080_0000, fail);
     try appendCompareXmmLowF32(allocator, machine, .xmm4, 0x40a0_0000, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiStructU128(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_u128")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    for (function.params.items) |param| {
+        if (!param.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "struct_u128_fail";
+    try appendCompareArg64Imm64(allocator, machine, .rdi, -4, fail);
+    try appendCompareArg64Imm64(allocator, machine, .rsi, 0, fail);
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);

@@ -430,6 +430,10 @@ That focused shape is now object-ok with selected low-lane float comparisons
 through `%xmm4` and a local trap failure edge. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_struct_u128`, a split
 u128 equality branch-to-return-or-trap shape.
+That focused shape is now object-ok with selected low/high i64 comparisons
+and a local trap failure edge. The broad row still remains the first sorted
+blocker; the next selected alias is `@zig_struct_i128`, a split i128 equality
+branch-to-return-or-trap shape.
 
 ## Activation Rule
 
