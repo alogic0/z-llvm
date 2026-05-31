@@ -12,43 +12,38 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the first remaining Milestone 1 uncovered ReleaseFast x86_64 asm/object
-blocker:
-`test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll`.
-The selected optimized-output shape has a switch-table load, indexed GEP, and
-phi merge.
+Reduce the next Milestone 2 ReleaseFast x86_64 asm/object blocker: selected
+public Zig aliases are not emitted into the local ELF object symbol table.
 
 Zig evidence:
-The fixture is reduced from
-`tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir/switch_control.zig.ReleaseFast.x86_64.optimized.ll`,
-emitted from `test/zig/inputs/switch_control.zig` in ReleaseFast mode. The
-Milestone 1 manifest records the current blocker as
-`UnsupportedCodegenControlFlow`.
+The Milestone 1 fixtures under
+`test/distribution/releasefast_x86_64/inputs/` all expose public aliases such as
+`@add`, `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`,
+`@optional_ptr_value`, and `@dense_switch`. Local object generation succeeds for
+the selected subset, but the validation-only object writer emits only function
+symbols such as `switch_control.dense_switch`.
 
 LLVM fallback removed or reduced:
-Add x86_64 asm/object support for the selected dense-switch shape. This reduces
-the ReleaseFast x86_64 asm/object fallback within the named Milestone 1 subset
-only; it does not claim broad switch lowering, global-data emission,
-alias/export symbol emission, debug/unwind records, linker behavior, or
-target-complete ABI lowering.
+Add ELF symbol-table alias coverage for selected aliases whose targets are
+locally emitted functions. This reduces the ReleaseFast x86_64 asm/object
+fallback enough to start executable callable ABI checks for the named Milestone
+1 subset only; it does not claim relocatable aliases, weak aliases, COMDAT,
+global data, linker behavior, or broad export policy.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=conservative boundary for selected subset`.
 
 Upstream mapping:
-Use LLVM x86_64 instruction selection for jump/value-table lowering, indexed
-loads, compare/branch selection, and phi merge lowering as the reference
-boundary:
-`llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`,
-`llvm-project-22/llvm/lib/Target/X86/X86ISelDAGToDAG.cpp`, and
-`llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
+Use LLVM object emission and symbol handling as the reference boundary:
+`llvm-project-22/llvm/lib/MC/ELFObjectWriter.cpp`,
+`llvm-project-22/llvm/lib/MC/MCELFStreamer.cpp`, and
+`llvm-project-22/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected dense-switch shape from
-`switch_control_dense_switch.ll`. Do not generalize to arbitrary switch tables,
-global initializers, relocations, stores, or branch probability metadata in this
-slice.
+Implement only selected aliases that target functions emitted in the same local
+object. Do not generalize to data aliases, aliases requiring relocations, weak
+aliases, COMDAT, visibility policy, or target-complete symbol binding.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh` and

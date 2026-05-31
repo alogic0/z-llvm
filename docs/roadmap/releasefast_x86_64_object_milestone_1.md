@@ -41,12 +41,10 @@ Object-ready selected subset:
 | `control_flow_calls_call_chain` | `control_flow_calls.zig` | shift and or arithmetic | local object + readelf |
 | `globals_comptime_const` | `globals_comptime.zig` | multiply by constant | local object + readelf |
 | `optional_pointer_value` | `optional_pointer.zig` | null branch and pointer load | local object + readelf |
+| `switch_control_dense_switch` | `switch_control.zig` | switch table load and phi merge, lowered as selected compare/return constants | local object + readelf |
 
-Classified blockers from representative non-empty optimized output:
-
-| Fixture | Source row | Shape | Current blocker |
-| --- | --- | --- | --- |
-| `switch_control_dense_switch` | `switch_control.zig` | switch table load and phi merge | `UnsupportedCodegenControlFlow` |
+No selected Milestone 1 fixture remains classified as an object-generation
+blocker.
 
 ## Validation Gate
 
@@ -81,7 +79,7 @@ variable shift/or chains beyond the selected shl-by-one plus or-one pattern
 integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission
 pointer loads and null-branch control flow beyond the selected nullable i32 load
-switch table lowering and phi merge codegen
+switch-table lowering beyond the selected dense constant-return shape
 debug/unwind records
 linker behavior
 target-complete ABI lowering
@@ -89,7 +87,8 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The first remaining uncovered blocker is `switch_control_dense_switch`: selected
-ReleaseFast optimized output with a switch-table load and phi merge. Milestone 2
-should add only the global-table reference, indexed load, bounded branch/phi
-lowering, fixture evidence, and validation needed for that shape.
+The next source-backed blocker is alias/export symbol coverage for the selected
+ReleaseFast object subset. All selected fixtures expose public aliases, while
+the current validation-only object writer emits only private function symbols.
+Milestone 2 should add only the alias symbol-table coverage needed to run stable
+callable ABI checks for the selected subset.

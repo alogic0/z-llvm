@@ -51,6 +51,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
             },
+            .cmp_arg8_imm8 => |cmp| try encodeCmp8Imm(&bytes, allocator, cmp.reg, cmp.imm),
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
             .je => |label| {
@@ -85,6 +86,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rsp_eax => 3,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .direct_call => 5,
+        .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg64 => 3,
         .je => 6,
@@ -139,6 +141,17 @@ fn encodeArgPtrToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, re
     if (reg.rexB()) try bytes.append(allocator, 0x41);
     try bytes.append(allocator, 0x8b);
     try bytes.append(allocator, @as(u8, reg.lowCode()));
+}
+
+fn encodeCmp8Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, imm: u8) !void {
+    if (reg.needsRex8()) {
+        var rex: u8 = 0x40;
+        if (reg.rexB()) rex |= 0x01;
+        try bytes.append(allocator, rex);
+    }
+    try bytes.append(allocator, 0x80);
+    try bytes.append(allocator, 0xf8 | @as(u8, reg.lowCode()));
+    try bytes.append(allocator, imm);
 }
 
 fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

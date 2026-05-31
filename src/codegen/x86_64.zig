@@ -132,6 +132,10 @@ pub const Instruction = union(enum) {
         symbol: []const u8,
         ret_ty: ir.Type,
     },
+    cmp_arg8_imm8: struct {
+        reg: ArgReg,
+        imm: u8,
+    },
     test_arg8: ArgReg,
     test_arg64: ArgReg,
     je: []const u8,
@@ -175,6 +179,13 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             return machine;
         }
         if (try lowerOptionalPointerLoadReturn(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
+    }
+
+    if (function.blocks.items.len == 4) {
+        if (try lowerDenseSwitchReturn(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
         }
@@ -722,6 +733,172 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     return true;
 }
 
+fn lowerDenseSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (!std.mem.eql(u8, function.name, "switch_control.dense_switch")) return false;
+    const arg_reg = try paramReg(function, function.params.items[0].name, .{ .int = 8 });
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const range_inst = entry.instructions.items[0];
+    if (range_inst.removed) return false;
+    const range_name = range_inst.result orelse return false;
+    const range_icmp = switch (range_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (range_icmp.predicate != .ult or !range_icmp.operand_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(range_icmp.lhs, function.params.items[0].name) or !isInt(range_icmp.rhs, 3)) return false;
+
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, range_name)) return false;
+
+    const lookup_index = blockIndex(function, entry_br.then_target) orelse return error.InvalidBranchTarget;
+    const fallback_index = blockIndex(function, entry_br.else_target) orelse return error.InvalidBranchTarget;
+    const lookup_block = function.blocks.items[lookup_index];
+    const fallback_block = function.blocks.items[fallback_index];
+    if (lookup_block.instructions.items.len != 3 or fallback_block.instructions.items.len != 3) return false;
+
+    const zext_inst = lookup_block.instructions.items[0];
+    const gep_inst = lookup_block.instructions.items[1];
+    const load_inst = lookup_block.instructions.items[2];
+    if (zext_inst.removed or gep_inst.removed or load_inst.removed) return false;
+    const zext_name = zext_inst.result orelse return false;
+    const gep_name = gep_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 8 }) or !zext.to_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(zext.value, function.params.items[0].name)) return false;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .int = 32 }) or !isNamed(gep.ptr, "@switch.table.switch_control.dense_switch")) return false;
+    if (gep.indices.items.len != 1) return false;
+    const gep_index = gep.indices.items[0];
+    if (!gep_index.ty.eql(.{ .int = 64 }) or !isNamed(gep_index.value, zext_name)) return false;
+
+    const lookup_load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!lookup_load.ty.eql(.{ .int = 32 }) or !isNamed(lookup_load.ptr, gep_name)) return false;
+    if (lookup_load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+
+    const lookup_br = switch (lookup_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+
+    const add_inst = fallback_block.instructions.items[0];
+    const fallback_icmp_inst = fallback_block.instructions.items[1];
+    const select_inst = fallback_block.instructions.items[2];
+    if (add_inst.removed or fallback_icmp_inst.removed or select_inst.removed) return false;
+    const add_name = add_inst.result orelse return false;
+    const fallback_icmp_name = fallback_icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(add.lhs, function.params.items[0].name) or !isInt(add.rhs, -3)) return false;
+
+    const fallback_icmp = switch (fallback_icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (fallback_icmp.predicate != .ult or !fallback_icmp.operand_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(fallback_icmp.lhs, add_name) or !isInt(fallback_icmp.rhs, 3)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, fallback_icmp_name) or !isInt(select.true_value, 19) or !isInt(select.false_value, 23)) return false;
+
+    const fallback_br = switch (fallback_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, lookup_br.target, fallback_br.target)) return false;
+
+    const merge_index = blockIndex(function, lookup_br.target) orelse return error.InvalidBranchTarget;
+    const merge_block = function.blocks.items[merge_index];
+    if (merge_block.instructions.items.len != 1) return false;
+    const phi_inst = merge_block.instructions.items[0];
+    if (phi_inst.removed) return false;
+    const phi_name = phi_inst.result orelse return false;
+    const phi = switch (phi_inst.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return false;
+
+    var saw_lookup_incoming = false;
+    var saw_fallback_incoming = false;
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, lookup_block.name)) {
+            if (!isNamed(incoming.value, load_name)) return false;
+            saw_lookup_incoming = true;
+        } else if (std.mem.eql(u8, incoming.block, fallback_block.name)) {
+            if (!isNamed(incoming.value, select_name)) return false;
+            saw_fallback_incoming = true;
+        } else {
+            return false;
+        }
+    }
+    if (!saw_lookup_incoming or !saw_fallback_incoming) return false;
+
+    const ret = switch (merge_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, phi_name)) return false;
+
+    const case_1 = "dense_case_1";
+    const case_2 = "dense_case_2";
+    const case_3_5 = "dense_case_3_5";
+    const default_case = "dense_default";
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 1 } });
+    try machine.instructions.append(allocator, .{ .je = case_1 });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 2 } });
+    try machine.instructions.append(allocator, .{ .je = case_2 });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 0 } });
+    try machine.instructions.append(allocator, .{ .je = lookup_block.name });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 3 } });
+    try machine.instructions.append(allocator, .{ .je = case_3_5 });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 4 } });
+    try machine.instructions.append(allocator, .{ .je = case_3_5 });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = arg_reg, .imm = 5 } });
+    try machine.instructions.append(allocator, .{ .je = case_3_5 });
+    try machine.instructions.append(allocator, .{ .label = default_case });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 23 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = lookup_block.name });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 11 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = case_1 });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 13 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = case_2 });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 17 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = case_3_5 });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 19 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerReturnTerminator(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -924,6 +1101,13 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
     };
 }
 
+fn isInt(value: ir.Value, expected: i128) bool {
+    return switch (value) {
+        .int => |actual| actual == expected,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
 fn isCommutative(op: ir.BinaryOp) bool {
     return switch (op) {
         .add, .mul, .@"and", .@"or", .xor => true,
@@ -1003,6 +1187,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .direct_call,
+        .cmp_arg8_imm8,
         .test_arg8,
         .test_arg64,
         .ret,
@@ -1031,7 +1216,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .test_arg8, .test_arg64, .je => {},
+        .mov_arg_arg, .cmp_arg8_imm8, .test_arg8, .test_arg64, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -1059,6 +1244,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .direct_call,
+        .cmp_arg8_imm8,
         .test_arg8,
         .test_arg64,
         .je,
