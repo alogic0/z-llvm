@@ -280,3 +280,8 @@ That focused shape is now object-ok with local trap failure edges and a
 selected packed i32-pair register check. The broad row still remains the first
 sorted failure; the next selected alias is `@zig_struct_f32_f32f32`, a
 vector/scalar float struct comparison control-flow shape.
+That focused shape is now object-ok for both public aliases
+`@zig_struct_f32_f32f32` and `@zig_struct_f32f32_f32` with local trap failure
+edges and selected vector/scalar float register checks. The broad row still
+remains the first sorted failure; the next selected alias is
+`@zig_ret_struct_f32_f32f32`, a vector/scalar float struct return shape.

@@ -47,6 +47,8 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_big_union = alias void (ptr), ptr @main.zig_big_union
 @zig_big_struct = alias void (ptr), ptr @main.zig_big_struct
 @zig_struct_i32_i32 = alias void (i64), ptr @main.zig_struct_i32_i32
+@zig_struct_f32_f32f32 = alias void (<2 x float>, float), ptr @main.zig_struct_f32_f32f32
+@zig_struct_f32f32_f32 = alias void (<2 x float>, float), ptr @main.zig_struct_f32_f32f32
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -487,6 +489,31 @@ define private void @main.zig_struct_i32_i32(i64 %0) unnamed_addr align 1 {
 7:
   ret void
 8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_struct_f32_f32f32(<2 x float> %0, float %1) unnamed_addr align 1 {
+2:
+  %.sroa.01.0.vec.extract = extractelement <2 x float> %0, i64 0
+  %3 = fcmp oeq float %.sroa.01.0.vec.extract, 1.000000e+00
+  br i1 %3, label %4, label %6
+4:
+  %.sroa.01.4.vec.extract = extractelement <2 x float> %0, i64 1
+  %5 = fcmp oeq float %.sroa.01.4.vec.extract, 2.000000e+00
+  br i1 %5, label %7, label %9
+6:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+7:
+  %8 = fcmp oeq float %1, 3.000000e+00
+  br i1 %8, label %10, label %11
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  ret void
+11:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }

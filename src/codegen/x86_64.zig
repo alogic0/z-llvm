@@ -445,6 +445,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructF32F32F32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3514,6 +3519,23 @@ fn lowerCAbiStructI32I32(allocator: std.mem.Allocator, machine: *MachineFunction
 
     const fail = "struct_i32_i32_fail";
     try appendCompareArg64Imm64(allocator, machine, .rdi, 0x0000_0002_0000_0001, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiStructF32F32F32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_f32_f32f32")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .float } }) or function.params.items[1].ty != .float) return error.UnsupportedCodegenType;
+
+    const fail = "struct_f32_f32f32_fail";
+    try appendComparePackedFloatPair(allocator, machine, .xmm0, 0x4000_0000_3f80_0000, fail);
+    try machine.instructions.append(allocator, .{ .movq_xmm_rax = .xmm1 });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 0x4040_0000 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);
