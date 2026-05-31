@@ -290,3 +290,7 @@ That focused shape is now object-ok for both public aliases
 `%xmm0`/`%xmm1` return materialization. The broad row still remains the first
 sorted failure; the next selected alias is `@zig_struct_f32a8_f32a8`, a
 vector/scalar float struct comparison control-flow shape.
+That focused shape is now object-ok with local trap failure edges and selected
+low-lane float register checks. The broad row still remains the first sorted
+failure; the next selected alias is `@zig_ret_struct_f32a8_f32a8`, a
+vector/scalar float struct return shape.

@@ -51,6 +51,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_struct_f32f32_f32 = alias void (<2 x float>, float), ptr @main.zig_struct_f32_f32f32
 @zig_ret_struct_f32_f32f32 = alias { <2 x float>, float } (), ptr @main.zig_ret_struct_f32_f32f32
 @zig_ret_struct_f32f32_f32 = alias { <2 x float>, float } (), ptr @main.zig_ret_struct_f32_f32f32
+@zig_struct_f32a8_f32a8 = alias void (<2 x float>, float, float), ptr @main.zig_struct_f32a8_f32a8
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -85,6 +86,30 @@ define private void @main.zig_f128_f128_struct(ptr noalias nonnull writeonly sre
 define private { <2 x float>, float } @main.zig_ret_struct_f32_f32f32() unnamed_addr align 1 {
 0:
   ret { <2 x float>, float } { <2 x float> <float 1.000000e+00, float 2.000000e+00>, float 3.000000e+00 }
+}
+
+define private void @main.zig_struct_f32a8_f32a8(<2 x float> %0, float %1, float %2) unnamed_addr align 1 {
+3:
+  %.sroa.01.0.vec.extract = extractelement <2 x float> %0, i64 0
+  %4 = fcmp oeq float %.sroa.01.0.vec.extract, 3.125000e+00
+  br i1 %4, label %5, label %7
+5:
+  %6 = fcmp oeq float %1, 4.375000e+00
+  br i1 %6, label %8, label %10
+7:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+8:
+  %9 = fcmp oeq float %2, 5.500000e+00
+  br i1 %9, label %11, label %12
+10:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+11:
+  ret void
+12:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
 }
 
 define private { fp128 } @main.zig_f128_struct(fp128 %0) unnamed_addr align 1 {

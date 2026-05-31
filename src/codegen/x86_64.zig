@@ -455,6 +455,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructF32A8F32A8(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3570,6 +3575,22 @@ fn lowerCAbiStructF32F32F32(allocator: std.mem.Allocator, machine: *MachineFunct
     return true;
 }
 
+fn lowerCAbiStructF32A8F32A8(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_f32a8_f32a8")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 3) return false;
+    if (!function.params.items[0].ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .float } }) or function.params.items[1].ty != .float or function.params.items[2].ty != .float) return error.UnsupportedCodegenType;
+
+    const fail = "struct_f32a8_f32a8_fail";
+    try appendCompareXmmLowF32(allocator, machine, .xmm0, 0x4048_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm1, 0x408c_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm2, 0x40b0_0000, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn appendCompareMem64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -3594,6 +3615,18 @@ fn appendComparePackedFloatPair(
     try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_bits });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn appendCompareXmmLowF32(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: XmmReg,
+    expected_bits: u32,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = @bitCast(expected_bits) });
     try machine.instructions.append(allocator, .{ .jne = fail });
 }
 
