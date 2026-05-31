@@ -355,3 +355,21 @@ rg -q 'movabs[[:space:]]+\$0x4,%rax' "$inherit_dump"
 rg -q '[[:space:]]ret' "$inherit_dump"
 
 printf 'ok distribution releasesmall object inherit_want_safety_i64_return\n'
+
+umul_fixture="test/distribution/releasesmall_x86_64/inputs/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.ll"
+umul_object="$tmp_dir/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.o"
+umul_summary="$tmp_dir/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.readelf.txt"
+umul_dump="$tmp_dir/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$umul_fixture" > "$umul_object"
+readelf -W -h -S -s -r "$umul_object" > "$umul_summary"
+objdump -dr "$umul_object" > "$umul_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$umul_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$umul_summary"
+rg -q '[[:space:]]entry$' "$umul_summary"
+rg -q '[[:space:]]no_compile_panic_for_unchecked_arith\.entry$' "$umul_summary"
+rg -q 'movabs[[:space:]]+\$0x0,%rax' "$umul_dump"
+rg -q '[[:space:]]ret' "$umul_dump"
+
+printf 'ok distribution releasesmall object no_compile_panic_for_unchecked_arith_umul_fix_sat_i64\n'

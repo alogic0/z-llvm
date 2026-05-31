@@ -13,9 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@entry` alias / `@no_compile_panic_for_unchecked_arith.entry`
-`llvm.umul.fix.sat.i64` constant-call return from
-`cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@main` alias / `@main.main` empty noreturn unreachable stub from
+`standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -420,9 +419,17 @@ the selected public shape is `@entry = alias i64 (), ptr
 `llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)` call whose result is returned as
 i64.
 
+That focused `no_compile_panic_for_unchecked_arith.entry` shape is now
+object-ok through selected `llvm.umul.fix.sat.i64` constant-call
+materialization. The current ReleaseSmall object probe is 458 object successes
+and 7 object failures. The next sorted failure is
+`standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected public shape is `@main = alias void (i32, i32, i32), ptr
+@main.main`, an empty noreturn function ending in `unreachable`.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@entry` i64 saturated-multiply intrinsic constant-call return shape. This
+`@main` empty noreturn unreachable-stub shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, complete Zig startup/runtime ownership, broad integer ABI lowering,
@@ -434,26 +441,21 @@ Mode/target/stage row:
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM intrinsic simplification plus x86_64 instruction selection and MC
-encoding behavior as the reference boundary:
-`llvm-project-22/llvm/include/llvm/IR/Intrinsics.td`,
-`llvm-project-22/llvm/lib/Analysis/ValueTracking.cpp`,
+Use LLVM unreachable lowering plus x86_64 instruction selection and MC encoding
+behavior as the reference boundary:
+`llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-constant i64 intrinsic result, also map against SelectionDAG call/result
-lowering and x86_64 integer return-register emission in
-`llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
+empty noreturn stub, also map against x86_64 trap emission in
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@entry` alias to
-`@no_compile_panic_for_unchecked_arith.entry` ReleaseSmall
-`llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)` return. Do not generalize to
-arbitrary integer ABI returns, arbitrary intrinsic calls, multi-register
-returns, debug/unwind object records, or non-x86_64 ABI behavior in this
-slice.
+Implement only the selected `@main` alias to `@main.main` ReleaseSmall empty
+noreturn unreachable stub. Do not generalize to arbitrary unreachable control
+flow, arbitrary inline assembly ownership, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

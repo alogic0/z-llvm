@@ -837,6 +837,7 @@ fn lowerStraightLineReturn(
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -869,6 +870,42 @@ fn lowerSelectedI64ConstReturn(
     };
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(value) });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSelectedUmlFixSatI64Return(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "no_compile_panic_for_unchecked_arith.entry")) return false;
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 0 or block.instructions.items.len != 1) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    const call_result = call_inst.result orelse return error.InstructionNeedsResult;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (!std.mem.eql(u8, ret_name, call_result)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, call.callee, "llvm.umul.fix.sat.i64")) return false;
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 3) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 64 }) or !call.args.items[0].value.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
+    if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !call.args.items[1].value.eql(.{ .int = 2 })) return error.UnsupportedCodegenValue;
+    if (!call.args.items[2].ty.eql(.{ .int = 32 }) or !call.args.items[2].value.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

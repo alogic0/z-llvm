@@ -501,7 +501,11 @@ next sorted blocker is
 `cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`;
 the selected alias is
 `@entry -> @no_compile_panic_for_unchecked_arith.entry`, a selected
-`llvm.umul.fix.sat.i64` constant-call return.
+`llvm.umul.fix.sat.i64` constant-call return. That shape is now object-ok
+through selected constant-call materialization. The current ReleaseSmall object
+probe is 458 successes and 7 failures. The next sorted blocker is
+`standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected alias is `@main -> @main.main`, an empty noreturn unreachable stub.
 
 ## Activation Rule
 

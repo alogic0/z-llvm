@@ -150,8 +150,10 @@ intermediate_object_probe=455 ok, 10 fail with --input-limit=67108864
 closed_blocker=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll selected @elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
 intermediate_object_probe=456 ok, 9 fail with --input-limit=67108864
 closed_blocker=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll selected @entry -> @inherit_want_safety.entry i64 constant return
-current_object_probe=457 ok, 8 fail with --input-limit=67108864
-first_blocker=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@entry -> @no_compile_panic_for_unchecked_arith.entry
-missing capability=selected llvm.umul.fix.sat.i64 constant-call return lowering
+intermediate_object_probe=457 ok, 8 fail with --input-limit=67108864
+closed_blocker=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll selected @entry -> @no_compile_panic_for_unchecked_arith.entry llvm.umul.fix.sat.i64 constant-call return
+current_object_probe=458 ok, 7 fail with --input-limit=67108864
+first_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@main -> @main.main
+missing capability=selected empty noreturn unreachable-stub lowering
 ```

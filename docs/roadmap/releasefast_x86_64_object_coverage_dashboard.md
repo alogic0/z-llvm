@@ -84,8 +84,10 @@ closed_failure_15=cases_compile_errors_illegal_operation_on_logical_ptr.zig.Rele
 closed_aliases_15=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
 closed_failure_16=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_16=@entry -> @inherit_want_safety.entry
-current_object_probe=457 object-ok, 8 object-fail
-first_failure=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@entry -> @no_compile_panic_for_unchecked_arith.entry
-missing_capability=selected ReleaseSmall llvm.umul.fix.sat.i64 constant-call return lowering
+closed_failure_17=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_17=@entry -> @no_compile_panic_for_unchecked_arith.entry
+current_object_probe=458 object-ok, 7 object-fail
+first_failure=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@main -> @main.main
+missing_capability=selected ReleaseSmall empty noreturn unreachable-stub lowering
 ```
