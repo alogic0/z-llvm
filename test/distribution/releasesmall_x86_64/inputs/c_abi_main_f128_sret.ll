@@ -31,6 +31,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_u16 = alias i16 (), ptr @main.zig_ret_u16
 @zig_ret_u8 = alias i8 (), ptr @main.zig_ret_u8
 @zig_ret_bool = alias i1 (), ptr @main.zig_ret_bool
+@zig_multiple_struct_floats = alias void (<2 x float>, <2 x float>, <2 x float>, <2 x float>), ptr @main.zig_multiple_struct_floats
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -201,4 +202,65 @@ define private i8 @main.zig_ret_u8() unnamed_addr align 1 {
 define private i1 @main.zig_ret_bool() unnamed_addr align 1 {
 0:
   ret i1 1
+}
+
+define private void @main.zig_multiple_struct_floats(<2 x float> %0, <2 x float> %1, <2 x float> %2, <2 x float> %3) unnamed_addr align 1 {
+4:
+  %.sroa.03.0.vec.extract = extractelement <2 x float> %0, i64 0
+  %5 = fcmp oeq float %.sroa.03.0.vec.extract, 1.000000e+00
+  br i1 %5, label %6, label %8
+6:
+  %.sroa.03.4.vec.extract = extractelement <2 x float> %0, i64 1
+  %7 = fcmp oeq float %.sroa.03.4.vec.extract, 2.100000e+01
+  br i1 %7, label %9, label %11
+8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+9:
+  %.sroa.3.8.vec.extract = extractelement <2 x float> %1, i64 0
+  %10 = fcmp oeq float %.sroa.3.8.vec.extract, 1.600000e+01
+  br i1 %10, label %12, label %14
+11:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+12:
+  %.sroa.3.12.vec.extract = extractelement <2 x float> %1, i64 1
+  %13 = fcmp oeq float %.sroa.3.12.vec.extract, 4.000000e+00
+  br i1 %13, label %15, label %17
+14:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+15:
+  %.sroa.04.0.vec.extract = extractelement <2 x float> %2, i64 0
+  %16 = fcmp oeq float %.sroa.04.0.vec.extract, 1.780000e+02
+  br i1 %16, label %18, label %20
+17:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+18:
+  %.sroa.04.4.vec.extract = extractelement <2 x float> %2, i64 1
+  %19 = fcmp oeq float %.sroa.04.4.vec.extract, 1.890000e+02
+  br i1 %19, label %21, label %23
+20:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+21:
+  %.sroa.35.8.vec.extract = extractelement <2 x float> %3, i64 0
+  %22 = fcmp oeq float %.sroa.35.8.vec.extract, 2.100000e+01
+  br i1 %22, label %24, label %26
+23:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+24:
+  %.sroa.35.12.vec.extract = extractelement <2 x float> %3, i64 1
+  %25 = fcmp oeq float %.sroa.35.12.vec.extract, 1.500000e+01
+  br i1 %25, label %27, label %28
+26:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+27:
+  ret void
+28:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
 }

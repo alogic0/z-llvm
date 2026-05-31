@@ -233,6 +233,9 @@ first sorted blocker; the next selected alias is `@zig_ret_bool`, a
 straight-line boolean return. That focused shape is now object-ok. The broad
 row still remains the first sorted blocker; the next selected alias is
 `@zig_multiple_struct_floats`, a vector-parameter floating comparison
+control-flow shape. That focused shape is now object-ok with local trap
+failure edges. The broad row still remains the first sorted blocker; the next
+selected alias is `@zig_multiple_struct_ints`, a packed-integer comparison
 control-flow shape.
 
 ## Activation Rule

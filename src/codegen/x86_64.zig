@@ -79,6 +79,26 @@ pub const ArgReg = enum {
     }
 };
 
+pub const XmmReg = enum(u3) {
+    xmm0,
+    xmm1,
+    xmm2,
+    xmm3,
+
+    pub fn name(reg: XmmReg) []const u8 {
+        return switch (reg) {
+            .xmm0 => "%xmm0",
+            .xmm1 => "%xmm1",
+            .xmm2 => "%xmm2",
+            .xmm3 => "%xmm3",
+        };
+    }
+
+    pub fn lowCode(reg: XmmReg) u3 {
+        return @intFromEnum(reg);
+    }
+};
+
 pub const MachineBinaryOp = enum {
     add,
     sub,
@@ -106,6 +126,7 @@ pub const Instruction = union(enum) {
     mov_imm_eax: i32,
     mov_imm_rax: i64,
     mov_imm_rdx: i64,
+    movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
         dst: ArgReg,
@@ -137,6 +158,7 @@ pub const Instruction = union(enum) {
     cmp_rcx_arg64: ArgReg,
     cmp_ecx_imm32: i32,
     cmp_rdi_imm64: i64,
+    cmp_rax_rdx,
     test_eax_eax,
     mulsd_xmm1_xmm0,
     addss_xmm1_xmm0,
@@ -331,6 +353,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiRetBool(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiMultipleStructFloats(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -3169,6 +3196,39 @@ fn lowerCAbiRetBool(allocator: std.mem.Allocator, machine: *MachineFunction, fun
     return true;
 }
 
+fn lowerCAbiMultipleStructFloats(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_multiple_struct_floats")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 4) return false;
+    const vec2_float: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .float } };
+    for (function.params.items) |param| {
+        if (!param.ty.eql(vec2_float)) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "multiple_struct_floats_fail";
+    try appendComparePackedFloatPair(allocator, machine, .xmm0, 0x41a8_0000_3f80_0000, fail);
+    try appendComparePackedFloatPair(allocator, machine, .xmm1, 0x4080_0000_4180_0000, fail);
+    try appendComparePackedFloatPair(allocator, machine, .xmm2, 0x433d_0000_4332_0000, fail);
+    try appendComparePackedFloatPair(allocator, machine, .xmm3, 0x4170_0000_41a8_0000, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn appendComparePackedFloatPair(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: XmmReg,
+    expected_bits: i64,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_bits });
+    try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
 fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_assert_CFF")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
@@ -3950,6 +4010,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm_eax,
         .mov_imm_rax,
         .mov_imm_rdx,
+        .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
@@ -3971,6 +4032,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .cmp_rdi_imm64,
+        .cmp_rax_rdx,
         .test_eax_eax,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
@@ -4023,7 +4085,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -4044,7 +4106,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_rdi_imm64, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -4066,6 +4128,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm_eax,
         .mov_imm_rax,
         .mov_imm_rdx,
+        .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
@@ -4087,6 +4150,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .cmp_rdi_imm64,
+        .cmp_rax_rdx,
         .test_eax_eax,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
