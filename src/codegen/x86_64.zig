@@ -5427,9 +5427,10 @@ fn lowerStartTrampoline(allocator: std.mem.Allocator, machine: *MachineFunction,
         .@"unreachable" => {},
         .ret, .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
     }
-    if (block.instructions.items.len != 2) return error.UnsupportedCodegenControlFlow;
+    if (block.instructions.items.len != 2 and block.instructions.items.len != 3) return error.UnsupportedCodegenControlFlow;
     try validateStartCfiInlineAsm(block.instructions.items[0]);
     const call_target = try validateStartTrampolineInlineAsm(block.instructions.items[1]);
+    if (block.instructions.items.len == 3) try validateTrapCall(block.instructions.items[2]);
 
     try machine.instructions.append(allocator, .xor_ebp_ebp);
     try machine.instructions.append(allocator, .mov_rsp_rdi);
@@ -5449,6 +5450,15 @@ fn validateStartCfiInlineAsm(instruction: ir.Instruction) !void {
     if (!inline_asm.sideeffect) return error.UnsupportedCodegenInstruction;
     if (!std.mem.eql(u8, inline_asm.template, ".cfi_undefined %rip")) return error.UnsupportedCodegenInstruction;
     if (!std.mem.eql(u8, inline_asm.constraints, "~{dirflag},~{fpsr},~{flags}")) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateTrapCall(instruction: ir.Instruction) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.trap") or call.ret_ty != .void or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
 }
 
 fn validateStartTrampolineInlineAsm(instruction: ir.Instruction) ![]const u8 {
@@ -5528,8 +5538,9 @@ fn lowerGetauxvalImpl(allocator: std.mem.Allocator, machine: *MachineFunction, f
 }
 
 fn validateGetauxvalShape(function: ir.Function) !void {
-    if (function.blockIndex("common.ret") == null or function.blockIndex(".preheader") == null) return error.UnsupportedCodegenControlFlow;
-    if (function.blockIndex("8") == null) return error.UnsupportedCodegenControlFlow;
+    const optimized_shape = function.blockIndex("common.ret") != null and function.blockIndex(".preheader") != null and function.blockIndex("8") != null;
+    const debug_shape = function.blockIndex("11") != null and function.blockIndex("18") != null and function.blockIndex("29") != null;
+    if (!optimized_shape and !debug_shape) return error.UnsupportedCodegenControlFlow;
 
     var saw_global_load = false;
     var saw_tag_load = false;
@@ -5541,8 +5552,8 @@ fn validateGetauxvalShape(function: ir.Function) !void {
                 .load => |load| {
                     if (load.ty == .ptr and isNamed(load.ptr, "@os.linux.elf_aux_maybe")) saw_global_load = true;
                     if (load.ty.eql(.{ .int = 64 }) and instruction.result != null) {
-                        if (isNamed(load.ptr, "3")) saw_tag_load = true;
-                        if (isNamed(load.ptr, "9")) saw_value_load = true;
+                        if (isNamed(load.ptr, "3") or isNamed(load.ptr, "14") or isNamed(load.ptr, "21")) saw_tag_load = true;
+                        if (isNamed(load.ptr, "9") or isNamed(load.ptr, "33")) saw_value_load = true;
                     }
                 },
                 else => {},

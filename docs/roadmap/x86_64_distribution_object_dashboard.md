@@ -25,7 +25,7 @@ Current automated summaries:
 | Debug broad pointers memory | `tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug broad tiny scalar plain | `tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
-| Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 150 | 50 | 0 | `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 196 | 4 | 0 | `cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -87,9 +87,12 @@ Debug broad:
   continuous Debug prefix 200 now advances past c_abi_main.zig.Debug.x86_64.ll
     after selected Debug/O0 C ABI aliases, aggregate stack returns, scalar
     returns, selected packed struct/union shapes, and panic-call stubs
+  continuous Debug prefix 200 also advances past selected address-space
+    pointer rows after accepting the Debug/O0 start trampoline trap tail and
+    Debug/O0 getauxval auxv scan shape
   continuous Debug prefix 200 first failure:
-    cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll
-    category=unsupported-control-flow
+    cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll
+    category=unsupported-instruction
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

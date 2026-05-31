@@ -606,12 +606,14 @@ The continuous Debug object probe now has a clean first-100-row prefix from
 `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` reports
 100 ok / 0 fail after closing the selected `behavior_sizeof_and_typeof`
 c_* panic-call unreachable stubs. The first-200-row prefix reports
-150 ok / 50 fail. The previous first failure,
-`c_abi_main.zig.Debug.x86_64.ll`, is object-clean after selected Debug/O0 C ABI
-aliases, stack-materialized aggregate returns, scalar returns, packed
-struct/union checks, and panic-call stubs. The current first failure is
-`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll`,
-categorized as `unsupported-control-flow`.
+196 ok / 4 fail. The previous failures, `c_abi_main.zig.Debug.x86_64.ll` and
+the selected address-space pointer rows, are object-clean after selected
+Debug/O0 C ABI aliases, stack-materialized aggregate returns, scalar returns,
+packed struct/union checks, panic-call stubs, the Debug/O0 start trampoline
+trap tail, and the Debug/O0 `getauxval` auxv scan shape. The current first
+failure is
+`cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll`,
+categorized as `unsupported-instruction`.
 
 ## Activation Rule
 
