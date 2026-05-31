@@ -133,6 +133,19 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .reload_rdi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x7c, 0x24, 0x08 }),
             .reload_rsi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x74, 0x24, 0x10 }),
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
+            .load_stack_disp8_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x44, 0x24 });
+                try bytes.append(allocator, disp);
+            },
+            .load_rax_ptr_disp8_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x8b });
+                if (disp == 0) {
+                    try bytes.append(allocator, 0x00);
+                } else {
+                    try bytes.append(allocator, 0x40);
+                    try bytes.append(allocator, disp);
+                }
+            },
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .load_arg_ptr_disp8_rax => |load| try encodeArgPtrDisp8ToRax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u8_eax => |load| try encodeArgPtrDisp8U8ToEax(&bytes, allocator, load.reg, load.offset),
@@ -259,6 +272,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .spill_rdi_rsi_rsp24 => 10,
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .reload_rsp_eax => 3,
+        .load_stack_disp8_rax => 5,
+        .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .load_arg_ptr_disp8_rax => |load| 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,

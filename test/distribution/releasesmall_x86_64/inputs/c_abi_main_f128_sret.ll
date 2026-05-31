@@ -59,6 +59,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_struct_f64 = alias { double } (), ptr @main.zig_ret_struct_f64
 @zig_struct_f32 = alias void (float), ptr @main.zig_struct_f32
 @zig_ret_struct_f32 = alias { float } (), ptr @main.zig_ret_struct_f32
+@zig_struct_u64_u64_8 = alias void (i64, i64, i64, i64, i64, i64, i64, i64, ptr, i64), ptr @main.zig_struct_u64_u64_8
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -176,6 +177,32 @@ define private void @main.zig_struct_f32(float %0) unnamed_addr align 1 {
 define private { float } @main.zig_ret_struct_f32() unnamed_addr align 1 {
 0:
   ret { float } { float 2.500000e+00 }
+}
+
+define private void @main.zig_struct_u64_u64_8(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4, i64 %5, i64 %6, i64 %7, ptr nonnull readonly byval(%main.Struct_u64_u64) align 8 captures(none) %8, i64 %9) unnamed_addr align 1 {
+10:
+  %.sroa.0.0.copyload = load i64, ptr %8, align 8
+  %11 = icmp eq i64 %.sroa.0.0.copyload, 19
+  br i1 %11, label %12, label %14
+12:
+  %.sroa.2.0..sroa_idx = getelementptr i8, ptr %8, i64 8
+  %.sroa.2.0.copyload = load i64, ptr %.sroa.2.0..sroa_idx, align 8
+  %13 = icmp eq i64 %.sroa.2.0.copyload, 20
+  br i1 %13, label %15, label %17
+14:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+15:
+  %16 = icmp eq i64 %9, 9
+  br i1 %16, label %18, label %19
+17:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+18:
+  ret void
+19:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
 }
 
 define private { fp128 } @main.zig_f128_struct(fp128 %0) unnamed_addr align 1 {

@@ -59,6 +59,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .reload_rdi_rsp24 => try writer.writeAll("\tmovq 8(%rsp), %rdi\n"),
             .reload_rsi_rsp24 => try writer.writeAll("\tmovq 16(%rsp), %rsi\n"),
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
+            .load_stack_disp8_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
+            .load_rax_ptr_disp8_rax => |offset| try writer.print("\tmovq {}(%rax), %rax\n", .{offset}),
             .load_arg_ptr_eax => |reg| try writer.print("\tmovl ({s}), %eax\n", .{reg.name64()}),
             .load_arg_ptr_disp8_rax => |load| try writer.print("\tmovq {}({s}), %rax\n", .{ load.offset, load.reg.name64() }),
             .load_arg_ptr_disp8_u8_eax => |load| try writer.print("\tmovzbl {}({s}), %eax\n", .{ load.offset, load.reg.name64() }),
