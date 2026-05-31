@@ -30,19 +30,66 @@ the pass is not exercised by Zig's configured LLVM path, or if the current
 finish definition deliberately treats it as a boundary, keep it in the backlog
 until a measured replacement need appears.
 
+An `opt-22` mismatch is promotable only when it is visible in one of these
+places:
+
+- an accepted Zig pipeline;
+- a source-backed reduced fixture;
+- an x86_64 handoff or codegen shape needed by the replacement matrix.
+
+Boundary closure is valid work when it changes the replacement matrix. A cycle
+may close by proving that a row is a local conservative boundary, out of scope
+for the current x86_64 milestone, or blocked on missing infrastructure, as long
+as the evidence and upstream behavior are documented.
+
+## Empty Active Queue
+
+When `docs/next_steps.md` has no active slice, do not continue with generic
+pass parity probing. Start from replacement evidence:
+
+1.  Inspect the latest source-backed corpus, accepted-pipeline, readiness, and
+    handoff records.
+2.  Decide whether that evidence is still fresh using the evidence freshness
+    rules below.
+3.  If the evidence is stale, run the smallest x86_64 discovery or validation
+    command that can refresh the affected stage.
+4.  Promote exactly one measured blocker, matrix gap, or documented boundary
+    closure into `docs/next_steps.md`.
+5.  If no blocker appears, record the clean row or boundary and move to the
+    next x86_64 stage before considering non-x86_64 work.
+
 Each active checklist in `docs/next_steps.md` should state:
 
 ```text
 Replacement goal:
 Zig evidence:
 LLVM fallback removed or reduced:
-Distribution mode/target affected:
+Mode/target/stage row:
+Upstream mapping:
+Known boundary:
 Validation gate:
+Commit:
 ```
 
 Use `unknown` only while selecting the slice. Before implementation is marked
 complete, replace `unknown` with a concrete answer or document why the slice is
 only preparatory infrastructure.
+
+## Evidence Freshness
+
+Previously clean evidence becomes stale for the affected stage when one of
+these changes lands:
+
+- parser, verifier, printer, pass-manager, or shared-analysis behavior;
+- target parsing, DataLayout, ABI classification, calling convention, object,
+  codegen, or handoff behavior;
+- `test/zig/manifest.tsv` or any checked Zig-emitted fixture;
+- stage4 Zig revision or fixture emitter version;
+- accepted pipeline expansion, pass ordering, or pass alias behavior;
+- a readiness gate failure that contradicts the recorded matrix status.
+
+When evidence is stale, refresh only the affected mode, target, or stage unless
+the change is a release milestone or matrix status upgrade.
 
 ## Distribution Replacement Matrix
 
@@ -90,6 +137,9 @@ docs-only change
 
 single pass or analysis fixture
   -> run the focused opt fixture or unit test for that pass
+
+single pass implementation touching shared pass logic
+  -> run the focused fixture and `zig build test`
 
 parser, verifier, printer, pass manager, or shared analysis change
   -> run the focused fixture plus the local readiness gate
@@ -302,9 +352,23 @@ A checkbox in `docs/next_steps.md` can be marked complete only after:
     recorded;
 6.  the step is committed separately using the commit policy.
 
+Each commit should close exactly one promoted slice or one prerequisite
+tooling/doc fix. If one discovery session reveals multiple independent fixes,
+split them into separate commits.
+
 If a step improves local quality but does not remove or reduce an LLVM fallback,
 the completion note must say that explicitly and point to the source-backed
 reason for doing it anyway.
+
+Each completed slice should leave a short completion note in the relevant doc
+or checklist stating one of:
+
+```text
+LLVM fallback reduced:
+evidence added only:
+local conservative boundary closed:
+out of scope for current x86_64 milestone:
+```
 
 ## Discovery Fix Review Loop
 
