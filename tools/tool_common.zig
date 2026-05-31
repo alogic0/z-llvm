@@ -133,6 +133,14 @@ pub fn commandExists(allocator: std.mem.Allocator, io: std.Io, command: []const 
     return termOk(result.term);
 }
 
+pub fn fileExists(io: std.Io, path: []const u8) !bool {
+    std.Io.Dir.cwd().access(io, path, .{}) catch |err| switch (err) {
+        error.FileNotFound => return false,
+        else => return err,
+    };
+    return true;
+}
+
 pub fn termOk(term: std.process.Child.Term) bool {
     return switch (term) {
         .exited => |code| code == 0,
