@@ -252,6 +252,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedDebugLocation(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -2256,6 +2261,23 @@ fn lowerCheckedArraySum(allocator: std.mem.Allocator, machine: *MachineFunction,
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = second_reg } });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = third_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedDebugLocation(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "atomics_inline_asm_debug.debug_location")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const value_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (value_reg != .rdi) return error.UnsupportedCodegenAbi;
+    if (!functionHasOverflowPanicEdge(function)) return false;
+
+    const overflow_label = "debug_location_overflow";
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);

@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSafe x86_64 asm/object blocker: selected
-`@debug_location` overflow-checked add-immediate lowering from
-`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll`.
+`@loop_sum` overflow-checked loop lowering from
+`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -29,20 +29,24 @@ failures. The selected `aggregates.zig.ReleaseSafe.x86_64.optimized.ll`
 blocker is now object-ok for `@slice_sum`, `@struct_sum`, and `@array_sum`
 overflow-checked `llvm.sadd.with.overflow.i32` shapes with panic-edge
 relocations. Focused validation for that closed slice is
-`bash scripts/run_distribution_releasesafe_object_m2.sh`. The current probe is
-9 object successes and 8 object failures.
+`bash scripts/run_distribution_releasesafe_object_m2.sh`. The selected
+`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
+object-ok for `@debug_location`, `@inline_asm_barrier`, and `@atomic_add`; the
+focused ReleaseSafe gate also covers the checked add-immediate shape. The
+current probe is 10 object successes and 7 object failures.
 
 The first sorted failure is now
-`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` with
+`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` with
 `error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@debug_location = alias i32 (i32), ptr @atomics_inline_asm_debug.debug_location`;
-the optimized body contains an overflow-checked add-immediate using
-`llvm.sadd.with.overflow.i32` and a safety panic edge to
-`debug.FullPanic((function 'defaultPanic')).integerOverflow`.
+`@loop_sum = alias i32 (i32), ptr @control_flow_calls.loop_sum`; the optimized
+body contains overflow-checked loop arithmetic using
+`llvm.sadd.with.overflow.i32` and safety panic edges to
+`debug.FullPanic((function 'defaultPanic')).integerOverflow` and
+`debug.FullPanic((function 'defaultPanic')).integerOutOfBounds`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSafe
-`@debug_location` shape. This continues reducing the ReleaseSafe asm/object
+`@loop_sum` shape. This continues reducing the ReleaseSafe asm/object
 fallback row for safety/runtime-call CFG shapes. It does not claim general
 ReleaseSafe panic runtime lowering, arbitrary checked arithmetic, unwinding,
 debug records, or target-complete ABI behavior.
@@ -61,11 +65,10 @@ safety edge, also map against LLVM IR overflow intrinsic handling in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@debug_location` ReleaseSafe shape from the
-`atomics_inline_asm_debug` optimized output. Do not generalize to every panic
-edge, every overflow intrinsic, arbitrary inline asm or atomic shape,
-unwinding, debug/unwind object records, or non-x86_64 ABI behavior in this
-slice.
+Implement only the selected `@loop_sum` ReleaseSafe shape from the
+`control_flow_calls` optimized output. Do not generalize to every panic edge,
+every overflow intrinsic, arbitrary loop, unwinding, debug/unwind object
+records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend the reduced ReleaseSafe fixture and run its focused

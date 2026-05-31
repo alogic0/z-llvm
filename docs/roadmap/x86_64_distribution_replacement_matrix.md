@@ -115,8 +115,9 @@ target=x86_64-linux-gnu
 stage=asm/object
 status=LLVM fallback required
 optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
-object_probe=9 ok, 8 fail with --input-limit=67108864
+object_probe=10 ok, 7 fail with --input-limit=67108864
 closed_blocker=aggregates.zig.ReleaseSafe.x86_64.optimized.ll selected checked aggregate sums
-first_blocker=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll
-missing capability=selected @debug_location overflow-checked add-immediate and panic-edge lowering
+closed_blocker=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll selected checked debug_location
+first_blocker=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll
+missing capability=selected @loop_sum overflow-checked loop and panic-edge lowering
 ```

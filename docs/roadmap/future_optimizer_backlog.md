@@ -131,9 +131,13 @@ successes. Object probing with `--input-limit=67108864` originally found 8
 successes and 9 failures. The selected
 `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
 the checked aggregate sum aliases. The current probe is 9 successes and 8
-failures. The first sorted blocker is
-`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll`, selected
-`@debug_location` overflow-checked add-immediate and panic-edge lowering.
+failures. The selected
+`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
+object-ok for the checked `@debug_location` alias and the already covered
+inline-asm/atomic aliases. The current probe is 10 successes and 7 failures.
+The first sorted blocker is
+`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@loop_sum`
+overflow-checked loop and panic-edge lowering.
 
 ## Activation Rule
 

@@ -57,3 +57,42 @@ C
 zig cc "$harness" "$object" -o "$exe"
 "$exe"
 printf 'ok distribution releasesafe object aggregates_checked_sums\n'
+
+atomics_fixture="test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll"
+atomics_object="$tmp_dir/atomics_debug_location_checked.o"
+atomics_summary="$tmp_dir/atomics_debug_location_checked.readelf.txt"
+atomics_dump="$tmp_dir/atomics_debug_location_checked.objdump.txt"
+atomics_harness="$tmp_dir/atomics_debug_location_checked_harness.c"
+atomics_exe="$tmp_dir/atomics_debug_location_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$atomics_fixture" > "$atomics_object"
+readelf -W -h -S -s -r "$atomics_object" > "$atomics_summary"
+objdump -dr "$atomics_object" > "$atomics_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$atomics_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$atomics_summary"
+rg -q '[[:space:]]debug_location$' "$atomics_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$atomics_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$atomics_dump"
+
+cat > "$atomics_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t debug_location(int32_t value);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    if (debug_location(0) != 1) return 1;
+    if (debug_location(41) != 42) return 2;
+    if (debug_location(-2) != -1) return 3;
+    return 0;
+}
+C
+
+zig cc "$atomics_harness" "$atomics_object" -o "$atomics_exe"
+"$atomics_exe"
+printf 'ok distribution releasesafe object atomics_debug_location_checked\n'
