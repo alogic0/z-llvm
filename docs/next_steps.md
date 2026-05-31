@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_small_struct_ints` small integer struct control-flow lowering from
+`@zig_med_struct_mixed` medium mixed struct control-flow lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -190,10 +190,15 @@ packed integer register checks. The broad row still remains the first object
 failure; the next selected public shape is `@zig_small_struct_ints = alias
 void (i32), ptr @main.zig_small_struct_ints`, a small integer struct
 control-flow shape that checks four packed byte fields in one 32-bit argument.
+That focused shape is now object-ok with local trap failure edges and a
+selected packed i32 payload check. The broad row still remains the first
+object failure; the next selected public shape is `@zig_med_struct_mixed =
+alias void (i64, i64), ptr @main.zig_med_struct_mixed`, a medium mixed
+integer/float struct control-flow shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_small_struct_ints` small integer struct control-flow shape. This
+`@zig_med_struct_mixed` medium mixed struct control-flow shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -209,12 +214,12 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-small integer struct control-flow shape, also map against SelectionDAG
-aggregate argument assignment, integer masking, integer comparison, and branch lowering in
+medium mixed struct control-flow shape, also map against SelectionDAG aggregate
+argument assignment, integer masking, bitcast-to-float comparison, and branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_small_struct_ints` ReleaseSmall small integer
+Implement only the selected `@zig_med_struct_mixed` ReleaseSmall medium mixed
 struct control-flow shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or

@@ -260,3 +260,7 @@ That focused shape is now object-ok with local trap failure edges and selected
 packed integer register checks. The broad row still remains the first sorted
 failure; the next selected alias is `@zig_small_struct_ints`, a small integer
 struct comparison control-flow shape.
+That focused shape is now object-ok with local trap failure edges and a
+selected packed i32 payload check. The broad row still remains the first
+sorted failure; the next selected alias is `@zig_med_struct_mixed`, a medium
+mixed struct comparison control-flow shape.
