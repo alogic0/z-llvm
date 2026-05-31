@@ -581,6 +581,14 @@ categories. The helper reproduced the current release-mode evidence:
 ReleaseFast 17 ok / 0 fail, ReleaseSafe 17 ok / 0 fail, and adjusted
 ReleaseSmall 463 ok / 0 fail / 2 excluded.
 
+The first broad Debug manifest row,
+`tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, is now object-clean as a selected
+source-backed row. The closed broad-Debug parser/verifier boundaries are
+LLVM `#dbg_*` debug records, `ret`/`unreachable` metadata, sizeless
+`DIBasicType`, and columnless `DILocation` nodes. This does not promote broad
+Debug asm/object; `tmp/zig_ir/raw/control_flow_calls.Debug.ll` is the next
+measured broad Debug row.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete

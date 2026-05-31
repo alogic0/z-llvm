@@ -162,7 +162,16 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
         }
         if (isUnsupportedEhTerminator(line)) return error.UnsupportedExceptionHandling;
 
-        if (std.mem.eql(u8, line, "unreachable")) {
+        if (isDebugRecord(line)) continue;
+
+        if (std.mem.startsWith(u8, line, "unreachable")) {
+            const trailing = std.mem.trim(u8, line["unreachable".len..], " \t");
+            if (trailing.len != 0) {
+                if (!std.mem.startsWith(u8, trailing, ",")) return error.InvalidTerminator;
+                const metadata = std.mem.trim(u8, trailing[1..], " \t");
+                if (metadata.len == 0) return error.InvalidTerminator;
+                try validateInstructionMetadata(metadata);
+            }
             if (block.terminator != null) return error.MultipleTerminators;
             block.terminator = .{ .@"unreachable" = {} };
             continue;
@@ -174,6 +183,10 @@ pub fn parse(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     if (current_function != null) return error.UnclosedFunction;
     if (module.functions.items.len == 0 and module.module_asm.items.len == 0 and module.named_types.items.len == 0 and module.globals.items.len == 0 and module.aliases.items.len == 0 and module.comdats.items.len == 0 and module.declarations.items.len == 0 and module.metadata.items.len == 0 and module.attribute_groups.items.len == 0) return error.EmptyModule;
     return module;
+}
+
+fn isDebugRecord(line: []const u8) bool {
+    return std.mem.startsWith(u8, line, "#dbg_");
 }
 
 fn parseModuleAsm(line: []const u8) !void {
@@ -2469,8 +2482,12 @@ fn parsePhi(allocator: std.mem.Allocator, text: []const u8) !core.PhiInst {
 }
 
 fn parseRet(line: []const u8) !core.Terminator {
-    if (!std.mem.startsWith(u8, line, "ret ")) return error.InvalidRet;
-    const typed = try parseLeadingType(line["ret ".len..]);
+    const metadata_start = std.mem.indexOf(u8, line, ", !");
+    const metadata = if (metadata_start) |index| std.mem.trim(u8, line[index + 2 ..], " \t") else null;
+    const instruction_text = if (metadata_start) |index| line[0..index] else line;
+    if (metadata) |attachment| try validateInstructionMetadata(attachment);
+    if (!std.mem.startsWith(u8, instruction_text, "ret ")) return error.InvalidRet;
+    const typed = try parseLeadingType(instruction_text["ret ".len..]);
     const ty = typed.ty;
     if (ty == .void) {
         if (std.mem.trim(u8, typed.after, " \t").len != 0) return error.InvalidRet;

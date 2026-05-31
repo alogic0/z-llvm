@@ -12,9 +12,10 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Probe the first broad Debug x86_64 asm/object row and either reduce one
-concrete object blocker into a tracked fixture or reaffirm broad Debug as an
-LLVM fallback with measured evidence.
+Probe the next broad Debug x86_64 asm/object row, starting with
+`control_flow_calls.Debug.ll`, and either reduce one concrete object blocker
+into a tracked fixture or reaffirm broad Debug as an LLVM fallback with
+measured evidence.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -557,9 +558,23 @@ and ReleaseSafe as 17/17 object-clean captured subsets, ReleaseSmall as an
 adjusted 463/465 object-clean subset with two explicit exclusions, and Debug as
 a reduced 6-fixture object-clean subset while broad Debug remains unproven.
 
+The first broad Debug row from the fixture manifest,
+`tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, originally failed before object
+emission on Debug/O0 parser and verifier boundaries: LLVM `#dbg_declare`
+records, `unreachable` and `ret` terminator metadata, sizeless
+`DIBasicType`, and columnless `DILocation(line: 0, scope: ...)` nodes. Those
+metadata forms are now accepted as conservative object-readiness boundaries.
+The focused object probe is clean:
+
+```text
+input=tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir
+summary total=1 ok=1 fail=0 excluded=0 first_failure=-
+source=tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll
+```
+
 LLVM fallback removed or reduced:
-Turn the dashboard's broad Debug asm/object fallback from an unmeasured
-statement into a measured first blocker. If the first blocker is small and
+Advance broad Debug asm/object evidence from the manifest's `tiny_scalar`
+source row to the next source-backed row. If the next blocker is small and
 source-backed, reduce it. If it is broad DWARF/O0/backend infrastructure,
 record that boundary explicitly and keep broad Debug as LLVM fallback.
 
@@ -580,13 +595,14 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 
 Known boundary:
 Do not claim broad Debug replacement from reduced fixtures. The next probe must
-select or capture one broad source-backed Debug row, record the exact command
-and first failure, and only create a fixture if the first blocker is a bounded
+select the next broad source-backed Debug row, record the exact command and
+first failure, and only create a fixture if the first blocker is a bounded
 codegen/object shape.
 
 Validation gate:
-Run the smallest broad Debug probe possible, record exact counts and first
-failure, and keep `bash scripts/run_distribution_debug_object_m4.sh` plus
+Run the smallest broad `control_flow_calls.Debug.ll` probe possible, record
+exact counts and first failure, and keep
+`bash scripts/run_distribution_debug_object_m4.sh` plus
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:

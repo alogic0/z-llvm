@@ -61,6 +61,18 @@ bash scripts/run_distribution_debug_object_m4.sh
            broad Debug std rows, target-complete ABI lowering
 ```
 
+The first broad Debug manifest row also has selected object evidence:
+
+```text
+source=tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll
+probe=tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir
+object_probe=1 ok, 0 fail
+closed_boundaries=#dbg_* records dropped as non-semantic object records,
+                  ret/unreachable metadata accepted, sizeless DIBasicType,
+                  columnless DILocation
+next_broad_debug_row=tmp/zig_ir/raw/control_flow_calls.Debug.ll
+```
+
 Handoff is conservative for release modes because
 `bash scripts/run_handoff_validation.sh` validates selected scalar, memory,
 loop, global, stack, and optimized scalar shapes, but not arbitrary accepted

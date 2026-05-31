@@ -2365,6 +2365,54 @@ test "verifier rejects impossible debug compile unit root" {
     try std.testing.expectError(error.InvalidDebugMetadata, module.verify());
 }
 
+test "verifier accepts sizeless debug basic types" {
+    const input =
+        \\define void @sizeless_basic_type() !dbg !4 {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!llvm.module.flags = !{!1}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!1 = !{i32 2, !"Debug Info Version", i32 3}
+        \\!2 = !DIFile(filename: "sizeless_basic_type.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "sizeless_basic_type", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{!7}
+        \\!7 = !DIBasicType(name: "void", encoding: DW_ATE_signed)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
+test "verifier accepts columnless debug locations" {
+    const input =
+        \\define void @columnless_location() !dbg !4 {
+        \\entry:
+        \\  ret void, !dbg !7
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!llvm.module.flags = !{!1}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!1 = !{i32 2, !"Debug Info Version", i32 3}
+        \\!2 = !DIFile(filename: "columnless_location.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "columnless_location", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!7 = !DILocation(line: 0, scope: !4)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
 test "parser preserves instruction debug metadata attachments" {
     const input =
         \\source_filename = "debug_metadata"
@@ -2950,6 +2998,78 @@ test "parser rejects unsupported instruction metadata attachments" {
     ;
 
     try std.testing.expectError(error.UnsupportedInstructionMetadata, ir.Module.parse(std.testing.allocator, input));
+}
+
+test "parser drops non-semantic debug records" {
+    const input =
+        \\define i32 @debug_record(ptr %p) !dbg !4 {
+        \\entry:
+        \\  #dbg_declare(ptr %p, !8, !DIExpression(), !9)
+        \\  ret i32 0, !dbg !9
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!llvm.module.flags = !{!1}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!1 = !{i32 2, !"Debug Info Version", i32 3}
+        \\!2 = !DIFile(filename: "debug_record.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "debug_record", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocalVariable(name: "p", arg: 1, scope: !4, file: !2, line: 1, type: !5)
+        \\!9 = !DILocation(line: 1, column: 1, scope: !4)
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqual(@as(usize, 0), module.functions.items[0].blocks.items[0].instructions.items.len);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqual(null, std.mem.indexOf(u8, output.writer.buffered(), "#dbg_declare"));
+}
+
+test "parser accepts unreachable metadata" {
+    const input =
+        \\define void @unreachable_metadata() {
+        \\entry:
+        \\  unreachable, !dbg !0
+        \\}
+        \\
+        \\!0 = !DILocation(line: 1, column: 1, scope: !1)
+        \\!1 = distinct !DISubprogram(name: "unreachable_metadata", file: !2, type: !3)
+        \\!2 = !DIFile(filename: "unreachable_metadata.zig", directory: ".")
+        \\!3 = !DISubroutineType(types: !4)
+        \\!4 = !{}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+}
+
+test "parser accepts return metadata" {
+    const input =
+        \\define i32 @return_metadata() {
+        \\entry:
+        \\  ret i32 0, !dbg !0
+        \\}
+        \\
+        \\!0 = !DILocation(line: 1, column: 1, scope: !1)
+        \\!1 = distinct !DISubprogram(name: "return_metadata", file: !2, type: !3)
+        \\!2 = !DIFile(filename: "return_metadata.zig", directory: ".")
+        \\!3 = !DISubroutineType(types: !4)
+        \\!4 = !{}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
 }
 
 test "parser preserves Zig raw aliases and attribute groups" {

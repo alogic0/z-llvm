@@ -833,12 +833,13 @@ fn verifyKnownMetadataNode(body: []const u8, ids: std.AutoHashMap(u32, []const u
     } else if (knownNodeBody(body, "!DIExpression(")) {
         if (!std.mem.endsWith(u8, std.mem.trim(u8, body, " \t"), ")")) return error.InvalidDebugMetadata;
     } else if (knownNodeBody(body, "!DILocation(")) {
-        if (!hasMetadataField(body, "line") or !hasMetadataField(body, "column") or !hasMetadataField(body, "scope")) return error.InvalidDebugMetadata;
+        if (!hasMetadataField(body, "line") or !hasMetadataField(body, "scope")) return error.InvalidDebugMetadata;
         try verifyFieldTargetAnyDebugNode(body, "scope", ids);
     } else if (knownNodeBody(body, "!DISubroutineType(")) {
         if (!hasMetadataField(body, "types")) return error.InvalidDebugMetadata;
     } else if (knownNodeBody(body, "!DIBasicType(")) {
-        if (!hasMetadataField(body, "name") or !hasMetadataField(body, "size")) return error.InvalidDebugMetadata;
+        if (!hasMetadataField(body, "encoding")) return error.InvalidDebugMetadata;
+        if (!hasMetadataField(body, "name") and !hasMetadataField(body, "size")) return error.InvalidDebugMetadata;
     } else if (knownNodeBody(body, "!DIDerivedType(")) {
         if (!hasMetadataField(body, "tag")) return error.InvalidDebugMetadata;
         if (metadataFieldRef(body, "baseType")) |id| try verifyMetadataIdExists(id, ids);

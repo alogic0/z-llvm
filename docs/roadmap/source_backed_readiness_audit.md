@@ -157,6 +157,11 @@ Debug:
       `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
       for call-chain, declare/value intrinsic, loop, metadata, and scope-branch
       shapes.
+- The first broad Debug manifest row,
+      `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, now emits a local object
+      after accepting source-backed Debug/O0 metadata forms: `#dbg_*` records,
+      terminator metadata, sizeless `DIBasicType`, and columnless
+      `DILocation`.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 
