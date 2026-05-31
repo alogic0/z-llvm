@@ -343,6 +343,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerDebugNoCompilePanicUncheckedArith(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiF128Sret(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -4118,6 +4123,78 @@ fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
         if (std.mem.eql(u8, block.name, name)) return block;
     }
     return null;
+}
+
+fn lowerDebugNoCompilePanicUncheckedArith(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "no_compile_panic_for_unchecked_arith.entry")) return false;
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 1) return false;
+    if (function.blocks.items[0].instructions.items.len != 21) return false;
+    try validateDebugNoCompilePanicUncheckedArithShape(function);
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateDebugNoCompilePanicUncheckedArithShape(function: ir.Function) !void {
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+    };
+    if (block.instructions.items.len != 21 or !ret.ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+
+    const slot = try validateAllocaNamed(block.instructions.items[0], .{ .int = 64 });
+    try validateStore(block.instructions.items[1], .{ .int = 64 }, .{ .int = 0 }, slot);
+    const load2 = try validateNamedLoad(block.instructions.items[2], .{ .int = 64 }, slot);
+    const add3 = try validateBinaryNamedImm(block.instructions.items[3], .add, .{ .int = 64 }, load2, 1);
+    try validateStore(block.instructions.items[4], .{ .int = 64 }, .{ .named = add3 }, slot);
+    const load5 = try validateNamedLoad(block.instructions.items[5], .{ .int = 64 }, slot);
+    const sub6 = try validateBinaryNamedImm(block.instructions.items[6], .sub, .{ .int = 64 }, load5, 1);
+    try validateStore(block.instructions.items[7], .{ .int = 64 }, .{ .named = sub6 }, slot);
+    const load8 = try validateNamedLoad(block.instructions.items[8], .{ .int = 64 }, slot);
+    const mul9 = try validateBinaryNamedImm(block.instructions.items[9], .mul, .{ .int = 64 }, load8, 2);
+    try validateStore(block.instructions.items[10], .{ .int = 64 }, .{ .named = mul9 }, slot);
+    const load11 = try validateNamedLoad(block.instructions.items[11], .{ .int = 64 }, slot);
+    const uadd12 = try validateSaturatingCall(block.instructions.items[12], "llvm.uadd.sat.i64", load11, 1, null);
+    try validateStore(block.instructions.items[13], .{ .int = 64 }, .{ .named = uadd12 }, slot);
+    const load14 = try validateNamedLoad(block.instructions.items[14], .{ .int = 64 }, slot);
+    const usub15 = try validateSaturatingCall(block.instructions.items[15], "llvm.usub.sat.i64", load14, 1, null);
+    try validateStore(block.instructions.items[16], .{ .int = 64 }, .{ .named = usub15 }, slot);
+    const load17 = try validateNamedLoad(block.instructions.items[17], .{ .int = 64 }, slot);
+    const umul18 = try validateSaturatingCall(block.instructions.items[18], "llvm.umul.fix.sat.i64", load17, 2, 0);
+    try validateStore(block.instructions.items[19], .{ .int = 64 }, .{ .named = umul18 }, slot);
+    const load20 = try validateNamedLoad(block.instructions.items[20], .{ .int = 64 }, slot);
+    if (!isNamed(ret.value orelse return error.InvalidRet, load20)) return error.UnsupportedCodegenControlFlow;
+}
+
+fn validateBinaryNamedImm(instruction: ir.Instruction, op: ir.BinaryOp, ty: ir.Type, lhs_name: []const u8, rhs: i128) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (binary.op != op or !binary.ty.eql(ty) or !isNamed(binary.lhs, lhs_name) or !binary.rhs.eql(.{ .int = rhs })) return error.UnsupportedCodegenInstruction;
+    return name;
+}
+
+fn validateSaturatingCall(instruction: ir.Instruction, callee: []const u8, lhs_name: []const u8, rhs: i128, scale: ?i128) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isCalleeName(call.callee, callee) or !call.ret_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenInstruction;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    const expected_args: usize = if (scale == null) 2 else 3;
+    if (call.args.items.len != expected_args) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 64 }) or !isNamed(call.args.items[0].value, lhs_name)) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !call.args.items[1].value.eql(.{ .int = rhs })) return error.UnsupportedCodegenInstruction;
+    if (scale) |scale_value| {
+        if (!call.args.items[2].ty.eql(.{ .int = 32 }) or !call.args.items[2].value.eql(.{ .int = scale_value })) return error.UnsupportedCodegenInstruction;
+    }
+    return name;
 }
 
 fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

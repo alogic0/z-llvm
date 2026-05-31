@@ -129,4 +129,19 @@ rg -q 'movabs[[:alpha:]]*[[:space:]]+\$0x4,%rax' "$inherit_dump"
 rg -q '[[:space:]]ret' "$inherit_dump"
 printf 'ok distribution debug object inherit_want_safety_o0\n'
 
+unchecked_arith_fixture="test/distribution/debug_x86_64/inputs/no_compile_panic_unchecked_arith_o0.ll"
+unchecked_arith_object="$tmp_dir/no_compile_panic_unchecked_arith_o0.o"
+unchecked_arith_summary="$tmp_dir/no_compile_panic_unchecked_arith_o0.readelf.txt"
+unchecked_arith_dump="$tmp_dir/no_compile_panic_unchecked_arith_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$unchecked_arith_fixture" > "$unchecked_arith_object"
+readelf -W -h -S -s -r "$unchecked_arith_object" > "$unchecked_arith_summary"
+objdump -dr "$unchecked_arith_object" > "$unchecked_arith_dump"
+
+check_common_object "$unchecked_arith_summary" entry
+rg -q '[[:space:]]no_compile_panic_for_unchecked_arith\.entry$' "$unchecked_arith_summary"
+rg -q 'movabs[[:alpha:]]*[[:space:]]+\$0x0,%rax' "$unchecked_arith_dump"
+rg -q '[[:space:]]ret' "$unchecked_arith_dump"
+printf 'ok distribution debug object no_compile_panic_unchecked_arith_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"
