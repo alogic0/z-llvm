@@ -12,7 +12,7 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Expand the continuous Debug object evidence beyond the now-clean prefix-200
+Expand the continuous Debug object evidence beyond the now-clean prefix-300
 boundary by probing the next bounded optimizer-ok prefix. Promote only the
 first measured source-backed failure, or record the clean prefix if no failure
 appears.
@@ -629,10 +629,15 @@ closed_blockers=c_abi_main.zig.Debug.x86_64.ll,
                 cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll,
                 cases_inherit_want_safety.zig.Debug.x86_64.ll,
                 cases_no_compile_panic_for_unchecked_arith.zig.Debug.x86_64.ll
+
+input=tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir
+summary total=300 ok=300 fail=0 excluded=0
+first_failure=-
+first_failure_category=-
 ```
 
 LLVM fallback removed or reduced:
-The first 200 continuous Debug optimizer-ok rows are object-clean. The next
+The first 300 continuous Debug optimizer-ok rows are object-clean. The next
 slice should probe the next bounded Debug prefix and reduce the first measured
 failure only if it stays source-backed and narrow. Keep broad Debug asm/object
 as LLVM fallback outside selected rows.

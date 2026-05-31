@@ -26,6 +26,7 @@ Current automated summaries:
 | Debug broad tiny scalar plain | `tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
+| Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
 
 ReleaseSmall exclusions:
 
@@ -106,6 +107,7 @@ Debug broad:
     selected Debug/O0 unchecked/saturating arithmetic chain lowering to the
     ABI-visible i64 return value
   continuous Debug prefix 200 is object-clean
+  continuous Debug prefix 300 is object-clean
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

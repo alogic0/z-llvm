@@ -106,6 +106,12 @@ closed_boundary=selected Debug/O0 C ABI aliases, stack-materialized aggregate
                 logical-pointer compile-error and SPIR-V logical-pointer merge
                 fixtures; selected Debug/O0 inherit_want_safety counter return;
                 selected Debug/O0 unchecked/saturating arithmetic chain return
+
+source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv first 300 optimizer-ok rows
+probe=tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir
+object_probe=300 ok, 0 fail
+first_failure=-
+first_failure_category=-
 ```
 
 Handoff is conservative for release modes because

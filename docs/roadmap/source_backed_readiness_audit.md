@@ -178,6 +178,8 @@ Debug:
       merge fixtures, plus selected Debug/O0 `inherit_want_safety` counter
       return lowering and unchecked/saturating arithmetic chain return
       lowering.
+- The continuous Debug first-300 optimizer-ok prefix is object-clean at
+      `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir`.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 

@@ -616,6 +616,10 @@ fixtures, plus selected Debug/O0 `inherit_want_safety` counter return lowering.
 The first-200 prefix is now object-clean after selected Debug/O0 unchecked and
 saturating arithmetic chain return lowering.
 
+The continuous Debug first-300 optimizer-ok prefix is also object-clean:
+`tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` reports
+300 ok / 0 fail.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete
