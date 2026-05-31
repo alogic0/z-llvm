@@ -26,6 +26,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, 0xb8);
                 try appendI32(&bytes, allocator, value);
             },
+            .mov_imm_rax => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
+                try appendU64(&bytes, allocator, @bitCast(value));
+            },
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
@@ -176,6 +180,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
     return switch (instruction) {
         .label => 0,
         .mov_imm_eax => 5,
+        .mov_imm_rax => 10,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,

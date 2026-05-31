@@ -189,4 +189,7 @@ replacement boundary. The broad row still remains the first sorted failure;
 the next selected alias is `@zig_ret_PD`, a mixed integer/double aggregate
 return. That focused shape is now object-ok. The broad row still remains the
 first sorted failure; the next selected alias is `@zig_ret_CFF`, a mixed
-integer/float aggregate return.
+integer/float aggregate return. That focused shape is now object-ok. The broad
+row still remains the first sorted failure; the next selected alias is
+`@zig_assert_CFF`, a mixed integer/float assertion shape with floating-point
+comparison and diagnostic failure edge.

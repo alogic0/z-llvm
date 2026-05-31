@@ -142,6 +142,6 @@ closed_blocker=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll sele
 current_object_probe=265 ok, 200 fail with --input-limit=67108864
 closed_blocker=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll selected c_fopen/c_ftell/c_fputs/c_printf
 first_blocker=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
-closed_aliases_in_first_blocker=@zig_f128_f128_struct selected C ABI fp128 byval/sret lowering; @zig_f128_struct/@zig_f128 selected fp128 returns; @zig_assert_PD selected return-code branch behavior; @zig_ret_PD selected mixed integer/double return
-missing capability=selected @zig_ret_CFF C ABI mixed integer/float aggregate-return lowering
+closed_aliases_in_first_blocker=@zig_f128_f128_struct selected C ABI fp128 byval/sret lowering; @zig_f128_struct/@zig_f128 selected fp128 returns; @zig_assert_PD selected return-code branch behavior; @zig_ret_PD selected mixed integer/double return; @zig_ret_CFF selected mixed integer/float return
+missing capability=selected @zig_assert_CFF C ABI mixed integer/float assertion return-code lowering
 ```
