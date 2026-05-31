@@ -139,6 +139,7 @@ pub fn main(init: std.process.Init) !void {
             machines.deinit(allocator);
         }
         for (module.functions.items) |function| {
+            if (!shouldLowerCodegenFunction(module, function)) continue;
             var machine = try codegen.x86_64.lowerFunction(allocator, triple, function);
             errdefer machine.deinit(allocator);
             try machines.append(allocator, machine);
@@ -171,6 +172,15 @@ fn parseInputLimit(text: []const u8) !usize {
     const limit = try std.fmt.parseInt(usize, text, 10);
     if (limit == 0) return error.InvalidInputLimit;
     return limit;
+}
+
+fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {
+    if (module.aliases.items.len == 0) return true;
+    if (function.linkage != .private and function.linkage != .internal) return true;
+    for (module.aliases.items) |alias| {
+        if (std.mem.eql(u8, alias.target, function.name)) return true;
+    }
+    return false;
 }
 
 fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {

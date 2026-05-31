@@ -47,7 +47,10 @@ none in this captured ReleaseFast object set
 ```text
 next_row=ReleaseSafe x86_64 asm/object
 optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
-first_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
-selected_alias=@slice_sum
-missing_capability=ReleaseSafe overflow-checked loop and panic-edge lowering
+closed_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
+closed_aliases=@slice_sum,@struct_sum,@array_sum
+current_probe=9 object-ok, 8 object-fail
+first_failure=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@debug_location
+missing_capability=ReleaseSafe overflow-checked add-immediate and panic-edge lowering
 ```

@@ -56,6 +56,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .test_arg64 => |reg| try writer.print("\ttestq {s}, {s}\n", .{ reg.name64(), reg.name64() }),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),
+            .jo => |label| try writer.print("\tjo .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),
         }
     }

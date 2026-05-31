@@ -126,7 +126,11 @@ tmp/zig_ir/distribution_m2_releasesafe_20260530
   capture_optimized_output=true
 ```
 
-Object probing those captured rows with `--input-limit=67108864` found 8 local
-object successes and 9 object failures. The first sorted failure is
-`aggregates.zig.ReleaseSafe.x86_64.optimized.ll` with selected `@slice_sum`
-overflow-checked loop and panic-edge lowering.
+Object probing those captured rows with `--input-limit=67108864` originally
+found 8 local object successes and 9 object failures. The selected
+`aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
+`@slice_sum`, `@struct_sum`, and `@array_sum` overflow-checked
+`llvm.sadd.with.overflow.i32` shapes with panic-edge relocations. The current
+probe is 9 object successes and 8 object failures; the first sorted failure is
+`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` with selected
+`@debug_location` overflow-checked add-immediate and panic-edge lowering.

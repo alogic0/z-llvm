@@ -114,6 +114,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x85 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jo => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x80 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .ret => try bytes.append(allocator, 0xc3),
         }
         offset += instructionSize(instruction);
@@ -169,7 +177,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
-        .je, .jne => 6,
+        .je, .jne, .jo => 6,
         .ret => 1,
     };
 }

@@ -127,10 +127,13 @@ shapes.
 
 The next measured object row is ReleaseSafe. The bounded capture
 `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` has 17 optimizer
-successes. Object probing with `--input-limit=67108864` found 8 successes and 9
+successes. Object probing with `--input-limit=67108864` originally found 8
+successes and 9 failures. The selected
+`aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
+the checked aggregate sum aliases. The current probe is 9 successes and 8
 failures. The first sorted blocker is
-`aggregates.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@slice_sum`
-overflow-checked loop and panic-edge lowering.
+`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll`, selected
+`@debug_location` overflow-checked add-immediate and panic-edge lowering.
 
 ## Activation Rule
 
