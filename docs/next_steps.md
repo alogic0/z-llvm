@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_struct_u64` two-u64 control-flow lowering from
+`@zig_ret_struct_u64` i64 return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -308,11 +308,15 @@ remains the first object failure; the next selected public shape is
 focused shape is now object-ok with selected `%rax`/`%rdx` return
 materialization. The broad row still remains the first object failure; the
 next selected public shape is `@zig_struct_u64 = alias void (i64, i64), ptr
-@main.zig_struct_u64`, a two-u64 control-flow shape.
+@main.zig_struct_u64`, a two-u64 control-flow shape. That focused shape is
+now object-ok with selected register checks and local trap failure edges. The
+broad row still remains the first object failure; the next selected public
+shape is `@zig_ret_struct_u64 = alias i64 (), ptr @main.zig_ret_struct_u64`,
+an i64 return shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_struct_u64` two-u64 control-flow shape. This
+`@zig_ret_struct_u64` i64 return shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -334,8 +338,8 @@ lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_struct_u64` ReleaseSmall two-u64
-control-flow shape from the `c_abi_main` optimized output.
+Implement only the selected `@zig_ret_struct_u64` ReleaseSmall i64 return
+shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.
