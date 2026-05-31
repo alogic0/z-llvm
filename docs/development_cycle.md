@@ -316,6 +316,13 @@ zig run tools/zig_corpus_discovery.zig -- \
   --progress-every=50
 ```
 
+Add `--capture-optimized-output` when a cycle needs canonical-form evidence for
+handoff triage. The discovery report then includes `optimized_ir_path`, and the
+normalized local optimized output is written under
+`tmp/zig_ir/<sweep-name>/optimized-ir/`. A captured output directory is a
+baseline unless it is compared against an earlier captured optimized-output
+directory; ordinary quiet reports prove pass/fail status only.
+
 If an optimizer sweep fails, classify the first row as pass behavior,
 transform-legality, or post-transform verifier failure. Reduce and fix that
 blocker before continuing broad optimizer sweeps. If the accepted pipeline is

@@ -23,8 +23,11 @@ const usage =
     \\                          verify-only sweeps use z_llvm --pass-limit=0
     \\                          because the CLI verifier already gates parsing
     \\  --local-input-limit=N   z_llvm input limit in bytes [1048576]
+    \\  --local-output-limit=N  z_llvm optimized output capture limit in bytes [67108864]
     \\  --max=N                 Stop after N candidate .zig files [0 means unlimited]
     \\  --progress-every=N      Write partial report and print progress every N files [25; 0 disables]
+    \\  --capture-optimized-output
+    \\                          Save normalized local optimized output for accepted rows
     \\  --local-trace           Pass --trace to z_llvm during local checks
     \\  --local-quiet           Pass --quiet to z_llvm during local checks [default]
     \\  --no-local-quiet        Keep local z_llvm check output
@@ -35,6 +38,7 @@ const usage =
     \\  <out-dir>/report.tsv
     \\  <out-dir>/summary.txt
     \\  <out-dir>/ir/*.ll
+    \\  <out-dir>/optimized-ir/*.ll when --capture-optimized-output is set
     \\  <out-dir>/logs/*.stderr.txt for failures
     \\
 ;
@@ -53,8 +57,10 @@ const Options = struct {
     target: []const u8 = "x86_64-linux-gnu",
     passes: []const u8 = "verify",
     local_input_limit: usize = 1024 * 1024,
+    local_output_limit: usize = 64 * 1024 * 1024,
     max: usize = 0,
     progress_every: usize = 25,
+    capture_optimized_output: bool = false,
     local_trace: bool = false,
     local_quiet: bool = true,
     strip: bool = true,
@@ -90,8 +96,11 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(ir_dir);
     const logs_dir = try std.fs.path.join(allocator, &.{ opts.out_dir, "logs" });
     defer allocator.free(logs_dir);
+    const optimized_dir = try std.fs.path.join(allocator, &.{ opts.out_dir, "optimized-ir" });
+    defer allocator.free(optimized_dir);
     try cwd.createDirPath(io, ir_dir);
     try cwd.createDirPath(io, logs_dir);
+    if (opts.capture_optimized_output) try cwd.createDirPath(io, optimized_dir);
 
     var candidates: std.ArrayList([]const u8) = .empty;
     defer {
@@ -107,7 +116,7 @@ pub fn main(init: std.process.Init) !void {
 
     var report: std.ArrayList(u8) = .empty;
     defer report.deinit(allocator);
-    try report.appendSlice(allocator, "status\tsource\tir_path\tlog_path\tnote\n");
+    try report.appendSlice(allocator, "status\tsource\tir_path\toptimized_ir_path\tlog_path\tnote\n");
 
     const report_path = try std.fs.path.join(allocator, &.{ opts.out_dir, "report.tsv" });
     defer allocator.free(report_path);
@@ -136,7 +145,7 @@ pub fn main(init: std.process.Init) !void {
             const log_path = try writeToolErrorLog(allocator, io, logs_dir, safe_name, "emit", err);
             defer allocator.free(log_path);
             counts.compile_skip += 1;
-            try appendRow(&report, allocator, "compile-skip", relative_source, ir_path, log_path, @errorName(err));
+            try appendRow(&report, allocator, "compile-skip", relative_source, ir_path, "", log_path, @errorName(err));
             try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
             continue;
         };
@@ -146,7 +155,7 @@ pub fn main(init: std.process.Init) !void {
             const log_path = try writeLog(allocator, io, logs_dir, safe_name, "emit", compile.stderr);
             defer allocator.free(log_path);
             counts.compile_skip += 1;
-            try appendRow(&report, allocator, "compile-skip", relative_source, ir_path, log_path, oneLineNote(compile.stderr));
+            try appendRow(&report, allocator, "compile-skip", relative_source, ir_path, "", log_path, oneLineNote(compile.stderr));
             try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
             continue;
         }
@@ -157,7 +166,7 @@ pub fn main(init: std.process.Init) !void {
             const log_path = try writeToolErrorLog(allocator, io, logs_dir, safe_name, "local", err);
             defer allocator.free(log_path);
             counts.optimizer_fail += 1;
-            try appendRow(&report, allocator, "optimizer-fail", relative_source, ir_path, log_path, @errorName(err));
+            try appendRow(&report, allocator, "optimizer-fail", relative_source, ir_path, "", log_path, @errorName(err));
             try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
             continue;
         };
@@ -168,14 +177,47 @@ pub fn main(init: std.process.Init) !void {
             const log_path = try writeLog(allocator, io, logs_dir, safe_name, status, local.stderr);
             defer allocator.free(log_path);
             incrementFailure(&counts, status);
-            try appendRow(&report, allocator, status, relative_source, ir_path, log_path, oneLineNote(local.stderr));
+            try appendRow(&report, allocator, status, relative_source, ir_path, "", log_path, oneLineNote(local.stderr));
             try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
             continue;
         }
 
+        var optimized_path: []const u8 = "";
+        var optimized_path_owned = false;
+        defer if (optimized_path_owned) allocator.free(optimized_path);
+
+        if (opts.capture_optimized_output) {
+            const optimized_basename = try std.fmt.allocPrint(allocator, "{s}.{s}.{s}.optimized.ll", .{ safe_name, opts.mode, targetTag(opts.target) });
+            defer allocator.free(optimized_basename);
+            optimized_path = try std.fs.path.join(allocator, &.{ optimized_dir, optimized_basename });
+            optimized_path_owned = true;
+
+            const optimized = runLocalOptimizedOutput(allocator, io, opts, ir_path) catch |err| {
+                const log_path = try writeToolErrorLog(allocator, io, logs_dir, safe_name, "optimized-output", err);
+                defer allocator.free(log_path);
+                counts.optimizer_fail += 1;
+                try appendRow(&report, allocator, "optimizer-fail", relative_source, ir_path, optimized_path, log_path, @errorName(err));
+                try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
+                continue;
+            };
+            defer freeRunResult(allocator, optimized);
+
+            if (!termOk(optimized.term)) {
+                const status = classifyLocalFailure(opts.passes, optimized.stderr);
+                const log_path = try writeLog(allocator, io, logs_dir, safe_name, "optimized-output", optimized.stderr);
+                defer allocator.free(log_path);
+                incrementFailure(&counts, status);
+                try appendRow(&report, allocator, status, relative_source, ir_path, optimized_path, log_path, oneLineNote(optimized.stderr));
+                try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
+                continue;
+            }
+
+            try cwd.writeFile(io, .{ .sub_path = optimized_path, .data = optimized.stdout });
+        }
+
         counts.local_ok += 1;
         const ok_status = if (std.mem.eql(u8, opts.passes, "verify")) "verify-ok" else "optimizer-ok";
-        try appendRow(&report, allocator, ok_status, relative_source, ir_path, "", "");
+        try appendRow(&report, allocator, ok_status, relative_source, ir_path, optimized_path, "", "");
         try maybeWriteProgress(allocator, io, cwd, report_path, summary_path, report.items, counts, processed, opts, zig_exe, test_root);
     }
 
@@ -239,10 +281,14 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
             opts.passes = arg["--passes=".len..];
         } else if (std.mem.startsWith(u8, arg, "--local-input-limit=")) {
             opts.local_input_limit = try parseNonZeroUsize(arg["--local-input-limit=".len..]);
+        } else if (std.mem.startsWith(u8, arg, "--local-output-limit=")) {
+            opts.local_output_limit = try parseNonZeroUsize(arg["--local-output-limit=".len..]);
         } else if (std.mem.startsWith(u8, arg, "--max=")) {
             opts.max = try std.fmt.parseInt(usize, arg["--max=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--progress-every=")) {
             opts.progress_every = try std.fmt.parseInt(usize, arg["--progress-every=".len..], 10);
+        } else if (std.mem.eql(u8, arg, "--capture-optimized-output")) {
+            opts.capture_optimized_output = true;
         } else if (std.mem.eql(u8, arg, "--local-trace")) {
             opts.local_trace = true;
         } else if (std.mem.eql(u8, arg, "--local-quiet")) {
@@ -409,6 +455,41 @@ fn runLocalCheck(
     });
 }
 
+fn runLocalOptimizedOutput(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    opts: Options,
+    ir_path: []const u8,
+) !std.process.RunResult {
+    const passes_arg = try std.fmt.allocPrint(allocator, "--passes={s}", .{opts.passes});
+    defer allocator.free(passes_arg);
+    const input_limit_arg = try std.fmt.allocPrint(allocator, "--input-limit={}", .{opts.local_input_limit});
+    defer allocator.free(input_limit_arg);
+
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
+    var optimize_arg: ?[]const u8 = null;
+    defer if (optimize_arg) |arg| allocator.free(arg);
+
+    if (opts.local_zllvm_exe) |local_exe| {
+        try argv.append(allocator, local_exe);
+    } else {
+        optimize_arg = try std.fmt.allocPrint(allocator, "-Doptimize={s}", .{opts.local_build_optimize});
+        try argv.appendSlice(allocator, &.{ opts.local_zig_exe, "build", optimize_arg.?, "run", "--" });
+    }
+
+    try argv.append(allocator, passes_arg);
+    try argv.append(allocator, input_limit_arg);
+    if (std.mem.eql(u8, opts.passes, "verify")) try argv.append(allocator, "--pass-limit=0");
+    try argv.append(allocator, ir_path);
+
+    return std.process.run(allocator, io, .{
+        .argv = argv.items,
+        .stdout_limit = .limited(opts.local_output_limit),
+        .stderr_limit = .limited(16 * 1024 * 1024),
+    });
+}
+
 fn freeRunResult(allocator: std.mem.Allocator, result: std.process.RunResult) void {
     allocator.free(result.stdout);
     allocator.free(result.stderr);
@@ -509,13 +590,15 @@ fn appendRow(
     status: []const u8,
     source: []const u8,
     ir_path: []const u8,
+    optimized_ir_path: []const u8,
     log_path: []const u8,
     note: []const u8,
 ) !void {
-    try report.print(allocator, "{s}\t{s}\t{s}\t{s}\t{s}\n", .{
+    try report.print(allocator, "{s}\t{s}\t{s}\t{s}\t{s}\t{s}\n", .{
         status,
         source,
         ir_path,
+        optimized_ir_path,
         log_path,
         note,
     });
@@ -572,6 +655,8 @@ fn writeProgress(
         \\source_report={s}
         \\source_status={s}
         \\local_input_limit={}
+        \\local_output_limit={}
+        \\capture_optimized_output={}
         \\candidates={}
         \\processed={}
         \\compile_skip={}
@@ -597,6 +682,8 @@ fn writeProgress(
         opts.source_report orelse "",
         opts.source_status orelse "",
         opts.local_input_limit,
+        opts.local_output_limit,
+        opts.capture_optimized_output,
         counts.candidates,
         processed,
         counts.compile_skip,

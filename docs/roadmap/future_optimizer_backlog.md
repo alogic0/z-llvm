@@ -98,6 +98,23 @@ validation policy, no handoff/codegen gate was promoted. The four future rows
 above are reaffirmed as boundaries; no new evidence changes their status, and
 no implementation slice is promoted.
 
+Optimized-output capture is now available through
+`tools/zig_corpus_discovery.zig --capture-optimized-output`. The focused
+ReleaseFast CFG-sensitive baseline is:
+
+```text
+tmp/zig_ir/optimized_cfg_releasefast_20260530
+  mode=ReleaseFast
+  target=x86_64-linux-gnu
+  passes=zig-release-fast-accepted
+  processed=11 compile_skip=0 emit_ok=11 local_ok=11
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+  optimized_output=tmp/zig_ir/optimized_cfg_releasefast_20260530/optimized-ir
+```
+
+No prior optimized-output artifact directory existed for a historical diff, so
+this baseline does not promote a handoff/codegen gate by itself.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete

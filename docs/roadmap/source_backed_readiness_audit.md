@@ -94,6 +94,25 @@ tiny_scalar_release_small: future
 vector_future_release_fast: parse,verify,future
 ```
 
+The discovery tool can now save optimized local output with
+`--capture-optimized-output`. A focused CFG-sensitive ReleaseFast x86_64
+baseline was captured after the SimplifyCFG follow-up:
+
+```text
+tmp/zig_ir/optimized_cfg_releasefast_20260530
+  mode=ReleaseFast
+  target=x86_64-linux-gnu
+  passes=zig-release-fast-accepted
+  source_report=tmp/zig_ir/cfg_sensitive_releasefast_sources.tsv
+  processed=11 compile_skip=0 emit_ok=11 local_ok=11
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+  optimized_output=tmp/zig_ir/optimized_cfg_releasefast_20260530/optimized-ir
+```
+
+There was no earlier optimized-output artifact directory to compare against, so
+this is a baseline for future canonical-form diffs rather than proof that
+optimized output was unchanged.
+
 ## Blocker Inventory
 
 Parser:
