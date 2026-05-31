@@ -55,6 +55,47 @@ tmp/zig_ir/continuous_20260530_151319_releasesmall
 No backlog item is promoted from this sweep because it found no measured
 source-backed blocker, no opt-22 mismatch, and no readiness-gate failure.
 
+Latest x86_64 accepted optimizer refresh after the SimplifyCFG common-code
+hoist follow-up:
+
+```text
+tmp/zig_ir/accepted_20260530_193848_releasefast
+  local_commit=d35c341
+  mode=ReleaseFast
+  target=x86_64-linux-gnu
+  passes=zig-release-fast-accepted
+  summary=tmp/zig_ir/accepted_20260530_193848_releasefast/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/accepted_20260530_195245_releasesafe
+  local_commit=d35c341
+  mode=ReleaseSafe
+  target=x86_64-linux-gnu
+  passes=zig-release-safe-accepted
+  summary=tmp/zig_ir/accepted_20260530_195245_releasesafe/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+
+tmp/zig_ir/accepted_20260530_201347_releasesmall
+  local_commit=d35c341
+  mode=ReleaseSmall
+  target=x86_64-linux-gnu
+  passes=zig-release-small-accepted
+  summary=tmp/zig_ir/accepted_20260530_201347_releasesmall/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  parse_fail=0 verify_fail=0 optimizer_fail=0 input_too_large=0
+```
+
+ReleaseFast remains the primary optimizer replacement row. ReleaseSafe was
+refreshed only because SimplifyCFG can affect safety/runtime-call CFG shapes,
+and ReleaseSmall was refreshed as milestone evidence. Debug remains optional
+for this refresh because no debug metadata or O0 behavior changed. The refreshed
+ReleaseFast, ReleaseSafe, and ReleaseSmall status/source report columns match
+the previous continuous accepted sweeps, so no handoff/codegen gate was run. The
+four future rows above are reaffirmed as boundaries; no new evidence changes
+their status, and no implementation slice is promoted.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete

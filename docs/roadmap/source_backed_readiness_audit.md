@@ -47,6 +47,52 @@ verify_fail=0
 optimizer_fail=0
 ```
 
+After the SimplifyCFG common-code hoist follow-up, the accepted optimizer rows
+were refreshed for x86_64 on local commit `d35c341` with the prebuilt
+`zig-out/bin/z_llvm` checker. ReleaseFast was the primary replacement row;
+ReleaseSafe was refreshed because SimplifyCFG can affect safety/runtime-call CFG
+shapes; ReleaseSmall was refreshed as milestone `Oz` evidence. Debug was not
+rerun because this change did not affect debug metadata or O0 pipeline behavior.
+
+```text
+tmp/zig_ir/accepted_20260530_193848_releasefast
+  mode=ReleaseFast
+  target=x86_64-linux-gnu
+  passes=zig-release-fast-accepted
+  summary=tmp/zig_ir/accepted_20260530_193848_releasefast/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+
+tmp/zig_ir/accepted_20260530_195245_releasesafe
+  mode=ReleaseSafe
+  target=x86_64-linux-gnu
+  passes=zig-release-safe-accepted
+  summary=tmp/zig_ir/accepted_20260530_195245_releasesafe/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+
+tmp/zig_ir/accepted_20260530_201347_releasesmall
+  mode=ReleaseSmall
+  target=x86_64-linux-gnu
+  passes=zig-release-small-accepted
+  summary=tmp/zig_ir/accepted_20260530_201347_releasesmall/summary.txt
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+```
+
+No parse, verify, optimizer, or input-size failure was promoted into
+`docs/next_steps.md`. The refreshed status/source report columns match the
+previous continuous accepted sweeps for the same modes, so no new optimized IR
+handoff shape was identified for an x86_64 backend/codegen gate. The explicit
+future rows remain boundaries:
+
+```text
+tiny_scalar_debug: future
+tiny_scalar_release_safe: future
+tiny_scalar_release_small: future
+vector_future_release_fast: parse,verify,future
+```
+
 ## Blocker Inventory
 
 Parser:
