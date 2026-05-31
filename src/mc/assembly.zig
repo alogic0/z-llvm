@@ -47,6 +47,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_imm64_xmm1 => |bits| try writer.print("\tmovabsq ${x}, %rax\n\tmovq %rax, %xmm1\n", .{bits}),
             .mov_imm32_xmm0 => |bits| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, %xmm0\n", .{bits}),
             .mov_imm32_xmm1 => |bits| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, %xmm1\n", .{bits}),
+            .ucomisd => |cmp| try writer.print("\tucomisd {s}, {s}\n", .{ cmp.src.name(), cmp.dst.name() }),
             .ucomisd_xmm1_xmm0 => try writer.writeAll("\tucomisd %xmm1, %xmm0\n"),
             .ucomiss_xmm1_xmm0 => try writer.writeAll("\tucomiss %xmm1, %xmm0\n"),
             .oltss_xmm0_xmm1_al => try writer.writeAll("\txorl %eax, %eax\n\tucomiss %xmm0, %xmm1\n\tseta %al\n"),

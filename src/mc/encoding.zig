@@ -121,6 +121,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendU32(&bytes, allocator, value);
                 try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc8 });
             },
+            .ucomisd => |cmp| try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc0 | (@as(u8, cmp.dst.lowCode()) << 3) | @as(u8, cmp.src.lowCode()) }),
             .ucomisd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc1 }),
             .ucomiss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc1 }),
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
@@ -264,6 +265,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm64_xmm1 => 15,
         .mov_imm32_xmm0 => 9,
         .mov_imm32_xmm1 => 9,
+        .ucomisd => 4,
         .ucomisd_xmm1_xmm0 => 4,
         .ucomiss_xmm1_xmm0 => 3,
         .oltss_xmm0_xmm1_al => 8,

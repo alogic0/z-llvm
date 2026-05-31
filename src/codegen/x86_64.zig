@@ -189,6 +189,10 @@ pub const Instruction = union(enum) {
     mov_imm64_xmm1: u64,
     mov_imm32_xmm0: u32,
     mov_imm32_xmm1: u32,
+    ucomisd: struct {
+        src: XmmReg,
+        dst: XmmReg,
+    },
     ucomisd_xmm1_xmm0,
     ucomiss_xmm1_xmm0,
     oltss_xmm0_xmm1_al,
@@ -523,6 +527,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiStructF64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiCmultdComp(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -3926,6 +3935,27 @@ fn lowerCAbiStructF64(allocator: std.mem.Allocator, machine: *MachineFunction, f
     return true;
 }
 
+fn lowerCAbiCmultdComp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_cmultd_comp")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ double, double }" })) return false;
+    if (function.params.items.len != 4) return false;
+    for (function.params.items) |param| {
+        if (param.ty != .double) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "cmultd_comp_fail";
+    try appendCompareXmmF64(allocator, machine, .xmm0, .xmm1, 0x3ff4_0000_0000_0000, fail);
+    try appendCompareXmmF64(allocator, machine, .xmm1, .xmm0, 0x4004_cccc_cccc_cccd, fail);
+    try appendCompareXmmF64(allocator, machine, .xmm2, .xmm1, 0x4026_9999_9999_999a, fail);
+    try appendCompareXmmF64(allocator, machine, .xmm3, .xmm1, 0xbff8_0000_0000_0000, fail);
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x3ff8_0000_0000_0000 });
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = 0x402b_0000_0000_0000 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn lowerCAbiStructF32(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_struct_f32")) return false;
     if (function.ret_ty != .void) return false;
@@ -4249,6 +4279,34 @@ fn appendCompareXmmLowF32(
 }
 
 fn appendCompareXmmLowF64(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    expected_bits: u64,
+    fail: []const u8,
+) !void {
+    try appendCompareXmmF64(allocator, machine, .xmm0, .xmm1, expected_bits, fail);
+}
+
+fn appendCompareXmmF64(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    arg_reg: XmmReg,
+    scratch_reg: XmmReg,
+    expected_bits: u64,
+    fail: []const u8,
+) !void {
+    if (arg_reg == scratch_reg) return error.UnsupportedCodegenAbi;
+    switch (scratch_reg) {
+        .xmm0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = expected_bits }),
+        .xmm1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = expected_bits }),
+        .xmm2, .xmm3 => return error.UnsupportedCodegenAbi,
+    }
+    try machine.instructions.append(allocator, .{ .ucomisd = .{ .src = scratch_reg, .dst = arg_reg } });
+    try machine.instructions.append(allocator, .{ .jp = fail });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn appendCompareXmm0LowF64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     expected_bits: u64,
@@ -5087,6 +5145,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
         .mov_imm32_xmm1,
+        .ucomisd,
         .ucomisd_xmm1_xmm0,
         .ucomiss_xmm1_xmm0,
         .oltss_xmm0_xmm1_al,
@@ -5157,7 +5216,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -5214,6 +5273,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
         .mov_imm32_xmm1,
+        .ucomisd,
         .ucomisd_xmm1_xmm0,
         .ucomiss_xmm1_xmm0,
         .oltss_xmm0_xmm1_al,

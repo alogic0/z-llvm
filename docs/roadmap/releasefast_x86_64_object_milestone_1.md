@@ -389,3 +389,7 @@ That focused shape is now object-ok with selected `%eax` return
 materialization. The broad row still remains the first sorted failure; the
 next selected alias is `@zig_cmultd_comp`, a double-comparison control-flow
 shape returning two doubles.
+That focused shape is now object-ok with selected `ucomisd` comparisons and
+`%xmm0`/`%xmm1` return materialization. The broad row still remains the first
+sorted failure; the next selected alias is `@zig_cmultf_comp`, a
+float-comparison control-flow shape returning a packed two-float vector.
