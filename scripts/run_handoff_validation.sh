@@ -113,6 +113,34 @@ run_empty_module_object_case \
   releasefast_empty_module \
   test/handoff/inputs/releasefast_empty_module.ll
 
+run_debug_handoff_case() {
+  local id="$1"
+  local input="$2"
+  local local_asm="$tmp_dir/$id.s"
+  local local_obj="$tmp_dir/$id.o"
+  local readelf_summary="$tmp_dir/$id.readelf.txt"
+
+  zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu --input-limit=67108864 "$input" > "$local_asm"
+  rg -q '^mathtest\.add:$' "$local_asm"
+  rg -q '[[:space:]]add[[:alpha:]]*[[:space:]]+%esi,[[:space:]]*%eax' "$local_asm"
+  rg -q '[[:space:]]jo[[:space:]]+' "$local_asm"
+  rg -F -q "callq debug.FullPanic((function 'defaultPanic')).integerOverflow" "$local_asm"
+  rg -q '[[:space:]]retq' "$local_asm"
+
+  zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu --input-limit=67108864 "$input" > "$local_obj"
+  readelf -W -h -S -s -r "$local_obj" > "$readelf_summary"
+  rg -q 'Type:[[:space:]]+REL' "$readelf_summary"
+  rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$readelf_summary"
+  rg -q '[[:space:]]mathtest\.add$' "$readelf_summary"
+  rg -q "R_X86_64_PLT32.*debug\\.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow" "$readelf_summary"
+
+  printf 'ok handoff debug %s\n' "$id"
+}
+
+run_debug_handoff_case \
+  debug_o0_mathtest_checked_add \
+  test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll
+
 run_asm_case() {
   local id="$1"
   local input="test/codegen/inputs/$id.ll"

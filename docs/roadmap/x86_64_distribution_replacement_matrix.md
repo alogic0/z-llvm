@@ -18,7 +18,7 @@ out of scope: not part of the current x86_64 milestone
 
 | Mode | Parse | Verify | Optimize | Handoff | Asm/Object |
 | --- | --- | --- | --- | --- | --- |
-| Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | conservative boundary |
+| Debug | conservative boundary | conservative boundary | conservative boundary | conservative boundary | conservative boundary |
 | ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
@@ -141,6 +141,18 @@ closed_boundary=Debug/O0 base64 table decoder matches the existing
                 ReleaseSmall table-decoder boundary for @decode_base_64
 closed_blocker=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
                selected @add -> @mathtest.add checked add with panic edge
+```
+
+Debug handoff is a conservative boundary for the selected Debug/O0 handoff
+fixture in `bash scripts/run_handoff_validation.sh`:
+
+```text
+source=test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll
+gate=bash scripts/run_handoff_validation.sh
+handoff_case=debug_o0_mathtest_checked_add
+checks=emit asm, checked-add branch, panic-call relocation, ELF relocatable
+boundary=selected Debug/O0 checked-add handoff only; not broad Debug codegen,
+         debug/unwind records, or target-complete ABI lowering
 ```
 
 Handoff is conservative for release modes because
