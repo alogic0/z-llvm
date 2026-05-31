@@ -20,7 +20,7 @@ out of scope: not part of the current x86_64 milestone
 | --- | --- | --- | --- | --- | --- |
 | Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | LLVM fallback required |
 | ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
-| ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
+| ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
 
 ## Evidence
@@ -83,8 +83,8 @@ lowering, arbitrary Zig source outside the captured set, debug/unwind records,
 linker ownership, dynamic TLS models, cross-target TLS relocations, and broad
 runtime completeness.
 
-Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
-ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
+Asm/object remains LLVM fallback required for Debug and ReleaseSmall, and for
+ReleaseFast and ReleaseSafe outside their named captured subsets.
 Existing docs explicitly exclude broad register allocation, scheduling,
 debug/unwind object records, linker ownership, and target-complete ABI lowering.
 
@@ -96,7 +96,7 @@ The first implementation target should be:
 mode=ReleaseFast
 target=x86_64-linux-gnu
 stage=asm/object
-status=LLVM fallback required
+status=conservative boundary
 ```
 
 Reason: ReleaseFast is the primary optimizer replacement row and a common Zig
@@ -115,7 +115,7 @@ target=x86_64-linux-gnu
 stage=asm/object
 status=LLVM fallback required
 optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
-object_probe=16 ok, 1 fail with --input-limit=67108864
+object_probe=17 ok, 0 fail with --input-limit=67108864
 closed_blocker=aggregates.zig.ReleaseSafe.x86_64.optimized.ll selected checked aggregate sums
 closed_blocker=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll selected checked debug_location
 closed_blocker=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll selected checked loop_sum/call_chain
@@ -124,6 +124,20 @@ closed_blocker=globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll selected che
 closed_blocker=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll selected checked load_store
 closed_blocker=switch_control.zig.ReleaseSafe.x86_64.optimized.ll selected checked branch_mix plus dense_switch
 closed_blocker=tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll selected checked add plus sideEffectFree
-first_blocker=tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll
-missing capability=selected @bump_tls checked local-exec TLS update and panic-edge lowering
+closed_blocker=tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll selected checked bump_tls plus read_tls
+promoted_status=conservative boundary for captured ReleaseSafe optimized-output object subset
+```
+
+The next measured row starts ReleaseSmall object replacement:
+
+```text
+mode=ReleaseSmall
+target=x86_64-linux-gnu
+stage=asm/object
+status=LLVM fallback required
+optimized_output=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir
+optimizer_capture=465 ok, 0 fail, 1009 compile_skip
+object_probe=263 ok, 202 fail with --input-limit=67108864
+first_blocker=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll
+missing capability=selected @writeToVRam volatile absolute-address store lowering
 ```

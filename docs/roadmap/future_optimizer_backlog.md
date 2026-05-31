@@ -158,6 +158,18 @@ scalar add and panic-edge lowering. That blocker is now object-ok for `@add`
 and `@sideEffectFree`. The current probe is 16 successes and 1 failure. The
 first sorted blocker is `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`,
 selected `@bump_tls` checked local-exec TLS update and panic-edge lowering.
+That blocker is now object-ok for `@bump_tls` and `@read_tls`. The ReleaseSafe
+object probe is now clean at 17 successes and 0 failures, promoting
+ReleaseSafe / x86_64-linux-gnu / asm-object to a conservative boundary for the
+captured optimized-output object subset.
+
+The next measured object row is ReleaseSmall. The bounded capture
+`tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` has 465
+optimizer successes, 1009 Zig compile skips, and 0 local optimizer failures.
+Object probing with `--input-limit=67108864` found 263 successes and 202
+failures. The first sorted blocker is
+`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
+`@writeToVRam` volatile absolute-address store lowering.
 
 ## Activation Rule
 

@@ -12,9 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the next measured ReleaseSafe x86_64 asm/object blocker: selected
-`@bump_tls` checked local-exec TLS update lowering from
-`tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`.
+Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
+`@writeToVRam` volatile absolute-address store lowering from
+`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -53,48 +53,58 @@ relocations. The current probe is 15 object successes and 2 object failures.
 The selected `tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
 object-ok for `@add` and `@sideEffectFree`, covering checked scalar add
 lowering and panic-edge relocations. The current probe is 16 object successes
-and 1 object failure.
+and 1 object failure. The selected
+`tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok
+for `@bump_tls` and `@read_tls`, covering checked local-exec TLS update
+lowering, `R_X86_64_TPOFF32` relocations, `.tdata`, executable TLS behavior,
+and panic-edge relocations. The ReleaseSafe broad object probe is now clean:
+17 object successes and 0 object failures.
 
-The first sorted failure is now
-`tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll` with
-`error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls`; the optimized
-body loads the private thread-local `i32`, performs checked
-`llvm.sadd.with.overflow.i32` with the argument, stores the result back to the
-TLS global, returns the result, and branches to
-`debug.FullPanic((function 'defaultPanic')).integerOverflow` on overflow.
+The next corrected-order probe captured ReleaseSmall optimized output at
+`tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir`:
+1474 processed, 1009 compile skips, 465 optimizer successes, and 0 parse,
+verify, optimizer, or input-size failures. Local object probing with
+`--input-limit=67108864` found 263 object successes and 202 object failures.
+
+The first sorted ReleaseSmall object failure is
+`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll` with
+`error: UnsupportedCodegenInstruction`. The first selected public shape is
+`@writeToVRam = alias void (), ptr @export_keyword.writeToVRam`; the optimized
+body performs `store volatile i8 88, ptr inttoptr (i64 536870912 to ptr), align
+536870912` and returns void.
 
 LLVM fallback removed or reduced:
-Add the smallest object/codegen support needed for the selected ReleaseSafe
-`@bump_tls` shape. This continues reducing the ReleaseSafe asm/object fallback
-row. It does not claim general ReleaseSafe panic runtime lowering, arbitrary
-TLS models, cross-target TLS relocations, unwinding, debug records, or
-target-complete ABI behavior.
+Add the smallest object/codegen support needed for the selected ReleaseSmall
+`@writeToVRam` shape. This begins reducing the ReleaseSmall
+asm/object fallback row. It does not claim arbitrary absolute addressing,
+memory-mapped IO completeness, non-x86_64 ABI behavior, debug records, unwind
+records, linker ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
-`mode=ReleaseSafe`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 calling-convention and instruction selection behavior as the
-reference boundary:
+Use LLVM x86_64 instruction selection and MC encoding behavior as the reference
+boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-safety edge, also map against LLVM IR overflow intrinsic handling in
+volatile absolute store, also map against SelectionDAG memory operation
+lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@bump_tls` ReleaseSafe local-exec TLS shape from
-the `tls_concurrency` optimized output. Do not generalize to arbitrary TLS
-models, cross-target TLS relocations, panic edges, unwinding, debug/unwind
-object records, or non-x86_64 ABI behavior in this slice.
+Implement only the selected `@writeToVRam` ReleaseSmall volatile absolute-store
+shape from the `behavior_export_keyword` optimized output. Do not generalize to
+arbitrary volatile memory operations, all constant-expression pointers,
+cross-target addressing, debug/unwind object records, or non-x86_64 ABI
+behavior in this slice.
 
 Validation gate:
-Add or extend the reduced ReleaseSafe fixture and run its focused
-object/executable or object-structure gate, then rerun the ReleaseSafe object
-probe over
-`tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` with
+Add or extend a reduced ReleaseSmall fixture and run its focused
+object-structure gate, then rerun the ReleaseSmall object probe over
+`tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` with
 `--input-limit=67108864`. Also keep `bash scripts/run_handoff_validation.sh`
 green.
 

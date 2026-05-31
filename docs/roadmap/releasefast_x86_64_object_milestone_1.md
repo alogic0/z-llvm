@@ -131,7 +131,7 @@ found 8 local object successes and 9 object failures. The selected
 `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
 `@slice_sum`, `@struct_sum`, and `@array_sum` overflow-checked
 `llvm.sadd.with.overflow.i32` shapes with panic-edge relocations. The current
-probe is 16 object successes and 1 object failure after closing selected
+probe is 17 object successes and 0 object failures after closing selected
 `atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` checked
 `@debug_location` support and selected
 `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` checked `@loop_sum`
@@ -143,6 +143,26 @@ plus guarded `@call_chain` support, and selected
 `pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll` checked `@load_store`
 support, and selected `switch_control.zig.ReleaseSafe.x86_64.optimized.ll`
 checked `@branch_mix` support, and selected
-`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` checked `@add` support. The
-first sorted failure is now `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`
-with selected `@bump_tls` checked local-exec TLS update and panic-edge lowering.
+`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` checked `@add` support, and
+selected `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll` checked
+`@bump_tls` support. This promotes ReleaseSafe / x86_64-linux-gnu / asm-object
+to a conservative boundary for the captured optimized-output object subset.
+
+The next measured asm/object row is ReleaseSmall. The bounded ReleaseSmall
+optimized-output capture is:
+
+```text
+tmp/zig_ir/distribution_m3_releasesmall_20260531
+  test_root=../ziglang/test
+  mode=ReleaseSmall
+  target=x86_64-linux-gnu
+  passes=zig-release-small-accepted
+  processed=1474 compile_skip=1009 emit_ok=465 local_ok=465
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+  capture_optimized_output=true
+```
+
+Object probing those captured rows with `--input-limit=67108864` found 263
+local object successes and 202 object failures. The first sorted failure is
+`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
+`@writeToVRam` volatile absolute-address store lowering.

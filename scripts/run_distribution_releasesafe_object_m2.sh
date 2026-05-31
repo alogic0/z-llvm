@@ -360,3 +360,49 @@ C
 zig cc "$tiny_harness" "$tiny_object" -o "$tiny_exe"
 "$tiny_exe"
 printf 'ok distribution releasesafe object tiny_scalar_checked_add\n'
+
+tls_fixture="test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll"
+tls_object="$tmp_dir/tls_concurrency_checked.o"
+tls_summary="$tmp_dir/tls_concurrency_checked.readelf.txt"
+tls_dump="$tmp_dir/tls_concurrency_checked.objdump.txt"
+tls_harness="$tmp_dir/tls_concurrency_checked_harness.c"
+tls_exe="$tmp_dir/tls_concurrency_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$tls_fixture" > "$tls_object"
+readelf -W -h -S -s -r "$tls_object" > "$tls_summary"
+objdump -dr "$tls_object" > "$tls_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$tls_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$tls_summary"
+rg -q '[[:space:]]bump_tls$' "$tls_summary"
+rg -q '[[:space:]]read_tls$' "$tls_summary"
+rg -q '\.tdata' "$tls_summary"
+rg -q 'TLS[[:space:]]+GLOBAL.*tls_concurrency\.tls_counter' "$tls_summary"
+rg -q 'R_X86_64_TPOFF32.*tls_concurrency\.tls_counter' "$tls_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$tls_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$tls_dump"
+
+cat > "$tls_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t bump_tls(int32_t delta);
+extern int32_t read_tls(void);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    if (read_tls() != 1) return 1;
+    if (bump_tls(4) != 5) return 2;
+    if (read_tls() != 5) return 3;
+    if (bump_tls(-2) != 3) return 4;
+    if (read_tls() != 3) return 5;
+    return 0;
+}
+C
+
+zig cc "$tls_harness" "$tls_object" -o "$tls_exe"
+"$tls_exe"
+printf 'ok distribution releasesafe object tls_concurrency_checked\n'
