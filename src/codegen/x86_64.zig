@@ -125,6 +125,8 @@ pub const Instruction = union(enum) {
     inc_rcx,
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
+    mulsd_xmm1_xmm0,
+    oltss_xmm0_xmm1_al,
     sub_rsp_8,
     add_rsp_8,
     spill_arg_rsp: struct {
@@ -243,6 +245,8 @@ fn lowerStraightLineReturn(
             if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerFloatLessReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
             if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
@@ -681,6 +685,72 @@ fn lowerMulConstReturn(
 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
     try machine.instructions.append(allocator, .{ .imul_eax_imm32 = selected.multiplier });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerFloatMulReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 2) return false;
+    if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double)) return false;
+    if (!function.params.items[0].ty.eql(.double) or !function.params.items[1].ty.eql(.double)) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const fmul_inst = block.instructions.items[0];
+    if (fmul_inst.removed) return false;
+    const fmul_result = fmul_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, fmul_result)) return false;
+
+    const fmul = switch (fmul_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (fmul.op != .fmul or !fmul.ty.eql(.double)) return false;
+    if (!isNamed(fmul.lhs, function.params.items[0].name) or !isNamed(fmul.rhs, function.params.items[1].name)) return false;
+
+    try machine.instructions.append(allocator, .mulsd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerFloatLessReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 2) return false;
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    if (!function.params.items[0].ty.eql(.float) or !function.params.items[1].ty.eql(.float)) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const fcmp_inst = block.instructions.items[0];
+    if (fcmp_inst.removed) return false;
+    const fcmp_result = fcmp_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, fcmp_result)) return false;
+
+    const fcmp = switch (fcmp_inst.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .olt or !fcmp.operand_ty.eql(.float)) return false;
+    if (!isNamed(fcmp.lhs, function.params.items[0].name) or !isNamed(fcmp.rhs, function.params.items[1].name)) return false;
+
+    try machine.instructions.append(allocator, .oltss_xmm0_xmm1_al);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1727,6 +1797,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .inc_rcx,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .mulsd_xmm1_xmm0,
+        .oltss_xmm0_xmm1_al,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,
@@ -1749,7 +1821,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1796,6 +1868,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .inc_rcx,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
+        .mulsd_xmm1_xmm0,
+        .oltss_xmm0_xmm1_al,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,

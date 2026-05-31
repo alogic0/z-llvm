@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is float_compare
-missing capability=selected float_mul and float_less floating-point return lowering
+current blocker=first broad optimized-output object failure is floats_math
+missing capability=selected float_select and float_add floating-point return lowering
 ```

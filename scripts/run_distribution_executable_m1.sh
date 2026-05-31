@@ -144,6 +144,41 @@ zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
 "$error_switch_exe"
 printf 'ok distribution executable error_switch\n'
 
+float_compare_fixture="test/distribution/releasefast_x86_64/inputs/float_compare_basic.ll"
+float_compare_object="$tmp_dir/float_compare_basic.o"
+float_compare_harness="$tmp_dir/float_compare_harness.c"
+float_compare_exe="$tmp_dir/float_compare_harness"
+
+zig build run -- --emit=obj --target="$target" "$float_compare_fixture" > "$float_compare_object"
+
+cat > "$float_compare_harness" <<'C'
+#include <stdbool.h>
+#include <math.h>
+
+extern double float_mul(double a, double b);
+extern bool float_less(float a, float b);
+
+static int close_to(double actual, double expected) {
+    double delta = actual - expected;
+    if (delta < 0.0) delta = -delta;
+    return delta < 0.000001;
+}
+
+int main(void) {
+    if (!close_to(float_mul(3.0, 2.5), 7.5)) return 1;
+    if (!close_to(float_mul(-4.0, 0.5), -2.0)) return 2;
+    if (!float_less(1.0f, 2.0f)) return 3;
+    if (float_less(2.0f, 1.0f)) return 4;
+    if (float_less(2.0f, 2.0f)) return 5;
+    if (float_less(NAN, 1.0f)) return 6;
+    return 0;
+}
+C
+
+zig cc "$float_compare_harness" "$float_compare_object" -o "$float_compare_exe"
+"$float_compare_exe"
+printf 'ok distribution executable float_compare\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"
