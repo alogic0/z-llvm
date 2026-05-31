@@ -155,6 +155,17 @@ boundary=selected Debug/O0 checked-add handoff only; not broad Debug codegen,
          debug/unwind records, or target-complete ABI lowering
 ```
 
+Debug object support explicitly excludes DWARF and unwind section ownership:
+
+```text
+gate=bash scripts/run_distribution_debug_unwind_boundary.sh
+targets=x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl
+source_fixture=test/zig/expected/debug_metadata.reduced.ll
+result=pass, object has .text but no .debug_* or .eh_frame sections
+boundary=selected Debug object lowering only; not DWARF, CFI, unwind tables,
+         variable-location salvage, or debugger-quality metadata emission
+```
+
 Handoff is conservative for release modes because
 `bash scripts/run_handoff_validation.sh` validates selected scalar, memory,
 loop, global, stack, and optimized scalar shapes, but not arbitrary accepted

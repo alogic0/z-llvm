@@ -64,6 +64,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_releasesmall_boundary_m3.sh` | tracked ReleaseSmall exclusion boundary fixtures | pass for GNU and musl targets |
 | `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
 | `bash scripts/run_distribution_debug_executable_m4.sh` | selected Debug executable ABI proof | pass |
+| `bash scripts/run_distribution_debug_unwind_boundary.sh` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad linker proof | pass |
@@ -167,6 +168,7 @@ Debug broad:
     standalone_shared_library_mathtest.zig.Debug.x86_64.ll after selected
     Debug/O0 mathtest.add checked-add and panic-edge lowering
   DWARF/unwind emission
+    focused_gate=bash scripts/run_distribution_debug_unwind_boundary.sh
   full O0 codegen surface
   variable-location salvage
   broad std Debug rows
