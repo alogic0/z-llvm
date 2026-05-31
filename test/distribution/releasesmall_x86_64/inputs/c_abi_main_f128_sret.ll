@@ -42,6 +42,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_small_packed_struct = alias void (i8), ptr @main.zig_small_packed_struct
 @zig_med_struct_ints = alias void (i64, i32), ptr @main.zig_med_struct_ints
 @zig_small_struct_ints = alias void (i32), ptr @main.zig_small_struct_ints
+@zig_med_struct_mixed = alias void (i64, i64), ptr @main.zig_med_struct_mixed
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -463,6 +464,35 @@ define private void @main.zig_small_struct_ints(i32 %0) unnamed_addr align 1 {
 15:
   ret void
 16:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_med_struct_mixed(i64 %0, i64 %1) unnamed_addr align 1 {
+2:
+  %.sroa.2.sroa.0.0.extract.trunc = trunc i64 %1 to i32
+  %3 = bitcast i32 %.sroa.2.sroa.0.0.extract.trunc to float
+  %4 = and i64 %0, 4294967295
+  %5 = icmp eq i64 %4, 1234
+  br i1 %5, label %6, label %9
+6:
+  %.sroa.0.sroa.2.0.extract.shift = lshr i64 %0, 32
+  %.sroa.0.sroa.2.0.extract.trunc = trunc nuw i64 %.sroa.0.sroa.2.0.extract.shift to i32
+  %7 = bitcast i32 %.sroa.0.sroa.2.0.extract.trunc to float
+  %8 = fcmp oeq float %7, 1.000000e+02
+  br i1 %8, label %10, label %12
+9:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+10:
+  %11 = fcmp oeq float %3, 1.337000e+03
+  br i1 %11, label %13, label %14
+12:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+13:
+  ret void
+14:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }
