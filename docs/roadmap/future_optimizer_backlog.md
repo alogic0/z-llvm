@@ -280,6 +280,10 @@ That focused shape is now object-ok with local trap failure edges and selected
 byval field-load checks. The broad row still remains the first sorted blocker;
 the next selected alias is `@zig_struct_i32_i32`, a packed i32 pair comparison
 control-flow shape.
+That focused shape is now object-ok with local trap failure edges and a
+selected packed i32-pair register check. The broad row still remains the first
+sorted blocker; the next selected alias is `@zig_struct_f32_f32f32`, a
+vector/scalar float struct comparison control-flow shape.
 
 ## Activation Rule
 

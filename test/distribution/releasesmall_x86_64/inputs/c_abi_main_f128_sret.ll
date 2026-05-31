@@ -46,6 +46,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_med_struct_mixed = alias void (i64, i64), ptr @main.zig_med_struct_mixed
 @zig_big_union = alias void (ptr), ptr @main.zig_big_union
 @zig_big_struct = alias void (ptr), ptr @main.zig_big_struct
+@zig_struct_i32_i32 = alias void (i64), ptr @main.zig_struct_i32_i32
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -467,6 +468,25 @@ define private void @main.zig_small_struct_ints(i32 %0) unnamed_addr align 1 {
 15:
   ret void
 16:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_struct_i32_i32(i64 %0) unnamed_addr align 1 {
+1:
+  %2 = and i64 %0, 4294967295
+  %3 = icmp eq i64 %2, 1
+  br i1 %3, label %4, label %6
+4:
+  %.sroa.2.0.extract.shift.mask = and i64 %0, -4294967296
+  %5 = icmp eq i64 %.sroa.2.0.extract.shift.mask, 8589934592
+  br i1 %5, label %7, label %8
+6:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+7:
+  ret void
+8:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }
