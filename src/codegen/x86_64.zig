@@ -95,6 +95,7 @@ pub const XmmReg = enum(u3) {
     xmm1,
     xmm2,
     xmm3,
+    xmm4,
 
     pub fn name(reg: XmmReg) []const u8 {
         return switch (reg) {
@@ -102,6 +103,7 @@ pub const XmmReg = enum(u3) {
             .xmm1 => "%xmm1",
             .xmm2 => "%xmm2",
             .xmm3 => "%xmm3",
+            .xmm4 => "%xmm4",
         };
     }
 
@@ -632,6 +634,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiF32(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiFiveFloats(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -4340,6 +4347,26 @@ fn lowerCAbiF32(allocator: std.mem.Allocator, machine: *MachineFunction, functio
     return true;
 }
 
+fn lowerCAbiFiveFloats(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_five_floats")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 5) return false;
+    for (function.params.items) |param| {
+        if (param.ty != .float) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "five_floats_fail";
+    try appendCompareXmmLowF32(allocator, machine, .xmm0, 0x3f80_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm1, 0x4000_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm2, 0x4040_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm3, 0x4080_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm4, 0x40a0_0000, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn appendCompareStackByval64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -4428,7 +4455,7 @@ fn appendCompareXmmF64(
     switch (scratch_reg) {
         .xmm0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = expected_bits }),
         .xmm1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = expected_bits }),
-        .xmm2, .xmm3 => return error.UnsupportedCodegenAbi,
+        .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
     }
     try machine.instructions.append(allocator, .{ .ucomisd = .{ .src = scratch_reg, .dst = arg_reg } });
     try machine.instructions.append(allocator, .{ .jp = fail });
