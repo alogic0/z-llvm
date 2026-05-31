@@ -9,8 +9,8 @@ This dashboard tracks the broad optimized-output object probe for
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 probe_date=2026-05-30
 rows=17
-object_ok=15
-object_fail=2
+object_ok=16
+object_fail=1
 gate=zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu <row.ll>
 ```
 
@@ -30,6 +30,7 @@ globals_comptime.zig.ReleaseFast.x86_64.optimized.ll
 integers.zig.ReleaseFast.x86_64.optimized.ll
 optional_pointer.zig.ReleaseFast.x86_64.optimized.ll
 packed_bits.zig.ReleaseFast.x86_64.optimized.ll
+pointers_memory.zig.ReleaseFast.x86_64.optimized.ll
 switch_control.zig.ReleaseFast.x86_64.optimized.ll
 tiny_scalar.zig.ReleaseFast.x86_64.optimized.ll
 ```
@@ -37,15 +38,14 @@ tiny_scalar.zig.ReleaseFast.x86_64.optimized.ll
 ## Current Blockers
 
 ```text
-pointers_memory.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInstruction
 tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInstruction
 ```
 
 ## Active Slice
 
 ```text
-row=pointers_memory.zig.ReleaseFast.x86_64.optimized.ll
-selected_aliases=@volatile_roundtrip,@load_store
-missing_capability=pointer load/store lowering including selected volatile roundtrip
+row=tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll
+selected_aliases=@bump_tls,@read_tls
+missing_capability=thread-local i32 load/store lowering
 boundary=selected source-backed shape only
 ```

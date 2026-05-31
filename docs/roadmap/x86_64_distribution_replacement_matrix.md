@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is pointers_memory
-missing capability=selected volatile_roundtrip and load_store pointer memory lowering
+current blocker=first broad optimized-output object failure is tls_concurrency
+missing capability=selected bump_tls and read_tls thread-local i32 lowering
 ```

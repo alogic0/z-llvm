@@ -13,27 +13,26 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@volatile_roundtrip` and `@load_store`
-pointer memory lowering in `pointers_memory.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected `@bump_tls` and `@read_tls` thread-local i32
+counter lowering in `tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now has 17 rows:
-15 pass local object emission and 2 remain blocked. The newly closed row is
-`packed_bits.zig.ReleaseFast.x86_64.optimized.ll`, including `@replace_low` and
-`@read_flag`. The next sorted failure is
-`pointers_memory.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases
-are `@volatile_roundtrip = alias i32 (ptr, i32)` and
-`@load_store = alias i32 (ptr, ptr)`.
+16 pass local object emission and 1 remains blocked. The newly closed row is
+`pointers_memory.zig.ReleaseFast.x86_64.optimized.ll`, including
+`@volatile_roundtrip` and `@load_store`. The next sorted failure is
+`tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases
+are `@bump_tls = alias i32 (i32)` and `@read_tls = alias i32 ()`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected
-`pointers_memory` shapes. The source-backed optimized output contains a volatile
-store/load roundtrip through a pointer argument and a non-volatile load/add/store
-between two pointer arguments. This reduces the ReleaseFast x86_64 asm/object
-fallback for the next broad optimized-output row only; it does not claim general
-alias analysis, memory ordering, volatile completeness, aggregate memory, or
-target-complete ABI coverage.
+`tls_concurrency` shapes. The source-backed optimized output contains a private
+thread-local i32 initialized to `1`, a load/add/store bump path, and a load-only
+read path. This reduces the final measured ReleaseFast x86_64 asm/object
+fallback row in this optimized-output set; it does not claim general TLS model
+coverage, dynamic TLS, cross-platform TLS relocations, atomics, or
+target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -47,10 +46,10 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@volatile_roundtrip` and `@load_store` shapes from
-the `pointers_memory` optimized output. Do not generalize to arbitrary pointer
-memory, aliasing, volatile ordering, vectors, TLS, floating point, or non-x86_64
-ABI behavior in this slice.
+Implement only the selected `@bump_tls` and `@read_tls` shapes from the
+`tls_concurrency` optimized output. Do not generalize to arbitrary TLS models,
+dynamic TLS, cross-target TLS relocations, vectors, floating point, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh`,

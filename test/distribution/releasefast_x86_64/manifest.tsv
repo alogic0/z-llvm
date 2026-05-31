@@ -22,6 +22,8 @@ globals_comptime_read_global	test/distribution/releasefast_x86_64/inputs/globals
 optional_pointer_value	test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll	object-readelf	object-ok	optional_pointer.zig	null branch and pointer load	optional_ptr_value
 packed_bits_replace_low	test/distribution/releasefast_x86_64/inputs/packed_bits_basic.ll	object-readelf	object-ok	packed_bits.zig	i8 low-bit replacement	replace_low
 packed_bits_read_flag	test/distribution/releasefast_x86_64/inputs/packed_bits_basic.ll	object-readelf	object-ok	packed_bits.zig	i8 sign-bit flag	read_flag
+pointers_memory_volatile_roundtrip	test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll	object-readelf	object-ok	pointers_memory.zig	volatile pointer store/load roundtrip	volatile_roundtrip
+pointers_memory_load_store	test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll	object-readelf	object-ok	pointers_memory.zig	pointer load add store	load_store
 switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll	object-readelf	object-ok	switch_control.zig	switch table load and phi merge	dense_switch
 aggregate_abi_pair_first	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair first truncation	pair_first
 aggregate_abi_make_pair	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair packing	make_pair

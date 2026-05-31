@@ -150,6 +150,8 @@ pub const Instruction = union(enum) {
     reload_rsp_eax: FrameIndex,
     load_arg_ptr_eax: ArgReg,
     add_arg_ptr_disp4_eax: ArgReg,
+    store_eax_arg_ptr: ArgReg,
+    volatile_roundtrip_rdi_esi_eax,
     load_global_i32_eax: []const u8,
     store_eax_global_i32: []const u8,
     atomic_xadd_global_eax: []const u8,
@@ -261,6 +263,8 @@ fn lowerStraightLineReturn(
             if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReplaceLowReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReadFlagReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerPointerLoadStoreReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatSubReturn(allocator, machine, function, block, ret)) return;
@@ -890,6 +894,99 @@ fn lowerPackedReadFlagReturn(
     if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
 
     try machine.instructions.append(allocator, .read_flag_i8_dil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerPointerVolatileRoundtripReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "pointers_memory.volatile_roundtrip")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const store_inst = block.instructions.items[0];
+    const load_inst = block.instructions.items[1];
+    if (store_inst.removed or load_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, load_result)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or !store.attrs.is_volatile) return false;
+    if (!isNamed(store.ptr, function.params.items[0].name) or !isNamed(store.value, function.params.items[1].name)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or !load.attrs.is_volatile) return false;
+    if (!isNamed(load.ptr, function.params.items[0].name)) return false;
+
+    try machine.instructions.append(allocator, .volatile_roundtrip_rdi_esi_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerPointerLoadStoreReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "pointers_memory.load_store")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const load_inst = block.instructions.items[0];
+    const add_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    if (!isNamed(load.ptr, function.params.items[0].name)) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(add.lhs, load_result) or !isInt(add.rhs, 1)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    if (!isNamed(store.ptr, function.params.items[1].name) or !isNamed(store.value, add_result)) return false;
+
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = .rsi });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -2295,6 +2392,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .store_eax_arg_ptr,
+        .volatile_roundtrip_rdi_esi_eax,
         .load_global_i32_eax,
         .store_eax_global_i32,
         .atomic_xadd_global_eax,
@@ -2312,7 +2411,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .load_global_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -2329,7 +2428,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_global_i32, .je, .jne => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_eax_global_i32, .je, .jne => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -2378,6 +2477,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .store_eax_arg_ptr,
+        .volatile_roundtrip_rdi_esi_eax,
         .load_global_i32_eax,
         .store_eax_global_i32,
         .atomic_xadd_global_eax,

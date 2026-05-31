@@ -407,6 +407,33 @@ zig cc "$packed_bits_harness" "$packed_bits_object" -o "$packed_bits_exe"
 "$packed_bits_exe"
 printf 'ok distribution executable packed_bits\n'
 
+pointers_memory_fixture="test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll"
+pointers_memory_object="$tmp_dir/pointers_memory_basic.o"
+pointers_memory_harness="$tmp_dir/pointers_memory_harness.c"
+pointers_memory_exe="$tmp_dir/pointers_memory_harness"
+
+zig build run -- --emit=obj --target="$target" "$pointers_memory_fixture" > "$pointers_memory_object"
+
+cat > "$pointers_memory_harness" <<'C'
+extern int volatile_roundtrip(int *slot, int value);
+extern int load_store(const int *src, int *dst);
+
+int main(void) {
+    int slot = 0;
+    int src = 41;
+    int dst = 0;
+    if (volatile_roundtrip(&slot, 17) != 17) return 1;
+    if (slot != 17) return 2;
+    if (load_store(&src, &dst) != 42) return 3;
+    if (dst != 42) return 4;
+    return 0;
+}
+C
+
+zig cc "$pointers_memory_harness" "$pointers_memory_object" -o "$pointers_memory_exe"
+"$pointers_memory_exe"
+printf 'ok distribution executable pointers_memory\n'
+
 dense_switch_fixture="test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll"
 dense_switch_object="$tmp_dir/switch_control_dense_switch.o"
 dense_switch_harness="$tmp_dir/dense_switch_harness.c"
