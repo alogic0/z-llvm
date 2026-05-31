@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_u16` u16 equality branch lowering from
+`@zig_u8` u8 equality branch lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -407,11 +407,11 @@ row still remains the first object failure; the next selected public shape is
 branch-to-return-or-trap shape. That focused shape is now object-ok through
 the selected 64-bit scalar branch path. The broad row still remains the first
 object failure; the next selected public shape is `@zig_u32 = alias void
-(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape.
+(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_u16` u16 equality branch-to-return-or-trap shape. This
+`@zig_u8` u8 equality branch-to-return-or-trap shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -427,12 +427,12 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-u16 equality branch shape, also map against SelectionDAG integer argument
+u8 equality branch shape, also map against SelectionDAG integer argument
 assignment, integer comparison, and conditional branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_u16` ReleaseSmall u16 equality
+Implement only the selected `@zig_u8` ReleaseSmall u8 equality
 branch-to-return-or-trap shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
