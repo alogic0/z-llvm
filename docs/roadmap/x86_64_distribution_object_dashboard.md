@@ -54,12 +54,13 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_executable_m1.sh` | selected ReleaseFast executable ABI checks | pass |
 | `bash scripts/run_distribution_releasesafe_object_m2.sh` | selected ReleaseSafe safety/runtime-call objects plus executable ABI checks | pass for GNU and musl targets |
 | `bash scripts/run_distribution_releasesmall_object_m3.sh` | selected ReleaseSmall object subset | pass |
+| `bash scripts/run_distribution_releasesmall_executable_m3.sh` | selected ReleaseSmall executable ABI checks | pass for GNU and musl targets |
 | `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
 | `bash scripts/run_distribution_debug_executable_m4.sh` | selected Debug executable ABI proof | pass |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
-| `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including Debug M4 object/executable gates | pass |
+| `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad linker proof | pass |
-| `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, and Debug fixtures | pass |
+| `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
 
 ## Matrix Boundary
 
@@ -67,7 +68,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | --- | --- | --- |
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call executable proof |
-| ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions |
+| ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions, selected executable proof |
 | Debug | conservative boundary | adjusted continuous 463-row object-clean subset with 2 explicit exclusions |
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
@@ -167,7 +168,7 @@ Global exclusions:
   scheduling
   linker ownership
   x86_64 musl executable/linker proof outside selected ReleaseFast, ReleaseSafe,
-    and Debug executable fixtures
+    ReleaseSmall, and Debug executable fixtures
   bitcode/LTO linker handoff until activation criteria are met
   dynamic TLS models
   non-x86_64 object formats

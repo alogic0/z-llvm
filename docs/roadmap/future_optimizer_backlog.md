@@ -566,8 +566,9 @@ rows. ReleaseSmall asm/object is now a conservative boundary for the named
 captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh`; it composes the
-ReleaseFast object/executable gates, ReleaseSafe object gate, selected
-ReleaseSmall object gate, and handoff validation, and it passes locally for
+ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
+selected ReleaseSmall object/executable gates, selected Debug
+object/executable gates, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over

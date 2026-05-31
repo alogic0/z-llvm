@@ -197,8 +197,8 @@ The first named no-LLVM-codegen x86_64 distribution subset gate is:
 bash scripts/run_distribution_no_llvm_codegen_subset.sh
   target=x86_64-unknown-linux-gnu
   includes=ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
-           selected ReleaseSmall object gate, selected Debug object/executable
-           gates, handoff validation
+           selected ReleaseSmall object/executable gates, selected Debug
+           object/executable gates, handoff validation
   result=pass
 ```
 
@@ -239,12 +239,12 @@ gate=bash scripts/run_distribution_x86_64_musl_executable_subset.sh
 target=x86_64-unknown-linux-musl
 cc_target=x86_64-linux-musl
 includes=ReleaseFast executable gate, selected ReleaseSafe M2
-         safety/runtime-call executable harnesses, selected Debug mathtest
-         executable gate
+         safety/runtime-call executable harnesses, selected ReleaseSmall M3
+         executable harnesses, selected Debug mathtest executable gate
 result=pass
-boundary=no ReleaseSmall musl executable expansion yet; no linker ownership,
-         CRT policy, libc integration, or dynamic loader behavior beyond the
-         selected harnesses
+boundary=no broad musl executable expansion beyond selected harnesses; no
+         linker ownership, CRT policy, libc integration, or dynamic loader
+         behavior beyond the selected harnesses
 ```
 
 Automated broad object probing is now available through:

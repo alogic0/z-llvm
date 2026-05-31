@@ -12,12 +12,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [x86_64 Distribution Object Dashboard](roadmap/x86_64_distribution_object_dashboard.md#focused-gates)
 
 Replacement goal:
-Promote the next stable executable proof from the selected x86_64 distribution
-subset. The selected ReleaseSafe safety/runtime-call M2 harnesses are now
-target-aware for both GNU and musl, so the next slice is ReleaseSmall executable
-expansion for ABI-stable fixtures, or an explicit ReleaseSmall executable
-boundary if the selected fixtures are not runnable without broad linker or ABI
-work.
+Select the next measured x86_64 distribution boundary after the selected
+ReleaseSafe and ReleaseSmall executable fixtures became target-aware for both
+GNU and musl. Prefer a source-backed linker/CRT boundary or one explicit
+ReleaseSmall exclusion probe; do not expand beyond the captured subset without
+a measured first blocker.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -747,9 +746,9 @@ asm/object is now a conservative boundary for the named captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is now
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh`. It composes the
 ReleaseFast object and executable gates, the ReleaseSafe object gate, the
-selected ReleaseSmall object gate, the selected Debug object and executable
-gates, and `bash scripts/run_handoff_validation.sh`. The gate passed locally
-for `TARGET=x86_64-unknown-linux-gnu`.
+selected ReleaseSmall object and executable gates, the selected Debug object
+and executable gates, and `bash scripts/run_handoff_validation.sh`. The gate
+passed locally for `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` originally found 2 object successes and
