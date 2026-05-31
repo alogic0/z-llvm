@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_f128_f128_struct` C ABI fp128 byval/sret lowering from
+`@zig_f128_struct` C ABI fp128 aggregate-return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -76,19 +76,24 @@ object probe is 265 object successes and 200 object failures.
 
 The first sorted ReleaseSmall object failure is
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll` with
-`error: UnsupportedCodegenControlFlow`. The first selected public shape is
+`error: UnsupportedCodegenControlFlow`. The first selected public shape was
 `@zig_f128_f128_struct = alias void (ptr, ptr), ptr
 @main.zig_f128_f128_struct`; the optimized body uses an sret destination, a
 byval fp128 struct input, `__eqtf2` comparison calls, panic branches, and
-fp128 stores into the return buffer.
+fp128 stores into the return buffer. That focused shape is now object-ok in
+`bash scripts/run_distribution_releasesmall_object_m3.sh`. The broad
+`c_abi_main` row remains the first object failure because the next selected
+public shape is `@zig_f128_struct = alias { fp128 } (fp128), ptr
+@main.zig_f128_struct`; its body compares an fp128 argument through `__eqtf2`,
+returns `{ fp128 }` on the success edge, and traps on the panic edge.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_f128_f128_struct` fp128 byval/sret shape. This continues reducing the
+`@zig_f128_struct` fp128 aggregate-return shape. This continues reducing the
 ReleaseSmall asm/object fallback row. It does not claim broad C ABI lowering,
-arbitrary fp128 arithmetic, general libcall lowering, panic runtime semantics,
-non-x86_64 ABI behavior, debug records, unwind records, linker ownership, or
-target-complete ABI behavior.
+arbitrary fp128 arithmetic, general libcall lowering, complete aggregate return
+classification, panic runtime semantics, non-x86_64 ABI behavior, debug
+records, unwind records, linker ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -100,16 +105,16 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-fp128 compare/libcall and sret/byval memory shape, also map against
-SelectionDAG call, argument, branch, and memory operation lowering in
+fp128 compare/libcall and aggregate-return shape, also map against
+SelectionDAG call, return, branch, and memory operation lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_f128_f128_struct` ReleaseSmall C ABI fp128
-byval/sret shape from the `c_abi_main` optimized output. Do not generalize to
-all C ABI aggregate classification, arbitrary fp128 operations, full libcall
-lowering, panic runtime behavior, debug/unwind object records, or non-x86_64
-ABI behavior in this slice.
+Implement only the selected `@zig_f128_struct` ReleaseSmall C ABI fp128
+aggregate-return shape from the `c_abi_main` optimized output. Do not
+generalize to all C ABI aggregate classification, arbitrary fp128 operations,
+full libcall lowering, panic runtime behavior, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

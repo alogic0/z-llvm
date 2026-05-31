@@ -40,3 +40,26 @@ rg -q '[[:space:]]c_printf$' "$stubs_summary"
 rg -q '[[:space:]]ud2' "$stubs_dump"
 
 printf 'ok distribution releasesmall object sizeof_typeof_unreachable_stubs\n'
+
+f128_fixture="test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll"
+f128_object="$tmp_dir/c_abi_main_f128_sret.o"
+f128_summary="$tmp_dir/c_abi_main_f128_sret.readelf.txt"
+f128_dump="$tmp_dir/c_abi_main_f128_sret.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$f128_fixture" > "$f128_object"
+readelf -W -h -S -s -r "$f128_object" > "$f128_summary"
+objdump -dr "$f128_object" > "$f128_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$f128_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$f128_summary"
+rg -q '[[:space:]]zig_f128_f128_struct$' "$f128_summary"
+rg -q '[[:space:]]__zllvm_f128_cmp0$' "$f128_summary"
+rg -q '[[:space:]]__zllvm_f128_ret1$' "$f128_summary"
+rg -q 'R_X86_64_PLT32.*__eqtf2' "$f128_summary"
+rg -q 'R_X86_64_PC32.*__zllvm_f128_cmp0' "$f128_summary"
+rg -q 'R_X86_64_PC32.*__zllvm_f128_ret1' "$f128_summary"
+rg -q 'R_X86_64_PLT32.*__eqtf2' "$f128_dump"
+rg -q 'movaps[[:space:]]+.*%xmm0' "$f128_dump"
+rg -q '[[:space:]]ud2' "$f128_dump"
+
+printf 'ok distribution releasesmall object c_abi_main_f128_sret\n'

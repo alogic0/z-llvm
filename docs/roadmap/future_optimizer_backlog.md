@@ -178,7 +178,10 @@ for `@c_fopen`, `@c_ftell`, `@c_fputs`, and `@c_printf`. The current
 ReleaseSmall object probe is 265 successes and 200 failures. The first sorted
 blocker is `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`, selected
 `@zig_f128_f128_struct` C ABI fp128 byval/sret lowering with `__eqtf2`
-comparison calls and panic branches.
+comparison calls and panic branches. That focused selected shape is now
+object-ok. The broad `c_abi_main` row remains the first sorted blocker; the
+next selected alias in that row is `@zig_f128_struct`, a C ABI fp128
+aggregate-return shape with an `__eqtf2` guard and panic edge.
 
 ## Activation Rule
 

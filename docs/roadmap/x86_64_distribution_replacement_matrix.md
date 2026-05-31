@@ -142,5 +142,6 @@ closed_blocker=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll sele
 current_object_probe=265 ok, 200 fail with --input-limit=67108864
 closed_blocker=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll selected c_fopen/c_ftell/c_fputs/c_printf
 first_blocker=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
-missing capability=selected @zig_f128_f128_struct C ABI fp128 byval/sret lowering with selected __eqtf2 panic branches
+closed_alias_in_first_blocker=@zig_f128_f128_struct selected C ABI fp128 byval/sret lowering
+missing capability=selected @zig_f128_struct C ABI fp128 aggregate-return lowering with selected __eqtf2 panic branch
 ```

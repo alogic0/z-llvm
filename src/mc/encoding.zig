@@ -69,6 +69,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x81, 0xf9 });
                 try appendI32(&bytes, allocator, value);
             },
+            .test_eax_eax => try bytes.appendSlice(allocator, &.{ 0x85, 0xc0 }),
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
@@ -87,12 +88,21 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
+            .sub_rsp_24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x18 }),
+            .add_rsp_24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x18 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
             .reload_arg_rsp => |reload| try encodeFrameSlotToReg(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
+            .spill_rdi_rsi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0x7c, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10 }),
+            .reload_rdi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x7c, 0x24, 0x08 }),
+            .reload_rsi_rsp24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x74, 0x24, 0x10 }),
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .add_arg_ptr_disp4_eax => |reg| try encodeArgPtrDisp4ToEax(&bytes, allocator, reg),
             .store_eax_arg_ptr => |reg| try encodeEaxToArgPtr(&bytes, allocator, reg),
+            .load_f128_arg_ptr_xmm0 => |load| try encodeF128ArgPtrToXmm0(&bytes, allocator, load.reg, load.offset),
+            .load_f128_const_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x28, 0x05, 0, 0, 0, 0 }),
+            .load_f128_const_xmm1 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x28, 0x0d, 0, 0, 0, 0 }),
+            .store_f128_xmm0_arg_ptr => |store| try encodeF128Xmm0ToArgPtr(&bytes, allocator, store.reg, store.offset),
             .volatile_roundtrip_rdi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0x37, 0x8b, 0x07 }),
             .load_global_i32_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x05, 0, 0, 0, 0 }),
             .store_eax_global_i32 => try bytes.appendSlice(allocator, &.{ 0x89, 0x05, 0, 0, 0, 0 }),
@@ -173,6 +183,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .cmp_ecx_imm32 => 6,
+        .test_eax_eax => 2,
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
         .subss_xmm1_xmm0 => 4,
@@ -182,12 +193,18 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm32_xmm0 => 9,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
+        .sub_rsp_24, .add_rsp_24 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
+        .spill_rdi_rsi_rsp24 => 10,
+        .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .reload_rsp_eax => 3,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .add_arg_ptr_disp4_eax => |reg| if (reg.rexB()) 4 else 3,
         .store_eax_arg_ptr => |reg| if (reg.rexB()) 3 else 2,
+        .load_f128_arg_ptr_xmm0 => |load| f128ArgPtrInstructionSize(load.reg, load.offset),
+        .load_f128_const_xmm0, .load_f128_const_xmm1 => 7,
+        .store_f128_xmm0_arg_ptr => |store| f128ArgPtrInstructionSize(store.reg, store.offset),
         .volatile_roundtrip_rdi_esi_eax => 4,
         .load_global_i32_eax, .store_eax_global_i32 => 6,
         .load_tls_i32_eax, .store_eax_tls_i32 => 8,
@@ -263,6 +280,32 @@ fn encodeArgPtrDisp4ToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocato
     try bytes.append(allocator, 0x03);
     try bytes.append(allocator, 0x40 | @as(u8, reg.lowCode()));
     try bytes.append(allocator, 0x04);
+}
+
+fn encodeF128ArgPtrToXmm0(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0x28 });
+    if (offset == 0) {
+        try bytes.append(allocator, @as(u8, reg.lowCode()));
+    } else {
+        try bytes.append(allocator, 0x40 | @as(u8, reg.lowCode()));
+        try bytes.append(allocator, offset);
+    }
+}
+
+fn encodeF128Xmm0ToArgPtr(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8) !void {
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.appendSlice(allocator, &.{ 0x0f, 0x29 });
+    if (offset == 0) {
+        try bytes.append(allocator, @as(u8, reg.lowCode()));
+    } else {
+        try bytes.append(allocator, 0x40 | @as(u8, reg.lowCode()));
+        try bytes.append(allocator, offset);
+    }
+}
+
+fn f128ArgPtrInstructionSize(reg: x86_64.ArgReg, offset: u8) u32 {
+    return (if (reg.rexB()) @as(u32, 1) else 0) + 3 + if (offset == 0) @as(u32, 0) else 1;
 }
 
 fn encodeCmp8Imm(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, imm: u8) !void {

@@ -76,6 +76,7 @@ closed_failure_11=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.l
 closed_aliases_11=@c_fopen,@c_ftell,@c_fputs,@c_printf
 next_object_probe=265 object-ok, 200 object-fail
 first_failure=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@zig_f128_f128_struct
-missing_capability=ReleaseSmall C ABI fp128 byval/sret lowering with selected __eqtf2 panic branches
+closed_alias_in_first_failure=@zig_f128_f128_struct
+selected_alias=@zig_f128_struct
+missing_capability=ReleaseSmall C ABI fp128 aggregate-return lowering with selected __eqtf2 panic branch
 ```

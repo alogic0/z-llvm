@@ -143,11 +143,11 @@ pub fn buildObjectWithModuleData(
     var cursor = alignForward(ehdr_size, 16);
     const text_offset = cursor;
     cursor += text.items.len;
-    cursor = alignForward(cursor, 4);
+    cursor = alignForward(cursor, 16);
 
     const data_offset = cursor;
     cursor += data.items.len;
-    cursor = alignForward(cursor, 4);
+    cursor = alignForward(cursor, 16);
 
     const tdata_offset = cursor;
     cursor += tdata.items.len;
@@ -189,7 +189,7 @@ pub fn buildObjectWithModuleData(
     const sections = [_]Section{
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
-        .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = 4 },
+        .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = 16 },
         .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = 4 },
         .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
         .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 6, .info = 1, .addralign = 8, .entsize = 24 },
@@ -234,6 +234,18 @@ fn isThreadLocal(global: ir.Global) bool {
 }
 
 fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(u8), global: ir.Global) !?u64 {
+    if (global.kind == .constant and global.ty.eql(.fp128)) {
+        const text = switch (global.initializer) {
+            .scalar => |scalar| switch (scalar) {
+                .fp => |text| text,
+                .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+            },
+            .none, .array, .c_string, .@"opaque" => return null,
+        };
+        try appendFp128(data, allocator, text);
+        return 16;
+    }
+
     if (global.kind != .global) return null;
     if (!global.ty.eql(.{ .int = 32 })) return null;
 
@@ -304,6 +316,15 @@ fn collectCallRelocations(
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 2,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
+                    .addend = -4,
+                });
+            },
+            .load_f128_const_xmm0, .load_f128_const_xmm1 => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 3,
                     .symbol_index = symbol_index,
                     .kind = 2,
                     .addend = -4,
@@ -427,6 +448,27 @@ fn appendI32(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, value: i3
     try buffer.append(allocator, @intCast((raw >> 8) & 0xff));
     try buffer.append(allocator, @intCast((raw >> 16) & 0xff));
     try buffer.append(allocator, @intCast((raw >> 24) & 0xff));
+}
+
+fn appendU64(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u64) !void {
+    try buffer.append(allocator, @intCast(value & 0xff));
+    try buffer.append(allocator, @intCast((value >> 8) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 16) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 24) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 32) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 40) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 48) & 0xff));
+    try buffer.append(allocator, @intCast((value >> 56) & 0xff));
+}
+
+fn appendFp128(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: []const u8) !void {
+    const prefix = "0xL";
+    if (!std.mem.startsWith(u8, text, prefix)) return error.UnsupportedGlobalVariable;
+    const digits = text[prefix.len..];
+    if (digits.len != 32) return error.UnsupportedGlobalVariable;
+    const value = std.fmt.parseInt(u128, digits, 16) catch return error.UnsupportedGlobalVariable;
+    try appendU64(buffer, allocator, @truncate(value));
+    try appendU64(buffer, allocator, @truncate(value >> 64));
 }
 
 fn i32Value(value: i128) !i32 {
