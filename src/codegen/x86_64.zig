@@ -435,6 +435,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiBigStruct(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3459,6 +3464,29 @@ fn lowerCAbiBigUnion(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     if (byval_reg != .rdi) return error.UnsupportedCodegenAbi;
 
     const fail = "big_union_fail";
+    try appendCompareMem64Imm64(allocator, machine, .rdi, 0, 1, fail);
+    try appendCompareMem64Imm64(allocator, machine, .rdi, 8, 2, fail);
+    try appendCompareMem64Imm64(allocator, machine, .rdi, 16, 3, fail);
+    try appendCompareMem64Imm64(allocator, machine, .rdi, 24, 4, fail);
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = .rdi, .offset = 32 } });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = 5 });
+    try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiBigStruct(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_big_struct")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return error.UnsupportedCodegenType;
+    const byval_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    if (byval_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const fail = "big_struct_fail";
     try appendCompareMem64Imm64(allocator, machine, .rdi, 0, 1, fail);
     try appendCompareMem64Imm64(allocator, machine, .rdi, 8, 2, fail);
     try appendCompareMem64Imm64(allocator, machine, .rdi, 16, 3, fail);

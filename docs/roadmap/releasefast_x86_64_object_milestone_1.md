@@ -272,3 +272,7 @@ That focused shape is now object-ok with local trap failure edges and selected
 byval field-load checks. The broad row still remains the first sorted failure;
 the next selected alias is `@zig_big_struct`, a byval aggregate comparison
 control-flow shape.
+That focused shape is now object-ok with local trap failure edges and selected
+byval field-load checks. The broad row still remains the first sorted failure;
+the next selected alias is `@zig_struct_i32_i32`, a packed i32 pair comparison
+control-flow shape.
