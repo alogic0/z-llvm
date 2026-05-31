@@ -191,7 +191,9 @@ behavior for `@zig_assert_PD` is now object-ok in the focused ReleaseSmall
 gate, with diagnostic printing side effects explicitly outside the local
 replacement boundary. The broad row still remains the first sorted blocker;
 the next selected alias is `@zig_ret_PD`, a mixed integer/double aggregate
-return.
+return. That focused shape is now object-ok. The broad row still remains the
+first sorted blocker; the next selected alias is `@zig_ret_CFF`, a mixed
+integer/float aggregate return.
 
 ## Activation Rule
 

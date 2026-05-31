@@ -16,6 +16,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_f128_struct = alias { fp128 } (fp128), ptr @main.zig_f128_struct
 @zig_f128 = alias fp128 (fp128), ptr @main.zig_f128
 @zig_assert_PD = alias i32 (i64, double), ptr @main.zig_assert_PD
+@zig_ret_PD = alias { i64, double } (), ptr @main.zig_ret_PD
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -87,4 +88,9 @@ define private i32 @main.zig_assert_PD(i64 %0, double %1) unnamed_addr align 1 {
   store double %1, ptr %.sroa.3.0..sroa_idx2, align 8
   call fastcc void @debug.print__anon_14634(ptr nonnull readonly align 8 %3)
   br label %5
+}
+
+define private { i64, double } @main.zig_ret_PD() unnamed_addr align 1 {
+0:
+  ret { i64, double } { i64 0, double 5.000000e-01 }
 }

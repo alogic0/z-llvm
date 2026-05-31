@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_ret_PD` C ABI mixed integer/double aggregate-return lowering from
+`@zig_ret_CFF` C ABI mixed integer/float aggregate-return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -96,11 +96,14 @@ selected return-code branch behavior for that shape while leaving diagnostic
 printing side effects outside the local replacement boundary. The broad
 `c_abi_main` row still remains the first object failure; the next selected
 public shape is `@zig_ret_PD = alias { i64, double } (), ptr
-@main.zig_ret_PD`, a mixed integer/double aggregate return.
+@main.zig_ret_PD`, a mixed integer/double aggregate return. That focused shape
+is now object-ok. The broad `c_abi_main` row still remains the first object
+failure; the next selected public shape is `@zig_ret_CFF = alias { i64, float
+} (), ptr @main.zig_ret_CFF`, a mixed integer/float aggregate return.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_ret_PD` mixed integer/double aggregate-return shape. This continues
+`@zig_ret_CFF` mixed integer/float aggregate-return shape. This continues
 reducing the ReleaseSmall asm/object fallback row. It does not claim broad C
 ABI lowering, general aggregate classification, arbitrary floating-point
 returns, non-x86_64 ABI behavior, debug records, unwind records, linker
@@ -121,7 +124,7 @@ return and register assignment lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_ret_PD` ReleaseSmall mixed integer/double
+Implement only the selected `@zig_ret_CFF` ReleaseSmall mixed integer/float
 aggregate-return shape from the `c_abi_main` optimized output. Do not
 generalize to all mixed aggregate ABI behavior, arbitrary aggregate returns,
 debug/unwind object records, or non-x86_64 ABI behavior in this slice.
