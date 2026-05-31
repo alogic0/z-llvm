@@ -319,3 +319,21 @@ rg -q 'add[[:alpha:]]*[[:space:]]+\$0x10,%rax' "$getauxval_dump"
 rg -q 'mov[[:alpha:]]*[[:space:]]+0x8\(%rax\),%rax' "$getauxval_dump"
 
 printf 'ok distribution releasesmall object array_in_anon_struct_getauxval\n'
+
+elem_ptr_fixture="test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll"
+elem_ptr_object="$tmp_dir/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.o"
+elem_ptr_summary="$tmp_dir/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.readelf.txt"
+elem_ptr_dump="$tmp_dir/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$elem_ptr_fixture" > "$elem_ptr_object"
+readelf -W -h -S -s -r "$elem_ptr_object" > "$elem_ptr_summary"
+objdump -dr "$elem_ptr_object" > "$elem_ptr_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$elem_ptr_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$elem_ptr_summary"
+rg -q '[[:space:]]elemVal$' "$elem_ptr_summary"
+rg -q '[[:space:]]elemPtr$' "$elem_ptr_summary"
+rg -q '[[:space:]]illegal_operation_on_logical_ptr\.elemPtr$' "$elem_ptr_summary"
+rg -q '[[:space:]]ud2' "$elem_ptr_dump"
+
+printf 'ok distribution releasesmall object compile_errors_illegal_operation_on_logical_ptr_elem_ptr\n'

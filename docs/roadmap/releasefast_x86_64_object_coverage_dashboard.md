@@ -80,8 +80,10 @@ closed_failure_13=cases_address_space_pointer_access_chaining_pointer_to_optiona
 closed_aliases_13=@_start -> @start._start
 closed_failure_14=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_14=@getauxval -> @os.linux.getauxvalImpl
-current_object_probe=455 object-ok, 10 object-fail
-first_failure=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
-missing_capability=ReleaseSmall empty noreturn unreachable stub lowering
+closed_failure_15=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_15=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
+current_object_probe=456 object-ok, 9 object-fail
+first_failure=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@entry -> @inherit_want_safety.entry
+missing_capability=ReleaseSmall i64 constant return lowering
 ```

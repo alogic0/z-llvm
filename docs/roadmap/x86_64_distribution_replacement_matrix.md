@@ -146,8 +146,10 @@ intermediate_object_probe=266 ok, 199 fail with --input-limit=67108864
 closed_blocker=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @start._start startup trampoline
 intermediate_object_probe=327 ok, 138 fail with --input-limit=67108864
 closed_blocker=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll selected @getauxval -> @os.linux.getauxvalImpl auxv scan
-current_object_probe=455 ok, 10 fail with --input-limit=67108864
-first_blocker=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
-missing capability=selected empty noreturn unreachable stub lowering
+intermediate_object_probe=455 ok, 10 fail with --input-limit=67108864
+closed_blocker=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll selected @elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
+current_object_probe=456 ok, 9 fail with --input-limit=67108864
+first_blocker=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@entry -> @inherit_want_safety.entry
+missing capability=selected i64 constant return lowering
 ```

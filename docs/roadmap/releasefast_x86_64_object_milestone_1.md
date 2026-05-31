@@ -486,3 +486,8 @@ failure is
 `cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`;
 the selected alias is `@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr`,
 an empty noreturn unreachable compile-error stub.
+That focused shape is now object-ok through the selected `ud2` unreachable
+stub path. The current ReleaseSmall object probe is 456 successes and 9
+failures. The next sorted failure is
+`cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
+alias is `@entry -> @inherit_want_safety.entry`, an i64 constant return.
