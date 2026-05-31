@@ -13,28 +13,26 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@float_select` and `@float_add`
-floating-point return lowering in
-`floats_math.zig.ReleaseFast.x86_64.optimized.ll`.
+optimized-output capture: selected `@double_literal` and `@float_literal`
+floating-point constant return lowering in
+`fp_constants.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` now has 17 rows:
-9 pass local object emission and 8 remain blocked. The newly closed row is
-`float_compare.zig.ReleaseFast.x86_64.optimized.ll`, including `@float_mul` and
-`@float_less`. The next sorted failure is
-`floats_math.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases are
-`@float_select = alias double (double, double, i1)` and
-`@float_add = alias float (float, float)`.
+10 pass local object emission and 7 remain blocked. The newly closed row is
+`floats_math.zig.ReleaseFast.x86_64.optimized.ll`, including `@float_select` and
+`@float_add`. The next sorted failure is
+`fp_constants.zig.ReleaseFast.x86_64.optimized.ll`, where the public aliases are
+`@double_literal = alias double ()` and `@float_literal = alias float ()`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected
-`floats_math` shapes. The source-backed optimized output contains a straight
-line `fadd float` return and a `select i1` choosing between two double
-arguments. This reduces the ReleaseFast x86_64 asm/object fallback for the next
-broad optimized-output row only; it does not claim general floating-point
-arithmetic, FP condition-code lowering, vector FP, libm, or target-complete ABI
-coverage.
+`fp_constants` shapes. The source-backed optimized output returns one double
+literal `2.25` and one float literal `1.5`. This reduces the ReleaseFast x86_64
+asm/object fallback for the next broad optimized-output row only; it does not
+claim general constant pools, arbitrary FP immediates, vector FP constants,
+relaxations, or target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -48,9 +46,9 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@float_select` and `@float_add` shapes from the
-`floats_math` optimized output. Do not generalize to other FP operations,
-integer/FP casts, vector FP, x87, libm calls, TLS, or non-x86_64 ABI behavior in
+Implement only the selected `@double_literal` and `@float_literal` shapes from
+the `fp_constants` optimized output. Do not generalize to other FP constants,
+constant pools, vector FP, x87, libm calls, TLS, or non-x86_64 ABI behavior in
 this slice.
 
 Validation gate:

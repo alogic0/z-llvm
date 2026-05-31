@@ -179,6 +179,44 @@ zig cc "$float_compare_harness" "$float_compare_object" -o "$float_compare_exe"
 "$float_compare_exe"
 printf 'ok distribution executable float_compare\n'
 
+floats_math_fixture="test/distribution/releasefast_x86_64/inputs/floats_math_basic.ll"
+floats_math_object="$tmp_dir/floats_math_basic.o"
+floats_math_harness="$tmp_dir/floats_math_harness.c"
+floats_math_exe="$tmp_dir/floats_math_harness"
+
+zig build run -- --emit=obj --target="$target" "$floats_math_fixture" > "$floats_math_object"
+
+cat > "$floats_math_harness" <<'C'
+#include <stdbool.h>
+
+extern double float_select(double a, double b, bool pick_a);
+extern float float_add(float a, float b);
+
+static int close_to_double(double actual, double expected) {
+    double delta = actual - expected;
+    if (delta < 0.0) delta = -delta;
+    return delta < 0.000001;
+}
+
+static int close_to_float(float actual, float expected) {
+    float delta = actual - expected;
+    if (delta < 0.0f) delta = -delta;
+    return delta < 0.0001f;
+}
+
+int main(void) {
+    if (!close_to_double(float_select(1.25, 9.5, true), 1.25)) return 1;
+    if (!close_to_double(float_select(1.25, 9.5, false), 9.5)) return 2;
+    if (!close_to_float(float_add(1.5f, 2.25f), 3.75f)) return 3;
+    if (!close_to_float(float_add(-4.0f, 1.5f), -2.5f)) return 4;
+    return 0;
+}
+C
+
+zig cc "$floats_math_harness" "$floats_math_object" -o "$floats_math_exe"
+"$floats_math_exe"
+printf 'ok distribution executable floats_math\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"
