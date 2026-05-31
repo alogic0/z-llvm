@@ -377,8 +377,8 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
-            .load_tls_i32_eax, .store_eax_tls_i32 => |symbol| {
-                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+            .load_tls_i32_eax, .add_tls_i32_eax, .store_eax_tls_i32 => |symbol| {
+                const symbol_index = try symbolIndexForTls(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 4,
                     .symbol_index = symbol_index,
@@ -405,6 +405,25 @@ fn symbolIndexForCall(
         .size = 0,
         .section_index = 0,
         .info = 0x10,
+    });
+    const index: u32 = @intCast(symbols.items.len);
+    try symbol_indices.put(name, index);
+    return index;
+}
+
+fn symbolIndexForTls(
+    allocator: std.mem.Allocator,
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    name: []const u8,
+) !u32 {
+    if (symbol_indices.get(name)) |index| return index;
+    try symbols.append(allocator, .{
+        .name = name,
+        .value = 0,
+        .size = 0,
+        .section_index = 0,
+        .info = 0x16,
     });
     const index: u32 = @intCast(symbols.items.len);
     try symbol_indices.put(name, index);

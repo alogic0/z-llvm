@@ -538,7 +538,13 @@ successes, 2 failures, and 1 excluded row. The next sorted implementation
 blocker is
 `standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
 selected alias is `@add_zig -> @main.add_zig`, a mixed Zig/C global-add i32
-return shape.
+return shape. That focused shape is now object-ok through selected private
+global load, external TLS global add, and `R_X86_64_TPOFF32` relocation
+support. The adjusted broad row still fails in
+`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`, so the
+adjusted ReleaseSmall object probe remains 462 successes, 2 failures, and 1
+excluded row. The next selected public alias in that row is
+`@add_may_panic -> @main.add_may_panic`, a checked add/panic branch shape.
 
 ## Activation Rule
 

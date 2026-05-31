@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@add_zig` alias / `@main.add_zig` mixed Zig/C global-add return from
+`@add_may_panic` alias / `@main.add_may_panic` checked add/panic branch from
 `standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -485,34 +485,47 @@ selected public shape is `@add_zig = alias i32 (i32), ptr @main.add_zig`,
 which loads private Zig global `@main.zig_k`, adds the i32 argument, loads
 external C global `@C_k`, adds it, and returns the result.
 
+That focused `@add_zig` shape is now object-ok through selected private global
+load, external TLS global add, and `R_X86_64_TPOFF32` relocation support. The
+adjusted broad row still fails in
+`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`, so the
+adjusted ReleaseSmall object probe remains 462 object successes, 2 object
+failures, and 1 excluded row. The next selected public shape in that row is
+`@add_may_panic = alias i32 (i32), ptr @main.add_may_panic`, which branches on
+`%0 < 0`, calls `@debug.defaultPanic` on the cold edge, and otherwise loads
+`@main.zig_k`, adds the i32 argument, and returns the result.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@add_zig` mixed Zig/C global-add shape. This continues reducing the
-ReleaseSmall asm/object fallback row. It does not claim broad arbitrary global
-expression lowering, complete C object/linker integration, C translation-unit
-ownership, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+`@add_may_panic` checked add/panic branch shape. This continues reducing the
+ReleaseSmall asm/object fallback row. It does not claim broad checked
+arithmetic lowering, panic formatting/runtime ownership, arbitrary branch
+selection, complete C object/linker integration, non-x86_64 ABI behavior,
+debug records, unwind records, linker ownership, or target-complete ABI
+behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 global address materialization, relocation selection, and
-integer add lowering behavior as the reference boundary:
+Use LLVM x86_64 branch lowering, panic-edge call lowering, global address
+materialization, relocation selection, and integer add lowering behavior as the
+reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-global-add shape, also map PC-relative global-load relocations against
-`llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
-`llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
+checked branch shape, also map PC-relative global-load and PLT32 panic-call
+relocations against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`
+and `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@add_zig` alias to `@main.add_zig` ReleaseSmall
-shape with one i32 parameter, one private i32 Zig global load, one external i32
-C global load, and straight-line i32 additions. Do not generalize to arbitrary
-global expressions, C compilation/linking, debug/unwind object records, or
+Implement only the selected `@add_may_panic` alias to `@main.add_may_panic`
+ReleaseSmall shape with one i32 parameter, one `icmp slt` guard, a selected
+panic call edge, one private i32 Zig global load, and straight-line i32 add on
+the return edge. Do not generalize to arbitrary checked arithmetic, panic
+runtime semantics, C compilation/linking, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.
 
 Validation gate:

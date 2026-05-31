@@ -498,3 +498,28 @@ rg -q 'call' "$libfuzzer_run_dump"
 rg -q '[[:space:]]ret' "$libfuzzer_run_dump"
 
 printf 'ok distribution releasesmall object standalone_libfuzzer_runner_test_run\n'
+
+mix_c_add_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_zig.ll"
+mix_c_add_object="$tmp_dir/standalone_mix_c_files_add_zig.o"
+mix_c_add_summary="$tmp_dir/standalone_mix_c_files_add_zig.readelf.txt"
+mix_c_add_dump="$tmp_dir/standalone_mix_c_files_add_zig.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$mix_c_add_fixture" > "$mix_c_add_object"
+readelf -W -h -S -s -r "$mix_c_add_object" > "$mix_c_add_summary"
+objdump -dr "$mix_c_add_object" > "$mix_c_add_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$mix_c_add_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$mix_c_add_summary"
+rg -q '[[:space:]]add_zig$' "$mix_c_add_summary"
+rg -q '[[:space:]]main\.add_zig$' "$mix_c_add_summary"
+rg -q '[[:space:]]main\.zig_k$' "$mix_c_add_summary"
+rg -q '[[:space:]]zig_k$' "$mix_c_add_summary"
+rg -q '[[:space:]]C_k$' "$mix_c_add_summary"
+rg -q 'R_X86_64_PC32.*main\.zig_k' "$mix_c_add_summary"
+rg -q 'R_X86_64_TPOFF32.*C_k' "$mix_c_add_summary"
+rg -q 'mov[[:alpha:]]*[[:space:]]+0x0\(%rip\),%eax' "$mix_c_add_dump"
+rg -q 'add[[:alpha:]]*[[:space:]]+%edi,%eax' "$mix_c_add_dump"
+rg -q 'add[[:alpha:]]*[[:space:]]+%fs:0x0,%eax' "$mix_c_add_dump"
+rg -q '[[:space:]]ret' "$mix_c_add_dump"
+
+printf 'ok distribution releasesmall object standalone_mix_c_files_add_zig\n'

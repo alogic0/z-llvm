@@ -165,6 +165,7 @@ closed_alias_in_blocker=@runner_test_name -> @main.runner_test_name string-slice
 closed_alias_in_blocker=@runner_test_run -> @main.runner_test_run selected runtime-call lowering
 current_adjusted_object_probe=462 ok, 2 fail, 1 excluded with --input-limit=67108864
 first_adjusted_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@add_zig -> @main.add_zig
-missing capability=selected mixed Zig/C global-add i32 return lowering
+closed_alias_in_blocker=@add_zig -> @main.add_zig mixed Zig/C global-add i32 return
+selected_alias=@add_may_panic -> @main.add_may_panic
+missing capability=selected checked add/panic branch lowering
 ```

@@ -261,6 +261,7 @@ pub const Instruction = union(enum) {
     lea_global_rdi: []const u8,
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
+    add_tls_i32_eax: []const u8,
     store_eax_tls_i32: []const u8,
     atomic_xadd_global_eax: []const u8,
     mov_rsp_rdi,
@@ -836,6 +837,7 @@ fn lowerStraightLineReturn(
             if (try lowerFloatLessReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatLiteralReturn(allocator, machine, function, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedMixCFilesAddZig(allocator, machine, function, block, ret)) return;
             if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
@@ -2425,6 +2427,68 @@ fn lowerExternExportsGlobalAccess(
     if (try lowerExternExportsGetHidden(allocator, machine, function, block, ret)) return true;
     if (try lowerExternExportsUpdateHidden(allocator, machine, function, block, ret)) return true;
     return false;
+}
+
+fn lowerSelectedMixCFilesAddZig(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main.add_zig")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const zig_load_inst = block.instructions.items[0];
+    const arg_add_inst = block.instructions.items[1];
+    const c_load_inst = block.instructions.items[2];
+    const c_add_inst = block.instructions.items[3];
+    if (zig_load_inst.removed or arg_add_inst.removed or c_load_inst.removed or c_add_inst.removed) return false;
+
+    const zig_load_result = zig_load_inst.result orelse return false;
+    const arg_add_result = arg_add_inst.result orelse return false;
+    const c_load_result = c_load_inst.result orelse return false;
+    const c_add_result = c_add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, c_add_result)) return false;
+
+    const zig_load = switch (zig_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!zig_load.ty.eql(.{ .int = 32 }) or zig_load.attrs.isBarrier() or !isNamed(zig_load.ptr, "@main.zig_k")) return false;
+
+    const arg_add = switch (arg_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (arg_add.op != .add or !arg_add.ty.eql(.{ .int = 32 })) return false;
+    const arg_reg = if (isNamed(arg_add.lhs, zig_load_result))
+        try paramValueReg(function, arg_add.rhs, .{ .int = 32 })
+    else if (isNamed(arg_add.rhs, zig_load_result))
+        try paramValueReg(function, arg_add.lhs, .{ .int = 32 })
+    else
+        return false;
+
+    const c_load = switch (c_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!c_load.ty.eql(.{ .int = 32 }) or c_load.attrs.isBarrier() or !isNamed(c_load.ptr, "@C_k")) return false;
+
+    const c_add = switch (c_add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (c_add.op != .add or !c_add.ty.eql(.{ .int = 32 })) return false;
+    if (!((isNamed(c_add.lhs, arg_add_result) and isNamed(c_add.rhs, c_load_result)) or
+        (isNamed(c_add.lhs, c_load_result) and isNamed(c_add.rhs, arg_add_result)))) return false;
+
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerExternExportsGetHidden(
@@ -5962,6 +6026,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .lea_global_rdi,
         .store_eax_global_i32,
         .load_tls_i32_eax,
+        .add_tls_i32_eax,
         .store_eax_tls_i32,
         .atomic_xadd_global_eax,
         .mov_rsp_rdi,
@@ -5984,7 +6049,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -6110,6 +6175,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .lea_global_rdi,
         .store_eax_global_i32,
         .load_tls_i32_eax,
+        .add_tls_i32_eax,
         .store_eax_tls_i32,
         .atomic_xadd_global_eax,
         .mov_rsp_rdi,

@@ -98,6 +98,7 @@ closed_failure_21=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_21=@runner_futex_wait -> @main.runner_futex_wait,@runner_test_name -> @main.runner_test_name,@runner_test_run -> @main.runner_test_run
 current_adjusted_object_probe=462 object-ok, 2 object-fail, 1 excluded
 first_adjusted_failure=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@add_zig -> @main.add_zig
-missing_capability=selected mixed Zig/C global-add i32 return lowering
+closed_aliases_in_failure=@add_zig -> @main.add_zig
+selected_alias=@add_may_panic -> @main.add_may_panic
+missing_capability=selected checked add/panic branch lowering
 ```
