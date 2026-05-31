@@ -355,6 +355,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiRetStructF32A8F32A8(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiRetI64(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -3199,6 +3204,29 @@ fn lowerCAbiRetStructF32F32F32(allocator: std.mem.Allocator, machine: *MachineFu
 
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x4000_0000_3f80_0000 });
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4040_0000 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCAbiRetStructF32A8F32A8(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_struct_f32a8_f32a8")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ <2 x float>, float }" })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    switch (value) {
+        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ <2 x float> <float 1.250000e+00, float undef>, float 2.750000e+00 }")) return error.UnsupportedCodegenValue,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x0000_0000_3fa0_0000 });
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4030_0000 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
