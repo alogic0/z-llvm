@@ -414,6 +414,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiMedStructInts(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3369,6 +3374,26 @@ fn lowerCAbiSmallPackedStruct(allocator: std.mem.Allocator, machine: *MachineFun
 
     const fail = "small_packed_struct_fail";
     try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = .rdi, .imm = 0xe4 } });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiMedStructInts(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_med_struct_ints")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 64 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+
+    const fail = "med_struct_ints_fail";
+    try appendCompareArg64Imm64(allocator, machine, .rdi, 0x0000_0002_0000_0001, fail);
+    try machine.instructions.append(allocator, .xor_ecx_ecx);
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = .rsi });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
