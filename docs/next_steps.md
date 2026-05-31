@@ -12,11 +12,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the first remaining x86_64 ReleaseSmall asm/object exclusion,
-`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`, into
-one bounded source-backed fixture if the float-format helper shape is local, or
-keep the exclusion explicit with measured evidence if it requires broader
-formatting/runtime lowering.
+Extract a bounded source-backed reduction from the smaller ReleaseSmall
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll` exclusion
+only if the table-decoder row isolates one missing lowering. If it remains a
+broad decoder/register-allocation problem, keep the ReleaseSmall boundary at
+the measured 463/465 adjusted subset and choose the next mode or stage.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -440,10 +440,20 @@ locals, lifetime intrinsics, table loads, branches, and helper calls.
 The `standalone_emit_llvm_no_bin_main` row is a documented ReleaseSmall
 boundary exclusion for the current object subset: `@strFromFloatHelp` is a
 large multi-block float-format helper and is not a defensible one-slice
-backend reduction. With that row excluded, the adjusted ReleaseSmall object
-probe found `standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll`
-as the next blocker. The selected `@getHidden` and `@updateHidden` shapes are
-now object-ok for private i32 global load/store access through public function
+backend reduction. A direct no-exclusion probe confirms the boundary:
+
+```text
+input=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
+summary total=1 ok=0 fail=1 excluded=0
+first_failure=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
+first_failure_category=unsupported-control-flow
+selected_public_shape=@strFromFloatHelp -> @main.strFromFloatHelp
+```
+
+With that row excluded, the adjusted ReleaseSmall object probe found
+`standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll` as the next
+blocker. The selected `@getHidden` and `@updateHidden` shapes are now
+object-ok for private i32 global load/store access through public function
 aliases. The adjusted ReleaseSmall object probe is 460 object successes, 4
 object failures, and 1 excluded row. The next sorted implementation failure is
 `standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
@@ -513,7 +523,17 @@ error return paths.
 The `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll` row
 is a documented boundary exclusion for the current ReleaseSmall object subset:
 it is broad multi-block decoder/table lowering, not a defensible one-slice
-backend reduction. With that row and the existing
+backend reduction. A direct no-exclusion probe confirms the boundary:
+
+```text
+input=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
+summary total=1 ok=0 fail=1 excluded=0
+first_failure=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
+first_failure_category=unsupported-control-flow
+selected_public_shape=@decode_base_64 -> @base64.decode_base_64
+```
+
+With that row and the existing
 `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
 float-format helper excluded, the adjusted ReleaseSmall object probe is clean:
 463 object successes, 0 object failures, and 2 excluded rows. ReleaseSmall
@@ -589,11 +609,9 @@ source=tmp/zig_ir/raw/tiny_scalar.Debug.ll
 ```
 
 LLVM fallback removed or reduced:
-Advance the adjusted ReleaseSmall asm/object subset by revisiting the first
-explicit exclusion. If the selected float-format helper contains one bounded
-lowering or ELF feature, add a tracked fixture and focused validation. If it
-requires broad formatting/runtime infrastructure, keep it excluded and record
-the exact first blocker.
+Decide whether the smaller `base64.decode_base_64` table-decoder exclusion can
+be reduced to one bounded local lowering slice. If not, leave both ReleaseSmall
+exclusions explicit and select the next measured mode/stage blocker.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -611,15 +629,15 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not remove the ReleaseSmall exclusion without a source-backed fixture or a
-reproducible object probe. Keep formatting/runtime helper support outside the
-local boundary unless the selected shape proves it can be reduced to a bounded
-lowering slice.
+Do not remove a ReleaseSmall exclusion without a source-backed fixture or a
+reproducible object probe. Keep float formatting, table-decoder loops, broad
+register allocation, and runtime helper completeness outside the local boundary
+unless the selected shape proves it can be reduced to a bounded lowering slice.
 
 Validation gate:
 Run a focused probe for
-`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`, then
-keep `bash scripts/run_distribution_releasesmall_object_m3.sh`,
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`, then keep
+`bash scripts/run_distribution_releasesmall_object_m3.sh`,
 `bash scripts/run_distribution_debug_object_m4.sh`, and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 

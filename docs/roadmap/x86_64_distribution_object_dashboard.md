@@ -31,10 +31,14 @@ ReleaseSmall exclusions:
 standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
   reason=float-format-helper-boundary
   boundary=multi-block float-format helper, not a one-slice object reduction
+  direct_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
+  result=1 fail, category=unsupported-control-flow
 
 standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
   reason=table-decoder-boundary
   boundary=table-driven decoder with broad loop/control-flow lowering
+  direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
+  result=1 fail, category=unsupported-control-flow
 ```
 
 ## Focused Gates
@@ -67,7 +71,9 @@ after a reviewed probe result and explicit boundary decision.
 ```text
 ReleaseSmall excluded:
   standalone_emit_llvm_no_bin_main: float-format helper
+    direct no-exclusion probe fails unsupported-control-flow
   standalone_mix_o_files_base64: table decoder
+    direct no-exclusion probe fails unsupported-control-flow
 
 Debug broad:
   tiny_scalar.Debug.x86_64.ll object-clean as a selected broad row

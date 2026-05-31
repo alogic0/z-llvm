@@ -513,7 +513,10 @@ next sorted blocker is
 selected alias is `@strFromFloatHelp -> @main.strFromFloatHelp`, a multi-block
 float-format helper. That row is a boundary exclusion for the current
 ReleaseSmall object subset because it is broad float-format/backend work, not a
-single defensible lowering slice. With that row excluded, the selected
+single defensible lowering slice. A direct no-exclusion probe at
+`tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir` confirms the
+row still fails as `unsupported-control-flow` by itself. With that row
+excluded, the selected
 `standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll`
 `@getHidden`/`@updateHidden` hidden i32 global access shapes are now object-ok.
 The adjusted ReleaseSmall object probe is 460 successes, 4 failures, and 1
@@ -554,10 +557,13 @@ row. The next sorted implementation blocker is
 selected alias is `@decode_base_64 -> @base64.decode_base_64`, a large
 table-driven base64 decoder. This row is a documented boundary exclusion for
 the current ReleaseSmall object subset: it is broad multi-block decoder/table
-lowering, not a defensible one-slice backend reduction. With that row and the
-existing float-format helper excluded, the adjusted ReleaseSmall object probe
-is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
-asm/object is now a conservative boundary for the named captured subset.
+lowering, not a defensible one-slice backend reduction. A direct no-exclusion
+probe at `tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir`
+confirms the row still fails as `unsupported-control-flow` by itself. With
+that row and the existing float-format helper excluded, the adjusted
+ReleaseSmall object probe is clean: 463 successes, 0 failures, and 2 excluded
+rows. ReleaseSmall asm/object is now a conservative boundary for the named
+captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh`; it composes the
 ReleaseFast object/executable gates, ReleaseSafe object gate, selected

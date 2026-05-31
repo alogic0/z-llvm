@@ -143,8 +143,12 @@ bash scripts/probe_distribution_objects.sh
   ReleaseSmall excluded rows:
     standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
       reason=float-format-helper-boundary
+      direct_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
+      result=1 fail, category=unsupported-control-flow
     standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
       reason=table-decoder-boundary
+      direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
+      result=1 fail, category=unsupported-control-flow
 ```
 
 The compact object-stage dashboard is
@@ -222,6 +226,7 @@ closed_blocker=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_6
 intermediate_object_probe=458 ok, 7 fail with --input-limit=67108864
 closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll selected @main -> @main.main empty noreturn unreachable stub
 boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
+boundary_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
@@ -236,6 +241,7 @@ closed_alias_in_blocker=@add_zig -> @main.add_zig mixed Zig/C global-add i32 ret
 closed_alias_in_blocker=@add_may_panic -> @main.add_may_panic checked add/panic branch
 intermediate_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit=67108864
 boundary_exclusion=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll selected @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
+boundary_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 current_adjusted_object_probe=463 ok, 0 fail, 2 excluded with --input-limit=67108864
 ReleaseSmall asm/object status=conservative boundary for named captured subset with explicit exclusions
 ```
