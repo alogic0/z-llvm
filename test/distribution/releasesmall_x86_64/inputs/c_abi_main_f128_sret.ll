@@ -56,6 +56,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_struct_f32a8 = alias void (float, float), ptr @main.zig_struct_f32a8
 @zig_ret_struct_f32a8 = alias { float } (), ptr @main.zig_ret_struct_f32a8
 @zig_struct_f64 = alias void (double), ptr @main.zig_struct_f64
+@zig_ret_struct_f64 = alias { double } (), ptr @main.zig_ret_struct_f64
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -152,6 +153,11 @@ define private void @main.zig_struct_f64(double %0) unnamed_addr align 1 {
 4:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
+}
+
+define private { double } @main.zig_ret_struct_f64() unnamed_addr align 1 {
+0:
+  ret { double } { double 2.500000e+00 }
 }
 
 define private { fp128 } @main.zig_f128_struct(fp128 %0) unnamed_addr align 1 {
