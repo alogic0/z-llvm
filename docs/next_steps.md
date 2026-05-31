@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@strFromFloatHelp` alias / `@main.strFromFloatHelp` multi-block float-format
-helper from `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@_start` alias / `@main._start` infinite-loop branch shape from
+`standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -435,9 +435,22 @@ selected public shape is `@strFromFloatHelp = alias void (double), ptr
 @main.strFromFloatHelp`, a large multi-block float-format helper with stack
 locals, lifetime intrinsics, table loads, branches, and helper calls.
 
+The `standalone_emit_llvm_no_bin_main` row is a documented ReleaseSmall
+boundary exclusion for the current object subset: `@strFromFloatHelp` is a
+large multi-block float-format helper and is not a defensible one-slice
+backend reduction. With that row excluded, the adjusted ReleaseSmall object
+probe found `standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll`
+as the next blocker. The selected `@getHidden` and `@updateHidden` shapes are
+now object-ok for private i32 global load/store access through public function
+aliases. The adjusted ReleaseSmall object probe is 460 object successes, 4
+object failures, and 1 excluded row. The next sorted implementation failure is
+`standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected public shape is `@_start = alias void (), ptr @main._start`, a
+noreturn two-block infinite loop.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@strFromFloatHelp` multi-block float-format helper shape. This
+`@_start` infinite-loop branch shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, complete Zig startup/runtime ownership, broad integer ABI lowering,
@@ -449,22 +462,21 @@ Mode/target/stage row:
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 instruction selection and MC encoding behavior as the reference
+Use LLVM x86_64 branch lowering and MC encoding behavior as the reference
 boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-float-format helper, also map table addressing, stack frame setup, and branch
-emission against
+infinite-loop shape, also map unconditional branch emission against
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only a bounded selected subset from `@strFromFloatHelp` if it can be
-reduced to a defensible source-backed object slice. Do not claim broad float
-formatting, full table lowering, arbitrary multi-block register allocation,
-debug/unwind object records, or non-x86_64 ABI behavior in this slice.
+Implement only the selected `@_start` alias to `@main._start` ReleaseSmall
+two-block infinite loop. Do not generalize to arbitrary multi-block control
+flow, full loop lowering, debug/unwind object records, or non-x86_64 ABI
+behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

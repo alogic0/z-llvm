@@ -88,8 +88,11 @@ closed_failure_17=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x8
 closed_aliases_17=@entry -> @no_compile_panic_for_unchecked_arith.entry
 closed_failure_18=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_18=@main -> @main.main
-current_object_probe=459 object-ok, 6 object-fail
-first_failure=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@strFromFloatHelp -> @main.strFromFloatHelp
-missing_capability=selected ReleaseSmall multi-block float-format helper lowering
+boundary_exclusion_1=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
+closed_failure_19=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_19=@getHidden,@updateHidden selected hidden i32 global access
+current_adjusted_object_probe=460 object-ok, 4 object-fail, 1 excluded
+first_adjusted_failure=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@_start -> @main._start
+missing_capability=selected ReleaseSmall two-block infinite-loop branch lowering
 ```

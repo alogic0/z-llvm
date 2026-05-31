@@ -154,8 +154,10 @@ intermediate_object_probe=457 ok, 8 fail with --input-limit=67108864
 closed_blocker=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll selected @entry -> @no_compile_panic_for_unchecked_arith.entry llvm.umul.fix.sat.i64 constant-call return
 intermediate_object_probe=458 ok, 7 fail with --input-limit=67108864
 closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll selected @main -> @main.main empty noreturn unreachable stub
-current_object_probe=459 ok, 6 fail with --input-limit=67108864
-first_blocker=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@strFromFloatHelp -> @main.strFromFloatHelp
-missing capability=selected multi-block float-format helper lowering
+boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
+closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
+current_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
+first_adjusted_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@_start -> @main._start
+missing capability=selected two-block infinite-loop branch lowering
 ```

@@ -834,6 +834,7 @@ fn lowerStraightLineReturn(
             if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
@@ -2275,6 +2276,87 @@ fn lowerGlobalUpdateReturn(
 
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerExternExportsGlobalAccess(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerExternExportsGetHidden(allocator, machine, function, block, ret)) return true;
+    if (try lowerExternExportsUpdateHidden(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
+fn lowerExternExportsGetHidden(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "exports.getHidden")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const load_inst = block.instructions.items[0];
+    if (load_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (!std.mem.eql(u8, ret_name, load_result)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const global_name = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (!std.mem.eql(u8, global_name, "exports.hidden")) return false;
+
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerExternExportsUpdateHidden(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "exports.updateHidden")) return false;
+    if (ret.ty != .void or ret.value != null) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const store_inst = block.instructions.items[0];
+    if (store_inst.removed) return false;
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    const source_reg = try paramValueReg(function, store.value, .{ .int = 32 });
+    if (source_reg != .rdi) return error.UnsupportedCodegenAbi;
+    const global_name = switch (store.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (!std.mem.eql(u8, global_name, "exports.hidden")) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = source_reg });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
     try machine.instructions.append(allocator, .ret);
     return true;

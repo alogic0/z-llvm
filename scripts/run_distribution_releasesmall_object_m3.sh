@@ -390,3 +390,26 @@ rg -q '[[:space:]]main\.main$' "$main_unreachable_summary"
 rg -q '[[:space:]]ud2' "$main_unreachable_dump"
 
 printf 'ok distribution releasesmall object standalone_compile_asm_main_unreachable\n'
+
+extern_exports_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_extern_exports_hidden_access.ll"
+extern_exports_object="$tmp_dir/standalone_extern_exports_hidden_access.o"
+extern_exports_summary="$tmp_dir/standalone_extern_exports_hidden_access.readelf.txt"
+extern_exports_dump="$tmp_dir/standalone_extern_exports_hidden_access.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$extern_exports_fixture" > "$extern_exports_object"
+readelf -W -h -S -s -r "$extern_exports_object" > "$extern_exports_summary"
+objdump -dr "$extern_exports_object" > "$extern_exports_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$extern_exports_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$extern_exports_summary"
+rg -q '[[:space:]]getHidden$' "$extern_exports_summary"
+rg -q '[[:space:]]updateHidden$' "$extern_exports_summary"
+rg -q '[[:space:]]exports\.getHidden$' "$extern_exports_summary"
+rg -q '[[:space:]]exports\.updateHidden$' "$extern_exports_summary"
+rg -q '[[:space:]]exports\.hidden$' "$extern_exports_summary"
+rg -q 'R_X86_64_PC32.*exports\.hidden' "$extern_exports_summary"
+rg -q 'mov[[:alpha:]]*[[:space:]]+0x0\(%rip\),%eax' "$extern_exports_dump"
+rg -q 'mov[[:alpha:]]*[[:space:]]+%edi,%eax' "$extern_exports_dump"
+rg -q 'mov[[:alpha:]]*[[:space:]]+%eax,0x0\(%rip\)' "$extern_exports_dump"
+
+printf 'ok distribution releasesmall object standalone_extern_exports_hidden_access\n'

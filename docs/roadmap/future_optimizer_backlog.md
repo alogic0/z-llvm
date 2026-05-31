@@ -511,7 +511,15 @@ The current ReleaseSmall object probe is 459 successes and 6 failures. The
 next sorted blocker is
 `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
 selected alias is `@strFromFloatHelp -> @main.strFromFloatHelp`, a multi-block
-float-format helper.
+float-format helper. That row is a boundary exclusion for the current
+ReleaseSmall object subset because it is broad float-format/backend work, not a
+single defensible lowering slice. With that row excluded, the selected
+`standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll`
+`@getHidden`/`@updateHidden` hidden i32 global access shapes are now object-ok.
+The adjusted ReleaseSmall object probe is 460 successes, 4 failures, and 1
+excluded row. The next sorted implementation blocker is
+`standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected alias is `@_start -> @main._start`, a two-block infinite loop.
 
 ## Activation Rule
 
