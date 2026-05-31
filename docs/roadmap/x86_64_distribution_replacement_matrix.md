@@ -247,6 +247,18 @@ boundary=no broad musl executable expansion beyond selected harnesses; no
          behavior beyond the selected harnesses
 ```
 
+The linker/CRT boundary is now explicit and validated:
+
+```text
+gate=bash scripts/run_distribution_linker_boundary.sh
+local_emit_modes=ir, asm, obj
+rejected_emit_mode=exe
+executable_validation_handoff=zig cc -target "$cc_target"
+result=pass
+boundary=no local executable emission, CRT/start-file policy, libc integration,
+         dynamic loader behavior, archive ownership, or linker script handling
+```
+
 Automated broad object probing is now available through:
 
 ```text

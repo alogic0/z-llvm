@@ -14,9 +14,10 @@ Source roadmap: [x86_64 Distribution Object Dashboard](roadmap/x86_64_distributi
 Replacement goal:
 Select the next measured x86_64 distribution boundary after the selected
 ReleaseSafe/ReleaseSmall executable fixtures and tracked ReleaseSmall exclusion
-fixtures became target-aware for both GNU and musl. Prefer a source-backed
-linker/CRT boundary; do not expand beyond the captured subset without a
-measured first blocker.
+fixtures became target-aware for both GNU and musl, and after the linker/CRT
+boundary became an executable gate. Pick the next measured blocker from a
+source-backed distribution row; do not expand beyond the captured subset
+without a measured first failure.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at

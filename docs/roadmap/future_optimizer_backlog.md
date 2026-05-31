@@ -576,6 +576,11 @@ selected ReleaseSmall object/executable gates, selected Debug
 object/executable gates, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
+The linker/CRT boundary is also validated by
+`bash scripts/run_distribution_linker_boundary.sh`: local `z_llvm` emit modes
+stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
+validation remains an explicit `zig cc -target "$cc_target"` handoff.
+
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
