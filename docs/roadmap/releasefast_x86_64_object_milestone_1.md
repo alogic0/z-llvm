@@ -364,3 +364,6 @@ next selected alias is `@zig_struct_u64`, a two-u64 control-flow shape.
 That focused shape is now object-ok with selected register checks and local
 trap failure edges. The broad row still remains the first sorted failure; the
 next selected alias is `@zig_ret_struct_u64`, an i64 return shape.
+That focused shape is now object-ok with selected `%rax` return
+materialization. The broad row still remains the first sorted failure; the
+next selected alias is `@zig_struct_u32`, an i32/i64 control-flow shape.
