@@ -68,4 +68,11 @@ rg -q 'mov[[:alpha:]]*[[:space:]]+%esi,\(%rdi\)' "$tmp_dir/debug_pointers_volati
 rg -q 'mov[[:alpha:]]*[[:space:]]+\(%rdi\),%eax' "$tmp_dir/debug_pointers_volatile_roundtrip.reduced.objdump.txt"
 printf 'ok distribution debug object debug_pointers_volatile_roundtrip\n'
 
+emit_and_check debug_sizeof_typeof_c_unreachable.reduced c_fopen
+rg -q '[[:space:]]c_ftell$' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced.readelf.txt"
+rg -q '[[:space:]]c_fputs$' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced.readelf.txt"
+rg -q '[[:space:]]c_printf$' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced.readelf.txt"
+rg -q 'ud2' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced.objdump.txt"
+printf 'ok distribution debug object debug_sizeof_typeof_c_unreachable\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

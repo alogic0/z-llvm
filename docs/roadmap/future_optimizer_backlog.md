@@ -571,13 +571,14 @@ ReleaseSmall object gate, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
-`test/zig/expected/debug_*.reduced.ll` is clean: 7 object successes and 0
+`test/zig/expected/debug_*.reduced.ll` is clean: 8 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
 selected blockers are call-result plus immediate-add lowering,
 `llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
 shape, the reduced Debug scope-branch phi shape, and the selected O0 alloca
-debug prologue before a volatile pointer roundtrip. Broad Debug asm/object
-still requires LLVM fallback because DWARF/unwind emission, full O0 codegen,
+debug prologue before a volatile pointer roundtrip, and Debug/O0 c_* panic-call
+unreachable stubs. Broad Debug asm/object still requires LLVM fallback because
+DWARF/unwind emission, full O0 codegen,
 variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
 
@@ -598,6 +599,14 @@ sizeless `DIBasicType`, and columnless `DILocation` nodes. The selected
 `pointers_memory` row also closes the bounded O0 local-variable alloca/store
 prologue in front of volatile pointer roundtrip lowering. This does not
 promote broad Debug asm/object beyond the selected rows.
+
+The continuous Debug object probe now has a clean first-100-row prefix from
+`tmp/zig_ir/continuous_20260530_151319_debug/report.tsv`:
+`tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` reports
+100 ok / 0 fail after closing the selected `behavior_sizeof_and_typeof`
+c_* panic-call unreachable stubs. The first-200-row prefix reports
+149 ok / 51 fail, with first failure
+`c_abi_main.zig.Debug.x86_64.ll` categorized as `unsupported-control-flow`.
 
 ## Activation Rule
 

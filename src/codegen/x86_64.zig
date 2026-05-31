@@ -3639,14 +3639,32 @@ fn inttoptrI64Address(value: ir.Value) !u32 {
 
 fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (function.blocks.items.len != 1) return false;
-    if (function.blocks.items[0].instructions.items.len != 0) return false;
-    switch (function.blocks.items[0].terminator orelse return error.BlockWithoutTerminator) {
+    const block = function.blocks.items[0];
+    switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         .ret, .br, .condbr, .@"switch", .indirectbr => return false,
     }
     if (!std.mem.startsWith(u8, function.name, "sizeof_and_typeof.exp.c_") and
         !std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.elemPtr") and
         !std.mem.eql(u8, function.name, "main.main")) return false;
+    if (block.instructions.items.len == 0) {
+        // Already a direct unreachable stub.
+    } else if (block.instructions.items.len == 1) {
+        const call = switch (block.instructions.items[0].kind) {
+            .call => |call| call,
+            else => return false,
+        };
+        if (!isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).reachedUnreachable") or
+            call.ret_ty != .void or
+            call.args.items.len != 0 or
+            call.callee_value != null or
+            call.inline_asm != null)
+        {
+            return false;
+        }
+    } else {
+        return false;
+    }
     if (function.attrs == null) {
         return false;
     }
@@ -6101,6 +6119,14 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
         .named => |value_name| std.mem.eql(u8, value_name, name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn isCalleeName(actual: []const u8, expected: []const u8) bool {
+    if (std.mem.eql(u8, actual, expected)) return true;
+    return actual.len == expected.len + 2 and
+        actual[0] == '"' and
+        actual[actual.len - 1] == '"' and
+        std.mem.eql(u8, actual[1 .. actual.len - 1], expected);
 }
 
 fn globalSymbolName(name: []const u8) ![]const u8 {

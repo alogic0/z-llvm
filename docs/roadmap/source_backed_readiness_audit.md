@@ -153,10 +153,11 @@ Debug:
 
 - Compile-unit, subprogram, lexical block, and location metadata survive the
       accepted reduced fixtures.
-- The reduced Debug x86_64 object gate is clean for seven selected fixtures:
+- The reduced Debug x86_64 object gate is clean for eight selected fixtures:
       `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
       for call-chain, declare/value intrinsic, loop, metadata, scope-branch,
-      and O0 volatile-pointer roundtrip shapes.
+      O0 volatile-pointer roundtrip, and c_* panic-call unreachable-stub
+      shapes.
 - The selected broad Debug raw rows now emit local objects:
       `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
       `tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
@@ -165,6 +166,11 @@ Debug:
       forms are `#dbg_*` records, terminator metadata, sizeless `DIBasicType`,
       columnless `DILocation`, and selected local-variable alloca/stores before
       volatile pointer roundtrip lowering.
+- The continuous Debug first-100 optimizer-ok prefix is object-clean at
+      `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir`. The
+      first-200 prefix reports 149 object successes and 51 failures, with
+      `c_abi_main.zig.Debug.x86_64.ll` as the first unsupported-control-flow
+      blocker.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 

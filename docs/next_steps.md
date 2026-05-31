@@ -12,11 +12,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Extract a bounded source-backed reduction from the smaller ReleaseSmall
-`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll` exclusion
-only if the table-decoder row isolates one missing lowering. If it remains a
-broad decoder/register-allocation problem, keep the ReleaseSmall boundary at
-the measured 463/465 adjusted subset and choose the next mode or stage.
+Reduce the first continuous Debug prefix-200 object blocker,
+`c_abi_main.zig.Debug.x86_64.ll`, into one bounded source-backed fixture if it
+exposes a selected ABI/control-flow shape. If the first public shape is broad
+O0 ABI infrastructure, record that boundary and keep broader Debug asm/object
+as LLVM fallback.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -577,8 +577,8 @@ The unified dashboard is
 `docs/roadmap/x86_64_distribution_object_dashboard.md`. It records ReleaseFast
 and ReleaseSafe as 17/17 object-clean captured subsets, ReleaseSmall as an
 adjusted 463/465 object-clean subset with two explicit exclusions, and Debug as
-a reduced 7-fixture object-clean subset plus four selected broad raw
-object-clean rows while broad Debug std rows remain unproven.
+a reduced 8-fixture object-clean subset plus selected broad raw and continuous
+prefix object-clean rows while broad Debug std rows remain unproven.
 
 The first broad Debug row from the fixture manifest,
 `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`, originally failed before object
@@ -608,18 +608,33 @@ summary total=1 ok=1 fail=0 excluded=0 first_failure=-
 source=tmp/zig_ir/raw/tiny_scalar.Debug.ll
 ```
 
+The continuous Debug object probe now has a clean first-100-row prefix:
+
+```text
+input=tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir
+summary total=100 ok=100 fail=0 excluded=0 first_failure=-
+closed_boundary=behavior_sizeof_and_typeof Debug/O0 c_* panic-call unreachable stubs
+
+input=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
+summary total=200 ok=149 fail=51 excluded=0
+first_failure=c_abi_main.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
+```
+
 LLVM fallback removed or reduced:
-Decide whether the smaller `base64.decode_base_64` table-decoder exclusion can
-be reduced to one bounded local lowering slice. If not, leave both ReleaseSmall
-exclusions explicit and select the next measured mode/stage blocker.
+Advance Debug asm/object evidence beyond the first 100 continuous rows by
+reducing the selected `c_abi_main` blocker only if the first public alias is
+bounded. Keep O0 C ABI breadth, full register allocation, and runtime/debug
+infrastructure outside the local replacement boundary unless the selected shape
+proves otherwise.
 
 Mode/target/stage row:
-`mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=conservative boundary with two explicit exclusions`.
+`mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`status=LLVM fallback required outside selected reduced/raw/prefix rows`.
 
 Upstream mapping:
-Use LLVM x86_64 Oz codegen, MC/object emission, diagnostics, and object-file
-handoff behavior as the reference boundary:
+Use LLVM x86_64 Debug/O0 codegen, MC/object emission, diagnostics, and
+object-file handoff behavior as the reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
@@ -629,16 +644,14 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not remove a ReleaseSmall exclusion without a source-backed fixture or a
-reproducible object probe. Keep float formatting, table-decoder loops, broad
-register allocation, and runtime helper completeness outside the local boundary
-unless the selected shape proves it can be reduced to a bounded lowering slice.
+Do not promote broad Debug asm/object from the clean prefix alone. Record the
+first `c_abi_main` public alias, its optimized IR shape, and whether it maps to
+an already selected ReleaseSmall C ABI lowering or to broader Debug/O0
+infrastructure.
 
 Validation gate:
-Run a focused probe for
-`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`, then keep
-`bash scripts/run_distribution_releasesmall_object_m3.sh`,
-`bash scripts/run_distribution_debug_object_m4.sh`, and
+Run a focused probe for `c_abi_main.zig.Debug.x86_64.ll`, then keep
+`bash scripts/run_distribution_debug_object_m4.sh` and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:
