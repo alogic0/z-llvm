@@ -67,6 +67,12 @@ No prior optimized-output artifact directory existed for a historical diff, so
 this is a baseline for future canonical-form comparisons rather than evidence
 that optimized forms were unchanged across commits.
 
+The first ReleaseFast asm/object fallback reduction tracks the selected empty
+optimized module as `test/handoff/inputs/releasefast_empty_module.ll`. The
+handoff gate now proves that a metadata-only accepted optimized module emits no
+assembly and still produces an x86_64 ELF relocatable object with `.text` and
+`.symtab` records.
+
 Asm/object remains LLVM fallback required for all distribution modes because the
 local x86_64 codegen, assembly, and ELF object paths are validation fixtures
 only. Existing docs explicitly exclude broad register allocation, scheduling,

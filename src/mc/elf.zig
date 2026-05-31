@@ -36,8 +36,6 @@ pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
 }
 
 pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction) ![]u8 {
-    if (functions.len == 0) return error.EmptyObject;
-
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
 

@@ -89,6 +89,30 @@ run_optimized_codegen_case \
   test/handoff/expected/asm/scalar_add_zero.s \
   test/handoff/expected/objdump/scalar_add_zero.txt
 
+run_empty_module_object_case() {
+  local id="$1"
+  local input="$2"
+  local local_asm="$tmp_dir/$id.s"
+  local local_obj="$tmp_dir/$id.o"
+  local readelf_summary="$tmp_dir/$id.readelf.txt"
+
+  zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu "$input" > "$local_asm"
+  test ! -s "$local_asm"
+
+  zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu "$input" > "$local_obj"
+  readelf -h -S -s "$local_obj" > "$readelf_summary"
+  rg -q 'Type:[[:space:]]+REL' "$readelf_summary"
+  rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$readelf_summary"
+  rg -q '\.text' "$readelf_summary"
+  rg -q '\.symtab' "$readelf_summary"
+
+  printf 'ok handoff empty-module object %s\n' "$id"
+}
+
+run_empty_module_object_case \
+  releasefast_empty_module \
+  test/handoff/inputs/releasefast_empty_module.ll
+
 run_asm_case() {
   local id="$1"
   local input="test/codegen/inputs/$id.ll"
