@@ -357,3 +357,25 @@ C
 zig cc "$atomics_barrier_harness" "$atomics_barrier_object" -o "$atomics_barrier_exe"
 "$atomics_barrier_exe"
 printf 'ok distribution executable atomics_inline_asm_barrier\n'
+
+atomics_add_fixture="test/distribution/releasefast_x86_64/inputs/atomics_atomic_add.ll"
+atomics_add_object="$tmp_dir/atomics_atomic_add.o"
+atomics_add_harness="$tmp_dir/atomics_atomic_add_harness.c"
+atomics_add_exe="$tmp_dir/atomics_atomic_add_harness"
+
+zig build run -- --emit=obj --target="$target" "$atomics_add_fixture" > "$atomics_add_object"
+
+cat > "$atomics_add_harness" <<'C'
+extern int atomic_add(int value);
+
+int main(void) {
+    if (atomic_add(5) != 0) return 1;
+    if (atomic_add(7) != 5) return 2;
+    if (atomic_add(-3) != 12) return 3;
+    return 0;
+}
+C
+
+zig cc "$atomics_add_harness" "$atomics_add_object" -o "$atomics_add_exe"
+"$atomics_add_exe"
+printf 'ok distribution executable atomics_atomic_add\n'

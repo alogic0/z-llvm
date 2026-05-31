@@ -12,13 +12,19 @@ tail -n +2 "$manifest" | while IFS=$'\t' read -r id input validation expected_st
       object="$tmp_dir/$id.o"
       summary="$tmp_dir/$id.readelf.txt"
       zig build run -- --emit=obj --target="$target" "$input" > "$object"
-      readelf -h -S -s "$object" > "$summary"
+      readelf -W -h -S -s -r "$object" > "$summary"
       rg -q 'Type:[[:space:]]+REL' "$summary"
       rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$summary"
       rg -q '\.text' "$summary"
       rg -q '\.symtab' "$summary"
       if [[ -n "${public_symbol:-}" ]]; then
         rg -q "[[:space:]]${public_symbol}$" "$summary"
+      fi
+      if [[ "$id" == "atomics_atomic_add" ]]; then
+        rg -q '\.data' "$summary"
+        rg -q '\.rela\.text' "$summary"
+        rg -q '[[:space:]]atomics_inline_asm_debug\.atomic_counter$' "$summary"
+        rg -q 'R_X86_64_PC32.*atomics_inline_asm_debug\.atomic_counter - 4' "$summary"
       fi
       printf 'ok distribution object %s [%s]\n' "$id" "$shape"
       ;;

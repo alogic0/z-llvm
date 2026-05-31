@@ -37,7 +37,7 @@ pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
 }
 
 pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction) ![]u8 {
-    return try buildObjectWithAliases(allocator, functions, &.{});
+    return try buildObjectWithModuleData(allocator, functions, &.{}, &.{});
 }
 
 pub fn writeObjectWithAliases(
@@ -51,13 +51,36 @@ pub fn writeObjectWithAliases(
     try writer.writeAll(object);
 }
 
+pub fn writeObjectWithModuleData(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    globals: []const ir.Global,
+    writer: anytype,
+) !void {
+    const object = try buildObjectWithModuleData(allocator, functions, aliases, globals);
+    defer allocator.free(object);
+    try writer.writeAll(object);
+}
+
 pub fn buildObjectWithAliases(
     allocator: std.mem.Allocator,
     functions: []const x86_64.MachineFunction,
     aliases: []const ir.GlobalAlias,
 ) ![]u8 {
+    return try buildObjectWithModuleData(allocator, functions, aliases, &.{});
+}
+
+pub fn buildObjectWithModuleData(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    globals: []const ir.Global,
+) ![]u8 {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
+    var data: std.ArrayList(u8) = .empty;
+    defer data.deinit(allocator);
 
     var symbols: std.ArrayList(Symbol) = .empty;
     defer symbols.deinit(allocator);
@@ -83,6 +106,7 @@ pub fn buildObjectWithAliases(
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
 
+    try appendSupportedGlobals(allocator, &data, &symbols, &symbol_indices, globals);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
 
     var relocations: std.ArrayList(Relocation) = .empty;
@@ -106,6 +130,7 @@ pub fn buildObjectWithAliases(
     defer shstrtab.deinit(allocator);
     try shstrtab.append(allocator, 0);
     const text_name = try appendString(&shstrtab, allocator, ".text");
+    const data_name = try appendString(&shstrtab, allocator, ".data");
     const rela_text_name = try appendString(&shstrtab, allocator, ".rela.text");
     const symtab_name = try appendString(&shstrtab, allocator, ".symtab");
     const strtab_name = try appendString(&shstrtab, allocator, ".strtab");
@@ -115,6 +140,10 @@ pub fn buildObjectWithAliases(
     var cursor = alignForward(ehdr_size, 16);
     const text_offset = cursor;
     cursor += text.items.len;
+    cursor = alignForward(cursor, 4);
+
+    const data_offset = cursor;
+    cursor += data.items.len;
     cursor = alignForward(cursor, 8);
 
     const rela_text_offset = cursor;
@@ -135,14 +164,15 @@ pub fn buildObjectWithAliases(
     cursor = alignForward(cursor, 8);
     const shoff = cursor;
 
-    const section_count = 6;
+    const section_count = 7;
     const total_size = shoff + section_count * 64;
     var object = try allocator.alloc(u8, total_size);
     errdefer allocator.free(object);
     @memset(object, 0);
 
-    writeElfHeader(object[0..64], shoff, section_count, 5);
+    writeElfHeader(object[0..64], shoff, section_count, 6);
     @memcpy(object[text_offset..][0..text.items.len], text.items);
+    @memcpy(object[data_offset..][0..data.items.len], data.items);
     writeRelocationTable(object[rela_text_offset..][0..rela_text_size], relocations.items);
     writeSymbolTable(object[symtab_offset..][0..symtab_size], symbols.items, symbol_name_offsets);
     @memcpy(object[strtab_offset..][0..strtab.items.len], strtab.items);
@@ -151,8 +181,9 @@ pub fn buildObjectWithAliases(
     const sections = [_]Section{
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
-        .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 3, .info = 1, .addralign = 8, .entsize = 24 },
-        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 4, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = 4 },
+        .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 4, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
         .{ .name_offset = strtab_name, .kind = 3, .flags = 0, .offset = strtab_offset, .size = strtab.items.len },
         .{ .name_offset = shstrtab_name, .kind = 3, .flags = 0, .offset = shstrtab_offset, .size = shstrtab.items.len },
     };
@@ -161,6 +192,44 @@ pub fn buildObjectWithAliases(
     }
 
     return object;
+}
+
+fn appendSupportedGlobals(
+    allocator: std.mem.Allocator,
+    data: *std.ArrayList(u8),
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    globals: []const ir.Global,
+) !void {
+    for (globals) |global| {
+        if (symbol_indices.contains(global.name)) continue;
+        const start: u64 = data.items.len;
+        const size = try appendSupportedGlobalData(allocator, data, global) orelse continue;
+        try symbols.append(allocator, .{
+            .name = global.name,
+            .value = start,
+            .size = size,
+            .section_index = 2,
+            .info = 0x11,
+        });
+        try symbol_indices.put(global.name, @intCast(symbols.items.len));
+    }
+}
+
+fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(u8), global: ir.Global) !?u64 {
+    if (global.kind != .global) return null;
+    if (!global.ty.eql(.{ .int = 32 })) return null;
+
+    const value: i32 = switch (global.initializer) {
+        .scalar => |scalar| switch (scalar) {
+            .int => |int| try i32Value(int),
+            .zero_initializer => 0,
+            .named, .fp, .undef, .poison, .null_value, .vector, .constant_expr => return null,
+        },
+        .none, .array, .c_string, .@"opaque" => return null,
+    };
+    try appendI32(data, allocator, value);
+    return 4;
 }
 
 fn appendLocalFunctionAliases(
@@ -202,6 +271,15 @@ fn collectCallRelocations(
                     .offset = function_offset + offset + 1,
                     .symbol_index = symbol_index,
                     .kind = 4,
+                    .addend = -4,
+                });
+            },
+            .atomic_xadd_global_eax => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 4,
+                    .symbol_index = symbol_index,
+                    .kind = 2,
                     .addend = -4,
                 });
             },
@@ -306,4 +384,17 @@ fn writeU32(buffer: []u8, offset: usize, value: u32) void {
 fn writeU64(buffer: []u8, offset: usize, value: u64) void {
     writeU32(buffer, offset, @intCast(value & 0xffff_ffff));
     writeU32(buffer, offset + 4, @intCast(value >> 32));
+}
+
+fn appendI32(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, value: i32) !void {
+    const raw: u32 = @bitCast(value);
+    try buffer.append(allocator, @intCast(raw & 0xff));
+    try buffer.append(allocator, @intCast((raw >> 8) & 0xff));
+    try buffer.append(allocator, @intCast((raw >> 16) & 0xff));
+    try buffer.append(allocator, @intCast((raw >> 24) & 0xff));
+}
+
+fn i32Value(value: i128) !i32 {
+    if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedGlobalVariable;
+    return @intCast(value);
 }

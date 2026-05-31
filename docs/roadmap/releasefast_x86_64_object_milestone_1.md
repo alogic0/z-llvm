@@ -97,7 +97,18 @@ target-complete ABI lowering
 The next source-backed blocker is broader ReleaseFast object coverage. A broad
 probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
 now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
-`aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted object failure
-is `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`, currently
-blocked on `@atomic_add`, which requires global storage emission plus atomic
-read-modify-write lowering.
+`aggregates.zig.ReleaseFast.x86_64.optimized.ll`; after the selected atomics
+slice it also passes `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`.
+The current broad object probe is:
+
+```text
+optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
+rows=17
+object_ok=6
+object_fail=11
+first_failure=control_flow_calls.zig.ReleaseFast.x86_64.optimized.ll
+first_missing_shape=selected @loop_sum multi-block unrolled loop lowering
+```
+
+The compact running dashboard is
+`docs/roadmap/releasefast_x86_64_object_coverage_dashboard.md`.

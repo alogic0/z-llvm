@@ -147,7 +147,7 @@ pub fn main(init: std.process.Init) !void {
         if (emit == .@"asm") {
             for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
         } else {
-            try mc.elf.writeObjectWithAliases(allocator, machines.items, module.aliases.items, stdout);
+            try mc.elf.writeObjectWithModuleData(allocator, machines.items, module.aliases.items, module.globals.items, stdout);
         }
         try stdout.flush();
         return;

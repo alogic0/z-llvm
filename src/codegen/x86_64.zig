@@ -136,6 +136,7 @@ pub const Instruction = union(enum) {
     reload_rsp_eax: FrameIndex,
     load_arg_ptr_eax: ArgReg,
     add_arg_ptr_disp4_eax: ArgReg,
+    atomic_xadd_global_eax: []const u8,
     direct_call: struct {
         symbol: []const u8,
         ret_ty: ir.Type,
@@ -235,6 +236,7 @@ fn lowerStraightLineReturn(
             if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -917,6 +919,46 @@ fn lowerInlineAsmBarrierReturn(
     return true;
 }
 
+fn lowerAtomicAddReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const atomic_inst = block.instructions.items[0];
+    if (atomic_inst.removed) return false;
+    const atomic_result = atomic_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, atomic_result)) return false;
+
+    const atomic = switch (atomic_inst.kind) {
+        .atomicrmw => |atomicrmw| atomicrmw,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, atomic.op, "add")) return false;
+    if (!atomic.ty.eql(.{ .int = 32 })) return false;
+    if (!std.mem.eql(u8, atomic.ordering, "monotonic")) return false;
+    if (atomic.syncscope != null or atomic.is_volatile) return false;
+
+    const value_reg = try paramValueReg(function, atomic.value, .{ .int = 32 });
+    const global_name = switch (atomic.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
+    try machine.instructions.append(allocator, .{ .atomic_xadd_global_eax = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerStraightLineInstructions(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1533,6 +1575,11 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
     };
 }
 
+fn globalSymbolName(name: []const u8) ![]const u8 {
+    if (!std.mem.startsWith(u8, name, "@") or name.len == 1) return error.UnsupportedCodegenValue;
+    return name[1..];
+}
+
 fn isInt(value: ir.Value, expected: i128) bool {
     return switch (value) {
         .int => |actual| actual == expected,
@@ -1626,6 +1673,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,
@@ -1640,7 +1688,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .atomic_xadd_global_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1692,6 +1740,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_arg_ptr_eax,
         .add_arg_ptr_disp4_eax,
+        .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,

@@ -61,6 +61,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .add_arg_ptr_disp4_eax => |reg| try encodeArgPtrDisp4ToEax(&bytes, allocator, reg),
+            .atomic_xadd_global_eax => try bytes.appendSlice(allocator, &.{ 0xf0, 0x0f, 0xc1, 0x05, 0, 0, 0, 0 }),
             .direct_call => {
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
@@ -116,6 +117,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rsp_eax => 3,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .add_arg_ptr_disp4_eax => |reg| if (reg.rexB()) 4 else 3,
+        .atomic_xadd_global_eax => 8,
         .direct_call => 5,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
