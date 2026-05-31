@@ -13,11 +13,11 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the current continuous Debug prefix-200 object blocker,
-`cases_inherit_want_safety.zig.Debug.x86_64.ll`,
-into one bounded source-backed fixture if it exposes a selected compile-error
-stub or Debug/O0 safety-inheritance shape. If the first public shape is broad
-O0 safety/runtime control flow, record that boundary and keep broader Debug
-asm/object as LLVM fallback.
+`cases_no_compile_panic_for_unchecked_arith.zig.Debug.x86_64.ll`,
+into one bounded source-backed fixture if it exposes a selected unchecked
+arithmetic or compile-panic suppression shape. If the first public shape is
+broad O0 arithmetic/runtime control flow, record that boundary and keep
+broader Debug asm/object as LLVM fallback.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -617,9 +617,9 @@ summary total=100 ok=100 fail=0 excluded=0 first_failure=-
 closed_boundary=behavior_sizeof_and_typeof Debug/O0 c_* panic-call unreachable stubs
 
 input=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
-summary total=200 ok=198 fail=2 excluded=0
-first_failure=cases_inherit_want_safety.zig.Debug.x86_64.ll
-first_failure_category=unsupported-control-flow
+summary total=200 ok=199 fail=1 excluded=0
+first_failure=cases_no_compile_panic_for_unchecked_arith.zig.Debug.x86_64.ll
+first_failure_category=unsupported-instruction
 closed_blockers=c_abi_main.zig.Debug.x86_64.ll,
                 cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.Debug.x86_64.ll,
                 cases_address_spaces_pointer_access_chaining_array_pointer.zig.Debug.x86_64.ll,
@@ -628,15 +628,16 @@ closed_blockers=c_abi_main.zig.Debug.x86_64.ll,
                 cases_array_in_anon_struct.zig.Debug.x86_64.ll,
                 cases_blocks.zig.Debug.x86_64.ll,
                 cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll,
-                cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll
+                cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll,
+                cases_inherit_want_safety.zig.Debug.x86_64.ll
 ```
 
 LLVM fallback removed or reduced:
 Advance Debug asm/object evidence beyond the first 100 continuous rows by
 reducing the next selected public shape from
-`cases_inherit_want_safety.zig.Debug.x86_64.ll`, only if it stays bounded. Keep
-broad O0 safety/runtime control flow, full register allocation, and
-runtime/debug infrastructure outside the local
+`cases_no_compile_panic_for_unchecked_arith.zig.Debug.x86_64.ll`, only if it
+stays bounded. Keep broad O0 arithmetic/runtime control flow, full register
+allocation, and runtime/debug infrastructure outside the local
 replacement boundary unless the selected shape proves otherwise.
 
 Mode/target/stage row:
@@ -661,7 +662,7 @@ selected lowering family or to broader Debug/O0 infrastructure.
 
 Validation gate:
 Run a focused probe for
-`cases_inherit_want_safety.zig.Debug.x86_64.ll`,
+`cases_no_compile_panic_for_unchecked_arith.zig.Debug.x86_64.ll`,
 then keep
 `bash scripts/run_distribution_debug_object_m4.sh` and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.

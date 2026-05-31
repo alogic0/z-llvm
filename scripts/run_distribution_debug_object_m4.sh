@@ -114,4 +114,19 @@ rg -q '[[:space:]]spirv_merge_logical_pointers\.a$' "$spirv_pointer_summary"
 rg -q '[[:space:]]ret' "$spirv_pointer_dump"
 printf 'ok distribution debug object spirv_merge_logical_pointers_o0\n'
 
+inherit_fixture="test/distribution/debug_x86_64/inputs/inherit_want_safety_o0.ll"
+inherit_object="$tmp_dir/inherit_want_safety_o0.o"
+inherit_summary="$tmp_dir/inherit_want_safety_o0.readelf.txt"
+inherit_dump="$tmp_dir/inherit_want_safety_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$inherit_fixture" > "$inherit_object"
+readelf -W -h -S -s -r "$inherit_object" > "$inherit_summary"
+objdump -dr "$inherit_object" > "$inherit_dump"
+
+check_common_object "$inherit_summary" entry
+rg -q '[[:space:]]inherit_want_safety\.entry$' "$inherit_summary"
+rg -q 'movabs[[:alpha:]]*[[:space:]]+\$0x4,%rax' "$inherit_dump"
+rg -q '[[:space:]]ret' "$inherit_dump"
+printf 'ok distribution debug object inherit_want_safety_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"
