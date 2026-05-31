@@ -59,11 +59,10 @@ bash scripts/run_handoff_validation.sh
 `scripts/run_distribution_object_m1.sh` emits local x86_64 ELF relocatable
 objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 `.symtab` records, including the selected public alias symbol for each fixture.
-`scripts/run_distribution_executable_m1.sh` links the selected `@add_wrap`,
-`@branch_mix`, `@call_chain`, `@comptime_const`, and `@optional_ptr_value`
-objects, plus `@dense_switch`, with tiny host harnesses and validates
-deterministic return values. Executable checks beyond those aliases remain
-Milestone 2 work.
+`scripts/run_distribution_executable_m1.sh` links all selected public aliases
+with tiny host harnesses and validates deterministic return values, including
+`@sideEffectFree`, `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`,
+`@comptime_const`, `@optional_ptr_value`, and `@dense_switch`.
 
 ## Matrix Result
 
@@ -83,7 +82,7 @@ integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission beyond selected local function aliases
 pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch-table lowering beyond the selected dense constant-return shape
-executable validation beyond the selected `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`, `@optional_ptr_value`, and `@dense_switch` aliases
+executable validation beyond selected Milestone 1 public aliases
 debug/unwind records
 linker behavior
 target-complete ABI lowering
@@ -91,7 +90,8 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The next source-backed blocker is executable callable ABI validation beyond
-`@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`, and
-`@optional_ptr_value`, plus `@dense_switch`. Milestone 2 should close the
-remaining selected `tiny_scalar` aliases, starting with `@add`.
+The next source-backed blocker is broader ReleaseFast object coverage. A broad
+probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
+promotes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` as the first
+remaining object failure, currently blocked on selected i64 aggregate ABI
+lowering.

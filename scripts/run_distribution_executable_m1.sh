@@ -5,6 +5,29 @@ target="${TARGET:-x86_64-unknown-linux-gnu}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
+tiny_scalar_fixture="test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll"
+tiny_scalar_object="$tmp_dir/tiny_scalar.o"
+tiny_scalar_harness="$tmp_dir/tiny_scalar_harness.c"
+tiny_scalar_exe="$tmp_dir/tiny_scalar_harness"
+
+zig build run -- --emit=obj --target="$target" "$tiny_scalar_fixture" > "$tiny_scalar_object"
+
+cat > "$tiny_scalar_harness" <<'C'
+extern void sideEffectFree(void);
+extern int add(int a, int b);
+
+int main(void) {
+    sideEffectFree();
+    if (add(40, 2) != 42) return 1;
+    if (add(-5, 8) != 3) return 2;
+    return 0;
+}
+C
+
+zig cc "$tiny_scalar_harness" "$tiny_scalar_object" -o "$tiny_scalar_exe"
+"$tiny_scalar_exe"
+printf 'ok distribution executable tiny_scalar\n'
+
 add_wrap_fixture="test/distribution/releasefast_x86_64/inputs/integers_add_wrap.ll"
 add_wrap_object="$tmp_dir/integers_add_wrap.o"
 add_wrap_harness="$tmp_dir/add_wrap_harness.c"

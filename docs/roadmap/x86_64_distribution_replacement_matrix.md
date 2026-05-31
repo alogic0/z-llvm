@@ -86,9 +86,8 @@ selected multiply-by-five pattern, global data emission, pointer loads and
 null-branch control flow beyond the selected nullable i32 load, switch-table
 lowering beyond the selected dense constant-return shape, alias/export symbol
 emission beyond selected local function aliases, debug/unwind records, linker
-behavior, executable validation beyond the selected `@add_wrap`, `@branch_mix`,
-`@call_chain`, `@comptime_const`, `@optional_ptr_value`, and `@dense_switch`
-aliases, and target-complete ABI lowering.
+behavior, executable validation beyond selected Milestone 1 public aliases, and
+target-complete ABI lowering.
 
 Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
 ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
@@ -116,7 +115,7 @@ Milestone 1 selected that row and closed the first subset boundary. Milestone 2
 starts from the first remaining blocker:
 
 ```text
-selected ReleaseFast object subset callable ABI check beyond add_wrap, branch_mix, call_chain, comptime_const, optional_ptr_value, and dense_switch
-current blocker=all selected non-tiny_scalar aliases have link-and-run validation
-missing capability=link-and-run validation for tiny_scalar @add and @sideEffectFree
+broader ReleaseFast object coverage
+current blocker=first broad optimized-output object failure is aggregate_abi
+missing capability=selected i64 aggregate ABI lowering
 ```
