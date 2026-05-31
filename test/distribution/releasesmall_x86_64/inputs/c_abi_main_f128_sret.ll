@@ -2,6 +2,7 @@ target triple = "x86_64-unknown-linux-gnu"
 
 %main.f128_f128_struct = type { fp128, fp128 }
 %main.PD = type { ptr, double }
+%Io.LockedStderr = type { ptr }
 
 @__zllvm_f128_cmp0 = private unnamed_addr constant fp128 0xL00000000000000004002A00000000000, align 16
 @__zllvm_f128_cmp1 = private unnamed_addr constant fp128 0xL00000000000000004004C80000000000, align 16
@@ -20,6 +21,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_ret_CFF = alias { i64, float } (), ptr @main.zig_ret_CFF
 @zig_assert_CFF = alias i32 (i64, float), ptr @main.zig_assert_CFF
 @zig_ret_DC = alias { double, i64 } (), ptr @main.zig_ret_DC
+@zig_assert_DC = alias i32 (double, i64), ptr @main.zig_assert_DC
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -128,4 +130,21 @@ define private i32 @main.zig_assert_CFF(i64 %0, float %1) unnamed_addr align 1 {
 define private { double, i64 } @main.zig_ret_DC() unnamed_addr align 1 {
 0:
   ret { double, i64 } { double -2.500000e-01, i64 15 }
+}
+
+define private i32 @main.zig_assert_DC(double %0, i64 %1) unnamed_addr align 1 {
+2:
+  %3 = alloca %Io.LockedStderr, align 8
+  %4 = alloca [64 x i8], align 1
+  %5 = fcmp une double %0, -2.500000e-01
+  %.0 = zext i1 %5 to i32
+  %6 = and i64 %1, 255
+  %.not = icmp eq i64 %6, 15
+  %.1 = select i1 %.not, i32 %.0, i32 2
+  %.not6 = icmp eq i32 %.1, 0
+  br i1 %.not6, label %7, label %8
+7:
+  ret i32 %.1
+8:
+  br label %7
 }

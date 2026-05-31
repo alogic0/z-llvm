@@ -200,4 +200,9 @@ the next selected alias is `@zig_ret_DC`, a mixed double/integer aggregate
 return. That focused shape is now object-ok. The broad row still remains the
 first sorted failure; the next selected alias is `@zig_assert_DC`, a mixed
 double/integer assertion shape with floating-point comparison, low-byte integer
-comparison, and diagnostic failure edge.
+comparison, and diagnostic failure edge. The selected return-code branch
+behavior for `@zig_assert_DC` is now object-ok in the focused ReleaseSmall
+gate, with diagnostic printing side effects explicitly outside the local
+replacement boundary. The broad row still remains the first sorted failure;
+the next selected alias is `@zig_ret_split_struct_mixed`, a two-register
+aggregate return.

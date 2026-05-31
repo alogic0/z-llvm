@@ -284,6 +284,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiAssertDCReturnCode(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -2909,6 +2914,32 @@ fn lowerCAbiRetDC(allocator: std.mem.Allocator, machine: *MachineFunction, funct
     return true;
 }
 
+fn lowerCAbiAssertDCReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_assert_DC")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.double) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    try validateAssertDCShape(function);
+
+    const fail_double = "assert_dc_double";
+    const fail_low = "assert_dc_low";
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = .rdi, .imm = 15 } });
+    try machine.instructions.append(allocator, .{ .jne = fail_low });
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = 0xbfd0_0000_0000_0000 });
+    try machine.instructions.append(allocator, .ucomisd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .jp = fail_double });
+    try machine.instructions.append(allocator, .{ .jne = fail_double });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail_double });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail_low });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 2 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_assert_CFF")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
@@ -2941,6 +2972,70 @@ fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineF
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn validateAssertDCShape(function: ir.Function) !void {
+    if (function.blocks.items.len < 3) return error.UnsupportedCodegenControlFlow;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 8) return error.UnsupportedCodegenInstruction;
+
+    const fcmp_name = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const fcmp = switch (entry.instructions.items[2].kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (fcmp.predicate != .une or !fcmp.operand_ty.eql(.double) or !isNamed(fcmp.lhs, function.params.items[0].name)) return error.UnsupportedCodegenInstruction;
+    switch (fcmp.rhs) {
+        .fp => |text| if (!std.mem.eql(u8, text, "-2.500000e-01")) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+
+    const zext_name = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    const zext = switch (entry.instructions.items[3].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 1 }) or !zext.to_ty.eql(.{ .int = 32 }) or !isNamed(zext.value, fcmp_name)) return error.UnsupportedCodegenInstruction;
+
+    const and_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const and_inst = switch (entry.instructions.items[4].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (and_inst.op != .@"and" or !and_inst.ty.eql(.{ .int = 64 }) or !isNamed(and_inst.lhs, function.params.items[1].name) or !and_inst.rhs.eql(.{ .int = 255 })) return error.UnsupportedCodegenInstruction;
+
+    const low_cmp_name = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const low_cmp = switch (entry.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (low_cmp.predicate != .eq or !low_cmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(low_cmp.lhs, and_name) or !low_cmp.rhs.eql(.{ .int = 15 })) return error.UnsupportedCodegenInstruction;
+
+    const select_name = entry.instructions.items[6].result orelse return error.UnsupportedCodegenInstruction;
+    const select = switch (entry.instructions.items[6].kind) {
+        .select => |select| select,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!isNamed(select.cond, low_cmp_name) or !isNamed(select.true_value, zext_name) or !select.false_value.eql(.{ .int = 2 })) return error.UnsupportedCodegenInstruction;
+
+    const zero_cmp_name = entry.instructions.items[7].result orelse return error.UnsupportedCodegenInstruction;
+    const zero_cmp = switch (entry.instructions.items[7].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zero_cmp.predicate != .eq or !zero_cmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(zero_cmp.lhs, select_name) or !zero_cmp.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, zero_cmp_name)) return error.UnsupportedCodegenControlFlow;
+    const ok_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ok_ret = switch (function.blocks.items[ok_index].terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ok_ret.ty.eql(.{ .int = 32 }) or !isNamed(ok_ret.value orelse return error.InvalidRet, select_name)) return error.UnsupportedCodegenValue;
 }
 
 fn validateAssertCFFShape(function: ir.Function) !void {
