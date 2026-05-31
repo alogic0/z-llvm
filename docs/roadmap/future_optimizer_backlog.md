@@ -525,7 +525,10 @@ adjusted ReleaseSmall object probe is 461 successes, 3 failures, and 1
 excluded row. The next sorted implementation blocker is
 `standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
 alias is `@runner_futex_wait -> @main.runner_futex_wait`, an i1 constant
-return.
+return. That focused shape is now object-ok, but the broad row still fails on
+the next selected public alias:
+`@runner_test_name -> @main.runner_test_name`, a string-slice aggregate return
+for the `"test"` name.
 
 ## Activation Rule
 

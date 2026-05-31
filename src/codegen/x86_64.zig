@@ -843,6 +843,7 @@ fn lowerStraightLineReturn(
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
@@ -876,6 +877,27 @@ fn lowerSelectedI64ConstReturn(
     };
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(value) });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSelectedI1ConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main.runner_futex_wait")) return false;
+    if (!ret.ty.eql(.{ .int = 1 })) return false;
+    if (function.params.items.len != 2 or block.instructions.items.len != 0) return false;
+    const value = switch (ret.value orelse return error.InvalidRet) {
+        .int => |int| int,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (value != 0 and value != 1) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(value) });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

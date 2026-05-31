@@ -160,6 +160,7 @@ intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
 current_adjusted_object_probe=461 ok, 3 fail, 1 excluded with --input-limit=67108864
 first_adjusted_blocker=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@runner_futex_wait -> @main.runner_futex_wait
-missing capability=selected i1 constant return lowering
+closed_alias_in_blocker=@runner_futex_wait -> @main.runner_futex_wait i1 constant return
+selected_alias=@runner_test_name -> @main.runner_test_name
+missing capability=selected string-slice aggregate return lowering
 ```

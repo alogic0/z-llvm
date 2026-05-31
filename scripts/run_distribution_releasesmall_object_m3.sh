@@ -431,3 +431,21 @@ rg -q 'jmp[[:space:]]+0 <_start>' "$start_loop_dump"
 rg -q '[[:space:]]ud2' "$start_loop_dump"
 
 printf 'ok distribution releasesmall object standalone_install_raw_hex_start_loop\n'
+
+libfuzzer_wait_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll"
+libfuzzer_wait_object="$tmp_dir/standalone_libfuzzer_runner_futex_wait.o"
+libfuzzer_wait_summary="$tmp_dir/standalone_libfuzzer_runner_futex_wait.readelf.txt"
+libfuzzer_wait_dump="$tmp_dir/standalone_libfuzzer_runner_futex_wait.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$libfuzzer_wait_fixture" > "$libfuzzer_wait_object"
+readelf -W -h -S -s -r "$libfuzzer_wait_object" > "$libfuzzer_wait_summary"
+objdump -dr "$libfuzzer_wait_object" > "$libfuzzer_wait_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$libfuzzer_wait_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$libfuzzer_wait_summary"
+rg -q '[[:space:]]runner_futex_wait$' "$libfuzzer_wait_summary"
+rg -q '[[:space:]]main\.runner_futex_wait$' "$libfuzzer_wait_summary"
+rg -q 'mov[[:alpha:]]*[[:space:]]+\$0x0,%eax' "$libfuzzer_wait_dump"
+rg -q '[[:space:]]ret' "$libfuzzer_wait_dump"
+
+printf 'ok distribution releasesmall object standalone_libfuzzer_runner_futex_wait\n'
