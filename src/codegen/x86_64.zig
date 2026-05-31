@@ -155,6 +155,7 @@ pub const Instruction = union(enum) {
     imul_eax_imm32: i32,
     shl_rdx_imm6: u6,
     or_rdx_rax,
+    add_rax_imm8: u8,
     add_ecx_eax,
     xor_ecx_ecx,
     xor_ebp_ebp,
@@ -181,8 +182,11 @@ pub const Instruction = union(enum) {
         imm: u16,
     },
     cmp_rdi_imm64: i64,
+    cmp_rdx_rdi,
     cmp_rax_rdx,
     test_eax_eax,
+    test_rax_rax,
+    test_rdx_rdx,
     mulsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
@@ -217,6 +221,7 @@ pub const Instruction = union(enum) {
     reload_rsp_eax: FrameIndex,
     load_stack_disp8_rax: u8,
     load_rax_ptr_disp8_rax: u8,
+    load_rax_ptr_rdx,
     load_arg_ptr_eax: ArgReg,
     load_arg_ptr_disp8_rax: struct {
         reg: ArgReg,
@@ -250,6 +255,7 @@ pub const Instruction = union(enum) {
     },
     volatile_roundtrip_rdi_esi_eax,
     load_global_i32_eax: []const u8,
+    load_global_ptr_rax: []const u8,
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
     store_eax_tls_i32: []const u8,
@@ -273,6 +279,7 @@ pub const Instruction = union(enum) {
     jo: []const u8,
     jp: []const u8,
     js: []const u8,
+    jmp: []const u8,
     ud2,
     ret,
 };
@@ -688,6 +695,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerStartTrampoline(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerGetauxvalImpl(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -4618,6 +4630,57 @@ fn validateStartTrampolineInlineAsm(instruction: ir.Instruction) ![]const u8 {
     return call_target[1..];
 }
 
+fn lowerGetauxvalImpl(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "os.linux.getauxvalImpl")) return false;
+    if (!function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 64 })) return false;
+    try validateGetauxvalShape(function);
+
+    try machine.instructions.append(allocator, .{ .load_global_ptr_rax = "os.linux.elf_aux_maybe" });
+    try machine.instructions.append(allocator, .test_rax_rax);
+    try machine.instructions.append(allocator, .{ .je = "zero" });
+    try machine.instructions.append(allocator, .{ .label = "loop" });
+    try machine.instructions.append(allocator, .load_rax_ptr_rdx);
+    try machine.instructions.append(allocator, .test_rdx_rdx);
+    try machine.instructions.append(allocator, .{ .je = "zero" });
+    try machine.instructions.append(allocator, .cmp_rdx_rdi);
+    try machine.instructions.append(allocator, .{ .je = "found" });
+    try machine.instructions.append(allocator, .{ .add_rax_imm8 = 16 });
+    try machine.instructions.append(allocator, .{ .jmp = "loop" });
+    try machine.instructions.append(allocator, .{ .label = "found" });
+    try machine.instructions.append(allocator, .{ .load_rax_ptr_disp8_rax = 8 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = "zero" });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateGetauxvalShape(function: ir.Function) !void {
+    if (function.blockIndex("common.ret") == null or function.blockIndex(".preheader") == null) return error.UnsupportedCodegenControlFlow;
+    if (function.blockIndex("8") == null) return error.UnsupportedCodegenControlFlow;
+
+    var saw_global_load = false;
+    var saw_tag_load = false;
+    var saw_value_load = false;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .load => |load| {
+                    if (load.ty == .ptr and isNamed(load.ptr, "@os.linux.elf_aux_maybe")) saw_global_load = true;
+                    if (load.ty.eql(.{ .int = 64 }) and instruction.result != null) {
+                        if (isNamed(load.ptr, "3")) saw_tag_load = true;
+                        if (isNamed(load.ptr, "9")) saw_value_load = true;
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+    if (!saw_global_load or !saw_tag_load or !saw_value_load) return error.UnsupportedCodegenControlFlow;
+}
+
 fn appendCompareStackByval64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -5512,7 +5575,7 @@ fn u5Value(value: i128) !u5 {
 
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
-        .je, .jne, .jo, .jp, .js => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
+        .je, .jne, .jo, .jp, .js, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .label,
         .mov_imm_eax,
         .mov_imm_rax,
@@ -5527,6 +5590,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .imul_eax_imm32,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .add_rax_imm8,
         .add_ecx_eax,
         .xor_ecx_ecx,
         .xor_ebp_ebp,
@@ -5542,8 +5606,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cmp_arg64_imm64,
         .cmp_arg16_imm16,
         .cmp_rdi_imm64,
+        .cmp_rdx_rdi,
         .cmp_rax_rdx,
         .test_eax_eax,
+        .test_rax_rax,
+        .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,
@@ -5569,6 +5636,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_rax_ptr_disp8_rax,
+        .load_rax_ptr_rdx,
         .load_arg_ptr_eax,
         .load_arg_ptr_disp8_rax,
         .load_arg_ptr_disp8_u8_eax,
@@ -5582,6 +5650,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .store_f128_xmm0_arg_ptr,
         .volatile_roundtrip_rdi_esi_eax,
         .load_global_i32_eax,
+        .load_global_ptr_rax,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .store_eax_tls_i32,
@@ -5606,7 +5675,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -5634,7 +5703,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .mov_rsp_rdi, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -5666,6 +5735,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .imul_eax_imm32,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .add_rax_imm8,
         .add_ecx_eax,
         .xor_ecx_ecx,
         .xor_ebp_ebp,
@@ -5681,8 +5751,11 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cmp_arg64_imm64,
         .cmp_arg16_imm16,
         .cmp_rdi_imm64,
+        .cmp_rdx_rdi,
         .cmp_rax_rdx,
         .test_eax_eax,
+        .test_rax_rax,
+        .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,
@@ -5708,6 +5781,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_rsp_eax,
         .load_stack_disp8_rax,
         .load_rax_ptr_disp8_rax,
+        .load_rax_ptr_rdx,
         .load_arg_ptr_eax,
         .load_arg_ptr_disp8_rax,
         .load_arg_ptr_disp8_u8_eax,
@@ -5721,6 +5795,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .store_f128_xmm0_arg_ptr,
         .volatile_roundtrip_rdi_esi_eax,
         .load_global_i32_eax,
+        .load_global_ptr_rax,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .store_eax_tls_i32,
@@ -5741,6 +5816,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .jo,
         .jp,
         .js,
+        .jmp,
         .ret,
         => {},
     };

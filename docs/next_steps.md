@@ -13,8 +13,9 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@start.posixCallMainAndExit` startup runtime control-flow shape from
-`cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@elemPtr` alias / `@illegal_operation_on_logical_ptr.elemPtr` noreturn
+unreachable stub from
+`cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -407,14 +408,14 @@ row still remains the first object failure; the next selected public shape is
 branch-to-return-or-trap shape. That focused shape is now object-ok through
 the selected 64-bit scalar branch path. The broad row still remains the first
 object failure; the next selected public shape is `@zig_u32 = alias void
-(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 8-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers`, a five-argument integer equality ladder ending in return-or-trap. That focused shape is now object-ok with selected integer argument comparisons through `%r8d` and a local trap failure edge. The broad row still remains the first object failure; the next selected public shape is `@zig_panic = alias void (), ptr @main.zig_panic`, a noreturn panic stub ending in unreachable. That focused shape is now object-ok through a selected local `ud2` panic stub, and the broad `c_abi_main` row is object-clean. The current ReleaseSmall object probe is 266 object successes and 199 object failures. The next sorted failure is `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public entry shape is `@_start = alias void (), ptr @start._start`, a naked startup inline-asm trampoline that calls `@start.posixCallMainAndExit` and ends in `unreachable`. That focused shape is now object-ok with selected startup trampoline lowering and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The current ReleaseSmall object probe is 327 object successes and 138 object failures. The next sorted failure is `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll`; the selected function is `@start.posixCallMainAndExit`, the Linux startup runtime control-flow shape that scans auxv, initializes TLS state, issues selected syscalls through inline asm, and branches through multiple noreturn startup paths.
+(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 8-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers`, a five-argument integer equality ladder ending in return-or-trap. That focused shape is now object-ok with selected integer argument comparisons through `%r8d` and a local trap failure edge. The broad row still remains the first object failure; the next selected public shape is `@zig_panic = alias void (), ptr @main.zig_panic`, a noreturn panic stub ending in unreachable. That focused shape is now object-ok through a selected local `ud2` panic stub, and the broad `c_abi_main` row is object-clean. The current ReleaseSmall object probe is 266 object successes and 199 object failures. The next sorted failure is `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public entry shape is `@_start = alias void (), ptr @start._start`, a naked startup inline-asm trampoline that calls `@start.posixCallMainAndExit` and ends in `unreachable`. That focused shape is now object-ok with selected startup trampoline lowering and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The current ReleaseSmall object probe is 327 object successes and 138 object failures. The actual next alias-target blocker in `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll` is `@getauxval = weak_odr alias i64 (i64), ptr @os.linux.getauxvalImpl`; the selected auxv scan shape is now object-ok with a PC-relative load of `@os.linux.elf_aux_maybe` and a bounded tag/value loop. The current ReleaseSmall object probe is 455 object successes and 10 object failures. The next sorted failure is `cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public shape is `@elemPtr = alias void (), ptr @illegal_operation_on_logical_ptr.elemPtr`, an empty noreturn compile-error stub ending in `unreachable`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@start.posixCallMainAndExit` startup runtime control-flow shape. This
+`@elemPtr` noreturn unreachable stub shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
-flow, complete Zig startup/runtime ownership, inline-asm generality,
+flow, complete Zig startup/runtime ownership, broad compile-error lowering,
 non-x86_64 ABI behavior, debug records, unwind records, linker ownership, or
 target-complete ABI behavior.
 
@@ -428,18 +429,18 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-startup runtime shape, also map against SelectionDAG CFG lowering, inline
-assembly syscall lowering, and x86 MC instruction emission in
+unreachable stub shape, also map against SelectionDAG unreachable lowering and
+x86 trap/MC instruction emission in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@start.posixCallMainAndExit` ReleaseSmall startup
-runtime shape from the `cases_array_in_anon_struct` optimized output. Do not
-generalize to arbitrary inline asm, complete Zig startup/TLS/syscall behavior,
-all indirect runtime calls, debug/unwind object records, or non-x86_64 ABI
-behavior in this slice.
+Implement only the selected `@elemPtr` alias to
+`@illegal_operation_on_logical_ptr.elemPtr` ReleaseSmall empty noreturn
+unreachable stub. Do not generalize to arbitrary compile-error lowering,
+panic/reporting paths, debug/unwind object records, or non-x86_64 ABI behavior
+in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

@@ -477,5 +477,12 @@ That focused shape is now object-ok with selected startup trampoline lowering
 and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The
 current ReleaseSmall object probe is 327 successes and 138 failures. The next
 sorted failure is `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll`;
-the selected function is `@start.posixCallMainAndExit`, a Linux startup
-runtime TLS/syscall/control-flow shape.
+the selected alias target is `@getauxval -> @os.linux.getauxvalImpl`, an auxv
+scan loop over `@os.linux.elf_aux_maybe`.
+That focused shape is now object-ok with PC-relative global-pointer load,
+tag/value loop lowering, and a `getauxval` public alias. The current
+ReleaseSmall object probe is 455 successes and 10 failures. The next sorted
+failure is
+`cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`;
+the selected alias is `@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr`,
+an empty noreturn unreachable compile-error stub.

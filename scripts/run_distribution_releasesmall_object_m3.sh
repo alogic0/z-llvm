@@ -295,3 +295,27 @@ rg -q 'and[[:alpha:]]*[[:space:]]+\$0xfffffffffffffff0,%rsp' "$start_dump"
 rg -q 'R_X86_64_PLT32[[:space:]]+start\.posixCallMainAndExit' "$start_dump"
 
 printf 'ok distribution releasesmall object address_space_start_trampoline\n'
+
+getauxval_fixture="test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll"
+getauxval_object="$tmp_dir/array_in_anon_struct_getauxval.o"
+getauxval_summary="$tmp_dir/array_in_anon_struct_getauxval.readelf.txt"
+getauxval_dump="$tmp_dir/array_in_anon_struct_getauxval.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$getauxval_fixture" > "$getauxval_object"
+readelf -W -h -S -s -r "$getauxval_object" > "$getauxval_summary"
+objdump -dr "$getauxval_object" > "$getauxval_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$getauxval_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$getauxval_summary"
+rg -q '[[:space:]]getauxval$' "$getauxval_summary"
+rg -q '[[:space:]]os\.linux\.getauxvalImpl$' "$getauxval_summary"
+rg -q '[[:space:]]os\.linux\.elf_aux_maybe$' "$getauxval_summary"
+rg -q 'R_X86_64_PC32.*os\.linux\.elf_aux_maybe' "$getauxval_summary"
+rg -q 'mov[[:alpha:]]*[[:space:]]+0x0\(%rip\),%rax' "$getauxval_dump"
+rg -q 'test[[:alpha:]]*[[:space:]]+%rax,%rax' "$getauxval_dump"
+rg -q 'mov[[:alpha:]]*[[:space:]]+\(%rax\),%rdx' "$getauxval_dump"
+rg -q 'cmp[[:alpha:]]*[[:space:]]+%rdi,%rdx' "$getauxval_dump"
+rg -q 'add[[:alpha:]]*[[:space:]]+\$0x10,%rax' "$getauxval_dump"
+rg -q 'mov[[:alpha:]]*[[:space:]]+0x8\(%rax\),%rax' "$getauxval_dump"
+
+printf 'ok distribution releasesmall object array_in_anon_struct_getauxval\n'

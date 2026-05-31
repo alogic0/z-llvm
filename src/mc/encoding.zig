@@ -59,6 +59,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.append(allocator, amount);
             },
             .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
+            .add_rax_imm8 => |value| try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc0, value }),
             .add_ecx_eax => try bytes.appendSlice(allocator, &.{ 0x01, 0xc8 }),
             .xor_ecx_ecx => try bytes.appendSlice(allocator, &.{ 0x31, 0xc9 }),
             .xor_ebp_ebp => try bytes.appendSlice(allocator, &.{ 0x31, 0xed }),
@@ -95,8 +96,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendU64(&bytes, allocator, @bitCast(value));
                 try bytes.appendSlice(allocator, &.{ 0x48, 0x39, 0xc7 });
             },
+            .cmp_rdx_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x39, 0xfa }),
             .cmp_rax_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x39, 0xd0 }),
             .test_eax_eax => try bytes.appendSlice(allocator, &.{ 0x85, 0xc0 }),
+            .test_rax_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x85, 0xc0 }),
+            .test_rdx_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x85, 0xd2 }),
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
@@ -149,6 +153,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                     try bytes.append(allocator, disp);
                 }
             },
+            .load_rax_ptr_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x10 }),
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .load_arg_ptr_disp8_rax => |load| try encodeArgPtrDisp8ToRax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u8_eax => |load| try encodeArgPtrDisp8U8ToEax(&bytes, allocator, load.reg, load.offset),
@@ -162,6 +167,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .store_f128_xmm0_arg_ptr => |store| try encodeF128Xmm0ToArgPtr(&bytes, allocator, store.reg, store.offset),
             .volatile_roundtrip_rdi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0x37, 0x8b, 0x07 }),
             .load_global_i32_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x05, 0, 0, 0, 0 }),
+            .load_global_ptr_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x05, 0, 0, 0, 0 }),
             .store_eax_global_i32 => try bytes.appendSlice(allocator, &.{ 0x89, 0x05, 0, 0, 0, 0 }),
             .load_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
             .store_eax_tls_i32 => try bytes.appendSlice(allocator, &.{ 0x64, 0x89, 0x04, 0x25, 0, 0, 0, 0 }),
@@ -217,6 +223,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x88 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jmp => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.append(allocator, 0xe9);
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .ret => try bytes.append(allocator, 0xc3),
         }
         offset += instructionSize(instruction);
@@ -241,6 +255,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .imul_eax_imm32 => 6,
         .shl_rdx_imm6 => 4,
         .or_rdx_rax => 3,
+        .add_rax_imm8 => 4,
         .add_ecx_eax => 2,
         .xor_ecx_ecx => 2,
         .xor_ebp_ebp => 2,
@@ -258,8 +273,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .cmp_arg64_imm64 => |cmp| if (cmp.reg.rexB()) 14 else 13,
         .cmp_arg16_imm16 => |cmp| if (cmp.reg.rexB()) 6 else 5,
         .cmp_rdi_imm64 => 13,
+        .cmp_rdx_rdi => 3,
         .cmp_rax_rdx => 3,
         .test_eax_eax => 2,
+        .test_rax_rax, .test_rdx_rdx => 3,
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
         .subss_xmm1_xmm0 => 4,
@@ -282,6 +299,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .reload_rsp_eax => 3,
         .load_stack_disp8_rax => 5,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
+        .load_rax_ptr_rdx => 3,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .load_arg_ptr_disp8_rax => |load| 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,
@@ -294,6 +312,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_f128_xmm0_arg_ptr => |store| f128ArgPtrInstructionSize(store.reg, store.offset),
         .volatile_roundtrip_rdi_esi_eax => 4,
         .load_global_i32_eax, .store_eax_global_i32 => 6,
+        .load_global_ptr_rax => 7,
         .load_tls_i32_eax, .store_eax_tls_i32 => 8,
         .atomic_xadd_global_eax => 8,
         .mov_rsp_rdi => 3,
@@ -305,6 +324,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg64 => 3,
         .ud2 => 2,
         .je, .jne, .jo, .jp, .js => 6,
+        .jmp => 5,
         .ret => 1,
     };
 }

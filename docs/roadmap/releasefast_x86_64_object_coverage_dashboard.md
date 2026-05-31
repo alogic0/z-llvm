@@ -78,8 +78,10 @@ closed_failure_12=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_12=selected public c_abi_main aliases through @zig_panic
 closed_failure_13=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_13=@_start -> @start._start
-current_object_probe=327 object-ok, 138 object-fail
-first_failure=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll
-selected_function=@start.posixCallMainAndExit
-missing_capability=ReleaseSmall startup runtime TLS/syscall/control-flow lowering
+closed_failure_14=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_14=@getauxval -> @os.linux.getauxvalImpl
+current_object_probe=455 object-ok, 10 object-fail
+first_failure=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
+missing_capability=ReleaseSmall empty noreturn unreachable stub lowering
 ```
