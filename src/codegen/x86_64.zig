@@ -4480,7 +4480,8 @@ fn lowerCAbiI16(allocator: std.mem.Allocator, machine: *MachineFunction, functio
 }
 
 fn lowerCAbiI8(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_i8")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_i8") and
+        !std.mem.eql(u8, function.name, "main.zig_u8")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 1) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 8 })) return error.UnsupportedCodegenType;

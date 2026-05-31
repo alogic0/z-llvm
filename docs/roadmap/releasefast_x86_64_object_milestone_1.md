@@ -459,3 +459,7 @@ alias is `@zig_u16`, a u16 equality branch-to-return-or-trap shape.
 That focused shape is now object-ok through the selected 16-bit scalar branch
 path. The broad row still remains the first sorted failure; the next selected
 alias is `@zig_u8`, a u8 equality branch-to-return-or-trap shape.
+That focused shape is now object-ok through the selected 8-bit scalar branch
+path. The broad row still remains the first sorted failure; the next selected
+alias is `@zig_five_integers`, a five-argument integer equality ladder ending
+in return-or-trap.
