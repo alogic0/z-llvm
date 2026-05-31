@@ -55,8 +55,10 @@ closed_failure_3=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_3=@loop_sum,@call_chain
 closed_failure_4=error_switch.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_4=@error_switch
-current_probe=12 object-ok, 5 object-fail
-first_failure=globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll
-selected_alias=@comptime_const
-missing_capability=ReleaseSafe checked multiply-by-constant and panic-edge lowering
+closed_failure_5=globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll
+closed_aliases_5=@comptime_const,@update_global,@read_global
+current_probe=13 object-ok, 4 object-fail
+first_failure=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@load_store
+missing_capability=ReleaseSafe checked pointer load/add/store and panic-edge lowering
 ```

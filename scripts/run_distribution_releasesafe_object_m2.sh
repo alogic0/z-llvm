@@ -183,3 +183,53 @@ C
 zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
 "$error_switch_exe"
 printf 'ok distribution releasesafe object error_switch_select\n'
+
+globals_fixture="test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll"
+globals_object="$tmp_dir/globals_comptime_checked.o"
+globals_summary="$tmp_dir/globals_comptime_checked.readelf.txt"
+globals_dump="$tmp_dir/globals_comptime_checked.objdump.txt"
+globals_harness="$tmp_dir/globals_comptime_checked_harness.c"
+globals_exe="$tmp_dir/globals_comptime_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$globals_fixture" > "$globals_object"
+readelf -W -h -S -s -r "$globals_object" > "$globals_summary"
+objdump -dr "$globals_object" > "$globals_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$globals_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$globals_summary"
+rg -q '[[:space:]]comptime_const$' "$globals_summary"
+rg -q '[[:space:]]update_global$' "$globals_summary"
+rg -q '[[:space:]]read_global$' "$globals_summary"
+rg -q '[[:space:]]globals_comptime\.global_counter$' "$globals_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$globals_summary"
+rg -q "R_X86_64_PC32.*globals_comptime\\.global_counter - 4" "$globals_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$globals_dump"
+
+cat > "$globals_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t comptime_const(int32_t value);
+extern int32_t update_global(int32_t value);
+extern int32_t read_global(void);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    if (comptime_const(0) != 0) return 1;
+    if (comptime_const(7) != 35) return 2;
+    if (comptime_const(-3) != -15) return 3;
+    if (read_global() != 3) return 4;
+    if (update_global(4) != 7) return 5;
+    if (read_global() != 7) return 6;
+    if (update_global(-2) != 5) return 7;
+    if (read_global() != 5) return 8;
+    return 0;
+}
+C
+
+zig cc "$globals_harness" "$globals_object" -o "$globals_exe"
+"$globals_exe"
+printf 'ok distribution releasesafe object globals_comptime_checked\n'

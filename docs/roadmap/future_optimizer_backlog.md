@@ -142,7 +142,11 @@ probe is 11 successes and 6 failures. The selected
 straight-line `@error_switch` `icmp`/`select` lowering. The current probe is 12
 successes and 5 failures. The first sorted blocker is
 `globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll`, selected
-`@comptime_const` checked multiply-by-constant and panic-edge lowering.
+`@comptime_const` checked multiply-by-constant and panic-edge lowering. That
+blocker is now object-ok for `@comptime_const`, `@update_global`, and
+`@read_global`. The current probe is 13 successes and 4 failures. The first
+sorted blocker is `pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll`,
+selected `@load_store` checked pointer load/add/store and panic-edge lowering.
 
 ## Activation Rule
 

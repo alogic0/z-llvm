@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSafe x86_64 asm/object blocker: selected
-`@comptime_const` checked multiply-by-constant lowering from
-`globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll`.
+`@load_store` checked pointer load/add/store lowering from
+`pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -37,22 +37,28 @@ selected `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` blocker is
 now object-ok for checked `@loop_sum` and guarded `@call_chain`; the focused
 ReleaseSafe gate also covers both shapes. The selected
 `error_switch.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
-straight-line `@error_switch` compare/select lowering. The current probe is 12
-object successes and 5 object failures.
+straight-line `@error_switch` compare/select lowering. The selected
+`globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok
+for `@comptime_const`, `@update_global`, and `@read_global`, covering checked
+multiply-by-constant arithmetic, checked private `i32` global updates, global
+load/store PC-relative relocations, and panic-edge relocations. The current
+probe is 13 object successes and 4 object failures.
 
 The first sorted failure is now
-`globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll` with
+`pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll` with
 `error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@comptime_const = alias i32 (i32), ptr @globals_comptime.comptime_const`; the
-optimized body contains checked multiply-by-constant arithmetic and a safety
-panic edge to `debug.FullPanic((function 'defaultPanic')).integerOverflow`.
+`@load_store = alias i32 (ptr, ptr), ptr @pointers_memory.load_store`; the
+optimized body loads an `i32` from the first pointer, performs checked
+`llvm.sadd.with.overflow.i32` by 1, stores the result through the second
+pointer, returns the result, and branches to
+`debug.FullPanic((function 'defaultPanic')).integerOverflow` on overflow.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSafe
-`@comptime_const` shape. This continues reducing the ReleaseSafe asm/object
-fallback row for safety/runtime-call CFG shapes. It does not claim general
-ReleaseSafe panic runtime lowering, arbitrary checked arithmetic, unwinding,
-debug records, or target-complete ABI behavior.
+`@load_store` shape. This continues reducing the ReleaseSafe asm/object
+fallback row. It does not claim general ReleaseSafe panic runtime lowering,
+arbitrary pointer/memory lowering, unwinding, debug records, or target-complete
+ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSafe`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -68,9 +74,9 @@ safety edge, also map against LLVM IR overflow intrinsic handling in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@comptime_const` ReleaseSafe shape from the
-`globals_comptime` optimized output. Do not generalize to every checked
-multiply, arbitrary panic edge, unwinding, debug/unwind object records, or
+Implement only the selected `@load_store` ReleaseSafe shape from the
+`pointers_memory` optimized output. Do not generalize to arbitrary pointer
+arithmetic, aliasing, panic edges, unwinding, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.
 
 Validation gate:

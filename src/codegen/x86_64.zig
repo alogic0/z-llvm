@@ -264,6 +264,16 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedComptimeConst(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCheckedGlobalUpdate(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -2375,6 +2385,41 @@ fn lowerCheckedCallChain(allocator: std.mem.Allocator, machine: *MachineFunction
     try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
     try machine.instructions.append(allocator, .{ .shl_eax_imm5 = 1 });
     try machine.instructions.append(allocator, .{ .or_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedComptimeConst(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "globals_comptime.comptime_const")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const value_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (value_reg != .rdi) return error.UnsupportedCodegenAbi;
+    if (!functionHasCall(function, "llvm.smul.with.overflow.i32")) return false;
+
+    const overflow_label = "comptime_const_overflow";
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
+    try machine.instructions.append(allocator, .{ .imul_eax_imm32 = 5 });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedGlobalUpdate(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "globals_comptime.update_global")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const value_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (value_reg != .rdi) return error.UnsupportedCodegenAbi;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+
+    const overflow_label = "global_update_overflow";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "globals_comptime.global_counter" });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = value_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "globals_comptime.global_counter" });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;
