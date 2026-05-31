@@ -115,6 +115,11 @@ tmp/zig_ir/optimized_cfg_releasefast_20260530
 No prior optimized-output artifact directory existed for a historical diff, so
 this baseline does not promote a handoff/codegen gate by itself.
 
+Milestone 1 for `ReleaseFast / x86_64-linux-gnu / asm-object` now records a
+conservative boundary for the selected Zig-backed object subset in
+`docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The first uncovered
+blocker is `switch_control_branch_mix`, a `select` feeding integer arithmetic.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete

@@ -1,0 +1,8 @@
+id	input	validation	expected_status	source_row	shape
+tiny_scalar	test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll	object-readelf	object-ok	tiny_scalar.zig	scalar arithmetic and void return
+integers_add_wrap	test/distribution/releasefast_x86_64/inputs/integers_add_wrap.ll	object-readelf	object-ok	integers.zig	scalar wrapping add
+switch_control_branch_mix	test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll	known-blocker	UnsupportedCodegenInstruction	switch_control.zig	branch/select lowered to select plus add
+control_flow_calls_call_chain	test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll	known-blocker	UnsupportedCodegenValue	control_flow_calls.zig	shift and or arithmetic
+globals_comptime_const	test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll	known-blocker	UnsupportedCodegenInstruction	globals_comptime.zig	mul by constant
+optional_pointer_value	test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll	known-blocker	UnsupportedCodegenControlFlow	optional_pointer.zig	null branch and pointer load
+switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll	known-blocker	UnsupportedCodegenControlFlow	switch_control.zig	switch table load and phi merge

@@ -19,7 +19,7 @@ out of scope: not part of the current x86_64 milestone
 | Mode | Parse | Verify | Optimize | Handoff | Asm/Object |
 | --- | --- | --- | --- | --- | --- |
 | Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | LLVM fallback required |
-| ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
+| ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
 | ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
 
@@ -73,9 +73,18 @@ handoff gate now proves that a metadata-only accepted optimized module emits no
 assembly and still produces an x86_64 ELF relocatable object with `.text` and
 `.symtab` records.
 
-Asm/object remains LLVM fallback required for all distribution modes because the
-local x86_64 codegen, assembly, and ELF object paths are validation fixtures
-only. Existing docs explicitly exclude broad register allocation, scheduling,
+ReleaseFast asm/object is now a conservative boundary for the selected
+Zig-backed optimized-output subset recorded in
+`docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The object-ready subset
+covers empty modules, `tiny_scalar`, and `integers_add_wrap`. It explicitly
+excludes branch/select lowering, variable shift/or chains, integer multiply by
+constant, global data and alias/export symbol emission, pointer loads,
+switch-table lowering, debug/unwind records, linker behavior, and
+target-complete ABI lowering.
+
+Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
+ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
+Existing docs explicitly exclude broad register allocation, scheduling,
 debug/unwind object records, linker ownership, and target-complete ABI lowering.
 
 ## First Fallback Row
@@ -94,3 +103,12 @@ distribution path. The next bounded slice should not attempt broad backend
 parity. It should reduce one concrete accepted ReleaseFast optimized-output
 shape that cannot pass the existing x86_64 handoff or asm/object validation
 subset, then add the smallest fixture and validation gate for that shape.
+
+Milestone 1 selected that row and closed the first subset boundary. Milestone 2
+starts from the first remaining blocker:
+
+```text
+test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll
+current blocker=UnsupportedCodegenInstruction
+missing capability=x86_64 lowering for select feeding integer arithmetic
+```
