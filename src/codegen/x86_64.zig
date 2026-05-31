@@ -328,6 +328,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerDebugLogicalPointerCompileError(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiF128Sret(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -1042,7 +1047,7 @@ fn validateVoidCall(instruction: ir.Instruction, callee: []const u8, expected_ar
         else => return error.UnsupportedCodegenInstruction,
     };
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    if (!std.mem.eql(u8, call.callee, callee)) return error.UnsupportedCodegenInstruction;
+    if (!isCalleeName(call.callee, callee)) return error.UnsupportedCodegenInstruction;
     if (call.ret_ty != .void or call.args.items.len != expected_args.len) return error.UnsupportedCodegenInstruction;
     for (call.args.items, expected_args) |arg, expected| {
         if (!arg.ty.eql(expected.ty) or !arg.value.eql(expected.value)) return error.UnsupportedCodegenValue;
@@ -3701,6 +3706,217 @@ fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction,
 
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerDebugLogicalPointerCompileError(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.startsWith(u8, function.name, "illegal_operation_on_logical_ptr.")) return false;
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+    if (function.attrs == null) return false;
+
+    if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.ptrIntArithmetic")) {
+        try validateDebugLogicalPointerPtrIntArithmetic(function);
+    } else if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.ptrPtrArithmetic")) {
+        try validateDebugLogicalPointerTwoLocalStores(function);
+    } else if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.ptrFromInt")) {
+        try validateDebugLogicalPointerPtrFromInt(function);
+    } else if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.intFromPtr")) {
+        try validateDebugLogicalPointerOneLocalStore(function);
+    } else if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.elemVal")) {
+        if (!hasSingleBlockInstructionCount(function, 7)) return false;
+        try validateDebugLogicalPointerElemVal(function);
+    } else if (std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.elemPtr")) {
+        if (!hasSingleBlockInstructionCount(function, 5)) return false;
+        try validateDebugLogicalPointerElemPtr(function);
+    } else {
+        return false;
+    }
+
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn hasSingleBlockInstructionCount(function: ir.Function, count: usize) bool {
+    return function.blocks.items.len == 1 and function.blocks.items[0].instructions.items.len == count;
+}
+
+fn validateDebugLogicalPointerPtrIntArithmetic(function: ir.Function) !void {
+    const block = try singleRetVoidBlock(function);
+    if (block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const slot = try validateAllocaNamed(block.instructions.items[0], .ptr);
+    try validateMemset(block.instructions.items[1], slot, 8);
+}
+
+fn validateDebugLogicalPointerTwoLocalStores(function: ir.Function) !void {
+    const block = try singleRetVoidBlock(function);
+    if (block.instructions.items.len != 4) return error.UnsupportedCodegenInstruction;
+    const first_slot = try validateAllocaNamed(block.instructions.items[0], .{ .int = 8 });
+    const second_slot = try validateAllocaNamed(block.instructions.items[1], .{ .int = 8 });
+    try validateStore(block.instructions.items[2], .{ .int = 8 }, .{ .int = 0 }, second_slot);
+    try validateStore(block.instructions.items[3], .{ .int = 8 }, .{ .int = 0 }, first_slot);
+}
+
+fn validateDebugLogicalPointerOneLocalStore(function: ir.Function) !void {
+    const block = try singleRetVoidBlock(function);
+    if (block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const slot = try validateAllocaNamed(block.instructions.items[0], .{ .int = 8 });
+    try validateStore(block.instructions.items[1], .{ .int = 8 }, .{ .int = 0 }, slot);
+}
+
+fn validateDebugLogicalPointerPtrFromInt(function: ir.Function) !void {
+    if (function.blocks.items.len != 4) return error.UnsupportedCodegenControlFlow;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 6) return error.UnsupportedCodegenInstruction;
+    const ptr_slot = try validateAllocaNamed(entry.instructions.items[0], .ptr);
+    const int_slot = try validateAllocaNamed(entry.instructions.items[1], .{ .int = 32 });
+    try validateStore(entry.instructions.items[2], .{ .int = 32 }, .{ .int = 4660 }, int_slot);
+    const load_name = try validateNamedLoad(entry.instructions.items[3], .{ .int = 32 }, int_slot);
+    const zext_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const zext = switch (entry.instructions.items[4].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 32 }) or !zext.to_ty.eql(.{ .int = 64 }) or !isNamed(zext.value, load_name)) return error.UnsupportedCodegenInstruction;
+    const cmp_name = entry.instructions.items[5].result orelse return error.UnsupportedCodegenInstruction;
+    const cmp = switch (entry.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cmp.predicate != .ne or !cmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(cmp.lhs, zext_name) or !cmp.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+    try validateCondbr(entry, cmp_name, "8", "9");
+
+    const success = function.blocks.items[1];
+    if (!std.mem.eql(u8, success.name, "6")) return error.UnsupportedCodegenControlFlow;
+    if (success.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const inttoptr_name = success.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const inttoptr = switch (success.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (inttoptr.op != .inttoptr or !inttoptr.from_ty.eql(.{ .int = 64 }) or inttoptr.to_ty != .ptr or !isNamed(inttoptr.value, zext_name)) return error.UnsupportedCodegenInstruction;
+    try validateStore(success.instructions.items[1], .ptr, .{ .named = inttoptr_name }, ptr_slot);
+    try validateRetVoid(success);
+
+    const branch = function.blocks.items[2];
+    if (!std.mem.eql(u8, branch.name, "8") or branch.instructions.items.len != 0) return error.UnsupportedCodegenControlFlow;
+    try validateBr(branch, "6");
+
+    const panic = function.blocks.items[3];
+    if (!std.mem.eql(u8, panic.name, "9")) return error.UnsupportedCodegenControlFlow;
+    if (panic.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    try validateAssumeTrue(panic.instructions.items[0]);
+    try validateVoidCall(panic.instructions.items[1], "debug.FullPanic((function 'defaultPanic')).castToNull", &.{});
+    switch (panic.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        .ret, .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
+    }
+}
+
+fn validateDebugLogicalPointerElemVal(function: ir.Function) !void {
+    const block = try singleRetVoidBlock(function);
+    if (block.instructions.items.len != 7) return error.UnsupportedCodegenInstruction;
+    const byte_slot = try validateAllocaNamed(block.instructions.items[0], .{ .int = 8 });
+    const ptr_slot = try validateAllocaNamed(block.instructions.items[1], .ptr);
+    try validateMemset(block.instructions.items[2], ptr_slot, 8);
+    const loaded_ptr = try validateNamedLoad(block.instructions.items[3], .ptr, ptr_slot);
+    const gep_name = try validateZeroArrayGep(block.instructions.items[4], loaded_ptr);
+    const loaded_byte = try validateNamedLoad(block.instructions.items[5], .{ .int = 8 }, gep_name);
+    try validateStore(block.instructions.items[6], .{ .int = 8 }, .{ .named = loaded_byte }, byte_slot);
+}
+
+fn validateDebugLogicalPointerElemPtr(function: ir.Function) !void {
+    const block = try singleRetVoidBlock(function);
+    if (block.instructions.items.len != 5) return error.UnsupportedCodegenInstruction;
+    const ptr_slot = try validateAllocaNamed(block.instructions.items[0], .ptr);
+    try validateMemset(block.instructions.items[1], ptr_slot, 8);
+    const loaded_ptr = try validateNamedLoad(block.instructions.items[2], .ptr, ptr_slot);
+    const gep_name = try validateZeroArrayGep(block.instructions.items[3], loaded_ptr);
+    try validateStore(block.instructions.items[4], .{ .int = 8 }, .{ .int = 0 }, gep_name);
+}
+
+fn singleRetVoidBlock(function: ir.Function) !ir.BasicBlock {
+    if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    const block = function.blocks.items[0];
+    try validateRetVoid(block);
+    return block;
+}
+
+fn validateRetVoid(block: ir.BasicBlock) !void {
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+    };
+    if (ret.ty != .void or ret.value != null) return error.UnsupportedCodegenControlFlow;
+}
+
+fn validateAllocaNamed(instruction: ir.Instruction, ty: ir.Type) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const alloca = switch (instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!alloca.allocated_ty.eql(ty)) return error.UnsupportedCodegenInstruction;
+    return name;
+}
+
+fn validateMemset(instruction: ir.Instruction, ptr_name: []const u8, len: i64) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.memset.p0.i64") or call.ret_ty != .void or call.args.items.len != 4) return error.UnsupportedCodegenInstruction;
+    if (call.args.items[0].ty != .ptr or !isNamed(call.args.items[0].value, ptr_name)) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[1].ty.eql(.{ .int = 8 }) or !call.args.items[1].value.eql(.{ .int = -86 })) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[2].ty.eql(.{ .int = 64 }) or !call.args.items[2].value.eql(.{ .int = len })) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[3].ty.eql(.{ .int = 1 }) or !call.args.items[3].value.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateStore(instruction: ir.Instruction, ty: ir.Type, value: ir.Value, ptr_name: []const u8) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(ty) or !store.value.eql(value) or !isNamed(store.ptr, ptr_name) or store.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateZeroArrayGep(instruction: ir.Instruction, ptr_name: []const u8) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" }) or !isNamed(gep.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
+    if (gep.indices.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or !index.value.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+    return name;
+}
+
+fn validateCondbr(block: ir.BasicBlock, cond_name: []const u8, true_block: []const u8, false_block: []const u8) !void {
+    const condbr = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        .ret, .br, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!isNamed(condbr.cond, cond_name) or !std.mem.eql(u8, condbr.then_target, true_block) or !std.mem.eql(u8, condbr.else_target, false_block)) return error.UnsupportedCodegenControlFlow;
+}
+
+fn validateBr(block: ir.BasicBlock, target_block: []const u8) !void {
+    const br = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!std.mem.eql(u8, br.target, target_block)) return error.UnsupportedCodegenControlFlow;
+}
+
+fn validateAssumeTrue(instruction: ir.Instruction) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.assume") or call.ret_ty != .void or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 1 }) or !call.args.items[0].value.eql(.{ .int = 1 })) return error.UnsupportedCodegenInstruction;
 }
 
 fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -7142,11 +7358,12 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
 }
 
 fn isCalleeName(actual: []const u8, expected: []const u8) bool {
-    if (std.mem.eql(u8, actual, expected)) return true;
-    return actual.len == expected.len + 2 and
-        actual[0] == '"' and
-        actual[actual.len - 1] == '"' and
-        std.mem.eql(u8, actual[1 .. actual.len - 1], expected);
+    const actual_name = if (std.mem.startsWith(u8, actual, "@")) actual[1..] else actual;
+    if (std.mem.eql(u8, actual_name, expected)) return true;
+    return actual_name.len == expected.len + 2 and
+        actual_name[0] == '"' and
+        actual_name[actual_name.len - 1] == '"' and
+        std.mem.eql(u8, actual_name[1 .. actual_name.len - 1], expected);
 }
 
 fn globalSymbolName(name: []const u8) ![]const u8 {

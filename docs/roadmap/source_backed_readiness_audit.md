@@ -168,14 +168,15 @@ Debug:
       volatile pointer roundtrip lowering.
 - The continuous Debug first-100 optimizer-ok prefix is object-clean at
       `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir`. The
-      first-200 prefix now reports 196 object successes and 4 failures. The
+      first-200 prefix now reports 197 object successes and 3 failures. The
       previous blockers, `c_abi_main.zig.Debug.x86_64.ll` and the selected
       address-space pointer rows, are object-clean after selected Debug/O0 C
       ABI aliases, stack-materialized aggregate returns, scalar returns, packed
       struct/union checks, panic-call stubs, the Debug/O0 start trampoline trap
-      tail, and the Debug/O0 `getauxval` auxv scan shape. The current first
-      unsupported-instruction blocker is
-      `cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll`.
+      tail, the Debug/O0 `getauxval` auxv scan shape, and the selected
+      object-only logical-pointer compile-error fixture. The current first
+      unsupported-control-flow blocker is
+      `cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll`.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 

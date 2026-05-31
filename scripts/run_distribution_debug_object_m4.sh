@@ -80,4 +80,24 @@ rg -q 'R_X86_64_PLT32.*__eqtf2' "$tmp_dir/debug_c_abi_f128_sret.reduced.readelf.
 rg -q 'ud2' "$tmp_dir/debug_c_abi_f128_sret.reduced.objdump.txt"
 printf 'ok distribution debug object debug_c_abi_f128_sret\n'
 
+logical_pointer_fixture="test/distribution/debug_x86_64/inputs/logical_pointer_compile_error_o0.ll"
+logical_pointer_object="$tmp_dir/logical_pointer_compile_error_o0.o"
+logical_pointer_summary="$tmp_dir/logical_pointer_compile_error_o0.readelf.txt"
+logical_pointer_dump="$tmp_dir/logical_pointer_compile_error_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$logical_pointer_fixture" > "$logical_pointer_object"
+readelf -W -h -S -s -r "$logical_pointer_object" > "$logical_pointer_summary"
+objdump -dr "$logical_pointer_object" > "$logical_pointer_dump"
+
+check_common_object "$logical_pointer_summary" ptrIntArithmetic
+rg -q '[[:space:]]ptrPtrArithmetic$' "$logical_pointer_summary"
+rg -q '[[:space:]]ptrFromInt$' "$logical_pointer_summary"
+rg -q '[[:space:]]intFromPtr$' "$logical_pointer_summary"
+rg -q '[[:space:]]elemVal$' "$logical_pointer_summary"
+rg -q '[[:space:]]elemPtr$' "$logical_pointer_summary"
+rg -q '[[:space:]]illegal_operation_on_logical_ptr\.ptrIntArithmetic$' "$logical_pointer_summary"
+rg -q '[[:space:]]illegal_operation_on_logical_ptr\.elemPtr$' "$logical_pointer_summary"
+rg -q '[[:space:]]ret' "$logical_pointer_dump"
+printf 'ok distribution debug object logical_pointer_compile_error_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

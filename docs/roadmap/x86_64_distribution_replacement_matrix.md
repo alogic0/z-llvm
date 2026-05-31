@@ -95,14 +95,15 @@ closed_boundary=Debug/O0 sizeof_and_typeof c_* panic-call unreachable stubs
 
 source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv first 200 optimizer-ok rows
 probe=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
-object_probe=196 ok, 4 fail
-first_failure=cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll
-first_failure_category=unsupported-instruction
+object_probe=197 ok, 3 fail
+first_failure=cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
 closed_blocker=c_abi_main.zig.Debug.x86_64.ll
 closed_boundary=selected Debug/O0 C ABI aliases, stack-materialized aggregate
                 returns, scalar returns, packed struct/union checks, and
                 panic-call stubs; selected Debug/O0 start trampoline trap tail
-                and getauxval auxv scan shape
+                and getauxval auxv scan shape; selected object-only Debug/O0
+                logical-pointer compile-error fixture
 ```
 
 Handoff is conservative for release modes because
