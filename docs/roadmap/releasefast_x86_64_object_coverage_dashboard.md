@@ -86,8 +86,10 @@ closed_failure_16=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_16=@entry -> @inherit_want_safety.entry
 closed_failure_17=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_17=@entry -> @no_compile_panic_for_unchecked_arith.entry
-current_object_probe=458 object-ok, 7 object-fail
-first_failure=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@main -> @main.main
-missing_capability=selected ReleaseSmall empty noreturn unreachable-stub lowering
+closed_failure_18=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_18=@main -> @main.main
+current_object_probe=459 object-ok, 6 object-fail
+first_failure=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@strFromFloatHelp -> @main.strFromFloatHelp
+missing_capability=selected ReleaseSmall multi-block float-format helper lowering
 ```

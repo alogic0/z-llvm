@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@main` alias / `@main.main` empty noreturn unreachable stub from
-`standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@strFromFloatHelp` alias / `@main.strFromFloatHelp` multi-block float-format
+helper from `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -427,9 +427,17 @@ and 7 object failures. The next sorted failure is
 selected public shape is `@main = alias void (i32, i32, i32), ptr
 @main.main`, an empty noreturn function ending in `unreachable`.
 
+That focused `main.main` shape is now object-ok through the selected `ud2`
+unreachable-stub path. The current ReleaseSmall object probe is 459 object
+successes and 6 object failures. The next sorted failure is
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected public shape is `@strFromFloatHelp = alias void (double), ptr
+@main.strFromFloatHelp`, a large multi-block float-format helper with stack
+locals, lifetime intrinsics, table loads, branches, and helper calls.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@main` empty noreturn unreachable-stub shape. This
+`@strFromFloatHelp` multi-block float-format helper shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, complete Zig startup/runtime ownership, broad integer ABI lowering,
@@ -441,21 +449,22 @@ Mode/target/stage row:
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM unreachable lowering plus x86_64 instruction selection and MC encoding
-behavior as the reference boundary:
+Use LLVM x86_64 instruction selection and MC encoding behavior as the reference
+boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-empty noreturn stub, also map against x86_64 trap emission in
+float-format helper, also map table addressing, stack frame setup, and branch
+emission against
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@main` alias to `@main.main` ReleaseSmall empty
-noreturn unreachable stub. Do not generalize to arbitrary unreachable control
-flow, arbitrary inline assembly ownership, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Implement only a bounded selected subset from `@strFromFloatHelp` if it can be
+reduced to a defensible source-backed object slice. Do not claim broad float
+formatting, full table lowering, arbitrary multi-block register allocation,
+debug/unwind object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

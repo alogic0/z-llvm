@@ -502,3 +502,9 @@ through selected constant-call materialization. The current ReleaseSmall object
 probe is 458 successes and 7 failures. The next sorted failure is
 `standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
 selected alias is `@main -> @main.main`, an empty noreturn unreachable stub.
+That shape is now object-ok through the selected `ud2` unreachable-stub path.
+The current ReleaseSmall object probe is 459 successes and 6 failures. The
+next sorted failure is
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
+selected alias is `@strFromFloatHelp -> @main.strFromFloatHelp`, a multi-block
+float-format helper.

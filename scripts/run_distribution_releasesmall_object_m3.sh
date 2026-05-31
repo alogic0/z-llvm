@@ -373,3 +373,20 @@ rg -q 'movabs[[:space:]]+\$0x0,%rax' "$umul_dump"
 rg -q '[[:space:]]ret' "$umul_dump"
 
 printf 'ok distribution releasesmall object no_compile_panic_for_unchecked_arith_umul_fix_sat_i64\n'
+
+main_unreachable_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_compile_asm_main_unreachable.ll"
+main_unreachable_object="$tmp_dir/standalone_compile_asm_main_unreachable.o"
+main_unreachable_summary="$tmp_dir/standalone_compile_asm_main_unreachable.readelf.txt"
+main_unreachable_dump="$tmp_dir/standalone_compile_asm_main_unreachable.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$main_unreachable_fixture" > "$main_unreachable_object"
+readelf -W -h -S -s -r "$main_unreachable_object" > "$main_unreachable_summary"
+objdump -dr "$main_unreachable_object" > "$main_unreachable_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$main_unreachable_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$main_unreachable_summary"
+rg -q '[[:space:]]main$' "$main_unreachable_summary"
+rg -q '[[:space:]]main\.main$' "$main_unreachable_summary"
+rg -q '[[:space:]]ud2' "$main_unreachable_dump"
+
+printf 'ok distribution releasesmall object standalone_compile_asm_main_unreachable\n'

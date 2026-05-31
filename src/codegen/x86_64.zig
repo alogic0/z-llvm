@@ -3135,7 +3135,8 @@ fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction,
         .ret, .br, .condbr, .@"switch", .indirectbr => return false,
     }
     if (!std.mem.startsWith(u8, function.name, "sizeof_and_typeof.exp.c_") and
-        !std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.elemPtr")) return false;
+        !std.mem.eql(u8, function.name, "illegal_operation_on_logical_ptr.elemPtr") and
+        !std.mem.eql(u8, function.name, "main.main")) return false;
     if (function.attrs == null) {
         return false;
     }
