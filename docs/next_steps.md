@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_cmultd` double comparison and return lowering from
+`@zig_cmultf` two-vector float comparison and return lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -349,11 +349,15 @@ low-lane float comparisons and packed `%xmm0` vector return materialization.
 The broad row still remains the first object failure; the next selected public
 shape is `@zig_cmultd = alias { double, double } (double, double, double,
 double), ptr @main.zig_cmultd`, a double-comparison control-flow shape
-returning two doubles.
+returning two doubles. That focused shape is now object-ok through the shared
+selected `ucomisd` comparison path. The broad row still remains the first
+object failure; the next selected public shape is `@zig_cmultf = alias
+{ <2 x float> } (<2 x float>, <2 x float>), ptr @main.zig_cmultf`, a
+two-vector float comparison shape returning a packed two-float vector.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_cmultd` double comparison and two-double return shape. This
+`@zig_cmultf` two-vector float comparison and packed vector return shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -369,13 +373,14 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-double comparison and return shape, also map against SelectionDAG floating
-comparison, branch lowering, and SSE return assignment in
+two-vector float comparison and return shape, also map against SelectionDAG
+vector extract, floating comparison, branch lowering, and SSE vector return in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_cmultd` ReleaseSmall double comparison and
-two-double return shape from the `c_abi_main` optimized output.
+Implement only the selected `@zig_cmultf` ReleaseSmall two-vector float
+comparison and packed vector return shape from the `c_abi_main` optimized
+output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.

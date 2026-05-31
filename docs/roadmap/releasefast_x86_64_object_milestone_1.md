@@ -397,3 +397,7 @@ That focused shape is now object-ok with selected low-lane float comparisons
 and packed `%xmm0` vector return materialization. The broad row still remains
 the first sorted failure; the next selected alias is `@zig_cmultd`, a
 double-comparison control-flow shape returning two doubles.
+That focused shape is now object-ok through the shared selected `ucomisd`
+comparison path. The broad row still remains the first sorted failure; the
+next selected alias is `@zig_cmultf`, a two-vector float comparison shape
+returning a packed two-float vector.

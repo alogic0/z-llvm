@@ -3941,7 +3941,8 @@ fn lowerCAbiStructF64(allocator: std.mem.Allocator, machine: *MachineFunction, f
 }
 
 fn lowerCAbiCmultdComp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "main.zig_cmultd_comp")) return false;
+    if (!std.mem.eql(u8, function.name, "main.zig_cmultd_comp") and
+        !std.mem.eql(u8, function.name, "main.zig_cmultd")) return false;
     if (!function.ret_ty.eql(.{ .aggregate = "{ double, double }" })) return false;
     if (function.params.items.len != 4) return false;
     for (function.params.items) |param| {
