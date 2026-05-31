@@ -150,7 +150,11 @@ selected `@load_store` checked pointer load/add/store and panic-edge lowering.
 That blocker is now object-ok for `@load_store`. The current probe is 14
 successes and 3 failures. The first sorted blocker is
 `switch_control.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@branch_mix`
-checked add-or-sub branch phi and panic-edge lowering.
+checked add-or-sub branch phi and panic-edge lowering. That blocker is now
+object-ok for `@branch_mix` and the already covered `@dense_switch`. The
+current probe is 15 successes and 2 failures. The first sorted blocker is
+`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@add` checked
+scalar add and panic-edge lowering.
 
 ## Activation Rule
 

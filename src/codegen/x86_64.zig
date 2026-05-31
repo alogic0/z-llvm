@@ -279,6 +279,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedBranchMix(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -2445,6 +2450,37 @@ fn lowerCheckedPointerLoadStore(allocator: std.mem.Allocator, machine: *MachineF
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = output_reg });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedBranchMix(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "switch_control.branch_mix")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 3) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or
+        !function.params.items[1].ty.eql(.{ .int = 32 }) or
+        !function.params.items[2].ty.eql(.{ .int = 1 })) return false;
+    const base_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    const delta_reg = try paramReg(function, function.params.items[1].name, .{ .int = 32 });
+    const cond_reg = try paramReg(function, function.params.items[2].name, .{ .int = 1 });
+    if (base_reg != .rdi or delta_reg != .rsi or cond_reg != .rdx) return error.UnsupportedCodegenAbi;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+    if (!functionHasCall(function, "llvm.ssub.with.overflow.i32")) return false;
+
+    const false_label = "branch_mix_sub";
+    const overflow_label = "branch_mix_overflow";
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = delta_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = delta_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;

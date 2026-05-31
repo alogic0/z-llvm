@@ -276,3 +276,45 @@ C
 zig cc "$pointers_harness" "$pointers_object" -o "$pointers_exe"
 "$pointers_exe"
 printf 'ok distribution releasesafe object pointers_memory_checked\n'
+
+switch_fixture="test/distribution/releasesafe_x86_64/inputs/switch_control_branch_mix_checked.ll"
+switch_object="$tmp_dir/switch_control_branch_mix_checked.o"
+switch_summary="$tmp_dir/switch_control_branch_mix_checked.readelf.txt"
+switch_dump="$tmp_dir/switch_control_branch_mix_checked.objdump.txt"
+switch_harness="$tmp_dir/switch_control_branch_mix_checked_harness.c"
+switch_exe="$tmp_dir/switch_control_branch_mix_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$switch_fixture" > "$switch_object"
+readelf -W -h -S -s -r "$switch_object" > "$switch_summary"
+objdump -dr "$switch_object" > "$switch_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$switch_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$switch_summary"
+rg -q '[[:space:]]branch_mix$' "$switch_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$switch_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$switch_dump"
+rg -q '[[:space:]]je[[:space:]]' "$switch_dump"
+
+cat > "$switch_harness" <<'C'
+#include <stdbool.h>
+#include <stdint.h>
+
+extern int32_t branch_mix(int32_t base, int32_t delta, bool add);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    if (branch_mix(10, 4, true) != 14) return 1;
+    if (branch_mix(10, 4, false) != 6) return 2;
+    if (branch_mix(-7, 3, true) != -4) return 3;
+    if (branch_mix(-7, 3, false) != -10) return 4;
+    return 0;
+}
+C
+
+zig cc "$switch_harness" "$switch_object" -o "$switch_exe"
+"$switch_exe"
+printf 'ok distribution releasesafe object switch_control_branch_mix_checked\n'
