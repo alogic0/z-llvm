@@ -58,6 +58,11 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .shift_mix_i32_edi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf1, 0x83, 0xe1, 0x1f, 0x89, 0xf8, 0xd3, 0xe0, 0x89, 0xfa, 0xd3, 0xea, 0x31, 0xd0 }),
             .replace_low_i8_dil_sil_al => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x83, 0xe0, 0xf8, 0x89, 0xf2, 0x83, 0xe2, 0x07, 0x09, 0xd0 }),
             .read_flag_i8_dil_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x40, 0x84, 0xff, 0x0f, 0x98, 0xc0 }),
+            .store_imm8_abs => |store| {
+                try bytes.appendSlice(allocator, &.{ 0xc6, 0x04, 0x25 });
+                try appendU32(&bytes, allocator, store.address);
+                try bytes.append(allocator, store.value);
+            },
             .cmp_ecx_arg32 => |reg| try encodeCmpEcxToArg32(&bytes, allocator, reg),
             .cmp_rcx_arg64 => |reg| try encodeCmpRcxToArg64(&bytes, allocator, reg),
             .cmp_ecx_imm32 => |value| {
@@ -163,6 +168,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .shift_mix_i32_edi_esi_eax => 15,
         .replace_low_i8_dil_sil_al => 12,
         .read_flag_i8_dil_al => 8,
+        .store_imm8_abs => 8,
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
         .cmp_ecx_imm32 => 6,

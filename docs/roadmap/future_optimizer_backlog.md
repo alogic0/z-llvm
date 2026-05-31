@@ -169,7 +169,11 @@ optimizer successes, 1009 Zig compile skips, and 0 local optimizer failures.
 Object probing with `--input-limit=67108864` found 263 successes and 202
 failures. The first sorted blocker is
 `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@writeToVRam` volatile absolute-address store lowering.
+`@writeToVRam` volatile absolute-address store lowering. That blocker is now
+object-ok for `@writeToVRam` and `@testPackedStuff`. The current ReleaseSmall
+object probe is 264 successes and 201 failures. The first sorted blocker is
+`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`, selected
+`@c_fopen` noreturn unreachable-stub lowering.
 
 ## Activation Rule
 

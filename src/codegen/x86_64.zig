@@ -127,6 +127,10 @@ pub const Instruction = union(enum) {
     shift_mix_i32_edi_esi_eax,
     replace_low_i8_dil_sil_al,
     read_flag_i8_dil_al,
+    store_imm8_abs: struct {
+        address: u32,
+        value: u8,
+    },
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
     cmp_ecx_imm32: i32,
@@ -205,6 +209,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
 
     var machine = MachineFunction.init(function.name, function.ret_ty);
     errdefer machine.deinit(allocator);
+
+    if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
 
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
@@ -2533,6 +2542,44 @@ fn lowerCheckedTlsBump(allocator: std.mem.Allocator, machine: *MachineFunction, 
     return true;
 }
 
+fn lowerVolatileAbsoluteStore(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "export_keyword.writeToVRam")) return false;
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 1) return false;
+    const store_inst = block.instructions.items[0];
+    if (store_inst.removed) return false;
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 8 }) or !store.attrs.is_volatile) return false;
+    const value: u8 = switch (store.value) {
+        .int => |int| if (int >= 0 and int <= std.math.maxInt(u8)) @intCast(int) else return false,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const address = try inttoptrI64Address(store.ptr);
+
+    try machine.instructions.append(allocator, .{ .store_imm8_abs = .{ .address = address, .value = value } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn inttoptrI64Address(value: ir.Value) !u32 {
+    const text = switch (value) {
+        .constant_expr => |text| text,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    };
+    const prefix = "inttoptr (i64 ";
+    const suffix = " to ptr)";
+    if (!std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return error.UnsupportedCodegenValue;
+    const number_text = text[prefix.len .. text.len - suffix.len];
+    const address = try std.fmt.parseInt(u64, number_text, 10);
+    if (address > std.math.maxInt(u32)) return error.UnsupportedCodegenValue;
+    return @intCast(address);
+}
+
 fn functionHasOverflowPanicEdge(function: ir.Function) bool {
     return sliceSumHasOverflowCheck(function);
 }
@@ -2860,6 +2907,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shift_mix_i32_edi_esi_eax,
         .replace_low_i8_dil_sil_al,
         .read_flag_i8_dil_al,
+        .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,
@@ -2916,7 +2964,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .je, .jne, .jo, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -2948,6 +2996,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shift_mix_i32_edi_esi_eax,
         .replace_low_i8_dil_sil_al,
         .read_flag_i8_dil_al,
+        .store_imm8_abs,
         .cmp_ecx_arg32,
         .cmp_rcx_arg64,
         .mulsd_xmm1_xmm0,

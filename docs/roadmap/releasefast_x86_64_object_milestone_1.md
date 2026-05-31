@@ -165,4 +165,8 @@ tmp/zig_ir/distribution_m3_releasesmall_20260531
 Object probing those captured rows with `--input-limit=67108864` found 263
 local object successes and 202 object failures. The first sorted failure is
 `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@writeToVRam` volatile absolute-address store lowering.
+`@writeToVRam` volatile absolute-address store lowering. That blocker is now
+object-ok for `@writeToVRam` and `@testPackedStuff`. The current ReleaseSmall
+object probe is 264 successes and 201 failures. The first sorted failure is
+`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`, selected
+`@c_fopen` noreturn unreachable-stub lowering.

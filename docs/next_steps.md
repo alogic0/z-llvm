@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@writeToVRam` volatile absolute-address store lowering from
-`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@c_fopen` noreturn unreachable stub lowering from
+`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -65,20 +65,23 @@ The next corrected-order probe captured ReleaseSmall optimized output at
 1474 processed, 1009 compile skips, 465 optimizer successes, and 0 parse,
 verify, optimizer, or input-size failures. Local object probing with
 `--input-limit=67108864` found 263 object successes and 202 object failures.
+The selected `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`
+blocker is now object-ok for `@writeToVRam` and `@testPackedStuff`, covering
+volatile absolute-address byte store lowering. The current ReleaseSmall object
+probe is 264 object successes and 201 object failures.
 
 The first sorted ReleaseSmall object failure is
-`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll` with
-`error: UnsupportedCodegenInstruction`. The first selected public shape is
-`@writeToVRam = alias void (), ptr @export_keyword.writeToVRam`; the optimized
-body performs `store volatile i8 88, ptr inttoptr (i64 536870912 to ptr), align
-536870912` and returns void.
+`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll` with
+`error: UnsupportedCodegenControlFlow`. The first selected public shape is
+`@c_fopen = alias ptr (ptr, ptr), ptr @sizeof_and_typeof.exp.c_fopen`; the
+optimized body is a `noreturn` function whose only terminator is `unreachable`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@writeToVRam` shape. This begins reducing the ReleaseSmall
-asm/object fallback row. It does not claim arbitrary absolute addressing,
-memory-mapped IO completeness, non-x86_64 ABI behavior, debug records, unwind
-records, linker ownership, or target-complete ABI behavior.
+`@c_fopen` unreachable-stub shape. This continues reducing the ReleaseSmall
+asm/object fallback row. It does not claim arbitrary trap lowering, panic
+semantics, non-x86_64 ABI behavior, debug records, unwind records, linker
+ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -90,16 +93,15 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-volatile absolute store, also map against SelectionDAG memory operation
-lowering in
+unreachable stub, also map against SelectionDAG terminator and unreachable
+handling in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@writeToVRam` ReleaseSmall volatile absolute-store
-shape from the `behavior_export_keyword` optimized output. Do not generalize to
-arbitrary volatile memory operations, all constant-expression pointers,
-cross-target addressing, debug/unwind object records, or non-x86_64 ABI
-behavior in this slice.
+Implement only the selected `@c_fopen` ReleaseSmall unreachable-stub shape from
+the `behavior_sizeof_and_typeof` optimized output. Do not generalize to
+arbitrary trap lowering, panic semantics, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
