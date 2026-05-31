@@ -75,4 +75,9 @@ rg -q '[[:space:]]c_printf$' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced
 rg -q 'ud2' "$tmp_dir/debug_sizeof_typeof_c_unreachable.reduced.objdump.txt"
 printf 'ok distribution debug object debug_sizeof_typeof_c_unreachable\n'
 
+emit_and_check debug_c_abi_f128_sret.reduced zig_f128_f128_struct
+rg -q 'R_X86_64_PLT32.*__eqtf2' "$tmp_dir/debug_c_abi_f128_sret.reduced.readelf.txt"
+rg -q 'ud2' "$tmp_dir/debug_c_abi_f128_sret.reduced.objdump.txt"
+printf 'ok distribution debug object debug_c_abi_f128_sret\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

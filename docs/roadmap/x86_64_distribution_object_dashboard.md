@@ -19,7 +19,7 @@ Current automated summaries:
 | ReleaseFast | `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
 | ReleaseSafe | `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
 | ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 465 | 463 | 0 | 2 | `-` |
-| Debug reduced | `test/zig/expected/debug_*.reduced.ll` | 8 | 8 | 0 | 0 | `-` |
+| Debug reduced | `test/zig/expected/debug_*.reduced.ll` | 9 | 9 | 0 | 0 | `-` |
 | Debug broad tiny scalar | `tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug broad control flow calls | `tmp/zig_ir/debug_object_probe_control_flow_calls_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug broad pointers memory | `tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
@@ -62,7 +62,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call objects |
 | ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions |
-| Debug | LLVM fallback required | reduced 8-fixture object subset plus selected broad raw and continuous-prefix object proof; broader Debug std rows remain unproven |
+| Debug | LLVM fallback required | reduced 9-fixture object subset plus selected broad raw and continuous-prefix object proof; broader Debug std rows remain unproven |
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
 in [x86_64_distribution_replacement_matrix.md](x86_64_distribution_replacement_matrix.md)
@@ -85,6 +85,8 @@ Debug broad:
   tiny_scalar.Debug.ll object-clean as the remaining selected raw row
   continuous Debug prefix 100 object-clean after selected panic-call C stubs
   continuous Debug prefix 200 first failure: c_abi_main.zig.Debug.x86_64.ll
+    selected @zig_f128_f128_struct Debug/O0 f128 sret alias is fixture-clean;
+    next public shape is @zig_f128_struct
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

@@ -577,7 +577,7 @@ The unified dashboard is
 `docs/roadmap/x86_64_distribution_object_dashboard.md`. It records ReleaseFast
 and ReleaseSafe as 17/17 object-clean captured subsets, ReleaseSmall as an
 adjusted 463/465 object-clean subset with two explicit exclusions, and Debug as
-a reduced 8-fixture object-clean subset plus selected broad raw and continuous
+a reduced 9-fixture object-clean subset plus selected broad raw and continuous
 prefix object-clean rows while broad Debug std rows remain unproven.
 
 The first broad Debug row from the fixture manifest,
@@ -619,14 +619,17 @@ input=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
 summary total=200 ok=149 fail=51 excluded=0
 first_failure=c_abi_main.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
+closed_alias_in_blocker=@zig_f128_f128_struct -> @main.zig_f128_f128_struct
+next_alias_in_blocker=@zig_f128_struct -> @main.zig_f128_struct
 ```
 
 LLVM fallback removed or reduced:
 Advance Debug asm/object evidence beyond the first 100 continuous rows by
-reducing the selected `c_abi_main` blocker only if the first public alias is
-bounded. Keep O0 C ABI breadth, full register allocation, and runtime/debug
-infrastructure outside the local replacement boundary unless the selected shape
-proves otherwise.
+reducing the next selected `c_abi_main` public alias,
+`@zig_f128_struct -> @main.zig_f128_struct`, only if it stays bounded. Keep O0
+C ABI breadth, full register allocation, and runtime/debug infrastructure
+outside the local replacement boundary unless the selected shape proves
+otherwise.
 
 Mode/target/stage row:
 `mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -644,9 +647,9 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not promote broad Debug asm/object from the clean prefix alone. Record the
-first `c_abi_main` public alias, its optimized IR shape, and whether it maps to
-an already selected ReleaseSmall C ABI lowering or to broader Debug/O0
+Do not promote broad Debug asm/object from the clean prefix alone. Record each
+`c_abi_main` public alias, its optimized IR shape, and whether it maps to an
+already selected ReleaseSmall C ABI lowering or to broader Debug/O0
 infrastructure.
 
 Validation gate:

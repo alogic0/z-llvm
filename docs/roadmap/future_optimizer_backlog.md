@@ -571,14 +571,15 @@ ReleaseSmall object gate, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
-`test/zig/expected/debug_*.reduced.ll` is clean: 8 object successes and 0
+`test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
 selected blockers are call-result plus immediate-add lowering,
 `llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
 shape, the reduced Debug scope-branch phi shape, and the selected O0 alloca
 debug prologue before a volatile pointer roundtrip, and Debug/O0 c_* panic-call
-unreachable stubs. Broad Debug asm/object still requires LLVM fallback because
-DWARF/unwind emission, full O0 codegen,
+unreachable stubs, and the Debug/O0 f128 sret C ABI shape from
+`c_abi_main.zig.Debug.x86_64.ll`. Broad Debug asm/object still requires LLVM
+fallback because DWARF/unwind emission, full O0 codegen,
 variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
 
@@ -607,6 +608,9 @@ The continuous Debug object probe now has a clean first-100-row prefix from
 c_* panic-call unreachable stubs. The first-200-row prefix reports
 149 ok / 51 fail, with first failure
 `c_abi_main.zig.Debug.x86_64.ll` categorized as `unsupported-control-flow`.
+The selected first alias in that blocker,
+`@zig_f128_f128_struct -> @main.zig_f128_f128_struct`, is now fixture-clean;
+the next public shape is `@zig_f128_struct -> @main.zig_f128_struct`.
 
 ## Activation Rule
 

@@ -153,11 +153,11 @@ Debug:
 
 - Compile-unit, subprogram, lexical block, and location metadata survive the
       accepted reduced fixtures.
-- The reduced Debug x86_64 object gate is clean for eight selected fixtures:
+- The reduced Debug x86_64 object gate is clean for nine selected fixtures:
       `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
       for call-chain, declare/value intrinsic, loop, metadata, scope-branch,
       O0 volatile-pointer roundtrip, and c_* panic-call unreachable-stub
-      shapes.
+      shapes, plus the selected Debug/O0 f128 sret C ABI shape.
 - The selected broad Debug raw rows now emit local objects:
       `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
       `tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
@@ -170,7 +170,9 @@ Debug:
       `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir`. The
       first-200 prefix reports 149 object successes and 51 failures, with
       `c_abi_main.zig.Debug.x86_64.ll` as the first unsupported-control-flow
-      blocker.
+      blocker. The first selected alias in that blocker,
+      `@zig_f128_f128_struct`, is now fixture-clean; the next public shape is
+      `@zig_f128_struct`.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 

@@ -3681,6 +3681,11 @@ fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     const sret_reg = try paramReg(function, function.params.items[0].name, .ptr);
     const byval_reg = try paramReg(function, function.params.items[1].name, .ptr);
     if (sret_reg != .rdi or byval_reg != .rsi) return error.UnsupportedCodegenAbi;
+    if (function.blocks.items.len == 7) {
+        const debug_shape = try validateDebugF128Sret(function);
+        try appendCAbiF128SretMachine(allocator, machine, debug_shape.first_panic_label, debug_shape.second_panic_label);
+        return true;
+    }
     if (function.blocks.items.len != 5) return false;
 
     const entry = function.blocks.items[0];
@@ -3698,6 +3703,16 @@ fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     try validatePanicUnreachableBlock(function.blocks.items[first_panic_index]);
     try validatePanicUnreachableBlock(function.blocks.items[second_panic_index]);
 
+    try appendCAbiF128SretMachine(allocator, machine, first.else_label, second.else_label);
+    return true;
+}
+
+fn appendCAbiF128SretMachine(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    first_panic_label: []const u8,
+    second_panic_label: []const u8,
+) !void {
     try machine.instructions.append(allocator, .sub_rsp_24);
     try machine.instructions.append(allocator, .spill_rdi_rsi_rsp24);
 
@@ -3706,14 +3721,14 @@ fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_cmp0" });
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try machine.instructions.append(allocator, .{ .jne = first.else_label });
+    try machine.instructions.append(allocator, .{ .jne = first_panic_label });
 
     try machine.instructions.append(allocator, .reload_rsi_rsp24);
     try machine.instructions.append(allocator, .{ .load_f128_arg_ptr_xmm0 = .{ .reg = .rsi, .offset = 16 } });
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_cmp1" });
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
     try machine.instructions.append(allocator, .test_eax_eax);
-    try machine.instructions.append(allocator, .{ .jne = second.else_label });
+    try machine.instructions.append(allocator, .{ .jne = second_panic_label });
 
     try machine.instructions.append(allocator, .reload_rdi_rsp24);
     try machine.instructions.append(allocator, .{ .load_f128_const_xmm0 = "__zllvm_f128_ret0" });
@@ -3723,11 +3738,10 @@ fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     try machine.instructions.append(allocator, .add_rsp_24);
     try machine.instructions.append(allocator, .ret);
 
-    try machine.instructions.append(allocator, .{ .label = first.else_label });
+    try machine.instructions.append(allocator, .{ .label = first_panic_label });
     try machine.instructions.append(allocator, .ud2);
-    try machine.instructions.append(allocator, .{ .label = second.else_label });
+    try machine.instructions.append(allocator, .{ .label = second_panic_label });
     try machine.instructions.append(allocator, .ud2);
-    return true;
 }
 
 fn lowerCAbiF128AggregateReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -5736,6 +5750,161 @@ const F128Branch = struct {
     else_label: []const u8,
     second_load: []const u8,
 };
+
+const DebugF128Sret = struct {
+    first_panic_label: []const u8,
+    second_panic_label: []const u8,
+};
+
+fn validateDebugF128Sret(function: ir.Function) !DebugF128Sret {
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 7) return error.UnsupportedCodegenInstruction;
+
+    const alloca_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    switch (entry.instructions.items[0].kind) {
+        .alloca => |alloca| if (!alloca.allocated_ty.eql(.{ .aggregate = "%main.f128_f128_struct" })) return error.UnsupportedCodegenType,
+        else => return error.UnsupportedCodegenInstruction,
+    }
+
+    try validateDebugF128Memcpy(entry.instructions.items[1], alloca_name, function.params.items[1].name);
+    const first_load_name = try validateDebugF128Load(entry.instructions.items[2], alloca_name);
+    const first_call_name = try validateDebugF128EqCall(entry.instructions.items[3], first_load_name, "0xL00000000000000004002A00000000000");
+    const first_eq_name = try validateDebugEqZeroI32(entry.instructions.items[4], first_call_name);
+    const first_expect_name = try validateDebugTestingExpect(entry.instructions.items[5], first_eq_name);
+    const first_ok_name = try validateDebugEqZeroI16(entry.instructions.items[6], first_expect_name);
+    const first_branch = try validateDebugCondBr(entry, first_ok_name);
+
+    const first_bridge = function.blocks.items[blockIndex(function, first_branch.then_target) orelse return error.InvalidBranchTarget];
+    const second_label = try validateEmptyBr(first_bridge);
+    const second = function.blocks.items[blockIndex(function, second_label) orelse return error.InvalidBranchTarget];
+    if (second.instructions.items.len != 6) return error.UnsupportedCodegenInstruction;
+    const second_gep_name = second.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const gep = switch (second.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(gep, alloca_name, 16);
+    const second_load_name = try validateDebugF128Load(second.instructions.items[1], second_gep_name);
+    const second_call_name = try validateDebugF128EqCall(second.instructions.items[2], second_load_name, "0xL00000000000000004004C80000000000");
+    const second_eq_name = try validateDebugEqZeroI32(second.instructions.items[3], second_call_name);
+    const second_expect_name = try validateDebugTestingExpect(second.instructions.items[4], second_eq_name);
+    const second_ok_name = try validateDebugEqZeroI16(second.instructions.items[5], second_expect_name);
+    const second_branch = try validateDebugCondBr(second, second_ok_name);
+
+    const success_bridge = function.blocks.items[blockIndex(function, second_branch.then_target) orelse return error.InvalidBranchTarget];
+    const success_label = try validateEmptyBr(success_bridge);
+    const success = function.blocks.items[blockIndex(function, success_label) orelse return error.InvalidBranchTarget];
+    try validateF128SretSuccess(success, function.params.items[0].name);
+    try validateDebugPanicUnreachableBlock(function.blocks.items[blockIndex(function, first_branch.else_target) orelse return error.InvalidBranchTarget]);
+    try validateDebugPanicUnreachableBlock(function.blocks.items[blockIndex(function, second_branch.else_target) orelse return error.InvalidBranchTarget]);
+
+    return .{
+        .first_panic_label = first_branch.else_target,
+        .second_panic_label = second_branch.else_target,
+    };
+}
+
+fn validateDebugF128Memcpy(instruction: ir.Instruction, dst_name: []const u8, src_name: []const u8) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64") or call.ret_ty != .void or call.args.items.len != 4) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.ptr) or !isNamed(call.args.items[0].value, dst_name)) return error.UnsupportedCodegenValue;
+    if (!call.args.items[1].ty.eql(.ptr) or !isNamed(call.args.items[1].value, src_name)) return error.UnsupportedCodegenValue;
+    if (!call.args.items[2].ty.eql(.{ .int = 64 }) or !call.args.items[2].value.eql(.{ .int = 32 })) return error.UnsupportedCodegenValue;
+    if (!call.args.items[3].ty.eql(.{ .int = 1 }) or !call.args.items[3].value.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
+}
+
+fn validateDebugF128Load(instruction: ir.Instruction, ptr_name: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!load.ty.eql(.fp128) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return error.UnsupportedCodegenInstruction;
+    return result;
+}
+
+fn validateDebugF128EqCall(instruction: ir.Instruction, lhs_name: []const u8, expected: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateF128EqCall(call, lhs_name, expected);
+    return result;
+}
+
+fn validateDebugEqZeroI32(instruction: ir.Instruction, call_name: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateEqZeroIcmp(icmp, call_name);
+    return result;
+}
+
+fn validateDebugTestingExpect(instruction: ir.Instruction, cond_name: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "testing.expect") or !call.ret_ty.eql(.{ .int = 16 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 1 }) or !isNamed(call.args.items[0].value, cond_name)) return error.UnsupportedCodegenValue;
+    return result;
+}
+
+fn validateDebugEqZeroI16(instruction: ir.Instruction, value_name: []const u8) ![]const u8 {
+    const result = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 16 })) return error.UnsupportedCodegenInstruction;
+    if (!isNamed(icmp.lhs, value_name) or !icmp.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenValue;
+    return result;
+}
+
+fn validateDebugCondBr(block: ir.BasicBlock, cond_name: []const u8) !struct { then_target: []const u8, else_target: []const u8 } {
+    const condbr = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cond_name)) return error.UnsupportedCodegenControlFlow;
+    return .{ .then_target = condbr.then_target, .else_target = condbr.else_target };
+}
+
+fn validateEmptyBr(block: ir.BasicBlock) ![]const u8 {
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    return switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br.target,
+        else => error.UnsupportedCodegenControlFlow,
+    };
+}
+
+fn validateDebugPanicUnreachableBlock(block: ir.BasicBlock) !void {
+    if (block.instructions.items.len != 3) return error.UnsupportedCodegenInstruction;
+    for (block.instructions.items[0..2]) |instruction| {
+        if (instruction.result == null) return error.UnsupportedCodegenInstruction;
+        switch (instruction.kind) {
+            .extractvalue => {},
+            else => return error.UnsupportedCodegenInstruction,
+        }
+    }
+    const call = switch (block.instructions.items[2].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.eql(u8, call.callee, "debug.defaultPanic") or call.ret_ty != .void) return error.UnsupportedCodegenInstruction;
+    switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return error.UnsupportedCodegenControlFlow,
+    }
+}
 
 fn validateF128EntryEqBranch(block: ir.BasicBlock, byval_param: []const u8) !F128Branch {
     if (block.instructions.items.len != 5) return error.UnsupportedCodegenInstruction;

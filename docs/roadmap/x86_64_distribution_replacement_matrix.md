@@ -54,11 +54,12 @@ reduced object probe is now clean for selected Debug fixtures:
 bash scripts/run_distribution_debug_object_m4.sh
   target=x86_64-unknown-linux-gnu
   inputs=test/zig/expected/debug_*.reduced.ll
-  object_probe=8 ok, 0 fail
+  object_probe=9 ok, 0 fail
   covered_shapes=call-chain add-immediate, dbg.declare/dbg.value no-op object
                  lowering, simple loop sum, metadata add, scope branch phi,
                  O0 alloca debug prologue plus volatile pointer roundtrip,
-                 Debug/O0 c_* panic-call unreachable stubs
+                 Debug/O0 c_* panic-call unreachable stubs,
+                 Debug/O0 f128 sret C ABI shape
   excluded=DWARF/unwind emission, full O0 codegen, variable-location salvage,
            broad Debug std rows, target-complete ABI lowering
 ```
@@ -97,6 +98,8 @@ probe=tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir
 object_probe=149 ok, 51 fail
 first_failure=c_abi_main.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
+closed_alias_in_blocker=@zig_f128_f128_struct -> @main.zig_f128_f128_struct
+next_alias_in_blocker=@zig_f128_struct -> @main.zig_f128_struct
 ```
 
 Handoff is conservative for release modes because
