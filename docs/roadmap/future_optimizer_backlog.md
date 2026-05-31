@@ -599,6 +599,10 @@ The composed conservative boundary gate is
 ReleaseSmall exclusions, Debug DWARF/unwind, and AArch64 object target
 boundaries.
 
+The combined selected distribution validation entrypoint is
+`bash scripts/run_distribution_all_gates.sh`, which composes the positive
+no-LLVM-codegen subset with the conservative boundary gates.
+
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed

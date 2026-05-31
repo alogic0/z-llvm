@@ -17,6 +17,7 @@ ReleaseSafe/ReleaseSmall executable fixtures and tracked ReleaseSmall exclusion
 fixtures became target-aware for both GNU and musl, and after the linker/CRT
 boundary, AArch64 object target boundary, and Debug DWARF/unwind boundary
 became executable gates composed by `bash scripts/run_distribution_boundary_gates.sh`.
+The combined validation entrypoint is now `bash scripts/run_distribution_all_gates.sh`.
 Pick the next measured blocker from a source-backed distribution row; do not
 expand beyond the captured subset without a measured first failure.
 

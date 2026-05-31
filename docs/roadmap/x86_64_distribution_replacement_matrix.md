@@ -292,6 +292,15 @@ includes=linker/CRT boundary, tracked ReleaseSmall exclusion boundaries,
 result=pass
 ```
 
+The combined selected distribution validation entrypoint is:
+
+```text
+gate=bash scripts/run_distribution_all_gates.sh
+includes=selected no-LLVM-codegen object/executable subset,
+         conservative boundary gates
+result=pass
+```
+
 Automated broad object probing is now available through:
 
 ```text
