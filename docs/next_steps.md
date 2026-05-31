@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_i8` i8 equality branch lowering from
+`@zig_u64` u64 equality branch lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -400,11 +400,15 @@ branch-to-return-or-trap shape. That focused shape is now object-ok with a
 selected 16-bit argument comparison and a local trap failure edge. The broad
 row still remains the first object failure; the next selected public shape is
 `@zig_i8 = alias void (i8), ptr @main.zig_i8`, an i8 equality
+branch-to-return-or-trap shape. That focused shape is now object-ok with a
+selected 8-bit argument comparison and a local trap failure edge. The broad
+row still remains the first object failure; the next selected public shape is
+`@zig_u64 = alias void (i64), ptr @main.zig_u64`, a u64 equality
 branch-to-return-or-trap shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_i8` i8 equality branch-to-return-or-trap shape. This
+`@zig_u64` u64 equality branch-to-return-or-trap shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -420,12 +424,12 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-i8 equality branch shape, also map against SelectionDAG integer argument
+u64 equality branch shape, also map against SelectionDAG integer argument
 assignment, integer comparison, and conditional branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_i8` ReleaseSmall i8 equality
+Implement only the selected `@zig_u64` ReleaseSmall u64 equality
 branch-to-return-or-trap shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or

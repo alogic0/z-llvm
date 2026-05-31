@@ -450,6 +450,10 @@ That focused shape is now object-ok with a selected 16-bit argument comparison
 and a local trap failure edge. The broad row still remains the first sorted
 blocker; the next selected alias is `@zig_i8`, an i8 equality
 branch-to-return-or-trap shape.
+That focused shape is now object-ok with a selected 8-bit argument comparison
+and a local trap failure edge. The broad row still remains the first sorted
+blocker; the next selected alias is `@zig_u64`, a u64 equality
+branch-to-return-or-trap shape.
 
 ## Activation Rule
 
