@@ -430,3 +430,7 @@ That focused shape is now object-ok with selected low/high i64 comparisons
 and a local trap failure edge. The broad row still remains the first sorted
 failure; the next selected alias is `@zig_struct_i128`, a split i128 equality
 branch-to-return-or-trap shape.
+That focused shape is now object-ok with selected low/high i64 comparisons
+and a local trap failure edge. The broad row still remains the first sorted
+failure; the next selected alias is `@zig_i64`, an i64 equality
+branch-to-return-or-trap shape.

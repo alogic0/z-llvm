@@ -87,6 +87,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_f32 = alias void (float), ptr @main.zig_f32
 @zig_five_floats = alias void (float, float, float, float, float), ptr @main.zig_five_floats
 @zig_struct_u128 = alias void (i64, i64), ptr @main.zig_struct_u128
+@zig_struct_i128 = alias void (i64, i64), ptr @main.zig_struct_i128
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -723,6 +724,21 @@ define private void @main.zig_struct_u128(i64 %0, i64 %1) unnamed_addr align 1 {
   %.sroa.01.0.insert.ext = zext i64 %0 to i128
   %.sroa.01.0.insert.insert = or disjoint i128 %.sroa.22.0.insert.shift, %.sroa.01.0.insert.ext
   %3 = icmp eq i128 %.sroa.01.0.insert.insert, 18446744073709551612
+  br i1 %3, label %4, label %5
+4:
+  ret void
+5:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_struct_i128(i64 %0, i64 %1) unnamed_addr align 1 {
+2:
+  %.sroa.22.0.insert.ext = zext i64 %1 to i128
+  %.sroa.22.0.insert.shift = shl nuw i128 %.sroa.22.0.insert.ext, 64
+  %.sroa.01.0.insert.ext = zext i64 %0 to i128
+  %.sroa.01.0.insert.insert = or disjoint i128 %.sroa.22.0.insert.shift, %.sroa.01.0.insert.ext
+  %3 = icmp eq i128 %.sroa.01.0.insert.insert, -6
   br i1 %3, label %4, label %5
 4:
   ret void
