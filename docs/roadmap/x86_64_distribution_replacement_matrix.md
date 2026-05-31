@@ -115,7 +115,7 @@ target=x86_64-linux-gnu
 stage=asm/object
 status=LLVM fallback required
 optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
-object_probe=15 ok, 2 fail with --input-limit=67108864
+object_probe=16 ok, 1 fail with --input-limit=67108864
 closed_blocker=aggregates.zig.ReleaseSafe.x86_64.optimized.ll selected checked aggregate sums
 closed_blocker=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll selected checked debug_location
 closed_blocker=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll selected checked loop_sum/call_chain
@@ -123,6 +123,7 @@ closed_blocker=error_switch.zig.ReleaseSafe.x86_64.optimized.ll selected straigh
 closed_blocker=globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll selected checked comptime_const/update_global/read_global
 closed_blocker=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll selected checked load_store
 closed_blocker=switch_control.zig.ReleaseSafe.x86_64.optimized.ll selected checked branch_mix plus dense_switch
-first_blocker=tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll
-missing capability=selected @add checked scalar add and panic-edge lowering
+closed_blocker=tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll selected checked add plus sideEffectFree
+first_blocker=tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll
+missing capability=selected @bump_tls checked local-exec TLS update and panic-edge lowering
 ```

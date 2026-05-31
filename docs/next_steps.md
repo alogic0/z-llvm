@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSafe x86_64 asm/object blocker: selected
-`@add` checked scalar add lowering from
-`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll`.
+`@bump_tls` checked local-exec TLS update lowering from
+`tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -50,20 +50,26 @@ failures. The selected `switch_control.zig.ReleaseSafe.x86_64.optimized.ll`
 blocker is now object-ok for `@branch_mix` and the already covered
 `@dense_switch`, covering checked add-or-sub branch lowering and panic-edge
 relocations. The current probe is 15 object successes and 2 object failures.
+The selected `tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
+object-ok for `@add` and `@sideEffectFree`, covering checked scalar add
+lowering and panic-edge relocations. The current probe is 16 object successes
+and 1 object failure.
 
 The first sorted failure is now
-`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` with
+`tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll` with
 `error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@add = alias i32 (i32, i32), ptr @tiny_scalar.add`; the optimized body
-performs checked `llvm.sadd.with.overflow.i32`, returns the extracted value, and
-branches to `debug.FullPanic((function 'defaultPanic')).integerOverflow` on
-overflow.
+`@bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls`; the optimized
+body loads the private thread-local `i32`, performs checked
+`llvm.sadd.with.overflow.i32` with the argument, stores the result back to the
+TLS global, returns the result, and branches to
+`debug.FullPanic((function 'defaultPanic')).integerOverflow` on overflow.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSafe
-`@add` shape. This continues reducing the ReleaseSafe asm/object fallback row.
-It does not claim general ReleaseSafe panic runtime lowering, arbitrary checked
-arithmetic lowering, unwinding, debug records, or target-complete ABI behavior.
+`@bump_tls` shape. This continues reducing the ReleaseSafe asm/object fallback
+row. It does not claim general ReleaseSafe panic runtime lowering, arbitrary
+TLS models, cross-target TLS relocations, unwinding, debug records, or
+target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSafe`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -79,10 +85,10 @@ safety edge, also map against LLVM IR overflow intrinsic handling in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@add` ReleaseSafe shape from the `tiny_scalar`
-optimized output. Do not generalize to arbitrary checked arithmetic, panic
-edges, unwinding, debug/unwind object records, or non-x86_64 ABI behavior in
-this slice.
+Implement only the selected `@bump_tls` ReleaseSafe local-exec TLS shape from
+the `tls_concurrency` optimized output. Do not generalize to arbitrary TLS
+models, cross-target TLS relocations, panic edges, unwinding, debug/unwind
+object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend the reduced ReleaseSafe fixture and run its focused

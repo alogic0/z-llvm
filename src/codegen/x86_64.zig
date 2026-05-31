@@ -284,6 +284,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedTinyAdd(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -2480,6 +2485,25 @@ fn lowerCheckedBranchMix(allocator: std.mem.Allocator, machine: *MachineFunction
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = delta_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedTinyAdd(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "tiny_scalar.add")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    const lhs_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    const rhs_reg = try paramReg(function, function.params.items[1].name, .{ .int = 32 });
+    if (lhs_reg != .rdi or rhs_reg != .rsi) return error.UnsupportedCodegenAbi;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+
+    const overflow_label = "tiny_add_overflow";
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = rhs_reg } });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);

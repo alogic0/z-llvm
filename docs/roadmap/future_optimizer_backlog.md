@@ -154,7 +154,10 @@ checked add-or-sub branch phi and panic-edge lowering. That blocker is now
 object-ok for `@branch_mix` and the already covered `@dense_switch`. The
 current probe is 15 successes and 2 failures. The first sorted blocker is
 `tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@add` checked
-scalar add and panic-edge lowering.
+scalar add and panic-edge lowering. That blocker is now object-ok for `@add`
+and `@sideEffectFree`. The current probe is 16 successes and 1 failure. The
+first sorted blocker is `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`,
+selected `@bump_tls` checked local-exec TLS update and panic-edge lowering.
 
 ## Activation Rule
 

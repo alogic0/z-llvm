@@ -61,8 +61,10 @@ closed_failure_6=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_6=@load_store
 closed_failure_7=switch_control.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_7=@branch_mix,@dense_switch
-current_probe=15 object-ok, 2 object-fail
-first_failure=tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll
-selected_alias=@add
-missing_capability=ReleaseSafe checked scalar add and panic-edge lowering
+closed_failure_8=tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll
+closed_aliases_8=@add,@sideEffectFree
+current_probe=16 object-ok, 1 object-fail
+first_failure=tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@bump_tls
+missing_capability=ReleaseSafe checked local-exec TLS update and panic-edge lowering
 ```

@@ -318,3 +318,45 @@ C
 zig cc "$switch_harness" "$switch_object" -o "$switch_exe"
 "$switch_exe"
 printf 'ok distribution releasesafe object switch_control_branch_mix_checked\n'
+
+tiny_fixture="test/distribution/releasesafe_x86_64/inputs/tiny_scalar_checked_add.ll"
+tiny_object="$tmp_dir/tiny_scalar_checked_add.o"
+tiny_summary="$tmp_dir/tiny_scalar_checked_add.readelf.txt"
+tiny_dump="$tmp_dir/tiny_scalar_checked_add.objdump.txt"
+tiny_harness="$tmp_dir/tiny_scalar_checked_add_harness.c"
+tiny_exe="$tmp_dir/tiny_scalar_checked_add_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$tiny_fixture" > "$tiny_object"
+readelf -W -h -S -s -r "$tiny_object" > "$tiny_summary"
+objdump -dr "$tiny_object" > "$tiny_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$tiny_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$tiny_summary"
+rg -q '[[:space:]]sideEffectFree$' "$tiny_summary"
+rg -q '[[:space:]]add$' "$tiny_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$tiny_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$tiny_dump"
+
+cat > "$tiny_harness" <<'C'
+#include <stdint.h>
+
+extern void sideEffectFree(void);
+extern int32_t add(int32_t lhs, int32_t rhs);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    sideEffectFree();
+    if (add(1, 2) != 3) return 1;
+    if (add(-7, 2) != -5) return 2;
+    if (add(1000, -250) != 750) return 3;
+    return 0;
+}
+C
+
+zig cc "$tiny_harness" "$tiny_object" -o "$tiny_exe"
+"$tiny_exe"
+printf 'ok distribution releasesafe object tiny_scalar_checked_add\n'
