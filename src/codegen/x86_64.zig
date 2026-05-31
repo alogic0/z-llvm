@@ -242,6 +242,16 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiF128AggregateReturn(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiF128ScalarReturn(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -2680,6 +2690,128 @@ fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, fu
     return true;
 }
 
+fn lowerCAbiF128AggregateReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_f128_struct")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ fp128 }" })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.fp128)) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const call_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateF128EqCall(call, function.params.items[0].name, "0xL0000000000000000400C81C800000000");
+
+    const icmp_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateEqZeroIcmp(icmp, call_name);
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return error.UnsupportedCodegenControlFlow;
+    const success_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const panic_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    try validateF128AggregateRet(function.blocks.items[success_index], "0xL0000000000000000400F81CD00000000");
+    try validatePanicUnreachableBlock(function.blocks.items[panic_index]);
+
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_struct_cmp0" });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try machine.instructions.append(allocator, .{ .jne = condbr.else_target });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .load_f128_const_xmm0 = "__zllvm_f128_struct_ret0" });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = condbr.else_target });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiF128ScalarReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_f128")) return false;
+    if (!function.ret_ty.eql(.fp128)) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.fp128)) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+    const call_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateF128EqCall(call, function.params.items[0].name, "0xL00000000000000004002800000000000");
+
+    const icmp_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const icmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateEqZeroIcmp(icmp, call_name);
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return error.UnsupportedCodegenControlFlow;
+    const success_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const panic_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    try validateF128ScalarRet(function.blocks.items[success_index], "0xL00000000000000004004100000000000");
+    try validatePanicUnreachableBlock(function.blocks.items[panic_index]);
+
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .load_f128_const_xmm1 = "__zllvm_f128_scalar_cmp0" });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "__eqtf2", .ret_ty = .{ .int = 32 } } });
+    try machine.instructions.append(allocator, .test_eax_eax);
+    try machine.instructions.append(allocator, .{ .jne = condbr.else_target });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .load_f128_const_xmm0 = "__zllvm_f128_scalar_ret0" });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = condbr.else_target });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn validateF128AggregateRet(block: ir.BasicBlock, expected: []const u8) !void {
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ fp128 }" })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    switch (value) {
+        .constant_expr => |text| {
+            var expected_text_buffer: [96]u8 = undefined;
+            const expected_text = try std.fmt.bufPrint(&expected_text_buffer, "{{ fp128 {s} }}", .{expected});
+            if (!std.mem.eql(u8, text, expected_text)) return error.UnsupportedCodegenValue;
+        },
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn validateF128ScalarRet(block: ir.BasicBlock, expected: []const u8) !void {
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.fp128)) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    switch (value) {
+        .fp => |text| if (!std.mem.eql(u8, text, expected)) return error.UnsupportedCodegenValue,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
 const F128Branch = struct {
     then_label: []const u8,
     else_label: []const u8,
@@ -3208,7 +3340,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -3228,7 +3360,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .js => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;

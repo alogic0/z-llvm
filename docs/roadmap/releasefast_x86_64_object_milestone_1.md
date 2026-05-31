@@ -177,4 +177,9 @@ failure is `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`, selected
 comparison calls and panic branches. That focused selected shape is now
 object-ok. The broad `c_abi_main` row remains the first sorted failure; the
 next selected alias in that row is `@zig_f128_struct`, a C ABI fp128
-aggregate-return shape with an `__eqtf2` guard and panic edge.
+aggregate-return shape with an `__eqtf2` guard and panic edge. The selected
+`@zig_f128_struct` and adjacent `@zig_f128` scalar fp128 return shapes are now
+object-ok in the focused ReleaseSmall gate. The broad row still remains the
+first sorted failure; the next selected alias is `@zig_assert_PD`, a mixed
+integer/double assertion shape with stack local aggregate setup, floating-point
+comparison, and panic edges.
