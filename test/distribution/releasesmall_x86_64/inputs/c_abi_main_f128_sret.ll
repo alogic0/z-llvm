@@ -36,6 +36,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_multiple_struct_floats = alias void (<2 x float>, <2 x float>, <2 x float>, <2 x float>), ptr @main.zig_multiple_struct_floats
 @zig_multiple_struct_ints = alias void (i64, i64, i64, i64), ptr @main.zig_multiple_struct_ints
 @zig_big_struct_both = alias void (ptr, ptr), ptr @main.zig_big_struct_both
+@zig_split_struct_mixed = alias void (i64, i64), ptr @main.zig_split_struct_mixed
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -372,6 +373,33 @@ define private void @main.zig_big_struct_both(ptr noalias nonnull writeonly sret
   tail call void @llvm.memcpy.p0.p0.i64(ptr %0, ptr @__anon_15510, i64 40, i1 0)
   ret void
 17:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_split_struct_mixed(i64 %0, i64 %1) unnamed_addr align 1 {
+2:
+  %.sroa.2.sroa.2.0.extract.shift = lshr i64 %1, 32
+  %.sroa.2.sroa.2.0.extract.trunc = trunc nuw i64 %.sroa.2.sroa.2.0.extract.shift to i32
+  %3 = bitcast i32 %.sroa.2.sroa.2.0.extract.trunc to float
+  %4 = icmp eq i64 %0, 1234
+  br i1 %4, label %5, label %8
+5:
+  %6 = and i64 %1, 255
+  %7 = icmp eq i64 %6, 100
+  br i1 %7, label %9, label %11
+8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+9:
+  %10 = fcmp oeq float %3, 1.337000e+03
+  br i1 %10, label %12, label %13
+11:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+12:
+  ret void
+13:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }
