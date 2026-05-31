@@ -153,6 +153,10 @@ Debug:
 
 - Compile-unit, subprogram, lexical block, and location metadata survive the
       accepted reduced fixtures.
+- The reduced Debug x86_64 object gate is clean for six selected fixtures:
+      `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
+      for call-chain, declare/value intrinsic, loop, metadata, and scope-branch
+      shapes.
 - Debug value salvage, DIExpression details, and large Debug-mode std support
       remain outside the accepted corpus.
 
@@ -166,8 +170,9 @@ Atomics:
 Backend handoff:
 
 - Machine IR, assembly, and object checks are validation-only.
-- TLS lowering, unwind/debug object records, register allocation, and ABI
-      lowering are not replacement-ready.
+- Selected Debug reduced objects now prove narrow codegen feasibility, but
+      TLS lowering, unwind/debug object records, register allocation, broad O0
+      lowering, and ABI lowering are not replacement-ready.
 
 ## Next Wave
 

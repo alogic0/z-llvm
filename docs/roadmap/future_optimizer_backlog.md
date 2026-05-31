@@ -564,6 +564,16 @@ ReleaseFast object/executable gates, ReleaseSafe object gate, selected
 ReleaseSmall object gate, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
+The bounded Debug x86_64 asm/object feasibility probe over
+`test/zig/expected/debug_*.reduced.ll` is clean: 6 object successes and 0
+failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
+selected blockers are call-result plus immediate-add lowering,
+`llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
+shape, and the reduced Debug scope-branch phi shape. Broad Debug asm/object
+still requires LLVM fallback because DWARF/unwind emission, full O0 codegen,
+variable-location salvage, broad std Debug rows, and target-complete ABI
+lowering remain outside this reduced subset.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete
@@ -627,6 +637,9 @@ explicit opt-22 parity work.
 Current debug-location-only behavior is fixture-backed. Full variable-location
 salvage remains outside the finish scope.
 
+- Treat reduced Debug object emission as a conservative subset only; do not
+  promote broad Debug asm/object until a source-backed broad Debug row is
+  captured, probed, and reduced from a concrete first blocker.
 - Add a debug salvage slice only when a source-backed transform removes or
   replaces an instruction carrying `!dbg` in a way not covered by existing
   fixtures.

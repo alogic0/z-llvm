@@ -47,6 +47,20 @@ matrix because broad raw Debug rows are still future evidence; reduced Debug
 metadata rows and the accepted Debug sweep prove only the documented local
 subset.
 
+Debug asm/object remains `LLVM fallback required` for the broad row. A bounded
+reduced object probe is now clean for selected Debug fixtures:
+
+```text
+bash scripts/run_distribution_debug_object_m4.sh
+  target=x86_64-unknown-linux-gnu
+  inputs=test/zig/expected/debug_*.reduced.ll
+  object_probe=6 ok, 0 fail
+  covered_shapes=call-chain add-immediate, dbg.declare/dbg.value no-op object
+                 lowering, simple loop sum, metadata add, scope branch phi
+  excluded=DWARF/unwind emission, full O0 codegen, variable-location salvage,
+           broad Debug std rows, target-complete ABI lowering
+```
+
 Handoff is conservative for release modes because
 `bash scripts/run_handoff_validation.sh` validates selected scalar, memory,
 loop, global, stack, and optimized scalar shapes, but not arbitrary accepted
@@ -93,10 +107,10 @@ bash scripts/run_distribution_no_llvm_codegen_subset.sh
   result=pass
 ```
 
-Asm/object remains LLVM fallback required for Debug, and for ReleaseFast,
-ReleaseSafe, and ReleaseSmall outside their named captured subsets.
-Existing docs explicitly exclude broad register allocation, scheduling,
-debug/unwind object records, linker ownership, and target-complete ABI lowering.
+Asm/object remains LLVM fallback required for broad Debug, and for ReleaseFast,
+ReleaseSafe, and ReleaseSmall outside their named captured subsets. Existing
+docs explicitly exclude broad register allocation, scheduling, debug/unwind
+object records, linker ownership, and target-complete ABI lowering.
 
 ## First Fallback Row
 

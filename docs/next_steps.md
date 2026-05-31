@@ -12,9 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Probe Debug x86_64 asm/object feasibility for a bounded optimized-output set
-and decide whether Debug remains a metadata-only boundary or becomes the next
-object milestone.
+Introduce object-probe automation for optimized-output directories so broad
+x86_64 object probes produce stable ok/fail/first-failure/category summaries
+instead of ad hoc shell loops.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -523,42 +523,50 @@ ReleaseFast object and executable gates, the ReleaseSafe object gate, the
 selected ReleaseSmall object gate, and `bash scripts/run_handoff_validation.sh`.
 The gate passed locally for `TARGET=x86_64-unknown-linux-gnu`.
 
+The bounded Debug x86_64 asm/object feasibility probe over
+`test/zig/expected/debug_*.reduced.ll` originally found 2 object successes and
+4 object failures. The first blocker was `debug_call_chain.reduced.ll`, a call
+result plus immediate-add shape. After selected constant-add-after-call
+lowering, debug intrinsic object no-ops, the reduced loop-sum lowerer, and the
+selected scope-branch phi lowerer, the probe is clean: 6 object successes and
+0 failures. The focused validation gate is
+`bash scripts/run_distribution_debug_object_m4.sh`. Debug remains
+`LLVM fallback required` for broad asm/object replacement; the new evidence is
+a reduced conservative object subset, not DWARF/unwind or full O0 codegen
+ownership.
+
 LLVM fallback removed or reduced:
-Run the smallest Debug x86_64 object feasibility probe that can decide whether
-Debug stays outside the current object milestone because of metadata/O0
-surface area, or whether a named Debug object subset should become Milestone 4.
-This reduces the remaining LLVM fallback by turning Debug from an unmeasured
-fallback row into an explicit boundary or measured object target. It does not
-claim broad Debug metadata preservation, DWARF/unwind ownership, full O0
-pipeline parity, linker ownership, LTO, sanitizer paths, non-x86_64 ABI
-behavior, or target-complete ABI behavior.
+Replace repeated broad object-probe shell loops with a tracked helper that can
+probe an optimized-output directory, emit stable counts, record the first
+sorted failure, and classify known boundary exclusions. This makes future
+ReleaseSmall, Debug, and later mode probes reproducible without expanding the
+local replacement claim.
 
 Mode/target/stage row:
-`mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=LLVM fallback required`.
+`mode=ReleaseSmall/Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`status=conservative boundary / LLVM fallback required outside named subsets`.
 
 Upstream mapping:
-Use LLVM x86_64 Debug/O0 object-emission and codegen handoff behavior as the
-reference boundary:
+Use LLVM x86_64 MC/object emission and codegen diagnostic behavior as the
+reference boundary for probe classification:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
-`llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-Debug feasibility probe, also map MC/object emission, relocations, and debug
-record boundaries against
-`llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
+`llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For object-file
+classification, also map MC/object emission, relocations, and debug-record
+boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not start by promising Debug object replacement. Capture or select a bounded
-Debug source-backed set, run local object emission, and record the first
-concrete blocker. If the first blocker is debug metadata/O0 infrastructure
-rather than a small codegen feature, keep Debug as a conservative/LLVM fallback
-boundary and document the exact reason.
+The helper must report evidence; it must not promote matrix rows by itself.
+Keep row promotion in docs after a human-reviewed probe result. Exclusions
+must be explicit by filename and reason.
 
 Validation gate:
-Run the bounded Debug capture/object probe and record exact counts, first
-failure, command, target, and exclusions. Keep
+Run the helper against the ReleaseSmall optimized-output directory and compare
+its summary with the current adjusted evidence: 463 object successes, 0 object
+failures, and 2 excluded rows. Keep
+`bash scripts/run_distribution_debug_object_m4.sh` and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:
