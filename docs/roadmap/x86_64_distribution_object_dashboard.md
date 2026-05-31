@@ -28,6 +28,7 @@ Current automated summaries:
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
 | Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 399 | 0 | 1 | `-` |
+| Debug continuous full 465 | `tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir` | 465 | 462 | 1 | 2 | `standalone_shared_library_mathtest.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -142,6 +143,15 @@ Debug broad:
     mix-C add_zig/add_may_panic checked-add and panic-edge lowering; the
     refreshed prefix-400 probe is 399 object successes, 0 object failures, and
     1 excluded row
+  continuous Debug full 465 uses the full available optimizer-ok Debug corpus
+    from tmp/zig_ir/continuous_20260530_151319_debug/report.tsv; the adjusted
+    probe is 462 object successes, 1 object failure, and 2 excluded rows
+  continuous Debug full 465 excludes
+    standalone_mix_o_files_base64.zig.Debug.x86_64.ll under the
+    debug-table-decoder-boundary, matching the existing ReleaseSmall base64
+    table-decoder boundary for @decode_base_64 -> @base64.decode_base_64
+  continuous Debug full 465 first implementation blocker is
+    standalone_shared_library_mathtest.zig.Debug.x86_64.ll
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

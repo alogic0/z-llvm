@@ -12,9 +12,10 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Run the next bounded continuous Debug object probe after closing the prefix-400
-object blockers. If it finds a source-backed failure, reduce that first sorted
-failure into the next implementation slice.
+Close the next measured continuous Debug object blocker:
+`standalone_shared_library_mathtest.zig.Debug.x86_64.ll`. Keep the slice
+bounded to one selected Debug/O0 public shape from that row, then rerun the
+focused Debug object gate and the adjusted full continuous Debug object probe.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -122,6 +123,81 @@ excluded_reason=debug-float-format-helper-boundary
 first_failure=-
 first_failure_category=-
 ```
+
+The next bounded probe used the full available continuous Debug object set.
+The report has 465 optimizer-ok rows, so the requested first-500-row prefix
+collapses to the full corpus at
+`tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir`. The direct
+probe found 462 object successes, 2 object failures, and the existing
+float-format helper exclusion:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/object_probe_summary.txt
+total=465
+ok=462
+fail=2
+excluded=1
+first_failure=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
+```
+
+`standalone_mix_o_files_base64.zig.Debug.x86_64.ll` is the Debug/O0 sibling of
+the documented ReleaseSmall table-decoder boundary. The selected public shape
+is `@decode_base_64 = alias i64 (ptr, i64, ptr, i64), ptr
+@base64.decode_base_64`; the body is a broad table-driven decoder with
+multi-block loops, table constants, input/output pointer traversal, panic
+edges, and error returns. That is not a defensible one-slice Debug backend
+reduction, so the row is an explicit boundary exclusion for this Debug object
+probe.
+
+With the float-format helper and table-decoder rows excluded, the adjusted
+full continuous Debug object probe is:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/object_probe_adjusted_summary.txt
+total=465
+ok=462
+fail=1
+excluded=2
+excluded_row=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+excluded_reason=debug-float-format-helper-boundary
+excluded_row=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
+excluded_reason=debug-table-decoder-boundary
+first_failure=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
+```
+
+The selected implementation target is
+`standalone_shared_library_mathtest.zig.Debug.x86_64.ll`. Select one public
+shape from that row, name the missing lowering/ELF behavior before editing, and
+add it to `bash scripts/run_distribution_debug_object_m4.sh`.
+
+LLVM fallback removed or reduced:
+Debug x86_64 asm/object fallback is reduced only for the adjusted continuous
+465-row object subset, with two explicit exclusions and one active blocker.
+
+Mode/target/stage row:
+Debug / x86_64-linux-gnu / asm-object remains `LLVM fallback required`.
+
+Upstream mapping:
+LLVM owns this broad Debug/O0 object surface through the normal x86 target
+CodeGen pipeline, including SelectionDAG/GlobalISel lowering, register
+allocation, and ELF emission. The local replacement must only implement the
+selected source-backed shape, not general Debug backend parity.
+
+Known boundary:
+DWARF/unwind emission, full O0 codegen, variable-location salvage,
+target-complete ABI lowering, the Debug float-format helper, and the Debug
+base64 table decoder remain outside this slice.
+
+Validation gate:
+`bash scripts/run_distribution_debug_object_m4.sh`, the adjusted full
+continuous Debug object probe, `bash scripts/run_distribution_no_llvm_codegen_subset.sh`,
+and `zig build test` if shared lowering code changes.
+
+Commit:
+Commit the boundary evidence first, then commit the selected
+`standalone_shared_library_mathtest` implementation slice separately.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:

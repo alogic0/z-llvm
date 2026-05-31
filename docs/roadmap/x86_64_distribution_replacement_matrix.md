@@ -126,6 +126,19 @@ closed_boundary=selected Debug/O0 panic-unreachable compile-asm entry,
                 issue-339 error-success edge, libfuzzer runner aliases, and
                 dynamic-library checked add; selected Debug/O0 mix-C
                 add_zig/add_may_panic checked-add and panic-edge lowering
+
+source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv all 465 optimizer-ok rows
+probe=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir
+object_probe=462 ok, 1 fail, 2 excluded
+excluded=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+excluded_reason=debug-float-format-helper-boundary
+excluded=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
+excluded_reason=debug-table-decoder-boundary
+first_failure=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
+first_failure_category=unsupported-control-flow
+closed_boundary=Debug/O0 base64 table decoder matches the existing
+                ReleaseSmall table-decoder boundary for @decode_base_64;
+                active_blocker=selected shared-library mathtest shape
 ```
 
 Handoff is conservative for release modes because
