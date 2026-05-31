@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_struct_u64_u64_4` split u64 pair struct control-flow lowering from
+`@zig_struct_u64_u64_3` split u64 pair struct control-flow lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -280,11 +280,16 @@ now object-ok with selected `%r9` byval field loads, stack argument load, and
 local trap failure edges. The broad row still remains the first object
 failure; the next selected public shape is `@zig_struct_u64_u64_4 = alias void
 (i64, i64, i64, i64, i64, i64, i64), ptr @main.zig_struct_u64_u64_4`, a split
-u64 pair struct control-flow shape with the final field stack-passed.
+u64 pair struct control-flow shape with the final field stack-passed. That
+focused shape is now object-ok with selected register and stack argument
+checks plus local trap failure edges. The broad row still remains the first
+object failure; the next selected public shape is `@zig_struct_u64_u64_3 =
+alias void (i64, i64, i64, i64, i64, i64), ptr @main.zig_struct_u64_u64_3`, a
+split u64 pair struct control-flow shape entirely in argument registers.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_struct_u64_u64_4` split u64 pair struct control-flow shape. This
+`@zig_struct_u64_u64_3` split u64 pair struct control-flow shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -306,7 +311,7 @@ lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_struct_u64_u64_4` ReleaseSmall split u64
+Implement only the selected `@zig_struct_u64_u64_3` ReleaseSmall split u64
 pair struct control-flow shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or

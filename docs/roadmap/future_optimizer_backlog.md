@@ -342,6 +342,10 @@ That focused shape is now object-ok with selected `%r9` byval field loads,
 stack argument load, and local trap failure edges. The broad row still remains
 the first sorted blocker; the next selected alias is `@zig_struct_u64_u64_4`,
 a split u64 pair struct control-flow shape with the final field stack-passed.
+That focused shape is now object-ok with selected register and stack argument
+checks plus local trap failure edges. The broad row still remains the first
+sorted blocker; the next selected alias is `@zig_struct_u64_u64_3`, a split
+u64 pair struct control-flow shape entirely in argument registers.
 
 ## Activation Rule
 
