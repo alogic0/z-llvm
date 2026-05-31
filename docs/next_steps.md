@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@inline_asm_barrier` lowering in
+optimized-output capture: selected `@atomic_add` global `atomicrmw` lowering in
 `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -22,16 +22,17 @@ The broad ReleaseFast optimized-output probe over
 `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
 `aggregates.zig.ReleaseFast.x86_64.optimized.ll`. The next sorted failure is
 `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`; the first shape,
-`@debug_location`, is now covered. The next shape is `@inline_asm_barrier =
-alias i32 (i32)`, which contains a side-effecting empty inline asm memory
-barrier and returns its i32 argument.
+`@debug_location`, is now covered, as is `@inline_asm_barrier`. The next shape
+is `@atomic_add = alias i32 (i32)`, which performs `atomicrmw add` on the private
+global `@atomics_inline_asm_debug.atomic_counter` and returns the old value.
 
 LLVM fallback removed or reduced:
-Add the smallest x86_64 lowering needed for the selected empty side-effecting
-inline asm memory barrier shape. This reduces the ReleaseFast x86_64 asm/object
-fallback for the next broad optimized-output row only; it does not claim general
-inline asm constraints, non-empty asm templates, atomicrmw, global data, memory
-ordering, or target-complete ABI coverage.
+Add the smallest object/codegen support needed for the selected `atomicrmw add`
+shape, including the private i32 global storage and x86_64 atomic add lowering.
+This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
+optimized-output row only; it does not claim general atomic orderings,
+thread-local storage, arbitrary globals, compare-exchange, or target-complete
+ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -45,9 +46,9 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@inline_asm_barrier` shape from the
-atomics/inline-asm optimized output. Do not generalize to non-empty inline asm,
-atomic operations, global storage, vectors, floating point, or non-x86_64 ABI
+Implement only the selected `@atomic_add` shape from the atomics/inline-asm
+optimized output. Do not generalize to other atomic operations, global
+initializers, thread-local storage, vectors, floating point, or non-x86_64 ABI
 behavior in this slice.
 
 Validation gate:

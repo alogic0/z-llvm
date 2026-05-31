@@ -234,6 +234,7 @@ fn lowerStraightLineReturn(
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
             if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
+            if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -884,6 +885,34 @@ fn lowerAddChain3Return(
     try machine.instructions.append(allocator, .{ .mov_arg_eax = first_lhs });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = first_rhs } });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = third_reg } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerInlineAsmBarrierReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    if (call_inst.result != null) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    const inline_asm = call.inline_asm orelse return false;
+    if (!inline_asm.sideeffect or !inline_asm.has_memory_clobber) return false;
+    if (inline_asm.template.len != 0) return false;
+    if (call.ret_ty != .void or call.args.items.len != 0) return false;
+
+    const ret_reg = try paramValueReg(function, ret.value orelse return error.InvalidRet, .{ .int = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = ret_reg });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

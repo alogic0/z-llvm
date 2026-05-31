@@ -335,3 +335,25 @@ C
 zig cc "$atomics_debug_harness" "$atomics_debug_object" -o "$atomics_debug_exe"
 "$atomics_debug_exe"
 printf 'ok distribution executable atomics_debug_location\n'
+
+atomics_barrier_fixture="test/distribution/releasefast_x86_64/inputs/atomics_inline_asm_barrier.ll"
+atomics_barrier_object="$tmp_dir/atomics_inline_asm_barrier.o"
+atomics_barrier_harness="$tmp_dir/atomics_inline_asm_barrier_harness.c"
+atomics_barrier_exe="$tmp_dir/atomics_inline_asm_barrier_harness"
+
+zig build run -- --emit=obj --target="$target" "$atomics_barrier_fixture" > "$atomics_barrier_object"
+
+cat > "$atomics_barrier_harness" <<'C'
+extern int inline_asm_barrier(int value);
+
+int main(void) {
+    if (inline_asm_barrier(0) != 0) return 1;
+    if (inline_asm_barrier(42) != 42) return 2;
+    if (inline_asm_barrier(-7) != -7) return 3;
+    return 0;
+}
+C
+
+zig cc "$atomics_barrier_harness" "$atomics_barrier_object" -o "$atomics_barrier_exe"
+"$atomics_barrier_exe"
+printf 'ok distribution executable atomics_inline_asm_barrier\n'

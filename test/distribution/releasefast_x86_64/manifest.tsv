@@ -14,3 +14,4 @@ aggregates_slice_sum	test/distribution/releasefast_x86_64/inputs/aggregates_slic
 aggregates_struct_sum	test/distribution/releasefast_x86_64/inputs/aggregates_struct_sum.ll	object-readelf	object-ok	aggregates.zig	struct field loads	struct_sum
 aggregates_array_sum	test/distribution/releasefast_x86_64/inputs/aggregates_array_sum.ll	object-readelf	object-ok	aggregates.zig	three argument add chain	array_sum
 atomics_debug_location	test/distribution/releasefast_x86_64/inputs/atomics_debug_location.ll	object-readelf	object-ok	atomics_inline_asm_debug.zig	add immediate return	debug_location
+atomics_inline_asm_barrier	test/distribution/releasefast_x86_64/inputs/atomics_inline_asm_barrier.ll	object-readelf	object-ok	atomics_inline_asm_debug.zig	empty inline asm memory barrier	inline_asm_barrier
