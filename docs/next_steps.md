@@ -12,10 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Close the next measured continuous Debug object blocker:
-`standalone_shared_library_mathtest.zig.Debug.x86_64.ll`. Keep the slice
-bounded to one selected Debug/O0 public shape from that row, then rerun the
-focused Debug object gate and the adjusted full continuous Debug object probe.
+Extend the first no-LLVM-codegen distribution subset gate with the selected
+Debug asm/object conservative boundary. Keep the gate focused: include the
+tracked Debug M4 object fixtures, not an expensive broad full-corpus probe.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -167,17 +166,36 @@ first_failure=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
 first_failure_category=unsupported-control-flow
 ```
 
-The selected implementation target is
-`standalone_shared_library_mathtest.zig.Debug.x86_64.ll`. Select one public
-shape from that row, name the missing lowering/ELF behavior before editing, and
-add it to `bash scripts/run_distribution_debug_object_m4.sh`.
+The selected `standalone_shared_library_mathtest.zig.Debug.x86_64.ll` public
+shape is `@add = alias i32 (i32, i32), ptr @mathtest.add`, a Debug/O0
+two-argument checked `llvm.sadd.with.overflow.i32` add with an integer-overflow
+panic edge. That shape is now object-ok through the tracked fixture
+`test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll` and
+`bash scripts/run_distribution_debug_object_m4.sh`. The adjusted full
+continuous Debug object probe is now clean for the captured subset:
+
+```text
+summary=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/object_probe_adjusted_summary_after_shared_library.txt
+total=465
+ok=463
+fail=0
+excluded=2
+excluded_row=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
+excluded_reason=debug-float-format-helper-boundary
+excluded_row=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
+excluded_reason=debug-table-decoder-boundary
+first_failure=-
+first_failure_category=-
+```
 
 LLVM fallback removed or reduced:
-Debug x86_64 asm/object fallback is reduced only for the adjusted continuous
-465-row object subset, with two explicit exclusions and one active blocker.
+Debug x86_64 asm/object fallback is reduced to a conservative captured-subset
+boundary: 463 object-clean continuous Debug rows, with two explicit exclusions.
 
 Mode/target/stage row:
-Debug / x86_64-linux-gnu / asm-object remains `LLVM fallback required`.
+Debug / x86_64-linux-gnu / asm-object is a conservative boundary for the
+adjusted continuous 463-row subset. Debug outside that named subset remains an
+LLVM fallback.
 
 Upstream mapping:
 LLVM owns this broad Debug/O0 object surface through the normal x86 target
@@ -191,13 +209,12 @@ target-complete ABI lowering, the Debug float-format helper, and the Debug
 base64 table decoder remain outside this slice.
 
 Validation gate:
-`bash scripts/run_distribution_debug_object_m4.sh`, the adjusted full
-continuous Debug object probe, `bash scripts/run_distribution_no_llvm_codegen_subset.sh`,
-and `zig build test` if shared lowering code changes.
+Update and run `bash scripts/run_distribution_no_llvm_codegen_subset.sh`, then
+keep `bash scripts/run_distribution_debug_object_m4.sh` and `zig build test`
+green.
 
 Commit:
-Commit the boundary evidence first, then commit the selected
-`standalone_shared_library_mathtest` implementation slice separately.
+Commit the no-LLVM subset gate update after validation.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:
@@ -818,14 +835,14 @@ first_failure_category=-
 ```
 
 LLVM fallback removed or reduced:
-The first 300 continuous Debug optimizer-ok rows are object-clean. The next
-slice should probe the next bounded Debug prefix and reduce the first measured
-failure only if it stays source-backed and narrow. Keep broad Debug asm/object
-as LLVM fallback outside selected rows.
+The adjusted continuous Debug 465-row object probe is clean for 463 rows with
+two explicit exclusions after the selected shared-library mathtest checked-add
+slice. Keep broad Debug asm/object as LLVM fallback outside the named captured
+subset.
 
 Mode/target/stage row:
 `mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=LLVM fallback required outside selected reduced/raw/prefix rows`.
+`status=conservative boundary for the adjusted continuous 463-row subset`.
 
 Upstream mapping:
 Use LLVM x86_64 Debug/O0 codegen, MC/object emission, diagnostics, and
@@ -839,13 +856,13 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not promote broad Debug asm/object from the clean prefix alone. Record each
-selected public shape, its Debug/O0 IR form, and whether it maps to an already
-selected lowering family or to broader Debug/O0 infrastructure.
+Do not promote target-complete Debug asm/object. The conservative boundary
+excludes DWARF/unwind emission, variable-location salvage, target-complete ABI
+lowering, the float-format helper, and the base64 table decoder.
 
 Validation gate:
-Run the next bounded Debug continuous-prefix object probe, then keep
-`bash scripts/run_distribution_debug_object_m4.sh` and
+Keep `bash scripts/run_distribution_debug_object_m4.sh`, the adjusted full
+continuous Debug object probe, and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:

@@ -18,7 +18,7 @@ out of scope: not part of the current x86_64 milestone
 
 | Mode | Parse | Verify | Optimize | Handoff | Asm/Object |
 | --- | --- | --- | --- | --- | --- |
-| Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | LLVM fallback required |
+| Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | conservative boundary |
 | ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
@@ -47,8 +47,9 @@ matrix because broad raw Debug rows are still future evidence; reduced Debug
 metadata rows and the accepted Debug sweep prove only the documented local
 subset.
 
-Debug asm/object remains `LLVM fallback required` for the broad row. A bounded
-reduced object probe is now clean for selected Debug fixtures:
+Debug asm/object is a conservative boundary for the adjusted continuous
+captured subset, not target-complete Debug backend ownership. A bounded reduced
+object probe is also clean for selected Debug fixtures:
 
 ```text
 bash scripts/run_distribution_debug_object_m4.sh
@@ -129,16 +130,17 @@ closed_boundary=selected Debug/O0 panic-unreachable compile-asm entry,
 
 source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv all 465 optimizer-ok rows
 probe=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir
-object_probe=462 ok, 1 fail, 2 excluded
+object_probe=463 ok, 0 fail, 2 excluded
 excluded=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
 excluded_reason=debug-float-format-helper-boundary
 excluded=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
 excluded_reason=debug-table-decoder-boundary
-first_failure=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
-first_failure_category=unsupported-control-flow
+first_failure=-
+first_failure_category=-
 closed_boundary=Debug/O0 base64 table decoder matches the existing
-                ReleaseSmall table-decoder boundary for @decode_base_64;
-                active_blocker=selected shared-library mathtest shape
+                ReleaseSmall table-decoder boundary for @decode_base_64
+closed_blocker=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
+               selected @add -> @mathtest.add checked add with panic edge
 ```
 
 Handoff is conservative for release modes because

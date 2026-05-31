@@ -28,7 +28,7 @@ Current automated summaries:
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
 | Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 399 | 0 | 1 | `-` |
-| Debug continuous full 465 | `tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir` | 465 | 462 | 1 | 2 | `standalone_shared_library_mathtest.zig.Debug.x86_64.ll` |
+| Debug continuous full 465 | `tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir` | 465 | 463 | 0 | 2 | `-` |
 
 ReleaseSmall exclusions:
 
@@ -65,7 +65,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call objects |
 | ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions |
-| Debug | LLVM fallback required | reduced object subset plus selected broad raw and continuous-prefix object proof; broader Debug std rows remain unproven |
+| Debug | conservative boundary | adjusted continuous 463-row object-clean subset with 2 explicit exclusions |
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
 in [x86_64_distribution_replacement_matrix.md](x86_64_distribution_replacement_matrix.md)
@@ -145,13 +145,14 @@ Debug broad:
     1 excluded row
   continuous Debug full 465 uses the full available optimizer-ok Debug corpus
     from tmp/zig_ir/continuous_20260530_151319_debug/report.tsv; the adjusted
-    probe is 462 object successes, 1 object failure, and 2 excluded rows
+    probe is 463 object successes, 0 object failures, and 2 excluded rows
   continuous Debug full 465 excludes
     standalone_mix_o_files_base64.zig.Debug.x86_64.ll under the
     debug-table-decoder-boundary, matching the existing ReleaseSmall base64
     table-decoder boundary for @decode_base_64 -> @base64.decode_base_64
-  continuous Debug full 465 first implementation blocker is
-    standalone_shared_library_mathtest.zig.Debug.x86_64.ll
+  continuous Debug full 465 now advances past
+    standalone_shared_library_mathtest.zig.Debug.x86_64.ll after selected
+    Debug/O0 mathtest.add checked-add and panic-edge lowering
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage

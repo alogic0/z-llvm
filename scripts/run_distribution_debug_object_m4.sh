@@ -233,4 +233,20 @@ rg -q '[[:space:]]js[[:space:]]+' "$mix_c_files_dump"
 rg -q 'ud2' "$mix_c_files_dump"
 printf 'ok distribution debug object mix_c_files_main_o0\n'
 
+shared_library_fixture="test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll"
+shared_library_object="$tmp_dir/shared_library_mathtest_add_o0.o"
+shared_library_summary="$tmp_dir/shared_library_mathtest_add_o0.readelf.txt"
+shared_library_dump="$tmp_dir/shared_library_mathtest_add_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$shared_library_fixture" > "$shared_library_object"
+readelf -W -h -S -s -r "$shared_library_object" > "$shared_library_summary"
+objdump -dr "$shared_library_object" > "$shared_library_dump"
+
+check_common_object "$shared_library_summary" add
+rg -q '[[:space:]]mathtest\.add$' "$shared_library_summary"
+rg -q "R_X86_64_PLT32.*debug\\.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow" "$shared_library_summary"
+rg -q '[[:space:]]jo[[:space:]]+' "$shared_library_dump"
+rg -q '[[:space:]]ret' "$shared_library_dump"
+printf 'ok distribution debug object shared_library_mathtest_add_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"
