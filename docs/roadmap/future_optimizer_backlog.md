@@ -230,7 +230,10 @@ shape is now object-ok. The broad row still remains the first sorted blocker;
 the next selected alias is `@zig_ret_u8`, a straight-line zero-extended u8
 return. That focused shape is now object-ok. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_ret_bool`, a
-straight-line boolean return.
+straight-line boolean return. That focused shape is now object-ok. The broad
+row still remains the first sorted blocker; the next selected alias is
+`@zig_multiple_struct_floats`, a vector-parameter floating comparison
+control-flow shape.
 
 ## Activation Rule
 

@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_ret_bool` straight-line i1 return lowering from
+`@zig_multiple_struct_floats` vector-parameter control-flow lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -146,14 +146,20 @@ the next selected public shape is `@zig_ret_u8 = alias i8 (), ptr
 @main.zig_ret_u8`, a straight-line zero-extended u8 return. That focused
 shape is now object-ok. The broad row still remains the first object failure;
 the next selected public shape is `@zig_ret_bool = alias i1 (), ptr
-@main.zig_ret_bool`, a straight-line boolean return.
+@main.zig_ret_bool`, a straight-line boolean return. That focused shape is now
+object-ok. The broad row still remains the first object failure; the next
+selected public shape is `@zig_multiple_struct_floats = alias void (<2 x
+float>, <2 x float>, <2 x float>, <2 x float>), ptr
+@main.zig_multiple_struct_floats`, a vector-parameter floating comparison
+control-flow shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_ret_bool` straight-line i1 return shape. This continues reducing the
-ReleaseSmall asm/object fallback row. It does not claim broad scalar return
-coverage, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+`@zig_multiple_struct_floats` vector-parameter control-flow shape. This
+continues reducing the ReleaseSmall asm/object fallback row. It does not claim
+broad vector ABI lowering, arbitrary floating-point comparison control flow,
+panic side-effect lowering, non-x86_64 ABI behavior, debug records, unwind
+records, linker ownership, or target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -165,15 +171,16 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-straight-line i1 return, also map against SelectionDAG integer return and
-register assignment lowering in
+vector-parameter control-flow shape, also map against SelectionDAG vector
+argument assignment, extractelement, floating comparison, and branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_ret_bool` ReleaseSmall straight-line i1
-return shape from the `c_abi_main` optimized output. Do not
-generalize to all scalar return attributes, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Implement only the selected `@zig_multiple_struct_floats` ReleaseSmall
+vector-parameter control-flow shape from the `c_abi_main` optimized output. Do
+not generalize to all vector ABI behavior, arbitrary floating-point comparison
+graphs, panic side effects, debug/unwind object records, or non-x86_64 ABI
+behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
