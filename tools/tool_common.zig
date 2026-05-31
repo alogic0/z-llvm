@@ -123,7 +123,7 @@ pub fn diffFiles(allocator: std.mem.Allocator, io: std.Io, expected: []const u8,
 }
 
 pub fn commandExists(allocator: std.mem.Allocator, io: std.Io, command: []const u8) !bool {
-    const argv = [_][]const u8{ "command", "-v", command };
+    const argv = [_][]const u8{ "which", command };
     const result = try std.process.run(allocator, io, .{
         .argv = &argv,
         .stdout_limit = .limited(1024 * 1024),
