@@ -3623,7 +3623,8 @@ fn lowerCheckedBranchMix(allocator: std.mem.Allocator, machine: *MachineFunction
 }
 
 fn lowerCheckedTinyAdd(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "tiny_scalar.add")) return false;
+    if (!std.mem.eql(u8, function.name, "tiny_scalar.add") and
+        !std.mem.eql(u8, function.name, "add.add")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;

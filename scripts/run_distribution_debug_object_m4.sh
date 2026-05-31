@@ -196,4 +196,20 @@ rg -q 'R_X86_64_PLT32.*fuzzer_start_test' "$libfuzzer_summary"
 rg -q '[[:space:]]ret' "$libfuzzer_dump"
 printf 'ok distribution debug object libfuzzer_runner_o0\n'
 
+load_dynamic_add_fixture="test/distribution/debug_x86_64/inputs/load_dynamic_library_add_o0.ll"
+load_dynamic_add_object="$tmp_dir/load_dynamic_library_add_o0.o"
+load_dynamic_add_summary="$tmp_dir/load_dynamic_library_add_o0.readelf.txt"
+load_dynamic_add_dump="$tmp_dir/load_dynamic_library_add_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$load_dynamic_add_fixture" > "$load_dynamic_add_object"
+readelf -W -h -S -s -r "$load_dynamic_add_object" > "$load_dynamic_add_summary"
+objdump -dr "$load_dynamic_add_object" > "$load_dynamic_add_dump"
+
+check_common_object "$load_dynamic_add_summary" add
+rg -q '[[:space:]]add\.add$' "$load_dynamic_add_summary"
+rg -q "R_X86_64_PLT32.*debug\\.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow" "$load_dynamic_add_summary"
+rg -q '[[:space:]]jo[[:space:]]+' "$load_dynamic_add_dump"
+rg -q '[[:space:]]ret' "$load_dynamic_add_dump"
+printf 'ok distribution debug object load_dynamic_library_add_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

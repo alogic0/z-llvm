@@ -27,7 +27,7 @@ Current automated summaries:
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
-| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 397 | 2 | 1 | `standalone_load_dynamic_library_add.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 398 | 1 | 1 | `standalone_mix_c_files_main.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -131,6 +131,12 @@ Debug broad:
     prefix-400 probe is 397 object successes, 2 object failures, and 1
     excluded row, with standalone_load_dynamic_library_add.zig.Debug.x86_64.ll
     as the first remaining failure
+  continuous Debug prefix 400 now advances past
+    standalone_load_dynamic_library_add.zig.Debug.x86_64.ll after reusing the
+    selected checked-add overflow lowering for @add -> @add.add; the refreshed
+    prefix-400 probe is 398 object successes, 1 object failure, and 1 excluded
+    row, with standalone_mix_c_files_main.zig.Debug.x86_64.ll as the first
+    remaining failure
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage
