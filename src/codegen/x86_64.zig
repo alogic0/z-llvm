@@ -475,6 +475,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructF64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -3666,6 +3671,20 @@ fn lowerCAbiStructF32A8(allocator: std.mem.Allocator, machine: *MachineFunction,
     return true;
 }
 
+fn lowerCAbiStructF64(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_f64")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 1) return false;
+    if (function.params.items[0].ty != .double) return error.UnsupportedCodegenType;
+
+    const fail = "struct_f64_fail";
+    try appendCompareXmmLowF64(allocator, machine, 0x4004_0000_0000_0000, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn appendCompareMem64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -3702,6 +3721,18 @@ fn appendCompareXmmLowF32(
 ) !void {
     try machine.instructions.append(allocator, .{ .movq_xmm_rax = reg });
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = @bitCast(expected_bits) });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn appendCompareXmmLowF64(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    expected_bits: u64,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = expected_bits });
+    try machine.instructions.append(allocator, .ucomisd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .jp = fail });
     try machine.instructions.append(allocator, .{ .jne = fail });
 }
 

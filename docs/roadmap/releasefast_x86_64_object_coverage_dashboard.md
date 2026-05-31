@@ -76,7 +76,7 @@ closed_failure_11=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.l
 closed_aliases_11=@c_fopen,@c_ftell,@c_fputs,@c_printf
 next_object_probe=265 object-ok, 200 object-fail
 first_failure=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
-closed_aliases_in_first_failure=@zig_f128_f128_struct,@zig_f128_struct,@zig_f128,@zig_assert_PD,@zig_ret_PD,@zig_ret_CFF,@zig_assert_CFF,@zig_ret_DC,@zig_assert_DC,@zig_ret_split_struct_mixed,@zig_ret_med_struct_mixed,@zig_ret_med_struct_ints,@zig_ret_small_struct_ints,@zig_ret_i64,@zig_ret_i32,@zig_ret_i16,@zig_ret_i8,@zig_ret_u16,@zig_ret_u8,@zig_ret_bool,@zig_multiple_struct_floats,@zig_multiple_struct_ints,@zig_big_struct_both,@zig_split_struct_mixed,@zig_split_struct_ints,@zig_big_packed_struct,@zig_small_packed_struct,@zig_med_struct_ints,@zig_small_struct_ints,@zig_med_struct_mixed,@zig_big_union,@zig_big_struct,@zig_struct_i32_i32,@zig_struct_f32_f32f32,@zig_struct_f32f32_f32,@zig_ret_struct_f32_f32f32,@zig_ret_struct_f32f32_f32,@zig_struct_f32a8_f32a8,@zig_ret_struct_f32a8_f32a8,@zig_struct_f32a8,@zig_ret_struct_f32a8
-selected_alias=@zig_struct_f64
-missing_capability=ReleaseSmall scalar double struct comparison control-flow lowering
+closed_aliases_in_first_failure=@zig_f128_f128_struct,@zig_f128_struct,@zig_f128,@zig_assert_PD,@zig_ret_PD,@zig_ret_CFF,@zig_assert_CFF,@zig_ret_DC,@zig_assert_DC,@zig_ret_split_struct_mixed,@zig_ret_med_struct_mixed,@zig_ret_med_struct_ints,@zig_ret_small_struct_ints,@zig_ret_i64,@zig_ret_i32,@zig_ret_i16,@zig_ret_i8,@zig_ret_u16,@zig_ret_u8,@zig_ret_bool,@zig_multiple_struct_floats,@zig_multiple_struct_ints,@zig_big_struct_both,@zig_split_struct_mixed,@zig_split_struct_ints,@zig_big_packed_struct,@zig_small_packed_struct,@zig_med_struct_ints,@zig_small_struct_ints,@zig_med_struct_mixed,@zig_big_union,@zig_big_struct,@zig_struct_i32_i32,@zig_struct_f32_f32f32,@zig_struct_f32f32_f32,@zig_ret_struct_f32_f32f32,@zig_ret_struct_f32f32_f32,@zig_struct_f32a8_f32a8,@zig_ret_struct_f32a8_f32a8,@zig_struct_f32a8,@zig_ret_struct_f32a8,@zig_struct_f64
+selected_alias=@zig_ret_struct_f64
+missing_capability=ReleaseSmall scalar double struct return lowering
 ```
