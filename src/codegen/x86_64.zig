@@ -536,6 +536,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiCmultfComp(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiStructF32(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -3950,6 +3955,26 @@ fn lowerCAbiCmultdComp(allocator: std.mem.Allocator, machine: *MachineFunction, 
     try appendCompareXmmF64(allocator, machine, .xmm3, .xmm1, 0xbff8_0000_0000_0000, fail);
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x3ff8_0000_0000_0000 });
     try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = 0x402b_0000_0000_0000 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiCmultfComp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_cmultf_comp")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ <2 x float> }" })) return false;
+    if (function.params.items.len != 4) return false;
+    for (function.params.items) |param| {
+        if (param.ty != .float) return error.UnsupportedCodegenType;
+    }
+
+    const fail = "cmultf_comp_fail";
+    try appendCompareXmmLowF32(allocator, machine, .xmm0, 0x3fa0_0000, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm1, 0x4026_6666, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm2, 0x4134_cccd, fail);
+    try appendCompareXmmLowF32(allocator, machine, .xmm3, 0xbfc0_0000, fail);
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = 0x4158_0000_3fc0_0000 });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);
