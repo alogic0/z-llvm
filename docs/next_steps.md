@@ -12,9 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Introduce object-probe automation for optimized-output directories so broad
-x86_64 object probes produce stable ok/fail/first-failure/category summaries
-instead of ad hoc shell loops.
+Create a unified x86_64 distribution object dashboard backed by automated
+object-probe summaries for ReleaseFast, ReleaseSafe, ReleaseSmall, and the
+reduced Debug object subset.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -535,20 +535,34 @@ selected scope-branch phi lowerer, the probe is clean: 6 object successes and
 a reduced conservative object subset, not DWARF/unwind or full O0 codegen
 ownership.
 
+Object-probe automation is now tracked as
+`bash scripts/probe_distribution_objects.sh`. It emits stable per-row
+ok/fail/excluded lines, first-failure data, and category counts. It reproduced
+the current x86_64 release-mode object evidence:
+
+```text
+ReleaseFast  input=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
+             summary total=17 ok=17 fail=0 excluded=0 first_failure=-
+ReleaseSafe  input=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
+             summary total=17 ok=17 fail=0 excluded=0 first_failure=-
+ReleaseSmall input=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir
+             summary total=465 ok=463 fail=0 excluded=2 first_failure=-
+             excluded=standalone_emit_llvm_no_bin_main float-format helper,
+                      standalone_mix_o_files_base64 table decoder
+```
+
 LLVM fallback removed or reduced:
-Replace repeated broad object-probe shell loops with a tracked helper that can
-probe an optimized-output directory, emit stable counts, record the first
-sorted failure, and classify known boundary exclusions. This makes future
-ReleaseSmall, Debug, and later mode probes reproducible without expanding the
-local replacement claim.
+Replace the mode-specific historical object notes with one compact dashboard
+that reports automated probe totals, focused gates, executable coverage, and
+explicit exclusions without expanding the local replacement claim.
 
 Mode/target/stage row:
 `mode=ReleaseSmall/Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=conservative boundary / LLVM fallback required outside named subsets`.
 
 Upstream mapping:
-Use LLVM x86_64 MC/object emission and codegen diagnostic behavior as the
-reference boundary for probe classification:
+Use LLVM x86_64 MC/object emission, codegen diagnostics, and object-file
+handoff behavior as the reference boundary for dashboard classifications:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
@@ -558,15 +572,14 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-The helper must report evidence; it must not promote matrix rows by itself.
-Keep row promotion in docs after a human-reviewed probe result. Exclusions
-must be explicit by filename and reason.
+The dashboard reports evidence; it must not promote matrix rows by itself.
+Keep row promotion in the replacement matrix after a human-reviewed probe
+result. Exclusions must be explicit by filename and reason.
 
 Validation gate:
-Run the helper against the ReleaseSmall optimized-output directory and compare
-its summary with the current adjusted evidence: 463 object successes, 0 object
-failures, and 2 excluded rows. Keep
-`bash scripts/run_distribution_debug_object_m4.sh` and
+Create the dashboard from the automated ReleaseFast, ReleaseSafe, and adjusted
+ReleaseSmall summaries, then keep `bash scripts/probe_distribution_objects.sh`
+`--help`, the adjusted ReleaseSmall probe, and
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:

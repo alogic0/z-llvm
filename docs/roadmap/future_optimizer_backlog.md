@@ -574,10 +574,19 @@ still requires LLVM fallback because DWARF/unwind emission, full O0 codegen,
 variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
 
+Broad object probes are now reproducible with
+`bash scripts/probe_distribution_objects.sh`. It reports stable per-row
+ok/fail/excluded lines, first failure, failure categories, and exclusion
+categories. The helper reproduced the current release-mode evidence:
+ReleaseFast 17 ok / 0 fail, ReleaseSafe 17 ok / 0 fail, and adjusted
+ReleaseSmall 463 ok / 0 fail / 2 excluded.
+
 ## Activation Rule
 
 - Start new work only from a measured source-backed blocker, a concrete
   opt-22 mismatch, or a failing readiness check.
+- Use `bash scripts/probe_distribution_objects.sh` for broad optimized-output
+  object probes before adding new ad hoc shell-loop evidence.
 - Add or identify the fixture before creating a new cycle.
 - Record the LLVM upstream source mapping before marking the cycle complete.
 - Keep local conservative behavior documented when LLVM is broader.

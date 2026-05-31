@@ -107,6 +107,20 @@ bash scripts/run_distribution_no_llvm_codegen_subset.sh
   result=pass
 ```
 
+Automated broad object probing is now available through:
+
+```text
+bash scripts/probe_distribution_objects.sh
+  ReleaseFast:  total=17  ok=17  fail=0 excluded=0 first_failure=-
+  ReleaseSafe:  total=17  ok=17  fail=0 excluded=0 first_failure=-
+  ReleaseSmall: total=465 ok=463 fail=0 excluded=2 first_failure=-
+  ReleaseSmall excluded rows:
+    standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
+      reason=float-format-helper-boundary
+    standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
+      reason=table-decoder-boundary
+```
+
 Asm/object remains LLVM fallback required for broad Debug, and for ReleaseFast,
 ReleaseSafe, and ReleaseSmall outside their named captured subsets. Existing
 docs explicitly exclude broad register allocation, scheduling, debug/unwind

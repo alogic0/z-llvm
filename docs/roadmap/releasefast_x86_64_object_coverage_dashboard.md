@@ -105,4 +105,8 @@ current_adjusted_object_probe=463 object-ok, 0 object-fail, 2 excluded
 ReleaseSmall_asm_object_status=conservative boundary for named captured subset
 no_llvm_codegen_subset_gate=scripts/run_distribution_no_llvm_codegen_subset.sh
 no_llvm_codegen_subset_gate_status=pass
+automated_object_probe=scripts/probe_distribution_objects.sh
+automated_releasefast_probe=17 object-ok, 0 object-fail, 0 excluded
+automated_releasesafe_probe=17 object-ok, 0 object-fail, 0 excluded
+automated_releasesmall_adjusted_probe=463 object-ok, 0 object-fail, 2 excluded
 ```
