@@ -12,9 +12,10 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Extend the first no-LLVM-codegen distribution subset gate with the selected
-Debug asm/object conservative boundary. Keep the gate focused: include the
-tracked Debug M4 object fixtures, not an expensive broad full-corpus probe.
+Select the next measured x86_64 replacement task now that the top-level
+no-LLVM-codegen distribution subset includes selected Debug asm/object
+coverage. Start from the matrix: prefer the first remaining LLVM fallback row
+that can be reduced by source-backed Zig evidence.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -209,12 +210,11 @@ target-complete ABI lowering, the Debug float-format helper, and the Debug
 base64 table decoder remain outside this slice.
 
 Validation gate:
-Update and run `bash scripts/run_distribution_no_llvm_codegen_subset.sh`, then
-keep `bash scripts/run_distribution_debug_object_m4.sh` and `zig build test`
-green.
+Inspect the matrix, dashboard, and latest probe summaries. Promote exactly one
+measured blocker or boundary closure into this file before implementation.
 
 Commit:
-Commit the no-LLVM subset gate update after validation.
+Commit the gate update first, then commit the next selected task separately.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:
@@ -739,8 +739,9 @@ asm/object is now a conservative boundary for the named captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is now
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh`. It composes the
 ReleaseFast object and executable gates, the ReleaseSafe object gate, the
-selected ReleaseSmall object gate, and `bash scripts/run_handoff_validation.sh`.
-The gate passed locally for `TARGET=x86_64-unknown-linux-gnu`.
+selected ReleaseSmall object gate, the selected Debug object gate, and
+`bash scripts/run_handoff_validation.sh`. The gate passed locally for
+`TARGET=x86_64-unknown-linux-gnu`.
 
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` originally found 2 object successes and
