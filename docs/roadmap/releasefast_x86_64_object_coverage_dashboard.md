@@ -91,8 +91,10 @@ closed_aliases_18=@main -> @main.main
 boundary_exclusion_1=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
 closed_failure_19=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_19=@getHidden,@updateHidden selected hidden i32 global access
-current_adjusted_object_probe=460 object-ok, 4 object-fail, 1 excluded
-first_adjusted_failure=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@_start -> @main._start
-missing_capability=selected ReleaseSmall two-block infinite-loop branch lowering
+closed_failure_20=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_20=@_start -> @main._start
+current_adjusted_object_probe=461 object-ok, 3 object-fail, 1 excluded
+first_adjusted_failure=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@runner_futex_wait -> @main.runner_futex_wait
+missing_capability=selected ReleaseSmall i1 constant return lowering
 ```

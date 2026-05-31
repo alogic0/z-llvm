@@ -704,6 +704,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerSelectedInfiniteLoop(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4770,6 +4775,31 @@ fn validateStartTrampolineInlineAsm(instruction: ir.Instruction) ![]const u8 {
     };
     if (!std.mem.startsWith(u8, call_target, "@")) return error.UnsupportedCodegenInstruction;
     return call_target[1..];
+}
+
+fn lowerSelectedInfiniteLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main._start")) return false;
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 2) return false;
+
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    if (entry.instructions.items.len != 0 or loop.instructions.items.len != 0) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => return false,
+    };
+    if (!std.mem.eql(u8, entry_br.target, loop.name)) return false;
+    const loop_br = switch (loop.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        .ret, .condbr, .@"switch", .indirectbr, .@"unreachable" => return false,
+    };
+    if (!std.mem.eql(u8, loop_br.target, loop.name)) return false;
+
+    try machine.instructions.append(allocator, .{ .label = "loop" });
+    try machine.instructions.append(allocator, .{ .jmp = "loop" });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
 }
 
 fn lowerGetauxvalImpl(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

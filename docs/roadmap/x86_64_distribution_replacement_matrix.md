@@ -156,8 +156,10 @@ intermediate_object_probe=458 ok, 7 fail with --input-limit=67108864
 closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll selected @main -> @main.main empty noreturn unreachable stub
 boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
-current_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
-first_adjusted_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@_start -> @main._start
-missing capability=selected two-block infinite-loop branch lowering
+intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
+closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
+current_adjusted_object_probe=461 ok, 3 fail, 1 excluded with --input-limit=67108864
+first_adjusted_blocker=standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@runner_futex_wait -> @main.runner_futex_wait
+missing capability=selected i1 constant return lowering
 ```

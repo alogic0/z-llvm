@@ -413,3 +413,21 @@ rg -q 'mov[[:alpha:]]*[[:space:]]+%edi,%eax' "$extern_exports_dump"
 rg -q 'mov[[:alpha:]]*[[:space:]]+%eax,0x0\(%rip\)' "$extern_exports_dump"
 
 printf 'ok distribution releasesmall object standalone_extern_exports_hidden_access\n'
+
+start_loop_fixture="test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll"
+start_loop_object="$tmp_dir/standalone_install_raw_hex_start_loop.o"
+start_loop_summary="$tmp_dir/standalone_install_raw_hex_start_loop.readelf.txt"
+start_loop_dump="$tmp_dir/standalone_install_raw_hex_start_loop.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$start_loop_fixture" > "$start_loop_object"
+readelf -W -h -S -s -r "$start_loop_object" > "$start_loop_summary"
+objdump -dr "$start_loop_object" > "$start_loop_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$start_loop_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$start_loop_summary"
+rg -q '[[:space:]]_start$' "$start_loop_summary"
+rg -q '[[:space:]]main\._start$' "$start_loop_summary"
+rg -q 'jmp[[:space:]]+0 <_start>' "$start_loop_dump"
+rg -q '[[:space:]]ud2' "$start_loop_dump"
+
+printf 'ok distribution releasesmall object standalone_install_raw_hex_start_loop\n'

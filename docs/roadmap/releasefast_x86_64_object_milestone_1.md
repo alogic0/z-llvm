@@ -515,4 +515,10 @@ single defensible lowering slice. With that row excluded, the selected
 The adjusted ReleaseSmall object probe is 460 successes, 4 failures, and 1
 excluded row. The next sorted implementation blocker is
 `standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@_start -> @main._start`, a two-block infinite loop.
+selected alias is `@_start -> @main._start`, a two-block infinite loop. That
+shape is now object-ok through selected unconditional self-branch lowering. The
+adjusted ReleaseSmall object probe is 461 successes, 3 failures, and 1
+excluded row. The next sorted implementation blocker is
+`standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
+alias is `@runner_futex_wait -> @main.runner_futex_wait`, an i1 constant
+return.

@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@_start` alias / `@main._start` infinite-loop branch shape from
-`standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@runner_futex_wait` alias / `@main.runner_futex_wait` i1 constant return from
+`standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -448,9 +448,17 @@ object failures, and 1 excluded row. The next sorted implementation failure is
 selected public shape is `@_start = alias void (), ptr @main._start`, a
 noreturn two-block infinite loop.
 
+That focused `@main._start` shape is now object-ok through selected
+unconditional self-branch lowering. The adjusted ReleaseSmall object probe is
+461 object successes, 3 object failures, and 1 excluded row. The next sorted
+implementation failure is
+`standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
+public shape is `@runner_futex_wait = alias i1 (ptr, i32), ptr
+@main.runner_futex_wait`, a straight-line `ret i1 0`.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@_start` infinite-loop branch shape. This
+`@runner_futex_wait` i1 constant return shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, complete Zig startup/runtime ownership, broad integer ABI lowering,
@@ -462,21 +470,21 @@ Mode/target/stage row:
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 branch lowering and MC encoding behavior as the reference
-boundary:
+Use LLVM x86_64 integer return lowering and MC encoding behavior as the
+reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-infinite-loop shape, also map unconditional branch emission against
+boolean return shape, also map `%al`/`%eax` return materialization against
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@_start` alias to `@main._start` ReleaseSmall
-two-block infinite loop. Do not generalize to arbitrary multi-block control
-flow, full loop lowering, debug/unwind object records, or non-x86_64 ABI
-behavior in this slice.
+Implement only the selected `@runner_futex_wait` alias to
+`@main.runner_futex_wait` ReleaseSmall `ret i1 0` shape. Do not generalize to
+arbitrary integer ABI returns, aggregate returns, libfuzzer runtime behavior,
+debug/unwind object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
