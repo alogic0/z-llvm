@@ -21,17 +21,17 @@ The Milestone 1 fixtures under
 `test/distribution/releasefast_x86_64/inputs/` all expose public aliases such as
 `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`,
 `@optional_ptr_value`, and `@dense_switch`. Local object generation and selected
-alias symbol emission succeed for the subset. `@add_wrap` has a link-and-run
-check. The next concrete validation gap is a link-and-run check for
-`@branch_mix` from `switch_control_branch_mix.ll`.
+alias symbol emission succeed for the subset. `@add_wrap` and `@branch_mix`
+have link-and-run checks. The next concrete validation gap is a link-and-run
+check for `@call_chain` from `control_flow_calls_call_chain.ll`.
 
 LLVM fallback removed or reduced:
-Extend the executable validation harness to `@branch_mix`: emit the local
+Extend the executable validation harness to `@call_chain`: emit the local
 object, link it with a tiny host harness, and validate deterministic return
-values for the selected i32/i32/i1 ABI shape. This reduces the ReleaseFast
-x86_64 asm/object fallback for the named Milestone 1 subset only; it does not
-claim broad linker ownership, startup runtime, libc replacement,
-cross-target execution, or exhaustive ABI coverage.
+values for the selected i32 ABI shape. This reduces the ReleaseFast x86_64
+asm/object fallback for the named Milestone 1 subset only; it does not claim
+broad linker ownership, startup runtime, libc replacement, cross-target
+execution, or exhaustive ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -45,7 +45,7 @@ handoff as the reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`.
 
 Known boundary:
-Implement only an `@branch_mix` executable check for the selected ReleaseFast
+Implement only an `@call_chain` executable check for the selected ReleaseFast
 x86_64 object. Do not generalize to pointer arguments, calls, switch behavior,
 global data, cross-compilation execution, or target-complete ABI validation in
 this slice.
