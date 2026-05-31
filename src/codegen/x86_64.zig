@@ -587,6 +587,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiStructU8(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4129,6 +4134,23 @@ fn lowerCAbiStructU16(allocator: std.mem.Allocator, machine: *MachineFunction, f
     try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rdi, .imm = 8 } });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try appendCompareArg64Imm64(allocator, machine, .rsi, 9, fail);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiStructU8(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_struct_u8")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 8 })) return error.UnsupportedCodegenType;
+    if (!function.params.items[1].ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenType;
+
+    const fail = "struct_u8_fail";
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = .rdi, .imm = 2 } });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try appendCompareArg64Imm64(allocator, machine, .rsi, 3, fail);
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .ud2);

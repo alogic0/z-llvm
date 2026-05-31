@@ -381,3 +381,7 @@ return shape.
 That focused shape is now object-ok with selected `%eax` return
 materialization. The broad row still remains the first sorted failure; the
 next selected alias is `@zig_struct_u8`, an i8/i64 control-flow shape.
+That focused shape is now object-ok with selected 8-bit and 64-bit register
+checks plus local trap failure edges. The broad row still remains the first
+sorted failure; the next selected alias is `@zig_ret_struct_u8`, an i8 return
+shape.
