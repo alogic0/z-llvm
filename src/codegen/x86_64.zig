@@ -163,6 +163,11 @@ pub const MachineFunction = struct {
     }
 };
 
+const SelectedI32Value = union(enum) {
+    imm: i32,
+    reg: ArgReg,
+};
+
 pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, function: ir.Function) !MachineFunction {
     const parsed_triple = try target.Triple.parse(triple_text);
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
@@ -465,24 +470,33 @@ fn lowerIcmpSelectConstReturn(
         else => return false,
     };
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 }) or !isNamed(select.cond, icmp_result)) return false;
-    const true_value = switch (select.true_value) {
-        .int => |value| try i32Value(value),
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
-    const false_value = switch (select.false_value) {
-        .int => |value| try i32Value(value),
-        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
+    const true_value = try selectedI32Value(function, select.true_value);
+    const false_value = try selectedI32Value(function, select.false_value);
 
     const true_label = "icmp_select_true";
     try machine.instructions.append(allocator, .{ .test_arg32 = cmp_reg });
     try machine.instructions.append(allocator, .{ .je = true_label });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = false_value });
+    try appendSelectedI32Return(allocator, machine, false_value);
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = true_label });
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = true_value });
+    try appendSelectedI32Return(allocator, machine, true_value);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn selectedI32Value(function: ir.Function, value: ir.Value) !SelectedI32Value {
+    return switch (value) {
+        .int => |int| .{ .imm = try i32Value(int) },
+        .named => |name| .{ .reg = try paramReg(function, name, .{ .int = 32 }) },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
+    };
+}
+
+fn appendSelectedI32Return(allocator: std.mem.Allocator, machine: *MachineFunction, value: SelectedI32Value) !void {
+    switch (value) {
+        .imm => |imm| try machine.instructions.append(allocator, .{ .mov_imm_eax = imm }),
+        .reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_eax = reg }),
+    }
 }
 
 fn lowerShiftOrConstReturn(

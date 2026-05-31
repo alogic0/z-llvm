@@ -117,5 +117,5 @@ starts from the first remaining blocker:
 ```text
 broader ReleaseFast object coverage
 current blocker=first broad optimized-output object failure is aggregates
-missing capability=selected scalar icmp/select between constant and parameter
+missing capability=selected slice_sum loop/control-flow lowering
 ```

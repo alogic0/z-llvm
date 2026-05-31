@@ -216,3 +216,25 @@ C
 zig cc "$aggregates_error_harness" "$aggregates_error_object" -o "$aggregates_error_exe"
 "$aggregates_error_exe"
 printf 'ok distribution executable aggregates_error_union_payload\n'
+
+aggregates_optional_fixture="test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll"
+aggregates_optional_object="$tmp_dir/aggregates_optional_payload.o"
+aggregates_optional_harness="$tmp_dir/aggregates_optional_payload_harness.c"
+aggregates_optional_exe="$tmp_dir/aggregates_optional_payload_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregates_optional_fixture" > "$aggregates_optional_object"
+
+cat > "$aggregates_optional_harness" <<'C'
+extern int optional_payload(int tag, int payload);
+
+int main(void) {
+    if (optional_payload(0, 99) != -1) return 1;
+    if (optional_payload(1, 99) != 99) return 2;
+    if (optional_payload(-3, -11) != -11) return 3;
+    return 0;
+}
+C
+
+zig cc "$aggregates_optional_harness" "$aggregates_optional_object" -o "$aggregates_optional_exe"
+"$aggregates_optional_exe"
+printf 'ok distribution executable aggregates_optional_payload\n'

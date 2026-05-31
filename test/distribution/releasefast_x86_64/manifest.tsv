@@ -9,3 +9,4 @@ switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_c
 aggregate_abi_pair_first	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair first truncation	pair_first
 aggregate_abi_make_pair	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair packing	make_pair
 aggregates_error_union_payload	test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select	error_union_payload
+aggregates_optional_payload	test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select parameter	optional_payload
