@@ -57,10 +57,9 @@ bash scripts/run_handoff_validation.sh
 
 `scripts/run_distribution_object_m1.sh` emits local x86_64 ELF relocatable
 objects for object-ready fixtures and checks ELF type, machine, `.text`, and
-`.symtab` records. Executable checks are not used in this milestone because the
-selected Zig-backed optimized outputs expose public aliases while the current
-validation-only object writer emits function symbols only; alias/export symbol
-coverage is a separate object-replacement blocker.
+`.symtab` records, including the selected public alias symbol for each fixture.
+Executable checks are not used yet; stable callable ABI validation is the next
+object-replacement blocker.
 
 ## Matrix Result
 
@@ -77,7 +76,7 @@ Explicit exclusions:
 general branch/select lowering beyond the selected add/sub pattern
 variable shift/or chains beyond the selected shl-by-one plus or-one pattern
 integer multiply beyond the selected multiply-by-five pattern
-global data and alias/export symbol emission
+global data and alias/export symbol emission beyond selected local function aliases
 pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch-table lowering beyond the selected dense constant-return shape
 debug/unwind records
@@ -87,8 +86,7 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The next source-backed blocker is alias/export symbol coverage for the selected
-ReleaseFast object subset. All selected fixtures expose public aliases, while
-the current validation-only object writer emits only private function symbols.
-Milestone 2 should add only the alias symbol-table coverage needed to run stable
-callable ABI checks for the selected subset.
+The next source-backed blocker is executable callable ABI validation for the
+selected ReleaseFast object subset. Milestone 2 should add only the smallest
+link-and-run check for one stable public alias first, then broaden fixture by
+fixture.

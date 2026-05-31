@@ -1,5 +1,6 @@
 const std = @import("std");
 const encoding = @import("encoding.zig");
+const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
 
 const Section = struct {
@@ -36,6 +37,25 @@ pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
 }
 
 pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction) ![]u8 {
+    return try buildObjectWithAliases(allocator, functions, &.{});
+}
+
+pub fn writeObjectWithAliases(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+    writer: anytype,
+) !void {
+    const object = try buildObjectWithAliases(allocator, functions, aliases);
+    defer allocator.free(object);
+    try writer.writeAll(object);
+}
+
+pub fn buildObjectWithAliases(
+    allocator: std.mem.Allocator,
+    functions: []const x86_64.MachineFunction,
+    aliases: []const ir.GlobalAlias,
+) ![]u8 {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
 
@@ -62,6 +82,8 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
         });
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
+
+    try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
 
     var relocations: std.ArrayList(Relocation) = .empty;
     defer relocations.deinit(allocator);
@@ -139,6 +161,28 @@ pub fn buildObject(allocator: std.mem.Allocator, functions: []const x86_64.Machi
     }
 
     return object;
+}
+
+fn appendLocalFunctionAliases(
+    allocator: std.mem.Allocator,
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    aliases: []const ir.GlobalAlias,
+) !void {
+    for (aliases) |alias| {
+        if (symbol_indices.contains(alias.name)) continue;
+        const target_index = symbol_indices.get(alias.target) orelse continue;
+        const target_symbol = symbols.items[target_index - 1];
+        if (target_symbol.section_index == 0) continue;
+        try symbols.append(allocator, .{
+            .name = alias.name,
+            .value = target_symbol.value,
+            .size = target_symbol.size,
+            .section_index = target_symbol.section_index,
+            .info = target_symbol.info,
+        });
+        try symbol_indices.put(alias.name, @intCast(symbols.items.len));
+    }
 }
 
 fn collectCallRelocations(

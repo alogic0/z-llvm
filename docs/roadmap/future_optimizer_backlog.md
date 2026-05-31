@@ -118,9 +118,9 @@ this baseline does not promote a handoff/codegen gate by itself.
 Milestone 1 for `ReleaseFast / x86_64-linux-gnu / asm-object` now records a
 conservative boundary for the selected Zig-backed object subset in
 `docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The first remaining
-uncovered blocker is alias/export symbol coverage for the selected public Zig
-entrypoints; object generation now succeeds for every selected Milestone 1
-fixture, but executable validation still cannot target the public aliases.
+uncovered blocker is executable callable ABI validation for one selected public
+alias; object generation and selected alias symbol emission now succeed for
+every selected Milestone 1 fixture.
 
 ## Activation Rule
 

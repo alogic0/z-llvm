@@ -12,38 +12,42 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the next Milestone 2 ReleaseFast x86_64 asm/object blocker: selected
-public Zig aliases are not emitted into the local ELF object symbol table.
+Reduce the next Milestone 2 ReleaseFast x86_64 asm/object blocker: the selected
+object gate checks ELF metadata and symbols only, not executable callable ABI
+behavior.
 
 Zig evidence:
 The Milestone 1 fixtures under
 `test/distribution/releasefast_x86_64/inputs/` all expose public aliases such as
 `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`, `@comptime_const`,
-`@optional_ptr_value`, and `@dense_switch`. Local object generation succeeds for
-the selected subset, but the validation-only object writer emits only function
-symbols such as `switch_control.dense_switch`.
+`@optional_ptr_value`, and `@dense_switch`. Local object generation and selected
+alias symbol emission succeed for the subset. The next concrete validation gap
+is a link-and-run check for one stable scalar alias, starting with `@add_wrap`
+from `integers_add_wrap.ll`.
 
 LLVM fallback removed or reduced:
-Add ELF symbol-table alias coverage for selected aliases whose targets are
-locally emitted functions. This reduces the ReleaseFast x86_64 asm/object
-fallback enough to start executable callable ABI checks for the named Milestone
-1 subset only; it does not claim relocatable aliases, weak aliases, COMDAT,
-global data, linker behavior, or broad export policy.
+Add the smallest executable validation harness for `@add_wrap`: emit the local
+object, link it with a tiny host harness, and validate deterministic return
+values. This reduces the ReleaseFast x86_64 asm/object fallback for the named
+Milestone 1 subset only; it does not claim broad linker ownership, startup
+runtime, libc replacement, cross-target execution, or exhaustive ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
 `status=conservative boundary for selected subset`.
 
 Upstream mapping:
-Use LLVM object emission and symbol handling as the reference boundary:
+Use LLVM object emission, target calling convention lowering, and link-time
+handoff as the reference boundary:
 `llvm-project-22/llvm/lib/MC/ELFObjectWriter.cpp`,
-`llvm-project-22/llvm/lib/MC/MCELFStreamer.cpp`, and
-`llvm-project-22/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp`.
+`llvm-project-22/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp`, and
+`llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`.
 
 Known boundary:
-Implement only selected aliases that target functions emitted in the same local
-object. Do not generalize to data aliases, aliases requiring relocations, weak
-aliases, COMDAT, visibility policy, or target-complete symbol binding.
+Implement only an `@add_wrap` executable check for the selected ReleaseFast
+x86_64 object. Do not generalize to pointer arguments, calls, switch behavior,
+global data, cross-compilation execution, or target-complete ABI validation in
+this slice.
 
 Validation gate:
 Run `bash scripts/run_distribution_object_m1.sh` and

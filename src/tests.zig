@@ -4978,6 +4978,34 @@ test "x86_64 elf writer emits direct call relocation metadata" {
     try std.testing.expect(std.mem.indexOf(u8, object, "callee") != null);
 }
 
+test "x86_64 elf writer emits selected local function aliases" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@public_add = alias i32 (i32, i32), ptr @internal_add
+        \\
+        \\define private i32 @internal_add(i32 %a, i32 %b) {
+        \\entry:
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    const object = try mc.elf.buildObjectWithAliases(std.testing.allocator, &.{machine}, module.aliases.items);
+    defer std.testing.allocator.free(object);
+
+    try std.testing.expect(std.mem.indexOf(u8, object, "internal_add") != null);
+    try std.testing.expect(std.mem.indexOf(u8, object, "public_add") != null);
+}
+
 test "x86_64 codegen rejects unsupported control flow" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

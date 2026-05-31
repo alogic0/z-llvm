@@ -82,10 +82,11 @@ covers empty modules, `tiny_scalar`, `integers_add_wrap`,
 `switch_control_dense_switch`. It explicitly excludes general branch/select
 lowering beyond the selected add/sub pattern, variable shift/or chains beyond
 the selected shl-by-one plus or-one pattern, integer multiply beyond the
-selected multiply-by-five pattern, global data and alias/export symbol emission,
-pointer loads and null-branch control flow beyond the selected nullable i32
-load, switch-table lowering beyond the selected dense constant-return shape,
-debug/unwind records, linker behavior, and target-complete ABI lowering.
+selected multiply-by-five pattern, global data emission, pointer loads and
+null-branch control flow beyond the selected nullable i32 load, switch-table
+lowering beyond the selected dense constant-return shape, alias/export symbol
+emission beyond selected local function aliases, debug/unwind records, linker
+behavior, executable validation, and target-complete ABI lowering.
 
 Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
 ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
@@ -113,7 +114,7 @@ Milestone 1 selected that row and closed the first subset boundary. Milestone 2
 starts from the first remaining blocker:
 
 ```text
-selected ReleaseFast object subset aliases
-current blocker=object writer emits private function symbols only
-missing capability=ELF symbol-table aliases for selected public Zig entrypoints
+selected ReleaseFast object subset callable ABI check
+current blocker=object gate checks ELF metadata and symbols only
+missing capability=link-and-run validation for one selected public alias
 ```

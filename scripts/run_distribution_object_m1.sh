@@ -6,7 +6,7 @@ target="${TARGET:-x86_64-unknown-linux-gnu}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-tail -n +2 "$manifest" | while IFS=$'\t' read -r id input validation expected_status source_row shape; do
+tail -n +2 "$manifest" | while IFS=$'\t' read -r id input validation expected_status source_row shape public_symbol; do
   case "$validation" in
     object-readelf)
       object="$tmp_dir/$id.o"
@@ -17,6 +17,9 @@ tail -n +2 "$manifest" | while IFS=$'\t' read -r id input validation expected_st
       rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$summary"
       rg -q '\.text' "$summary"
       rg -q '\.symtab' "$summary"
+      if [[ -n "${public_symbol:-}" ]]; then
+        rg -q "[[:space:]]${public_symbol}$" "$summary"
+      fi
       printf 'ok distribution object %s [%s]\n' "$id" "$shape"
       ;;
     known-blocker)
