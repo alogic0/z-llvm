@@ -25,6 +25,8 @@ packed_bits_read_flag	test/distribution/releasefast_x86_64/inputs/packed_bits_ba
 pointers_memory_volatile_roundtrip	test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll	object-readelf	object-ok	pointers_memory.zig	volatile pointer store/load roundtrip	volatile_roundtrip
 pointers_memory_load_store	test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll	object-readelf	object-ok	pointers_memory.zig	pointer load add store	load_store
 switch_control_dense_switch	test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll	object-readelf	object-ok	switch_control.zig	switch table load and phi merge	dense_switch
+tls_concurrency_bump_tls	test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll	object-readelf	object-ok	tls_concurrency.zig	local-exec TLS i32 bump	bump_tls
+tls_concurrency_read_tls	test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll	object-readelf	object-ok	tls_concurrency.zig	local-exec TLS i32 read	read_tls
 aggregate_abi_pair_first	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair first truncation	pair_first
 aggregate_abi_make_pair	test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll	object-readelf	object-ok	aggregate_abi.zig	i64 pair packing	make_pair
 aggregates_error_union_payload	test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select	error_union_payload

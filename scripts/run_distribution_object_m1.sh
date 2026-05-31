@@ -26,6 +26,11 @@ tail -n +2 "$manifest" | while IFS=$'\t' read -r id input validation expected_st
         rg -q '[[:space:]]atomics_inline_asm_debug\.atomic_counter$' "$summary"
         rg -q 'R_X86_64_PC32.*atomics_inline_asm_debug\.atomic_counter - 4' "$summary"
       fi
+      if [[ "$id" == "tls_concurrency_bump_tls" || "$id" == "tls_concurrency_read_tls" ]]; then
+        rg -q '\.tdata' "$summary"
+        rg -q 'TLS[[:space:]]+GLOBAL.*tls_concurrency\.tls_counter' "$summary"
+        rg -q 'R_X86_64_TPOFF32.*tls_concurrency\.tls_counter' "$summary"
+      fi
       printf 'ok distribution object %s [%s]\n' "$id" "$shape"
       ;;
     known-blocker)

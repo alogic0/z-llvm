@@ -9,8 +9,8 @@ This dashboard tracks the broad optimized-output object probe for
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 probe_date=2026-05-30
 rows=17
-object_ok=16
-object_fail=1
+object_ok=17
+object_fail=0
 gate=zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu <row.ll>
 ```
 
@@ -33,19 +33,21 @@ packed_bits.zig.ReleaseFast.x86_64.optimized.ll
 pointers_memory.zig.ReleaseFast.x86_64.optimized.ll
 switch_control.zig.ReleaseFast.x86_64.optimized.ll
 tiny_scalar.zig.ReleaseFast.x86_64.optimized.ll
+tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll
 ```
 
 ## Current Blockers
 
 ```text
-tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInstruction
+none in this captured ReleaseFast object set
 ```
 
 ## Active Slice
 
 ```text
-row=tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll
-selected_aliases=@bump_tls,@read_tls
-missing_capability=thread-local i32 load/store lowering
-boundary=selected source-backed shape only
+next_row=ReleaseSafe x86_64 asm/object
+optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
+first_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@slice_sum
+missing_capability=ReleaseSafe overflow-checked loop and panic-edge lowering
 ```

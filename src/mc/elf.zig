@@ -81,6 +81,8 @@ pub fn buildObjectWithModuleData(
     defer text.deinit(allocator);
     var data: std.ArrayList(u8) = .empty;
     defer data.deinit(allocator);
+    var tdata: std.ArrayList(u8) = .empty;
+    defer tdata.deinit(allocator);
 
     var symbols: std.ArrayList(Symbol) = .empty;
     defer symbols.deinit(allocator);
@@ -106,7 +108,7 @@ pub fn buildObjectWithModuleData(
         try symbol_indices.put(function.name, @intCast(symbols.items.len));
     }
 
-    try appendSupportedGlobals(allocator, &data, &symbols, &symbol_indices, globals);
+    try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
 
     var relocations: std.ArrayList(Relocation) = .empty;
@@ -131,6 +133,7 @@ pub fn buildObjectWithModuleData(
     try shstrtab.append(allocator, 0);
     const text_name = try appendString(&shstrtab, allocator, ".text");
     const data_name = try appendString(&shstrtab, allocator, ".data");
+    const tdata_name = try appendString(&shstrtab, allocator, ".tdata");
     const rela_text_name = try appendString(&shstrtab, allocator, ".rela.text");
     const symtab_name = try appendString(&shstrtab, allocator, ".symtab");
     const strtab_name = try appendString(&shstrtab, allocator, ".strtab");
@@ -144,6 +147,10 @@ pub fn buildObjectWithModuleData(
 
     const data_offset = cursor;
     cursor += data.items.len;
+    cursor = alignForward(cursor, 4);
+
+    const tdata_offset = cursor;
+    cursor += tdata.items.len;
     cursor = alignForward(cursor, 8);
 
     const rela_text_offset = cursor;
@@ -164,15 +171,16 @@ pub fn buildObjectWithModuleData(
     cursor = alignForward(cursor, 8);
     const shoff = cursor;
 
-    const section_count = 7;
+    const section_count = 8;
     const total_size = shoff + section_count * 64;
     var object = try allocator.alloc(u8, total_size);
     errdefer allocator.free(object);
     @memset(object, 0);
 
-    writeElfHeader(object[0..64], shoff, section_count, 6);
+    writeElfHeader(object[0..64], shoff, section_count, 7);
     @memcpy(object[text_offset..][0..text.items.len], text.items);
     @memcpy(object[data_offset..][0..data.items.len], data.items);
+    @memcpy(object[tdata_offset..][0..tdata.items.len], tdata.items);
     writeRelocationTable(object[rela_text_offset..][0..rela_text_size], relocations.items);
     writeSymbolTable(object[symtab_offset..][0..symtab_size], symbols.items, symbol_name_offsets);
     @memcpy(object[strtab_offset..][0..strtab.items.len], strtab.items);
@@ -182,8 +190,9 @@ pub fn buildObjectWithModuleData(
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
         .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = 4 },
-        .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 4, .info = 1, .addralign = 8, .entsize = 24 },
-        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = 4 },
+        .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
+        .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 6, .info = 1, .addralign = 8, .entsize = 24 },
         .{ .name_offset = strtab_name, .kind = 3, .flags = 0, .offset = strtab_offset, .size = strtab.items.len },
         .{ .name_offset = shstrtab_name, .kind = 3, .flags = 0, .offset = shstrtab_offset, .size = shstrtab.items.len },
     };
@@ -197,23 +206,31 @@ pub fn buildObjectWithModuleData(
 fn appendSupportedGlobals(
     allocator: std.mem.Allocator,
     data: *std.ArrayList(u8),
+    tdata: *std.ArrayList(u8),
     symbols: *std.ArrayList(Symbol),
     symbol_indices: *std.StringHashMap(u32),
     globals: []const ir.Global,
 ) !void {
     for (globals) |global| {
         if (symbol_indices.contains(global.name)) continue;
-        const start: u64 = data.items.len;
-        const size = try appendSupportedGlobalData(allocator, data, global) orelse continue;
+        const is_tls = isThreadLocal(global);
+        const section_data = if (is_tls) tdata else data;
+        const start: u64 = section_data.items.len;
+        const size = try appendSupportedGlobalData(allocator, section_data, global) orelse continue;
         try symbols.append(allocator, .{
             .name = global.name,
             .value = start,
             .size = size,
-            .section_index = 2,
-            .info = 0x11,
+            .section_index = if (is_tls) 3 else 2,
+            .info = if (is_tls) 0x16 else 0x11,
         });
         try symbol_indices.put(global.name, @intCast(symbols.items.len));
     }
+}
+
+fn isThreadLocal(global: ir.Global) bool {
+    const attrs = global.address_attrs orelse return false;
+    return std.mem.indexOf(u8, attrs, "thread_local") != null;
 }
 
 fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(u8), global: ir.Global) !?u64 {
@@ -290,6 +307,15 @@ fn collectCallRelocations(
                     .symbol_index = symbol_index,
                     .kind = 2,
                     .addend = -4,
+                });
+            },
+            .load_tls_i32_eax, .store_eax_tls_i32 => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 4,
+                    .symbol_index = symbol_index,
+                    .kind = 23,
+                    .addend = 0,
                 });
             },
             else => {},

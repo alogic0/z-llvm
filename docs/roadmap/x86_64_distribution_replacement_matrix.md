@@ -73,21 +73,15 @@ handoff gate now proves that a metadata-only accepted optimized module emits no
 assembly and still produces an x86_64 ELF relocatable object with `.text` and
 `.symtab` records.
 
-ReleaseFast asm/object is now a conservative boundary for the selected
-Zig-backed optimized-output subset recorded in
-`docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The object-ready subset
-covers empty modules, `tiny_scalar`, `integers_add_wrap`,
-`switch_control_branch_mix`, `control_flow_calls_call_chain`, and
-`globals_comptime_const`, `optional_pointer_value`, and
-`switch_control_dense_switch`. It explicitly excludes general branch/select
-lowering beyond the selected add/sub pattern, variable shift/or chains beyond
-the selected shl-by-one plus or-one pattern, integer multiply beyond the
-selected multiply-by-five pattern, global data emission, pointer loads and
-null-branch control flow beyond the selected nullable i32 load, switch-table
-lowering beyond the selected dense constant-return shape, alias/export symbol
-emission beyond selected local function aliases, debug/unwind records, linker
-behavior, executable validation beyond selected Milestone 1 public aliases, and
-target-complete ABI lowering.
+ReleaseFast asm/object is now a conservative boundary for the captured
+Zig-backed optimized-output set recorded in
+`docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The broad object probe
+over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` has 17
+local object successes and 0 failures, with executable validation for the
+selected public aliases. It still explicitly excludes target-complete ABI
+lowering, arbitrary Zig source outside the captured set, debug/unwind records,
+linker ownership, dynamic TLS models, cross-target TLS relocations, and broad
+runtime completeness.
 
 Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
 ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
@@ -112,10 +106,16 @@ shape that cannot pass the existing x86_64 handoff or asm/object validation
 subset, then add the smallest fixture and validation gate for that shape.
 
 Milestone 1 selected that row and closed the first subset boundary. Milestone 2
-starts from the first remaining blocker:
+closed the broad captured ReleaseFast object set. The next measured row starts
+ReleaseSafe object replacement:
 
 ```text
-broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is tls_concurrency
-missing capability=selected bump_tls and read_tls thread-local i32 lowering
+mode=ReleaseSafe
+target=x86_64-linux-gnu
+stage=asm/object
+status=LLVM fallback required
+optimized_output=tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir
+object_probe=8 ok, 9 fail with --input-limit=67108864
+first_blocker=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
+missing capability=selected @slice_sum overflow-checked loop and panic-edge lowering
 ```

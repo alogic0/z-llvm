@@ -434,6 +434,31 @@ zig cc "$pointers_memory_harness" "$pointers_memory_object" -o "$pointers_memory
 "$pointers_memory_exe"
 printf 'ok distribution executable pointers_memory\n'
 
+tls_concurrency_fixture="test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll"
+tls_concurrency_object="$tmp_dir/tls_concurrency_counter.o"
+tls_concurrency_harness="$tmp_dir/tls_concurrency_harness.c"
+tls_concurrency_exe="$tmp_dir/tls_concurrency_harness"
+
+zig build run -- --emit=obj --target="$target" "$tls_concurrency_fixture" > "$tls_concurrency_object"
+
+cat > "$tls_concurrency_harness" <<'C'
+extern int bump_tls(int delta);
+extern int read_tls(void);
+
+int main(void) {
+    if (read_tls() != 1) return 1;
+    if (bump_tls(4) != 5) return 2;
+    if (read_tls() != 5) return 3;
+    if (bump_tls(-2) != 3) return 4;
+    if (read_tls() != 3) return 5;
+    return 0;
+}
+C
+
+zig cc "$tls_concurrency_harness" "$tls_concurrency_object" -o "$tls_concurrency_exe"
+"$tls_concurrency_exe"
+printf 'ok distribution executable tls_concurrency\n'
+
 dense_switch_fixture="test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll"
 dense_switch_object="$tmp_dir/switch_control_dense_switch.o"
 dense_switch_harness="$tmp_dir/dense_switch_harness.c"

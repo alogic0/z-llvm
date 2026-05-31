@@ -66,7 +66,8 @@ with tiny host harnesses and validates deterministic return values, including
 `@make_pair`, plus `@error_union_payload` and `@optional_payload`.
 `@slice_sum`, `@struct_sum`, and `@array_sum` are also covered by the broader
 ReleaseFast object executable gate, as are `@debug_location` and
-`@inline_asm_barrier`.
+`@inline_asm_barrier`, selected `@atomic_add`, `@volatile_roundtrip`,
+`@load_store`, and selected local-exec TLS `@bump_tls` and `@read_tls`.
 
 ## Matrix Result
 
@@ -94,21 +95,38 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The next source-backed blocker is broader ReleaseFast object coverage. A broad
+The next source-backed blocker was broader ReleaseFast object coverage. A broad
 probe over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir`
-now passes `aggregate_abi.zig.ReleaseFast.x86_64.optimized.ll` and
-`aggregates.zig.ReleaseFast.x86_64.optimized.ll`; after the selected atomics
-slice it also passes `atomics_inline_asm_debug.zig.ReleaseFast.x86_64.optimized.ll`.
-The current broad object probe is:
+now passes every captured row, including the selected atomics, loop, error
+switch, floating-point, globals, integer, pointer/memory, and local-exec TLS
+shapes. The current broad object probe is:
 
 ```text
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 rows=17
-object_ok=16
-object_fail=1
-first_failure=tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll
-first_missing_shape=selected @bump_tls and @read_tls thread-local i32 lowering
+object_ok=17
+object_fail=0
+first_failure=none
 ```
 
 The compact running dashboard is
 `docs/roadmap/releasefast_x86_64_object_coverage_dashboard.md`.
+
+The next measured asm/object row is ReleaseSafe. The bounded ReleaseSafe
+optimized-output capture is:
+
+```text
+tmp/zig_ir/distribution_m2_releasesafe_20260530
+  test_root=test/zig/inputs
+  mode=ReleaseSafe
+  target=x86_64-linux-gnu
+  passes=zig-release-safe-accepted
+  processed=17 compile_skip=0 emit_ok=17 local_ok=17
+  input_too_large=0 parse_fail=0 verify_fail=0 optimizer_fail=0
+  capture_optimized_output=true
+```
+
+Object probing those captured rows with `--input-limit=67108864` found 8 local
+object successes and 9 object failures. The first sorted failure is
+`aggregates.zig.ReleaseSafe.x86_64.optimized.ll` with selected `@slice_sum`
+overflow-checked loop and panic-edge lowering.

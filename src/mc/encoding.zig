@@ -87,6 +87,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .volatile_roundtrip_rdi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0x37, 0x8b, 0x07 }),
             .load_global_i32_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x05, 0, 0, 0, 0 }),
             .store_eax_global_i32 => try bytes.appendSlice(allocator, &.{ 0x89, 0x05, 0, 0, 0, 0 }),
+            .load_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
+            .store_eax_tls_i32 => try bytes.appendSlice(allocator, &.{ 0x64, 0x89, 0x04, 0x25, 0, 0, 0, 0 }),
             .atomic_xadd_global_eax => try bytes.appendSlice(allocator, &.{ 0xf0, 0x0f, 0xc1, 0x05, 0, 0, 0, 0 }),
             .direct_call => {
                 try bytes.append(allocator, 0xe8);
@@ -160,6 +162,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .store_eax_arg_ptr => |reg| if (reg.rexB()) 3 else 2,
         .volatile_roundtrip_rdi_esi_eax => 4,
         .load_global_i32_eax, .store_eax_global_i32 => 6,
+        .load_tls_i32_eax, .store_eax_tls_i32 => 8,
         .atomic_xadd_global_eax => 8,
         .direct_call => 5,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
