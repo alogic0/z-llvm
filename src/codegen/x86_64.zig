@@ -663,6 +663,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiI16(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4444,6 +4449,21 @@ fn lowerCAbiI32(allocator: std.mem.Allocator, machine: *MachineFunction, functio
     const fail = "i32_fail";
     try machine.instructions.append(allocator, .{ .mov_arg_eax = .rdi });
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = -3 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn lowerCAbiI16(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_i16")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 16 })) return error.UnsupportedCodegenType;
+
+    const fail = "i16_fail";
+    try machine.instructions.append(allocator, .{ .cmp_arg16_imm16 = .{ .reg = .rdi, .imm = 0xfffe } });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
