@@ -2,6 +2,11 @@
 set -euo pipefail
 
 target="${TARGET:-x86_64-unknown-linux-gnu}"
+case "$target" in
+    x86_64-unknown-linux-gnu) cc_target="${CC_TARGET:-x86_64-linux-gnu}" ;;
+    x86_64-unknown-linux-musl) cc_target="${CC_TARGET:-x86_64-linux-musl}" ;;
+    *) cc_target="${CC_TARGET:-$target}" ;;
+esac
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -31,6 +36,6 @@ cat > "$mathtest_panic_stub" <<'ASM'
   ud2
 ASM
 
-zig cc "$mathtest_harness" "$mathtest_panic_stub" "$mathtest_object" -o "$mathtest_exe"
+zig cc -target "$cc_target" "$mathtest_harness" "$mathtest_panic_stub" "$mathtest_object" -o "$mathtest_exe"
 "$mathtest_exe"
 printf 'ok distribution debug executable shared_library_mathtest_add_o0\n'

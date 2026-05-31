@@ -2,6 +2,11 @@
 set -euo pipefail
 
 target="${TARGET:-x86_64-unknown-linux-gnu}"
+case "$target" in
+    x86_64-unknown-linux-gnu) cc_target="${CC_TARGET:-x86_64-linux-gnu}" ;;
+    x86_64-unknown-linux-musl) cc_target="${CC_TARGET:-x86_64-linux-musl}" ;;
+    *) cc_target="${CC_TARGET:-$target}" ;;
+esac
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -24,7 +29,7 @@ int main(void) {
 }
 C
 
-zig cc "$tiny_scalar_harness" "$tiny_scalar_object" -o "$tiny_scalar_exe"
+zig cc -target "$cc_target" "$tiny_scalar_harness" "$tiny_scalar_object" -o "$tiny_scalar_exe"
 "$tiny_scalar_exe"
 printf 'ok distribution executable tiny_scalar\n'
 
@@ -46,7 +51,7 @@ int main(void) {
 }
 C
 
-zig cc "$add_wrap_harness" "$add_wrap_object" -o "$add_wrap_exe"
+zig cc -target "$cc_target" "$add_wrap_harness" "$add_wrap_object" -o "$add_wrap_exe"
 "$add_wrap_exe"
 printf 'ok distribution executable add_wrap\n'
 
@@ -79,7 +84,7 @@ int main(void) {
 }
 C
 
-zig cc "$integers_cmp_shift_harness" "$integers_cmp_shift_object" -o "$integers_cmp_shift_exe"
+zig cc -target "$cc_target" "$integers_cmp_shift_harness" "$integers_cmp_shift_object" -o "$integers_cmp_shift_exe"
 "$integers_cmp_shift_exe"
 printf 'ok distribution executable integers_cmp_shift\n'
 
@@ -104,7 +109,7 @@ int main(void) {
 }
 C
 
-zig cc "$branch_mix_harness" "$branch_mix_object" -o "$branch_mix_exe"
+zig cc -target "$cc_target" "$branch_mix_harness" "$branch_mix_object" -o "$branch_mix_exe"
 "$branch_mix_exe"
 printf 'ok distribution executable branch_mix\n'
 
@@ -126,7 +131,7 @@ int main(void) {
 }
 C
 
-zig cc "$call_chain_harness" "$call_chain_object" -o "$call_chain_exe"
+zig cc -target "$cc_target" "$call_chain_harness" "$call_chain_object" -o "$call_chain_exe"
 "$call_chain_exe"
 printf 'ok distribution executable call_chain\n'
 
@@ -150,7 +155,7 @@ int main(void) {
 }
 C
 
-zig cc "$loop_sum_harness" "$loop_sum_object" -o "$loop_sum_exe"
+zig cc -target "$cc_target" "$loop_sum_harness" "$loop_sum_object" -o "$loop_sum_exe"
 "$loop_sum_exe"
 printf 'ok distribution executable loop_sum\n'
 
@@ -173,7 +178,7 @@ int main(void) {
 }
 C
 
-zig cc "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
+zig cc -target "$cc_target" "$error_switch_harness" "$error_switch_object" -o "$error_switch_exe"
 "$error_switch_exe"
 printf 'ok distribution executable error_switch\n'
 
@@ -208,7 +213,7 @@ int main(void) {
 }
 C
 
-zig cc "$float_compare_harness" "$float_compare_object" -o "$float_compare_exe"
+zig cc -target "$cc_target" "$float_compare_harness" "$float_compare_object" -o "$float_compare_exe"
 "$float_compare_exe"
 printf 'ok distribution executable float_compare\n'
 
@@ -246,7 +251,7 @@ int main(void) {
 }
 C
 
-zig cc "$floats_math_harness" "$floats_math_object" -o "$floats_math_exe"
+zig cc -target "$cc_target" "$floats_math_harness" "$floats_math_object" -o "$floats_math_exe"
 "$floats_math_exe"
 printf 'ok distribution executable floats_math\n'
 
@@ -268,7 +273,7 @@ int main(void) {
 }
 C
 
-zig cc "$fp_constants_harness" "$fp_constants_object" -o "$fp_constants_exe"
+zig cc -target "$cc_target" "$fp_constants_harness" "$fp_constants_object" -o "$fp_constants_exe"
 "$fp_constants_exe"
 printf 'ok distribution executable fp_constants\n'
 
@@ -304,7 +309,7 @@ int main(void) {
 }
 C
 
-zig cc "$fp_extended_harness" "$fp_extended_object" -lm -o "$fp_extended_exe"
+zig cc -target "$cc_target" "$fp_extended_harness" "$fp_extended_object" -lm -o "$fp_extended_exe"
 "$fp_extended_exe"
 printf 'ok distribution executable fp_extended_ops\n'
 
@@ -326,7 +331,7 @@ int main(void) {
 }
 C
 
-zig cc "$comptime_const_harness" "$comptime_const_object" -o "$comptime_const_exe"
+zig cc -target "$cc_target" "$comptime_const_harness" "$comptime_const_object" -o "$comptime_const_exe"
 "$comptime_const_exe"
 printf 'ok distribution executable comptime_const\n'
 
@@ -351,7 +356,7 @@ int main(void) {
 }
 C
 
-zig cc "$globals_counter_harness" "$globals_counter_object" -o "$globals_counter_exe"
+zig cc -target "$cc_target" "$globals_counter_harness" "$globals_counter_object" -o "$globals_counter_exe"
 "$globals_counter_exe"
 printf 'ok distribution executable globals_comptime_counter\n'
 
@@ -377,7 +382,7 @@ int main(void) {
 }
 C
 
-zig cc "$optional_ptr_harness" "$optional_ptr_object" -o "$optional_ptr_exe"
+zig cc -target "$cc_target" "$optional_ptr_harness" "$optional_ptr_object" -o "$optional_ptr_exe"
 "$optional_ptr_exe"
 printf 'ok distribution executable optional_ptr_value\n'
 
@@ -403,7 +408,7 @@ int main(void) {
 }
 C
 
-zig cc "$packed_bits_harness" "$packed_bits_object" -o "$packed_bits_exe"
+zig cc -target "$cc_target" "$packed_bits_harness" "$packed_bits_object" -o "$packed_bits_exe"
 "$packed_bits_exe"
 printf 'ok distribution executable packed_bits\n'
 
@@ -430,7 +435,7 @@ int main(void) {
 }
 C
 
-zig cc "$pointers_memory_harness" "$pointers_memory_object" -o "$pointers_memory_exe"
+zig cc -target "$cc_target" "$pointers_memory_harness" "$pointers_memory_object" -o "$pointers_memory_exe"
 "$pointers_memory_exe"
 printf 'ok distribution executable pointers_memory\n'
 
@@ -455,7 +460,7 @@ int main(void) {
 }
 C
 
-zig cc "$tls_concurrency_harness" "$tls_concurrency_object" -o "$tls_concurrency_exe"
+zig cc -target "$cc_target" "$tls_concurrency_harness" "$tls_concurrency_object" -o "$tls_concurrency_exe"
 "$tls_concurrency_exe"
 printf 'ok distribution executable tls_concurrency\n'
 
@@ -481,7 +486,7 @@ int main(void) {
 }
 C
 
-zig cc "$dense_switch_harness" "$dense_switch_object" -o "$dense_switch_exe"
+zig cc -target "$cc_target" "$dense_switch_harness" "$dense_switch_object" -o "$dense_switch_exe"
 "$dense_switch_exe"
 printf 'ok distribution executable dense_switch\n'
 
@@ -505,7 +510,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregate_abi_harness" "$aggregate_abi_object" -o "$aggregate_abi_exe"
+zig cc -target "$cc_target" "$aggregate_abi_harness" "$aggregate_abi_object" -o "$aggregate_abi_exe"
 "$aggregate_abi_exe"
 printf 'ok distribution executable aggregate_abi_pair\n'
 
@@ -527,7 +532,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregates_error_harness" "$aggregates_error_object" -o "$aggregates_error_exe"
+zig cc -target "$cc_target" "$aggregates_error_harness" "$aggregates_error_object" -o "$aggregates_error_exe"
 "$aggregates_error_exe"
 printf 'ok distribution executable aggregates_error_union_payload\n'
 
@@ -549,7 +554,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregates_optional_harness" "$aggregates_optional_object" -o "$aggregates_optional_exe"
+zig cc -target "$cc_target" "$aggregates_optional_harness" "$aggregates_optional_object" -o "$aggregates_optional_exe"
 "$aggregates_optional_exe"
 printf 'ok distribution executable aggregates_optional_payload\n'
 
@@ -575,7 +580,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregates_slice_harness" "$aggregates_slice_object" -o "$aggregates_slice_exe"
+zig cc -target "$cc_target" "$aggregates_slice_harness" "$aggregates_slice_object" -o "$aggregates_slice_exe"
 "$aggregates_slice_exe"
 printf 'ok distribution executable aggregates_slice_sum\n'
 
@@ -603,7 +608,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregates_struct_harness" "$aggregates_struct_object" -o "$aggregates_struct_exe"
+zig cc -target "$cc_target" "$aggregates_struct_harness" "$aggregates_struct_object" -o "$aggregates_struct_exe"
 "$aggregates_struct_exe"
 printf 'ok distribution executable aggregates_struct_sum\n'
 
@@ -624,7 +629,7 @@ int main(void) {
 }
 C
 
-zig cc "$aggregates_array_harness" "$aggregates_array_object" -o "$aggregates_array_exe"
+zig cc -target "$cc_target" "$aggregates_array_harness" "$aggregates_array_object" -o "$aggregates_array_exe"
 "$aggregates_array_exe"
 printf 'ok distribution executable aggregates_array_sum\n'
 
@@ -646,7 +651,7 @@ int main(void) {
 }
 C
 
-zig cc "$atomics_debug_harness" "$atomics_debug_object" -o "$atomics_debug_exe"
+zig cc -target "$cc_target" "$atomics_debug_harness" "$atomics_debug_object" -o "$atomics_debug_exe"
 "$atomics_debug_exe"
 printf 'ok distribution executable atomics_debug_location\n'
 
@@ -668,7 +673,7 @@ int main(void) {
 }
 C
 
-zig cc "$atomics_barrier_harness" "$atomics_barrier_object" -o "$atomics_barrier_exe"
+zig cc -target "$cc_target" "$atomics_barrier_harness" "$atomics_barrier_object" -o "$atomics_barrier_exe"
 "$atomics_barrier_exe"
 printf 'ok distribution executable atomics_inline_asm_barrier\n'
 
@@ -690,6 +695,6 @@ int main(void) {
 }
 C
 
-zig cc "$atomics_add_harness" "$atomics_add_object" -o "$atomics_add_exe"
+zig cc -target "$cc_target" "$atomics_add_harness" "$atomics_add_object" -o "$atomics_add_exe"
 "$atomics_add_exe"
 printf 'ok distribution executable atomics_atomic_add\n'

@@ -12,9 +12,10 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Select the next measured target, ABI, or executable-link boundary after the
-selected `x86_64-unknown-linux-musl` object subset gate is recorded. Keep the
-next slice object/linker scoped and source-backed.
+Select the next measured x86_64 target or ABI boundary after selected
+`x86_64-unknown-linux-musl` object and executable subset gates are recorded.
+Prefer ReleaseSafe/ReleaseSmall executable expansion only if it has stable ABI
+fixtures; otherwise record the linker boundary explicitly.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -213,13 +214,13 @@ math, phis, loops, and helper calls; the latter is a table-driven decoder with
 loop-carried state, i128 stores, and table constants.
 
 Validation gate:
-Inspect the new musl object subset evidence and decide whether the next slice
-should be musl executable/linker proof, another x86_64 ABI boundary, or a
-documented out-of-scope linker boundary.
+Inspect ReleaseSafe and ReleaseSmall selected fixtures for ABI-stable
+executable proof, then promote exactly one musl executable expansion or linker
+boundary into this file.
 
 Commit:
-Commit the musl object subset gate first, then commit the next selected task
-separately.
+Commit the musl executable subset gate first, then commit the next selected
+task separately.
 
 The broad ReleaseFast optimized-output object probe over
 `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` is clean:

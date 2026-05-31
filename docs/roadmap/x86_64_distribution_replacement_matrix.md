@@ -230,6 +230,20 @@ boundary=object emission only; no musl executable harnesses, linker ownership,
          CRT/start files, libc integration, or dynamic loader behavior
 ```
 
+The selected x86_64 musl executable subset is also target-backed for stable ABI
+fixtures:
+
+```text
+gate=bash scripts/run_distribution_x86_64_musl_executable_subset.sh
+target=x86_64-unknown-linux-musl
+cc_target=x86_64-linux-musl
+includes=ReleaseFast executable gate, selected Debug mathtest executable gate
+result=pass
+boundary=no ReleaseSafe or ReleaseSmall musl executable expansion yet; no
+         linker ownership, CRT policy, libc integration, or dynamic loader
+         behavior beyond the selected harnesses
+```
+
 Automated broad object probing is now available through:
 
 ```text

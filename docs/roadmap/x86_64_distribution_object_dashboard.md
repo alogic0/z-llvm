@@ -59,6 +59,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including Debug M4 object/executable gates | pass |
 | `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset, no executable/linker proof | pass |
+| `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset | pass |
 
 ## Matrix Boundary
 
@@ -165,7 +166,8 @@ Global exclusions:
   broad register allocation
   scheduling
   linker ownership
-  x86_64 musl executable/linker proof
+  x86_64 musl executable/linker proof outside selected ReleaseFast and Debug
+    executable fixtures
   bitcode/LTO linker handoff until activation criteria are met
   dynamic TLS models
   non-x86_64 object formats
