@@ -264,3 +264,31 @@ C
 zig cc "$aggregates_slice_harness" "$aggregates_slice_object" -o "$aggregates_slice_exe"
 "$aggregates_slice_exe"
 printf 'ok distribution executable aggregates_slice_sum\n'
+
+aggregates_struct_fixture="test/distribution/releasefast_x86_64/inputs/aggregates_struct_sum.ll"
+aggregates_struct_object="$tmp_dir/aggregates_struct_sum.o"
+aggregates_struct_harness="$tmp_dir/aggregates_struct_sum_harness.c"
+aggregates_struct_exe="$tmp_dir/aggregates_struct_sum_harness"
+
+zig build run -- --emit=obj --target="$target" "$aggregates_struct_fixture" > "$aggregates_struct_object"
+
+cat > "$aggregates_struct_harness" <<'C'
+struct Pair {
+    int a;
+    int b;
+};
+
+extern int struct_sum(const struct Pair *pair);
+
+int main(void) {
+    struct Pair first = { 7, 11 };
+    struct Pair second = { -4, 9 };
+    if (struct_sum(&first) != 18) return 1;
+    if (struct_sum(&second) != 5) return 2;
+    return 0;
+}
+C
+
+zig cc "$aggregates_struct_harness" "$aggregates_struct_object" -o "$aggregates_struct_exe"
+"$aggregates_struct_exe"
+printf 'ok distribution executable aggregates_struct_sum\n'

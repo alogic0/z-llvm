@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next ReleaseFast x86_64 asm/object blocker from the broader
-optimized-output capture: selected `@struct_sum` pointer GEP/load lowering in
+optimized-output capture: selected `@array_sum` add-chain lowering in
 `aggregates.zig.ReleaseFast.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -22,16 +22,14 @@ The broad ReleaseFast optimized-output probe over
 `aggregates.zig.ReleaseFast.x86_64.optimized.ll` as the first sorted object
 failure after the selected `aggregate_abi` i64 pair fixture. The first bounded
 constant-select shape, `@error_union_payload`, is now covered. The next shape is
-`@struct_sum = alias i32 (ptr)`, which does two readonly i32 loads from a base
-pointer and a `getelementptr i8, ptr %0, i64 4` field offset, then returns their
-sum.
+`@array_sum = alias i32 (i32, i32, i32)`, which adds three i32 parameters using
+two straight-line `add` instructions and returns the second add.
 
 LLVM fallback removed or reduced:
-Add the smallest x86_64 lowering needed for the selected `@struct_sum` shape.
+Add the smallest x86_64 lowering needed for the selected `@array_sum` shape.
 This reduces the ReleaseFast x86_64 asm/object fallback for the next broad
-optimized-output row only; it does not claim general pointer arithmetic,
-arbitrary field layout, stores, memory alias analysis, or target-complete ABI
-coverage.
+optimized-output row only; it does not claim general expression trees, register
+allocation, overflow semantics, vector values, or target-complete ABI coverage.
 
 Mode/target/stage row:
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -45,7 +43,7 @@ reference boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`.
 
 Known boundary:
-Implement only the selected `@struct_sum` shape from the aggregates optimized
+Implement only the selected `@array_sum` shape from the aggregates optimized
 output. Do not generalize to unrelated aggregate functions, vectors, atomics,
 floating point, or non-x86_64 ABI behavior in this slice.
 

@@ -11,3 +11,4 @@ aggregate_abi_make_pair	test/distribution/releasefast_x86_64/inputs/aggregate_ab
 aggregates_error_union_payload	test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select	error_union_payload
 aggregates_optional_payload	test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll	object-readelf	object-ok	aggregates.zig	scalar icmp select parameter	optional_payload
 aggregates_slice_sum	test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll	object-readelf	object-ok	aggregates.zig	slice sum loop	slice_sum
+aggregates_struct_sum	test/distribution/releasefast_x86_64/inputs/aggregates_struct_sum.ll	object-readelf	object-ok	aggregates.zig	struct field loads	struct_sum

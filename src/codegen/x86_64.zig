@@ -134,6 +134,7 @@ pub const Instruction = union(enum) {
     },
     reload_rsp_eax: FrameIndex,
     load_arg_ptr_eax: ArgReg,
+    add_arg_ptr_disp4_eax: ArgReg,
     direct_call: struct {
         symbol: []const u8,
         ret_ty: ir.Type,
@@ -229,6 +230,7 @@ fn lowerStraightLineReturn(
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAggregateAbiReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerStructSumReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -717,6 +719,70 @@ fn lowerMakePairReturn(
     try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
     try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
     try machine.instructions.append(allocator, .or_rdx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerStructSumReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const first_load_inst = block.instructions.items[0];
+    const gep_inst = block.instructions.items[1];
+    const second_load_inst = block.instructions.items[2];
+    const add_inst = block.instructions.items[3];
+    if (first_load_inst.removed or gep_inst.removed or second_load_inst.removed or add_inst.removed) return false;
+
+    const first_load_result = first_load_inst.result orelse return false;
+    const gep_result = gep_inst.result orelse return false;
+    const second_load_result = second_load_inst.result orelse return false;
+    const add_result = add_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+
+    const first_load = switch (first_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!first_load.ty.eql(.{ .int = 32 })) return false;
+    if (first_load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+    const base_reg = try paramValueReg(function, first_load.ptr, .ptr);
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !first_load.ptr.eql(gep.ptr)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or !isInt(index.value, 4)) return false;
+
+    const second_load = switch (second_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!second_load.ty.eql(.{ .int = 32 }) or !isNamed(second_load.ptr, gep_result)) return false;
+    if (second_load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    if (!((isNamed(add.lhs, first_load_result) and isNamed(add.rhs, second_load_result)) or
+        (isNamed(add.lhs, second_load_result) and isNamed(add.rhs, first_load_result)))) return false;
+
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = base_reg });
+    try machine.instructions.append(allocator, .{ .add_arg_ptr_disp4_eax = base_reg });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -1428,6 +1494,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp,
         .reload_rsp_eax,
         .load_arg_ptr_eax,
+        .add_arg_ptr_disp4_eax,
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,
@@ -1442,7 +1509,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rdi_rcx4_ptr_eax, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -1492,6 +1559,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .reload_arg_rsp,
         .reload_rsp_eax,
         .load_arg_ptr_eax,
+        .add_arg_ptr_disp4_eax,
         .direct_call,
         .cmp_arg8_imm8,
         .test_arg8,
