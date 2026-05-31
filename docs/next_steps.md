@@ -13,8 +13,9 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@entry` alias / `@inherit_want_safety.entry` i64 constant return from
-`cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@entry` alias / `@no_compile_panic_for_unchecked_arith.entry`
+`llvm.umul.fix.sat.i64` constant-call return from
+`cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -409,9 +410,19 @@ the selected 64-bit scalar branch path. The broad row still remains the first
 object failure; the next selected public shape is `@zig_u32 = alias void
 (i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 8-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers`, a five-argument integer equality ladder ending in return-or-trap. That focused shape is now object-ok with selected integer argument comparisons through `%r8d` and a local trap failure edge. The broad row still remains the first object failure; the next selected public shape is `@zig_panic = alias void (), ptr @main.zig_panic`, a noreturn panic stub ending in unreachable. That focused shape is now object-ok through a selected local `ud2` panic stub, and the broad `c_abi_main` row is object-clean. The current ReleaseSmall object probe is 266 object successes and 199 object failures. The next sorted failure is `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public entry shape is `@_start = alias void (), ptr @start._start`, a naked startup inline-asm trampoline that calls `@start.posixCallMainAndExit` and ends in `unreachable`. That focused shape is now object-ok with selected startup trampoline lowering and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The current ReleaseSmall object probe is 327 object successes and 138 object failures. The actual next alias-target blocker in `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll` is `@getauxval = weak_odr alias i64 (i64), ptr @os.linux.getauxvalImpl`; the selected auxv scan shape is now object-ok with a PC-relative load of `@os.linux.elf_aux_maybe` and a bounded tag/value loop. The current ReleaseSmall object probe is 455 object successes and 10 object failures. The next sorted failure is `cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public shape is `@elemPtr = alias void (), ptr @illegal_operation_on_logical_ptr.elemPtr`, an empty noreturn compile-error stub ending in `unreachable`. That focused shape is now object-ok through the selected `ud2` unreachable-stub path. The current ReleaseSmall object probe is 456 object successes and 9 object failures. The next sorted failure is `cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public shape is `@entry = alias i64 (), ptr @inherit_want_safety.entry`, an i64 constant return of `4`.
 
+That focused `inherit_want_safety.entry` shape is now object-ok through
+selected `%rax` constant return materialization. The current ReleaseSmall
+object probe is 457 object successes and 8 object failures. The next sorted
+failure is
+`cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`;
+the selected public shape is `@entry = alias i64 (), ptr
+@no_compile_panic_for_unchecked_arith.entry`, a straight-line
+`llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)` call whose result is returned as
+i64.
+
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@entry` i64 constant return shape. This
+`@entry` i64 saturated-multiply intrinsic constant-call return shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, complete Zig startup/runtime ownership, broad integer ABI lowering,
@@ -423,22 +434,26 @@ Mode/target/stage row:
 `status=LLVM fallback required`.
 
 Upstream mapping:
-Use LLVM x86_64 instruction selection and MC encoding behavior as the reference
-boundary:
+Use LLVM intrinsic simplification plus x86_64 instruction selection and MC
+encoding behavior as the reference boundary:
+`llvm-project-22/llvm/include/llvm/IR/Intrinsics.td`,
+`llvm-project-22/llvm/lib/Analysis/ValueTracking.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-constant i64 return shape, also map against SelectionDAG constant return
+constant i64 intrinsic result, also map against SelectionDAG call/result
 lowering and x86_64 integer return-register emission in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@entry` alias to `@inherit_want_safety.entry`
-ReleaseSmall i64 constant return. Do not generalize to arbitrary integer ABI
-returns, multi-register returns, debug/unwind object records, or non-x86_64
-ABI behavior in this slice.
+Implement only the selected `@entry` alias to
+`@no_compile_panic_for_unchecked_arith.entry` ReleaseSmall
+`llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)` return. Do not generalize to
+arbitrary integer ABI returns, arbitrary intrinsic calls, multi-register
+returns, debug/unwind object records, or non-x86_64 ABI behavior in this
+slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused

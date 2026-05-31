@@ -490,4 +490,11 @@ That focused shape is now object-ok through the selected `ud2` unreachable
 stub path. The current ReleaseSmall object probe is 456 successes and 9
 failures. The next sorted failure is
 `cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
-alias is `@entry -> @inherit_want_safety.entry`, an i64 constant return.
+alias is `@entry -> @inherit_want_safety.entry`, an i64 constant return. That
+shape is now object-ok through selected `%rax` constant return materialization.
+The current ReleaseSmall object probe is 457 successes and 8 failures. The
+next sorted failure is
+`cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`;
+the selected alias is
+`@entry -> @no_compile_panic_for_unchecked_arith.entry`, a selected
+`llvm.umul.fix.sat.i64` constant-call return.

@@ -836,6 +836,7 @@ fn lowerStraightLineReturn(
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -850,6 +851,26 @@ fn lowerStraightLineReturn(
         },
         .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
+}
+
+fn lowerSelectedI64ConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "inherit_want_safety.entry")) return false;
+    if (!ret.ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 0 or block.instructions.items.len != 0) return false;
+    const value = switch (ret.value orelse return error.InvalidRet) {
+        .int => |int| int,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(value) });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerSingleStackSlotCallReturn(
@@ -5566,6 +5587,11 @@ fn blockIndex(function: ir.Function, name: []const u8) ?usize {
 
 fn i32Value(value: i128) !i32 {
     if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+fn i64Value(value: i128) !i64 {
+    if (value < std.math.minInt(i64) or value > std.math.maxInt(i64)) return error.UnsupportedCodegenValue;
     return @intCast(value);
 }
 

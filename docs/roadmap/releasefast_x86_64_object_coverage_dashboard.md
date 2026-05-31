@@ -82,8 +82,10 @@ closed_failure_14=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.l
 closed_aliases_14=@getauxval -> @os.linux.getauxvalImpl
 closed_failure_15=cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_15=@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr
-current_object_probe=456 object-ok, 9 object-fail
-first_failure=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@entry -> @inherit_want_safety.entry
-missing_capability=ReleaseSmall i64 constant return lowering
+closed_failure_16=cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_16=@entry -> @inherit_want_safety.entry
+current_object_probe=457 object-ok, 8 object-fail
+first_failure=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@entry -> @no_compile_panic_for_unchecked_arith.entry
+missing_capability=selected ReleaseSmall llvm.umul.fix.sat.i64 constant-call return lowering
 ```

@@ -337,3 +337,21 @@ rg -q '[[:space:]]illegal_operation_on_logical_ptr\.elemPtr$' "$elem_ptr_summary
 rg -q '[[:space:]]ud2' "$elem_ptr_dump"
 
 printf 'ok distribution releasesmall object compile_errors_illegal_operation_on_logical_ptr_elem_ptr\n'
+
+inherit_fixture="test/distribution/releasesmall_x86_64/inputs/inherit_want_safety_i64_return.ll"
+inherit_object="$tmp_dir/inherit_want_safety_i64_return.o"
+inherit_summary="$tmp_dir/inherit_want_safety_i64_return.readelf.txt"
+inherit_dump="$tmp_dir/inherit_want_safety_i64_return.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$inherit_fixture" > "$inherit_object"
+readelf -W -h -S -s -r "$inherit_object" > "$inherit_summary"
+objdump -dr "$inherit_object" > "$inherit_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$inherit_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$inherit_summary"
+rg -q '[[:space:]]entry$' "$inherit_summary"
+rg -q '[[:space:]]inherit_want_safety\.entry$' "$inherit_summary"
+rg -q 'movabs[[:space:]]+\$0x4,%rax' "$inherit_dump"
+rg -q '[[:space:]]ret' "$inherit_dump"
+
+printf 'ok distribution releasesmall object inherit_want_safety_i64_return\n'
