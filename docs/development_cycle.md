@@ -58,6 +58,37 @@ pass parity probing. Start from replacement evidence:
 5.  If no blocker appears, record the clean row or boundary and move to the
     next x86_64 stage before considering non-x86_64 work.
 
+## Accepted Optimizer Triage
+
+When recent work may affect accepted optimizer behavior and there is no active
+slice, tighten discovery to this order:
+
+1.  Check `ReleaseFast` first. It is the primary optimizer replacement row and
+    the best signal for regressions in canonicalization passes such as
+    SimplifyCFG.
+2.  Record new evidence only when the sweep is clean and reproducible. Include
+    exact mode, pass pipeline, target/triple, local commit, output directory,
+    and summary path.
+3.  Check `ReleaseSafe` only when the changed behavior can affect
+    safety/runtime-call CFG shapes, or when the existing `ReleaseSafe` evidence
+    is stale.
+4.  Check `ReleaseSmall` next only as milestone evidence. `Oz` may expose
+    different canonical forms, but it is not a default per-cycle habit.
+5.  Keep `Debug` optional unless debug metadata, O0 pipeline behavior, or
+    Debug evidence freshness changed.
+6.  Promote the first parse, verify, optimizer, input-size, handoff, or codegen
+    failure into `docs/next_steps.md` as the next real implementation slice.
+7.  Treat explicit future rows as boundaries unless new evidence changes their
+    status. Reaffirm the boundary rather than reclassifying it when no new
+    requirement appears.
+8.  Run x86_64 handoff or codegen checks only when refreshed optimizer output
+    introduces a new shape relevant to handoff.
+9.  Update readiness and evidence docs only when there is new data. Evidence
+    docs should lag as little as possible, but should not churn for unchanged
+    facts.
+10. If no blockers appear, leave `docs/next_steps.md` empty unless a boundary
+    closure advances the x86_64 replacement matrix.
+
 Each active checklist in `docs/next_steps.md` should state:
 
 ```text
