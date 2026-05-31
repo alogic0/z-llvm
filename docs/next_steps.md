@@ -13,7 +13,7 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_bool` i1 branch lowering from
+`@zig_ptr` pointer equality branch lowering from
 `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
@@ -357,11 +357,15 @@ two-vector float comparison shape returning a packed two-float vector. That
 focused shape is now object-ok with selected packed vector comparisons and
 packed `%xmm0` return materialization. The broad row still remains the first
 object failure; the next selected public shape is `@zig_bool = alias void
-(i1), ptr @main.zig_bool`, an i1 branch-to-return-or-trap shape.
+(i1), ptr @main.zig_bool`, an i1 branch-to-return-or-trap shape. That focused
+shape is now object-ok with selected low-byte compare and local trap failure
+edge. The broad row still remains the first object failure; the next selected
+public shape is `@zig_ptr = alias void (ptr), ptr @main.zig_ptr`, a pointer
+equality branch-to-return-or-trap shape.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_bool` i1 branch-to-return-or-trap shape. This
+`@zig_ptr` pointer equality branch-to-return-or-trap shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
 flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
@@ -377,13 +381,13 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-i1 branch shape, also map against SelectionDAG integer argument assignment and
-conditional branch lowering in
+pointer equality branch shape, also map against SelectionDAG pointer argument
+assignment, integer comparison, and conditional branch lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_bool` ReleaseSmall i1 branch-to-return-or-trap
-shape from the `c_abi_main` optimized output.
+Implement only the selected `@zig_ptr` ReleaseSmall pointer equality
+branch-to-return-or-trap shape from the `c_abi_main` optimized output.
 Do not generalize to all aggregate ABI behavior, arbitrary floating-point
 comparison graphs, panic side effects, debug/unwind object records, or
 non-x86_64 ABI behavior in this slice.

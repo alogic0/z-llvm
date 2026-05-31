@@ -409,6 +409,10 @@ That focused shape is now object-ok with selected packed vector comparisons
 and packed `%xmm0` return materialization. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_bool`, an i1
 branch-to-return-or-trap shape.
+That focused shape is now object-ok with selected low-byte compare and local
+trap failure edge. The broad row still remains the first sorted blocker; the
+next selected alias is `@zig_ptr`, a pointer equality branch-to-return-or-trap
+shape.
 
 ## Activation Rule
 
