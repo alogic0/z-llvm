@@ -224,4 +224,6 @@ The broad row still remains the first sorted failure; the next selected alias
 is `@zig_ret_u16`, a straight-line zero-extended u16 return. That focused
 shape is now object-ok. The broad row still remains the first sorted failure;
 the next selected alias is `@zig_ret_u8`, a straight-line zero-extended u8
-return.
+return. That focused shape is now object-ok. The broad row still remains the
+first sorted failure; the next selected alias is `@zig_ret_bool`, a
+straight-line boolean return.
