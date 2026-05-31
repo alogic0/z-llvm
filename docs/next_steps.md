@@ -12,9 +12,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Create a unified x86_64 distribution object dashboard backed by automated
-object-probe summaries for ReleaseFast, ReleaseSafe, ReleaseSmall, and the
-reduced Debug object subset.
+Probe the first broad Debug x86_64 asm/object row and either reduce one
+concrete object blocker into a tracked fixture or reaffirm broad Debug as an
+LLVM fallback with measured evidence.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -551,18 +551,25 @@ ReleaseSmall input=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir
                       standalone_mix_o_files_base64 table decoder
 ```
 
+The unified dashboard is
+`docs/roadmap/x86_64_distribution_object_dashboard.md`. It records ReleaseFast
+and ReleaseSafe as 17/17 object-clean captured subsets, ReleaseSmall as an
+adjusted 463/465 object-clean subset with two explicit exclusions, and Debug as
+a reduced 6-fixture object-clean subset while broad Debug remains unproven.
+
 LLVM fallback removed or reduced:
-Replace the mode-specific historical object notes with one compact dashboard
-that reports automated probe totals, focused gates, executable coverage, and
-explicit exclusions without expanding the local replacement claim.
+Turn the dashboard's broad Debug asm/object fallback from an unmeasured
+statement into a measured first blocker. If the first blocker is small and
+source-backed, reduce it. If it is broad DWARF/O0/backend infrastructure,
+record that boundary explicitly and keep broad Debug as LLVM fallback.
 
 Mode/target/stage row:
-`mode=ReleaseSmall/Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=conservative boundary / LLVM fallback required outside named subsets`.
+`mode=Debug`, `target=x86_64-linux-gnu`, `stage=asm/object`,
+`status=LLVM fallback required outside the reduced object subset`.
 
 Upstream mapping:
-Use LLVM x86_64 MC/object emission, codegen diagnostics, and object-file
-handoff behavior as the reference boundary for dashboard classifications:
+Use LLVM x86_64 Debug/O0 codegen, MC/object emission, diagnostics, and
+object-file handoff behavior as the reference boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
@@ -572,14 +579,14 @@ boundaries against `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-The dashboard reports evidence; it must not promote matrix rows by itself.
-Keep row promotion in the replacement matrix after a human-reviewed probe
-result. Exclusions must be explicit by filename and reason.
+Do not claim broad Debug replacement from reduced fixtures. The next probe must
+select or capture one broad source-backed Debug row, record the exact command
+and first failure, and only create a fixture if the first blocker is a bounded
+codegen/object shape.
 
 Validation gate:
-Create the dashboard from the automated ReleaseFast, ReleaseSafe, and adjusted
-ReleaseSmall summaries, then keep `bash scripts/probe_distribution_objects.sh`
-`--help`, the adjusted ReleaseSmall probe, and
+Run the smallest broad Debug probe possible, record exact counts and first
+failure, and keep `bash scripts/run_distribution_debug_object_m4.sh` plus
 `bash scripts/run_distribution_no_llvm_codegen_subset.sh` green.
 
 Commit:

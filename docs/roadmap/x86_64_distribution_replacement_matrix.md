@@ -121,6 +121,9 @@ bash scripts/probe_distribution_objects.sh
       reason=table-decoder-boundary
 ```
 
+The compact object-stage dashboard is
+`docs/roadmap/x86_64_distribution_object_dashboard.md`.
+
 Asm/object remains LLVM fallback required for broad Debug, and for ReleaseFast,
 ReleaseSafe, and ReleaseSmall outside their named captured subsets. Existing
 docs explicitly exclude broad register allocation, scheduling, debug/unwind

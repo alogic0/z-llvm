@@ -1,5 +1,9 @@
 # ReleaseFast x86_64 Object Coverage Dashboard
 
+Current compact cross-mode object evidence lives in
+[x86_64_distribution_object_dashboard.md](x86_64_distribution_object_dashboard.md).
+This file remains the historical ReleaseFast-to-ReleaseSmall closure log.
+
 This dashboard tracks the broad optimized-output object probe for
 `mode=ReleaseFast`, `target=x86_64-linux-gnu`, `stage=asm/object`.
 
