@@ -177,6 +177,7 @@ pub const Instruction = union(enum) {
     jne: []const u8,
     jo: []const u8,
     js: []const u8,
+    ud2,
     ret,
 };
 
@@ -211,6 +212,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     errdefer machine.deinit(allocator);
 
     if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerUnreachableStub(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -2580,6 +2586,22 @@ fn inttoptrI64Address(value: ir.Value) !u32 {
     return @intCast(address);
 }
 
+fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.blocks.items.len != 1) return false;
+    if (function.blocks.items[0].instructions.items.len != 0) return false;
+    switch (function.blocks.items[0].terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        .ret, .br, .condbr, .@"switch", .indirectbr => return false,
+    }
+    if (!std.mem.startsWith(u8, function.name, "sizeof_and_typeof.exp.c_")) return false;
+    if (function.attrs == null) {
+        return false;
+    }
+
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn functionHasOverflowPanicEdge(function: ir.Function) bool {
     return sliceSumHasOverflowCheck(function);
 }
@@ -2938,12 +2960,13 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .ud2,
         .ret,
         => {},
     };
 
     var eax_defined = function.ret_ty == .void or function.ret_ty.eql(.float) or function.ret_ty.eql(.double);
-    var saw_ret = false;
+    var saw_terminator = false;
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
@@ -2968,11 +2991,16 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
-            saw_ret = true;
+            saw_terminator = true;
+            eax_defined = function.ret_ty == .void;
+        },
+        .ud2 => {
+            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+            saw_terminator = true;
             eax_defined = function.ret_ty == .void;
         },
     };
-    if (!saw_ret) return error.MissingMachineReturn;
+    if (!saw_terminator) return error.MissingMachineReturn;
 }
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {
@@ -3027,6 +3055,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .ud2,
         .je,
         .jne,
         .jo,

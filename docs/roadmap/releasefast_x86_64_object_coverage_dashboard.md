@@ -72,8 +72,10 @@ next_optimized_output=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized
 next_optimizer_capture=465 object candidates, 0 local optimizer failures
 closed_failure_10=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_10=@writeToVRam,@testPackedStuff
-next_object_probe=264 object-ok, 201 object-fail
-first_failure=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@c_fopen
-missing_capability=ReleaseSmall noreturn unreachable-stub lowering
+closed_failure_11=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_11=@c_fopen,@c_ftell,@c_fputs,@c_printf
+next_object_probe=265 object-ok, 200 object-fail
+first_failure=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
+selected_alias=@zig_f128_f128_struct
+missing_capability=ReleaseSmall C ABI fp128 byval/sret lowering with selected __eqtf2 panic branches
 ```

@@ -167,6 +167,11 @@ local object successes and 202 object failures. The first sorted failure is
 `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
 `@writeToVRam` volatile absolute-address store lowering. That blocker is now
 object-ok for `@writeToVRam` and `@testPackedStuff`. The current ReleaseSmall
-object probe is 264 successes and 201 failures. The first sorted failure is
+object probe is 264 successes and 201 failures. The next sorted failure was
 `behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@c_fopen` noreturn unreachable-stub lowering.
+`@c_fopen` noreturn unreachable-stub lowering. That blocker is now object-ok
+for `@c_fopen`, `@c_ftell`, `@c_fputs`, and `@c_printf`. The current
+ReleaseSmall object probe is 265 successes and 200 failures. The first sorted
+failure is `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`, selected
+`@zig_f128_f128_struct` C ABI fp128 byval/sret lowering with `__eqtf2`
+comparison calls and panic branches.

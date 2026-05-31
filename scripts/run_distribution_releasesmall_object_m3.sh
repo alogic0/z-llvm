@@ -21,3 +21,22 @@ rg -q '[[:space:]]writeToVRam$' "$summary"
 rg -q 'movb[[:space:]]+\$0x58,0x20000000' "$dump"
 
 printf 'ok distribution releasesmall object export_keyword_vram_store\n'
+
+stubs_fixture="test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll"
+stubs_object="$tmp_dir/sizeof_typeof_unreachable_stubs.o"
+stubs_summary="$tmp_dir/sizeof_typeof_unreachable_stubs.readelf.txt"
+stubs_dump="$tmp_dir/sizeof_typeof_unreachable_stubs.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$stubs_fixture" > "$stubs_object"
+readelf -W -h -S -s -r "$stubs_object" > "$stubs_summary"
+objdump -dr "$stubs_object" > "$stubs_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$stubs_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$stubs_summary"
+rg -q '[[:space:]]c_fopen$' "$stubs_summary"
+rg -q '[[:space:]]c_ftell$' "$stubs_summary"
+rg -q '[[:space:]]c_fputs$' "$stubs_summary"
+rg -q '[[:space:]]c_printf$' "$stubs_summary"
+rg -q '[[:space:]]ud2' "$stubs_dump"
+
+printf 'ok distribution releasesmall object sizeof_typeof_unreachable_stubs\n'

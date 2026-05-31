@@ -107,6 +107,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .test_arg32 => |reg| try encodeTest32(&bytes, allocator, reg),
             .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
+            .ud2 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x0b }),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
                 const next = offset + instructionSize(instruction);
@@ -196,6 +197,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
+        .ud2 => 2,
         .je, .jne, .jo, .js => 6,
         .ret => 1,
     };

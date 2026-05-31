@@ -137,8 +137,10 @@ stage=asm/object
 status=LLVM fallback required
 optimized_output=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir
 optimizer_capture=465 ok, 0 fail, 1009 compile_skip
-object_probe=264 ok, 201 fail with --input-limit=67108864
+previous_object_probe=264 ok, 201 fail with --input-limit=67108864
 closed_blocker=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll selected writeToVRam/testPackedStuff
-first_blocker=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll
-missing capability=selected @c_fopen noreturn unreachable-stub lowering
+current_object_probe=265 ok, 200 fail with --input-limit=67108864
+closed_blocker=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll selected c_fopen/c_ftell/c_fputs/c_printf
+first_blocker=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
+missing capability=selected @zig_f128_f128_struct C ABI fp128 byval/sret lowering with selected __eqtf2 panic branches
 ```

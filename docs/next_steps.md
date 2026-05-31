@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@c_fopen` noreturn unreachable stub lowering from
-`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@zig_f128_f128_struct` C ABI fp128 byval/sret lowering from
+`c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -68,20 +68,27 @@ verify, optimizer, or input-size failures. Local object probing with
 The selected `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`
 blocker is now object-ok for `@writeToVRam` and `@testPackedStuff`, covering
 volatile absolute-address byte store lowering. The current ReleaseSmall object
-probe is 264 object successes and 201 object failures.
+probe is 264 object successes and 201 object failures. The selected
+`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll` blocker is
+now object-ok for `@c_fopen`, `@c_ftell`, `@c_fputs`, and `@c_printf`,
+covering selected noreturn unreachable-stub lowering. The current ReleaseSmall
+object probe is 265 object successes and 200 object failures.
 
 The first sorted ReleaseSmall object failure is
-`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll` with
+`c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll` with
 `error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@c_fopen = alias ptr (ptr, ptr), ptr @sizeof_and_typeof.exp.c_fopen`; the
-optimized body is a `noreturn` function whose only terminator is `unreachable`.
+`@zig_f128_f128_struct = alias void (ptr, ptr), ptr
+@main.zig_f128_f128_struct`; the optimized body uses an sret destination, a
+byval fp128 struct input, `__eqtf2` comparison calls, panic branches, and
+fp128 stores into the return buffer.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@c_fopen` unreachable-stub shape. This continues reducing the ReleaseSmall
-asm/object fallback row. It does not claim arbitrary trap lowering, panic
-semantics, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+`@zig_f128_f128_struct` fp128 byval/sret shape. This continues reducing the
+ReleaseSmall asm/object fallback row. It does not claim broad C ABI lowering,
+arbitrary fp128 arithmetic, general libcall lowering, panic runtime semantics,
+non-x86_64 ABI behavior, debug records, unwind records, linker ownership, or
+target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -93,15 +100,16 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-unreachable stub, also map against SelectionDAG terminator and unreachable
-handling in
+fp128 compare/libcall and sret/byval memory shape, also map against
+SelectionDAG call, argument, branch, and memory operation lowering in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@c_fopen` ReleaseSmall unreachable-stub shape from
-the `behavior_sizeof_and_typeof` optimized output. Do not generalize to
-arbitrary trap lowering, panic semantics, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Implement only the selected `@zig_f128_f128_struct` ReleaseSmall C ABI fp128
+byval/sret shape from the `c_abi_main` optimized output. Do not generalize to
+all C ABI aggregate classification, arbitrary fp128 operations, full libcall
+lowering, panic runtime behavior, debug/unwind object records, or non-x86_64
+ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
