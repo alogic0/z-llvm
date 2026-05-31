@@ -98,6 +98,8 @@ pub const Instruction = union(enum) {
         op: MachineBinaryOp,
         reg: ArgReg,
     },
+    shl_eax_imm5: u5,
+    or_eax_imm32: i32,
     sub_rsp_8,
     add_rsp_8,
     spill_arg_rsp: struct {
@@ -172,6 +174,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -380,6 +383,64 @@ fn lowerSelectAddSubReturn(
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .{ .mov_arg_eax = base_reg });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .sub, .reg = neg_param } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerShiftOrConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const shift_inst = block.instructions.items[0];
+    const or_inst = block.instructions.items[1];
+    if (shift_inst.removed or or_inst.removed) return false;
+
+    const shift_result = shift_inst.result orelse return false;
+    const or_result = or_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, or_result)) return false;
+
+    const shift = switch (shift_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shift.op != .shl or !shift.ty.eql(.{ .int = 32 })) return false;
+    const src_reg = try paramValueReg(function, shift.lhs, .{ .int = 32 });
+    const shift_amount = switch (shift.rhs) {
+        .int => |value| try u5Value(value),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const or_binary = switch (or_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (or_binary.op != .@"or" or !or_binary.ty.eql(.{ .int = 32 })) return false;
+    const or_value = if (isNamed(or_binary.lhs, shift_result))
+        switch (or_binary.rhs) {
+            .int => |value| try i32Value(value),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+    else if (isNamed(or_binary.rhs, shift_result))
+        switch (or_binary.lhs) {
+            .int => |value| try i32Value(value),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+    else
+        return false;
+
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = src_reg });
+    try machine.instructions.append(allocator, .{ .shl_eax_imm5 = shift_amount });
+    try machine.instructions.append(allocator, .{ .or_eax_imm32 = or_value });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -753,6 +814,11 @@ fn i32Value(value: i128) !i32 {
     return @intCast(value);
 }
 
+fn u5Value(value: i128) !u5 {
+    if (value < 0 or value > std.math.maxInt(u5)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .je => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
@@ -761,6 +827,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
+        .shl_eax_imm5,
+        .or_eax_imm32,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,
@@ -777,7 +845,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32 => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -812,6 +880,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
+        .shl_eax_imm5,
+        .or_eax_imm32,
         .sub_rsp_8,
         .add_rsp_8,
         .spill_arg_rsp,

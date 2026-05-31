@@ -118,8 +118,7 @@ this baseline does not promote a handoff/codegen gate by itself.
 Milestone 1 for `ReleaseFast / x86_64-linux-gnu / asm-object` now records a
 conservative boundary for the selected Zig-backed object subset in
 `docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The first remaining
-uncovered blocker is `control_flow_calls_call_chain`, a shift feeding integer
-`or`.
+uncovered blocker is `globals_comptime_const`, a multiply by constant.
 
 ## Activation Rule
 

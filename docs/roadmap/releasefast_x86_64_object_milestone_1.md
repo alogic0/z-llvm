@@ -38,12 +38,12 @@ Object-ready selected subset:
 | `tiny_scalar` | `tiny_scalar.zig` | scalar arithmetic and void return | local object + readelf |
 | `integers_add_wrap` | `integers.zig` | scalar wrapping add | local object + readelf |
 | `switch_control_branch_mix` | `switch_control.zig` | branch/select lowered to `select` plus add | local object + readelf |
+| `control_flow_calls_call_chain` | `control_flow_calls.zig` | shift and or arithmetic | local object + readelf |
 
 Classified blockers from representative non-empty optimized output:
 
 | Fixture | Source row | Shape | Current blocker |
 | --- | --- | --- | --- |
-| `control_flow_calls_call_chain` | `control_flow_calls.zig` | shift and or arithmetic | `UnsupportedCodegenValue` |
 | `globals_comptime_const` | `globals_comptime.zig` | multiply by constant | `UnsupportedCodegenInstruction` |
 | `optional_pointer_value` | `optional_pointer.zig` | null branch and pointer load | `UnsupportedCodegenControlFlow` |
 | `switch_control_dense_switch` | `switch_control.zig` | switch table load and phi merge | `UnsupportedCodegenControlFlow` |
@@ -77,7 +77,7 @@ Explicit exclusions:
 
 ```text
 general branch/select lowering beyond the selected add/sub pattern
-variable shift/or chains
+variable shift/or chains beyond the selected shl-by-one plus or-one pattern
 integer multiply by constant
 global data and alias/export symbol emission
 pointer loads and null-branch control flow
@@ -89,7 +89,7 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The first remaining uncovered blocker is `control_flow_calls_call_chain`:
-selected ReleaseFast optimized output with shift and or arithmetic. Milestone 2
-should add only the x86_64 lowering, encoding, fixture evidence, and validation
-needed for that shape.
+The first remaining uncovered blocker is `globals_comptime_const`: selected
+ReleaseFast optimized output with multiply by constant. Milestone 2 should add
+only the x86_64 lowering, encoding, fixture evidence, and validation needed for
+that shape.

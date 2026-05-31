@@ -29,6 +29,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
+            .shl_eax_imm5 => |amount| {
+                try bytes.appendSlice(allocator, &.{ 0xc1, 0xe0 });
+                try bytes.append(allocator, amount);
+            },
+            .or_eax_imm32 => |value| {
+                try bytes.append(allocator, 0x0d);
+                try appendI32(&bytes, allocator, value);
+            },
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
@@ -62,6 +70,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
+        .shl_eax_imm5 => 3,
+        .or_eax_imm32 => 5,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
