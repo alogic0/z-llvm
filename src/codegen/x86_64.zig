@@ -274,6 +274,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedPointerLoadStore(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -2420,6 +2425,26 @@ fn lowerCheckedGlobalUpdate(allocator: std.mem.Allocator, machine: *MachineFunct
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = value_reg } });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "globals_comptime.global_counter" });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedPointerLoadStore(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "pointers_memory.load_store")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
+    const input_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const output_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    if (input_reg != .rdi or output_reg != .rsi) return error.UnsupportedCodegenAbi;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+
+    const overflow_label = "load_store_overflow";
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = input_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = output_reg });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;

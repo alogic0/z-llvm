@@ -57,8 +57,10 @@ closed_failure_4=error_switch.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_4=@error_switch
 closed_failure_5=globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_5=@comptime_const,@update_global,@read_global
-current_probe=13 object-ok, 4 object-fail
-first_failure=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll
-selected_alias=@load_store
-missing_capability=ReleaseSafe checked pointer load/add/store and panic-edge lowering
+closed_failure_6=pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll
+closed_aliases_6=@load_store
+current_probe=14 object-ok, 3 object-fail
+first_failure=switch_control.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@branch_mix
+missing_capability=ReleaseSafe checked add-or-sub branch phi and panic-edge lowering
 ```

@@ -147,6 +147,10 @@ blocker is now object-ok for `@comptime_const`, `@update_global`, and
 `@read_global`. The current probe is 13 successes and 4 failures. The first
 sorted blocker is `pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll`,
 selected `@load_store` checked pointer load/add/store and panic-edge lowering.
+That blocker is now object-ok for `@load_store`. The current probe is 14
+successes and 3 failures. The first sorted blocker is
+`switch_control.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@branch_mix`
+checked add-or-sub branch phi and panic-edge lowering.
 
 ## Activation Rule
 

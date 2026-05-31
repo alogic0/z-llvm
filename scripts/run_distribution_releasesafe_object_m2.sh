@@ -233,3 +233,46 @@ C
 zig cc "$globals_harness" "$globals_object" -o "$globals_exe"
 "$globals_exe"
 printf 'ok distribution releasesafe object globals_comptime_checked\n'
+
+pointers_fixture="test/distribution/releasesafe_x86_64/inputs/pointers_memory_checked.ll"
+pointers_object="$tmp_dir/pointers_memory_checked.o"
+pointers_summary="$tmp_dir/pointers_memory_checked.readelf.txt"
+pointers_dump="$tmp_dir/pointers_memory_checked.objdump.txt"
+pointers_harness="$tmp_dir/pointers_memory_checked_harness.c"
+pointers_exe="$tmp_dir/pointers_memory_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$pointers_fixture" > "$pointers_object"
+readelf -W -h -S -s -r "$pointers_object" > "$pointers_summary"
+objdump -dr "$pointers_object" > "$pointers_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$pointers_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$pointers_summary"
+rg -q '[[:space:]]load_store$' "$pointers_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$pointers_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$pointers_dump"
+
+cat > "$pointers_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t load_store(const int32_t *input, int32_t *output);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    int32_t input = 41;
+    int32_t output = 0;
+    if (load_store(&input, &output) != 42) return 1;
+    if (output != 42) return 2;
+    input = -3;
+    if (load_store(&input, &output) != -2) return 3;
+    if (output != -2) return 4;
+    return 0;
+}
+C
+
+zig cc "$pointers_harness" "$pointers_object" -o "$pointers_exe"
+"$pointers_exe"
+printf 'ok distribution releasesafe object pointers_memory_checked\n'
