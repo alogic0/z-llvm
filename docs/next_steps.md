@@ -13,10 +13,10 @@ Source roadmap: [x86_64 Distribution Object Dashboard](roadmap/x86_64_distributi
 
 Replacement goal:
 Select the next measured x86_64 distribution boundary after the selected
-ReleaseSafe and ReleaseSmall executable fixtures became target-aware for both
-GNU and musl. Prefer a source-backed linker/CRT boundary or one explicit
-ReleaseSmall exclusion probe; do not expand beyond the captured subset without
-a measured first blocker.
+ReleaseSafe/ReleaseSmall executable fixtures and tracked ReleaseSmall exclusion
+fixtures became target-aware for both GNU and musl. Prefer a source-backed
+linker/CRT boundary; do not expand beyond the captured subset without a
+measured first blocker.
 
 Zig evidence:
 The continuous Debug prefix-400 object probe at
@@ -652,6 +652,8 @@ summary total=1 ok=0 fail=1 excluded=0
 first_failure=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
 first_failure_category=unsupported-control-flow
 selected_public_shape=@strFromFloatHelp -> @main.strFromFloatHelp
+tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
+focused_gate=bash scripts/run_distribution_releasesmall_boundary_m3.sh
 ```
 
 With that row excluded, the adjusted ReleaseSmall object probe found
@@ -735,6 +737,8 @@ summary total=1 ok=0 fail=1 excluded=0
 first_failure=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 first_failure_category=unsupported-control-flow
 selected_public_shape=@decode_base_64 -> @base64.decode_base_64
+tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
+focused_gate=bash scripts/run_distribution_releasesmall_boundary_m3.sh
 ```
 
 With that row and the existing

@@ -37,12 +37,14 @@ standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
   reason=float-format-helper-boundary
   boundary=multi-block float-format helper, not a one-slice object reduction
   direct_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
+  tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
   result=1 fail, category=unsupported-control-flow
 
 standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
   reason=table-decoder-boundary
   boundary=table-driven decoder with broad loop/control-flow lowering
   direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
+  tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
   result=1 fail, category=unsupported-control-flow
 ```
 
@@ -55,6 +57,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_releasesafe_object_m2.sh` | selected ReleaseSafe safety/runtime-call objects plus executable ABI checks | pass for GNU and musl targets |
 | `bash scripts/run_distribution_releasesmall_object_m3.sh` | selected ReleaseSmall object subset | pass |
 | `bash scripts/run_distribution_releasesmall_executable_m3.sh` | selected ReleaseSmall executable ABI checks | pass for GNU and musl targets |
+| `bash scripts/run_distribution_releasesmall_boundary_m3.sh` | tracked ReleaseSmall exclusion boundary fixtures | pass for GNU and musl targets |
 | `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
 | `bash scripts/run_distribution_debug_executable_m4.sh` | selected Debug executable ABI proof | pass |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
