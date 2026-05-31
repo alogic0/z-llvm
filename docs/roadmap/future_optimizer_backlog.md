@@ -594,6 +594,11 @@ fixtures emit normal object sections but no `.debug_*` or `.eh_frame` sections.
 Debug object support remains a conservative boundary, not debugger-quality
 metadata, CFI, unwind, or variable-location ownership.
 
+The composed conservative boundary gate is
+`bash scripts/run_distribution_boundary_gates.sh`, covering linker/CRT,
+ReleaseSmall exclusions, Debug DWARF/unwind, and AArch64 object target
+boundaries.
+
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
 failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed

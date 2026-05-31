@@ -283,6 +283,15 @@ boundary=local object emission is x86_64-linux only; AArch64 parse/verify/
          ownership
 ```
 
+The current conservative boundary gates are composed by:
+
+```text
+gate=bash scripts/run_distribution_boundary_gates.sh
+includes=linker/CRT boundary, tracked ReleaseSmall exclusion boundaries,
+         Debug DWARF/unwind boundary, AArch64 object target boundary
+result=pass
+```
+
 Automated broad object probing is now available through:
 
 ```text

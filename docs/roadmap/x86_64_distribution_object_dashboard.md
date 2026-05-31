@@ -71,6 +71,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
 | `bash scripts/run_distribution_linker_boundary.sh` | explicit linker/CRT boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand off to `zig cc` | pass |
 | `bash scripts/run_distribution_aarch64_object_boundary.sh` | explicit non-x86_64 object boundary for AArch64 Linux | pass |
+| `bash scripts/run_distribution_boundary_gates.sh` | composed conservative boundary gates: linker, ReleaseSmall exclusions, Debug unwind, AArch64 object target | pass |
 
 ## Matrix Boundary
 
