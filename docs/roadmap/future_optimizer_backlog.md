@@ -477,6 +477,12 @@ probe is 266 successes and 199 failures. The next sorted blocker is
 `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`;
 the selected alias is `@_start -> @start._start`, a naked startup inline-asm
 trampoline ending in unreachable.
+That focused shape is now object-ok with selected startup trampoline lowering
+and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The
+current ReleaseSmall object probe is 327 successes and 138 failures. The next
+sorted blocker is `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll`;
+the selected function is `@start.posixCallMainAndExit`, a Linux startup
+runtime TLS/syscall/control-flow shape.
 
 ## Activation Rule
 

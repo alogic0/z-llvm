@@ -76,8 +76,10 @@ closed_failure_11=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.l
 closed_aliases_11=@c_fopen,@c_ftell,@c_fputs,@c_printf
 closed_failure_12=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_12=selected public c_abi_main aliases through @zig_panic
-current_object_probe=266 object-ok, 199 object-fail
-first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@_start -> @start._start
-missing_capability=ReleaseSmall naked startup inline-asm trampoline lowering
+closed_failure_13=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
+closed_aliases_13=@_start -> @start._start
+current_object_probe=327 object-ok, 138 object-fail
+first_failure=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll
+selected_function=@start.posixCallMainAndExit
+missing_capability=ReleaseSmall startup runtime TLS/syscall/control-flow lowering
 ```

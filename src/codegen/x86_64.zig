@@ -157,6 +157,7 @@ pub const Instruction = union(enum) {
     or_rdx_rax,
     add_ecx_eax,
     xor_ecx_ecx,
+    xor_ebp_ebp,
     add_rdi_rcx4_ptr_eax,
     inc_rcx,
     smin_i32_edi_esi_eax,
@@ -253,10 +254,13 @@ pub const Instruction = union(enum) {
     load_tls_i32_eax: []const u8,
     store_eax_tls_i32: []const u8,
     atomic_xadd_global_eax: []const u8,
+    mov_rsp_rdi,
+    and_rsp_neg16,
     direct_call: struct {
         symbol: []const u8,
         ret_ty: ir.Type,
     },
+    noreturn_direct_call: []const u8,
     cmp_arg8_imm8: struct {
         reg: ArgReg,
         imm: u8,
@@ -679,6 +683,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiPanic(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerStartTrampoline(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -4548,6 +4557,67 @@ fn lowerCAbiPanic(allocator: std.mem.Allocator, machine: *MachineFunction, funct
     return true;
 }
 
+fn lowerStartTrampoline(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "start._start")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
+
+    const block = function.blocks.items[0];
+    const terminator = block.terminator orelse return error.BlockWithoutTerminator;
+    switch (terminator) {
+        .@"unreachable" => {},
+        .ret, .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
+    }
+    if (block.instructions.items.len != 2) return error.UnsupportedCodegenControlFlow;
+    try validateStartCfiInlineAsm(block.instructions.items[0]);
+    const call_target = try validateStartTrampolineInlineAsm(block.instructions.items[1]);
+
+    try machine.instructions.append(allocator, .xor_ebp_ebp);
+    try machine.instructions.append(allocator, .mov_rsp_rdi);
+    try machine.instructions.append(allocator, .and_rsp_neg16);
+    try machine.instructions.append(allocator, .{ .noreturn_direct_call = call_target });
+    return true;
+}
+
+fn validateStartCfiInlineAsm(instruction: ir.Instruction) !void {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    const inline_asm = call.inline_asm orelse return error.UnsupportedCodegenInstruction;
+    if (call.ret_ty != .void or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
+    if (!inline_asm.sideeffect) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, inline_asm.template, ".cfi_undefined %rip")) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, inline_asm.constraints, "~{dirflag},~{fpsr},~{flags}")) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateStartTrampolineInlineAsm(instruction: ir.Instruction) ![]const u8 {
+    if (instruction.removed or instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    const inline_asm = call.inline_asm orelse return error.UnsupportedCodegenInstruction;
+    if (call.ret_ty != .void or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!inline_asm.sideeffect) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, inline_asm.template, " xorl %ebp, %ebp\\0A movq %rsp, %rdi\\0A andq $$-16, %rsp\\0A callq ${1:P}")) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, inline_asm.constraints, "X,X,~{dirflag},~{fpsr},~{flags}")) return error.UnsupportedCodegenInstruction;
+
+    const self_arg = call.args.items[0];
+    if (self_arg.ty != .ptr or !isNamed(self_arg.value, "@start._start")) return error.UnsupportedCodegenInstruction;
+
+    const target_arg = call.args.items[1];
+    if (target_arg.ty != .ptr) return error.UnsupportedCodegenInstruction;
+    const call_target = switch (target_arg.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenInstruction,
+    };
+    if (!std.mem.startsWith(u8, call_target, "@")) return error.UnsupportedCodegenInstruction;
+    return call_target[1..];
+}
+
 fn appendCompareStackByval64Imm64(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -5459,6 +5529,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .or_rdx_rax,
         .add_ecx_eax,
         .xor_ecx_ecx,
+        .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
         .smin_i32_edi_esi_eax,
@@ -5515,7 +5586,10 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_tls_i32_eax,
         .store_eax_tls_i32,
         .atomic_xadd_global_eax,
+        .mov_rsp_rdi,
+        .and_rsp_neg16,
         .direct_call,
+        .noreturn_direct_call,
         .cmp_arg8_imm8,
         .cmp_ecx_imm32,
         .cmp_eax_imm32,
@@ -5553,7 +5627,14 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
+        .and_rsp_neg16 => rsp_mod16 = 0,
+        .noreturn_direct_call => {
+            if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+            if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+            saw_terminator = true;
+            eax_defined = true;
+        },
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .mov_rsp_rdi, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -5587,6 +5668,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .or_rdx_rax,
         .add_ecx_eax,
         .xor_ecx_ecx,
+        .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
         .smin_i32_edi_esi_eax,
@@ -5643,7 +5725,10 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_tls_i32_eax,
         .store_eax_tls_i32,
         .atomic_xadd_global_eax,
+        .mov_rsp_rdi,
+        .and_rsp_neg16,
         .direct_call,
+        .noreturn_direct_call,
         .cmp_arg8_imm8,
         .cmp_ecx_imm32,
         .cmp_eax_imm32,

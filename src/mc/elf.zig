@@ -303,6 +303,15 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
+            .noreturn_direct_call => |symbol| {
+                const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
+                try relocations.append(allocator, .{
+                    .offset = function_offset + offset + 1,
+                    .symbol_index = symbol_index,
+                    .kind = 4,
+                    .addend = -4,
+                });
+            },
             .atomic_xadd_global_eax => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{

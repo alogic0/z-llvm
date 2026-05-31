@@ -142,8 +142,10 @@ closed_blocker=behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll sele
 intermediate_object_probe=265 ok, 200 fail with --input-limit=67108864
 closed_blocker=behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll selected c_fopen/c_ftell/c_fputs/c_printf
 closed_blocker=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll selected public aliases through @zig_panic
-current_object_probe=266 ok, 199 fail with --input-limit=67108864
-first_blocker=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@_start -> @start._start
-missing capability=selected naked startup inline-asm trampoline lowering
+intermediate_object_probe=266 ok, 199 fail with --input-limit=67108864
+closed_blocker=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @start._start startup trampoline
+current_object_probe=327 ok, 138 fail with --input-limit=67108864
+first_blocker=cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll
+selected_function=@start.posixCallMainAndExit
+missing capability=selected startup runtime TLS/syscall/control-flow lowering
 ```

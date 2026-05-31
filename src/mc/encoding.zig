@@ -61,6 +61,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .or_rdx_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x09, 0xd0 }),
             .add_ecx_eax => try bytes.appendSlice(allocator, &.{ 0x01, 0xc8 }),
             .xor_ecx_ecx => try bytes.appendSlice(allocator, &.{ 0x31, 0xc9 }),
+            .xor_ebp_ebp => try bytes.appendSlice(allocator, &.{ 0x31, 0xed }),
             .add_rdi_rcx4_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x03, 0x04, 0x8f }),
             .inc_rcx => try bytes.appendSlice(allocator, &.{ 0x48, 0xff, 0xc1 }),
             .smin_i32_edi_esi_eax => try bytes.appendSlice(allocator, &.{ 0x89, 0xf8, 0x39, 0xf7, 0x0f, 0x4f, 0xc6 }),
@@ -165,7 +166,9 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_tls_i32_eax => try bytes.appendSlice(allocator, &.{ 0x64, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
             .store_eax_tls_i32 => try bytes.appendSlice(allocator, &.{ 0x64, 0x89, 0x04, 0x25, 0, 0, 0, 0 }),
             .atomic_xadd_global_eax => try bytes.appendSlice(allocator, &.{ 0xf0, 0x0f, 0xc1, 0x05, 0, 0, 0, 0 }),
-            .direct_call => {
+            .mov_rsp_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xe7 }),
+            .and_rsp_neg16 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xe4, 0xf0 }),
+            .direct_call, .noreturn_direct_call => {
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
             },
@@ -240,6 +243,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .or_rdx_rax => 3,
         .add_ecx_eax => 2,
         .xor_ecx_ecx => 2,
+        .xor_ebp_ebp => 2,
         .add_rdi_rcx4_ptr_eax => 3,
         .inc_rcx => 3,
         .smin_i32_edi_esi_eax => 7,
@@ -292,7 +296,9 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_global_i32_eax, .store_eax_global_i32 => 6,
         .load_tls_i32_eax, .store_eax_tls_i32 => 8,
         .atomic_xadd_global_eax => 8,
-        .direct_call => 5,
+        .mov_rsp_rdi => 3,
+        .and_rsp_neg16 => 4,
+        .direct_call, .noreturn_direct_call => 5,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,

@@ -273,3 +273,25 @@ rg -q 'jp[[:space:]]+' "$f128_dump"
 rg -q '[[:space:]]ud2' "$f128_dump"
 
 printf 'ok distribution releasesmall object c_abi_main_f128_sret\n'
+
+start_fixture="test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll"
+start_object="$tmp_dir/address_space_start_trampoline.o"
+start_summary="$tmp_dir/address_space_start_trampoline.readelf.txt"
+start_dump="$tmp_dir/address_space_start_trampoline.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$start_fixture" > "$start_object"
+readelf -W -h -S -s -r "$start_object" > "$start_summary"
+objdump -dr "$start_object" > "$start_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$start_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$start_summary"
+rg -q '[[:space:]]_start$' "$start_summary"
+rg -q '[[:space:]]start\._start$' "$start_summary"
+rg -q '[[:space:]]start\.posixCallMainAndExit$' "$start_summary"
+rg -q 'R_X86_64_PLT32.*start\.posixCallMainAndExit' "$start_summary"
+rg -q 'xor[[:alpha:]]*[[:space:]]+%ebp,%ebp' "$start_dump"
+rg -q 'mov[[:alpha:]]*[[:space:]]+%rsp,%rdi' "$start_dump"
+rg -q 'and[[:alpha:]]*[[:space:]]+\$0xfffffffffffffff0,%rsp' "$start_dump"
+rg -q 'R_X86_64_PLT32[[:space:]]+start\.posixCallMainAndExit' "$start_dump"
+
+printf 'ok distribution releasesmall object address_space_start_trampoline\n'
