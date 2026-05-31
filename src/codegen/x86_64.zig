@@ -678,6 +678,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCAbiPanic(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -4530,6 +4535,17 @@ fn appendCompareArg32Imm32(
     try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected });
     try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn lowerCAbiPanic(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_panic")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    try validatePanicUnreachableBlock(function.blocks.items[0]);
+
+    try machine.instructions.append(allocator, .ud2);
+    return true;
 }
 
 fn appendCompareStackByval64Imm64(

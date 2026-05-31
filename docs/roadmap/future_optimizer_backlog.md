@@ -471,6 +471,12 @@ That focused shape is now object-ok with selected integer argument comparisons
 through `%r8d` and a local trap failure edge. The broad row still remains the
 first sorted blocker; the next selected alias is `@zig_panic`, a noreturn
 panic stub ending in unreachable.
+That focused shape is now object-ok with a selected local `ud2` panic stub.
+The broad `c_abi_main` row is object-clean. The current ReleaseSmall object
+probe is 266 successes and 199 failures. The next sorted blocker is
+`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`;
+the selected alias is `@_start -> @start._start`, a naked startup inline-asm
+trampoline ending in unreachable.
 
 ## Activation Rule
 

@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@zig_panic` noreturn panic stub lowering from
-`c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`.
+`@_start` alias / `@start._start` naked startup inline-asm trampoline from
+`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -407,15 +407,16 @@ row still remains the first object failure; the next selected public shape is
 branch-to-return-or-trap shape. That focused shape is now object-ok through
 the selected 64-bit scalar branch path. The broad row still remains the first
 object failure; the next selected public shape is `@zig_u32 = alias void
-(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 8-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers`, a five-argument integer equality ladder ending in return-or-trap. That focused shape is now object-ok with selected integer argument comparisons through `%r8d` and a local trap failure edge. The broad row still remains the first object failure; the next selected public shape is `@zig_panic = alias void (), ptr @main.zig_panic`, a noreturn panic stub ending in unreachable.
+(i32), ptr @main.zig_u32`, a u32 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 32-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u16 = alias void (i16), ptr @main.zig_u16`, a u16 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 16-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_u8 = alias void (i8), ptr @main.zig_u8`, a u8 equality branch-to-return-or-trap shape. That focused shape is now object-ok through the selected 8-bit scalar branch path. The broad row still remains the first object failure; the next selected public shape is `@zig_five_integers = alias void (i32, i32, i32, i32, i32), ptr @main.zig_five_integers`, a five-argument integer equality ladder ending in return-or-trap. That focused shape is now object-ok with selected integer argument comparisons through `%r8d` and a local trap failure edge. The broad row still remains the first object failure; the next selected public shape is `@zig_panic = alias void (), ptr @main.zig_panic`, a noreturn panic stub ending in unreachable. That focused shape is now object-ok through a selected local `ud2` panic stub, and the broad `c_abi_main` row is object-clean. The current ReleaseSmall object probe is 266 object successes and 199 object failures. The next sorted failure is `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`; the selected public entry shape is `@_start = alias void (), ptr @start._start`, a naked startup inline-asm trampoline that calls `@start.posixCallMainAndExit` and ends in `unreachable`.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@zig_panic` noreturn panic stub shape. This
+`@_start` / `@start._start` naked startup inline-asm trampoline shape. This
 continues reducing the ReleaseSmall asm/object fallback row. It does not claim
 broad aggregate ABI lowering, arbitrary floating-point comparison control
-flow, panic side-effect lowering, non-x86_64 ABI behavior, debug records,
-unwind records, linker ownership, or target-complete ABI behavior.
+flow, full Zig startup lowering, inline-asm generality, non-x86_64 ABI
+behavior, debug records, unwind records, linker ownership, or target-complete
+ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
@@ -427,16 +428,18 @@ boundary:
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-noreturn panic stub shape, also map against SelectionDAG integer argument
-assignment, integer comparison, and conditional branch lowering in
-`llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
+startup trampoline shape, also map against inline assembly lowering and x86 MC
+instruction emission in
+`llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
+`llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp`, and
+`llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Implement only the selected `@zig_panic` ReleaseSmall noreturn panic stub
-branch-to-return-or-trap shape from the `c_abi_main` optimized output.
-Do not generalize to all aggregate ABI behavior, arbitrary floating-point
-comparison graphs, panic side effects, debug/unwind object records, or
-non-x86_64 ABI behavior in this slice.
+Implement only the selected `_start` alias to `@start._start` ReleaseSmall
+naked startup inline-asm trampoline from the address-space pointer optimized
+output. Do not generalize to arbitrary inline asm, full Zig startup,
+`@start.posixCallMainAndExit`, TLS/syscall startup behavior,
+debug/unwind object records, or non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend a reduced ReleaseSmall fixture and run its focused
