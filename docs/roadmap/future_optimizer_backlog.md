@@ -256,6 +256,10 @@ That focused shape is now object-ok with local trap failure edges and selected
 low/high register checks. The broad row still remains the first sorted
 blocker; the next selected alias is `@zig_small_packed_struct`, a packed i8
 struct comparison control-flow shape.
+That focused shape is now object-ok with local trap failure edges and an exact
+selected byte payload check. The broad row still remains the first sorted
+blocker; the next selected alias is `@zig_med_struct_ints`, a medium integer
+struct comparison control-flow shape.
 
 ## Activation Rule
 

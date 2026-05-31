@@ -39,6 +39,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @zig_split_struct_mixed = alias void (i64, i64), ptr @main.zig_split_struct_mixed
 @zig_split_struct_ints = alias void (i64, i64), ptr @main.zig_split_struct_ints
 @zig_big_packed_struct = alias void (i128), ptr @main.zig_big_packed_struct
+@zig_small_packed_struct = alias void (i8), ptr @main.zig_small_packed_struct
 
 declare i32 @__eqtf2(fp128, fp128)
 declare fastcc void @debug.defaultPanic(ptr, i64)
@@ -446,6 +447,38 @@ define private void @main.zig_big_packed_struct(i128 %0) unnamed_addr align 1 {
 7:
   ret void
 8:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+}
+
+define private void @main.zig_small_packed_struct(i8 zeroext %0) unnamed_addr align 1 {
+1:
+  %2 = and i8 %0, 3
+  %3 = icmp eq i8 %2, 0
+  br i1 %3, label %4, label %7
+4:
+  %5 = and i8 %0, 12
+  %6 = icmp eq i8 %5, 4
+  br i1 %6, label %8, label %11
+7:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+8:
+  %9 = and i8 %0, 48
+  %10 = icmp eq i8 %9, 32
+  br i1 %10, label %12, label %14
+11:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+12:
+  %13 = icmp ugt i8 %0, -65
+  br i1 %13, label %15, label %16
+14:
+  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
+  unreachable
+15:
+  ret void
+16:
   tail call fastcc void @debug.defaultPanic(ptr nonnull readonly @__anon_762, i64 12)
   unreachable
 }
