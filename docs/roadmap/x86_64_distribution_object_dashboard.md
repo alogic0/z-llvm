@@ -25,7 +25,7 @@ Current automated summaries:
 | Debug broad pointers memory | `tmp/zig_ir/debug_object_probe_pointers_memory_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug broad tiny scalar plain | `tmp/zig_ir/debug_object_probe_tiny_scalar_plain_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
-| Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 197 | 3 | 0 | `cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 198 | 2 | 0 | `cases_inherit_want_safety.zig.Debug.x86_64.ll` |
 
 ReleaseSmall exclusions:
 
@@ -94,8 +94,12 @@ Debug broad:
     cases_compile_errors_illegal_operation_on_logical_ptr.zig.Debug.x86_64.ll
     after the selected object-only Debug/O0 logical-pointer compile-error
     fixture
-  continuous Debug prefix 200 first failure:
+  continuous Debug prefix 200 also advances past
     cases_compile_errors_spirv_merge_logical_pointers.zig.Debug.x86_64.ll
+    after the selected object-only Debug/O0 SPIR-V logical-pointer merge
+    fixture
+  continuous Debug prefix 200 first failure:
+    cases_inherit_want_safety.zig.Debug.x86_64.ll
     category=unsupported-control-flow
   DWARF/unwind emission
   full O0 codegen surface

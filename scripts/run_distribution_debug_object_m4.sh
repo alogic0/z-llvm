@@ -100,4 +100,18 @@ rg -q '[[:space:]]illegal_operation_on_logical_ptr\.elemPtr$' "$logical_pointer_
 rg -q '[[:space:]]ret' "$logical_pointer_dump"
 printf 'ok distribution debug object logical_pointer_compile_error_o0\n'
 
+spirv_pointer_fixture="test/distribution/debug_x86_64/inputs/spirv_merge_logical_pointers_o0.ll"
+spirv_pointer_object="$tmp_dir/spirv_merge_logical_pointers_o0.o"
+spirv_pointer_summary="$tmp_dir/spirv_merge_logical_pointers_o0.readelf.txt"
+spirv_pointer_dump="$tmp_dir/spirv_merge_logical_pointers_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$spirv_pointer_fixture" > "$spirv_pointer_object"
+readelf -W -h -S -s -r "$spirv_pointer_object" > "$spirv_pointer_summary"
+objdump -dr "$spirv_pointer_object" > "$spirv_pointer_dump"
+
+check_common_object "$spirv_pointer_summary" a
+rg -q '[[:space:]]spirv_merge_logical_pointers\.a$' "$spirv_pointer_summary"
+rg -q '[[:space:]]ret' "$spirv_pointer_dump"
+printf 'ok distribution debug object spirv_merge_logical_pointers_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

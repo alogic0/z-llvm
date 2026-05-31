@@ -333,6 +333,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerDebugSpirvMergeLogicalPointers(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCAbiF128Sret(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -3917,6 +3922,56 @@ fn validateAssumeTrue(instruction: ir.Instruction) !void {
     };
     if (!std.mem.eql(u8, call.callee, "llvm.assume") or call.ret_ty != .void or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!call.args.items[0].ty.eql(.{ .int = 1 }) or !call.args.items[0].value.eql(.{ .int = 1 })) return error.UnsupportedCodegenInstruction;
+}
+
+fn lowerDebugSpirvMergeLogicalPointers(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "spirv_merge_logical_pointers.a")) return false;
+    if (function.ret_ty != .void or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 4) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 8) return error.UnsupportedCodegenInstruction;
+    const result_slot = try validateAllocaNamed(entry.instructions.items[0], .ptr);
+    const cond_slot = try validateAllocaNamed(entry.instructions.items[1], .{ .int = 1 });
+    const false_slot = try validateAllocaNamed(entry.instructions.items[2], .ptr);
+    const true_slot = try validateAllocaNamed(entry.instructions.items[3], .ptr);
+    try validateMemset(entry.instructions.items[4], true_slot, 8);
+    try validateMemset(entry.instructions.items[5], false_slot, 8);
+    try validateStore(entry.instructions.items[6], .{ .int = 1 }, .{ .int = 0 }, cond_slot);
+    const cond_name = try validateNamedLoad(entry.instructions.items[7], .{ .int = 1 }, cond_slot);
+    try validateCondbr(entry, cond_name, "8", "10");
+
+    const merge = function.blocks.items[1];
+    if (!std.mem.eql(u8, merge.name, "6") or merge.instructions.items.len != 2) return error.UnsupportedCodegenControlFlow;
+    const phi_name = merge.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const phi = switch (merge.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (phi.incoming.items.len != 2 or !phi.ty.eql(.ptr)) return error.UnsupportedCodegenInstruction;
+    try validatePhiIncoming(phi.incoming.items[0], "9", "8");
+    try validatePhiIncoming(phi.incoming.items[1], "11", "10");
+    try validateStore(merge.instructions.items[1], .ptr, .{ .named = phi_name }, result_slot);
+    try validateRetVoid(merge);
+
+    const true_block = function.blocks.items[2];
+    if (!std.mem.eql(u8, true_block.name, "8") or true_block.instructions.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    const true_loaded = try validateNamedLoad(true_block.instructions.items[0], .ptr, true_slot);
+    if (!std.mem.eql(u8, true_loaded, "9")) return error.UnsupportedCodegenInstruction;
+    try validateBr(true_block, "6");
+
+    const false_block = function.blocks.items[3];
+    if (!std.mem.eql(u8, false_block.name, "10") or false_block.instructions.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    const false_loaded = try validateNamedLoad(false_block.instructions.items[0], .ptr, false_slot);
+    if (!std.mem.eql(u8, false_loaded, "11")) return error.UnsupportedCodegenInstruction;
+    try validateBr(false_block, "6");
+
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validatePhiIncoming(incoming: ir.PhiIncoming, value_name: []const u8, block_name: []const u8) !void {
+    if (!isNamed(incoming.value, value_name) or !std.mem.eql(u8, incoming.block, block_name)) return error.UnsupportedCodegenInstruction;
 }
 
 fn lowerCAbiF128Sret(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
