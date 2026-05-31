@@ -326,3 +326,7 @@ That focused shape is now object-ok with selected stack argument loads, byval
 field loads, and local trap failure edges. The broad row still remains the
 first sorted failure; the next selected alias is `@zig_struct_u64_u64_7`, a
 byval two-u64 struct control-flow shape after seven leading integer arguments.
+That focused shape is now object-ok with selected stack argument loads, byval
+field loads, and local trap failure edges. The broad row still remains the
+first sorted failure; the next selected alias is `@zig_struct_u64_u64_6`, a
+byval two-u64 struct control-flow shape after six leading integer arguments.
