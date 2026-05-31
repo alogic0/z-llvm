@@ -99,8 +99,8 @@ closed_aliases_21=@runner_futex_wait -> @main.runner_futex_wait,@runner_test_nam
 intermediate_adjusted_object_probe=462 object-ok, 2 object-fail, 1 excluded
 closed_failure_22=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll
 closed_aliases_22=@add_zig -> @main.add_zig,@add_may_panic -> @main.add_may_panic
-current_adjusted_object_probe=463 object-ok, 1 object-fail, 1 excluded
-first_adjusted_failure=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@decode_base_64 -> @base64.decode_base_64
-missing_capability=table-driven multi-block base64 decoder object lowering or boundary classification
+intermediate_adjusted_object_probe=463 object-ok, 1 object-fail, 1 excluded
+boundary_exclusion_2=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll selected @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
+current_adjusted_object_probe=463 object-ok, 0 object-fail, 2 excluded
+ReleaseSmall_asm_object_status=conservative boundary for named captured subset
 ```

@@ -12,9 +12,8 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_64_object_milestone_1.md#milestone-2)
 
 Replacement goal:
-Reduce the next measured ReleaseSmall x86_64 asm/object blocker: selected
-`@decode_base_64` alias / `@base64.decode_base_64` table-driven decoder from
-`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`.
+Define the first named no-LLVM-codegen x86_64 distribution subset gate across
+ReleaseFast, ReleaseSafe, and selected ReleaseSmall asm/object evidence.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -508,44 +507,52 @@ ptr @base64.decode_base_64`, a large table-driven base64 decoder with
 multi-block control flow, table constants, input/output pointer loops, and
 error return paths.
 
+The `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll` row
+is a documented boundary exclusion for the current ReleaseSmall object subset:
+it is broad multi-block decoder/table lowering, not a defensible one-slice
+backend reduction. With that row and the existing
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
+float-format helper excluded, the adjusted ReleaseSmall object probe is clean:
+463 object successes, 0 object failures, and 2 excluded rows. ReleaseSmall
+asm/object is now a conservative boundary for the named captured subset.
+
 LLVM fallback removed or reduced:
-Add the smallest object/codegen support needed for the selected ReleaseSmall
-`@decode_base_64` base64 decoder row. First decide whether this is a
-defensible bounded lowering slice or a conservative boundary exclusion for the
-current ReleaseSmall object subset. It does not claim broad table-driven loop
-lowering, complete pointer-loop/data-movement ownership, generated decoder
-semantics, non-x86_64 ABI behavior, debug records, unwind records, linker
-ownership, or target-complete ABI behavior.
+Add a top-level distribution gate that proves the named x86_64 subset reaches
+local asm/object output without LLVM codegen for the final object stage. This
+reduces the remaining LLVM fallback from a mode-wide unknown to explicit named
+subsets plus documented exclusions. It does not claim complete Zig
+distribution replacement, Debug object support, broad linker ownership,
+debug/unwind records, LTO, sanitizer paths, non-x86_64 ABI behavior, or
+target-complete ABI behavior.
 
 Mode/target/stage row:
 `mode=ReleaseSmall`, `target=x86_64-linux-gnu`, `stage=asm/object`,
-`status=LLVM fallback required`.
+`status=conservative boundary`. This gate should also include the existing
+ReleaseFast and ReleaseSafe conservative asm/object boundaries.
 
 Upstream mapping:
-Use LLVM x86_64 loop/control-flow lowering, table-constant addressing,
-integer/pointer addressing, and relocation selection as the reference boundary:
+Use LLVM x86_64 object-emission and codegen handoff behavior as the reference
+boundary:
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`,
 `llvm-project-22/llvm/lib/Target/X86/X86CallingConv.td`,
 `llvm-project-22/llvm/lib/Target/X86/X86ISelLowering.cpp`, and
 `llvm-project-22/llvm/lib/Target/X86/X86InstrCompiler.td`. For the selected
-decoder shape, also map constant table and data relocations against
+distribution gate, also map MC/object emission and relocations against
 `llvm-project-22/llvm/lib/Target/X86/X86MCInstLower.cpp` and
 `llvm-project-22/llvm/lib/Target/X86/X86AsmPrinter.cpp`.
 
 Known boundary:
-Do not start by claiming the full base64 decoder as local replacement. Either
-extract a small source-backed object fixture from the row if a bounded missing
-lowering capability is visible, or classify this row as an explicit
-ReleaseSmall object boundary exclusion for the current subset. Do not
-generalize to arbitrary table-driven loops, decoder runtime semantics,
-debug/unwind object records, or non-x86_64 ABI behavior in this slice.
+Define only the named subset already backed by focused fixtures and broad
+object probes. The gate should include ReleaseFast, ReleaseSafe, and selected
+ReleaseSmall object fixtures, plus handoff validation. Do not include Debug,
+the ReleaseSmall float-format helper, the ReleaseSmall base64 decoder, broad
+linking, LTO, sanitizer paths, debug/unwind object records, or target-complete
+ABI behavior in this slice.
 
 Validation gate:
-Add or extend a reduced ReleaseSmall fixture and run its focused
-object-structure gate, then rerun the ReleaseSmall object probe over
-`tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` with
-`--input-limit=67108864`. Also keep `bash scripts/run_handoff_validation.sh`
-green.
+Add a top-level script that runs the focused ReleaseFast, ReleaseSafe, and
+ReleaseSmall object gates plus `bash scripts/run_handoff_validation.sh`.
+Validate that it does not invoke LLVM codegen for the final object stage.
 
 Commit:
 Use the commit policy after the lowering, fixture classification, docs, and

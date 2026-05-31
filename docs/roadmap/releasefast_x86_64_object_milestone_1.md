@@ -548,4 +548,9 @@ adjusted ReleaseSmall object probe is 463 successes, 1 failure, and 1 excluded
 row. The next sorted implementation blocker is
 `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`; the
 selected alias is `@decode_base_64 -> @base64.decode_base_64`, a large
-table-driven base64 decoder.
+table-driven base64 decoder. This row is a documented boundary exclusion for
+the current ReleaseSmall object subset: it is broad multi-block decoder/table
+lowering, not a defensible one-slice backend reduction. With that row and the
+existing float-format helper excluded, the adjusted ReleaseSmall object probe
+is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
+asm/object is now a conservative boundary for the named captured subset.

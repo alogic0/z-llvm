@@ -21,7 +21,7 @@ out of scope: not part of the current x86_64 milestone
 | Debug | conservative boundary | conservative boundary | conservative boundary | LLVM fallback required | LLVM fallback required |
 | ReleaseFast | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 | ReleaseSafe | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
-| ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | LLVM fallback required |
+| ReleaseSmall | local replacement | local replacement | local replacement | conservative boundary | conservative boundary |
 
 ## Evidence
 
@@ -83,8 +83,8 @@ lowering, arbitrary Zig source outside the captured set, debug/unwind records,
 linker ownership, dynamic TLS models, cross-target TLS relocations, and broad
 runtime completeness.
 
-Asm/object remains LLVM fallback required for Debug and ReleaseSmall, and for
-ReleaseFast and ReleaseSafe outside their named captured subsets.
+Asm/object remains LLVM fallback required for Debug, and for ReleaseFast,
+ReleaseSafe, and ReleaseSmall outside their named captured subsets.
 Existing docs explicitly exclude broad register allocation, scheduling,
 debug/unwind object records, linker ownership, and target-complete ABI lowering.
 
@@ -167,8 +167,8 @@ intermediate_adjusted_object_probe=462 ok, 2 fail, 1 excluded with --input-limit
 closed_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll selected mix-C aliases
 closed_alias_in_blocker=@add_zig -> @main.add_zig mixed Zig/C global-add i32 return
 closed_alias_in_blocker=@add_may_panic -> @main.add_may_panic checked add/panic branch
-current_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit=67108864
-first_adjusted_blocker=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
-selected_alias=@decode_base_64 -> @base64.decode_base_64
-missing capability=table-driven multi-block base64 decoder object lowering or boundary classification
+intermediate_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit=67108864
+boundary_exclusion=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll selected @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
+current_adjusted_object_probe=463 ok, 0 fail, 2 excluded with --input-limit=67108864
+ReleaseSmall asm/object status=conservative boundary for named captured subset with explicit exclusions
 ```
