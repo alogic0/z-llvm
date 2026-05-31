@@ -40,12 +40,12 @@ Object-ready selected subset:
 | `switch_control_branch_mix` | `switch_control.zig` | branch/select lowered to `select` plus add | local object + readelf |
 | `control_flow_calls_call_chain` | `control_flow_calls.zig` | shift and or arithmetic | local object + readelf |
 | `globals_comptime_const` | `globals_comptime.zig` | multiply by constant | local object + readelf |
+| `optional_pointer_value` | `optional_pointer.zig` | null branch and pointer load | local object + readelf |
 
 Classified blockers from representative non-empty optimized output:
 
 | Fixture | Source row | Shape | Current blocker |
 | --- | --- | --- | --- |
-| `optional_pointer_value` | `optional_pointer.zig` | null branch and pointer load | `UnsupportedCodegenControlFlow` |
 | `switch_control_dense_switch` | `switch_control.zig` | switch table load and phi merge | `UnsupportedCodegenControlFlow` |
 
 ## Validation Gate
@@ -80,7 +80,7 @@ general branch/select lowering beyond the selected add/sub pattern
 variable shift/or chains beyond the selected shl-by-one plus or-one pattern
 integer multiply beyond the selected multiply-by-five pattern
 global data and alias/export symbol emission
-pointer loads and null-branch control flow
+pointer loads and null-branch control flow beyond the selected nullable i32 load
 switch table lowering and phi merge codegen
 debug/unwind records
 linker behavior
@@ -89,7 +89,7 @@ target-complete ABI lowering
 
 ## Milestone 2
 
-The first remaining uncovered blocker is `optional_pointer_value`: selected
-ReleaseFast optimized output with null-branch control flow and pointer load.
-Milestone 2 should add only the x86_64 lowering, encoding, fixture evidence, and
-validation needed for that shape.
+The first remaining uncovered blocker is `switch_control_dense_switch`: selected
+ReleaseFast optimized output with a switch-table load and phi merge. Milestone 2
+should add only the global-table reference, indexed load, bounded branch/phi
+lowering, fixture evidence, and validation needed for that shape.

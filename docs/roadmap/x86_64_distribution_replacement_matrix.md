@@ -78,12 +78,13 @@ Zig-backed optimized-output subset recorded in
 `docs/roadmap/releasefast_x86_64_object_milestone_1.md`. The object-ready subset
 covers empty modules, `tiny_scalar`, `integers_add_wrap`,
 `switch_control_branch_mix`, `control_flow_calls_call_chain`, and
-`globals_comptime_const`. It explicitly excludes general branch/select lowering
-beyond the selected add/sub pattern, variable shift/or chains beyond the
-selected shl-by-one plus or-one pattern, integer multiply beyond the selected
-multiply-by-five pattern, global data and alias/export symbol emission, pointer
-loads, switch-table lowering, debug/unwind records, linker behavior, and
-target-complete ABI lowering.
+`globals_comptime_const`, and `optional_pointer_value`. It explicitly excludes
+general branch/select lowering beyond the selected add/sub pattern, variable
+shift/or chains beyond the selected shl-by-one plus or-one pattern, integer
+multiply beyond the selected multiply-by-five pattern, global data and
+alias/export symbol emission, pointer loads and null-branch control flow beyond
+the selected nullable i32 load, switch-table lowering, debug/unwind records,
+linker behavior, and target-complete ABI lowering.
 
 Asm/object remains LLVM fallback required for Debug, ReleaseSafe, and
 ReleaseSmall, and for ReleaseFast outside the named Milestone 1 subset.
@@ -111,7 +112,7 @@ Milestone 1 selected that row and closed the first subset boundary. Milestone 2
 starts from the first remaining blocker:
 
 ```text
-test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll
+test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll
 current blocker=UnsupportedCodegenControlFlow
-missing capability=x86_64 lowering for null branch and pointer load
+missing capability=x86_64 lowering for switch-table load and phi merge
 ```

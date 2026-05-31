@@ -19,8 +19,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),
             .reload_arg_rsp => |reload| try writer.print("\tmovl {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name32() }),
             .reload_rsp_eax => try writer.writeAll("\tmovl (%rsp), %eax\n"),
+            .load_arg_ptr_eax => |reg| try writer.print("\tmovl ({s}), %eax\n", .{reg.name64()}),
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),
+            .test_arg64 => |reg| try writer.print("\ttestq {s}, {s}\n", .{ reg.name64(), reg.name64() }),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),
         }

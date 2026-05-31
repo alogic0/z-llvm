@@ -46,11 +46,13 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
             .reload_arg_rsp => |reload| try encodeFrameSlotToReg(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
             .reload_rsp_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x04, 0x24 }),
+            .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .direct_call => {
                 try bytes.append(allocator, 0xe8);
                 try appendI32(&bytes, allocator, 0);
             },
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
+            .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
             .je => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
                 const next = offset + instructionSize(instruction);
@@ -81,8 +83,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
         .reload_rsp_eax => 3,
+        .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .direct_call => 5,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
+        .test_arg64 => 3,
         .je => 6,
         .ret => 1,
     };
@@ -131,6 +135,12 @@ fn encodeFrameSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator,
     try bytes.append(allocator, 0x24);
 }
 
+fn encodeArgPtrToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    if (reg.rexB()) try bytes.append(allocator, 0x41);
+    try bytes.append(allocator, 0x8b);
+    try bytes.append(allocator, @as(u8, reg.lowCode()));
+}
+
 fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
     if (reg.needsRex8()) {
         var rex: u8 = 0x40;
@@ -139,6 +149,16 @@ fn encodeTest8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86
     }
     const code: u8 = @intCast(reg.lowCode());
     try bytes.append(allocator, 0x84);
+    try bytes.append(allocator, 0xc0 | (code << 3) | code);
+}
+
+fn encodeTest64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (reg.rexR()) rex |= 0x04;
+    if (reg.rexB()) rex |= 0x01;
+    const code: u8 = @intCast(reg.lowCode());
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0x85);
     try bytes.append(allocator, 0xc0 | (code << 3) | code);
 }
 

@@ -21,6 +21,17 @@ pub const ArgReg = enum {
         };
     }
 
+    pub fn name64(reg: ArgReg) []const u8 {
+        return switch (reg) {
+            .rdi => "%rdi",
+            .rsi => "%rsi",
+            .rdx => "%rdx",
+            .rcx => "%rcx",
+            .r8 => "%r8",
+            .r9 => "%r9",
+        };
+    }
+
     pub fn name8(reg: ArgReg) []const u8 {
         return switch (reg) {
             .rdi => "%dil",
@@ -56,6 +67,10 @@ pub const ArgReg = enum {
     }
 
     pub fn rexR(reg: ArgReg) bool {
+        return reg == .r8 or reg == .r9;
+    }
+
+    pub fn rexB(reg: ArgReg) bool {
         return reg == .r8 or reg == .r9;
     }
 
@@ -112,11 +127,13 @@ pub const Instruction = union(enum) {
         frame_index: FrameIndex,
     },
     reload_rsp_eax: FrameIndex,
+    load_arg_ptr_eax: ArgReg,
     direct_call: struct {
         symbol: []const u8,
         ret_ty: ir.Type,
     },
     test_arg8: ArgReg,
+    test_arg64: ArgReg,
     je: []const u8,
     ret,
 };
@@ -154,6 +171,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
 
     if (function.blocks.items.len == 3) {
         if (try lowerConditionalReturn(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
+        if (try lowerOptionalPointerLoadReturn(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
         }
@@ -608,6 +629,99 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     return true;
 }
 
+fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const icmp_inst = entry.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.ptr)) return false;
+    const ptr_name = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (icmp.rhs != .null_value) return false;
+    const ptr_reg = try paramReg(function, ptr_name, .ptr);
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_result)) return false;
+
+    const null_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const load_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const null_block = function.blocks.items[null_index];
+    const load_block = function.blocks.items[load_index];
+    if (null_block.instructions.items.len != 1 or load_block.instructions.items.len != 1) return false;
+
+    const phi_inst = null_block.instructions.items[0];
+    if (phi_inst.removed) return false;
+    const phi_result = phi_inst.result orelse return false;
+    const phi = switch (phi_inst.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return false;
+
+    const ret = switch (null_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, phi_result)) return false;
+
+    const load_inst = load_block.instructions.items[0];
+    if (load_inst.removed) return false;
+    const load_result = load_inst.result orelse return false;
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or !isNamed(load.ptr, ptr_name)) return false;
+    if (load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
+
+    const load_br = switch (load_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, load_br.target, null_block.name)) return false;
+
+    var saw_null_incoming = false;
+    var saw_load_incoming = false;
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, entry.name)) {
+            switch (incoming.value) {
+                .int => |value| {
+                    if (value != -1) return false;
+                    saw_null_incoming = true;
+                },
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            }
+        } else if (std.mem.eql(u8, incoming.block, load_block.name)) {
+            if (!isNamed(incoming.value, load_result)) return false;
+            saw_load_incoming = true;
+        } else {
+            return false;
+        }
+    }
+    if (!saw_null_incoming or !saw_load_incoming) return false;
+
+    try machine.instructions.append(allocator, .{ .test_arg64 = ptr_reg });
+    try machine.instructions.append(allocator, .{ .je = null_block.name });
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = null_block.name });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerReturnTerminator(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -887,8 +1001,10 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .spill_arg_rsp,
         .reload_arg_rsp,
         .reload_rsp_eax,
+        .load_arg_ptr_eax,
         .direct_call,
         .test_arg8,
+        .test_arg64,
         .ret,
         => {},
     };
@@ -898,7 +1014,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32 => eax_defined = true,
+        .mov_imm_eax, .mov_arg_eax, .binary_arg_eax, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .load_arg_ptr_eax => eax_defined = true,
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -915,7 +1031,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .test_arg8, .je => {},
+        .mov_arg_arg, .test_arg8, .test_arg64, .je => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -941,8 +1057,10 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .spill_arg_rsp,
         .reload_arg_rsp,
         .reload_rsp_eax,
+        .load_arg_ptr_eax,
         .direct_call,
         .test_arg8,
+        .test_arg64,
         .je,
         .ret,
         => {},
