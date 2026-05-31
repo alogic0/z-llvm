@@ -117,14 +117,15 @@ first_failure_category=-
 
 source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv first 400 optimizer-ok rows
 probe=tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir
-object_probe=398 ok, 1 fail, 1 excluded
+object_probe=399 ok, 0 fail, 1 excluded
 excluded=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
 excluded_reason=debug-float-format-helper-boundary
-first_failure=standalone_mix_c_files_main.zig.Debug.x86_64.ll
-first_failure_category=unsupported-control-flow
+first_failure=-
+first_failure_category=-
 closed_boundary=selected Debug/O0 panic-unreachable compile-asm entry,
                 issue-339 error-success edge, libfuzzer runner aliases, and
-                dynamic-library checked add
+                dynamic-library checked add; selected Debug/O0 mix-C
+                add_zig/add_may_panic checked-add and panic-edge lowering
 ```
 
 Handoff is conservative for release modes because

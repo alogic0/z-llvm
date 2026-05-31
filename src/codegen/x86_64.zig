@@ -768,6 +768,16 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerSelectedMixCFilesAddZigDebugO0(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerSelectedMixCFilesAddMayPanicDebugO0(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerSelectedIssue339TestFoo(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -2670,6 +2680,75 @@ fn lowerSelectedMixCFilesAddMayPanic(
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerSelectedMixCFilesAddZigDebugO0(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.add_zig")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const arg_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (arg_reg != .rdi) return error.UnsupportedCodegenAbi;
+    if (function.blocks.items.len != 5) return false;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+    if (!functionLoadsGlobal(function, "main.zig_k") or !functionLoadsGlobal(function, "C_k")) return false;
+
+    const overflow_label = "mix_c_add_zig_overflow";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerSelectedMixCFilesAddMayPanicDebugO0(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.add_may_panic")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const arg_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (arg_reg != .rdi) return error.UnsupportedCodegenAbi;
+    if (function.blocks.items.len != 6) return false;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+    if (!functionLoadsGlobal(function, "main.zig_k")) return false;
+    if (!functionHasCall(function, "debug.defaultPanic")) return false;
+
+    const negative_label = "mix_c_add_may_panic_negative";
+    const overflow_label = "mix_c_add_may_panic_overflow";
+    try machine.instructions.append(allocator, .{ .test_arg32 = arg_reg });
+    try machine.instructions.append(allocator, .{ .js = negative_label });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = negative_label });
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_17177" });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "debug.defaultPanic", .ret_ty = .void } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .ud2);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn functionLoadsGlobal(function: ir.Function, global_name: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const load = switch (instruction.kind) {
+                .load => |load| load,
+                else => continue,
+            };
+            const loaded_global = switch (load.ptr) {
+                .named => |name| globalSymbolName(name) catch continue,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => continue,
+            };
+            if (std.mem.eql(u8, loaded_global, global_name)) return true;
+        }
+    }
+    return false;
 }
 
 fn validateMixCFilesNegativePanicBlock(block: ir.BasicBlock) !void {

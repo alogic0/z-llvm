@@ -212,4 +212,25 @@ rg -q '[[:space:]]jo[[:space:]]+' "$load_dynamic_add_dump"
 rg -q '[[:space:]]ret' "$load_dynamic_add_dump"
 printf 'ok distribution debug object load_dynamic_library_add_o0\n'
 
+mix_c_files_fixture="test/distribution/debug_x86_64/inputs/mix_c_files_main_o0.ll"
+mix_c_files_object="$tmp_dir/mix_c_files_main_o0.o"
+mix_c_files_summary="$tmp_dir/mix_c_files_main_o0.readelf.txt"
+mix_c_files_dump="$tmp_dir/mix_c_files_main_o0.objdump.txt"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$mix_c_files_fixture" > "$mix_c_files_object"
+readelf -W -h -S -s -r "$mix_c_files_object" > "$mix_c_files_summary"
+objdump -dr "$mix_c_files_object" > "$mix_c_files_dump"
+
+check_common_object "$mix_c_files_summary" add_zig
+rg -q '[[:space:]]add_may_panic$' "$mix_c_files_summary"
+rg -q '[[:space:]]zig_k$' "$mix_c_files_summary"
+rg -q 'R_X86_64_PC32.*main\.zig_k' "$mix_c_files_summary"
+rg -q 'R_X86_64_TPOFF32.*C_k' "$mix_c_files_summary"
+rg -q "R_X86_64_PLT32.*debug\\.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow" "$mix_c_files_summary"
+rg -q 'R_X86_64_PLT32.*debug\.defaultPanic' "$mix_c_files_summary"
+rg -q '[[:space:]]jo[[:space:]]+' "$mix_c_files_dump"
+rg -q '[[:space:]]js[[:space:]]+' "$mix_c_files_dump"
+rg -q 'ud2' "$mix_c_files_dump"
+printf 'ok distribution debug object mix_c_files_main_o0\n'
+
 printf 'ok distribution debug reduced object target=%s\n' "$target"

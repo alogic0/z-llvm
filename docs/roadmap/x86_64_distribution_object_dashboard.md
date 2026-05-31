@@ -27,7 +27,7 @@ Current automated summaries:
 | Debug continuous prefix 100 | `tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` | 100 | 100 | 0 | 0 | `-` |
 | Debug continuous prefix 200 | `tmp/zig_ir/debug_object_probe_continuous_prefix200_20260531/ir` | 200 | 200 | 0 | 0 | `-` |
 | Debug continuous prefix 300 | `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` | 300 | 300 | 0 | 0 | `-` |
-| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 398 | 1 | 1 | `standalone_mix_c_files_main.zig.Debug.x86_64.ll` |
+| Debug continuous prefix 400 | `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` | 400 | 399 | 0 | 1 | `-` |
 
 ReleaseSmall exclusions:
 
@@ -137,6 +137,11 @@ Debug broad:
     prefix-400 probe is 398 object successes, 1 object failure, and 1 excluded
     row, with standalone_mix_c_files_main.zig.Debug.x86_64.ll as the first
     remaining failure
+  continuous Debug prefix 400 now advances past
+    standalone_mix_c_files_main.zig.Debug.x86_64.ll after selected Debug/O0
+    mix-C add_zig/add_may_panic checked-add and panic-edge lowering; the
+    refreshed prefix-400 probe is 399 object successes, 0 object failures, and
+    1 excluded row
   DWARF/unwind emission
   full O0 codegen surface
   variable-location salvage
