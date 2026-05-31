@@ -742,6 +742,14 @@ tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_
 focused_gate=bash scripts/run_distribution_releasesmall_boundary_m3.sh
 ```
 
+The object probe helper now invokes the built `zig-out/bin/z_llvm` binary
+directly, preserving the failing function name in logs:
+
+```text
+fail standalone_emit_llvm_no_bin_str_from_float_help.ll category=unsupported-control-flow codegen failed for function main.strFromFloatHelp: error.UnsupportedCodegenControlFlow
+fail standalone_mix_o_files_base64_decode_base_64.ll category=unsupported-control-flow codegen failed for function base64.decode_base_64: error.UnsupportedCodegenControlFlow
+```
+
 With that row and the existing
 `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
 float-format helper excluded, the adjusted ReleaseSmall object probe is clean:

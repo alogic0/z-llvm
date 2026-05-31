@@ -67,6 +67,8 @@ else
     trap 'rm -rf "$tmp_dir"' EXIT
 fi
 
+zig build >/dev/null
+
 exclude_reason() {
     local file="$1"
     local spec name reason
@@ -131,7 +133,7 @@ while IFS= read -r input; do
     stem="$(safe_stem "$file")"
     object="$work_dir/$stem.o"
     log="$work_dir/$stem.err"
-    if zig build run -- --emit=obj --target="$target" --input-limit="$input_limit" "$input" > "$object" 2> "$log"; then
+    if zig-out/bin/z_llvm --emit=obj --target="$target" --input-limit="$input_limit" "$input" > "$object" 2> "$log"; then
         ok=$((ok + 1))
         printf 'ok %s\n' "$file"
     else

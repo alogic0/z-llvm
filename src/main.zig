@@ -140,7 +140,9 @@ pub fn main(init: std.process.Init) !void {
         }
         for (module.functions.items) |function| {
             if (!shouldLowerCodegenFunction(module, function)) continue;
-            var machine = try codegen.x86_64.lowerFunction(allocator, triple, function);
+            var machine = codegen.x86_64.lowerFunction(allocator, triple, function) catch |err| {
+                try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
+            };
             errdefer machine.deinit(allocator);
             try machines.append(allocator, machine);
         }

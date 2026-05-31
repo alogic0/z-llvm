@@ -12,6 +12,10 @@ Probe helper:
 bash scripts/probe_distribution_objects.sh
 ```
 
+The helper builds `z_llvm` once and invokes `zig-out/bin/z_llvm` directly, so
+failure logs preserve the local codegen diagnostic and function name for
+source-backed blocker selection.
+
 Current automated summaries:
 
 | Mode | Input | Total | Object OK | Object Fail | Excluded | First Failure |

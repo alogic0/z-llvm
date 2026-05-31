@@ -9,10 +9,12 @@ exe_out="$tmp_dir/emit_exe.out"
 exe_err="$tmp_dir/emit_exe.err"
 fixture="test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll"
 
-zig build run -- --help > "$help_out"
+zig build >/dev/null
+
+zig-out/bin/z_llvm --help > "$help_out"
 rg -q 'usage: z_llvm \[--emit=ir\|asm\|obj\]' "$help_out"
 
-if zig build run -- --emit=exe --target=x86_64-unknown-linux-gnu "$fixture" > "$exe_out" 2> "$exe_err"; then
+if zig-out/bin/z_llvm --emit=exe --target=x86_64-unknown-linux-gnu "$fixture" > "$exe_out" 2> "$exe_err"; then
     printf 'error: expected --emit=exe to remain outside the local distribution boundary\n' >&2
     exit 1
 fi
