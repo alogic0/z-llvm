@@ -217,6 +217,28 @@ zig cc "$floats_math_harness" "$floats_math_object" -o "$floats_math_exe"
 "$floats_math_exe"
 printf 'ok distribution executable floats_math\n'
 
+fp_constants_fixture="test/distribution/releasefast_x86_64/inputs/fp_constants_literals.ll"
+fp_constants_object="$tmp_dir/fp_constants_literals.o"
+fp_constants_harness="$tmp_dir/fp_constants_harness.c"
+fp_constants_exe="$tmp_dir/fp_constants_harness"
+
+zig build run -- --emit=obj --target="$target" "$fp_constants_fixture" > "$fp_constants_object"
+
+cat > "$fp_constants_harness" <<'C'
+extern double double_literal(void);
+extern float float_literal(void);
+
+int main(void) {
+    if (double_literal() != 2.25) return 1;
+    if (float_literal() != 1.5f) return 2;
+    return 0;
+}
+C
+
+zig cc "$fp_constants_harness" "$fp_constants_object" -o "$fp_constants_exe"
+"$fp_constants_exe"
+printf 'ok distribution executable fp_constants\n'
+
 comptime_const_fixture="test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll"
 comptime_const_object="$tmp_dir/globals_comptime_const.o"
 comptime_const_harness="$tmp_dir/comptime_const_harness.c"

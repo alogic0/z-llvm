@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is fp_constants
-missing capability=selected double_literal and float_literal constant return lowering
+current blocker=first broad optimized-output object failure is fp_extended_ops
+missing capability=selected float_rem, double_div, and float_sub FP operation lowering
 ```

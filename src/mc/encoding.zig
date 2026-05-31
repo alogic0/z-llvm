@@ -59,6 +59,16 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
             .movapd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x28, 0xc1 }),
+            .mov_imm64_xmm0 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
+                try appendU64(&bytes, allocator, value);
+                try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x6e, 0xc0 });
+            },
+            .mov_imm32_xmm0 => |value| {
+                try bytes.append(allocator, 0xb8);
+                try appendU32(&bytes, allocator, value);
+                try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x6e, 0xc0 });
+            },
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
@@ -122,6 +132,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0 => 4,
+        .mov_imm64_xmm0 => 15,
+        .mov_imm32_xmm0 => 9,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
@@ -263,4 +275,9 @@ fn appendU32(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u32
     try bytes.append(allocator, @intCast((value >> 8) & 0xff));
     try bytes.append(allocator, @intCast((value >> 16) & 0xff));
     try bytes.append(allocator, @intCast((value >> 24) & 0xff));
+}
+
+fn appendU64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u64) !void {
+    try appendU32(bytes, allocator, @intCast(value & 0xffff_ffff));
+    try appendU32(bytes, allocator, @intCast(value >> 32));
 }
