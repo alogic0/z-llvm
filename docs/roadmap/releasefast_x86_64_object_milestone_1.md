@@ -409,3 +409,8 @@ That focused shape is now object-ok with selected low-byte compare and local
 trap failure edge. The broad row still remains the first sorted failure; the
 next selected alias is `@zig_ptr`, a pointer equality branch-to-return-or-trap
 shape.
+That focused shape is now object-ok with selected 64-bit pointer compare and
+local trap failure edge. `@zig_longdouble` is already object-ok through
+existing straight-line void return lowering. The broad row still remains the
+first sorted failure; the next selected alias is `@zig_f64`, a double equality
+branch-to-return-or-trap shape.
