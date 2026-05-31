@@ -135,9 +135,11 @@ failures. The selected
 `atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
 object-ok for the checked `@debug_location` alias and the already covered
 inline-asm/atomic aliases. The current probe is 10 successes and 7 failures.
-The first sorted blocker is
-`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@loop_sum`
-overflow-checked loop and panic-edge lowering.
+The selected `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` blocker
+is now object-ok for checked `@loop_sum` and guarded `@call_chain`. The current
+probe is 11 successes and 6 failures. The first sorted blocker is
+`error_switch.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@error_switch`
+straight-line `icmp`/`select` lowering.
 
 ## Activation Rule
 

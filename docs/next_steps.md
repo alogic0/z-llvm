@@ -13,8 +13,8 @@ Source roadmap: [ReleaseFast x86_64 Object Milestone 1](roadmap/releasefast_x86_
 
 Replacement goal:
 Reduce the next measured ReleaseSafe x86_64 asm/object blocker: selected
-`@loop_sum` overflow-checked loop lowering from
-`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll`.
+`@error_switch` straight-line compare/select lowering from
+`error_switch.zig.ReleaseSafe.x86_64.optimized.ll`.
 
 Zig evidence:
 The broad ReleaseFast optimized-output object probe over
@@ -33,20 +33,21 @@ relocations. Focused validation for that closed slice is
 `atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
 object-ok for `@debug_location`, `@inline_asm_barrier`, and `@atomic_add`; the
 focused ReleaseSafe gate also covers the checked add-immediate shape. The
-current probe is 10 object successes and 7 object failures.
+selected `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` blocker is
+now object-ok for checked `@loop_sum` and guarded `@call_chain`; the focused
+ReleaseSafe gate also covers both shapes. The current probe is 11 object
+successes and 6 object failures.
 
 The first sorted failure is now
-`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` with
-`error: UnsupportedCodegenControlFlow`. The first selected public shape is
-`@loop_sum = alias i32 (i32), ptr @control_flow_calls.loop_sum`; the optimized
-body contains overflow-checked loop arithmetic using
-`llvm.sadd.with.overflow.i32` and safety panic edges to
-`debug.FullPanic((function 'defaultPanic')).integerOverflow` and
-`debug.FullPanic((function 'defaultPanic')).integerOutOfBounds`.
+`error_switch.zig.ReleaseSafe.x86_64.optimized.ll` with
+`error: UnsupportedCodegenInstruction`. The selected public shape is
+`@error_switch = alias i32 (i8), ptr @error_switch.error_switch`; the optimized
+body is a one-block `icmp eq i8`, `icmp eq i8`, `select`, `select`, `ret`
+canonical form.
 
 LLVM fallback removed or reduced:
 Add the smallest object/codegen support needed for the selected ReleaseSafe
-`@loop_sum` shape. This continues reducing the ReleaseSafe asm/object
+`@error_switch` shape. This continues reducing the ReleaseSafe asm/object
 fallback row for safety/runtime-call CFG shapes. It does not claim general
 ReleaseSafe panic runtime lowering, arbitrary checked arithmetic, unwinding,
 debug records, or target-complete ABI behavior.
@@ -65,10 +66,10 @@ safety edge, also map against LLVM IR overflow intrinsic handling in
 `llvm-project-22/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp`.
 
 Known boundary:
-Implement only the selected `@loop_sum` ReleaseSafe shape from the
-`control_flow_calls` optimized output. Do not generalize to every panic edge,
-every overflow intrinsic, arbitrary loop, unwinding, debug/unwind object
-records, or non-x86_64 ABI behavior in this slice.
+Implement only the selected `@error_switch` ReleaseSafe shape from the
+`error_switch` optimized output. Do not generalize to every compare/select
+tree, arbitrary switch lowering, unwinding, debug/unwind object records, or
+non-x86_64 ABI behavior in this slice.
 
 Validation gate:
 Add or extend the reduced ReleaseSafe fixture and run its focused

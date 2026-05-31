@@ -51,8 +51,10 @@ closed_failure_1=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_1=@slice_sum,@struct_sum,@array_sum
 closed_failure_2=atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll
 closed_aliases_2=@debug_location,@inline_asm_barrier,@atomic_add
-current_probe=10 object-ok, 7 object-fail
-first_failure=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll
-selected_alias=@loop_sum
-missing_capability=ReleaseSafe overflow-checked loop and panic-edge lowering
+closed_failure_3=control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll
+closed_aliases_3=@loop_sum,@call_chain
+current_probe=11 object-ok, 6 object-fail
+first_failure=error_switch.zig.ReleaseSafe.x86_64.optimized.ll
+selected_alias=@error_switch
+missing_capability=ReleaseSafe straight-line icmp/select/select lowering
 ```

@@ -96,3 +96,55 @@ C
 zig cc "$atomics_harness" "$atomics_object" -o "$atomics_exe"
 "$atomics_exe"
 printf 'ok distribution releasesafe object atomics_debug_location_checked\n'
+
+control_flow_fixture="test/distribution/releasesafe_x86_64/inputs/control_flow_calls_checked.ll"
+control_flow_object="$tmp_dir/control_flow_calls_checked.o"
+control_flow_summary="$tmp_dir/control_flow_calls_checked.readelf.txt"
+control_flow_dump="$tmp_dir/control_flow_calls_checked.objdump.txt"
+control_flow_harness="$tmp_dir/control_flow_calls_checked_harness.c"
+control_flow_exe="$tmp_dir/control_flow_calls_checked_harness"
+
+zig build run -- --emit=obj --target="$target" --input-limit=67108864 "$control_flow_fixture" > "$control_flow_object"
+readelf -W -h -S -s -r "$control_flow_object" > "$control_flow_summary"
+objdump -dr "$control_flow_object" > "$control_flow_dump"
+
+rg -q 'Type:[[:space:]]+REL' "$control_flow_summary"
+rg -q 'Machine:[[:space:]]+Advanced Micro Devices X86-64' "$control_flow_summary"
+rg -q '[[:space:]]loop_sum$' "$control_flow_summary"
+rg -q '[[:space:]]call_chain$' "$control_flow_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOverflow - 4" "$control_flow_summary"
+rg -q "R_X86_64_PLT32.*debug.FullPanic\\(\\(function 'defaultPanic'\\)\\)\\.integerOutOfBounds - 4" "$control_flow_summary"
+rg -q '[[:space:]]jo[[:space:]]' "$control_flow_dump"
+rg -q '[[:space:]]js[[:space:]]' "$control_flow_dump"
+
+cat > "$control_flow_harness" <<'C'
+#include <stdint.h>
+
+extern int32_t loop_sum(uint32_t limit);
+extern int32_t call_chain(int32_t value);
+
+void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+void panic_overflow_stub(void) {
+    __builtin_trap();
+}
+
+void panic_out_of_bounds_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
+void panic_out_of_bounds_stub(void) {
+    __builtin_trap();
+}
+
+int main(void) {
+    if (loop_sum(0) != 0) return 1;
+    if (loop_sum(1) != 0) return 2;
+    if (loop_sum(5) != 10) return 3;
+    if (loop_sum(13) != 78) return 4;
+    if (call_chain(0) != 1) return 5;
+    if (call_chain(5) != 11) return 6;
+    if (call_chain(17) != 35) return 7;
+    return 0;
+}
+C
+
+zig cc "$control_flow_harness" "$control_flow_object" -o "$control_flow_exe"
+"$control_flow_exe"
+printf 'ok distribution releasesafe object control_flow_calls_checked\n'

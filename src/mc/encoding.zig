@@ -60,6 +60,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .read_flag_i8_dil_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x40, 0x84, 0xff, 0x0f, 0x98, 0xc0 }),
             .cmp_ecx_arg32 => |reg| try encodeCmpEcxToArg32(&bytes, allocator, reg),
             .cmp_rcx_arg64 => |reg| try encodeCmpRcxToArg64(&bytes, allocator, reg),
+            .cmp_ecx_imm32 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x81, 0xf9 });
+                try appendI32(&bytes, allocator, value);
+            },
             .mulsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x59, 0xc1 }),
             .addss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x58, 0xc1 }),
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
@@ -122,6 +126,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x80 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .js => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x88 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .ret => try bytes.append(allocator, 0xc3),
         }
         offset += instructionSize(instruction);
@@ -153,6 +165,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .read_flag_i8_dil_al => 8,
         .cmp_ecx_arg32 => |reg| if (reg.rexB()) 3 else 2,
         .cmp_rcx_arg64 => |reg| if (reg.rexB()) 4 else 3,
+        .cmp_ecx_imm32 => 6,
         .mulsd_xmm1_xmm0 => 4,
         .addss_xmm1_xmm0 => 4,
         .subss_xmm1_xmm0 => 4,
@@ -177,7 +190,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
-        .je, .jne, .jo => 6,
+        .je, .jne, .jo, .js => 6,
         .ret => 1,
     };
 }

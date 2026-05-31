@@ -27,6 +27,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .read_flag_i8_dil_al => try writer.writeAll("\txorl %eax, %eax\n\ttestb %dil, %dil\n\tsets %al\n"),
             .cmp_ecx_arg32 => |reg| try writer.print("\tcmpl %ecx, {s}\n", .{reg.name32()}),
             .cmp_rcx_arg64 => |reg| try writer.print("\tcmpq %rcx, {s}\n", .{reg.name64()}),
+            .cmp_ecx_imm32 => |value| try writer.print("\tcmpl ${}, %ecx\n", .{value}),
             .mulsd_xmm1_xmm0 => try writer.writeAll("\tmulsd %xmm1, %xmm0\n"),
             .addss_xmm1_xmm0 => try writer.writeAll("\taddss %xmm1, %xmm0\n"),
             .subss_xmm1_xmm0 => try writer.writeAll("\tsubss %xmm1, %xmm0\n"),
@@ -57,6 +58,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),
             .jo => |label| try writer.print("\tjo .L{s}_{s}\n", .{ function.name, label }),
+            .js => |label| try writer.print("\tjs .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),
         }
     }

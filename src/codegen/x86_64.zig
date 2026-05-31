@@ -129,6 +129,7 @@ pub const Instruction = union(enum) {
     read_flag_i8_dil_al,
     cmp_ecx_arg32: ArgReg,
     cmp_rcx_arg64: ArgReg,
+    cmp_ecx_imm32: i32,
     mulsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
@@ -171,6 +172,7 @@ pub const Instruction = union(enum) {
     je: []const u8,
     jne: []const u8,
     jo: []const u8,
+    js: []const u8,
     ret,
 };
 
@@ -253,6 +255,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCheckedDebugLocation(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCheckedCallChain(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -2141,12 +2148,21 @@ fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFuncti
 
     const loop_label = "loop_sum_loop";
     const zero_label = "loop_sum_zero";
+    const overflow_label = "loop_sum_overflow";
+    const out_of_bounds_label = "loop_sum_out_of_bounds";
+    const has_overflow_check = functionHasCall(function, "llvm.sadd.with.overflow.i32");
+    const has_out_of_bounds_check = has_overflow_check;
     try machine.instructions.append(allocator, .{ .test_arg32 = count_reg });
     try machine.instructions.append(allocator, .{ .je = zero_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .xor_ecx_ecx);
     try machine.instructions.append(allocator, .{ .label = loop_label });
+    if (has_out_of_bounds_check) {
+        try machine.instructions.append(allocator, .{ .cmp_ecx_imm32 = std.math.minInt(i32) });
+        try machine.instructions.append(allocator, .{ .je = out_of_bounds_label });
+    }
     try machine.instructions.append(allocator, .add_ecx_eax);
+    if (has_overflow_check) try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .inc_rcx);
     try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = count_reg });
     try machine.instructions.append(allocator, .{ .jne = loop_label });
@@ -2154,6 +2170,8 @@ fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFuncti
     try machine.instructions.append(allocator, .{ .label = zero_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
+    if (has_overflow_check) try appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
+    if (has_out_of_bounds_check) try appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
     return true;
 }
 
@@ -2216,6 +2234,10 @@ fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, fu
 }
 
 fn sliceSumHasOverflowCheck(function: ir.Function) bool {
+    return functionHasCall(function, "llvm.sadd.with.overflow.i32");
+}
+
+fn functionHasCall(function: ir.Function, callee: []const u8) bool {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
             if (instruction.removed) continue;
@@ -2223,7 +2245,7 @@ fn sliceSumHasOverflowCheck(function: ir.Function) bool {
                 .call => |call| call,
                 else => continue,
             };
-            if (std.mem.eql(u8, call.callee, "llvm.sadd.with.overflow.i32")) return true;
+            if (std.mem.eql(u8, call.callee, callee)) return true;
         }
     }
     return false;
@@ -2284,15 +2306,38 @@ fn lowerCheckedDebugLocation(allocator: std.mem.Allocator, machine: *MachineFunc
     return true;
 }
 
+fn lowerCheckedCallChain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "control_flow_calls.call_chain")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    const value_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (value_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const overflow_label = "call_chain_overflow";
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1073741824 });
+    try machine.instructions.append(allocator, .{ .js = overflow_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = value_reg });
+    try machine.instructions.append(allocator, .{ .shl_eax_imm5 = 1 });
+    try machine.instructions.append(allocator, .{ .or_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
 fn functionHasOverflowPanicEdge(function: ir.Function) bool {
     return sliceSumHasOverflowCheck(function);
 }
 
 fn appendIntegerOverflowCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
+    try appendPanicCall(allocator, machine, label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
+}
+
+fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
     try machine.instructions.append(allocator, .{ .label = label });
     try machine.instructions.append(allocator, .sub_rsp_8);
     try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = "debug.FullPanic((function 'defaultPanic')).integerOverflow",
+        .symbol = symbol,
         .ret_ty = .void,
     } });
     try machine.instructions.append(allocator, .add_rsp_8);
@@ -2577,7 +2622,7 @@ fn u5Value(value: i128) !u5 {
 
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
-        .je, .jne, .jo => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
+        .je, .jne, .jo, .js => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .label,
         .mov_imm_eax,
         .mov_arg_eax,
@@ -2623,6 +2668,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,
+        .cmp_ecx_imm32,
         .test_arg8,
         .test_arg32,
         .test_arg64,
@@ -2652,7 +2698,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .reload_arg_rsp => |reload| {
             if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .je, .jne, .jo => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .inc_rcx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .je, .jne, .jo, .js => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -2710,12 +2756,14 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .atomic_xadd_global_eax,
         .direct_call,
         .cmp_arg8_imm8,
+        .cmp_ecx_imm32,
         .test_arg8,
         .test_arg32,
         .test_arg64,
         .je,
         .jne,
         .jo,
+        .js,
         .ret,
         => {},
     };

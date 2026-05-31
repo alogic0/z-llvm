@@ -131,9 +131,10 @@ found 8 local object successes and 9 object failures. The selected
 `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
 `@slice_sum`, `@struct_sum`, and `@array_sum` overflow-checked
 `llvm.sadd.with.overflow.i32` shapes with panic-edge relocations. The current
-probe is 10 object successes and 7 object failures after closing selected
+probe is 11 object successes and 6 object failures after closing selected
 `atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` checked
-`@debug_location` support alongside the already covered `@inline_asm_barrier`
-and `@atomic_add` shapes. The first sorted failure is now
-`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` with selected
-`@loop_sum` overflow-checked loop and panic-edge lowering.
+`@debug_location` support and selected
+`control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` checked `@loop_sum`
+plus guarded `@call_chain` support. The first sorted failure is now
+`error_switch.zig.ReleaseSafe.x86_64.optimized.ll` with selected
+`@error_switch` straight-line `icmp`/`select` lowering.
