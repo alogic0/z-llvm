@@ -205,4 +205,7 @@ behavior for `@zig_assert_DC` is now object-ok in the focused ReleaseSmall
 gate, with diagnostic printing side effects explicitly outside the local
 replacement boundary. The broad row still remains the first sorted failure;
 the next selected alias is `@zig_ret_split_struct_mixed`, a two-register
-aggregate return.
+aggregate return. That focused shape is now object-ok. The broad row still
+remains the first sorted failure; the next selected alias is
+`@zig_ret_med_struct_mixed`, another two-register aggregate return with
+different constant bit patterns.

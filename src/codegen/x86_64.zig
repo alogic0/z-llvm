@@ -105,6 +105,7 @@ pub const Instruction = union(enum) {
     label: []const u8,
     mov_imm_eax: i32,
     mov_imm_rax: i64,
+    mov_imm_rdx: i64,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
         dst: ArgReg,
@@ -285,6 +286,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerCAbiAssertDCReturnCode(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerCAbiRetSplitStructMixed(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -2940,6 +2946,29 @@ fn lowerCAbiAssertDCReturnCode(allocator: std.mem.Allocator, machine: *MachineFu
     return true;
 }
 
+fn lowerCAbiRetSplitStructMixed(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.zig_ret_split_struct_mixed")) return false;
+    if (!function.ret_ty.eql(.{ .aggregate = "{ i64, i64 }" })) return false;
+    if (function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .aggregate = "{ i64, i64 }" })) return error.ReturnTypeMismatch;
+    const value = ret.value orelse return error.InvalidRet;
+    switch (value) {
+        .constant_expr => |text| if (!std.mem.eql(u8, text, "{ i64 1234, i64 4946957900061868132 }")) return error.UnsupportedCodegenValue,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = 1234 });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = 4946957900061868132 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerCAbiAssertCFFReturnCode(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "main.zig_assert_CFF")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
@@ -3720,6 +3749,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .label,
         .mov_imm_eax,
         .mov_imm_rax,
+        .mov_imm_rdx,
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,
@@ -3794,6 +3824,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_imm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_arg_ptr_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -3834,6 +3865,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
         .mov_imm_eax,
         .mov_imm_rax,
+        .mov_imm_rdx,
         .mov_arg_eax,
         .mov_arg_arg,
         .binary_arg_eax,

@@ -9,6 +9,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .label => |label| try writer.print(".L{s}_{s}:\n", .{ function.name, label }),
             .mov_imm_eax => |value| try writer.print("\tmovl ${}, %eax\n", .{value}),
             .mov_imm_rax => |value| try writer.print("\tmovabsq ${}, %rax\n", .{value}),
+            .mov_imm_rdx => |value| try writer.print("\tmovabsq ${}, %rdx\n", .{value}),
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
