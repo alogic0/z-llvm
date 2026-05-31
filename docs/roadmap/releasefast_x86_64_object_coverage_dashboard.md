@@ -9,8 +9,8 @@ This dashboard tracks the broad optimized-output object probe for
 optimized_output=tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir
 probe_date=2026-05-30
 rows=17
-object_ok=13
-object_fail=4
+object_ok=14
+object_fail=3
 gate=zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu <row.ll>
 ```
 
@@ -27,6 +27,7 @@ floats_math.zig.ReleaseFast.x86_64.optimized.ll
 fp_constants.zig.ReleaseFast.x86_64.optimized.ll
 fp_extended_ops.zig.ReleaseFast.x86_64.optimized.ll
 globals_comptime.zig.ReleaseFast.x86_64.optimized.ll
+integers.zig.ReleaseFast.x86_64.optimized.ll
 optional_pointer.zig.ReleaseFast.x86_64.optimized.ll
 switch_control.zig.ReleaseFast.x86_64.optimized.ll
 tiny_scalar.zig.ReleaseFast.x86_64.optimized.ll
@@ -35,7 +36,6 @@ tiny_scalar.zig.ReleaseFast.x86_64.optimized.ll
 ## Current Blockers
 
 ```text
-integers.zig.ReleaseFast.x86_64.optimized.ll              UnsupportedCodegenValue
 packed_bits.zig.ReleaseFast.x86_64.optimized.ll           UnsupportedCodegenType
 pointers_memory.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInstruction
 tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInstruction
@@ -44,8 +44,8 @@ tls_concurrency.zig.ReleaseFast.x86_64.optimized.ll       UnsupportedCodegenInst
 ## Active Slice
 
 ```text
-row=integers.zig.ReleaseFast.x86_64.optimized.ll
-selected_aliases=@cmp_select,@shift_mix
-missing_capability=integer intrinsic and variable shift/xor lowering
+row=packed_bits.zig.ReleaseFast.x86_64.optimized.ll
+selected_aliases=@replace_low,@read_flag
+missing_capability=i8 bit-mask/or and sign-bit flag lowering
 boundary=selected source-backed shape only
 ```

@@ -50,6 +50,39 @@ zig cc "$add_wrap_harness" "$add_wrap_object" -o "$add_wrap_exe"
 "$add_wrap_exe"
 printf 'ok distribution executable add_wrap\n'
 
+integers_cmp_shift_fixture="test/distribution/releasefast_x86_64/inputs/integers_cmp_shift.ll"
+integers_cmp_shift_object="$tmp_dir/integers_cmp_shift.o"
+integers_cmp_shift_harness="$tmp_dir/integers_cmp_shift_harness.c"
+integers_cmp_shift_exe="$tmp_dir/integers_cmp_shift_harness"
+
+zig build run -- --emit=obj --target="$target" "$integers_cmp_shift_fixture" > "$integers_cmp_shift_object"
+
+cat > "$integers_cmp_shift_harness" <<'C'
+#include <stdint.h>
+
+extern int cmp_select(int a, int b);
+extern int shift_mix(int value, int amount);
+
+static int expected_shift_mix(int value, int amount) {
+    uint32_t bits = (uint32_t)value;
+    uint32_t shift = (uint32_t)amount & 31u;
+    return (int)((bits << shift) ^ (bits >> shift));
+}
+
+int main(void) {
+    if (cmp_select(7, 3) != 3) return 1;
+    if (cmp_select(-4, 2) != -4) return 2;
+    if (cmp_select(-1, -9) != -9) return 3;
+    if (shift_mix(0x12345678, 4) != expected_shift_mix(0x12345678, 4)) return 4;
+    if (shift_mix(-7, 35) != expected_shift_mix(-7, 35)) return 5;
+    return 0;
+}
+C
+
+zig cc "$integers_cmp_shift_harness" "$integers_cmp_shift_object" -o "$integers_cmp_shift_exe"
+"$integers_cmp_shift_exe"
+printf 'ok distribution executable integers_cmp_shift\n'
+
 branch_mix_fixture="test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll"
 branch_mix_object="$tmp_dir/switch_control_branch_mix.o"
 branch_mix_harness="$tmp_dir/branch_mix_harness.c"

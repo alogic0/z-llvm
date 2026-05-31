@@ -1,6 +1,8 @@
 id	input	validation	expected_status	source_row	shape	public_symbol
 tiny_scalar	test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll	object-readelf	object-ok	tiny_scalar.zig	scalar arithmetic and void return	add
 integers_add_wrap	test/distribution/releasefast_x86_64/inputs/integers_add_wrap.ll	object-readelf	object-ok	integers.zig	scalar wrapping add	add_wrap
+integers_cmp_select	test/distribution/releasefast_x86_64/inputs/integers_cmp_shift.ll	object-readelf	object-ok	integers.zig	signed min intrinsic	cmp_select
+integers_shift_mix	test/distribution/releasefast_x86_64/inputs/integers_cmp_shift.ll	object-readelf	object-ok	integers.zig	masked variable shift xor	shift_mix
 switch_control_branch_mix	test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll	object-readelf	object-ok	switch_control.zig	branch/select lowered to select plus add	branch_mix
 control_flow_calls_call_chain	test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll	object-readelf	object-ok	control_flow_calls.zig	shift and or arithmetic	call_chain
 control_flow_calls_loop_sum	test/distribution/releasefast_x86_64/inputs/control_flow_calls_loop_sum.ll	object-readelf	object-ok	control_flow_calls.zig	multi-block unrolled loop sum	loop_sum

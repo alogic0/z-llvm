@@ -21,6 +21,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .xor_ecx_ecx => try writer.writeAll("\txorl %ecx, %ecx\n"),
             .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
             .inc_rcx => try writer.writeAll("\tincq %rcx\n"),
+            .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
+            .shift_mix_i32_edi_esi_eax => try writer.writeAll("\tmovl %esi, %ecx\n\tandl $31, %ecx\n\tmovl %edi, %eax\n\tshll %cl, %eax\n\tmovl %edi, %edx\n\tshrl %cl, %edx\n\txorl %edx, %eax\n"),
             .cmp_ecx_arg32 => |reg| try writer.print("\tcmpl %ecx, {s}\n", .{reg.name32()}),
             .cmp_rcx_arg64 => |reg| try writer.print("\tcmpq %rcx, {s}\n", .{reg.name64()}),
             .mulsd_xmm1_xmm0 => try writer.writeAll("\tmulsd %xmm1, %xmm0\n"),

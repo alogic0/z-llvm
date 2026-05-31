@@ -116,6 +116,6 @@ starts from the first remaining blocker:
 
 ```text
 broader ReleaseFast object coverage
-current blocker=first broad optimized-output object failure is integers
-missing capability=selected cmp_select and shift_mix integer lowering
+current blocker=first broad optimized-output object failure is packed_bits
+missing capability=selected replace_low and read_flag i8 bit lowering
 ```
