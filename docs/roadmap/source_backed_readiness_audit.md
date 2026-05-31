@@ -81,10 +81,11 @@ tmp/zig_ir/accepted_20260530_201347_releasesmall
 ```
 
 No parse, verify, optimizer, or input-size failure was promoted into
-`docs/next_steps.md`. The refreshed status/source report columns match the
-previous continuous accepted sweeps for the same modes, so no new optimized IR
-handoff shape was identified for an x86_64 backend/codegen gate. The explicit
-future rows remain boundaries:
+`docs/next_steps.md`. The refreshed discovery artifacts did not capture
+optimized output for canonical-form comparison; they prove only that no new
+failing source row appeared under the accepted pipelines. Under the focused
+validation policy, no x86_64 backend/codegen handoff gate was promoted from
+this clean sweep. The explicit future rows remain boundaries:
 
 ```text
 tiny_scalar_debug: future

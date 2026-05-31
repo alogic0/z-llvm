@@ -91,10 +91,12 @@ ReleaseFast remains the primary optimizer replacement row. ReleaseSafe was
 refreshed only because SimplifyCFG can affect safety/runtime-call CFG shapes,
 and ReleaseSmall was refreshed as milestone evidence. Debug remains optional
 for this refresh because no debug metadata or O0 behavior changed. The refreshed
-ReleaseFast, ReleaseSafe, and ReleaseSmall status/source report columns match
-the previous continuous accepted sweeps, so no handoff/codegen gate was run. The
-four future rows above are reaffirmed as boundaries; no new evidence changes
-their status, and no implementation slice is promoted.
+ReleaseFast, ReleaseSafe, and ReleaseSmall discovery artifacts did not capture
+optimized output for canonical-form comparison; they prove only that no new
+failing source row appeared under the accepted pipelines. Under the focused
+validation policy, no handoff/codegen gate was promoted. The four future rows
+above are reaffirmed as boundaries; no new evidence changes their status, and
+no implementation slice is promoted.
 
 ## Activation Rule
 
