@@ -14,7 +14,7 @@ Add the next external IR-writer runtime surface after conditional branches,
 phi/merge values, loops, dense-switch, mutable global update, i32 ABI-argument
 direct-call, i64 call-return, local-exec TLS read/update, selected atomic add,
 selected inline-asm memory barrier, selected small aggregate ABI, and selected
-float compare/multiply/add surfaces: a source-backed x86_64 double select row.
+float compare/multiply/add/select surfaces: a source-backed x86_64 f32 subtract row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -37,15 +37,17 @@ ABI shape from `test/zig/inputs/aggregate_abi.zig`. The next source-backed
 `float_less(a: f32, b: f32) bool` family from
 `test/zig/inputs/float_compare.zig`, and `releasefast_runtime_float_mul`
 covers `float_mul(a: f64, b: f64) f64` from the same fixture. The next
-`releasefast_runtime_float_add` row covers
-`float_add(a: f32, b: f32) f32` from `test/zig/inputs/floats_math.zig`. The
-next source-backed shape uses the same fixture's selected
-`float_select(a: f64, b: f64, flag: bool) f64` family that already appears in
-captured ReleaseFast x86_64 IR and selected x86_64 FP object/codegen evidence.
+`releasefast_runtime_float_add` and `releasefast_runtime_float_select` rows
+cover `float_add(a: f32, b: f32) f32` and
+`float_select(a: f64, b: f64, flag: bool) f64` from
+`test/zig/inputs/floats_math.zig`. The next source-backed shape is
+`test/zig/inputs/fp_extended_ops.zig`, using the selected
+`float_sub(a: f32, b: f32) f32` family that already appears in captured
+ReleaseFast x86_64 IR and selected x86_64 FP object/codegen evidence.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected double-precision
-floating-point select behavior. Do not claim broad FP math, NaN/fast-math
+Reduce the remaining external writer gap for selected single-precision
+floating-point subtract behavior. Do not claim broad FP math, NaN/fast-math
 policy, constrained FP, libm/compiler-rt calls, vector FP, or full
 floating-point ABI coverage.
 
@@ -54,26 +56,26 @@ ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
-LLVM floating-point select lowering maps the selected `select i1 ..., double`
-shape to x86_64 SSE register selection behavior. Source behavior is represented
-by Zig's `floats_math.float_select` family. Record more precise upstream files
-if the slice needs optimizer/codegen behavior beyond the selected `f64` select
+LLVM floating-point subtract lowering maps the selected `fsub float` shape to
+x86_64 SSE scalar subtract behavior. Source behavior is represented by Zig's
+`fp_extended_ops.float_sub` family. Record more precise upstream files if the
+slice needs optimizer/codegen behavior beyond the selected `f32` subtract
 shape.
 
 Known boundary:
-Only one selected `f64` select shape. Other FP arithmetic, unordered
+Only one selected `f32` subtract shape. Other FP arithmetic, unordered
 predicates, NaN/fast-math behavior beyond the selected LLVM operation, libm
 calls, vectors, constrained FP intrinsics, and broad FP ABI behavior remain out
 of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_select`
+`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_sub`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected float-select slice separately with the policy in
+Commit the selected float-subtract slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -112,11 +114,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 25-row
+also passes: the first ReleaseFast tiny-scalar row and the full 26-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 25 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 26 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -125,7 +127,7 @@ dense-switch rows, plus the mutable global update, ABI-argument direct-call,
 local-exec TLS read/update rows, the selected atomic add row, and the selected
 inline-asm memory barrier row, plus the selected aggregate pair ABI row,
 selected ordered `f32` less-than row, selected `f64` multiply row, and selected
-`f32` add row. Broad
+`f32` add row, plus the selected `f64` select row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -174,8 +176,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=25 executable_ok=25 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=25 minimal_wrapper_rows=0
+             full set total=26 executable_ok=26 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=26 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -183,7 +185,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1
              global-update=1 abi-arg-call=1 tls-read=1 tls-bump=1
              atomic-add=1 inline-asm-barrier=1 aggregate-pair-abi=1
-             float-less=1 float-mul=1 float-add=1 minimal-ret0=0
+             float-less=1 float-mul=1 float-add=1 float-select=1
+             minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0
