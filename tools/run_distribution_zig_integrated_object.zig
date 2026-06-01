@@ -196,6 +196,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-subtract",
     },
     .{
+        .id = "releasefast_runtime_double_div",
+        .wrapper = "test/zig/integrated/runtime_double_div_main.zig",
+        .covered_fixture = "test/zig/inputs/fp_extended_ops.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-divide",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -351,6 +359,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "float-add" },
         .{ .name = "float-select" },
         .{ .name = "float-sub" },
+        .{ .name = "double-div" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -634,6 +643,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_sub")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-subtract";
     }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_double_div")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-divide";
+    }
     return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
 }
 
@@ -680,6 +692,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "float-add")) return "float-add";
     if (std.mem.eql(u8, contents[value_start..value_end], "float-select")) return "float-select";
     if (std.mem.eql(u8, contents[value_start..value_end], "float-sub")) return "float-sub";
+    if (std.mem.eql(u8, contents[value_start..value_end], "double-div")) return "double-div";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

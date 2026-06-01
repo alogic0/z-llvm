@@ -256,6 +256,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeFloatSelectIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_sub")) {
         try writeRuntimeFloatSubIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_double_div")) {
+        try writeRuntimeDoubleDivIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -302,6 +304,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_add")) return "float-add";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_select")) return "float-select";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_sub")) return "float-sub";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_double_div")) return "double-div";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -883,6 +886,47 @@ fn writeRuntimeFloatSubIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime float subtract external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeDoubleDivIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@double_div = alias double (double, double), ptr @fp_extended_ops.double_div
+        \\@float_sub = alias float (float, float), ptr @fp_extended_ops.float_sub
+        \\@float_rem = alias float (float, float), ptr @fp_extended_ops.float_rem
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %quot = fdiv double 6.000000e+00, 2.000000e+00
+        \\  %ok = fcmp oeq double %quot, 3.000000e+00
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private double @fp_extended_ops.double_div(double %0, double %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = fdiv double %0, %1
+        \\  ret double %3
+        \\}}
+        \\
+        \\define private float @fp_extended_ops.float_sub(float %0, float %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = fsub float %0, %1
+        \\  ret float %3
+        \\}}
+        \\
+        \\define private float @fp_extended_ops.float_rem(float %0, float %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = frem float %0, %1
+        \\  ret float %3
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime double divide external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
