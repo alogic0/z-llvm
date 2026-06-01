@@ -68,6 +68,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_debug_unwind_boundary.sh` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
+| `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, and ReleaseSmall objects, using `zig build-exe -fno-lld` | pass |
 | `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
 | `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
 | `bash scripts/run_distribution_linker_boundary.sh` | explicit linker/CRT ownership boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand local objects to Zig's linker/toolchain through `zig cc` | pass |
@@ -186,6 +187,8 @@ Global exclusions:
   x86_64 musl executable proof outside selected ReleaseFast, ReleaseSafe,
     ReleaseSmall, and Debug executable fixtures; broad linker/CRT/libc
     ownership remains Zig-owned
+  native Zig linker proof outside the selected `zig build distribution-native-link`
+    subset
   bitcode/LTO artifact handoff to Zig's linker/toolchain until activation
     criteria are met
   dynamic TLS models

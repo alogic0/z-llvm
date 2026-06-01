@@ -260,6 +260,22 @@ boundary=no broad musl executable expansion beyond selected harnesses; Zig's
          dynamic loader behavior beyond the selected harnesses
 ```
 
+The selected native Zig linker handoff subset is intentionally smaller and
+stricter than the `zig cc` executable gates:
+
+```text
+gate=zig build distribution-native-link
+target=x86_64-unknown-linux-gnu
+linker_selection=zig build-exe -fno-lld
+includes=ReleaseFast tiny scalar/add-wrap/global-constant objects,
+         ReleaseSafe checked-add object with panic stub,
+         ReleaseSmall i64 constant-return object
+result=pass
+boundary=native Zig linker proof only for this ABI-stable subset; broad
+         executable/linker coverage, CRT policy, libc integration, dynamic
+         loading, archives, and shared libraries remain Zig-owned
+```
+
 The linker/CRT boundary is now explicit and validated as an ownership boundary,
 not a future `z_llvm` linker plan. `z_llvm` emits LLVM-compatible IR, assembly,
 and selected relocatable objects; final executable, shared-library, archive,

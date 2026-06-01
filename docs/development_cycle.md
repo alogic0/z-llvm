@@ -182,6 +182,9 @@ executable gates prove Zig-driver/toolchain handoff only. They do not prove
 native Zig linker coverage unless the gate explicitly selects and records a
 native-linker path. Native linker replacement is Zig-owned; this repository can
 only validate that its emitted objects are acceptable inputs to that path.
+The selected native-linker proof is `zig build distribution-native-link`: it
+emits local objects with `z_llvm`, compiles C harnesses without linking, then
+links with `zig build-exe -fno-lld` before running the executables.
 
 ## Validation Scope
 
@@ -205,6 +208,9 @@ target, ABI, codegen, object, or handoff change
 
 linker, CRT, executable handoff, non-x86_64 target boundary, or debug unwind boundary
   -> run `zig build distribution-boundary`
+
+native Zig linker handoff change
+  -> run `zig build distribution-native-link`
 
 corpus manifest or Zig-emitted fixture change
   -> run the affected mode sweep only

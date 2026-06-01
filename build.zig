@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
     addScriptStep(b, "distribution-all", "Run selected distribution gates and boundary gates", "scripts/run_distribution_all_gates.sh");
     addScriptStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "scripts/run_distribution_no_llvm_codegen_subset.sh");
     addScriptStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "scripts/run_distribution_boundary_gates.sh");
+    addScriptStep(b, "distribution-native-link", "Run selected native Zig linker handoff gates", "scripts/run_distribution_native_link_m5.sh");
     addScriptStep(b, "distribution-musl-object", "Run selected x86_64 musl object subset gates", "scripts/run_distribution_x86_64_musl_object_subset.sh");
     addScriptStep(b, "distribution-musl-executable", "Run selected x86_64 musl executable subset gates", "scripts/run_distribution_x86_64_musl_executable_subset.sh");
     addScriptStepWithArgs(b, "probe-distribution-objects", "Run object-probe automation; pass arguments after --", "scripts/probe_distribution_objects.sh");

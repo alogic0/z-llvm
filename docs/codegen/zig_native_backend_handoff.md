@@ -60,6 +60,12 @@ native-linker claim requires a separate gate that selects a native-linker path
 and records that fact; this repository should validate object compatibility
 with that path, not implement the linker.
 
+The selected native-linker proof is `zig build distribution-native-link`. It
+emits local `.o` files with `z_llvm`, compiles C harnesses with `zig cc -c`,
+then links with `zig build-exe -fno-lld` before executing the result. This
+currently covers a small ABI-stable subset across ReleaseFast, ReleaseSafe,
+and ReleaseSmall objects.
+
 Default non-goals:
 
 ```text
@@ -159,6 +165,12 @@ zig build distribution-boundary
 That boundary gate verifies the local linker non-goal separately from the
 positive no-LLVM-codegen distribution subset. It proves that final linking is
 outside `z_llvm`; it does not prove that Zig avoided LLD internally.
+
+For selected native-linker handoff proof, run:
+
+```sh
+zig build distribution-native-link
+```
 
 ## Out Of Scope
 

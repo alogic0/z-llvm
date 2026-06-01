@@ -25,10 +25,11 @@ Latest local validation:
 zig build test
 bash scripts/run_readiness_checks.sh
 bash scripts/run_distribution_all_gates.sh
+zig build distribution-native-link
 ```
 
-All three passed after the script runner cleanup and shared tool helper
-refactor.
+All four passed after the script runner cleanup, shared tool helper refactor,
+and selected native-linker proof addition.
 
 Current distribution evidence is recorded in
 [x86_64_distribution_object_dashboard.md](roadmap/x86_64_distribution_object_dashboard.md)
@@ -44,6 +45,7 @@ Debug        x86_64 asm/object: conservative boundary, adjusted continuous 463-r
              object-clean, 2 explicit exclusions
 musl         selected x86_64 object/executable subset gates pass
 linking      final executable/library/archive/linker-script ownership remains Zig-owned
+native link  selected ABI-stable objects link and run through `zig build-exe -fno-lld`
 AArch64      object emission remains an explicit target boundary
 ```
 
