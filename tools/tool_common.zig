@@ -1,4 +1,5 @@
 const std = @import("std");
+const regex = @import("zigrep_regex/regex/root.zig");
 
 pub const TempDir = struct {
     path: []const u8,
@@ -148,6 +149,75 @@ pub fn commandExists(allocator: std.mem.Allocator, io: std.Io, command: []const 
     });
     defer freeRunResult(allocator, result);
     return termOk(result.term);
+}
+
+pub fn expectRegex(allocator: std.mem.Allocator, io: std.Io, path: []const u8, pattern: []const u8) !void {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(128 * 1024 * 1024));
+    defer allocator.free(contents);
+
+    const normalized_pattern = try normalizeRgPattern(allocator, pattern);
+    defer allocator.free(normalized_pattern);
+
+    var compiled = regex.compileRe(allocator, normalized_pattern, .{}) catch |err| {
+        try validationError(io, "invalid regex pattern for {s}: {s}: {s}\n", .{ path, pattern, @errorName(err) });
+    };
+    defer compiled.deinit();
+
+    if (try isMatchLinewise(&compiled, contents)) return;
+    try validationError(io, "missing regex match in {s}: {s}\n", .{ path, pattern });
+}
+
+pub fn expectLiteral(allocator: std.mem.Allocator, io: std.Io, path: []const u8, needle: []const u8) !void {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(128 * 1024 * 1024));
+    defer allocator.free(contents);
+    if (std.mem.indexOf(u8, contents, needle) != null) return;
+    try validationError(io, "missing literal match in {s}: {s}\n", .{ path, needle });
+}
+
+fn isMatchLinewise(compiled: *const regex.Compiled, contents: []const u8) !bool {
+    var start: usize = 0;
+    while (start <= contents.len) {
+        const newline = std.mem.indexOfScalarPos(u8, contents, start, '\n');
+        const end = newline orelse contents.len;
+        const line = std.mem.trimEnd(u8, contents[start..end], "\r");
+        if (try compiled.isMatch(line)) return true;
+        if (newline == null) break;
+        start = end + 1;
+    }
+    return false;
+}
+
+fn normalizeRgPattern(allocator: std.mem.Allocator, pattern: []const u8) ![]u8 {
+    var normalized: std.ArrayList(u8) = .empty;
+    errdefer normalized.deinit(allocator);
+
+    var index: usize = 0;
+    while (index < pattern.len) {
+        if (std.mem.startsWith(u8, pattern[index..], "[[:space:]]")) {
+            try normalized.appendSlice(allocator, "\\s");
+            index += "[[:space:]]".len;
+        } else if (std.mem.startsWith(u8, pattern[index..], "[[:alpha:]]")) {
+            try normalized.appendSlice(allocator, "[A-Za-z]");
+            index += "[[:alpha:]]".len;
+        } else if (std.mem.startsWith(u8, pattern[index..], "[[:digit:]]")) {
+            try normalized.appendSlice(allocator, "\\d");
+            index += "[[:digit:]]".len;
+        } else if (std.mem.startsWith(u8, pattern[index..], "[[:alnum:]]")) {
+            try normalized.appendSlice(allocator, "[A-Za-z0-9]");
+            index += "[[:alnum:]]".len;
+        } else if (std.mem.startsWith(u8, pattern[index..], "[[:xdigit:]]")) {
+            try normalized.appendSlice(allocator, "[A-Fa-f0-9]");
+            index += "[[:xdigit:]]".len;
+        } else if (std.mem.startsWith(u8, pattern[index..], "[[:blank:]]")) {
+            try normalized.appendSlice(allocator, "[ \\t]");
+            index += "[[:blank:]]".len;
+        } else {
+            try normalized.append(allocator, pattern[index]);
+            index += 1;
+        }
+    }
+
+    return normalized.toOwnedSlice(allocator);
 }
 
 pub fn fileExists(io: std.Io, path: []const u8) !bool {

@@ -178,9 +178,7 @@ fn runKnownBlocker(
 }
 
 fn expectRegex(allocator: std.mem.Allocator, io: std.Io, path: []const u8, pattern: []const u8) !void {
-    const argv = [_][]const u8{ "rg", "-q", pattern, path };
-    const result = try common.runCapture(allocator, io, &argv, "rg");
-    common.freeRunResult(allocator, result);
+    try common.expectRegex(allocator, io, path, pattern);
 }
 
 fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
