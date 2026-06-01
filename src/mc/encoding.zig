@@ -30,6 +30,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
                 try appendU64(&bytes, allocator, @bitCast(value));
             },
+            .mov_imm_rdi => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0xbf });
+                try appendU64(&bytes, allocator, @bitCast(value));
+            },
             .mov_imm_rdx => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xba });
                 try appendU64(&bytes, allocator, @bitCast(value));
@@ -255,6 +259,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .label => 0,
         .mov_imm_eax => 5,
         .mov_imm_rax => 10,
+        .mov_imm_rdi => 10,
         .mov_imm_rdx => 10,
         .mov_imm_rsi => 10,
         .movq_xmm_rax => 5,

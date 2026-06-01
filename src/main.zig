@@ -246,6 +246,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimePackedReplaceLowIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) {
         try writeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) {
+        try writeRuntimeArraySumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -313,6 +315,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) return "packed-replace-low";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) return "struct-field-sum";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) return "array-scalar-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -804,6 +807,34 @@ fn writeRuntimeStructSumIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeArraySumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@array_sum = alias i32 (i32, i32, i32), ptr @aggregates.array_sum
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @aggregates.array_sum(i32 10, i32 20, i32 12)
+        \\  %ok = icmp eq i32 %value, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.array_sum(i32 %0, i32 %1, i32 %2) unnamed_addr align 1 {{
+        \\entry:
+        \\  %4 = add i32 %1, %0
+        \\  %5 = add i32 %4, %2
+        \\  ret i32 %5
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime array-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

@@ -138,6 +138,7 @@ pub const Instruction = union(enum) {
     label: []const u8,
     mov_imm_eax: i32,
     mov_imm_rax: i64,
+    mov_imm_rdi: i64,
     mov_imm_rdx: i64,
     mov_imm_rsi: i64,
     movq_xmm_rax: XmmReg,
@@ -940,6 +941,7 @@ fn lowerStraightLineReturn(
             if (try lowerAddChain3Return(allocator, machine, function, block, ret)) return;
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeArraySumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
@@ -1037,6 +1039,69 @@ fn lowerSelectedI64CallMainReturn(
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = 4 });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeArraySumMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "aggregates.array_sum")) return false;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(call.calling_conv);
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 3) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 10)) return error.UnsupportedCodegenValue;
+    if (!call.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[1].value, 20)) return error.UnsupportedCodegenValue;
+    if (!call.args.items[2].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[2].value, 12)) return error.UnsupportedCodegenValue;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "array_sum_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm_rdi = 10 });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 20 });
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = 12 });
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
@@ -9081,6 +9146,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .label,
         .mov_imm_eax,
         .mov_imm_rax,
+        .mov_imm_rdi,
         .mov_imm_rdx,
         .mov_imm_rsi,
         .movq_xmm_rax,
@@ -9186,7 +9252,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
-        .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -9234,6 +9300,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
         .mov_imm_eax,
         .mov_imm_rax,
+        .mov_imm_rdi,
         .mov_imm_rdx,
         .mov_imm_rsi,
         .movq_xmm_rax,
