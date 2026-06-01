@@ -1,4 +1,5 @@
 const std = @import("std");
+const common = @import("tool_common.zig");
 
 const usage =
     \\usage: zig run tools/probe_distribution_objects.zig -- --input-dir=DIR [options]
@@ -57,6 +58,10 @@ const Counts = struct {
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
+
+    const build_argv = [_][]const u8{ "zig", "build" };
+    const build_result = try common.runCapture(allocator, io, &build_argv, "zig build");
+    common.freeRunResult(allocator, build_result);
 
     var opts = try parseArgs(allocator, io, init);
     defer opts.deinit(allocator);
