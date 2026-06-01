@@ -250,6 +250,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeFloatLessIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_mul")) {
         try writeRuntimeFloatMulIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_add")) {
+        try writeRuntimeFloatAddIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -293,6 +295,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) return "aggregate-pair-abi";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_less")) return "float-less";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_mul")) return "float-mul";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_add")) return "float-add";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -765,6 +768,40 @@ fn writeRuntimeFloatMulIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime float multiply external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeFloatAddIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@float_add = alias float (float, float), ptr @floats_math.float_add
+        \\@float_select = alias double (double, double, i1), ptr @floats_math.float_select
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %sum = fadd float 1.000000e+00, 2.000000e+00
+        \\  %ok = fcmp oeq float %sum, 3.000000e+00
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private float @floats_math.float_add(float %0, float %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = fadd float %0, %1
+        \\  ret float %3
+        \\}}
+        \\
+        \\define private double @floats_math.float_select(double %0, double %1, i1 %2) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = select i1 %2, double %0, double %1
+        \\  ret double %3
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime float add external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
