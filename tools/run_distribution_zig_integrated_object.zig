@@ -128,8 +128,8 @@ const cases = [_]Case{
         .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig",
         .covered_fixture = "test/zig/inputs/tiny_scalar.zig",
         .mode = "ReleaseSafe",
-        .validation = .link_only,
-        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
         .id = "releasesmall_globals_comptime",
@@ -506,6 +506,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (!use_ir_writer) return case.fallback;
     if (case.validation == .link_only) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
+    }
+    if (std.mem.eql(u8, case.id, "releasesafe_tiny_scalar_runtime_boundary")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
 }

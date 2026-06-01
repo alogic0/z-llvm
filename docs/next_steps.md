@@ -12,8 +12,8 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 Replacement goal:
 Add the next external IR-writer runtime surface after conditional branches,
 phi/merge values, loops, dense-switch, mutable global update, i32 ABI-argument
-direct-call, and i64 call-return rows: refine the source-backed x86_64
-ReleaseSafe checked-add runtime boundary.
+direct-call, i64 call-return, and the refined ReleaseSafe checked-add boundary:
+a source-backed x86_64 TLS row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -26,43 +26,42 @@ paired with `test/zig/inputs/switch_control.zig`;
 paired with `test/zig/inputs/control_flow_calls.zig`;
 `releasesmall_runtime_i64_call` is paired with
 `test/zig/inputs/i64_arithmetic.zig`. The next source-backed shape is
-`test/zig/inputs/tiny_scalar.zig`, using the ReleaseSafe checked-add overflow
-intrinsic and Zig panic-runtime declaration already represented by
-`releasesafe_tiny_scalar_runtime_boundary`.
+`test/zig/inputs/tls_concurrency.zig`, using the selected `read_tls()` or
+`bump_tls(value: i32)` families that already back x86_64 object/native-link TLS
+evidence.
 
 LLVM fallback removed or reduced:
-Reduce the remaining ReleaseSafe runtime-boundary gap by making the checked-add
-row more precise. Prefer executable proof for the non-overflow path if the
-panic declaration can stay a safe link-only boundary; otherwise keep the row
-link-only but add stricter object/relocation evidence for the selected panic
-edge.
+Reduce the remaining external writer gap for selected local-exec TLS access.
+Prefer `read_tls()` first if executable native-link behavior is stable; use
+`bump_tls(value: i32)` only if the focused evidence requires update semantics.
+Do not claim dynamic TLS model or cross-target TLS coverage.
 
 Mode/target/stage row:
-ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
-pipeline -> local object -> Zig native-link executable or link-only boundary
-proof.
+ReleaseFast or ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted
+optimizer pipeline -> local object -> Zig native-link executable or link-only
+TLS boundary proof.
 
 Upstream mapping:
-LLVM checked arithmetic lowering maps to `llvm.sadd.with.overflow.i32`,
-`extractvalue`, conditional branch, and a Zig panic-runtime call edge emitted
-from Zig's LLVM backend. Source behavior is represented by Zig's selected
-ReleaseSafe tiny-scalar checked-add shape.
+LLVM TLS lowering maps to thread-local global declarations, local-exec TLS
+relocations, and scalar loads/stores emitted from Zig's LLVM backend. Source
+behavior is represented by Zig's `tls_concurrency.read_tls` or
+`tls_concurrency.bump_tls` shape.
 Record more precise upstream files if the slice needs optimizer/codegen behavior
-beyond the selected checked-add runtime boundary.
+beyond the selected TLS access.
 
 Known boundary:
-Only one selected checked-add row. Full Zig panic runtime implementation,
-error unions, stack traces, debug runtime, TLS, vectors, and aggregate ABI
-remain out of scope.
+Only one selected x86_64 local-exec TLS shape. Dynamic TLS, TLS runtime
+initialization, cross-target TLS, atomics, inline asm, vectors, and aggregate
+ABI remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_tiny_scalar_runtime_boundary`
+`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_read`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the ReleaseSafe checked-add runtime-boundary slice separately with the policy in
+Commit the selected TLS slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -160,7 +159,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=17 executable_ok=16 link_only_ok=1 local_fail=0
+             full set total=17 executable_ok=17 link_only_ok=0 local_fail=0
              scalar_runtime_rows=17 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2

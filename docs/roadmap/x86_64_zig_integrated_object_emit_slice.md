@@ -266,8 +266,8 @@ runtime-emitted rows:
 
   releasesafe_tiny_scalar_runtime_boundary: checked-add-runtime-boundary
     dso_local i32 @main emits llvm.sadd.with.overflow.i32, branches to a
-    panic-runtime declaration on overflow, and lowers the selected constant
-    non-overflow object path as link-only boundary evidence
+    panic-runtime declaration on overflow, validates that edge as a boundary,
+    and executes the selected constant non-overflow object path
 
   releasesmall_globals_comptime: global-load
     same private global load surface under the ReleaseSmall accepted pipeline,
@@ -352,10 +352,10 @@ ReleaseSafe executable:
   wrapper=test/zig/integrated/error_switch_main.zig
   covered_fixture=test/zig/inputs/error_switch.zig
 
-ReleaseSafe link-only boundary:
+ReleaseSafe executable with validated panic edge boundary:
   wrapper=test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig
   covered_fixture=test/zig/inputs/tiny_scalar.zig
-  boundary=zig-panic-runtime
+  boundary=validated-zig-panic-edge
 
 ReleaseSmall executable:
   wrapper=test/zig/integrated/globals_comptime_small_main.zig
@@ -382,7 +382,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=17 executable_ok=16 link_only_ok=1 local_fail=0
+ir-writer full set:    total=17 executable_ok=17 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -452,7 +452,7 @@ stores beyond the selected mutable global update semantics
 calls beyond the selected i32 ABI argument direct-call and selected i64
 call-return shapes
 error unions and ReleaseSafe runtime/panic paths beyond the selected
-panic-runtime link-only boundary
+validated panic-runtime edge boundary
 TLS, atomics, inline asm, vectors
 aggregate ABI lowering, sret/byval, varargs
 debug metadata, DWARF, unwind/personality records
