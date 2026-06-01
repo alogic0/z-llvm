@@ -21,6 +21,13 @@ The combined validation entrypoint is now `bash scripts/run_distribution_all_gat
 Pick the next measured blocker from a source-backed distribution row; do not
 expand beyond the captured subset without a measured first failure.
 
+Linker ownership:
+This active queue must not promote `z_llvm` executable or linker
+implementation. If a selected executable gate fails, first decide whether the
+local object is ABI-, symbol-, relocation-, or section-incompatible with Zig's
+linker/toolchain. Zig's linker path remains the owner of final executable,
+library, archive, CRT, libc, and dynamic-loader behavior.
+
 Zig evidence:
 The continuous Debug prefix-400 object probe at
 `tmp/zig_ir/debug_object_probe_continuous_prefix400_20260531/ir` originally

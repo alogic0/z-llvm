@@ -199,8 +199,8 @@ over `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` has 17
 local object successes and 0 failures, with executable validation for the
 selected public aliases. It still explicitly excludes target-complete ABI
 lowering, arbitrary Zig source outside the captured set, debug/unwind records,
-linker ownership, dynamic TLS models, cross-target TLS relocations, and broad
-runtime completeness.
+final-linker work owned by Zig's linker/toolchain, dynamic TLS models,
+cross-target TLS relocations, and broad runtime completeness.
 
 The first named no-LLVM-codegen x86_64 distribution subset gate is:
 
@@ -230,7 +230,8 @@ status=deferred until a source-backed activation criterion requires bitcode or
 
 The selected x86_64 musl object subset is a target-boundary proof. It also
 inherits the selected ReleaseSafe executable harnesses embedded in the M2 gate,
-but does not claim broad executable or linker replacement for musl:
+but does not claim broad executable replacement or local linker ownership for
+musl:
 
 ```text
 gate=bash scripts/run_distribution_x86_64_musl_object_subset.sh
@@ -238,8 +239,9 @@ target=x86_64-unknown-linux-musl
 includes=ReleaseFast object gate, ReleaseSafe object gate,
          ReleaseSmall object gate, selected Debug object gate
 result=pass
-boundary=no broad musl executable harnesses, linker ownership, CRT/start files,
-         libc integration, or dynamic loader behavior
+boundary=no broad musl executable harnesses; final linker/toolchain ownership
+         stays with Zig; no local CRT/start-file, libc integration, or dynamic
+         loader behavior
 ```
 
 The selected x86_64 musl executable subset is also target-backed for stable ABI
@@ -253,12 +255,16 @@ includes=ReleaseFast executable gate, selected ReleaseSafe M2
          safety/runtime-call executable harnesses, selected ReleaseSmall M3
          executable harnesses, selected Debug mathtest executable gate
 result=pass
-boundary=no broad musl executable expansion beyond selected harnesses; no
-         linker ownership, CRT policy, libc integration, or dynamic loader
-         behavior beyond the selected harnesses
+boundary=no broad musl executable expansion beyond selected harnesses; Zig's
+         linker/toolchain owns final linking, CRT policy, libc integration, and
+         dynamic loader behavior beyond the selected harnesses
 ```
 
-The linker/CRT boundary is now explicit and validated:
+The linker/CRT boundary is now explicit and validated as an ownership boundary,
+not a future `z_llvm` linker plan. `z_llvm` emits LLVM-compatible IR, assembly,
+and selected relocatable objects; final executable, shared-library, archive,
+linker-script, CRT, libc, and dynamic-loader behavior stays in Zig's
+linker/toolchain.
 
 ```text
 gate=bash scripts/run_distribution_linker_boundary.sh
@@ -266,8 +272,9 @@ local_emit_modes=ir, asm, obj
 rejected_emit_mode=exe
 executable_validation_handoff=zig cc -target "$cc_target"
 result=pass
-boundary=no local executable emission, CRT/start-file policy, libc integration,
-         dynamic loader behavior, archive ownership, or linker script handling
+boundary=no z_llvm executable emission, CRT/start-file policy, libc integration,
+         dynamic loader behavior, archive ownership, or linker script handling;
+         executable gates hand local objects to Zig's linker/toolchain
 ```
 
 AArch64 object emission is an explicit target boundary for the current
@@ -328,7 +335,8 @@ The compact object-stage dashboard is
 Asm/object remains LLVM fallback required for broad Debug, and for ReleaseFast,
 ReleaseSafe, and ReleaseSmall outside their named captured subsets. Existing
 docs explicitly exclude broad register allocation, scheduling, debug/unwind
-object records, linker ownership, and target-complete ABI lowering.
+object records, final-linker work owned by Zig's linker/toolchain, and
+target-complete ABI lowering.
 
 ## First Fallback Row
 

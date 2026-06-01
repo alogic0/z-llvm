@@ -35,13 +35,27 @@ keep tiny codegen/MC/object paths as validation-only fixtures
 study object/debug/linker boundaries when optimizer semantics require them
 ```
 
+## Linker Ownership
+
+Zig already owns linker infrastructure under `ziglang/src/link/*` and may
+select its LLD path when configured. This repository should not clone LLD or
+implement final executable, shared-library, archive, linker-script, CRT, libc,
+or dynamic-loader behavior.
+
+The local object work exists to validate that optimized LLVM-compatible IR can
+become relocatable `.o` files whose symbols, relocations, sections, ABI, and
+metadata are acceptable inputs to Zig's linker/toolchain. Executable harnesses
+compile or link through Zig's linker path; failures are local object
+compatibility gaps unless explicitly traced to missing Zig linker behavior.
+
 Default non-goals:
 
 ```text
 do not replace Zig's AIR, Liveness, MIR, codegen, linker, or debug pipelines
 do not grow a general register allocator or scheduler here
 do not generalize local MC/object writing beyond validation fixtures
-do not move linker, archive, Clang, or C frontend replacement into optimizer epics
+do not clone LLD or move linker, archive, Clang, or C frontend replacement into
+optimizer epics
 ```
 
 ## Handoff Map
@@ -76,7 +90,7 @@ for mapping optimizer outputs to Zig-native handoff questions.
 | `src/codegen/` tiny x86_64 lowering | validation-only | Proves selected optimized IR still reaches assembly/object bytes for tiny fixtures. |
 | `src/mc/assembly.zig` | validation-only | Normalized assembly text is useful for regression checks, not a general `AsmPrinter` replacement. |
 | `src/mc/encoding.zig` | validation-only | Direct encoding covers only tiny x86_64 instructions used by fixtures. |
-| `src/mc/elf.zig` | validation-only | ELF64 object writing validates relocation and symbol assumptions for tiny x86_64 fixtures. |
+| `src/mc/elf.zig` | validation-only | Selected ELF64 relocatable object writing validates relocation and symbol assumptions for tiny x86_64 fixtures; final ELF linking is Zig-owned. |
 | debug metadata preservation/emission | debug-info study | Activate only after metadata parsing/preservation exists and a Zig fixture needs it. |
 | broad register allocation, scheduling, multi-target MC, linkers | out of scope | Zig native backends and linkers already own this path. |
 
@@ -132,9 +146,10 @@ not claim full native backend or object/codegen completeness.
 | Full native backend replacement | Zig-owned backend work. |
 | General register allocation | Out of scope until a source-backed validation slice requires a tiny model. |
 | Instruction scheduling and target cost modeling | Out of scope; tied to real backend quality work. |
-| Full ELF/Mach-O/COFF object writing | Linker/object roadmap only, not optimizer work. |
+| Full executable/shared-library/archive linking | Zig linker-owned, not `z_llvm` work. |
+| General ELF/Mach-O/COFF object writer parity | Out of scope except selected relocatable `.o` validation fixtures. |
 | DWARF/CodeView emission | Debug-info study only after metadata surface exists. |
-| LLD, archives, `zig cc`, `zig c++`, and `translate-c` | Separate Zig LLVM-removal workstreams. |
+| LLD, archives, `zig cc`, `zig c++`, and `translate-c` | Separate Zig LLVM-removal workstreams; do not clone their ownership into this repository. |
 
 ## Maintenance
 

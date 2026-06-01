@@ -55,7 +55,7 @@ Use these categories consistently in inventories and roadmap slices:
 | `ziglang/src/Compilation/Config.zig:190` | Decides whether the LLVM library may be used to build LLVM modules. | tooling | hard policy input | Document and use as the boundary between LLVM backend and libLLVM dependency removal. |
 | `ziglang/src/Compilation/Config.zig:202` | Chooses Clang or Aro for C frontend work. | C frontend | optional/handoff | Keep out of optimizer work; track only when C frontend behavior affects emitted IR fixtures. |
 | `ziglang/src/Compilation/Config.zig:317` | Chooses whether Zig uses the LLVM backend for machine code generation. | target/data-layout, codegen | hard policy input | Use this as the roadmap boundary for native-backend handoff work. |
-| `ziglang/src/Compilation/Config.zig:381` | Chooses LLD or Zig's own linker. | object/linker | optional/handoff | Keep linker replacement separate from optimizer epics. |
+| `ziglang/src/Compilation/Config.zig:381` | Chooses LLD or Zig's own linker. | object/linker | optional/handoff | Keep final linker ownership with Zig; track only object handoff compatibility here. |
 | `ziglang/src/target.zig:167` | Records targets where LLVM has non-experimental support. | target/data-layout, codegen | hard for LLVM-backed paths | Inventory target coverage before adding backend work. |
 | `ziglang/src/target.zig:260` | Records targets where Zig supports LLD. | object/linker | optional/handoff | Use as linker inventory source; do not make it optimizer scope. |
 | `ziglang/src/target.zig:478` | Records Clang assembler and target-option quirks. | C frontend, target/data-layout | optional/handoff | Inventory only unless target-option semantics change LLVM IR generation. |

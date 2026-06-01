@@ -85,6 +85,6 @@ compare_codegen_asm.sh: full current tiny x86_64 assembly smoke matrix
 ## Boundary
 
 Register allocation, instruction scheduling, target-cost modeling, debug/unwind
-emission, and object/linker ownership remain outside this handoff cycle. They
-should be added only when a source-backed Zig fixture requires that level of
-backend validation.
+emission, broad object parity, and final linker ownership remain outside this
+handoff cycle. They should be added only when a source-backed Zig fixture
+requires that level of backend validation; final linking remains Zig-owned.

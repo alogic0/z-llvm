@@ -17,6 +17,12 @@ for linker LTO handoff. The local project does not need those artifacts to
 continue optimizer and verifier work because all accepted corpus rows currently
 have text IR captures and text-based `opt-22` comparisons.
 
+Linker ownership follows the same boundary as object emission: LTO work is only
+activated when Zig's linker/toolchain needs a bitcode handoff artifact from
+`z_llvm`. This repository should not implement LTO linker ownership; it may
+eventually produce bitcode or summary artifacts compatible with Zig's selected
+linker path.
+
 ## Evidence
 
 ```text
@@ -65,7 +71,8 @@ Start bitcode writer work only when at least one condition is true:
 
 ```text
 a Zig LLVM-removal path needs -femit-llvm-bc without libLLVM
-a Zig LTO path needs local linker handoff bitcode
+a Zig linker/toolchain LTO path needs a local bitcode handoff artifact from
+  z_llvm
 text IR is no longer enough for a source-backed compatibility test
 a migration artifact must be consumed by LLVM tools that require bitcode
 ```
@@ -79,7 +86,8 @@ requires summary behavior.
 Cycle BC1: scalar module bitcode writer for one tiny text-IR fixture
 Cycle BC2: bitcode metadata and attribute encoding policy
 Cycle BC3: bitcode global/alias/COMDAT encoding
-Cycle LTO1: FullLTO pre-link artifact handoff through local bitcode
+Cycle LTO1: FullLTO pre-link artifact handoff to Zig's linker/toolchain through
+           local bitcode
 Cycle TLTO1: ThinLTO module summary inventory and writer design
 Cycle TLTO2: ThinLTO import/export and WPD boundary fixtures
 ```

@@ -68,9 +68,9 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `bash scripts/run_distribution_debug_unwind_boundary.sh` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
 | `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
-| `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad linker proof | pass |
+| `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
 | `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
-| `bash scripts/run_distribution_linker_boundary.sh` | explicit linker/CRT boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand off to `zig cc` | pass |
+| `bash scripts/run_distribution_linker_boundary.sh` | explicit linker/CRT ownership boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand local objects to Zig's linker/toolchain through `zig cc` | pass |
 | `bash scripts/run_distribution_aarch64_object_boundary.sh` | explicit non-x86_64 object boundary for AArch64 Linux | pass |
 | `bash scripts/run_distribution_boundary_gates.sh` | composed conservative boundary gates: linker, ReleaseSmall exclusions, Debug unwind, AArch64 object target | pass |
 | `bash scripts/run_distribution_all_gates.sh` | selected positive no-LLVM-codegen subset plus conservative boundary gates | pass |
@@ -180,12 +180,14 @@ Debug broad:
 Global exclusions:
   broad register allocation
   scheduling
-  linker ownership
+  final executable/library/archive linking owned by Zig's linker/toolchain
   executable emission in `z_llvm` (`--emit=exe` is rejected by the linker
-    boundary gate)
-  x86_64 musl executable/linker proof outside selected ReleaseFast, ReleaseSafe,
-    ReleaseSmall, and Debug executable fixtures
-  bitcode/LTO linker handoff until activation criteria are met
+    boundary gate; final links are delegated to Zig's linker/toolchain)
+  x86_64 musl executable proof outside selected ReleaseFast, ReleaseSafe,
+    ReleaseSmall, and Debug executable fixtures; broad linker/CRT/libc
+    ownership remains Zig-owned
+  bitcode/LTO artifact handoff to Zig's linker/toolchain until activation
+    criteria are met
   dynamic TLS models
   non-x86_64 object formats
   AArch64 object emission (`--emit=obj --target=aarch64-unknown-linux-gnu`

@@ -158,6 +158,19 @@ check belongs in a cycle only when the selected work changes target parsing,
 DataLayout, ABI classification, target features, object format, calling
 convention behavior, or backend lowering that can plausibly differ by target.
 
+## Linker Ownership Rule
+
+`z_llvm` must not grow a standalone executable, shared-library, archive, or
+linker-script implementation. Its distribution role stops at LLVM-compatible
+IR, selected optimization, and selected relocatable object emission. Final
+executable and library linking belongs to Zig's linker/toolchain
+(`ziglang/src/link/*`, or Zig's selected LLD path).
+
+Executable validation should emit local `.o` files with `z_llvm` and then hand
+them to Zig's linker/toolchain through `zig cc` or the selected Zig driver
+path. Treat failures as object ABI, symbol, relocation, section, or Zig-linker
+integration gaps unless evidence proves a Zig linker change is required.
+
 ## Validation Scope
 
 Use the smallest validation gate that proves the selected slice:

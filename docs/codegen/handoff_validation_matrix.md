@@ -81,7 +81,8 @@ aggregate, vector, and byval/byref calling convention lowering
 stack alignment and red-zone policy beyond tiny x86_64 fixtures
 debug/unwind metadata preservation through backend emission
 atomic, volatile, inline asm, and concurrency barriers in codegen
-object/linker ownership boundaries for relocations, COMDAT, TLS, and sections
+object compatibility boundaries for relocations, COMDAT, TLS, and sections;
+final executable/library linking remains Zig-owned
 ```
 
 ## Next Roadmap Wave Driver

@@ -52,6 +52,10 @@ LoopInterleaving enabled outside debug
 MergeFunctions enabled outside debug
 ```
 
+Local linker ownership rule: local LTO support, if activated, should produce
+pre-link IR, bitcode, or summary artifacts for Zig's linker/toolchain. It must
+not clone LLD's whole-program linker/LTO ownership in `z_llvm`.
+
 ## Local Status
 
 ```text
@@ -96,7 +100,7 @@ writer or linker-LTO correctness claims.
 | Module summary index | Needed for ThinLTO import/export and WPD | Missing |
 | Alias canonicalization | Pre-link canonicalization for module/global identity | Placeholder, aliases missing |
 | Anonymous global naming | Deterministic global naming before LTO | Placeholder, anonymous globals missing |
-| Linker LTO flags | LLD chooses LTO optimization level and mode | Inventory only |
+| Linker LTO flags | Zig's linker/toolchain chooses LTO optimization level and mode, including any selected LLD path | Zig linker/toolchain policy inventory only; not `z_llvm` ownership |
 | Post-link pipeline | Final whole-program optimization decisions | Missing |
 | WPD/CFI/import/export | Requires class hierarchy, summaries, and linker participation | Missing |
 | Debug metadata during LTO | LTO must preserve or merge debug metadata | Missing metadata semantics |
@@ -132,5 +136,6 @@ aliases or anonymous globals are represented locally
 bitcode writer/parser work is active
 a Zig LTO fixture requires a local pre-link behavior
 an optimizer pass changes behavior specifically under LTO phase
-LLD/linker-facing behavior needs validation for an accepted fixture
+Zig linker/toolchain-facing LTO artifact behavior needs validation for an
+  accepted fixture
 ```

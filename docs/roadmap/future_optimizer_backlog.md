@@ -579,7 +579,8 @@ object/executable gates, and handoff validation, and it passes locally for
 The linker/CRT boundary is also validated by
 `bash scripts/run_distribution_linker_boundary.sh`: local `z_llvm` emit modes
 stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
-validation remains an explicit `zig cc -target "$cc_target"` handoff.
+validation remains an explicit handoff to Zig's linker/toolchain through
+`zig cc -target "$cc_target"`.
 
 The first non-x86_64 object target boundary is validated by
 `bash scripts/run_distribution_aarch64_object_boundary.sh`: a source-backed
