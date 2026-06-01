@@ -31,15 +31,17 @@ zig build probe-native-linker-broad -- --mode=ReleaseFast
 zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
 zig build probe-native-linker-broad -- --mode=Debug
+zig build distribution-native-link-boundary2
 ```
 
 The focused gates passed after the script runner cleanup, shared tool helper
-refactor, selected native-linker proof expansion, and native-linker
-compatibility probe addition. Broad native-link probes are link-only evidence:
-ReleaseFast is clean, while ReleaseSafe, ReleaseSmall, and Debug currently stop
-at documented Zig-owned runtime/TLS boundaries after the local object
-compatibility blockers found in ReleaseSmall `c_abi_main` and Debug
-`libfuzzer_runner_o0` were closed.
+refactor, selected native-linker proof expansion, native-linker compatibility
+probe addition, exact broad-probe category split, and ReleaseSmall base64 table
+lookup reduction. Broad native-link probes are link-only evidence: every
+current ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug row is accepted,
+accounted for by an exact Zig runtime/TLS/compiler-rt category, or explicitly
+excluded as a documented boundary. No broad probe currently reports an
+unclassified local object/link failure.
 
 Current distribution evidence is recorded in
 [x86_64_distribution_object_dashboard.md](roadmap/x86_64_distribution_object_dashboard.md)
@@ -47,6 +49,8 @@ and
 [x86_64_distribution_replacement_matrix.md](roadmap/x86_64_distribution_replacement_matrix.md).
 The selected native-link distribution slice is recorded in
 [x86_64_native_link_distribution_slice.md](roadmap/x86_64_native_link_distribution_slice.md):
+the captured release-mode claim is recorded in
+[x86_64_captured_release_native_link_claim.md](roadmap/x86_64_captured_release_native_link_claim.md).
 
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
@@ -57,22 +61,24 @@ Debug        x86_64 asm/object: conservative boundary, adjusted continuous 463-r
              object-clean, 2 explicit exclusions
 musl         selected x86_64 object/executable subset gates pass
 linking      final executable/library/archive/linker-script ownership remains Zig-owned
-native link  44 selected ABI-stable objects link and run through
-             `zig build-exe -fno-lld`; probe accepted=44 failed=0
+native link  45 selected ABI-stable objects link and run through
+             `zig build-exe -fno-lld`; probe accepted=45 failed=0
              per-mode: ReleaseFast 27/27, ReleaseSafe 9/9,
-             ReleaseSmall 7/7, Debug 1/1
-broad link   link-only native-link probe:
-             ReleaseFast 17/17 accepted
-             ReleaseSafe 9/17 accepted, first boundary runtime-symbol
-             ReleaseSmall 272/465 accepted, 191 runtime-symbol failures,
-             2 explicit exclusions
-             Debug 7/10 accepted, first boundary runtime-symbol
+             ReleaseSmall 8/8, Debug 1/1
+broad link   link-only native-link boundary2:
+             ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
+             ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0
+             ReleaseSmall total=465 accepted=271 accounted=192 local_fail=0,
+             2 explicit exclusions, accounted_total=465
+             Debug total=10 accepted=6 accounted=4 local_fail=0
 AArch64      object emission remains an explicit target boundary
 ```
 
 There is no current measured first failure in the selected x86_64 distribution
-subset. The broad native-link first failures are Zig-owned runtime/TLS
-boundaries, so they are not active `z_llvm` implementation slices.
+subset. The broad native-link boundary2 gate also has no unclassified local
+failure; remaining broad rows are Zig-owned runtime/TLS/compiler-rt boundaries
+or the two named ReleaseSmall exclusions, so they are not active `z_llvm`
+implementation slices.
 
 ## Next Selection Rule
 
@@ -91,10 +97,10 @@ Preferred next probes, in order:
 3. Promote the first parse, verify, optimize, handoff, object, executable ABI,
    relocation, or boundary failure from that probe.
 4. For native-linker work, run `zig build probe-native-linker` or
-   `zig build probe-native-linker-broad -- --mode=...` before selecting
-   implementation. The first classified failure becomes a local object
-   compatibility slice unless evidence proves Zig runtime, TLS, or linker
-   ownership.
+   `zig build distribution-native-link-boundary2` before selecting
+   implementation. The first unclassified local failure becomes a local object
+   compatibility slice unless evidence proves Zig runtime, TLS, compiler-rt,
+   or linker ownership.
 5. If no blocker appears, update the dashboard or matrix only when the clean
    evidence changes a row status or named boundary.
 

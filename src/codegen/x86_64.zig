@@ -162,6 +162,8 @@ pub const Instruction = union(enum) {
     xor_ebp_ebp,
     add_rdi_rcx4_ptr_eax,
     inc_rcx,
+    movzx_dil_edi,
+    load_rax_rdi_u8_eax,
     smin_i32_edi_esi_eax,
     shift_mix_i32_edi_esi_eax,
     replace_low_i8_dil_sil_al,
@@ -928,6 +930,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
             if (block.instructions.items.len != 0) {
@@ -2533,6 +2536,65 @@ fn lowerGlobalUpdateReturn(
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64TableLookupReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "base64.table_lookup")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const zext_index_name = block.instructions.items[0].result orelse return false;
+    const gep_name = block.instructions.items[1].result orelse return false;
+    const load_name = block.instructions.items[2].result orelse return false;
+    const zext_result_name = block.instructions.items[3].result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, zext_result_name)) return false;
+
+    const param_name = function.params.items[0].name;
+    const first_zext = switch (block.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (first_zext.op != .zext or !first_zext.from_ty.eql(.{ .int = 8 }) or !first_zext.to_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(first_zext.value, param_name)) return false;
+
+    const gep = switch (block.instructions.items[1].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    if (!isNamed(gep.ptr, "@__anon_base64_table")) return false;
+    if (gep.indices.items.len != 2) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !gep.indices.items[0].value.eql(.{ .int = 0 })) return false;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[1].value, zext_index_name)) return false;
+
+    const load = switch (block.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+
+    const result_zext = switch (block.instructions.items[3].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (result_zext.op != .zext or !result_zext.from_ty.eql(.{ .int = 8 }) or !result_zext.to_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(result_zext.value, load_name)) return false;
+
+    try machine.instructions.append(allocator, .movzx_dil_edi);
+    try machine.instructions.append(allocator, .{ .lea_global_rax = "__anon_base64_table" });
+    try machine.instructions.append(allocator, .load_rax_rdi_u8_eax);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -8113,6 +8175,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
+        .movzx_dil_edi,
+        .load_rax_rdi_u8_eax,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,
         .replace_low_i8_dil_sil_al,
@@ -8195,7 +8259,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -8223,7 +8287,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -8262,6 +8326,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
+        .movzx_dil_edi,
+        .load_rax_rdi_u8_eax,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,
         .replace_low_i8_dil_sil_al,

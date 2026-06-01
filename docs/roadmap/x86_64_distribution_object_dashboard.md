@@ -51,6 +51,9 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
   direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
   tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
   result=1 fail, category=unsupported-control-flow
+  reduced_closed_fixture=test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll
+  reduced_gate=zig build distribution-releasesmall-object
+  reduced_native_link=zig build distribution-native-link-releasesmall
 ```
 
 ## Focused Gates
@@ -69,18 +72,19 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build handoff` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug/O0 objects, using `zig build-exe -fno-lld` | pass |
-| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 44 accepted / 0 failed |
-| `zig build probe-native-linker-broad -- --mode=ReleaseFast` | broad ReleaseFast link-only native-link acceptance over the 17 captured optimized IR rows | pass, 17 accepted / 0 failed |
-| `zig build probe-native-linker-broad -- --mode=ReleaseSafe` | broad ReleaseSafe link-only native-link acceptance over the 17 captured optimized IR rows | boundary, 9 accepted / 8 runtime-symbol failures |
-| `zig build probe-native-linker-broad -- --mode=ReleaseSmall` | broad ReleaseSmall link-only native-link acceptance over the 465 captured optimized IR rows, preserving the 2 explicit object exclusions | boundary, 272 accepted / 191 runtime-symbol failures / 2 excluded |
-| `zig build probe-native-linker-broad -- --mode=Debug` | broad selected Debug/O0 link-only native-link acceptance over `test/distribution/debug_x86_64/inputs` | boundary, 7 accepted / 2 runtime-symbol failures / 1 TLS-symbol failure |
+| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 45 accepted / 0 failed |
+| `zig build probe-native-linker-broad -- --mode=ReleaseFast` | broad ReleaseFast link-only native-link acceptance over the 17 captured optimized IR rows | pass, 16 accepted / 1 compiler-rt accounted / 0 local failures |
+| `zig build probe-native-linker-broad -- --mode=ReleaseSafe` | broad ReleaseSafe link-only native-link accounting over the 17 captured optimized IR rows | boundary, 8 accepted / 9 accounted / 0 local failures |
+| `zig build probe-native-linker-broad -- --mode=ReleaseSmall` | broad ReleaseSmall link-only native-link accounting over the 465 captured optimized IR rows, preserving the 2 explicit object exclusions | boundary, 271 accepted / 192 accounted / 2 excluded / 0 local failures |
+| `zig build probe-native-linker-broad -- --mode=Debug` | broad selected Debug/O0 link-only native-link accounting over `test/distribution/debug_x86_64/inputs` | boundary, 6 accepted / 4 accounted / 0 local failures |
+| `zig build distribution-native-link-boundary2` | composed broad native-link boundary gate for ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug; fails on generic runtime buckets or unclassified local failures | pass, local_fail=0 for all modes |
 | `zig build distribution-native-link-releasefast` | ReleaseFast native-link proof for the full current executable harness set | pass, 27 executed |
 | `zig build distribution-native-link-releasesafe` | ReleaseSafe native-link proof for the full current executable ABI set | pass, 9 executed |
-| `zig build distribution-native-link-releasesmall` | ReleaseSmall native-link proof for the full current executable ABI set | pass, 7 executed |
+| `zig build distribution-native-link-releasesmall` | ReleaseSmall native-link proof for the full current executable ABI set | pass, 8 executed |
 | `zig build distribution-native-link-debug` | selected Debug/O0 native-link proof | pass, 1 executed |
 | `zig build probe-native-linker-releasefast` | ReleaseFast native-link compatibility probe for the full current executable harness set | pass, 27 accepted / 0 failed |
 | `zig build probe-native-linker-releasesafe` | ReleaseSafe native-link compatibility probe for the full current executable ABI set | pass, 9 accepted / 0 failed |
-| `zig build probe-native-linker-releasesmall` | ReleaseSmall native-link compatibility probe for the full current executable ABI set | pass, 7 accepted / 0 failed |
+| `zig build probe-native-linker-releasesmall` | ReleaseSmall native-link compatibility probe for the full current executable ABI set | pass, 8 accepted / 0 failed |
 | `zig build probe-native-linker-debug` | selected Debug/O0 native-link compatibility probe | pass, 1 accepted / 0 failed |
 | `zig build distribution-musl-object` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
 | `zig build distribution-musl-executable` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
@@ -105,12 +109,12 @@ link-only acceptance means the local `.o` emitted by `z_llvm` can be handed to
 `zig build-exe -fno-lld`; it does not prove callable behavior unless the row is
 also covered by an executable native-link gate.
 
-| Mode | Total | Link OK | Link Fail | Excluded | First Failure | Category |
-| --- | ---: | ---: | ---: | ---: | --- | --- |
-| ReleaseFast | 17 | 17 | 0 | 0 | `-` | `-` |
-| ReleaseSafe | 17 | 9 | 8 | 0 | `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` | `runtime-symbol` |
-| ReleaseSmall | 465 | 272 | 191 | 2 | `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll` | `runtime-symbol` |
-| Debug/O0 selected | 10 | 7 | 3 | 0 | `load_dynamic_library_add_o0.ll` | `runtime-symbol` |
+| Mode | Total | Accepted | Accounted | Local Fail | Excluded | Category |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| ReleaseFast | 17 | 16 | 1 | 0 | 0 | `libc/compiler-rt=1` |
+| ReleaseSafe | 17 | 8 | 9 | 0 | 0 | `zig-panic-runtime=8, libc/compiler-rt=1` |
+| ReleaseSmall | 465 | 271 | 192 | 0 | 2 | `zig-startup-runtime=190, zig-tls-runtime=1, libc/compiler-rt=1` |
+| Debug/O0 selected | 10 | 6 | 4 | 0 | 0 | `zig-panic-runtime=2, zig-test-runtime=1, zig-tls-runtime=1` |
 
 Closed native-link object compatibility blockers:
 
@@ -124,6 +128,13 @@ Debug/O0 libfuzzer runner:
   blocker=undefined private c-string byte arrays and selected main.testOne helper
   fix=emit generic [N x i8] c-string/zero constants and lower selected helper
   proof=Debug broad probe now accepts libfuzzer_runner_o0.ll
+
+ReleaseSmall base64 table lookup reduction:
+  blocker=full base64 decoder remains a broad table/control-flow boundary
+  fix=track and lower a reduced four-byte table lookup with PC-relative
+      constant address and indexed byte load
+  proof=base64_table_lookup fixture is object-clean and native-link executable
+        through Zig's native linker
 ```
 
 The dashboard does not promote matrix rows by itself. Row status changes belong

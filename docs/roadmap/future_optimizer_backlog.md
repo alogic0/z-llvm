@@ -587,7 +587,10 @@ The selected native-linker proof is separate and stricter:
 `zig build distribution-native-link` links ABI-stable local objects with
 `zig build-exe -fno-lld`, and `zig build probe-native-linker` classifies native
 linker acceptance for the same selected object set. The current probe result is
-12 accepted, 0 failed.
+45 accepted, 0 failed. The broad accounting gate is
+`zig build distribution-native-link-boundary2`; ReleaseFast, ReleaseSafe,
+ReleaseSmall, and Debug currently report `local_fail=0` with Zig runtime, TLS,
+compiler-rt/libc, and explicit ReleaseSmall exclusions classified separately.
 
 The first non-x86_64 object target boundary is validated by
 `zig build distribution-aarch64-boundary`: a source-backed

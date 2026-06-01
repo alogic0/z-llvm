@@ -805,6 +805,22 @@ pub const cases = [_]Case{
         ,
     },
     .{
+        .id = "releasesmall_base64_table_lookup",
+        .mode = "ReleaseSmall",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t base64_table_lookup(uint8_t index);
+        \\int main(void) {
+        \\    if (base64_table_lookup(0) != 0) return 1;
+        \\    if (base64_table_lookup(1) != 4) return 2;
+        \\    if (base64_table_lookup(3) != 12) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
         .id = "debug_shared_library_mathtest_add_o0",
         .mode = "Debug",
         .fixture = "test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll",

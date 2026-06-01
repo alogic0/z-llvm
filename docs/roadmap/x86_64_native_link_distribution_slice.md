@@ -3,6 +3,8 @@
 This slice defines the first selected x86_64 distribution path where `z_llvm`
 owns LLVM-compatible IR parsing, selected optimization, selected object
 emission, and final executable proof through Zig's native linker path.
+The narrower captured release-mode claim is tracked in
+`docs/roadmap/x86_64_captured_release_native_link_claim.md`.
 
 ## Contract
 
@@ -101,6 +103,7 @@ ReleaseSmall:
   releasesmall_mix_c_files_add_may_panic
   releasesmall_libfuzzer_runner_futex_wait
   releasesmall_libfuzzer_runner_test_name
+  releasesmall_base64_table_lookup
 
 Debug:
   debug_shared_library_mathtest_add_o0
@@ -111,11 +114,11 @@ Latest probe result:
 ```text
 executable_abi_proof=zig build distribution-native-link
 selected_link_probe=zig build probe-native-linker
-accepted=44
+accepted=45
 failed=0
 ReleaseFast accepted=27 failed=0
 ReleaseSafe accepted=9 failed=0
-ReleaseSmall accepted=7 failed=0
+ReleaseSmall accepted=8 failed=0
 Debug accepted=1 failed=0
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
@@ -124,37 +127,45 @@ failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
 Latest broad link-only probe result:
 
 ```text
-gate=zig build probe-native-linker-broad -- --mode=ReleaseFast
-summary=tmp/zig_ir/native_link_broad_releasefast.summary
-total=17 accepted=17 failed=0 excluded=0 first_failure=-
+gate=zig build distribution-native-link-boundary2
+summary=tmp/zig_ir/native_link_boundary2_releasefast.summary
+mode=ReleaseFast
+total=17 accepted=16 accounted=1 local_fail=0 excluded=0 accounted_total=17
+accounted_category=libc/compiler-rt=1
+first_failure=-
 
-gate=zig build probe-native-linker-broad -- --mode=ReleaseSafe
-summary=tmp/zig_ir/native_link_broad_releasesafe.summary
-total=17 accepted=9 failed=8 excluded=0
-first_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
-first_failure_category=runtime-symbol
-boundary=debug.FullPanic runtime symbol ownership remains Zig-owned
+summary=tmp/zig_ir/native_link_boundary2_releasesafe.summary
+mode=ReleaseSafe
+total=17 accepted=8 accounted=9 local_fail=0 excluded=0 accounted_total=17
+accounted_category=libc/compiler-rt=1
+accounted_category=zig-panic-runtime=8
+first_failure=-
 
-gate=zig build probe-native-linker-broad -- --mode=ReleaseSmall
-summary=tmp/zig_ir/native_link_broad_releasesmall.summary
-total=465 accepted=272 failed=191 excluded=2
-first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
-first_failure_category=runtime-symbol
-boundary=start.posixCallMainAndExit startup/runtime ownership remains Zig-owned
+summary=tmp/zig_ir/native_link_boundary2_releasesmall.summary
+mode=ReleaseSmall
+total=465 accepted=271 accounted=192 local_fail=0 excluded=2 accounted_total=465
+accounted_category=libc/compiler-rt=1
+accounted_category=zig-startup-runtime=190
+accounted_category=zig-tls-runtime=1
+excluded_category=float-format-helper-boundary=1
+excluded_category=table-decoder-boundary=1
+first_failure=-
 
-gate=zig build probe-native-linker-broad -- --mode=Debug
-summary=tmp/zig_ir/native_link_broad_debug.summary
-total=10 accepted=7 failed=3 excluded=0
-first_failure=load_dynamic_library_add_o0.ll
-first_failure_category=runtime-symbol
-boundary=Debug/O0 panic runtime and TLS ownership remain Zig-owned boundaries
+summary=tmp/zig_ir/native_link_boundary2_debug.summary
+mode=Debug
+total=10 accepted=6 accounted=4 local_fail=0 excluded=0 accounted_total=10
+accounted_category=zig-panic-runtime=2
+accounted_category=zig-test-runtime=1
+accounted_category=zig-tls-runtime=1
+first_failure=-
 ```
 
 Broad link-only evidence is not executable ABI evidence. It proves that local
 objects can be accepted by Zig's native linker after safe unresolved function
-stubs are generated. Runtime symbols, data symbols, TLS symbols, COMDAT,
-section, relocation, alignment, ABI, and unknown linker failures remain
-classified separately.
+stubs are generated. The broad boundary2 gate fails on generic
+`runtime-symbol` buckets and unclassified local failures; runtime, TLS,
+compiler-rt/libc, object exclusions, COMDAT, section, relocation, alignment,
+ABI, and unknown linker failures remain classified separately.
 
 Focused native-link object handoff shapes:
 
@@ -165,6 +176,9 @@ global_relocation=ReleaseFast globals_comptime and ReleaseSmall hidden-access
                   selected objects link through native linker
 private_constants=ReleaseSmall c_abi_main fp128 constants and Debug/O0
                   libfuzzer byte arrays are defined in local ELF objects
+table_constant=ReleaseSmall base64_table_lookup links and executes through a
+               reduced table-constant indexed-load fixture; the full base64
+               decoder row remains an explicit control-flow/table boundary
 comdat=no current selected local object emits COMDAT groups; COMDAT remains a
        classified probe category and future compatibility boundary
 ```
@@ -184,6 +198,7 @@ zig build probe-native-linker-broad -- --mode=ReleaseFast
 zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
 zig build probe-native-linker-broad -- --mode=Debug
+zig build distribution-native-link-boundary2
 ```
 
 ## Boundaries
@@ -198,4 +213,6 @@ compatibility slice unless evidence proves the failure belongs to Zig's
 runtime, TLS, or linker implementation. Closed local compatibility examples in
 this slice include synthesized fp128 constant emission for ReleaseSmall
 `c_abi_main` and generic byte-array constant emission for Debug/O0 libfuzzer
-runner objects.
+runner objects. The first reduced ReleaseSmall base64 table lookup is also
+closed as selected object and executable native-link evidence; it does not
+claim the full `@decode_base_64 -> @base64.decode_base_64` decoder boundary.

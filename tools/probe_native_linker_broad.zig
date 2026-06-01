@@ -46,15 +46,18 @@ const CategoryCount = struct {
 const Counts = struct {
     total: usize = 0,
     accepted: usize = 0,
-    failed: usize = 0,
+    accounted: usize = 0,
+    local_fail: usize = 0,
     excluded: usize = 0,
     first_failure: []const u8 = "-",
     first_failure_category: []const u8 = "-",
-    categories: std.ArrayList(CategoryCount) = .empty,
+    accounted_categories: std.ArrayList(CategoryCount) = .empty,
+    local_categories: std.ArrayList(CategoryCount) = .empty,
     excluded_categories: std.ArrayList(CategoryCount) = .empty,
 
     fn deinit(counts: *Counts, allocator: std.mem.Allocator) void {
-        counts.categories.deinit(allocator);
+        counts.accounted_categories.deinit(allocator);
+        counts.local_categories.deinit(allocator);
         counts.excluded_categories.deinit(allocator);
     }
 };
@@ -68,15 +71,107 @@ const Symbol = struct {
 const LinkPlan = struct {
     has_start: bool = false,
     has_main: bool = false,
-    function_stubs: std.ArrayList([]const u8) = .empty,
+    stubs: std.ArrayList(Stub) = .empty,
     boundary_symbol: ?[]const u8 = null,
-    boundary_category: ?[]const u8 = null,
+    boundary_category: ?Category = null,
 
     fn deinit(plan: *LinkPlan, allocator: std.mem.Allocator) void {
-        for (plan.function_stubs.items) |symbol| allocator.free(symbol);
-        plan.function_stubs.deinit(allocator);
+        for (plan.stubs.items) |stub| allocator.free(stub.symbol);
+        plan.stubs.deinit(allocator);
         if (plan.boundary_symbol) |symbol| allocator.free(symbol);
     }
+};
+
+const Category = enum {
+    zig_panic_runtime,
+    zig_startup_runtime,
+    zig_test_runtime,
+    zig_debug_runtime,
+    zig_tls_runtime,
+    libc_compiler_rt,
+    unknown_local_candidate,
+    data_symbol,
+    symbol,
+    relocation,
+    section,
+    comdat,
+    alignment,
+    abi,
+    object_error,
+    object_unknown,
+    unsupported_control_flow,
+    unsupported_instruction,
+    unsupported_value,
+    unsupported_type,
+    unsupported_abi,
+    unsupported_target,
+    input_too_large,
+    unknown_linker_compatibility,
+
+    fn name(category: Category) []const u8 {
+        return switch (category) {
+            .zig_panic_runtime => "zig-panic-runtime",
+            .zig_startup_runtime => "zig-startup-runtime",
+            .zig_test_runtime => "zig-test-runtime",
+            .zig_debug_runtime => "zig-debug-runtime",
+            .zig_tls_runtime => "zig-tls-runtime",
+            .libc_compiler_rt => "libc/compiler-rt",
+            .unknown_local_candidate => "unknown-local-candidate",
+            .data_symbol => "data-symbol",
+            .symbol => "symbol",
+            .relocation => "relocation",
+            .section => "section",
+            .comdat => "comdat",
+            .alignment => "alignment",
+            .abi => "abi",
+            .object_error => "object-error",
+            .object_unknown => "object-unknown",
+            .unsupported_control_flow => "unsupported-control-flow",
+            .unsupported_instruction => "unsupported-instruction",
+            .unsupported_value => "unsupported-value",
+            .unsupported_type => "unsupported-type",
+            .unsupported_abi => "unsupported-abi",
+            .unsupported_target => "unsupported-target",
+            .input_too_large => "input-too-large",
+            .unknown_linker_compatibility => "unknown-linker-compatibility",
+        };
+    }
+
+    fn isLocalFailure(category: Category) bool {
+        return switch (category) {
+            .unknown_local_candidate,
+            .symbol,
+            .relocation,
+            .section,
+            .comdat,
+            .alignment,
+            .abi,
+            .object_error,
+            .object_unknown,
+            .unsupported_control_flow,
+            .unsupported_instruction,
+            .unsupported_value,
+            .unsupported_type,
+            .unsupported_abi,
+            .unsupported_target,
+            .input_too_large,
+            .unknown_linker_compatibility,
+            => true,
+            .zig_panic_runtime,
+            .zig_startup_runtime,
+            .zig_test_runtime,
+            .zig_debug_runtime,
+            .zig_tls_runtime,
+            .libc_compiler_rt,
+            .data_symbol,
+            => false,
+        };
+    }
+};
+
+const Stub = struct {
+    symbol: []const u8,
+    category: Category,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -159,14 +254,22 @@ pub fn main(init: std.process.Init) !void {
                 counts.accepted += 1;
                 try output.print(allocator, "accepted {s} validation=link-only\n", .{file});
             },
-            .failed => |category| {
-                counts.failed += 1;
-                try incrementCategory(allocator, &counts.categories, category);
+            .accounted => |category| {
+                counts.accounted += 1;
+                try incrementCategory(allocator, &counts.accounted_categories, category.name());
+                try output.print(allocator, "accounted {s} category={s}", .{ file, category.name() });
+                if (result.symbol) |symbol| try output.print(allocator, " symbol={s}", .{symbol});
+                if (result.log) |log| try output.print(allocator, " {s}", .{firstLine(log)});
+                try output.append(allocator, '\n');
+            },
+            .local_fail => |category| {
+                counts.local_fail += 1;
+                try incrementCategory(allocator, &counts.local_categories, category.name());
                 if (std.mem.eql(u8, counts.first_failure, "-")) {
                     counts.first_failure = file;
-                    counts.first_failure_category = category;
+                    counts.first_failure_category = category.name();
                 }
-                try output.print(allocator, "fail {s} category={s}", .{ file, category });
+                try output.print(allocator, "local_fail {s} category={s}", .{ file, category.name() });
                 if (result.symbol) |symbol| try output.print(allocator, " symbol={s}", .{symbol});
                 if (result.log) |log| try output.print(allocator, " {s}", .{firstLine(log)});
                 try output.append(allocator, '\n');
@@ -174,19 +277,27 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    try output.print(allocator, "summary mode={s} total={} accepted={} failed={} excluded={} first_failure={s} first_failure_category={s}\n", .{
+    const accounted_total = counts.accepted + counts.accounted + counts.excluded;
+    try output.print(allocator, "summary mode={s} total={} accepted={} accounted={} local_fail={} excluded={} accounted_total={} first_failure={s} first_failure_category={s}\n", .{
         mode,
         counts.total,
         counts.accepted,
-        counts.failed,
+        counts.accounted,
+        counts.local_fail,
         counts.excluded,
+        accounted_total,
         counts.first_failure,
         counts.first_failure_category,
     });
 
-    std.mem.sort(CategoryCount, counts.categories.items, {}, categoryLessThan);
-    for (counts.categories.items) |category| {
-        try output.print(allocator, "fail_category {s}={}\n", .{ category.name, category.count });
+    std.mem.sort(CategoryCount, counts.accounted_categories.items, {}, categoryLessThan);
+    for (counts.accounted_categories.items) |category| {
+        try output.print(allocator, "accounted_category {s}={}\n", .{ category.name, category.count });
+    }
+
+    std.mem.sort(CategoryCount, counts.local_categories.items, {}, categoryLessThan);
+    for (counts.local_categories.items) |category| {
+        try output.print(allocator, "local_fail_category {s}={}\n", .{ category.name, category.count });
     }
 
     std.mem.sort(CategoryCount, counts.excluded_categories.items, {}, categoryLessThan);
@@ -208,7 +319,8 @@ pub fn main(init: std.process.Init) !void {
 const ProbeFileResult = struct {
     kind: union(enum) {
         accepted,
-        failed: []const u8,
+        accounted: Category,
+        local_fail: Category,
     },
     symbol: ?[]u8 = null,
     log: ?[]u8 = null,
@@ -246,7 +358,7 @@ fn probeFile(
     defer common.freeRunResult(allocator, emit_result);
     if (!common.termOk(emit_result.term)) {
         const log = try allocator.dupe(u8, if (emit_result.stderr.len != 0) emit_result.stderr else emit_result.stdout);
-        return .{ .kind = .{ .failed = objectCategoryForError(log) }, .log = log };
+        return .{ .kind = .{ .local_fail = objectCategoryForError(log) }, .log = log };
     }
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object, .data = emit_result.stdout });
 
@@ -257,7 +369,7 @@ fn probeFile(
     defer plan.deinit(allocator);
     if (plan.boundary_category) |category| {
         return .{
-            .kind = .{ .failed = category },
+            .kind = if (category.isLocalFailure()) .{ .local_fail = category } else .{ .accounted = category },
             .symbol = if (plan.boundary_symbol) |symbol| try allocator.dupe(u8, symbol) else null,
         };
     }
@@ -279,8 +391,8 @@ fn probeFile(
     }
 
     try link_args.append(allocator, object);
-    if (plan.function_stubs.items.len != 0) {
-        try writeStubAsm(allocator, io, stubs_s, plan.function_stubs.items);
+    if (plan.stubs.items.len != 0) {
+        try writeStubAsm(allocator, io, stubs_s, plan.stubs.items);
         const asm_argv = [_][]const u8{ "zig", "cc", "-target", opts.cc_target, "-c", stubs_s, "-o", stubs_o };
         const asm_result = try common.runCapture(allocator, io, &asm_argv, "zig cc -c broad native-link stubs");
         common.freeRunResult(allocator, asm_result);
@@ -298,11 +410,14 @@ fn probeFile(
     defer allocator.free(link_result.stdout);
     if (common.termOk(link_result.term)) {
         allocator.free(link_result.stderr);
+        if (firstStubCategory(plan.stubs.items)) |category| {
+            return .{ .kind = .{ .accounted = category } };
+        }
         return .{ .kind = .accepted };
     }
 
     const category = linkCategoryForError(link_result.stderr);
-    return .{ .kind = .{ .failed = category }, .log = link_result.stderr };
+    return .{ .kind = if (category.isLocalFailure()) .{ .local_fail = category } else .{ .accounted = category }, .log = link_result.stderr };
 }
 
 fn emitObject(allocator: std.mem.Allocator, io: std.Io, opts: Options, input_path: []const u8) !std.process.RunResult {
@@ -336,29 +451,33 @@ fn buildLinkPlan(allocator: std.mem.Allocator, io: std.Io, symbols_path: []const
         }
         if (symbol.name.len == 0) continue;
 
-        if (std.mem.eql(u8, symbol.type_name, "FUNC") or isKnownFunctionSymbol(symbol.name)) {
-            try plan.function_stubs.append(allocator, try allocator.dupe(u8, symbol.name));
-            continue;
-        }
-
-        if (isRuntimeSymbol(symbol.name)) {
-            plan.boundary_symbol = try allocator.dupe(u8, symbol.name);
-            plan.boundary_category = "runtime-symbol";
-            return plan;
-        }
         if (std.mem.eql(u8, symbol.type_name, "TLS")) {
             plan.boundary_symbol = try allocator.dupe(u8, symbol.name);
-            plan.boundary_category = "tls-symbol";
+            plan.boundary_category = .zig_tls_runtime;
             return plan;
         }
         if (std.mem.eql(u8, symbol.type_name, "OBJECT")) {
             plan.boundary_symbol = try allocator.dupe(u8, symbol.name);
-            plan.boundary_category = "data-symbol";
+            plan.boundary_category = .data_symbol;
+            return plan;
+        }
+
+        if (classifyStubbedFunctionImport(symbol.name)) |category| {
+            try plan.stubs.append(allocator, .{
+                .symbol = try allocator.dupe(u8, symbol.name),
+                .category = category,
+            });
+            continue;
+        }
+
+        if (classifyRuntimeBoundary(symbol.name)) |category| {
+            plan.boundary_symbol = try allocator.dupe(u8, symbol.name);
+            plan.boundary_category = category;
             return plan;
         }
 
         plan.boundary_symbol = try allocator.dupe(u8, symbol.name);
-        plan.boundary_category = "symbol";
+        plan.boundary_category = .unknown_local_candidate;
         return plan;
     }
 
@@ -383,7 +502,7 @@ fn parseSymbol(line: []const u8) ?Symbol {
     };
 }
 
-fn writeStubAsm(allocator: std.mem.Allocator, io: std.Io, path: []const u8, stubs: []const []const u8) !void {
+fn writeStubAsm(allocator: std.mem.Allocator, io: std.Io, path: []const u8, stubs: []const Stub) !void {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(allocator);
     for (stubs) |symbol| {
@@ -392,9 +511,9 @@ fn writeStubAsm(allocator: std.mem.Allocator, io: std.Io, path: []const u8, stub
             \\.globl "{s}"
             \\.type "{s}", @function
             \\"{s}":
-            \\  ret
+            \\  ud2
             \\
-        , .{ symbol, symbol, symbol });
+        , .{ symbol.symbol, symbol.symbol, symbol.symbol });
         defer allocator.free(block);
         try text.appendSlice(allocator, block);
     }
@@ -500,53 +619,72 @@ fn excludeReason(excludes: []const Exclude, file: []const u8) ?[]const u8 {
     return null;
 }
 
-fn objectCategoryForError(log: []const u8) []const u8 {
+fn objectCategoryForError(log: []const u8) Category {
     const line = firstLine(log);
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenControlFlow") != null) return "unsupported-control-flow";
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenInstruction") != null) return "unsupported-instruction";
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenValue") != null) return "unsupported-value";
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenType") != null) return "unsupported-type";
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenAbi") != null) return "unsupported-abi";
-    if (std.mem.indexOf(u8, line, "UnsupportedCodegenTarget") != null) return "unsupported-target";
-    if (std.mem.indexOf(u8, line, "InputTooLarge") != null) return "input-too-large";
-    if (std.mem.startsWith(u8, line, "error:")) return "object-error";
-    return "object-unknown";
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenControlFlow") != null) return .unsupported_control_flow;
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenInstruction") != null) return .unsupported_instruction;
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenValue") != null) return .unsupported_value;
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenType") != null) return .unsupported_type;
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenAbi") != null) return .unsupported_abi;
+    if (std.mem.indexOf(u8, line, "UnsupportedCodegenTarget") != null) return .unsupported_target;
+    if (std.mem.indexOf(u8, line, "InputTooLarge") != null) return .input_too_large;
+    if (std.mem.startsWith(u8, line, "error:")) return .object_error;
+    return .object_unknown;
 }
 
-fn linkCategoryForError(stderr: []const u8) []const u8 {
-    if (std.mem.indexOf(u8, stderr, "duplicate symbol") != null) return "symbol";
+fn linkCategoryForError(stderr: []const u8) Category {
+    if (std.mem.indexOf(u8, stderr, "duplicate symbol") != null) return .symbol;
     if (std.mem.indexOf(u8, stderr, "undefined symbol") != null or
         std.mem.indexOf(u8, stderr, "undefined reference") != null)
     {
-        return "symbol";
+        return .unknown_local_candidate;
     }
-    if (std.mem.indexOf(u8, stderr, "relocation") != null) return "relocation";
-    if (std.mem.indexOf(u8, stderr, "section") != null) return "section";
-    if (std.mem.indexOf(u8, stderr, "TLS") != null or std.mem.indexOf(u8, stderr, "thread-local") != null) return "tls-model";
-    if (std.mem.indexOf(u8, stderr, "COMDAT") != null or std.mem.indexOf(u8, stderr, "comdat") != null) return "comdat";
-    if (std.mem.indexOf(u8, stderr, "align") != null) return "alignment";
-    if (std.mem.indexOf(u8, stderr, "ABI") != null or std.mem.indexOf(u8, stderr, "calling convention") != null) return "abi";
-    return "unknown-linker-compatibility";
+    if (std.mem.indexOf(u8, stderr, "relocation") != null) return .relocation;
+    if (std.mem.indexOf(u8, stderr, "section") != null) return .section;
+    if (std.mem.indexOf(u8, stderr, "TLS") != null or std.mem.indexOf(u8, stderr, "thread-local") != null) return .zig_tls_runtime;
+    if (std.mem.indexOf(u8, stderr, "COMDAT") != null or std.mem.indexOf(u8, stderr, "comdat") != null) return .comdat;
+    if (std.mem.indexOf(u8, stderr, "align") != null) return .alignment;
+    if (std.mem.indexOf(u8, stderr, "ABI") != null or std.mem.indexOf(u8, stderr, "calling convention") != null) return .abi;
+    return .unknown_linker_compatibility;
 }
 
-fn isRuntimeSymbol(name: []const u8) bool {
-    return std.mem.startsWith(u8, name, "debug.") or
-        std.mem.startsWith(u8, name, "start.") or
-        std.mem.startsWith(u8, name, "os.") or
-        std.mem.startsWith(u8, name, "builtin.");
+fn classifyStubbedFunctionImport(name: []const u8) ?Category {
+    if (isLibcOrCompilerRtSymbol(name)) return .libc_compiler_rt;
+    if (isZigTestRuntimeSymbol(name)) return .zig_test_runtime;
+    if (classifyRuntimeBoundary(name)) |category| {
+        if (category != .zig_tls_runtime) return category;
+    }
+    return null;
 }
 
-fn isKnownFunctionSymbol(name: []const u8) bool {
+fn classifyRuntimeBoundary(name: []const u8) ?Category {
+    if (std.mem.startsWith(u8, name, "start.")) return .zig_startup_runtime;
+    if (std.mem.indexOf(u8, name, "Panic") != null or std.mem.indexOf(u8, name, "panic") != null) return .zig_panic_runtime;
+    if (std.mem.startsWith(u8, name, "debug.")) return .zig_debug_runtime;
+    if (std.mem.startsWith(u8, name, "os.")) return .zig_startup_runtime;
+    if (std.mem.startsWith(u8, name, "builtin.")) return .zig_debug_runtime;
+    return null;
+}
+
+fn isZigTestRuntimeSymbol(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "fuzzer_") or
+        std.mem.startsWith(u8, name, "test.") or
+        std.mem.indexOf(u8, name, ".test.") != null;
+}
+
+fn isLibcOrCompilerRtSymbol(name: []const u8) bool {
     return std.mem.eql(u8, name, "__eqtf2") or
         std.mem.eql(u8, name, "fmodf") or
         std.mem.eql(u8, name, "fmod") or
-        std.mem.eql(u8, name, "fuzzer_set_test") or
-        std.mem.eql(u8, name, "fuzzer_new_input") or
-        std.mem.eql(u8, name, "fuzzer_start_test") or
         std.mem.eql(u8, name, "memcpy") or
         std.mem.eql(u8, name, "memmove") or
         std.mem.eql(u8, name, "memset") or
         std.mem.eql(u8, name, "memcmp");
+}
+
+fn firstStubCategory(stubs: []const Stub) ?Category {
+    if (stubs.len == 0) return null;
+    return stubs[0].category;
 }
 
 fn firstLine(text: []const u8) []const u8 {

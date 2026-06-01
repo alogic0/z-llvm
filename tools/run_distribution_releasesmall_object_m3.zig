@@ -318,6 +318,12 @@ const cases = [_]Case{
         .dump_patterns = &.{ "lea[[:alpha:]]*[[:space:]]+0x0\\(%rip\\),%rdi", "movabs[[:space:]]+\\$0x5,%rsi", "call", "[[:space:]]ret" },
     },
     .{
+        .id = "base64_table_lookup",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll",
+        .summary_patterns = &.{ "[[:space:]]base64_table_lookup$", "[[:space:]]base64\\.table_lookup$", "[[:space:]]__anon_base64_table$", "R_X86_64_PC32.*__anon_base64_table" },
+        .dump_patterns = &.{ "lea[[:alpha:]]*[[:space:]]+0x0\\(%rip\\),%rax", "movzbl[[:space:]]+%dil,%edi", "movzbl[[:space:]]+\\(%rax,%rdi,1\\),%eax", "[[:space:]]ret" },
+    },
+    .{
         .id = "standalone_mix_c_files_add_zig",
         .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_zig.ll",
         .summary_patterns = &.{ "[[:space:]]add_zig$", "[[:space:]]main\\.add_zig$", "[[:space:]]main\\.zig_k$", "[[:space:]]zig_k$", "[[:space:]]C_k$", "R_X86_64_PC32.*main\\.zig_k", "R_X86_64_TPOFF32.*C_k" },
