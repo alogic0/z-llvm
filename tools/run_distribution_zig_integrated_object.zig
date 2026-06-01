@@ -132,6 +132,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls",
     },
     .{
+        .id = "releasefast_runtime_atomic_add",
+        .wrapper = "test/zig/integrated/runtime_atomic_add_main.zig",
+        .covered_fixture = "test/zig/inputs/atomics_inline_asm_debug.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -279,6 +287,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
+        .{ .name = "atomic-add" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -536,6 +545,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
+    }
     return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
 }
 
@@ -574,6 +586,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";
+    if (std.mem.eql(u8, contents[value_start..value_end], "atomic-add")) return "atomic-add";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

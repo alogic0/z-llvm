@@ -269,6 +269,11 @@ runtime-emitted rows:
     through a main alias; the focused executable gate validates argc=1 updates
     the initial TLS value 1 to exit code 2
 
+  releasefast_runtime_atomic_add: atomic-add
+    private i32 atomics_inline_asm_debug.atomic_counter is updated by a
+    monotonic atomicrmw add, exposed through a main alias, and validated through
+    the selected x86_64 lock xadd object path
+
   releasesmall_i64_arithmetic: i64-arithmetic
     dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
 
@@ -399,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=19 executable_ok=19 link_only_ok=0 local_fail=0
+ir-writer full set:    total=20 executable_ok=20 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -422,7 +427,9 @@ ir-writer tls read:    zig build distribution-zig-ir-writer -- --case=releasefas
 ir-writer tls read:    total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tls bump:    zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_bump
 ir-writer tls bump:    total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=19 minimal_wrapper_rows=0
+ir-writer atomic add:  zig build distribution-zig-ir-writer -- --case=releasefast_runtime_atomic_add
+ir-writer atomic add:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=20 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
                        i64-arithmetic=1 i64-call-return=1
@@ -430,7 +437,7 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        checked-add-runtime-boundary=1 runtime-condbr=1
                        runtime-phi-merge=1 runtime-loop-sum=1
                        runtime-switch=1 global-update=1 abi-arg-call=1
-                       tls-read=1 tls-bump=1 minimal-ret0=0
+                       tls-read=1 tls-bump=1 atomic-add=1 minimal-ret0=0
 ```
 
 ## Fallback Accounting
@@ -474,7 +481,8 @@ calls beyond the selected i32 ABI argument direct-call and selected i64
 call-return shapes
 error unions and ReleaseSafe runtime/panic paths beyond the selected
 validated panic-runtime edge boundary
-TLS beyond selected local-exec read/update, atomics, inline asm, vectors
+TLS beyond selected local-exec read/update, atomics beyond selected monotonic
+add, inline asm, vectors
 aggregate ABI lowering, sret/byval, varargs
 debug metadata, DWARF, unwind/personality records
 non-x86_64 targets, LTO, simultaneous asm+object emission
@@ -493,12 +501,12 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 19/19 selected rows as runtime surfaces:
+The external writer now emits 20/20 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
 `runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, and
-`global-update`, `abi-arg-call`, `tls-read`, and `tls-bump`; no selected rows remain as `minimal-ret0` hook-only
+`global-update`, `abi-arg-call`, `tls-read`, `tls-bump`, and `atomic-add`; no selected rows remain as `minimal-ret0` hook-only
 proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for

@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=19 executable_ok=19 link_only_ok=0 local_fail=0
+total=20 executable_ok=20 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -430,7 +430,8 @@ runtime_call_chain_gate=zig build distribution-zig-ir-writer -- --case=releasefa
 i64_call_return_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_i64_call
 tls_read_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_read
 tls_bump_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_bump
-ir_writer_rows=scalar_runtime_rows=19, minimal_wrapper_rows=0
+atomic_add_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_atomic_add
+ir_writer_rows=scalar_runtime_rows=20, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -438,7 +439,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                runtime-phi-merge=1, runtime-loop-sum=1,
                runtime-switch=1, global-update=1, abi-arg-call=1,
                i64-call-return=1, tls-read=1, tls-bump=1,
-               minimal-ret0=0
+               atomic-add=1, minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
 FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
@@ -454,6 +455,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_runtime_call_chain abi-arg-call,
                         releasefast_runtime_tls_read tls-read,
                         releasefast_runtime_tls_bump tls-bump,
+                        releasefast_runtime_atomic_add atomic-add,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
@@ -470,8 +472,8 @@ remaining_dependency=general Zig LLVM Builder state remains; full FuncGen and
 excluded=runtime arithmetic beyond selected rows, stores beyond the selected
          mutable global update, ABI calls beyond the selected i32 argument
          direct call and selected i64 call return, TLS beyond selected
-         local-exec read/update,
-         atomics, vectors, aggregate ABI lowering, debug/unwind, AArch64,
+         local-exec read/update, atomics beyond selected monotonic add,
+         vectors, aggregate ABI lowering, debug/unwind, AArch64,
          wasm, LTO, broad runtime/TLS/compiler-rt
 ```
 

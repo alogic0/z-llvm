@@ -240,6 +240,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) {
         try writeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) {
+        try writeRuntimeAtomicAddIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -278,6 +280,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -614,6 +617,26 @@ fn writeRuntimeTlsBumpIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime TLS bump external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeAtomicAddIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@atomics_inline_asm_debug.atomic_counter = private global i32 0, align 4
+        \\@main = alias i32 (i32), ptr @atomics_inline_asm_debug.atomic_add
+        \\
+        \\define private i32 @atomics_inline_asm_debug.atomic_add(i32 %value) local_unnamed_addr {{
+        \\entry:
+        \\  %old = atomicrmw add ptr @atomics_inline_asm_debug.atomic_counter, i32 %value monotonic, align 4
+        \\  ret i32 %old
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime atomic add external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
