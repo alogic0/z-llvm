@@ -51,6 +51,8 @@ musl         selected x86_64 object/executable subset gates pass
 linking      final executable/library/archive/linker-script ownership remains Zig-owned
 native link  12 selected ABI-stable objects link and run through
              `zig build-exe -fno-lld`; probe accepted=12 failed=0
+             per-mode: ReleaseFast 6/6, ReleaseSafe 2/2,
+             ReleaseSmall 3/3, Debug 1/1
 AArch64      object emission remains an explicit target boundary
 ```
 
@@ -73,9 +75,10 @@ Preferred next probes, in order:
    boundary.
 3. Promote the first parse, verify, optimize, handoff, object, executable ABI,
    relocation, or boundary failure from that probe.
-4. For native-linker work, run `zig build probe-native-linker` before selecting
-   implementation. The first classified failure becomes a local object
-   compatibility slice unless evidence proves Zig linker behavior.
+4. For native-linker work, run `zig build probe-native-linker` or the relevant
+   per-mode probe before selecting implementation. The first classified failure
+   becomes a local object compatibility slice unless evidence proves Zig linker
+   behavior.
 5. If no blocker appears, update the dashboard or matrix only when the clean
    evidence changes a row status or named boundary.
 

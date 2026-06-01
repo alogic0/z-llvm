@@ -288,6 +288,8 @@ target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
 accepted=12
 failed=0
+per_mode=ReleaseFast 6/6 accepted, ReleaseSafe 2/2 accepted,
+         ReleaseSmall 3/3 accepted, Debug 1/1 accepted
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
 next_blocker=none measured; first future failure becomes a local object
@@ -296,6 +298,8 @@ next_blocker=none measured; first future failure becomes a local object
 
 The named distribution slice is
 [x86_64_native_link_distribution_slice.md](x86_64_native_link_distribution_slice.md).
+Per-mode native-link build aliases exist for ReleaseFast, ReleaseSafe,
+ReleaseSmall, and Debug so each promotion can be refreshed independently.
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,
 not a future `z_llvm` linker plan. `z_llvm` emits LLVM-compatible IR, assembly,

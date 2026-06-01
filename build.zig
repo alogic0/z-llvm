@@ -58,6 +58,14 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
     addToolStep(b, "distribution-native-link", "Run selected native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig");
     addToolStep(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
+    addToolStepWithFixedArgs(b, "distribution-native-link-releasefast", "Run selected ReleaseFast native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=ReleaseFast"});
+    addToolStepWithFixedArgs(b, "distribution-native-link-releasesafe", "Run selected ReleaseSafe native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=ReleaseSafe"});
+    addToolStepWithFixedArgs(b, "distribution-native-link-releasesmall", "Run selected ReleaseSmall native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=ReleaseSmall"});
+    addToolStepWithFixedArgs(b, "distribution-native-link-debug", "Run selected Debug native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=Debug"});
+    addToolStepWithFixedArgs(b, "probe-native-linker-releasefast", "Probe selected ReleaseFast objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig", &.{"--mode=ReleaseFast"});
+    addToolStepWithFixedArgs(b, "probe-native-linker-releasesafe", "Probe selected ReleaseSafe objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig", &.{"--mode=ReleaseSafe"});
+    addToolStepWithFixedArgs(b, "probe-native-linker-releasesmall", "Probe selected ReleaseSmall objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig", &.{"--mode=ReleaseSmall"});
+    addToolStepWithFixedArgs(b, "probe-native-linker-debug", "Probe selected Debug objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig", &.{"--mode=Debug"});
     addToolStepWithFixedArgs(b, "distribution-musl-object", "Run selected x86_64 musl object subset gates", "tools/run_distribution_x86_64_musl_subset.zig", &.{"--mode=object"});
     addToolStepWithFixedArgs(b, "distribution-musl-executable", "Run selected x86_64 musl executable subset gates", "tools/run_distribution_x86_64_musl_subset.zig", &.{"--mode=executable"});
     addToolStepWithArgs(b, "probe-distribution-objects", "Run object-probe automation; pass arguments after --", "tools/probe_distribution_objects.zig");

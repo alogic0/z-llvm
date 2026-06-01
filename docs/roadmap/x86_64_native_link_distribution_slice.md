@@ -78,8 +78,25 @@ Latest probe result:
 ```text
 accepted=12
 failed=0
+ReleaseFast accepted=6 failed=0
+ReleaseSafe accepted=2 failed=0
+ReleaseSmall accepted=3 failed=0
+Debug accepted=1 failed=0
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
+```
+
+Per-mode gates:
+
+```text
+zig build distribution-native-link-releasefast
+zig build distribution-native-link-releasesafe
+zig build distribution-native-link-releasesmall
+zig build distribution-native-link-debug
+zig build probe-native-linker-releasefast
+zig build probe-native-linker-releasesafe
+zig build probe-native-linker-releasesmall
+zig build probe-native-linker-debug
 ```
 
 ## Boundaries

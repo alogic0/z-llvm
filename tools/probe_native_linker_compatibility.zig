@@ -5,6 +5,8 @@ const native_cases = @import("native_link_cases.zig");
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
+    const mode_filter = try parseModeFilter(allocator, io, init);
+    defer if (mode_filter.owned) allocator.free(mode_filter.mode.?);
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
@@ -20,7 +22,10 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
 
     var accepted: usize = 0;
+    var selected: usize = 0;
     for (native_cases.cases) |case| {
+        if (!modeMatches(mode_filter.mode, case.mode)) continue;
+        selected += 1;
         const result = try probeCase(allocator, io, temp, target, cc_target, case);
         switch (result) {
             .accepted => {
@@ -38,8 +43,55 @@ pub fn main(init: std.process.Init) !void {
         try stdout_writer.interface.flush();
     }
 
-    try stdout_writer.interface.print("summary native-link-probe target={s} linker=zig build-exe -fno-lld accepted={} failed=0\n", .{ target, accepted });
+    if (selected == 0) {
+        try common.validationError(io, "no native-link probe cases selected for mode filter\n", .{});
+    }
+
+    const mode_label = mode_filter.mode orelse "all";
+    try stdout_writer.interface.print("summary native-link-probe target={s} mode={s} linker=zig build-exe -fno-lld accepted={} failed=0\n", .{ target, mode_label, accepted });
     try stdout_writer.interface.flush();
+}
+
+const ModeFilter = struct {
+    mode: ?[]const u8,
+    owned: bool = false,
+};
+
+fn parseModeFilter(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !ModeFilter {
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    _ = args.next();
+
+    var mode: ?[]const u8 = null;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            var stdout_buffer: [512]u8 = undefined;
+            var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+            try stdout_writer.interface.writeAll("usage: zig build probe-native-linker -- [--mode=ReleaseFast|ReleaseSafe|ReleaseSmall|Debug]\n");
+            try stdout_writer.interface.flush();
+            std.process.exit(0);
+        } else if (std.mem.startsWith(u8, arg, "--mode=")) {
+            if (mode != null) try common.validationError(io, "duplicate --mode argument\n", .{});
+            const value = arg["--mode=".len..];
+            if (!isKnownMode(value)) try common.validationError(io, "unknown native-link probe mode: {s}\n", .{value});
+            mode = try allocator.dupe(u8, value);
+        } else {
+            try common.validationError(io, "unexpected native-link probe argument: {s}\n", .{arg});
+        }
+    }
+
+    return .{ .mode = mode, .owned = mode != null };
+}
+
+fn modeMatches(filter: ?[]const u8, mode: []const u8) bool {
+    return filter == null or std.mem.eql(u8, filter.?, mode);
+}
+
+fn isKnownMode(mode: []const u8) bool {
+    return std.mem.eql(u8, mode, "ReleaseFast") or
+        std.mem.eql(u8, mode, "ReleaseSafe") or
+        std.mem.eql(u8, mode, "ReleaseSmall") or
+        std.mem.eql(u8, mode, "Debug");
 }
 
 const ProbeResult = union(enum) {
