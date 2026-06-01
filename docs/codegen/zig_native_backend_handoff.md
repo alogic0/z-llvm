@@ -53,7 +53,9 @@ The current linker boundary is checked directly by
 `--emit=obj` stay in scope, `z_llvm --emit=exe` stays rejected, and executable
 validation continues to hand local objects to Zig's toolchain through `zig cc`
 or the selected Zig driver path. `zig build distribution-all` composes that
-boundary proof with the selected positive no-LLVM-codegen distribution subset.
+boundary proof with the selected positive no-LLVM-codegen distribution subset,
+the selected native-linker execution proof, and the native-linker acceptance
+probe.
 This is not, by itself, proof that Zig's native linker was used: `zig cc` may
 still choose an LLD-backed implementation for a target or configuration. A
 native-linker claim requires a separate gate that selects a native-linker path
@@ -63,8 +65,11 @@ with that path, not implement the linker.
 The selected native-linker proof is `zig build distribution-native-link`. It
 emits local `.o` files with `z_llvm`, compiles C harnesses with `zig cc -c`,
 then links with `zig build-exe -fno-lld` before executing the result. This
-currently covers a small ABI-stable subset across ReleaseFast, ReleaseSafe,
-and ReleaseSmall objects.
+currently covers an ABI-stable subset across ReleaseFast, ReleaseSafe,
+ReleaseSmall, and Debug/O0 objects. `zig build probe-native-linker` runs the
+same selected object set as a compatibility probe and classifies the first
+native-linker acceptance failure by symbol, relocation, section, TLS model,
+COMDAT, alignment, ABI, or unknown linker compatibility.
 
 Default non-goals:
 

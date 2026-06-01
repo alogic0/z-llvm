@@ -42,10 +42,12 @@ pub fn main(init: std.process.Init) !void {
     try expectContains(allocator, io, "tools/run_distribution_releasesafe_object_m2.zig", "\"zig\", \"cc\", \"-target\", cc_target");
     try expectContains(allocator, io, "tools/run_distribution_releasesmall_executable_m3.zig", "\"zig\", \"cc\", \"-target\", cc_target");
     try expectContains(allocator, io, "tools/run_distribution_debug_executable_m4.zig", "\"zig\", \"cc\", \"-target\", cc_target");
+    try expectContains(allocator, io, "tools/run_distribution_native_link_m5.zig", "\"zig\", \"build-exe\"");
+    try expectContains(allocator, io, "tools/run_distribution_native_link_m5.zig", "\"-fno-lld\"");
 
     var stdout_buffer: [256]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    try stdout_writer.interface.writeAll("ok distribution linker boundary [local emit=ir/asm/obj, executable handoff=zig cc]\n");
+    try stdout_writer.interface.writeAll("ok distribution linker boundary [local emit=ir/asm/obj, executable handoff=zig cc, native proof=zig build-exe -fno-lld]\n");
     try stdout_writer.interface.flush();
 }
 

@@ -3,6 +3,8 @@ const common = @import("tool_common.zig");
 
 const tools = [_][]const u8{
     "tools/run_distribution_no_llvm_codegen_subset.zig",
+    "tools/run_distribution_native_link_m5.zig",
+    "tools/probe_native_linker_compatibility.zig",
     "tools/run_distribution_boundary_gates.zig",
 };
 

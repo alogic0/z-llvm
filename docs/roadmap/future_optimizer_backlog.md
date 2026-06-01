@@ -580,7 +580,14 @@ The linker/CRT boundary is also validated by
 `zig build distribution-linker-boundary`: local `z_llvm` emit modes
 stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
 validation remains an explicit handoff to Zig's linker/toolchain through
-`zig cc -target "$cc_target"`.
+`zig cc -target "$cc_target"`, which is driver/toolchain handoff evidence
+rather than native-linker evidence.
+
+The selected native-linker proof is separate and stricter:
+`zig build distribution-native-link` links ABI-stable local objects with
+`zig build-exe -fno-lld`, and `zig build probe-native-linker` classifies native
+linker acceptance for the same selected object set. The current probe result is
+12 accepted, 0 failed.
 
 The first non-x86_64 object target boundary is validated by
 `zig build distribution-aarch64-boundary`: a source-backed
@@ -602,7 +609,8 @@ boundaries.
 
 The combined selected distribution validation entrypoint is
 `zig build distribution-all`, which composes the positive
-no-LLVM-codegen subset with the conservative boundary gates.
+no-LLVM-codegen subset with the selected native-link proof/probe and the
+conservative boundary gates.
 
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0

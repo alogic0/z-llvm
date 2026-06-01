@@ -170,8 +170,10 @@ The boundary is executable evidence, not just policy: `z_llvm --emit=exe` must
 remain rejected, and selected executable validation must continue to hand local
 objects to Zig's toolchain instead of adding a local linker path. Use
 `zig build distribution-boundary` for the explicit linker/CRT ownership gate,
-or `zig build distribution-all` when the positive no-LLVM-codegen subset and
-the conservative boundary gates both need to be proven.
+`zig build distribution-native-link` for the selected `-fno-lld` executable
+proof, or `zig build distribution-all` when the positive no-LLVM-codegen
+subset, native-link proof/probe, and conservative boundary gates all need to be
+proven.
 
 Executable validation should emit local `.o` files with `z_llvm` and then hand
 them to Zig's linker/toolchain through `zig cc` or the selected Zig driver
@@ -185,6 +187,8 @@ only validate that its emitted objects are acceptable inputs to that path.
 The selected native-linker proof is `zig build distribution-native-link`: it
 emits local objects with `z_llvm`, compiles C harnesses without linking, then
 links with `zig build-exe -fno-lld` before running the executables.
+`zig build probe-native-linker` uses the same selected object set to classify
+native-linker acceptance failures as local object compatibility work.
 
 ## Validation Scope
 

@@ -26,15 +26,19 @@ zig build test
 zig build readiness
 zig build distribution-all
 zig build distribution-native-link
+zig build probe-native-linker
 ```
 
-All four passed after the script runner cleanup, shared tool helper refactor,
-and selected native-linker proof addition.
+All five passed after the script runner cleanup, shared tool helper refactor,
+selected native-linker proof expansion, and native-linker compatibility probe
+addition.
 
 Current distribution evidence is recorded in
 [x86_64_distribution_object_dashboard.md](roadmap/x86_64_distribution_object_dashboard.md)
 and
-[x86_64_distribution_replacement_matrix.md](roadmap/x86_64_distribution_replacement_matrix.md):
+[x86_64_distribution_replacement_matrix.md](roadmap/x86_64_distribution_replacement_matrix.md).
+The selected native-link distribution slice is recorded in
+[x86_64_native_link_distribution_slice.md](roadmap/x86_64_native_link_distribution_slice.md):
 
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
@@ -45,7 +49,8 @@ Debug        x86_64 asm/object: conservative boundary, adjusted continuous 463-r
              object-clean, 2 explicit exclusions
 musl         selected x86_64 object/executable subset gates pass
 linking      final executable/library/archive/linker-script ownership remains Zig-owned
-native link  selected ABI-stable objects link and run through `zig build-exe -fno-lld`
+native link  12 selected ABI-stable objects link and run through
+             `zig build-exe -fno-lld`; probe accepted=12 failed=0
 AArch64      object emission remains an explicit target boundary
 ```
 
@@ -68,7 +73,10 @@ Preferred next probes, in order:
    boundary.
 3. Promote the first parse, verify, optimize, handoff, object, executable ABI,
    relocation, or boundary failure from that probe.
-4. If no blocker appears, update the dashboard or matrix only when the clean
+4. For native-linker work, run `zig build probe-native-linker` before selecting
+   implementation. The first classified failure becomes a local object
+   compatibility slice unless evidence proves Zig linker behavior.
+5. If no blocker appears, update the dashboard or matrix only when the clean
    evidence changes a row status or named boundary.
 
 Use this template for the next active slice:

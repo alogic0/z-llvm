@@ -68,13 +68,14 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build distribution-debug-unwind` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
 | `zig build handoff` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
-| `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, and ReleaseSmall objects, using `zig build-exe -fno-lld` | pass |
+| `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug/O0 objects, using `zig build-exe -fno-lld` | pass |
+| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 12 accepted / 0 failed |
 | `zig build distribution-musl-object` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
 | `zig build distribution-musl-executable` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
 | `zig build distribution-linker-boundary` | explicit linker/CRT ownership boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand local objects to Zig's linker/toolchain through `zig cc` | pass |
 | `zig build distribution-aarch64-boundary` | explicit non-x86_64 object boundary for AArch64 Linux | pass |
 | `zig build distribution-boundary` | composed conservative boundary gates: linker, ReleaseSmall exclusions, Debug unwind, AArch64 object target | pass |
-| `zig build distribution-all` | selected positive no-LLVM-codegen subset plus conservative boundary gates | pass |
+| `zig build distribution-all` | selected positive no-LLVM-codegen subset plus native-link proof/probe and conservative boundary gates | pass |
 
 ## Matrix Boundary
 
@@ -188,7 +189,7 @@ Global exclusions:
     ReleaseSmall, and Debug executable fixtures; broad linker/CRT/libc
     ownership remains Zig-owned
   native Zig linker proof outside the selected `zig build distribution-native-link`
-    subset
+    and `zig build probe-native-linker` subset
   bitcode/LTO artifact handoff to Zig's linker/toolchain until activation
     criteria are met
   dynamic TLS models

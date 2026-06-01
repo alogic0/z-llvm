@@ -268,13 +268,34 @@ gate=zig build distribution-native-link
 target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
 includes=ReleaseFast tiny scalar/add-wrap/global-constant objects,
-         ReleaseSafe checked-add object with panic stub,
-         ReleaseSmall i64 constant-return object
+         cmp/shift, branch/select, and loop objects,
+         ReleaseSafe checked-add object with panic stub and error-switch object,
+         ReleaseSmall i64 constant-return, unchecked-arith, and hidden-access
+         objects,
+         selected Debug/O0 mathtest add object with panic stub
 result=pass
 boundary=native Zig linker proof only for this ABI-stable subset; broad
          executable/linker coverage, CRT policy, libc integration, dynamic
          loading, archives, and shared libraries remain Zig-owned
 ```
+
+The matching native-linker compatibility probe is source-backed and currently
+clean for the same selected subset:
+
+```text
+gate=zig build probe-native-linker
+target=x86_64-unknown-linux-gnu
+linker_selection=zig build-exe -fno-lld
+accepted=12
+failed=0
+failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
+                   ABI, unknown linker compatibility
+next_blocker=none measured; first future failure becomes a local object
+             compatibility slice unless evidence proves Zig linker behavior
+```
+
+The named distribution slice is
+[x86_64_native_link_distribution_slice.md](x86_64_native_link_distribution_slice.md).
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,
 not a future `z_llvm` linker plan. `z_llvm` emits LLVM-compatible IR, assembly,
@@ -287,10 +308,12 @@ gate=zig build distribution-linker-boundary
 local_emit_modes=ir, asm, obj
 rejected_emit_mode=exe
 executable_validation_handoff=zig cc -target "$cc_target"
+native_linker_proof=zig build distribution-native-link
 result=pass
 boundary=no z_llvm executable emission, CRT/start-file policy, libc integration,
          dynamic loader behavior, archive ownership, or linker script handling;
-         executable gates hand local objects to Zig's linker/toolchain
+         broad executable gates hand local objects to Zig's driver/toolchain;
+         only the `zig build-exe -fno-lld` gate is native-linker evidence
 ```
 
 AArch64 object emission is an explicit target boundary for the current
