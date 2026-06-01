@@ -129,7 +129,7 @@ matching return block merge
 Run all LLVM comparison fixtures:
 
 ```sh
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 Canonicalization fixtures:

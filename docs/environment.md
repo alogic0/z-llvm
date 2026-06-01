@@ -26,7 +26,7 @@ Use different Zig executables for different jobs:
 Before regenerating Zig-emitted IR fixtures, verify the source/compiler pair:
 
 ```bash
-scripts/check_zig_stage4_emitter.sh
+zig build check-zig-stage4-emitter
 ```
 
 The stage4 version string must include the same commit prefix as
@@ -40,8 +40,8 @@ revision as `../ziglang` and the manifest records that fact.
 Use the checked capture helper for new source-backed rows:
 
 ```bash
-scripts/capture_zig_ir.sh test/zig/inputs/tiny_scalar.zig ReleaseFast
-scripts/capture_zig_ir.sh test/zig/inputs/tiny_scalar.zig Debug
+zig build capture-zig-ir -- test/zig/inputs/tiny_scalar.zig ReleaseFast
+zig build capture-zig-ir -- test/zig/inputs/tiny_scalar.zig Debug
 ```
 
 By default, `ReleaseFast` and `ReleaseSmall` captures write to

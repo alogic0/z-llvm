@@ -96,5 +96,5 @@ jump_threading_non_phi_reject
 opt-22 comparison command:
 
 ```bash
-bash scripts/compare_opt.sh test/opt/fixtures.tsv
+zig build compare-opt -- test/opt/fixtures.tsv
 ```

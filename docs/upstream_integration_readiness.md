@@ -7,11 +7,11 @@ discussion and what must remain an external experiment.
 
 ```text
 zig version
-OPT_BIN=opt-22 bash scripts/compare_opt.sh
-scripts/run_zig_corpus.sh
-bash scripts/run_handoff_validation.sh
-bash scripts/run_generated_scalar_diff.sh
-bash scripts/run_readiness_checks.sh
+OPT_BIN=opt-22 zig build compare-opt --
+zig build zig-corpus
+zig build handoff
+zig build generated-scalar-diff
+zig build readiness
 ```
 
 The corpus docs record the Zig compiler version, target triple, optimize mode,

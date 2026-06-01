@@ -27,16 +27,16 @@ pub fn main(init: std.process.Init) !void {
 
     switch (mode) {
         .object => {
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_object_m1.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_releasesafe_object_m2.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_releasesmall_object_m3.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_debug_object_m4.sh");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_object_m1.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_releasesafe_object_m2.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_releasesmall_object_m3.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_debug_object_m4.zig");
         },
         .executable => {
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_executable_m1.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_releasesafe_object_m2.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_releasesmall_executable_m3.sh");
-            try runGate(allocator, io, selected_target, "scripts/run_distribution_debug_executable_m4.sh");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_executable_m1.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_releasesafe_object_m2.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_releasesmall_executable_m3.zig");
+            try runGate(allocator, io, selected_target, "tools/run_distribution_debug_executable_m4.zig");
         },
     }
 
@@ -73,11 +73,11 @@ fn parseMode(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
     return mode orelse try common.validationError(io, "missing --mode\n{s}", .{usage});
 }
 
-fn runGate(allocator: std.mem.Allocator, io: std.Io, target: []const u8, script: []const u8) !void {
+fn runGate(allocator: std.mem.Allocator, io: std.Io, target: []const u8, tool: []const u8) !void {
     const target_arg = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
     defer allocator.free(target_arg);
-    const argv = [_][]const u8{ "env", target_arg, "bash", script };
-    const result = try common.runCapture(allocator, io, &argv, script);
+    const argv = [_][]const u8{ "env", target_arg, "zig", "run", tool };
+    const result = try common.runCapture(allocator, io, &argv, tool);
     defer common.freeRunResult(allocator, result);
 
     var stdout_buffer: [4096]u8 = undefined;

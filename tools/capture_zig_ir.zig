@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const usage = "usage: scripts/capture_zig_ir.sh <zig-source> <Debug|ReleaseSafe|ReleaseFast|ReleaseSmall> [target] [output.ll]";
+const usage = "usage: zig build capture-zig-ir -- <zig-source> <Debug|ReleaseSafe|ReleaseFast|ReleaseSmall> [target] [output.ll]";
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -36,8 +36,8 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(default_zig_emitter);
     const zig_emitter = zig_emitter_env orelse default_zig_emitter;
 
-    const check_argv = [_][]const u8{ "bash", "scripts/check_zig_stage4_emitter.sh" };
-    const check_result = try common.runCapture(allocator, io, &check_argv, "scripts/check_zig_stage4_emitter.sh");
+    const check_argv = [_][]const u8{ "zig", "run", "tools/check_zig_stage4_emitter.zig" };
+    const check_result = try common.runCapture(allocator, io, &check_argv, "tools/check_zig_stage4_emitter.zig");
     common.freeRunResult(allocator, check_result);
 
     const output_path = if (output_override) |path|

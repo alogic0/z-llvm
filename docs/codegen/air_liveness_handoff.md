@@ -66,7 +66,7 @@ opaque metadata used only to satisfy LLVM's verifier
 ## Current Validation Cases
 
 ```text
-bash scripts/run_handoff_validation.sh
+zig build handoff
 ```
 
 The script checks:
@@ -79,7 +79,7 @@ instcombine_safe_scalar: backend-neutral scalar fold expectation
 dse_overwrite: overwritten store cleanup expectation
 licm_invariant: pure loop-invariant scalar motion expectation
 globaldce_basic: global reachability expectation
-compare_codegen_asm.sh: full current tiny x86_64 assembly smoke matrix
+zig build compare-codegen-asm: full current tiny x86_64 assembly smoke matrix
 ```
 
 ## Boundary

@@ -564,49 +564,49 @@ probe at `tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir`
 confirms the row still fails as `unsupported-control-flow` by itself. The
 tracked boundary fixture is
 `test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll`,
-and `bash scripts/run_distribution_releasesmall_boundary_m3.sh` validates both
+and `zig build distribution-releasesmall-boundary` validates both
 ReleaseSmall exclusions as the current negative boundary. With that row and the
 existing float-format helper excluded, the adjusted ReleaseSmall object probe
 is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
 asm/object is now a conservative boundary for the named captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is
-`bash scripts/run_distribution_no_llvm_codegen_subset.sh`; it composes the
+`zig build distribution-no-llvm`; it composes the
 ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
 selected ReleaseSmall object/executable gates, selected Debug
 object/executable gates, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.
 
 The linker/CRT boundary is also validated by
-`bash scripts/run_distribution_linker_boundary.sh`: local `z_llvm` emit modes
+`zig build distribution-linker-boundary`: local `z_llvm` emit modes
 stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
 validation remains an explicit handoff to Zig's linker/toolchain through
 `zig cc -target "$cc_target"`.
 
 The first non-x86_64 object target boundary is validated by
-`bash scripts/run_distribution_aarch64_object_boundary.sh`: a source-backed
+`zig build distribution-aarch64-boundary`: a source-backed
 ReleaseFast fixture rejects `--emit=obj --target=aarch64-unknown-linux-gnu`
 with the explicit unsupported-codegen-target diagnostic. AArch64 backend,
 ABI, relocation, and object ownership remain outside the current local
 distribution subset.
 
 The Debug DWARF/unwind boundary is validated by
-`bash scripts/run_distribution_debug_unwind_boundary.sh`: selected Debug object
+`zig build distribution-debug-unwind`: selected Debug object
 fixtures emit normal object sections but no `.debug_*` or `.eh_frame` sections.
 Debug object support remains a conservative boundary, not debugger-quality
 metadata, CFI, unwind, or variable-location ownership.
 
 The composed conservative boundary gate is
-`bash scripts/run_distribution_boundary_gates.sh`, covering linker/CRT,
+`zig build distribution-boundary`, covering linker/CRT,
 ReleaseSmall exclusions, Debug DWARF/unwind, and AArch64 object target
 boundaries.
 
 The combined selected distribution validation entrypoint is
-`bash scripts/run_distribution_all_gates.sh`, which composes the positive
+`zig build distribution-all`, which composes the positive
 no-LLVM-codegen subset with the conservative boundary gates.
 
 The bounded Debug x86_64 asm/object feasibility probe over
 `test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
-failures in `bash scripts/run_distribution_debug_object_m4.sh`. The closed
+failures in `zig build distribution-debug-object`. The closed
 selected blockers are call-result plus immediate-add lowering,
 `llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
 shape, the reduced Debug scope-branch phi shape, and the selected O0 alloca
@@ -618,7 +618,7 @@ variable-location salvage, broad std Debug rows, and target-complete ABI
 lowering remain outside this reduced subset.
 
 Broad object probes are now reproducible with
-`bash scripts/probe_distribution_objects.sh`, a compatibility shim over
+`zig build probe-distribution-objects --`, a compatibility shim over
 `tools/probe_distribution_objects.zig`. It reports stable per-row
 ok/fail/excluded lines, first failure, failure categories, and exclusion
 categories. The Zig helper reproduced the current release-mode evidence:
@@ -659,12 +659,12 @@ The continuous Debug first-300 optimizer-ok prefix is also object-clean:
 
 - Start new work only from a measured source-backed blocker, a concrete
   opt-22 mismatch, or a failing readiness check.
-- Use `bash scripts/probe_distribution_objects.sh` for broad optimized-output
+- Use `zig build probe-distribution-objects --` for broad optimized-output
   object probes before adding new ad hoc shell-loop evidence.
 - Add or identify the fixture before creating a new cycle.
 - Record the LLVM upstream source mapping before marking the cycle complete.
 - Keep local conservative behavior documented when LLVM is broader.
-- Run `bash scripts/run_readiness_checks.sh` before closing the cycle.
+- Run `zig build readiness` before closing the cycle.
 
 ## Corpus Discovery Candidates
 

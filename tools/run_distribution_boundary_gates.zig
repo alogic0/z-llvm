@@ -2,16 +2,16 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const Gate = struct {
-    script: []const u8,
+    tool: []const u8,
     target: ?[]const u8 = null,
 };
 
 const gates = [_]Gate{
-    .{ .script = "scripts/run_distribution_linker_boundary.sh" },
-    .{ .script = "scripts/run_distribution_releasesmall_boundary_m3.sh" },
-    .{ .script = "scripts/run_distribution_debug_unwind_boundary.sh" },
-    .{ .script = "scripts/run_distribution_debug_unwind_boundary.sh", .target = "x86_64-unknown-linux-musl" },
-    .{ .script = "scripts/run_distribution_aarch64_object_boundary.sh", .target = "aarch64-unknown-linux-gnu" },
+    .{ .tool = "tools/run_distribution_linker_boundary.zig" },
+    .{ .tool = "tools/run_distribution_releasesmall_boundary_m3.zig" },
+    .{ .tool = "tools/run_distribution_debug_unwind_boundary.zig" },
+    .{ .tool = "tools/run_distribution_debug_unwind_boundary.zig", .target = "x86_64-unknown-linux-musl" },
+    .{ .tool = "tools/run_distribution_aarch64_object_boundary.zig", .target = "aarch64-unknown-linux-gnu" },
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -27,11 +27,11 @@ pub fn main(init: std.process.Init) !void {
         if (gate.target) |target| {
             const target_assignment = try std.fmt.allocPrint(allocator, "TARGET={s}", .{target});
             defer allocator.free(target_assignment);
-            const argv = [_][]const u8{ "env", target_assignment, "bash", gate.script };
-            try runAndForward(allocator, io, &stdout_writer.interface, &argv, gate.script);
+            const argv = [_][]const u8{ "env", target_assignment, "zig", "run", gate.tool };
+            try runAndForward(allocator, io, &stdout_writer.interface, &argv, gate.tool);
         } else {
-            const argv = [_][]const u8{ "bash", gate.script };
-            try runAndForward(allocator, io, &stdout_writer.interface, &argv, gate.script);
+            const argv = [_][]const u8{ "zig", "run", gate.tool };
+            try runAndForward(allocator, io, &stdout_writer.interface, &argv, gate.tool);
         }
     }
 

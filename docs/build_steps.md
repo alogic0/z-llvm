@@ -49,8 +49,9 @@ zig build probe-distribution-objects -- \
 zig build capture-zig-ir -- test/zig/inputs/tiny_scalar.zig ReleaseFast
 ```
 
-## Compatibility Shims
+## Shell Scripts
 
-The `scripts/*.sh` files remain stable compatibility entrypoints, but their
-bodies delegate to Zig tools. Prefer the `zig build` steps for common gates and
-use the scripts when reproducing historical command lines from roadmap docs.
+There are no supported shell compatibility entrypoints. Current usage goes
+through `zig build` steps. Archived roadmap documents may still mention old
+script commands as historical transcripts; use the build steps above for new
+validation runs.

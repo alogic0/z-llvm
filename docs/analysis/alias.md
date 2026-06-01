@@ -93,7 +93,7 @@ Fixture coverage:
   opt fixture: gvn_argmemonly_call_no_clobber
 
 opt-22 comparison command:
-  bash scripts/compare_opt.sh test/opt/fixtures.tsv
+  zig build compare-opt -- test/opt/fixtures.tsv
 
 Local-only fixture command:
   zig build test

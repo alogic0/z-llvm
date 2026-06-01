@@ -202,7 +202,7 @@ Known missing behavior:
   no inlining through unsupported call-site attributes or operand bundles
 
 Fixtures and comparison:
-  bash scripts/compare_opt.sh test/opt/fixtures.tsv
+  zig build compare-opt -- test/opt/fixtures.tsv
   always_inline_direct compares with opt-22 -passes=always-inline
   always_inline_noinline_call compares with opt-22 -passes=always-inline
 ```
@@ -246,7 +246,7 @@ Known missing behavior:
   no debug-location salvage
 
 Fixtures and comparison:
-  bash scripts/compare_opt.sh test/opt/fixtures.tsv
+  zig build compare-opt -- test/opt/fixtures.tsv
   inline_direct_small compares with opt-22 -passes=cgscc(inline)
   inline_noinline_call compares with opt-22 -passes=cgscc(inline); both
   preserve the noinline call-site attribute group and leave the call in place.

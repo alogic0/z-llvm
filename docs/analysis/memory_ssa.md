@@ -127,9 +127,9 @@ Fixture coverage:
 
 opt-22 comparison command:
   covered indirectly through GVN and EarlyCSE memory fixtures in
-  `bash scripts/compare_opt.sh`
+  `zig build compare-opt --`
 
 Local-only fixture command:
   zig build test
-  bash scripts/compare_opt.sh
+  zig build compare-opt --
 ```

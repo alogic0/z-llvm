@@ -73,7 +73,7 @@ tiny_scalar ReleaseSafe raw capture: generated successfully, still future-only a
 tiny_scalar ReleaseFast stripped capture: byte-identical to checked capture
 tiny_scalar ReleaseSmall stripped capture: byte-identical to checked capture
 integers ReleaseFast AArch64 stripped capture: byte-identical to checked capture
-readiness gate: scripts/check_zig_stage4_emitter.sh and bash scripts/run_readiness_checks.sh passed
+readiness gate: zig build check-zig-stage4-emitter and zig build readiness passed
 ```
 
 2026-05-11 refresh against the current authoritative stage4 emitter:
@@ -172,7 +172,7 @@ current `../ziglang` `ReleaseFast` output.
 Run the accepted optimizer-input rows through the local optimizer with:
 
 ```sh
-scripts/run_zig_corpus.sh
+zig build zig-corpus
 ```
 
 The runner reads `docs/fixtures/zig_ir/manifest.tsv`, preserves empty TSV
@@ -194,7 +194,7 @@ to explicit local accepted-subset aliases instead of one global pass list.
 Override the manifest-selected pipeline for experiments with:
 
 ```sh
-PASSES=verify,instcombine,dce scripts/run_zig_corpus.sh
+PASSES=verify,instcombine,dce zig build zig-corpus
 ```
 
 The runner prints an execution summary with accepted, unsupported, future, and

@@ -19,10 +19,10 @@ z_llvm/docs/debug/metadata_inventory.md
 
 | Area | Local artifact | Validation command | Boundary |
 | --- | --- | --- | --- |
-| Assembly text | `test/codegen/expected/asm/*.s` | `bash scripts/compare_codegen_asm.sh` | Readable tiny x86_64 lowering smoke only. |
-| ELF relocatable object | `--emit=obj` over tiny x86_64 fixtures | `bash scripts/compare_codegen_objdump.sh` | Encoded text bytes and direct-call relocation smoke only. |
-| Symbols and relocations | `readelf -r -s` over call fixtures | `bash scripts/compare_codegen_readelf.sh` | Direct-call `R_X86_64_PLT32` and symbol-table visibility checks. |
-| Debug metadata | opaque IR metadata preservation | `scripts/run_zig_corpus.sh` | Parser/printer preservation only, not DWARF emission. |
+| Assembly text | `test/codegen/expected/asm/*.s` | `zig build compare-codegen-asm` | Readable tiny x86_64 lowering smoke only. |
+| ELF relocatable object | `--emit=obj` over tiny x86_64 fixtures | `zig build compare-codegen-objdump` | Encoded text bytes and direct-call relocation smoke only. |
+| Symbols and relocations | `readelf -r -s` over call fixtures | `zig build compare-codegen-readelf` | Direct-call `R_X86_64_PLT32` and symbol-table visibility checks. |
+| Debug metadata | opaque IR metadata preservation | `zig build zig-corpus` | Parser/printer preservation only, not DWARF emission. |
 | Unwind/CFI | none | none | Out of scope until call/frame lowering requires frame directives. |
 
 ## Activation Criteria
@@ -50,7 +50,7 @@ no relocation kinds beyond the documented direct-call subset
 ## Current Smoke Matrix
 
 ```text
-bash scripts/run_handoff_validation.sh
+zig build handoff
 ```
 
 The handoff script now runs optimizer checks, assembly smoke checks, objdump

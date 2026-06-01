@@ -51,15 +51,15 @@ blocker.
 Run the milestone gate with:
 
 ```sh
-bash scripts/run_distribution_object_m1.sh
-bash scripts/run_distribution_executable_m1.sh
-bash scripts/run_handoff_validation.sh
+zig build distribution-object
+zig build distribution-executable
+zig build handoff
 ```
 
-`scripts/run_distribution_object_m1.sh` emits local x86_64 ELF relocatable
+`zig build distribution-object` emits local x86_64 ELF relocatable
 objects for object-ready fixtures and checks ELF type, machine, `.text`, and
 `.symtab` records, including the selected public alias symbol for each fixture.
-`scripts/run_distribution_executable_m1.sh` links all selected public aliases
+`zig build distribution-executable` links all selected public aliases
 with tiny host harnesses and validates deterministic return values, including
 `@sideEffectFree`, `@add`, `@add_wrap`, `@branch_mix`, `@call_chain`,
 `@comptime_const`, `@optional_ptr_value`, `@dense_switch`, `@pair_first`, and
@@ -555,7 +555,7 @@ existing float-format helper excluded, the adjusted ReleaseSmall object probe
 is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
 asm/object is now a conservative boundary for the named captured subset.
 The first named no-LLVM-codegen x86_64 distribution subset gate is
-`bash scripts/run_distribution_no_llvm_codegen_subset.sh`; it composes the
+`zig build distribution-no-llvm`; it composes the
 ReleaseFast object/executable gates, ReleaseSafe object gate, selected
 ReleaseSmall object gate, and handoff validation, and it passes locally for
 `TARGET=x86_64-unknown-linux-gnu`.

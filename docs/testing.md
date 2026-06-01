@@ -52,7 +52,7 @@ opt-22 -passes=mem2reg test/opt/inputs/mem2reg_single_store.ll -S -o /tmp/llvm_m
 Run all currently mapped LLVM comparisons:
 
 ```bash
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 The comparison matrix includes scalar IR round-trip coverage for casts,
@@ -95,7 +95,7 @@ explicit unsupported global diagnostics
 Use a different `opt` binary:
 
 ```bash
-OPT_BIN=opt bash scripts/compare_opt.sh
+OPT_BIN=opt zig build compare-opt --
 ```
 
 Named pipeline and pass-manager debugging commands:
@@ -130,10 +130,10 @@ Assembly and object bootstrap commands:
 ```bash
 zig build run -- --emit=asm --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll
 zig build run -- --emit=obj --target=x86_64-unknown-linux-gnu test/codegen/inputs/add_args.ll > /tmp/z_llvm_add_args.o
-bash scripts/compare_codegen_asm.sh
-bash scripts/compare_codegen_objdump.sh
-bash scripts/compare_codegen_readelf.sh
-bash scripts/run_handoff_validation.sh
+zig build compare-codegen-asm
+zig build compare-codegen-objdump
+zig build compare-codegen-readelf
+zig build handoff
 readelf -h -S -s /tmp/z_llvm_add_args.o
 objdump -dr /tmp/z_llvm_add_args.o
 ```
@@ -147,13 +147,13 @@ unsupported control flow, unsupported call conventions, stack-passed call
 arguments, and unsupported call live pressure.
 
 Native handoff validation is intentionally narrower than codegen completeness:
-`scripts/run_handoff_validation.sh` checks representative scalar, memory, loop,
+`zig build handoff` checks representative scalar, memory, loop,
 and global optimizer facts, checks one optimized scalar pattern through local
 assembly/object emission against `opt-22` and `llc-22`, then runs assembly,
 objdump, and readelf smoke checks to keep local backend experiments
 validation-only.
 
-`scripts/run_generated_scalar_diff.sh` generates accepted scalar IR cases in a
+`zig build generated-scalar-diff` generates accepted scalar IR cases in a
 temporary directory, compares local output with `opt-22`, checks generated
 unsupported cases fail closed, and runs an optional `lli-22` execution smoke
 when available.

@@ -3,11 +3,11 @@ const common = @import("tool_common.zig");
 
 const commands = [_]Command{
     .{ .label = "zig build test", .argv = &.{ "zig", "build", "test" } },
-    .{ .label = "scripts/compare_opt.sh", .argv = &.{ "bash", "scripts/compare_opt.sh" } },
-    .{ .label = "scripts/lint_zig_ir_manifest.sh", .argv = &.{ "bash", "scripts/lint_zig_ir_manifest.sh" } },
-    .{ .label = "scripts/run_zig_corpus.sh", .argv = &.{ "bash", "scripts/run_zig_corpus.sh" } },
-    .{ .label = "scripts/run_handoff_validation.sh", .argv = &.{ "bash", "scripts/run_handoff_validation.sh" } },
-    .{ .label = "scripts/run_generated_scalar_diff.sh", .argv = &.{ "bash", "scripts/run_generated_scalar_diff.sh" } },
+    .{ .label = "tools/compare_opt.zig", .argv = &.{ "zig", "run", "tools/compare_opt.zig" } },
+    .{ .label = "tools/lint_zig_ir_manifest.zig", .argv = &.{ "zig", "run", "tools/lint_zig_ir_manifest.zig" } },
+    .{ .label = "tools/run_zig_corpus.zig", .argv = &.{ "zig", "run", "tools/run_zig_corpus.zig" } },
+    .{ .label = "tools/run_handoff_validation.zig", .argv = &.{ "zig", "run", "tools/run_handoff_validation.zig" } },
+    .{ .label = "tools/run_generated_scalar_diff.zig", .argv = &.{ "zig", "run", "tools/run_generated_scalar_diff.zig" } },
 };
 
 const Command = struct {

@@ -47,7 +47,7 @@ Non-goals for this finish line:
 Readiness gate command:
 
 ```text
-bash scripts/run_readiness_checks.sh
+zig build readiness
 ```
 
 Latest recorded summary:

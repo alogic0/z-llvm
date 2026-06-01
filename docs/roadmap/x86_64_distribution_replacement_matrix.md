@@ -52,7 +52,7 @@ captured subset, not target-complete Debug backend ownership. A bounded reduced
 object probe is also clean for selected Debug fixtures:
 
 ```text
-bash scripts/run_distribution_debug_object_m4.sh
+zig build distribution-debug-object
   target=x86_64-unknown-linux-gnu
   inputs=test/zig/expected/debug_*.reduced.ll plus selected Debug/O0
          distribution fixtures
@@ -144,11 +144,11 @@ closed_blocker=standalone_shared_library_mathtest.zig.Debug.x86_64.ll
 ```
 
 Debug handoff is a conservative boundary for the selected Debug/O0 handoff
-fixture in `bash scripts/run_handoff_validation.sh`:
+fixture in `zig build handoff`:
 
 ```text
 source=test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll
-gate=bash scripts/run_handoff_validation.sh
+gate=zig build handoff
 handoff_case=debug_o0_mathtest_checked_add
 checks=emit asm, checked-add branch, panic-call relocation, ELF relocatable
 boundary=selected Debug/O0 checked-add handoff only; not broad Debug codegen,
@@ -158,7 +158,7 @@ boundary=selected Debug/O0 checked-add handoff only; not broad Debug codegen,
 Debug object support explicitly excludes DWARF and unwind section ownership:
 
 ```text
-gate=bash scripts/run_distribution_debug_unwind_boundary.sh
+gate=zig build distribution-debug-unwind
 targets=x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl
 source_fixture=test/zig/expected/debug_metadata.reduced.ll
 result=pass, object has .text but no .debug_* or .eh_frame sections
@@ -167,7 +167,7 @@ boundary=selected Debug object lowering only; not DWARF, CFI, unwind tables,
 ```
 
 Handoff is conservative for release modes because
-`bash scripts/run_handoff_validation.sh` validates selected scalar, memory,
+`zig build handoff` validates selected scalar, memory,
 loop, global, stack, and optimized scalar shapes, but not arbitrary accepted
 ReleaseFast, ReleaseSafe, or ReleaseSmall optimized output. The focused
 ReleaseFast CFG-sensitive optimized-output baseline is:
@@ -205,7 +205,7 @@ cross-target TLS relocations, and broad runtime completeness.
 The first named no-LLVM-codegen x86_64 distribution subset gate is:
 
 ```text
-bash scripts/run_distribution_no_llvm_codegen_subset.sh
+zig build distribution-no-llvm
   target=x86_64-unknown-linux-gnu
   includes=ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
            selected ReleaseSmall object/executable gates, selected Debug
@@ -234,7 +234,7 @@ but does not claim broad executable replacement or local linker ownership for
 musl:
 
 ```text
-gate=bash scripts/run_distribution_x86_64_musl_object_subset.sh
+gate=zig build distribution-musl-object
 target=x86_64-unknown-linux-musl
 includes=ReleaseFast object gate, ReleaseSafe object gate,
          ReleaseSmall object gate, selected Debug object gate
@@ -248,7 +248,7 @@ The selected x86_64 musl executable subset is also target-backed for stable ABI
 fixtures:
 
 ```text
-gate=bash scripts/run_distribution_x86_64_musl_executable_subset.sh
+gate=zig build distribution-musl-executable
 target=x86_64-unknown-linux-musl
 cc_target=x86_64-linux-musl
 includes=ReleaseFast executable gate, selected ReleaseSafe M2
@@ -283,7 +283,7 @@ linker-script, CRT, libc, and dynamic-loader behavior stays in Zig's
 linker/toolchain.
 
 ```text
-gate=bash scripts/run_distribution_linker_boundary.sh
+gate=zig build distribution-linker-boundary
 local_emit_modes=ir, asm, obj
 rejected_emit_mode=exe
 executable_validation_handoff=zig cc -target "$cc_target"
@@ -297,7 +297,7 @@ AArch64 object emission is an explicit target boundary for the current
 distribution matrix:
 
 ```text
-gate=bash scripts/run_distribution_aarch64_object_boundary.sh
+gate=zig build distribution-aarch64-boundary
 target=aarch64-unknown-linux-gnu
 source_fixture=test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll
 result=pass, rejected with unsupported codegen target
@@ -309,7 +309,7 @@ boundary=local object emission is x86_64-linux only; AArch64 parse/verify/
 The current conservative boundary gates are composed by:
 
 ```text
-gate=bash scripts/run_distribution_boundary_gates.sh
+gate=zig build distribution-boundary
 includes=linker/CRT boundary, tracked ReleaseSmall exclusion boundaries,
          Debug DWARF/unwind boundary, AArch64 object target boundary
 result=pass
@@ -318,7 +318,7 @@ result=pass
 The combined selected distribution validation entrypoint is:
 
 ```text
-gate=bash scripts/run_distribution_all_gates.sh
+gate=zig build distribution-all
 includes=selected no-LLVM-codegen object/executable subset,
          conservative boundary gates
 result=pass
@@ -327,7 +327,7 @@ result=pass
 Automated broad object probing is now available through:
 
 ```text
-bash scripts/probe_distribution_objects.sh
+zig build probe-distribution-objects --
   implementation=tools/probe_distribution_objects.zig
   ReleaseFast:  total=17  ok=17  fail=0 excluded=0 first_failure=-
   ReleaseSafe:  total=17  ok=17  fail=0 excluded=0 first_failure=-
@@ -439,7 +439,7 @@ intermediate_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit
 boundary_exclusion=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll selected @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
 boundary_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
-focused_boundary_gate=bash scripts/run_distribution_releasesmall_boundary_m3.sh
+focused_boundary_gate=zig build distribution-releasesmall-boundary
 current_adjusted_object_probe=463 ok, 0 fail, 2 excluded with --input-limit=67108864
 ReleaseSmall asm/object status=conservative boundary for named captured subset with explicit exclusions
 ```

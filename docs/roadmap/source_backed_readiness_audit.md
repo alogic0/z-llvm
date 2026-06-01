@@ -5,7 +5,7 @@ current corpus proves and which next blockers should drive future slices.
 
 ## Refresh Evidence
 
-- `scripts/check_zig_stage4_emitter.sh` confirms
+- `zig build check-zig-stage4-emitter` confirms
       `../ziglang/build/stage4/bin/zig` is
       `0.17.0-dev.304+9787df942` and matches `../ziglang` HEAD `9787df942`.
 - Fresh `tiny_scalar` `ReleaseFast` and `ReleaseSmall` captures are
@@ -154,7 +154,7 @@ Debug:
 - Compile-unit, subprogram, lexical block, and location metadata survive the
       accepted reduced fixtures.
 - The reduced Debug x86_64 object gate is clean for nine selected fixtures:
-      `bash scripts/run_distribution_debug_object_m4.sh` emits local objects
+      `zig build distribution-debug-object` emits local objects
       for call-chain, declare/value intrinsic, loop, metadata, scope-branch,
       O0 volatile-pointer roundtrip, and c_* panic-call unreachable-stub
       shapes, plus the selected Debug/O0 f128 sret C ABI shape.

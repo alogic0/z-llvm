@@ -9,7 +9,7 @@ stage4 emitter: ../ziglang/build/stage4/bin/zig
 version: 0.17.0-dev.304+9787df942
 source checkout: ../ziglang
 source revision: 9787df942
-check: scripts/check_zig_stage4_emitter.sh
+check: zig build check-zig-stage4-emitter
 result: emitter version matches checkout HEAD
 ```
 
@@ -31,19 +31,19 @@ and new authoritative captures use the current stage4 emitter.
 ## Gates
 
 ```text
-scripts/check_zig_stage4_emitter.sh
-bash scripts/run_readiness_checks.sh
+zig build check-zig-stage4-emitter
+zig build readiness
 ```
 
-`run_readiness_checks.sh` completed:
+`zig build readiness` completed:
 
 ```text
 zig build test
-bash scripts/compare_opt.sh
-scripts/lint_zig_ir_manifest.sh
-scripts/run_zig_corpus.sh
-bash scripts/run_handoff_validation.sh
-bash scripts/run_generated_scalar_diff.sh
+zig build compare-opt --
+zig build lint-zig-ir-manifest
+zig build zig-corpus
+zig build handoff
+zig build generated-scalar-diff
 ```
 
 Corpus summary:

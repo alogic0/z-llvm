@@ -90,7 +90,7 @@ unit-test only:
 Comparison command:
 
 ```bash
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 Known gaps:

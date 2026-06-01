@@ -279,7 +279,7 @@ show which optimized facts are useful before native backend handoff
 Capture Zig-emitted LLVM IR from the authoritative stage4 compiler:
 
 ```sh
-scripts/capture_zig_ir.sh test/zig/inputs/example.zig ReleaseFast x86_64-linux-gnu tmp/example.ll
+zig build capture-zig-ir -- test/zig/inputs/example.zig ReleaseFast x86_64-linux-gnu tmp/example.ll
 ```
 
 Run the accepted local pipeline:

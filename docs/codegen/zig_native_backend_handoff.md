@@ -146,7 +146,7 @@ Run the bounded handoff regression set with:
 zig build handoff
 ```
 
-The compatibility script is still `bash scripts/run_handoff_validation.sh`.
+The supported compatibility gate is `zig build handoff`.
 The gate covers representative scalar, memory, loop, and global optimizer
 outputs plus tiny x86_64 assembly/object smoke checks, including fixed stack
 access feeding a direct call, selected empty-module object emission, and the

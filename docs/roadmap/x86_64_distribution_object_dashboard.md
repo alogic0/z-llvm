@@ -9,7 +9,7 @@ broad probes, focused gates, executable coverage, and explicit exclusions.
 Probe helper:
 
 ```text
-bash scripts/probe_distribution_objects.sh
+zig build probe-distribution-objects --
 ```
 
 The helper builds `z_llvm` once and invokes `zig-out/bin/z_llvm` directly, so
@@ -57,24 +57,24 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 
 | Gate | Coverage | Latest Result |
 | --- | --- | --- |
-| `bash scripts/run_distribution_object_m1.sh` | selected ReleaseFast objects | pass |
-| `bash scripts/run_distribution_executable_m1.sh` | selected ReleaseFast executable ABI checks | pass |
-| `bash scripts/run_distribution_releasesafe_object_m2.sh` | selected ReleaseSafe safety/runtime-call objects plus executable ABI checks | pass for GNU and musl targets |
-| `bash scripts/run_distribution_releasesmall_object_m3.sh` | selected ReleaseSmall object subset | pass |
-| `bash scripts/run_distribution_releasesmall_executable_m3.sh` | selected ReleaseSmall executable ABI checks | pass for GNU and musl targets |
-| `bash scripts/run_distribution_releasesmall_boundary_m3.sh` | tracked ReleaseSmall exclusion boundary fixtures | pass for GNU and musl targets |
-| `bash scripts/run_distribution_debug_object_m4.sh` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
-| `bash scripts/run_distribution_debug_executable_m4.sh` | selected Debug executable ABI proof | pass |
-| `bash scripts/run_distribution_debug_unwind_boundary.sh` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
-| `bash scripts/run_handoff_validation.sh` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
-| `bash scripts/run_distribution_no_llvm_codegen_subset.sh` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
+| `zig build distribution-object` | selected ReleaseFast objects | pass |
+| `zig build distribution-executable` | selected ReleaseFast executable ABI checks | pass |
+| `zig build distribution-releasesafe-object` | selected ReleaseSafe safety/runtime-call objects plus executable ABI checks | pass for GNU and musl targets |
+| `zig build distribution-releasesmall-object` | selected ReleaseSmall object subset | pass |
+| `zig build distribution-releasesmall-executable` | selected ReleaseSmall executable ABI checks | pass for GNU and musl targets |
+| `zig build distribution-releasesmall-boundary` | tracked ReleaseSmall exclusion boundary fixtures | pass for GNU and musl targets |
+| `zig build distribution-debug-object` | reduced Debug objects plus selected Debug/O0 distribution objects | pass |
+| `zig build distribution-debug-executable` | selected Debug executable ABI proof | pass |
+| `zig build distribution-debug-unwind` | selected Debug object boundary: no DWARF or unwind sections emitted | pass for GNU and musl targets |
+| `zig build handoff` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
+| `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, and ReleaseSmall objects, using `zig build-exe -fno-lld` | pass |
-| `bash scripts/run_distribution_x86_64_musl_object_subset.sh` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
-| `bash scripts/run_distribution_x86_64_musl_executable_subset.sh` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
-| `bash scripts/run_distribution_linker_boundary.sh` | explicit linker/CRT ownership boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand local objects to Zig's linker/toolchain through `zig cc` | pass |
-| `bash scripts/run_distribution_aarch64_object_boundary.sh` | explicit non-x86_64 object boundary for AArch64 Linux | pass |
-| `bash scripts/run_distribution_boundary_gates.sh` | composed conservative boundary gates: linker, ReleaseSmall exclusions, Debug unwind, AArch64 object target | pass |
-| `bash scripts/run_distribution_all_gates.sh` | selected positive no-LLVM-codegen subset plus conservative boundary gates | pass |
+| `zig build distribution-musl-object` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
+| `zig build distribution-musl-executable` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |
+| `zig build distribution-linker-boundary` | explicit linker/CRT ownership boundary: local emit modes stop at `ir`/`asm`/`obj`, executable gates hand local objects to Zig's linker/toolchain through `zig cc` | pass |
+| `zig build distribution-aarch64-boundary` | explicit non-x86_64 object boundary for AArch64 Linux | pass |
+| `zig build distribution-boundary` | composed conservative boundary gates: linker, ReleaseSmall exclusions, Debug unwind, AArch64 object target | pass |
+| `zig build distribution-all` | selected positive no-LLVM-codegen subset plus conservative boundary gates | pass |
 
 ## Matrix Boundary
 
@@ -172,7 +172,7 @@ Debug broad:
     standalone_shared_library_mathtest.zig.Debug.x86_64.ll after selected
     Debug/O0 mathtest.add checked-add and panic-edge lowering
   DWARF/unwind emission
-    focused_gate=bash scripts/run_distribution_debug_unwind_boundary.sh
+    focused_gate=zig build distribution-debug-unwind
   full O0 codegen surface
   variable-location salvage
   broad std Debug rows

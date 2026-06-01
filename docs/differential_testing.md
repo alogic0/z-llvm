@@ -6,7 +6,7 @@ accepted IR cases rather than storing large fuzzing corpora in the repository.
 ## Runner
 
 ```text
-scripts/run_generated_scalar_diff.sh
+zig build generated-scalar-diff
 ```
 
 The runner:

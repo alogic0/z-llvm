@@ -126,7 +126,7 @@ Zig-emitted aggregate coverage:
   parsed.
 
 opt-22 comparison command:
-  bash scripts/compare_opt.sh
+  zig build compare-opt --
 
 Local-only fixture command:
   zig build test

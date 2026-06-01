@@ -111,7 +111,7 @@ Run:
 
 ```sh
 zig build test
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 ## Deferred Work

@@ -239,22 +239,23 @@ When a step updates Zig-emitted IR fixtures, record the emitter version and
 `../ziglang` source revision in the fixture manifest before marking the step
 complete.
 
-Use these scripts for fixture work:
+Use these build steps for fixture work:
 
 ```bash
-scripts/check_zig_stage4_emitter.sh
-scripts/capture_zig_ir.sh test/zig/inputs/<group>.zig ReleaseFast
-scripts/lint_zig_ir_manifest.sh
+zig build check-zig-stage4-emitter
+zig build capture-zig-ir -- test/zig/inputs/<group>.zig ReleaseFast
+zig build lint-zig-ir-manifest
 ```
 
 The equivalent build aliases for common fixture and gate workflows are listed
 in [build_steps.md](build_steps.md). Prefer `zig build readiness`,
 `zig build handoff`, `zig build distribution-all`, and
-`zig build distribution-boundary` for current validation; keep the script
-commands when reproducing historical roadmap evidence exactly.
+`zig build distribution-boundary` for current validation. Archived roadmap
+documents may still show old script commands as historical transcripts; do not
+add new shell-script entrypoints for current validation.
 
 Readiness checks run manifest linting and accepted corpus validation through
-Zig-backed shell shims, but do not regenerate fixtures.
+Zig build steps, but do not regenerate fixtures.
 
 For corpus discovery, use `tools/zig_corpus_discovery.zig` and keep the same
 compiler split:

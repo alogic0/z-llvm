@@ -69,7 +69,7 @@ Expected `z_llvm` outputs are in `test/opt/expected/z_llvm/`.
 Run all metadata-backed comparisons:
 
 ```bash
-bash scripts/compare_opt.sh
+zig build compare-opt
 ```
 
 `opt-equivalent` rows are compared against normalized `opt` output.
@@ -80,13 +80,13 @@ than the current local slice or emits IR outside the accepted parser surface.
 Use a different `opt` binary:
 
 ```bash
-OPT_BIN=opt bash scripts/compare_opt.sh
+OPT_BIN=opt zig build compare-opt
 ```
 
 Run a custom metadata file:
 
 ```bash
-bash scripts/compare_opt.sh test/opt/fixtures.tsv
+zig build compare-opt -- test/opt/fixtures.tsv
 ```
 
 The fixtures are intentionally limited to the reproduced subset of each LLVM

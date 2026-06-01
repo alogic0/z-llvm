@@ -199,15 +199,15 @@ Focused fixer checks:
 
 ```text
 zig build test
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 Reviewer gates:
 
 ```text
 zig build test
-bash scripts/compare_opt.sh
-bash scripts/run_readiness_checks.sh
+zig build compare-opt --
+zig build readiness
 ```
 
 ## First Use

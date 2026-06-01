@@ -1,9 +1,9 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const scripts = [_][]const u8{
-    "scripts/run_distribution_no_llvm_codegen_subset.sh",
-    "scripts/run_distribution_boundary_gates.sh",
+const tools = [_][]const u8{
+    "tools/run_distribution_no_llvm_codegen_subset.zig",
+    "tools/run_distribution_boundary_gates.zig",
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -21,9 +21,9 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.print("distribution all gates target={s}\n", .{target});
     try stdout_writer.interface.flush();
 
-    for (scripts) |script| {
-        const argv = [_][]const u8{ "env", target_assignment, "bash", script };
-        const result = try common.runCapture(allocator, io, &argv, script);
+    for (tools) |tool| {
+        const argv = [_][]const u8{ "env", target_assignment, "zig", "run", tool };
+        const result = try common.runCapture(allocator, io, &argv, tool);
         defer common.freeRunResult(allocator, result);
         try stdout_writer.interface.writeAll(result.stdout);
         try stdout_writer.interface.flush();

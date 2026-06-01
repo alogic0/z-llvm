@@ -53,7 +53,7 @@ The current proof fixture is text-IR-only:
 zig build test
   verifies lto-prelink-o3 and lto-prelink-oz descriptors
 
-bash scripts/compare_opt.sh
+zig build compare-opt --
   verifies represented optimizer behavior against opt-22 on text IR fixtures
 ```
 

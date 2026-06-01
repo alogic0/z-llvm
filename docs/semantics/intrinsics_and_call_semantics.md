@@ -74,7 +74,7 @@ semantics needed by Zig-emitted IR corpus rows.
 Comparison command:
 
 ```sh
-bash scripts/compare_opt.sh
+zig build compare-opt --
 ```
 
 ## Remaining Gaps

@@ -167,14 +167,14 @@ Use focused validation first:
 
 ```bash
 zig build
-bash scripts/compare_opt.sh <fixture-name>
+zig build compare-opt -- <fixture-name>
 ```
 
 Then run the broader gate appropriate for the touched area. For pass-manager,
 pipeline, parser, verifier, or shared analysis changes, prefer:
 
 ```bash
-bash scripts/run_readiness_checks.sh
+zig build readiness
 ```
 
 For Zig-emitted corpus changes, follow the compiler policy in

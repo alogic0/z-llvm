@@ -23,8 +23,8 @@ Latest local validation:
 
 ```text
 zig build test
-bash scripts/run_readiness_checks.sh
-bash scripts/run_distribution_all_gates.sh
+zig build readiness
+zig build distribution-all
 zig build distribution-native-link
 ```
 
