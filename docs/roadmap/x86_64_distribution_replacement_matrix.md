@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=34 executable_ok=34 link_only_ok=0 local_fail=0
+total=35 executable_ok=35 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -445,7 +445,8 @@ float_select_gate=zig build distribution-zig-ir-writer -- --case=releasefast_run
 float_sub_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_sub
 double_div_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_double_div
 float_rem_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_rem
-ir_writer_rows=scalar_runtime_rows=34, minimal_wrapper_rows=0
+struct_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_struct_sum
+ir_writer_rows=scalar_runtime_rows=35, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -459,7 +460,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                atomic-add=1, inline-asm-barrier=1,
                aggregate-pair-abi=1, float-less=1, float-mul=1,
                float-add=1, float-select=1, float-sub=1,
-               double-div=1, float-rem=1,
+               double-div=1, float-rem=1, struct-field-sum=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -498,6 +499,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_runtime_float_sub float-sub,
                         releasefast_runtime_double_div double-div,
                         releasefast_runtime_float_rem float-rem,
+                        releasefast_runtime_struct_sum struct-field-sum,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,

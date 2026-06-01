@@ -244,6 +244,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimePackedReadFlagIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) {
         try writeRuntimePackedReplaceLowIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) {
+        try writeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -310,6 +312,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) return "packed-replace-low";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) return "struct-field-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -771,6 +774,36 @@ fn writeRuntimePackedReplaceLowIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime packed replace-low external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeStructSumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@struct_sum = alias i32 (ptr), ptr @aggregates.struct_sum
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %sum = add i32 20, 22
+        \\  %ok = icmp eq i32 %sum, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.struct_sum(ptr %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %2 = load i32, ptr %0, align 4
+        \\  %3 = getelementptr i8, ptr %0, i64 4
+        \\  %4 = load i32, ptr %3, align 4
+        \\  %5 = add i32 %4, %2
+        \\  ret i32 %5
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
