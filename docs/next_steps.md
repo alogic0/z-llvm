@@ -15,8 +15,8 @@ phi/merge values, loops, dense-switch, mutable global update, i32 ABI-argument
 direct-call, i64 call-return, local-exec TLS read/update, selected atomic add,
 selected inline-asm memory barrier, selected small aggregate ABI, and selected
 float compare/multiply/add/select/subtract/divide/remainder and pointer
-load/store/volatile-roundtrip/optional-pointer surfaces: a source-backed
-x86_64 packed low-field replacement row.
+load/store/volatile-roundtrip/optional-pointer and packed bitfield surfaces: a
+source-backed x86_64 extern-struct field-load sum row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -66,41 +66,44 @@ The completed `releasefast_runtime_packed_read_flag` row is paired with
 `packed_bits.read_flag(raw: u8) bool` from
 `test/zig/inputs/packed_bits.zig`, which exercises selected packed-bitfield
 read/bit-test behavior.
-The next source-backed shape from the same fixture is
-`packed_bits.replace_low(raw: u8, value: u8) u8`, which exercises selected
-packed low-bit replacement with mask/or integer operations.
+The completed `releasefast_runtime_packed_replace_low` row from the same
+fixture is `packed_bits.replace_low(raw: u8, value: u8) u8`, which exercises
+selected packed low-bit replacement with mask/or integer operations.
+The next source-backed shape is `aggregates.struct_sum(pair: *const Pair) i32`
+from `test/zig/inputs/aggregates.zig`, which exercises two `i32` field loads
+from an extern struct pointer and a scalar add.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected packed low-field update
-behavior: preserve the high five bits from one `u8`, mask the replacement low
-three bits from another `u8`, combine them, and return a C ABI `i32` success
-code. Do not claim broad packed struct lowering, arbitrary bitfield extraction,
-vector bit operations, or aggregate ABI behavior.
+Reduce the remaining external writer gap for selected aggregate field-load
+behavior: load two adjacent `i32` fields through an extern struct pointer, add
+them, and return a C ABI `i32` success code. Do not claim broad aggregate ABI,
+byval/sret, arbitrary GEP lowering, alias-sensitive field transforms, or vector
+aggregate behavior.
 
 Mode/target/stage row:
 ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
-LLVM lowers the selected Zig source row to integer `and`/`or` bit manipulation
-over `i8` values. Source behavior is represented by Zig's
-`packed_bits.replace_low` family.
+LLVM lowers the selected Zig source row to pointer field access via GEP-like
+addressing, two scalar `i32` loads, and an `add`. Source behavior is
+represented by Zig's `aggregates.struct_sum` family.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected packed low-field replacement shape.
+behavior beyond the selected extern struct two-field sum shape.
 
 Known boundary:
-Only one selected packed low-field replacement from two `u8` values. Wider
-packed structs, arbitrary bit ranges, vector bit operations, and broad
+Only one selected two-field extern struct load/add shape. Byval/sret, returned
+aggregates, nested aggregates, vector fields, arbitrary GEPs, and broad
 aggregate ABI behavior remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_packed_replace_low`
+`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_struct_sum`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected packed replace-low slice separately with the policy in
+Commit the selected struct-sum slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -139,11 +142,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 33-row
+also passes: the first ReleaseFast tiny-scalar row and the full 34-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 33 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 34 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -153,6 +156,7 @@ selected pointer load/store row, local-exec TLS read/update rows, the selected
 volatile roundtrip row, local-exec TLS read/update rows, the selected atomic
 add row, optional pointer row, and the selected inline-asm memory barrier row,
 plus the selected packed read-flag row and aggregate pair ABI row,
+selected packed replace-low row,
 selected ordered `f32` less-than row, selected `f64` multiply row, selected
 `f32` add row, selected `f64` select row, selected `f32` subtract row, and
 selected `f64` divide row, and selected `f32` remainder row. Broad
@@ -204,8 +208,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=33 executable_ok=33 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=33 minimal_wrapper_rows=0
+             full set total=34 executable_ok=34 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=34 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -213,7 +217,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1
              global-update=1 pointer-load-store=1 volatile-roundtrip=1
              optional-pointer=1 packed-read-flag=1 abi-arg-call=1
-             tls-read=1 tls-bump=1 atomic-add=1
+             packed-replace-low=1 tls-read=1 tls-bump=1 atomic-add=1
              inline-asm-barrier=1 aggregate-pair-abi=1
              float-less=1 float-mul=1 float-add=1 float-select=1
              float-sub=1 double-div=1 float-rem=1 minimal-ret0=0
