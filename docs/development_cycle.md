@@ -166,6 +166,13 @@ IR, selected optimization, and selected relocatable object emission. Final
 executable and library linking belongs to Zig's linker/toolchain
 (`ziglang/src/link/*`, or Zig's selected LLD path).
 
+The boundary is executable evidence, not just policy: `z_llvm --emit=exe` must
+remain rejected, and selected executable validation must continue to hand local
+objects to Zig's toolchain instead of adding a local linker path. Use
+`zig build distribution-boundary` for the explicit linker/CRT ownership gate,
+or `zig build distribution-all` when the positive no-LLVM-codegen subset and
+the conservative boundary gates both need to be proven.
+
 Executable validation should emit local `.o` files with `z_llvm` and then hand
 them to Zig's linker/toolchain through `zig cc` or the selected Zig driver
 path. Treat failures as object ABI, symbol, relocation, section, or Zig-linker
@@ -186,16 +193,20 @@ single pass implementation touching shared pass logic
   -> run the focused fixture and `zig build test`
 
 parser, verifier, printer, pass manager, or shared analysis change
-  -> run the focused fixture plus the local readiness gate
+  -> run the focused fixture plus `zig build readiness`
 
 target, ABI, codegen, object, or handoff change
-  -> run the focused x86_64 handoff/codegen gate
+  -> run the focused gate plus `zig build handoff`
+
+linker, CRT, executable handoff, non-x86_64 target boundary, or debug unwind boundary
+  -> run `zig build distribution-boundary`
 
 corpus manifest or Zig-emitted fixture change
   -> run the affected mode sweep only
 
 release milestone or replacement-matrix status upgrade
-  -> run the broader readiness and discovery gates
+  -> run `zig build readiness` plus the relevant distribution gate, usually
+     `zig build distribution-all`
 ```
 
 Full Debug, ReleaseFast, ReleaseSafe, ReleaseSmall, and multi-target sweeps are
@@ -224,6 +235,12 @@ scripts/check_zig_stage4_emitter.sh
 scripts/capture_zig_ir.sh test/zig/inputs/<group>.zig ReleaseFast
 scripts/lint_zig_ir_manifest.sh
 ```
+
+The equivalent build aliases for common fixture and gate workflows are listed
+in [build_steps.md](build_steps.md). Prefer `zig build readiness`,
+`zig build handoff`, `zig build distribution-all`, and
+`zig build distribution-boundary` for current validation; keep the script
+commands when reproducing historical roadmap evidence exactly.
 
 Readiness checks run manifest linting and accepted corpus validation through
 Zig-backed shell shims, but do not regenerate fixtures.

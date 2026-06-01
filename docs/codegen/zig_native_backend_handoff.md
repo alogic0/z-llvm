@@ -48,6 +48,13 @@ metadata are acceptable inputs to Zig's linker/toolchain. Executable harnesses
 compile or link through Zig's linker path; failures are local object
 compatibility gaps unless explicitly traced to missing Zig linker behavior.
 
+The current linker boundary is checked directly by
+`zig build distribution-boundary`: local `--emit=ir`, `--emit=asm`, and
+`--emit=obj` stay in scope, `z_llvm --emit=exe` stays rejected, and executable
+validation continues to hand local objects to Zig's toolchain through `zig cc`
+or the selected Zig driver path. `zig build distribution-all` composes that
+boundary proof with the selected positive no-LLVM-codegen distribution subset.
+
 Default non-goals:
 
 ```text
@@ -125,18 +132,27 @@ Otherwise, add a doc row or inventory row instead of implementing backend code.
 Run the bounded handoff regression set with:
 
 ```sh
-bash scripts/run_handoff_validation.sh
+zig build handoff
 ```
 
+The compatibility script is still `bash scripts/run_handoff_validation.sh`.
 The gate covers representative scalar, memory, loop, and global optimizer
-outputs plus tiny x86_64 assembly smoke checks. Cycle 07 adds an explicit
-stack-memory-to-call proof (`call_stack_slot`) so the validation set includes
-fixed stack access feeding a direct call while preserving the local SysV stack
-alignment policy. Stub Replacement Slice 32 adds an optimized scalar handoff
-proof (`test/handoff/inputs/scalar_add_zero.ll`): local `instcombine,dce`
-output is compared against `opt-22`, then emitted through local x86_64
-assembly/object paths and compared with `llc-22` object disassembly. It does
-not claim full native backend or object/codegen completeness.
+outputs plus tiny x86_64 assembly/object smoke checks, including fixed stack
+access feeding a direct call, selected empty-module object emission, and the
+selected Debug/O0 checked-add handoff fixture. Local `instcombine,dce` output
+for `test/handoff/inputs/scalar_add_zero.ll` is compared against `opt-22`, then
+emitted through local x86_64 assembly/object paths and compared with `llc-22`
+object disassembly. It does not claim full native backend, linker, or
+object/codegen completeness.
+
+For linker and executable-handoff ownership, run:
+
+```sh
+zig build distribution-boundary
+```
+
+That boundary gate verifies the local linker non-goal separately from the
+positive no-LLVM-codegen distribution subset.
 
 ## Out Of Scope
 
