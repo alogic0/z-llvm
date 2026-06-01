@@ -254,6 +254,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeErrorUnionPayloadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) {
         try writeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) {
+        try writeRuntimeFpConstantsIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -325,6 +327,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) return "slice-loop-sum";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) return "fp-literal-return";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -942,6 +945,35 @@ fn writeRuntimeSliceSumIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime slice-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeFpConstantsIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@double_literal = alias double (), ptr @fp_constants.double_literal
+        \\@float_literal = alias float (), ptr @fp_constants.float_literal
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define private double @fp_constants.double_literal() unnamed_addr align 1 {{
+        \\entry:
+        \\  ret double 2.250000e+00
+        \\}}
+        \\
+        \\define private float @fp_constants.float_literal() unnamed_addr align 1 {{
+        \\entry:
+        \\  ret float 1.500000e+00
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime FP constants external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

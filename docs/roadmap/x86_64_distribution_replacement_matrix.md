@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=39 executable_ok=39 link_only_ok=0 local_fail=0
+total=40 executable_ok=40 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -450,7 +450,8 @@ array_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtim
 optional_payload_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_optional_payload
 error_union_payload_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_error_union_payload
 slice_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_slice_sum
-ir_writer_rows=scalar_runtime_rows=39, minimal_wrapper_rows=0
+fp_constants_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_fp_constants
+ir_writer_rows=scalar_runtime_rows=40, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -468,7 +469,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                array-scalar-sum=1,
                optional-scalar-payload=1,
                error-union-payload=1,
-               slice-loop-sum=1,
+               slice-loop-sum=1, fp-literal-return=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -514,6 +515,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_runtime_error_union_payload
                         error-union-payload,
                         releasefast_runtime_slice_sum slice-loop-sum,
+                        releasefast_runtime_fp_constants
+                        fp-literal-return,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
