@@ -219,6 +219,11 @@ runtime-emitted rows:
     private i32 global is loaded by globals_comptime.read_global; main calls
     that function and exits 5
 
+  releasefast_runtime_cond_branch: runtime-condbr
+    dso_local i32 @main branches on a runtime i1 ABI argument and returns from
+    separate then/else blocks; the focused executable gate covers a real
+    parameter-driven conditional branch without phi merging
+
   releasesmall_i64_arithmetic: i64-arithmetic
     dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
 
@@ -319,14 +324,17 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ir-writer full set:    total=11 executable_ok=10 link_only_ok=1 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=10 minimal_wrapper_rows=0
+ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
+ir-writer condbr:      total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=11 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
                        i64-arithmetic=1 table-indexed-load=1
-                       checked-add-runtime-boundary=1 minimal-ret0=0
+                       checked-add-runtime-boundary=1 runtime-condbr=1
+                       minimal-ret0=0
 ```
 
 ## Fallback Accounting
@@ -363,8 +371,8 @@ Unsupported external IR writer constructs remain explicit:
 
 ```text
 runtime integer arithmetic beyond the selected scalar/i64/integer rows
-branches beyond selected constant-condbr and checked-add boundary shapes,
-switches, phi emission, and loops
+branches beyond the selected runtime-condbr, constant-condbr, and checked-add
+boundary shapes; switches, phi emission, and loops
 stores and mutable global update semantics
 calls with ABI arguments or non-i32 returns
 error unions and ReleaseSafe runtime/panic paths beyond the selected
@@ -388,11 +396,11 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 10/10 selected rows as runtime surfaces:
+The external writer now emits 11/11 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `table-indexed-load`, and
-`checked-add-runtime-boundary`; no selected rows remain as `minimal-ret0`
-hook-only proofs. LLVM's module optimization pipeline, LLVM
+`checked-add-runtime-boundary`, plus `runtime-condbr`; no selected rows remain
+as `minimal-ret0` hook-only proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.

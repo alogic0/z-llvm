@@ -224,6 +224,8 @@ fn writeIrWriterModuleFromEnv(
         try writeControlFlowCallsIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) {
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) {
+        try writeRuntimeCondBranchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -252,6 +254,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) return "direct-call";
     if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) return "runtime-condbr";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -380,6 +383,28 @@ fn writeGlobalsComptimeIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write globals_comptime external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeCondBranchIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main(i1 zeroext %flag) local_unnamed_addr {{
+        \\entry:
+        \\  br i1 %flag, label %then, label %else
+        \\
+        \\then:
+        \\  ret i32 0
+        \\
+        \\else:
+        \\  ret i32 1
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime conditional branch external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

@@ -68,6 +68,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_runtime_cond_branch",
+        .wrapper = "test/zig/integrated/runtime_cond_branch_main.zig",
+        .covered_fixture = "test/zig/inputs/switch_control.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -198,6 +206,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "i64-arithmetic" },
         .{ .name = "table-indexed-load" },
         .{ .name = "checked-add-runtime-boundary" },
+        .{ .name = "runtime-condbr" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -470,6 +479,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "i64-arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, contents[value_start..value_end], "table-indexed-load")) return "table-indexed-load";
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-add-runtime-boundary")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, contents[value_start..value_end], "runtime-condbr")) return "runtime-condbr";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
