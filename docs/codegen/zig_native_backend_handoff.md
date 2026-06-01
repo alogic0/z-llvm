@@ -98,8 +98,8 @@ optimizer/object path. Runtime writer rows now cover
 `i64-call-return`, `tls-read`, `tls-bump`, `atomic-add`,
 `inline-asm-barrier`, `aggregate-pair-abi`, `float-less`, `float-mul`,
 `float-add`, `float-select`, `float-sub`, `double-div`, `float-rem`, and
-`struct-field-sum`, `array-scalar-sum`, and `optional-scalar-payload`; all 37
-selected rows are runtime-emitted and the gate
+`struct-field-sum`, `array-scalar-sum`, `optional-scalar-payload`, and
+`error-union-payload`; all 38 selected rows are runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than

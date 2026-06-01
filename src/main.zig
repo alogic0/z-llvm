@@ -250,6 +250,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeArraySumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) {
         try writeRuntimeOptionalPayloadIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) {
+        try writeRuntimeErrorUnionPayloadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -319,6 +321,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) return "struct-field-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) return "array-scalar-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -866,6 +869,34 @@ fn writeRuntimeOptionalPayloadIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime optional-payload external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeErrorUnionPayloadIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@error_union_payload = alias i32 (i32), ptr @aggregates.error_union_payload
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @aggregates.error_union_payload(i32 0)
+        \\  %ok = icmp eq i32 %value, 7
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.error_union_payload(i32 %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.not.i = icmp eq i32 %0, 0
+        \\  %2 = select i1 %.not.i, i32 7, i32 -1
+        \\  ret i32 %2
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime error-union-payload external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
