@@ -256,6 +256,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) {
         try writeRuntimeFpConstantsIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) {
+        try writeRuntimeComptimeConstIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -328,6 +330,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) return "slice-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) return "fp-literal-return";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) return "comptime-const-mul";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -974,6 +977,33 @@ fn writeRuntimeFpConstantsIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime FP constants external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeComptimeConstIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@comptime_const = alias i32 (i32), ptr @globals_comptime.comptime_const
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @globals_comptime.comptime_const(i32 7)
+        \\  %ok = icmp eq i32 %value, 35
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @globals_comptime.comptime_const(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  %scaled = mul nsw i32 %value, 5
+        \\  ret i32 %scaled
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime comptime const external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

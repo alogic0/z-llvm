@@ -945,6 +945,7 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeOptionalPayloadMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeErrorUnionPayloadMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeSliceSumMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeComptimeConstMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
@@ -1286,6 +1287,65 @@ fn lowerRuntimeSliceSumMainReturn(
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     try machine.instructions.append(allocator, .add_rsp_8);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 10 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeComptimeConstMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "globals_comptime.comptime_const")) return false;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(call.calling_conv);
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 7)) return error.UnsupportedCodegenValue;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, 35)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "comptime_const_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm_rdi = 7 });
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 35 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);

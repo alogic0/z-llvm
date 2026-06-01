@@ -196,6 +196,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-fp-literal-return",
     },
     .{
+        .id = "releasefast_runtime_comptime_const",
+        .wrapper = "test/zig/integrated/runtime_comptime_const_main.zig",
+        .covered_fixture = "test/zig/inputs/globals_comptime.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-comptime-const-mul",
+    },
+    .{
         .id = "releasefast_runtime_call_chain",
         .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
         .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
@@ -455,6 +463,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "error-union-payload" },
         .{ .name = "slice-loop-sum" },
         .{ .name = "fp-literal-return" },
+        .{ .name = "comptime-const-mul" },
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
@@ -760,6 +769,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_fp_constants")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-fp-literal-return";
     }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_comptime_const")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-comptime-const-mul";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -836,6 +848,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "error-union-payload")) return "error-union-payload";
     if (std.mem.eql(u8, contents[value_start..value_end], "slice-loop-sum")) return "slice-loop-sum";
     if (std.mem.eql(u8, contents[value_start..value_end], "fp-literal-return")) return "fp-literal-return";
+    if (std.mem.eql(u8, contents[value_start..value_end], "comptime-const-mul")) return "comptime-const-mul";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";
