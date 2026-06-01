@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=36 executable_ok=36 link_only_ok=0 local_fail=0
+total=37 executable_ok=37 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -447,7 +447,8 @@ double_div_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runti
 float_rem_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_rem
 struct_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_struct_sum
 array_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_array_sum
-ir_writer_rows=scalar_runtime_rows=36, minimal_wrapper_rows=0
+optional_payload_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_optional_payload
+ir_writer_rows=scalar_runtime_rows=37, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -463,6 +464,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                float-add=1, float-select=1, float-sub=1,
                double-div=1, float-rem=1, struct-field-sum=1,
                array-scalar-sum=1,
+               optional-scalar-payload=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -503,6 +505,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_runtime_float_rem float-rem,
                         releasefast_runtime_struct_sum struct-field-sum,
                         releasefast_runtime_array_sum array-scalar-sum,
+                        releasefast_runtime_optional_payload
+                        optional-scalar-payload,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
