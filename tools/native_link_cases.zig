@@ -7,6 +7,7 @@ pub const Case = struct {
     mode: []const u8,
     fixture: []const u8,
     harness: []const u8,
+    link_math: bool = false,
     stubs: []const Stub = &.{},
 };
 
@@ -101,6 +102,134 @@ pub const cases = [_]Case{
         ,
     },
     .{
+        .id = "releasefast_call_chain",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "control_flow_calls_call_chain.ll",
+        .harness =
+        \\extern int call_chain(int value);
+        \\int main(void) {
+        \\    if (call_chain(0) != 1) return 1;
+        \\    if (call_chain(5) != 11) return 2;
+        \\    if (call_chain(17) != 35) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_error_switch",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "error_switch_error_switch.ll",
+        .harness =
+        \\extern int error_switch(unsigned char tag);
+        \\int main(void) {
+        \\    if (error_switch(0) != 0) return 1;
+        \\    if (error_switch(1) != -1) return 2;
+        \\    if (error_switch(2) != -2) return 3;
+        \\    if (error_switch(255) != -2) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_float_compare",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "float_compare_basic.ll",
+        .harness =
+        \\#include <stdbool.h>
+        \\#include <math.h>
+        \\extern double float_mul(double a, double b);
+        \\extern bool float_less(float a, float b);
+        \\static int close_to(double actual, double expected) {
+        \\    double delta = actual - expected;
+        \\    if (delta < 0.0) delta = -delta;
+        \\    return delta < 0.000001;
+        \\}
+        \\int main(void) {
+        \\    if (!close_to(float_mul(3.0, 2.5), 7.5)) return 1;
+        \\    if (!close_to(float_mul(-4.0, 0.5), -2.0)) return 2;
+        \\    if (!float_less(1.0f, 2.0f)) return 3;
+        \\    if (float_less(2.0f, 1.0f)) return 4;
+        \\    if (float_less(2.0f, 2.0f)) return 5;
+        \\    if (float_less(NAN, 1.0f)) return 6;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_floats_math",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "floats_math_basic.ll",
+        .harness =
+        \\#include <stdbool.h>
+        \\extern double float_select(double a, double b, bool pick_a);
+        \\extern float float_add(float a, float b);
+        \\static int close_to_double(double actual, double expected) {
+        \\    double delta = actual - expected;
+        \\    if (delta < 0.0) delta = -delta;
+        \\    return delta < 0.000001;
+        \\}
+        \\static int close_to_float(float actual, float expected) {
+        \\    float delta = actual - expected;
+        \\    if (delta < 0.0f) delta = -delta;
+        \\    return delta < 0.0001f;
+        \\}
+        \\int main(void) {
+        \\    if (!close_to_double(float_select(1.25, 9.5, true), 1.25)) return 1;
+        \\    if (!close_to_double(float_select(1.25, 9.5, false), 9.5)) return 2;
+        \\    if (!close_to_float(float_add(1.5f, 2.25f), 3.75f)) return 3;
+        \\    if (!close_to_float(float_add(-4.0f, 1.5f), -2.5f)) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_fp_constants",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "fp_constants_literals.ll",
+        .harness =
+        \\extern double double_literal(void);
+        \\extern float float_literal(void);
+        \\int main(void) {
+        \\    if (double_literal() != 2.25) return 1;
+        \\    if (float_literal() != 1.5f) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_fp_extended_ops",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "fp_extended_ops_basic.ll",
+        .link_math = true,
+        .harness =
+        \\extern float float_rem(float a, float b);
+        \\extern double double_div(double a, double b);
+        \\extern float float_sub(float a, float b);
+        \\static int close_to_double(double actual, double expected) {
+        \\    double delta = actual - expected;
+        \\    if (delta < 0.0) delta = -delta;
+        \\    return delta < 0.000001;
+        \\}
+        \\static int close_to_float(float actual, float expected) {
+        \\    float delta = actual - expected;
+        \\    if (delta < 0.0f) delta = -delta;
+        \\    return delta < 0.0001f;
+        \\}
+        \\int main(void) {
+        \\    if (!close_to_float(float_rem(7.5f, 2.0f), 1.5f)) return 1;
+        \\    if (!close_to_double(double_div(9.0, 4.0), 2.25)) return 2;
+        \\    if (!close_to_float(float_sub(7.0f, 2.5f), 4.5f)) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
         .id = "releasefast_comptime_const",
         .mode = "ReleaseFast",
         .fixture = releasefast_root ++ "globals_comptime_const.ll",
@@ -109,6 +238,260 @@ pub const cases = [_]Case{
         \\int main(void) {
         \\    if (comptime_const(7) != 35) return 1;
         \\    if (comptime_const(-3) != -15) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_globals_counter",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "globals_comptime_global_counter.ll",
+        .harness =
+        \\extern int update_global(int delta);
+        \\extern int read_global(void);
+        \\int main(void) {
+        \\    if (read_global() != 3) return 1;
+        \\    if (update_global(4) != 7) return 2;
+        \\    if (read_global() != 7) return 3;
+        \\    if (update_global(-2) != 5) return 4;
+        \\    if (read_global() != 5) return 5;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_optional_ptr_value",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "optional_pointer_value.ll",
+        .harness =
+        \\#include <stddef.h>
+        \\extern int optional_ptr_value(const int *value);
+        \\int main(void) {
+        \\    int positive = 42;
+        \\    int negative = -9;
+        \\    if (optional_ptr_value(&positive) != 42) return 1;
+        \\    if (optional_ptr_value(&negative) != -9) return 2;
+        \\    if (optional_ptr_value(NULL) != -1) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_packed_bits",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "packed_bits_basic.ll",
+        .harness =
+        \\#include <stdbool.h>
+        \\extern unsigned char replace_low(unsigned char high, unsigned char low);
+        \\extern bool read_flag(unsigned char value);
+        \\int main(void) {
+        \\    if (replace_low(0xf8, 0x05) != 0xfd) return 1;
+        \\    if (replace_low(0xab, 0x02) != 0xaa) return 2;
+        \\    if (read_flag(0x80) != true) return 3;
+        \\    if (read_flag(0x7f) != false) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_pointers_memory",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "pointers_memory_basic.ll",
+        .harness =
+        \\extern int volatile_roundtrip(int *slot, int value);
+        \\extern int load_store(const int *src, int *dst);
+        \\int main(void) {
+        \\    int slot = 0;
+        \\    int src = 41;
+        \\    int dst = 0;
+        \\    if (volatile_roundtrip(&slot, 17) != 17) return 1;
+        \\    if (slot != 17) return 2;
+        \\    if (load_store(&src, &dst) != 42) return 3;
+        \\    if (dst != 42) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_tls_concurrency",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "tls_concurrency_counter.ll",
+        .harness =
+        \\extern int bump_tls(int delta);
+        \\extern int read_tls(void);
+        \\int main(void) {
+        \\    if (read_tls() != 1) return 1;
+        \\    if (bump_tls(4) != 5) return 2;
+        \\    if (read_tls() != 5) return 3;
+        \\    if (bump_tls(-2) != 3) return 4;
+        \\    if (read_tls() != 3) return 5;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_dense_switch",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "switch_control_dense_switch.ll",
+        .harness =
+        \\extern int dense_switch(unsigned char value);
+        \\int main(void) {
+        \\    if (dense_switch(0) != 11) return 1;
+        \\    if (dense_switch(1) != 13) return 2;
+        \\    if (dense_switch(2) != 17) return 3;
+        \\    if (dense_switch(3) != 19) return 4;
+        \\    if (dense_switch(5) != 19) return 5;
+        \\    if (dense_switch(6) != 23) return 6;
+        \\    if (dense_switch(255) != 23) return 7;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregate_abi_pair",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregate_abi_pair.ll",
+        .harness =
+        \\extern int pair_first(long long pair);
+        \\extern long long make_pair(int first, int second);
+        \\int main(void) {
+        \\    if (pair_first(0x000000020000002aLL) != 42) return 1;
+        \\    if (pair_first(-1LL) != -1) return 2;
+        \\    if (make_pair(0x11223344, 0x55667788) != ((0x55667788LL << 32) | 0x11223344LL)) return 3;
+        \\    if (make_pair(-1, 0) != 0x00000000ffffffffLL) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregates_error_union_payload",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregates_error_union_payload.ll",
+        .harness =
+        \\extern int error_union_payload(int tag);
+        \\int main(void) {
+        \\    if (error_union_payload(0) != 7) return 1;
+        \\    if (error_union_payload(1) != -1) return 2;
+        \\    if (error_union_payload(-3) != -1) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregates_optional_payload",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregates_optional_payload.ll",
+        .harness =
+        \\extern int optional_payload(int tag, int payload);
+        \\int main(void) {
+        \\    if (optional_payload(0, 99) != -1) return 1;
+        \\    if (optional_payload(1, 99) != 99) return 2;
+        \\    if (optional_payload(-3, -11) != -11) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregates_slice_sum",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregates_slice_sum.ll",
+        .harness =
+        \\extern int slice_sum(const int *values, long long len);
+        \\int main(void) {
+        \\    int values[] = { 4, -2, 9, 1 };
+        \\    if (slice_sum(values, 0) != 0) return 1;
+        \\    if (slice_sum(values, 1) != 4) return 2;
+        \\    if (slice_sum(values, 3) != 11) return 3;
+        \\    if (slice_sum(values, 4) != 12) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregates_struct_sum",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregates_struct_sum.ll",
+        .harness =
+        \\struct Pair {
+        \\    int a;
+        \\    int b;
+        \\};
+        \\extern int struct_sum(const struct Pair *pair);
+        \\int main(void) {
+        \\    struct Pair first = { 7, 11 };
+        \\    struct Pair second = { -4, 9 };
+        \\    if (struct_sum(&first) != 18) return 1;
+        \\    if (struct_sum(&second) != 5) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_aggregates_array_sum",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "aggregates_array_sum.ll",
+        .harness =
+        \\extern int array_sum(int a, int b, int c);
+        \\int main(void) {
+        \\    if (array_sum(1, 2, 3) != 6) return 1;
+        \\    if (array_sum(-4, 9, 5) != 10) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_atomics_debug_location",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "atomics_debug_location.ll",
+        .harness =
+        \\extern int debug_location(int value);
+        \\int main(void) {
+        \\    if (debug_location(0) != 1) return 1;
+        \\    if (debug_location(41) != 42) return 2;
+        \\    if (debug_location(-2) != -1) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_atomics_inline_asm_barrier",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "atomics_inline_asm_barrier.ll",
+        .harness =
+        \\extern int inline_asm_barrier(int value);
+        \\int main(void) {
+        \\    if (inline_asm_barrier(0) != 0) return 1;
+        \\    if (inline_asm_barrier(42) != 42) return 2;
+        \\    if (inline_asm_barrier(-7) != -7) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasefast_atomics_atomic_add",
+        .mode = "ReleaseFast",
+        .fixture = releasefast_root ++ "atomics_atomic_add.ll",
+        .harness =
+        \\extern int atomic_add(int value);
+        \\int main(void) {
+        \\    if (atomic_add(5) != 0) return 1;
+        \\    if (atomic_add(7) != 5) return 2;
+        \\    if (atomic_add(-3) != 12) return 3;
         \\    return 0;
         \\}
         \\

@@ -58,7 +58,28 @@ ReleaseFast:
   releasefast_cmp_shift
   releasefast_branch_mix
   releasefast_loop_sum
+  releasefast_call_chain
+  releasefast_error_switch
+  releasefast_float_compare
+  releasefast_floats_math
+  releasefast_fp_constants
+  releasefast_fp_extended_ops
   releasefast_comptime_const
+  releasefast_globals_counter
+  releasefast_optional_ptr_value
+  releasefast_packed_bits
+  releasefast_pointers_memory
+  releasefast_tls_concurrency
+  releasefast_dense_switch
+  releasefast_aggregate_abi_pair
+  releasefast_aggregates_error_union_payload
+  releasefast_aggregates_optional_payload
+  releasefast_aggregates_slice_sum
+  releasefast_aggregates_struct_sum
+  releasefast_aggregates_array_sum
+  releasefast_atomics_debug_location
+  releasefast_atomics_inline_asm_barrier
+  releasefast_atomics_atomic_add
 
 ReleaseSafe:
   releasesafe_checked_add
@@ -76,9 +97,9 @@ Debug:
 Latest probe result:
 
 ```text
-accepted=12
+accepted=33
 failed=0
-ReleaseFast accepted=6 failed=0
+ReleaseFast accepted=27 failed=0
 ReleaseSafe accepted=2 failed=0
 ReleaseSmall accepted=3 failed=0
 Debug accepted=1 failed=0

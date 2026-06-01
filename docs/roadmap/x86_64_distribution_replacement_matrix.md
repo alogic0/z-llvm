@@ -267,8 +267,7 @@ stricter than the `zig cc` executable gates:
 gate=zig build distribution-native-link
 target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
-includes=ReleaseFast tiny scalar/add-wrap/global-constant objects,
-         cmp/shift, branch/select, and loop objects,
+includes=ReleaseFast full current executable harness set, 27 fixtures,
          ReleaseSafe checked-add object with panic stub and error-switch object,
          ReleaseSmall i64 constant-return, unchecked-arith, and hidden-access
          objects,
@@ -286,9 +285,9 @@ clean for the same selected subset:
 gate=zig build probe-native-linker
 target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
-accepted=12
+accepted=33
 failed=0
-per_mode=ReleaseFast 6/6 accepted, ReleaseSafe 2/2 accepted,
+per_mode=ReleaseFast 27/27 accepted, ReleaseSafe 2/2 accepted,
          ReleaseSmall 3/3 accepted, Debug 1/1 accepted
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility

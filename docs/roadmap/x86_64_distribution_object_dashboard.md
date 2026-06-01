@@ -69,12 +69,12 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build handoff` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug/O0 objects, using `zig build-exe -fno-lld` | pass |
-| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 12 accepted / 0 failed |
-| `zig build distribution-native-link-releasefast` | selected ReleaseFast native-link proof | pass, 6 executed |
+| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 33 accepted / 0 failed |
+| `zig build distribution-native-link-releasefast` | ReleaseFast native-link proof for the full current executable harness set | pass, 27 executed |
 | `zig build distribution-native-link-releasesafe` | selected ReleaseSafe native-link proof | pass, 2 executed |
 | `zig build distribution-native-link-releasesmall` | selected ReleaseSmall native-link proof | pass, 3 executed |
 | `zig build distribution-native-link-debug` | selected Debug/O0 native-link proof | pass, 1 executed |
-| `zig build probe-native-linker-releasefast` | selected ReleaseFast native-link compatibility probe | pass, 6 accepted / 0 failed |
+| `zig build probe-native-linker-releasefast` | ReleaseFast native-link compatibility probe for the full current executable harness set | pass, 27 accepted / 0 failed |
 | `zig build probe-native-linker-releasesafe` | selected ReleaseSafe native-link compatibility probe | pass, 2 accepted / 0 failed |
 | `zig build probe-native-linker-releasesmall` | selected ReleaseSmall native-link compatibility probe | pass, 3 accepted / 0 failed |
 | `zig build probe-native-linker-debug` | selected Debug/O0 native-link compatibility probe | pass, 1 accepted / 0 failed |

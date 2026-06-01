@@ -120,6 +120,7 @@ fn runCase(
         common.freeRunResult(allocator, asm_result);
         try link_args.append(allocator, stub_object);
     }
+    if (case.link_math) try link_args.append(allocator, "-lm");
     try link_args.appendSlice(allocator, &.{ "-lc", emit_bin_arg });
 
     const link_result = try common.runCapture(allocator, io, link_args.items, "zig build-exe -fno-lld");

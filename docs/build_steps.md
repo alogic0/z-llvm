@@ -22,11 +22,11 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-boundary` | Run conservative boundary gates: linker/CRT ownership, ReleaseSmall exclusions, Debug unwind/DWARF boundary, and AArch64 object target boundary. Use when boundary docs or boundary behavior changes. |
 | `zig build distribution-native-link` | Run selected native Zig linker handoff proof. This emits local objects with `z_llvm`, compiles C harnesses with `zig cc -c`, links with `zig build-exe -fno-lld`, and runs the executables. Use when proving native-linker compatibility for selected local objects. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
-| `zig build distribution-native-link-releasefast` | Run only the selected ReleaseFast native-link executable proof. |
+| `zig build distribution-native-link-releasefast` | Run the ReleaseFast native-link executable proof for the full current executable harness set. |
 | `zig build distribution-native-link-releasesafe` | Run only the selected ReleaseSafe native-link executable proof. |
 | `zig build distribution-native-link-releasesmall` | Run only the selected ReleaseSmall native-link executable proof. |
 | `zig build distribution-native-link-debug` | Run only the selected Debug/O0 native-link executable proof. |
-| `zig build probe-native-linker-releasefast` | Probe only the selected ReleaseFast native-link object set. |
+| `zig build probe-native-linker-releasefast` | Probe the ReleaseFast native-link object set for the full current executable harness set. |
 | `zig build probe-native-linker-releasesafe` | Probe only the selected ReleaseSafe native-link object set. |
 | `zig build probe-native-linker-releasesmall` | Probe only the selected ReleaseSmall native-link object set. |
 | `zig build probe-native-linker-debug` | Probe only the selected Debug/O0 native-link object set. |

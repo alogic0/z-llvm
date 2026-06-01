@@ -151,6 +151,7 @@ fn probeCase(
         try link_args.append(allocator, stub_object);
     }
 
+    if (case.link_math) try link_args.append(allocator, "-lm");
     try link_args.appendSlice(allocator, &.{ "-lc", emit_bin_arg });
     const link_result = try std.process.run(allocator, io, .{
         .argv = link_args.items,
