@@ -113,13 +113,20 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next();
     var pipeline: Pipeline = .postopt;
     var mode_filter: ?[]const u8 = null;
+    var case_filter: ?[]const u8 = null;
+    var use_ir_writer = false;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
             pipeline = .postopt;
         } else if (std.mem.eql(u8, arg, "--pipeline=preopt")) {
             pipeline = .preopt;
+        } else if (std.mem.eql(u8, arg, "--ir-writer")) {
+            use_ir_writer = true;
+            pipeline = .preopt;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             mode_filter = arg["--mode=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--case=")) {
+            case_filter = arg["--case=".len..];
         } else {
             try common.validationError(io, "unexpected argument for integrated object runner: {s}\n", .{arg});
         }
@@ -152,7 +159,11 @@ pub fn main(init: std.process.Init) !void {
     var env_map = std.process.Environ.Map.init(allocator);
     defer env_map.deinit();
     try copyEnvironment(&env_map, init.environ_map);
-    try env_map.put("ZIG_USE_ZLLVM_OBJECT", "1");
+    if (use_ir_writer) {
+        try env_map.put("ZIG_USE_ZLLVM_IR_WRITER", "1");
+    } else {
+        try env_map.put("ZIG_USE_ZLLVM_OBJECT", "1");
+    }
     try env_map.put("ZLLVM_PIPELINE", pipelineName(pipeline));
     try env_map.put("ZLLVM_EXE", zllvm_exe);
 
@@ -162,8 +173,8 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "zig-integrated-object target={s} pipeline={s} linker=zig build-exe -fno-lld hook=ZIG_USE_ZLLVM_OBJECT zllvm={s}\n",
-        .{ target, pipelineName(pipeline), zllvm_exe },
+        "zig-integrated-object target={s} pipeline={s} linker=zig build-exe -fno-lld hook={s} zllvm={s}\n",
+        .{ target, pipelineName(pipeline), if (use_ir_writer) "ZIG_USE_ZLLVM_IR_WRITER" else "ZIG_USE_ZLLVM_OBJECT", zllvm_exe },
     );
     try stdout_writer.interface.flush();
 
@@ -173,6 +184,9 @@ pub fn main(init: std.process.Init) !void {
     for (cases) |case| {
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
+        }
+        if (case_filter) |filter| {
+            if (!std.mem.eql(u8, filter, case.id)) continue;
         }
         try requirePairing(case);
         total += 1;
@@ -187,7 +201,7 @@ pub fn main(init: std.process.Init) !void {
         try env_map.put("ZLLVM_CASE_ID", case.id);
         try env_map.put("ZLLVM_WRAPPER", case.wrapper);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
-        try requireHookMarker(allocator, io, marker, case, pipeline);
+        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer);
         try linkIntegratedObject(allocator, io, target, object, exe);
         if (case.validation == .executable) {
             const run_argv = [_][]const u8{exe};
@@ -199,14 +213,14 @@ pub fn main(init: std.process.Init) !void {
         }
         try stdout_writer.interface.print(
             "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, case.proof, validationName(case.validation), case.fallback },
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), effectiveFallback(case, use_ir_writer) },
         );
         try stdout_writer.interface.flush();
     }
 
     try stdout_writer.interface.print(
-        "summary zig-integrated-object pipeline={s} total={} executable_ok={} link_only_ok={} local_fail=0\n",
-        .{ pipelineName(pipeline), total, executable_ok, link_only_ok },
+        "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} local_fail=0\n",
+        .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok },
     );
     try stdout_writer.interface.flush();
 }
@@ -231,6 +245,7 @@ fn requireHookMarker(
     marker: []const u8,
     case: Case,
     pipeline: Pipeline,
+    use_ir_writer: bool,
 ) !void {
     const contents = std.Io.Dir.cwd().readFileAlloc(io, marker, allocator, .limited(1024 * 1024)) catch |err| {
         try common.validationError(io, "missing z_llvm hook marker for {s}: {t}\n", .{ case.id, err });
@@ -247,6 +262,7 @@ fn requireHookMarker(
         .postopt => try requireMarkerField(io, contents, "zllvm_passes", "", case),
         .preopt => try requireMarkerField(io, contents, "zllvm_passes", acceptedPipeline(case.mode), case),
     }
+    if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer", "zig-owned-text", case);
 }
 
 fn requireMarkerField(io: std.Io, contents: []const u8, field: []const u8, value: []const u8, case: Case) !void {
@@ -323,6 +339,19 @@ fn validationName(validation: Validation) []const u8 {
         .executable => "executable",
         .link_only => "link-only",
     };
+}
+
+fn effectiveProof(use_ir_writer: bool) []const u8 {
+    if (use_ir_writer) return "integrated Zig-owned textual IR writer plus z_llvm optimizer/object path plus Zig build-exe native link";
+    return "integrated Zig build-obj object path plus Zig build-exe native link";
+}
+
+fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
+    if (!use_ir_writer) return case.fallback;
+    if (case.validation == .link_only) {
+        return "ir-construction:zig-owned-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
+    }
+    return "ir-construction:zig-owned-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
 }
 
 fn pipelineName(pipeline: Pipeline) []const u8 {

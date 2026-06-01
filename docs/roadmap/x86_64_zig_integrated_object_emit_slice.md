@@ -1,8 +1,8 @@
 # x86_64 Zig Integrated Object Emit Slice
 
 This slice moves the selected source-backed proof from an external capture
-pipeline into Zig's LLVM backend object-emission boundary. It now has two hook
-levels:
+pipeline into Zig's LLVM backend object-emission boundary. It now has three
+hook levels:
 
 ```text
 postopt:
@@ -18,6 +18,17 @@ preopt:
   Zig build-obj
     -> Zig constructs LLVM IR with libLLVM
     -> patched Zig writes pre-optimization LLVM IR before module_pm.run(...)
+    -> z_llvm runs the accepted Zig-mode pipeline
+    -> z_llvm emits x86_64 relocatable .o
+    -> Zig native linker links C ABI main wrappers with
+       zig build-exe -fno-lld -fno-compiler-rt -lc
+
+ir-writer:
+  Zig build-obj
+    -> Zig frontend validates the selected wrapper and comptime fixture checks
+    -> patched Zig Object.emit writes a whitelisted textual LLVM IR module
+       directly, without serializing/parsing the Builder module through
+       libLLVM
     -> z_llvm runs the accepted Zig-mode pipeline
     -> z_llvm emits x86_64 relocatable .o
     -> Zig native linker links C ABI main wrappers with
@@ -40,6 +51,8 @@ Validation gates:
 zig build distribution-zig-integrated-object   # postopt
 zig build distribution-zig-integrated-preopt   # preopt
 zig build distribution-zig-integrated-preopt -- --mode=ReleaseFast
+zig build distribution-zig-ir-writer-tiny-scalar
+zig build distribution-zig-ir-writer
 ```
 
 ## Zig Object-Emission Boundary
@@ -49,6 +62,21 @@ checkout:
 
 ```text
 src/codegen/llvm.zig:771 Object.emit
+  first checks the experimental Zig-owned IR writer hook at
+  src/codegen/llvm.zig:777 and returns early when it emits a selected object.
+
+src/codegen/llvm.zig:1137 emitZllvmIrWriterObject
+  validates ZIG_USE_ZLLVM_IR_WRITER=1, the selected case, mode, x86_64 Linux
+  target, and object-only emission before writing textual LLVM IR.
+
+src/codegen/llvm.zig:1192 writeZllvmIrWriterModule
+  writes the current minimal Zig-owned textual LLVM IR surface for selected
+  wrappers: target triple plus dso_local i32 @main() returning zero.
+
+src/codegen/llvm.zig:1262 runZllvmIrWriterCommand
+  runs z_llvm --passes=<accepted Zig-mode pipeline> and z_llvm --emit=obj.
+
+src/codegen/llvm.zig:780 normal libLLVM path
   finalizes the LLVM builder module, serializes Zig's LLVM bitcode, and parses
   that bitcode back into a libLLVM Module.
 
@@ -81,6 +109,7 @@ Opt-in environment:
 
 ```text
 ZIG_USE_ZLLVM_OBJECT=1
+ZIG_USE_ZLLVM_IR_WRITER=1
 ZLLVM_EXE=/path/to/zig-out/bin/z_llvm
 ZLLVM_PIPELINE=postopt|preopt
 ZLLVM_ZIG_MODE=ReleaseFast|ReleaseSafe|ReleaseSmall
@@ -93,6 +122,8 @@ Contract:
 ```text
 postopt_input=optimized LLVM IR text file written by patched Zig
 preopt_input=pre-optimization LLVM IR text file written by patched Zig
+ir_writer_input=selected textual LLVM IR module written directly by patched
+                Zig Object.emit
 output=x86_64 Linux relocatable object
 object_target=x86_64-unknown-linux-gnu
 link_target=x86_64-linux-gnu
@@ -109,6 +140,12 @@ preserve the previous experimental behavior. If `z_llvm` fails, the diagnostic
 reports the source wrapper metadata, mode, IR path, object path, target,
 command, exit status, and failure category.
 
+If `ZIG_USE_ZLLVM_IR_WRITER=1` is set, the hook is intentionally stricter: it
+requires `ZLLVM_PIPELINE=preopt`, a supported mode, a whitelisted `ZLLVM_CASE_ID`,
+x86_64 Linux object emission, and `ZLLVM_EXE`. If any of those are missing or
+unsupported, patched Zig fails clearly. With the env var unset, the libLLVM
+fallback path is untouched.
+
 Marker fields:
 
 ```text
@@ -121,7 +158,49 @@ ir=<path>
 case_id=<case>
 wrapper=<path>
 mode=<mode>
+ir_writer=zig-owned-text   # only for ZIG_USE_ZLLVM_IR_WRITER=1
 ```
+
+## FuncGen Inventory
+
+The current 10 wrappers deliberately enforce source behavior with `comptime`
+checks and expose a minimal runtime C ABI `main` returning zero. That makes the
+object-emitted `FuncGen.zig` surface for these rows much smaller than the
+source fixtures they cover:
+
+```text
+needed for emitted wrapper objects:
+  ../ziglang/src/codegen/llvm/FuncGen.zig:446 dispatches .ret AIR
+  ../ziglang/src/codegen/llvm/FuncGen.zig:934 airRet
+  ../ziglang/src/codegen/llvm/FuncGen.zig:1027 emits wip.ret(operand)
+
+source-backed fixture constructs checked at comptime or in separate
+object/native-link fixture gates, not yet emitted by the Zig-owned IR writer:
+  ../ziglang/src/codegen/llvm/FuncGen.zig:570  airCall
+  ../ziglang/src/codegen/llvm/FuncGen.zig:1533 airCondBr
+  ../ziglang/src/codegen/llvm/FuncGen.zig:1686 airSwitchBr
+  ../ziglang/src/codegen/llvm/FuncGen.zig:3344 airAdd
+  ../ziglang/src/codegen/llvm/FuncGen.zig:4702 airStore
+  ../ziglang/src/codegen/llvm/FuncGen.zig:4760 airLoad
+  ../ziglang/src/codegen/llvm/FuncGen.zig:5499 airSelect
+```
+
+Minimal Zig-owned IR emission surface for this slice:
+
+```text
+module header: source_filename, x86_64 Linux target triple
+function: dso_local i32 @main() local_unnamed_addr
+basic block: entry
+terminator: ret i32 0
+metadata: none
+globals: none
+attributes: none
+```
+
+This is intentionally not a generic replacement for `FuncGen.zig`. The next
+expansion should promote one concrete runtime-emitted construct from the
+unsupported list into the textual writer, then add a focused wrapper that
+requires it.
 
 ## Fixture Pairing
 
@@ -191,6 +270,8 @@ Expected summary:
 ```text
 postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ```
 
 ## Fallback Accounting
@@ -206,10 +287,34 @@ still uses LLVM linker/LLD: no, final link uses Zig build-exe -fno-lld
 final linker: Zig native linker/toolchain
 ```
 
+For `ZIG_USE_ZLLVM_IR_WRITER=1` selected rows:
+
+```text
+still uses Zig LLVM Builder for general backend state: yes
+still serializes/parses/prints the Builder module through libLLVM: no
+still uses LLVM module optimization pipeline: no
+still uses LLVM target-machine object emission: no
+still uses LLVM linker/LLD: no, final link uses Zig build-exe -fno-lld
+```
+
 The claim is intentionally x86_64-only and excludes AArch64, wasm, LTO, Debug
 expansion, Zig startup runtime replacement, compiler_rt sub-compilation
 replacement, broad runtime behavior, dynamic TLS, libc/compiler-rt replacement,
 and target-complete object/codegen coverage.
+
+Unsupported Zig-owned IR writer constructs remain explicit:
+
+```text
+runtime integer arithmetic beyond ret i32 0
+branches, switches, phi/select emission, loops
+loads, stores, globals, constants, table data
+calls and calling-convention variants
+error unions and ReleaseSafe runtime/panic paths
+TLS, atomics, inline asm, vectors
+aggregate ABI lowering, sret/byval, varargs
+debug metadata, DWARF, unwind/personality records
+non-x86_64 targets, LTO, simultaneous asm+object emission
+```
 
 ## Milestone Claim
 
@@ -219,3 +324,10 @@ relocatable object, and Zig's native linker links the executable. LLVM
 TargetMachine codegen and LLVM's module optimization pipeline are bypassed for
 those selected preopt rows. Zig still uses libLLVM to parse, hold, and print
 the LLVM module after Zig IR construction.
+
+For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig writes the
+minimal whitelisted textual LLVM IR module itself, `z_llvm` performs the
+accepted Zig-mode optimization pipeline and emits the relocatable object, and
+Zig's native linker links the executable. LLVM's module optimization pipeline,
+LLVM TargetMachine codegen, and libLLVM bitcode parse/print of the selected
+object module are bypassed for those rows.

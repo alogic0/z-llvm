@@ -13,6 +13,7 @@ const tools = [_]Tool{
     .{ .path = "tools/run_distribution_zig_source_native_link.zig" },
     .{ .path = "tools/run_distribution_zig_integrated_object.zig" },
     .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--pipeline=preopt"} },
+    .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--ir-writer"} },
     .{ .path = "tools/run_distribution_boundary_gates.zig" },
 };
 

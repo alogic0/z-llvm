@@ -60,6 +60,8 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-zig-source-native-link", "Run selected Zig source to z_llvm object to native-link executable gate", "tools/run_distribution_zig_source_native_link.zig");
     addToolStep(b, "distribution-zig-integrated-object", "Run patched Zig integrated z_llvm object-emission gate", "tools/run_distribution_zig_integrated_object.zig");
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-integrated-preopt", "Run patched Zig integrated preopt z_llvm optimizer/object-emission gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--pipeline=preopt"});
+    addToolStepWithFixedAndUserArgs(b, "distribution-zig-ir-writer-tiny-scalar", "Run the first selected Zig-owned textual IR writer gate", "tools/run_distribution_zig_integrated_object.zig", &.{ "--ir-writer", "--case=releasefast_tiny_scalar" });
+    addToolStepWithFixedAndUserArgs(b, "distribution-zig-ir-writer", "Run selected Zig-owned textual IR writer integration gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--ir-writer"});
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
     addToolStep(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");

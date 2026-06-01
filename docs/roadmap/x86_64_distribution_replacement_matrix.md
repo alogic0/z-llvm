@@ -368,7 +368,7 @@ fallback=stage4 Zig still emits LLVM IR; no LLVM codegen after IR emission for
 ```
 
 Zig integrated object emission is the experimental in-Zig hook stage above the
-external source capture pipeline. It is tracked in two levels:
+external source capture pipeline. It is tracked in three levels:
 
 ```text
 gate=zig build distribution-zig-integrated-object
@@ -405,6 +405,31 @@ wrapper_scope=compile-time semantic checks plus minimal C ABI main; broader
               callable ABI behavior remains covered by object/native-link
               fixture gates
 excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
+
+gate=zig build distribution-zig-ir-writer
+first_gate=zig build distribution-zig-ir-writer-tiny-scalar
+stage=Zig-owned textual IR writer, selected wrapper subset
+path=Zig build-obj -> patched Zig Object.emit textual LLVM IR
+     -> z_llvm --passes=<accepted Zig-mode pipeline>
+     -> z_llvm --emit=obj
+     -> zig build-exe -fno-lld
+status=experimental conservative boundary
+claim=selected wrapper objects bypass LLVM module optimization, LLVM
+      TargetMachine object emission, and libLLVM bitcode parse/print of the
+      selected emitted module
+total=10 executable_ok=9 link_only_ok=1 local_fail=0
+first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
+marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
+       wrapper, mode, ir_writer=zig-owned-text
+FuncGen_emitted_surface=ret i32 0 from selected C ABI main wrappers
+source_fixture_pairing=each row still records covered_fixture and mode; source
+                       behavior is enforced by comptime checks or existing
+                       object/native-link fixture gates
+remaining_dependency=general Zig LLVM Builder state remains; full FuncGen and
+                     broad Zig IR construction are not replaced
+excluded=runtime arithmetic, branches, switches, loops, loads/stores, globals,
+         calls, TLS, atomics, vectors, aggregate ABI lowering, debug/unwind,
+         AArch64, wasm, LTO, broad runtime/TLS/compiler-rt
 ```
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,

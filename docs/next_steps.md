@@ -30,6 +30,8 @@ zig build probe-native-linker
 zig build distribution-zig-source-native-link
 zig build distribution-zig-integrated-object
 zig build distribution-zig-integrated-preopt
+zig build distribution-zig-ir-writer-tiny-scalar
+zig build distribution-zig-ir-writer
 zig build probe-native-linker-broad -- --mode=ReleaseFast
 zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
@@ -50,7 +52,11 @@ boundary before `z_llvm --emit=obj` and `zig build-exe -fno-lld`. The
 integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
-finishes the selected wrappers. Broad
+finishes the selected wrappers. The Zig-owned textual IR writer gate now also
+passes: the first ReleaseFast tiny-scalar row and the full 10-row integrated
+set go through `ZIG_USE_ZLLVM_IR_WRITER=1`, a whitelisted direct textual IR
+module from patched `Object.emit`, the accepted `z_llvm` preopt pipeline,
+local object emission, and Zig native linking. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -95,6 +101,11 @@ preopt       patched Zig build-obj -> preopt IR -> z_llvm accepted pipeline
              -> z_llvm object -> Zig native link:
              total=10 executable_ok=9 link_only_ok=1 local_fail=0
              ReleaseFast narrow gate also passes with --mode=ReleaseFast
+ir writer    patched Zig build-obj -> Zig-owned textual IR subset
+             -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
+             tiny-scalar total=1 executable_ok=1 local_fail=0
+             full set total=10 executable_ok=9 link_only_ok=1 local_fail=0
+             emitted FuncGen surface is currently minimal C ABI main ret i32 0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0

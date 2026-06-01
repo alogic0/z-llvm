@@ -73,14 +73,20 @@ COMDAT, alignment, ABI, or unknown linker compatibility.
 
 The experimental integrated object-emission proofs are
 `zig build distribution-zig-integrated-object` and
-`zig build distribution-zig-integrated-preopt`. They require a patched local
-`../ziglang` with `ZIG_USE_ZLLVM_OBJECT=1`, `ZLLVM_EXE=/path/to/z_llvm`, and
-`ZLLVM_PIPELINE=postopt|preopt`. Zig still constructs LLVM IR. In postopt mode,
-LLVM runs Zig's normal module optimization pipeline and the hook replaces only
-LLVM target-machine object emission with `z_llvm --emit=obj`. In preopt mode,
-patched Zig writes IR before `module_pm.run(...)`, `z_llvm` runs the accepted
-mode pipeline and emits the object, and LLVM's module optimization pipeline is
-bypassed for the selected rows. Both modes link through Zig native linking with
+`zig build distribution-zig-integrated-preopt`; the Zig-owned textual IR writer
+proofs are `zig build distribution-zig-ir-writer-tiny-scalar` and
+`zig build distribution-zig-ir-writer`. The postopt/preopt hooks require a
+patched local `../ziglang` with `ZIG_USE_ZLLVM_OBJECT=1`,
+`ZLLVM_EXE=/path/to/z_llvm`, and `ZLLVM_PIPELINE=postopt|preopt`. Zig still
+constructs LLVM IR. In postopt mode, LLVM runs Zig's normal module optimization
+pipeline and the hook replaces only LLVM target-machine object emission with
+`z_llvm --emit=obj`. In preopt mode, patched Zig writes IR before
+`module_pm.run(...)`, `z_llvm` runs the accepted mode pipeline and emits the
+object, and LLVM's module optimization pipeline is bypassed for the selected
+rows. With `ZIG_USE_ZLLVM_IR_WRITER=1`, patched `Object.emit` writes a
+whitelisted textual LLVM IR module directly for selected wrapper rows before
+the libLLVM bitcode parse/print path, then uses the same preopt `z_llvm`
+optimizer/object path. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than
 standalone toy programs. The current wrappers expose C ABI `main`; the gate
