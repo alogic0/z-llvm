@@ -148,6 +148,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasesmall_runtime_i64_call",
+        .wrapper = "test/zig/integrated/i64_arithmetic_main.zig",
+        .covered_fixture = "test/zig/inputs/i64_arithmetic.zig",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
         .id = "releasesmall_base64_table_lookup",
         .wrapper = "test/zig/integrated/base64_table_lookup_main.zig",
         .covered_fixture = "test/zig/inputs/base64_table_lookup.zig",
@@ -244,6 +252,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "direct-call" },
         .{ .name = "global-load" },
         .{ .name = "i64-arithmetic" },
+        .{ .name = "i64-call-return" },
         .{ .name = "table-indexed-load" },
         .{ .name = "checked-add-runtime-boundary" },
         .{ .name = "runtime-condbr" },
@@ -525,6 +534,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "direct-call")) return "direct-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "global-load")) return "global-load";
     if (std.mem.eql(u8, contents[value_start..value_end], "i64-arithmetic")) return "i64-arithmetic";
+    if (std.mem.eql(u8, contents[value_start..value_end], "i64-call-return")) return "i64-call-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "table-indexed-load")) return "table-indexed-load";
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-add-runtime-boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-condbr")) return "runtime-condbr";

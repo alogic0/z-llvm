@@ -244,6 +244,8 @@ fn writeIrWriterModuleFromEnv(
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
+        try writeRuntimeI64CallIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) {
         try writeBase64TableLookupIrWriterBody(io, &writer.interface, ir_path);
     } else {
@@ -274,6 +276,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
     return "minimal-ret0";
 }
@@ -582,6 +585,30 @@ fn writeI64ArithmeticIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write i64 arithmetic external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeI64CallIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i64 @i64_arithmetic.i64_value() local_unnamed_addr {{
+        \\entry:
+        \\  ret i64 4
+        \\}}
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %wide = call i64 @i64_arithmetic.i64_value()
+        \\  %ok = icmp eq i64 %wide, 4
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime i64 call external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

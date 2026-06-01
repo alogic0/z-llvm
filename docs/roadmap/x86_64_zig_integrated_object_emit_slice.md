@@ -252,6 +252,11 @@ runtime-emitted rows:
     i32 return value, and is exposed through a main alias; the focused
     executable gate validates argc=1 exits 3
 
+  releasesmall_runtime_i64_call: i64-call-return
+    dso_local i64_arithmetic.i64_value returns an i64 constant, main calls it,
+    compares the i64 return value, and exits 0 only if the selected non-i32
+    call-return path succeeds under the ReleaseSmall accepted pipeline
+
   releasesmall_i64_arithmetic: i64-arithmetic
     dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
 
@@ -361,6 +366,11 @@ ReleaseSmall executable:
   wrapper=test/zig/integrated/i64_arithmetic_main.zig
   covered_fixture=test/zig/inputs/i64_arithmetic.zig
 
+  wrapper=test/zig/integrated/i64_arithmetic_main.zig
+  covered_fixture=test/zig/inputs/i64_arithmetic.zig
+  note=releasesmall_runtime_i64_call covers the i64 call-return surface for
+       the same source fixture
+
   wrapper=test/zig/integrated/base64_table_lookup_main.zig
   covered_fixture=test/zig/inputs/base64_table_lookup.zig
 ```
@@ -372,7 +382,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=16 executable_ok=15 link_only_ok=1 local_fail=0
+ir-writer full set:    total=17 executable_ok=16 link_only_ok=1 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -389,10 +399,13 @@ ir-writer global update:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer call chain:  zig build distribution-zig-ir-writer -- --case=releasefast_runtime_call_chain
 ir-writer call chain:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=16 minimal_wrapper_rows=0
+ir-writer i64 call:    zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_i64_call
+ir-writer i64 call:    total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=17 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
-                       i64-arithmetic=1 table-indexed-load=1
+                       i64-arithmetic=1 i64-call-return=1
+                       table-indexed-load=1
                        checked-add-runtime-boundary=1 runtime-condbr=1
                        runtime-phi-merge=1 runtime-loop-sum=1
                        runtime-switch=1 global-update=1 abi-arg-call=1
@@ -436,8 +449,8 @@ runtime integer arithmetic beyond the selected scalar/i64/integer rows
 branches beyond the selected runtime-condbr, constant-condbr, checked-add
 boundary, loop, and dense-switch shapes
 stores beyond the selected mutable global update semantics
-calls beyond the selected i32 ABI argument direct-call shape, including
-non-i32 returns
+calls beyond the selected i32 ABI argument direct-call and selected i64
+call-return shapes
 error unions and ReleaseSafe runtime/panic paths beyond the selected
 panic-runtime link-only boundary
 TLS, atomics, inline asm, vectors
@@ -459,9 +472,9 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 16/16 selected rows as runtime surfaces:
+The external writer now emits 17/17 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
-`global-load`, `i64-arithmetic`, `table-indexed-load`, and
+`global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
 `runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, and
 `global-update` and `abi-arg-call`; no selected rows remain as `minimal-ret0` hook-only
