@@ -92,6 +92,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_runtime_switch",
+        .wrapper = "test/zig/integrated/runtime_switch_main.zig",
+        .covered_fixture = "test/zig/inputs/switch_control.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -225,6 +233,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "runtime-condbr" },
         .{ .name = "runtime-phi-merge" },
         .{ .name = "runtime-loop-sum" },
+        .{ .name = "runtime-switch" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -447,6 +456,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_control_flow_calls")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_globals_comptime")) return 5;
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_switch")) return 13;
     if (std.mem.eql(u8, case.id, "releasesmall_globals_comptime")) return 5;
     return 0;
 }
@@ -500,6 +510,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-condbr")) return "runtime-condbr";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-phi-merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-loop-sum")) return "runtime-loop-sum";
+    if (std.mem.eql(u8, contents[value_start..value_end], "runtime-switch")) return "runtime-switch";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

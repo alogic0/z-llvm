@@ -230,6 +230,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimePhiMergeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) {
         try writeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) {
+        try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -261,6 +263,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) return "runtime-condbr";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -470,6 +473,42 @@ fn writeRuntimeLoopSumIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime loop sum external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeSwitchIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@switch.table.switch_control.dense_switch = private unnamed_addr constant [3 x i32] [i32 11, i32 13, i32 17], align 4
+        \\@main = alias i32 (i8), ptr @switch_control.dense_switch
+        \\
+        \\define private range(i32 11, 24) i32 @switch_control.dense_switch(i8 zeroext %0) unnamed_addr {{
+        \\entry:
+        \\  %in_table = icmp ult i8 %0, 3
+        \\  br i1 %in_table, label %switch.lookup, label %fallback
+        \\
+        \\switch.lookup:
+        \\  %index = zext i8 %0 to i64
+        \\  %switch.gep = getelementptr i32, ptr @switch.table.switch_control.dense_switch, i64 %index
+        \\  %switch.load = load i32, ptr %switch.gep, align 4
+        \\  br label %merge
+        \\
+        \\fallback:
+        \\  %range_base = add i8 %0, -3
+        \\  %in_range = icmp ult i8 %range_base, 3
+        \\  %fallback_value = select i1 %in_range, i32 19, i32 23
+        \\  br label %merge
+        \\
+        \\merge:
+        \\  %ret = phi i32 [ %switch.load, %switch.lookup ], [ %fallback_value, %fallback ]
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime switch external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
