@@ -46,6 +46,7 @@ local_stages=parse, verify, optimize, asm/object
 native_linker=zig build-exe -fno-lld
 gate=zig build distribution-native-link
 probe=zig build probe-native-linker
+broad_probe=zig build probe-native-linker-broad -- --mode=...
 status=local conservative boundary for selected ABI-stable fixtures
 ```
 
@@ -108,6 +109,8 @@ Debug:
 Latest probe result:
 
 ```text
+executable_abi_proof=zig build distribution-native-link
+selected_link_probe=zig build probe-native-linker
 accepted=44
 failed=0
 ReleaseFast accepted=27 failed=0
@@ -116,6 +119,54 @@ ReleaseSmall accepted=7 failed=0
 Debug accepted=1 failed=0
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
+```
+
+Latest broad link-only probe result:
+
+```text
+gate=zig build probe-native-linker-broad -- --mode=ReleaseFast
+summary=tmp/zig_ir/native_link_broad_releasefast.summary
+total=17 accepted=17 failed=0 excluded=0 first_failure=-
+
+gate=zig build probe-native-linker-broad -- --mode=ReleaseSafe
+summary=tmp/zig_ir/native_link_broad_releasesafe.summary
+total=17 accepted=9 failed=8 excluded=0
+first_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
+first_failure_category=runtime-symbol
+boundary=debug.FullPanic runtime symbol ownership remains Zig-owned
+
+gate=zig build probe-native-linker-broad -- --mode=ReleaseSmall
+summary=tmp/zig_ir/native_link_broad_releasesmall.summary
+total=465 accepted=272 failed=191 excluded=2
+first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
+first_failure_category=runtime-symbol
+boundary=start.posixCallMainAndExit startup/runtime ownership remains Zig-owned
+
+gate=zig build probe-native-linker-broad -- --mode=Debug
+summary=tmp/zig_ir/native_link_broad_debug.summary
+total=10 accepted=7 failed=3 excluded=0
+first_failure=load_dynamic_library_add_o0.ll
+first_failure_category=runtime-symbol
+boundary=Debug/O0 panic runtime and TLS ownership remain Zig-owned boundaries
+```
+
+Broad link-only evidence is not executable ABI evidence. It proves that local
+objects can be accepted by Zig's native linker after safe unresolved function
+stubs are generated. Runtime symbols, data symbols, TLS symbols, COMDAT,
+section, relocation, alignment, ABI, and unknown linker failures remain
+classified separately.
+
+Focused native-link object handoff shapes:
+
+```text
+tls=ReleaseFast tls_concurrency selected object links through native linker;
+    Debug/O0 external TLS symbol C_k remains a TLS-symbol boundary
+global_relocation=ReleaseFast globals_comptime and ReleaseSmall hidden-access
+                  selected objects link through native linker
+private_constants=ReleaseSmall c_abi_main fp128 constants and Debug/O0
+                  libfuzzer byte arrays are defined in local ELF objects
+comdat=no current selected local object emits COMDAT groups; COMDAT remains a
+       classified probe category and future compatibility boundary
 ```
 
 Per-mode gates:
@@ -129,6 +180,10 @@ zig build probe-native-linker-releasefast
 zig build probe-native-linker-releasesafe
 zig build probe-native-linker-releasesmall
 zig build probe-native-linker-debug
+zig build probe-native-linker-broad -- --mode=ReleaseFast
+zig build probe-native-linker-broad -- --mode=ReleaseSafe
+zig build probe-native-linker-broad -- --mode=ReleaseSmall
+zig build probe-native-linker-broad -- --mode=Debug
 ```
 
 ## Boundaries
@@ -138,6 +193,9 @@ policy, libc integration, dynamic loading, archives, shared libraries, linker
 scripts, non-x86_64 object formats, full Debug DWARF/unwind, and runtime paths
 that require Zig-owned linker or runtime behavior beyond selected stubs.
 
-The first future `zig build probe-native-linker` failure becomes the next local
-object compatibility slice unless evidence proves the failure belongs to Zig's
-linker implementation.
+The first future native-link probe failure becomes the next local object
+compatibility slice unless evidence proves the failure belongs to Zig's
+runtime, TLS, or linker implementation. Closed local compatibility examples in
+this slice include synthesized fp128 constant emission for ReleaseSmall
+`c_abi_main` and generic byte-array constant emission for Debug/O0 libfuzzer
+runner objects.

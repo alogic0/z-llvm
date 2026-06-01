@@ -6173,6 +6173,20 @@ fn lowerSelectedLibfuzzerDebugO0(allocator: std.mem.Allocator, machine: *Machine
         try machine.instructions.append(allocator, .ret);
         return true;
     }
+    if (std.mem.eql(u8, function.name, "main.testOne")) {
+        if (!function.ret_ty.eql(.{ .int = 1 }) or function.params.items.len != 0) return false;
+        if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
+        const block = function.blocks.items[0];
+        if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+        const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| ret,
+            .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
+        };
+        if (!ret.ty.eql(.{ .int = 1 }) or !(ret.value orelse return error.InvalidRet).eql(.{ .int = 0 })) return error.UnsupportedCodegenControlFlow;
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
     return false;
 }
 

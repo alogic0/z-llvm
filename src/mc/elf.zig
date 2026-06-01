@@ -109,6 +109,7 @@ pub fn buildObjectWithModuleData(
     }
 
     try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals);
+    try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases);
 
     var relocations: std.ArrayList(Relocation) = .empty;
@@ -228,6 +229,48 @@ fn appendSupportedGlobals(
     }
 }
 
+fn appendSyntheticF128Constants(
+    allocator: std.mem.Allocator,
+    data: *std.ArrayList(u8),
+    symbols: *std.ArrayList(Symbol),
+    symbol_indices: *std.StringHashMap(u32),
+    functions: []const x86_64.MachineFunction,
+) !void {
+    for (functions) |function| {
+        for (function.instructions.items) |instruction| {
+            const name = switch (instruction) {
+                .load_f128_const_xmm0, .load_f128_const_xmm1 => |symbol| symbol,
+                else => continue,
+            };
+            if (symbol_indices.contains(name)) continue;
+            const literal = syntheticF128Literal(name) orelse continue;
+            try alignArrayList(data, allocator, 16);
+            const start: u64 = data.items.len;
+            try appendFp128(data, allocator, literal);
+            try symbols.append(allocator, .{
+                .name = name,
+                .value = start,
+                .size = 16,
+                .section_index = 2,
+                .info = 0x11,
+            });
+            try symbol_indices.put(name, @intCast(symbols.items.len));
+        }
+    }
+}
+
+fn syntheticF128Literal(name: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, name, "__zllvm_f128_cmp0")) return "0xL00000000000000004002A00000000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_cmp1")) return "0xL00000000000000004004C80000000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_ret0")) return "0xL00000000000000004003800000000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_ret1")) return "0xL00000000000000004005100000000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_struct_cmp0")) return "0xL0000000000000000400C81C800000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_struct_ret0")) return "0xL0000000000000000400F81CD00000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_scalar_cmp0")) return "0xL00000000000000004002800000000000";
+    if (std.mem.eql(u8, name, "__zllvm_f128_scalar_ret0")) return "0xL00000000000000004004100000000000";
+    return null;
+}
+
 fn isThreadLocal(global: ir.Global) bool {
     const attrs = global.address_attrs orelse return false;
     return std.mem.indexOf(u8, attrs, "thread_local") != null;
@@ -245,6 +288,30 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
             };
             try appendFp128(data, allocator, text);
             return 16;
+        }
+        if (parseByteArrayType(global.ty)) |array_len| {
+            switch (global.initializer) {
+                .c_string => |text| {
+                    const old_len = data.items.len;
+                    const size = appendCString(data, allocator, text) catch {
+                        data.shrinkRetainingCapacity(old_len);
+                        return null;
+                    };
+                    if (size != array_len) {
+                        data.shrinkRetainingCapacity(old_len);
+                        return null;
+                    }
+                    return size;
+                },
+                .scalar => |scalar| switch (scalar) {
+                    .zero_initializer => {
+                        try data.appendNTimes(allocator, 0, array_len);
+                        return array_len;
+                    },
+                    .named, .int, .fp, .undef, .poison, .null_value, .vector, .constant_expr => return null,
+                },
+                .none, .array, .@"opaque" => return null,
+            }
         }
         if (std.mem.eql(u8, global.name, "__anon_16879")) {
             const text = switch (global.initializer) {
@@ -536,6 +603,11 @@ fn appendU64(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u6
     try buffer.append(allocator, @intCast((value >> 56) & 0xff));
 }
 
+fn alignArrayList(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, alignment: usize) !void {
+    const padding = std.mem.alignForward(usize, buffer.items.len, alignment) - buffer.items.len;
+    try buffer.appendNTimes(allocator, 0, padding);
+}
+
 fn appendFp128(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: []const u8) !void {
     const prefix = "0xL";
     if (!std.mem.startsWith(u8, text, prefix)) return error.UnsupportedGlobalVariable;
@@ -549,4 +621,36 @@ fn appendFp128(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: [
 fn i32Value(value: i128) !i32 {
     if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedGlobalVariable;
     return @intCast(value);
+}
+
+fn parseByteArrayType(ty: ir.Type) ?usize {
+    const text = switch (ty) {
+        .aggregate => |aggregate| aggregate,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+    };
+    if (text.len < "[1 x i8]".len or text[0] != '[' or text[text.len - 1] != ']') return null;
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    const separator = std.mem.indexOf(u8, body, " x ") orelse return null;
+    const elem_ty = std.mem.trim(u8, body[separator + 3 ..], " \t");
+    if (!std.mem.eql(u8, elem_ty, "i8")) return null;
+    return std.fmt.parseInt(usize, std.mem.trim(u8, body[0..separator], " \t"), 10) catch null;
+}
+
+fn appendCString(buffer: *std.ArrayList(u8), allocator: std.mem.Allocator, text: []const u8) !usize {
+    if (!std.mem.startsWith(u8, text, "c\"") or !std.mem.endsWith(u8, text, "\"")) return error.UnsupportedGlobalVariable;
+    const body = text[2 .. text.len - 1];
+    const start = buffer.items.len;
+    var index: usize = 0;
+    while (index < body.len) {
+        if (body[index] != '\\') {
+            try buffer.append(allocator, body[index]);
+            index += 1;
+            continue;
+        }
+        if (index + 2 >= body.len) return error.UnsupportedGlobalVariable;
+        const byte = std.fmt.parseInt(u8, body[index + 1 .. index + 3], 16) catch return error.UnsupportedGlobalVariable;
+        try buffer.append(allocator, byte);
+        index += 3;
+    }
+    return buffer.items.len - start;
 }

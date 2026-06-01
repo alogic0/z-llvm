@@ -295,6 +295,43 @@ next_blocker=none measured; first future failure becomes a local object
              compatibility slice unless evidence proves Zig linker behavior
 ```
 
+Broad native-link acceptance is tracked as link-only evidence, not executable
+ABI proof. It proves selected local objects are structurally acceptable to
+Zig's native linker path with safe unresolved function stubs, while keeping
+runtime/TLS/linker ownership boundaries visible:
+
+```text
+gate=zig build probe-native-linker-broad -- --mode=ReleaseFast
+summary=tmp/zig_ir/native_link_broad_releasefast.summary
+accepted=17 failed=0 excluded=0
+status=conservative boundary, all captured ReleaseFast rows link-only accepted
+
+gate=zig build probe-native-linker-broad -- --mode=ReleaseSafe
+summary=tmp/zig_ir/native_link_broad_releasesafe.summary
+accepted=9 failed=8 excluded=0
+first_failure=aggregates.zig.ReleaseSafe.x86_64.optimized.ll
+first_failure_category=runtime-symbol
+boundary=debug.FullPanic safety runtime ownership remains Zig-owned
+
+gate=zig build probe-native-linker-broad -- --mode=ReleaseSmall
+summary=tmp/zig_ir/native_link_broad_releasesmall.summary
+accepted=272 failed=191 excluded=2
+first_failure=cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll
+first_failure_category=runtime-symbol
+boundary=start.posixCallMainAndExit startup/runtime ownership remains Zig-owned
+closed_local_blocker=c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
+                     selected fp128 constants are now defined in local objects
+
+gate=zig build probe-native-linker-broad -- --mode=Debug
+summary=tmp/zig_ir/native_link_broad_debug.summary
+accepted=7 failed=3 excluded=0
+first_failure=load_dynamic_library_add_o0.ll
+first_failure_category=runtime-symbol
+closed_local_blocker=libfuzzer_runner_o0.ll selected byte-array constants and
+                     main.testOne helper now link through Zig native linker
+boundary=Debug/O0 panic runtime and TLS ownership remain Zig-owned
+```
+
 The named distribution slice is
 [x86_64_native_link_distribution_slice.md](x86_64_native_link_distribution_slice.md).
 Per-mode native-link build aliases exist for ReleaseFast, ReleaseSafe,

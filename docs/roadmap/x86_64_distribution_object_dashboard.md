@@ -70,6 +70,10 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug/O0 objects, using `zig build-exe -fno-lld` | pass |
 | `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 44 accepted / 0 failed |
+| `zig build probe-native-linker-broad -- --mode=ReleaseFast` | broad ReleaseFast link-only native-link acceptance over the 17 captured optimized IR rows | pass, 17 accepted / 0 failed |
+| `zig build probe-native-linker-broad -- --mode=ReleaseSafe` | broad ReleaseSafe link-only native-link acceptance over the 17 captured optimized IR rows | boundary, 9 accepted / 8 runtime-symbol failures |
+| `zig build probe-native-linker-broad -- --mode=ReleaseSmall` | broad ReleaseSmall link-only native-link acceptance over the 465 captured optimized IR rows, preserving the 2 explicit object exclusions | boundary, 272 accepted / 191 runtime-symbol failures / 2 excluded |
+| `zig build probe-native-linker-broad -- --mode=Debug` | broad selected Debug/O0 link-only native-link acceptance over `test/distribution/debug_x86_64/inputs` | boundary, 7 accepted / 2 runtime-symbol failures / 1 TLS-symbol failure |
 | `zig build distribution-native-link-releasefast` | ReleaseFast native-link proof for the full current executable harness set | pass, 27 executed |
 | `zig build distribution-native-link-releasesafe` | ReleaseSafe native-link proof for the full current executable ABI set | pass, 9 executed |
 | `zig build distribution-native-link-releasesmall` | ReleaseSmall native-link proof for the full current executable ABI set | pass, 7 executed |
@@ -93,6 +97,34 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call executable proof |
 | ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions, selected executable proof |
 | Debug | conservative boundary | adjusted continuous 463-row object-clean subset with 2 explicit exclusions |
+
+## Native-Link Acceptance
+
+Broad link-only probes are tracked separately from executable ABI proof. A
+link-only acceptance means the local `.o` emitted by `z_llvm` can be handed to
+`zig build-exe -fno-lld`; it does not prove callable behavior unless the row is
+also covered by an executable native-link gate.
+
+| Mode | Total | Link OK | Link Fail | Excluded | First Failure | Category |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| ReleaseFast | 17 | 17 | 0 | 0 | `-` | `-` |
+| ReleaseSafe | 17 | 9 | 8 | 0 | `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` | `runtime-symbol` |
+| ReleaseSmall | 465 | 272 | 191 | 2 | `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll` | `runtime-symbol` |
+| Debug/O0 selected | 10 | 7 | 3 | 0 | `load_dynamic_library_add_o0.ll` | `runtime-symbol` |
+
+Closed native-link object compatibility blockers:
+
+```text
+ReleaseSmall c_abi_main:
+  blocker=undefined synthetic __zllvm_f128_* constants
+  fix=define selected fp128 constants in local ELF object data
+  proof=ReleaseSmall broad probe now accepts c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll
+
+Debug/O0 libfuzzer runner:
+  blocker=undefined private c-string byte arrays and selected main.testOne helper
+  fix=emit generic [N x i8] c-string/zero constants and lower selected helper
+  proof=Debug broad probe now accepts libfuzzer_runner_o0.ll
+```
 
 The dashboard does not promote matrix rows by itself. Row status changes belong
 in [x86_64_distribution_replacement_matrix.md](x86_64_distribution_replacement_matrix.md)
@@ -197,7 +229,7 @@ Global exclusions:
     ReleaseSmall, and Debug executable fixtures; broad linker/CRT/libc
     ownership remains Zig-owned
   native Zig linker proof outside the selected `zig build distribution-native-link`
-    and `zig build probe-native-linker` subset
+    and broad link-only probe subsets
   bitcode/LTO artifact handoff to Zig's linker/toolchain until activation
     criteria are met
   dynamic TLS models

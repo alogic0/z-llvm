@@ -196,6 +196,12 @@ Backend handoff:
 - Selected Debug reduced objects now prove narrow codegen feasibility, but
       TLS lowering, unwind/debug object records, register allocation, broad O0
       lowering, and ABI lowering are not replacement-ready.
+- Broad native-link acceptance is tracked separately from executable ABI proof.
+      `zig build probe-native-linker-broad -- --mode=ReleaseFast` accepts all
+      17 captured ReleaseFast rows. ReleaseSafe, ReleaseSmall, and Debug broad
+      probes now stop at Zig-owned runtime/TLS boundaries after local object
+      compatibility fixes for selected ReleaseSmall fp128 constants and Debug/O0
+      byte-array/helper symbols.
 
 ## Next Wave
 

@@ -177,6 +177,7 @@ fn parseInputLimit(text: []const u8) !usize {
 }
 
 fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {
+    if (std.mem.eql(u8, function.name, "main.testOne")) return true;
     if (module.aliases.items.len == 0) return true;
     if (function.linkage != .private and function.linkage != .internal) return true;
     for (module.aliases.items) |alias| {

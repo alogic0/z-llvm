@@ -22,6 +22,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-boundary` | Run conservative boundary gates: linker/CRT ownership, ReleaseSmall exclusions, Debug unwind/DWARF boundary, and AArch64 object target boundary. Use when boundary docs or boundary behavior changes. |
 | `zig build distribution-native-link` | Run selected native Zig linker handoff proof. This emits local objects with `z_llvm`, compiles C harnesses with `zig cc -c`, links with `zig build-exe -fno-lld`, and runs the executables. Use when proving native-linker compatibility for selected local objects. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
+| `zig build probe-native-linker-broad -- --mode=ReleaseFast\|ReleaseSafe\|ReleaseSmall\|Debug` | Probe broad optimized IR/input directories for link-only acceptance through Zig's native linker. This emits local `.o` files with `z_llvm`, generates safe stubs only for unresolved function symbols, links with `zig build-exe -fno-lld`, and records link-only counts separately from executable ABI proof. |
 | `zig build distribution-native-link-releasefast` | Run the ReleaseFast native-link executable proof for the full current executable harness set. |
 | `zig build distribution-native-link-releasesafe` | Run the ReleaseSafe native-link executable proof for the full current executable ABI set. |
 | `zig build distribution-native-link-releasesmall` | Run the ReleaseSmall native-link executable proof for the full current executable ABI set. |
@@ -37,9 +38,12 @@ The executable gates hand local objects to Zig's driver through `zig cc`. They
 prove Zig-driver/toolchain handoff, not necessarily native Zig linker use,
 because Zig may still select an LLD-backed linker path internally.
 `zig build distribution-native-link` is the stricter native-linker-only
-execution proof for the selected subset. `zig build probe-native-linker` is the
-matching acceptance probe; a failure there becomes a local object compatibility
-task unless evidence points to Zig linker behavior.
+execution proof for the selected ABI-stable subset. `zig build
+probe-native-linker` is the matching selected acceptance probe. `zig build
+probe-native-linker-broad -- --mode=...` is broader link-only evidence: it does
+not claim ABI behavior, but it exposes object/linker compatibility problems.
+A failure in either native-link probe becomes a local object compatibility task
+unless evidence points to Zig-owned runtime/linker behavior.
 
 ## Utility Steps
 
