@@ -161,6 +161,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 }
             },
             .load_rax_ptr_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x10 }),
+            .load_rax_ptr_eax => try bytes.appendSlice(allocator, &.{ 0x8b, 0x00 }),
             .load_arg_ptr_eax => |reg| try encodeArgPtrToEax(&bytes, allocator, reg),
             .load_arg_ptr_disp8_rax => |load| try encodeArgPtrDisp8ToRax(&bytes, allocator, load.reg, load.offset),
             .load_arg_ptr_disp8_u8_eax => |load| try encodeArgPtrDisp8U8ToEax(&bytes, allocator, load.reg, load.offset),
@@ -313,6 +314,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_stack_disp8_rax => 5,
         .load_rax_ptr_disp8_rax => |offset| 3 + if (offset == 0) @as(u32, 0) else 1,
         .load_rax_ptr_rdx => 3,
+        .load_rax_ptr_eax => 2,
         .load_arg_ptr_eax => |reg| if (reg.rexB()) 3 else 2,
         .load_arg_ptr_disp8_rax => |load| 3 + if (load.offset == 0) @as(u32, 0) else 1,
         .load_arg_ptr_disp8_u8_eax => |load| (if (load.reg.rexB()) @as(u32, 1) else 0) + 3 + if (load.offset == 0) @as(u32, 0) else 1,

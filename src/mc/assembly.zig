@@ -73,6 +73,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .load_stack_disp8_rax => |offset| try writer.print("\tmovq {}(%rsp), %rax\n", .{offset}),
             .load_rax_ptr_disp8_rax => |offset| try writer.print("\tmovq {}(%rax), %rax\n", .{offset}),
             .load_rax_ptr_rdx => try writer.writeAll("\tmovq (%rax), %rdx\n"),
+            .load_rax_ptr_eax => try writer.writeAll("\tmovl (%rax), %eax\n"),
             .load_arg_ptr_eax => |reg| try writer.print("\tmovl ({s}), %eax\n", .{reg.name64()}),
             .load_arg_ptr_disp8_rax => |load| try writer.print("\tmovq {}({s}), %rax\n", .{ load.offset, load.reg.name64() }),
             .load_arg_ptr_disp8_u8_eax => |load| try writer.print("\tmovzbl {}({s}), %eax\n", .{ load.offset, load.reg.name64() }),

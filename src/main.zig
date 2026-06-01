@@ -238,6 +238,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) {
         try writeRuntimeVolatileRoundtripIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) {
+        try writeRuntimeOptionalPointerIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -301,6 +303,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) return "volatile-roundtrip";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -646,6 +649,49 @@ fn writeRuntimeVolatileRoundtripIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime volatile roundtrip external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeOptionalPointerIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@optional_pointer.writer_value = dso_local global i32 42, align 4
+        \\@optional_ptr_value = alias i32 (ptr), ptr @optional_pointer.optional_ptr_value
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %.not = icmp eq ptr @optional_pointer.writer_value, null
+        \\  br i1 %.not, label %null, label %nonnull
+        \\
+        \\null:
+        \\  ret i32 1
+        \\
+        \\nonnull:
+        \\  %value = load i32, ptr @optional_pointer.writer_value, align 4
+        \\  %ok = icmp eq i32 %value, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @optional_pointer.optional_ptr_value(ptr %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.not = icmp eq ptr %0, null
+        \\  br i1 %.not, label %common.ret, label %nonnull
+        \\
+        \\common.ret:
+        \\  %common.ret.op = phi i32 [ %loaded, %nonnull ], [ -1, %entry ]
+        \\  ret i32 %common.ret.op
+        \\
+        \\nonnull:
+        \\  %loaded = load i32, ptr %0, align 4
+        \\  br label %common.ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime optional pointer external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

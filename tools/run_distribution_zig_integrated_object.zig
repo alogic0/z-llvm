@@ -124,6 +124,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-volatile-roundtrip",
     },
     .{
+        .id = "releasefast_runtime_optional_pointer",
+        .wrapper = "test/zig/integrated/runtime_optional_pointer_main.zig",
+        .covered_fixture = "test/zig/inputs/optional_pointer.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-pointer",
+    },
+    .{
         .id = "releasefast_runtime_call_chain",
         .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
         .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
@@ -374,6 +382,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "global-update" },
         .{ .name = "pointer-load-store" },
         .{ .name = "volatile-roundtrip" },
+        .{ .name = "optional-pointer" },
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
@@ -652,6 +661,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_volatile_roundtrip")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-volatile-roundtrip";
     }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_optional_pointer")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-pointer";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -719,6 +731,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "global-update")) return "global-update";
     if (std.mem.eql(u8, contents[value_start..value_end], "pointer-load-store")) return "pointer-load-store";
     if (std.mem.eql(u8, contents[value_start..value_end], "volatile-roundtrip")) return "volatile-roundtrip";
+    if (std.mem.eql(u8, contents[value_start..value_end], "optional-pointer")) return "optional-pointer";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";

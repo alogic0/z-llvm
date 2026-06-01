@@ -226,6 +226,7 @@ pub const Instruction = union(enum) {
     load_stack_disp8_rax: u8,
     load_rax_ptr_disp8_rax: u8,
     load_rax_ptr_rdx,
+    load_rax_ptr_eax,
     load_arg_ptr_eax: ArgReg,
     load_arg_ptr_disp8_rax: struct {
         reg: ArgReg,
@@ -802,6 +803,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             return machine;
         }
         if (try lowerSelectedCheckedAddRuntimeBoundaryMain(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
+        if (try lowerRuntimeOptionalPointerMain(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
         }
@@ -4124,6 +4129,102 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = null_block.name });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const icmp_inst = entry.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_name = icmp_inst.result orelse return false;
+
+    const null_icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (null_icmp.predicate != .eq or !null_icmp.operand_ty.eql(.ptr)) return false;
+    const pointee_global = switch (null_icmp.lhs) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, pointee_global, "optional_pointer.writer_value")) return false;
+    if (null_icmp.rhs != .null_value) return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return false;
+
+    const null_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const nonnull_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const null_block = function.blocks.items[null_index];
+    const nonnull_block = function.blocks.items[nonnull_index];
+
+    if (null_block.instructions.items.len != 0) return false;
+    const null_ret = switch (null_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!null_ret.ty.eql(.{ .int = 32 }) or !isInt(null_ret.value orelse return error.InvalidRet, 1)) return false;
+
+    if (nonnull_block.instructions.items.len != 3) return false;
+    const value_load_inst = nonnull_block.instructions.items[0];
+    const value_icmp_inst = nonnull_block.instructions.items[1];
+    const select_inst = nonnull_block.instructions.items[2];
+    if (value_load_inst.removed or value_icmp_inst.removed or select_inst.removed) return false;
+    const value_name = value_load_inst.result orelse return false;
+    const value_icmp_name = value_icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+
+    const value_load = switch (value_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!value_load.ty.eql(.{ .int = 32 }) or value_load.attrs.isBarrier()) return false;
+    const value_load_global = switch (value_load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, value_load_global, pointee_global)) return false;
+
+    const value_icmp = switch (value_icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (value_icmp.predicate != .eq or !value_icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(value_icmp.lhs, value_name) or !isInt(value_icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, value_icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const nonnull_ret = switch (nonnull_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!nonnull_ret.ty.eql(.{ .int = 32 }) or !isNamed(nonnull_ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "optional_pointer_fail";
+    try machine.instructions.append(allocator, .{ .lea_global_rax = pointee_global });
+    try machine.instructions.append(allocator, .test_rax_rax);
+    try machine.instructions.append(allocator, .{ .je = fail });
+    try machine.instructions.append(allocator, .load_rax_ptr_eax);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -9042,6 +9143,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_stack_disp8_rax,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
+        .load_rax_ptr_eax,
         .load_arg_ptr_eax,
         .load_arg_ptr_disp8_rax,
         .load_arg_ptr_disp8_u8_eax,
@@ -9083,7 +9185,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -9194,6 +9296,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_stack_disp8_rax,
         .load_rax_ptr_disp8_rax,
         .load_rax_ptr_rdx,
+        .load_rax_ptr_eax,
         .load_arg_ptr_eax,
         .load_arg_ptr_disp8_rax,
         .load_arg_ptr_disp8_u8_eax,

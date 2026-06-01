@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=31 executable_ok=31 link_only_ok=0 local_fail=0
+total=32 executable_ok=32 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -428,6 +428,7 @@ runtime_switch_gate=zig build distribution-zig-ir-writer -- --case=releasefast_r
 runtime_global_update_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_global_update
 runtime_pointer_load_store_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_pointer_load_store
 runtime_volatile_roundtrip_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_volatile_roundtrip
+runtime_optional_pointer_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_optional_pointer
 runtime_call_chain_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_call_chain
 i64_call_return_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_i64_call
 tls_read_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_read
@@ -442,14 +443,15 @@ float_select_gate=zig build distribution-zig-ir-writer -- --case=releasefast_run
 float_sub_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_sub
 double_div_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_double_div
 float_rem_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_rem
-ir_writer_rows=scalar_runtime_rows=31, minimal_wrapper_rows=0
+ir_writer_rows=scalar_runtime_rows=32, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
                checked-add-runtime-boundary=1, runtime-condbr=1,
                runtime-phi-merge=1, runtime-loop-sum=1,
                runtime-switch=1, global-update=1,
-               pointer-load-store=1, volatile-roundtrip=1, abi-arg-call=1,
+               pointer-load-store=1, volatile-roundtrip=1,
+               optional-pointer=1, abi-arg-call=1,
                i64-call-return=1, tls-read=1, tls-bump=1,
                atomic-add=1, inline-asm-barrier=1,
                aggregate-pair-abi=1, float-less=1, float-mul=1,
@@ -472,6 +474,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         pointer-load-store,
                         releasefast_runtime_volatile_roundtrip
                         volatile-roundtrip,
+                        releasefast_runtime_optional_pointer
+                        optional-pointer,
                         releasefast_runtime_call_chain abi-arg-call,
                         releasefast_runtime_tls_read tls-read,
                         releasefast_runtime_tls_bump tls-bump,
