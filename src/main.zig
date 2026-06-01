@@ -242,6 +242,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) {
         try writeRuntimeAtomicAddIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) {
+        try writeRuntimeInlineAsmBarrierIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -281,6 +283,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) return "inline-asm-barrier";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -637,6 +640,25 @@ fn writeRuntimeAtomicAddIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime atomic add external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeInlineAsmBarrierIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@main = alias i32 (i32), ptr @atomics_inline_asm_debug.inline_asm_barrier
+        \\
+        \\define private i32 @atomics_inline_asm_debug.inline_asm_barrier(i32 %value) local_unnamed_addr {{
+        \\entry:
+        \\  tail call void asm sideeffect "", "~{{memory}},~{{dirflag}},~{{fpsr}},~{{flags}}"()
+        \\  ret i32 %value
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime inline asm barrier external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
