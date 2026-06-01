@@ -17,8 +17,8 @@ selected inline-asm memory barrier, selected small aggregate ABI, and selected
 float compare/multiply/add/select/subtract/divide/remainder and pointer
 load/store/volatile-roundtrip/optional-pointer, packed bitfield, and
 extern-struct field-load, scalarized array-sum, and optional scalar payload
-and error-union payload surfaces: a source-backed x86_64 pointer-indexed slice
-sum row.
+error-union payload, and pointer-indexed slice-sum surfaces: a source-backed
+x86_64 FP literal return row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -89,54 +89,56 @@ and catch fallback and is now covered by
 `releasefast_runtime_error_union_payload`. The next source-backed shape is
 `aggregates.slice_sum(ptr: [*]const i32, len: usize) i32`, which appears in
 captured ReleaseFast x86_64 IR as a loop with phi values, indexed GEP, `i32`
-load, add, and loop-exit branch.
+load, add, and loop-exit branch and is now covered by
+`releasefast_runtime_slice_sum`. The next source-backed shape is
+`fp_constants.float_literal() f32` / `fp_constants.double_literal() f64`,
+which appears in captured ReleaseFast x86_64 IR as direct `ret float` and
+`ret double` constants.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected pointer-indexed slice
-loop behavior after the scalar aggregate rows: emit the
-`aggregates.slice_sum` shape as a bounded loop over `ptr[index]`, phi-carried
-sum/index values, scalar `i32` loads, and a C ABI `i32` executable proof. Do
-not claim broad slice lowering, arbitrary pointer provenance, vectorized
-loops, unbounded alias analysis, or general loop canonicalization.
+Reduce the remaining external writer gap for selected FP constant materialized
+returns after the aggregate loop row: emit the `fp_constants.float_literal`
+and `fp_constants.double_literal` shapes as direct `f32`/`f64` constant
+returns, plus a C ABI `i32` executable proof. Do not claim broad FP constant
+folding, all FP formats, vector constants, fp128, or target-complete FP ABI.
 
 Mode/target/stage row:
 ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
-LLVM lowers the completed error-union source row to:
-`%.not.i = icmp eq i32 %0, 0`,
-`%2 = select i1 %.not.i, i32 7, i32 -1`, `ret i32 %2` in
-`test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
-The next selected row lowers to a loop in
+LLVM lowers the completed slice-sum source row to a loop in
 `test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll` with:
 `%.010 = phi i32 [ 0, %2 ], [ %5, %.lr.ph ]`,
 `%.089 = phi i64 [ 0, %2 ], [ %6, %.lr.ph ]`,
 `%3 = getelementptr [4 x i8], ptr %0, i64 %.089`,
 `%4 = load i32, ptr %3, align 4`, `%5 = add nsw i32 %4, %.010`,
 and a loop-exit compare/branch.
-Source behavior is represented by Zig's `aggregates.slice_sum` family.
+The next selected row lowers to direct FP returns in
+`test/distribution/releasefast_x86_64/inputs/fp_constants_literals.ll`:
+`ret double 2.250000e+00` and `ret float 1.500000e+00`.
+Source behavior is represented by Zig's `fp_constants` fixture.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected pointer-indexed slice-sum loop shape.
+behavior beyond the selected FP literal return shape.
 
-Completed optional-payload mapping:
-`%.not = icmp eq i32 %0, 0`,
-`%spec.select = select i1 %.not, i32 -1, i32 %1`, `ret i32 %spec.select` in
-`test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll`.
+Completed error-union mapping:
+`%.not.i = icmp eq i32 %0, 0`,
+`%2 = select i1 %.not.i, i32 7, i32 -1`, `ret i32 %2` in
+`test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only one selected pointer-indexed slice-sum loop shape. Dynamic slice creation,
-runtime safety checks, alias-sensitive memory transforms, vectorized loops,
-arbitrary GEPs, and broad slice/aggregate ABI behavior remain out of scope.
+Only selected f32/f64 literal returns. fp128, x87, vector constants, constant
+global FP loads, NaN payload preservation, and broad FP ABI behavior remain
+out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_slice_sum`
+`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_fp_constants`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected slice-sum slice separately with the policy in
+Commit the selected FP constants slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -175,11 +177,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 38-row
+also passes: the first ReleaseFast tiny-scalar row and the full 39-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 38 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 39 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -191,7 +193,7 @@ add row, optional pointer row, and the selected inline-asm memory barrier row,
 plus the selected packed read-flag row, selected packed replace-low row,
 selected aggregate pair ABI row, selected struct field-sum row, selected
 scalarized array-sum row, selected optional scalar payload row, selected
-error-union payload row,
+error-union payload row, selected pointer-indexed slice-sum row,
 selected ordered `f32` less-than row, selected `f64` multiply row, selected
 `f32` add row, selected `f64` select row, selected `f32` subtract row, and
 selected `f64` divide row, and selected `f32` remainder row. Broad
@@ -243,8 +245,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=38 executable_ok=38 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=38 minimal_wrapper_rows=0
+             full set total=39 executable_ok=39 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=39 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -258,6 +260,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              float-sub=1 double-div=1 float-rem=1 struct-field-sum=1
              array-scalar-sum=1 optional-scalar-payload=1
              error-union-payload=1
+             slice-loop-sum=1
              minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0

@@ -252,6 +252,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeOptionalPayloadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) {
         try writeRuntimeErrorUnionPayloadIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) {
+        try writeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -322,6 +324,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) return "array-scalar-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) return "slice-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -897,6 +900,48 @@ fn writeRuntimeErrorUnionPayloadIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime error-union-payload external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeSliceSumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@slice_sum_values = constant [4 x i32] [i32 1, i32 2, i32 3, i32 4], align 4
+        \\@slice_sum = alias i32 (ptr, i64), ptr @aggregates.slice_sum
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @aggregates.slice_sum(ptr @slice_sum_values, i64 4)
+        \\  %ok = icmp eq i32 %value, 10
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.slice_sum(ptr %0, i64 %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.not = icmp eq i64 %1, 0
+        \\  br i1 %.not, label %exit, label %loop
+        \\
+        \\loop:
+        \\  %sum = phi i32 [ 0, %entry ], [ %sum_next, %loop ]
+        \\  %index = phi i64 [ 0, %entry ], [ %next, %loop ]
+        \\  %ptr = getelementptr [4 x i8], ptr %0, i64 %index
+        \\  %loaded = load i32, ptr %ptr, align 4
+        \\  %sum_next = add i32 %loaded, %sum
+        \\  %next = add i64 %index, 1
+        \\  %done = icmp eq i64 %next, %1
+        \\  br i1 %done, label %exit, label %loop
+        \\
+        \\exit:
+        \\  %result = phi i32 [ 0, %entry ], [ %sum_next, %loop ]
+        \\  ret i32 %result
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime slice-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

@@ -289,6 +289,22 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
             try appendFp128(data, allocator, text);
             return 16;
         }
+        if (parseI32ArrayType(global.ty)) |array_len| {
+            const array = switch (global.initializer) {
+                .array => |array| array,
+                .none, .scalar, .c_string, .@"opaque" => return null,
+            };
+            if (!array.elem_ty.eql(.{ .int = 32 }) or array.values.items.len != array_len) return null;
+            for (array.values.items) |value| {
+                const int = switch (value) {
+                    .int => |int| int,
+                    .undef, .poison, .zero_initializer => 0,
+                    .named, .fp, .null_value, .vector, .constant_expr => return null,
+                };
+                try appendI32(data, allocator, try i32Value(int));
+            }
+            return array_len * 4;
+        }
         if (parseByteArrayType(global.ty)) |array_len| {
             switch (global.initializer) {
                 .c_string => |text| {
@@ -633,6 +649,19 @@ fn parseByteArrayType(ty: ir.Type) ?usize {
     const separator = std.mem.indexOf(u8, body, " x ") orelse return null;
     const elem_ty = std.mem.trim(u8, body[separator + 3 ..], " \t");
     if (!std.mem.eql(u8, elem_ty, "i8")) return null;
+    return std.fmt.parseInt(usize, std.mem.trim(u8, body[0..separator], " \t"), 10) catch null;
+}
+
+fn parseI32ArrayType(ty: ir.Type) ?usize {
+    const text = switch (ty) {
+        .aggregate => |aggregate| aggregate,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => return null,
+    };
+    if (text.len < "[1 x i32]".len or text[0] != '[' or text[text.len - 1] != ']') return null;
+    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
+    const separator = std.mem.indexOf(u8, body, " x ") orelse return null;
+    const elem_ty = std.mem.trim(u8, body[separator + 3 ..], " \t");
+    if (!std.mem.eql(u8, elem_ty, "i32")) return null;
     return std.fmt.parseInt(usize, std.mem.trim(u8, body[0..separator], " \t"), 10) catch null;
 }
 
