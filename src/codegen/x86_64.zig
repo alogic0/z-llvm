@@ -320,7 +320,7 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     const parsed_triple = try target.Triple.parse(triple_text);
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
 
-    var machine = MachineFunction.init(function.name, function.ret_ty);
+    var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
     errdefer machine.deinit(allocator);
 
     if (try lowerVolatileAbsoluteStore(allocator, &machine, function)) {
@@ -9348,17 +9348,22 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
 }
 
 fn isCalleeName(actual: []const u8, expected: []const u8) bool {
-    const actual_name = if (std.mem.startsWith(u8, actual, "@")) actual[1..] else actual;
+    const actual_name = symbolName(actual);
     if (std.mem.eql(u8, actual_name, expected)) return true;
-    return actual_name.len == expected.len + 2 and
-        actual_name[0] == '"' and
-        actual_name[actual_name.len - 1] == '"' and
-        std.mem.eql(u8, actual_name[1 .. actual_name.len - 1], expected);
+    return false;
 }
 
 fn globalSymbolName(name: []const u8) ![]const u8 {
     if (!std.mem.startsWith(u8, name, "@") or name.len == 1) return error.UnsupportedCodegenValue;
-    return name[1..];
+    return symbolName(name);
+}
+
+fn symbolName(name: []const u8) []const u8 {
+    const without_at = if (std.mem.startsWith(u8, name, "@")) name[1..] else name;
+    if (without_at.len >= 2 and without_at[0] == '"' and without_at[without_at.len - 1] == '"') {
+        return without_at[1 .. without_at.len - 1];
+    }
+    return without_at;
 }
 
 fn isInt(value: ir.Value, expected: i128) bool {

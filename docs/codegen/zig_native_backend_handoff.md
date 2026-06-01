@@ -100,7 +100,8 @@ optimizer/object path. Runtime writer rows now cover
 `float-add`, `float-select`, `float-sub`, `double-div`, `float-rem`, and
 `struct-field-sum`, `array-scalar-sum`, `optional-scalar-payload`,
 `error-union-payload`, `slice-loop-sum`, `fp-literal-return`, and
-`comptime-const-mul`, and `add-imm-return`; all 42 selected rows are
+`comptime-const-mul`, `add-imm-return`, and `checked-add-imm-boundary`; all 43
+selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it

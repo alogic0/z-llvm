@@ -260,6 +260,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeComptimeConstIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_debug_location")) {
         try writeRuntimeDebugLocationIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_debug_location")) {
+        try writeReleaseSafeRuntimeDebugLocationIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -334,6 +336,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) return "fp-literal-return";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) return "comptime-const-mul";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_debug_location")) return "add-imm-return";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_debug_location")) return "checked-add-imm-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -1034,6 +1037,51 @@ fn writeRuntimeDebugLocationIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime debug_location external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeDebugLocationIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@debug_location = alias i32 (i32), ptr @atomics_inline_asm_debug.debug_location
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @atomics_inline_asm_debug.debug_location(i32 41)
+        \\  %ok = icmp eq i32 %value, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @atomics_inline_asm_debug.debug_location(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %value, i32 1)
+        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
+        \\  br i1 %overflow, label %panic, label %ok
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\ok:
+        \\  %result = extractvalue {{ i32, i1 }} %checked, 0
+        \\  ret i32 %result
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime debug_location external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

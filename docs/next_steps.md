@@ -15,11 +15,12 @@ phi/merge values, loops, dense-switch, mutable global update, i32 ABI-argument
 direct-call, i64 call-return, local-exec TLS read/update, selected atomic add,
 selected inline-asm memory barrier, selected small aggregate ABI, selected
 float compare/multiply/add/select/subtract/divide/remainder/literal-return,
-selected comptime constant multiply, selected add-immediate return, pointer
+selected comptime constant multiply, selected add-immediate return,
+ReleaseSafe checked add-immediate boundary, pointer
 load/store/volatile-roundtrip/optional-pointer, packed bitfield, extern-struct
 field-load, scalarized array-sum, optional scalar payload, error-union
 payload, and pointer-indexed slice-sum surfaces: a source-backed x86_64
-i64 pair-packing row.
+ReleaseSafe checked comptime constant multiply row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -103,16 +104,23 @@ source-backed shape is
 `atomics_inline_asm_debug.debug_location(value: i32) i32`, which appears in
 captured ReleaseFast x86_64 IR as selected `add nsw i32 %0, 1` plus a direct
 return and is now covered by `releasefast_runtime_debug_location`. The next
-source-backed shape is `aggregate_abi.make_pair(a: i32, b: i32) Pair`, which
-appears in captured ReleaseFast x86_64 IR as two `zext i32 to i64` values, a
-left shift by 32, and an `or` packing the two fields into the returned `i64`.
+source-backed shape is
+`atomics_inline_asm_debug.debug_location(value: i32) i32` under ReleaseSafe,
+which appears in captured ReleaseSafe x86_64 IR as `llvm.sadd.with.overflow`
+plus an integer-overflow panic edge and is now covered by
+`releasesafe_runtime_debug_location`. The next source-backed shape is
+`globals_comptime.comptime_const(value: i32) i32` under ReleaseSafe, which
+appears in captured ReleaseSafe x86_64 IR as checked multiply-by-five with an
+integer-overflow panic edge.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected aggregate pair
-construction after the add-immediate row: emit the `aggregate_abi.make_pair`
-shape as two `i32` arguments packed into one returned `i64`, plus a C ABI
-executable proof. Do not claim broad aggregate ABI, byval/sret, mixed
-integer/float aggregate handling, varargs, or target-complete struct returns.
+Reduce the remaining external writer gap for selected ReleaseSafe checked
+arithmetic after the checked add-immediate row: emit
+`globals_comptime.comptime_const` as `llvm.smul.with.overflow.i32(value, 5)`
+with the selected Zig integer-overflow panic edge, plus a C ABI executable
+proof for the non-overflow path. Do not claim broad ReleaseSafe panic
+semantics, arbitrary checked multiplication, runtime ownership, or all safety
+paths.
 
 Mode/target/stage row:
 ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -139,15 +147,17 @@ selected row lowers in
 `%2 = add nsw i32 %0, 1`, `ret i32 %2`.
 Source behavior is represented by Zig's `atomics_inline_asm_debug` fixture.
 The next selected row lowers in
-`test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll` to:
-`%.sroa.2.0.insert.ext = zext i32 %1 to i64`,
-`%.sroa.2.0.insert.shift = shl nuw i64 %.sroa.2.0.insert.ext, 32`,
-`%.sroa.0.0.insert.ext = zext i32 %0 to i64`, and
-`%.sroa.0.0.insert.insert = or disjoint i64 %.sroa.2.0.insert.shift,
-%.sroa.0.0.insert.ext`.
-Source behavior is represented by Zig's `aggregate_abi` fixture.
+`test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll`
+to `llvm.sadd.with.overflow.i32`, an overflow branch to
+`debug.FullPanic((function 'defaultPanic')).integerOverflow`, and a non-overflow
+`extractvalue` return and is now covered by
+`releasesafe_runtime_debug_location`. The next selected row lowers in
+`test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll` to
+`llvm.smul.with.overflow.i32(i32 %0, i32 5)`, an overflow branch to the same
+integer-overflow panic edge, and a non-overflow `extractvalue` return.
+Source behavior is represented by Zig's `globals_comptime` fixture.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected i64 pair-packing return shape.
+behavior beyond the selected ReleaseSafe checked multiply-by-constant shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -155,18 +165,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected two-`i32` to one-`i64` pair packing. Pair unpacking is already
-covered separately; broad aggregate ABI, mixed register classes, memory
-returns, byval/sret, varargs, and non-x86_64 ABI behavior remain out of scope.
+Only selected `i32` checked multiply-by-five with the integer-overflow panic
+edge stubbed for non-overflow executable proof. Broad ReleaseSafe runtime
+semantics, all panic functions, arbitrary checked arithmetic, and runtime
+ownership remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_make_pair`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_comptime_const`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected i64 pair-packing slice separately with the policy in
+Commit the selected ReleaseSafe checked comptime constant multiply slice
+separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -205,11 +217,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 42-row
+also passes: the first ReleaseFast tiny-scalar row and the full 43-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 42 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 43 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -226,7 +238,8 @@ selected ordered `f32` less-than row, selected `f64` multiply row, selected
 `f32` add row, selected `f64` select row, selected `f32` subtract row, and
 selected `f64` divide row, selected `f32` remainder row, and selected f32/f64
 literal-return row, selected comptime constant multiply row, and selected
-add-immediate return row. Broad
+add-immediate return row, plus the selected ReleaseSafe checked add-immediate
+panic-edge row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -275,8 +288,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=42 executable_ok=42 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=42 minimal_wrapper_rows=0
+             full set total=43 executable_ok=43 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=43 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -293,6 +306,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              slice-loop-sum=1 fp-literal-return=1
              comptime-const-mul=1
              add-imm-return=1
+             checked-add-imm-boundary=1
              minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
