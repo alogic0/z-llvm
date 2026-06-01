@@ -38,10 +38,10 @@ pub fn main(init: std.process.Init) !void {
     }
     try expectContains(allocator, io, exe_err, "UnsupportedEmitMode");
 
-    try expectContains(allocator, io, "scripts/run_distribution_executable_m1.sh", "zig cc -target \"$cc_target\"");
-    try expectContains(allocator, io, "scripts/run_distribution_releasesafe_object_m2.sh", "zig cc -target \"$cc_target\"");
-    try expectContains(allocator, io, "scripts/run_distribution_releasesmall_executable_m3.sh", "zig cc -target \"$cc_target\"");
-    try expectContains(allocator, io, "scripts/run_distribution_debug_executable_m4.sh", "zig cc -target \"$cc_target\"");
+    try expectContains(allocator, io, "tools/run_distribution_executable_m1.zig", "\"zig\", \"cc\", \"-target\", cc_target");
+    try expectContains(allocator, io, "tools/run_distribution_releasesafe_object_m2.zig", "\"zig\", \"cc\", \"-target\", cc_target");
+    try expectContains(allocator, io, "tools/run_distribution_releasesmall_executable_m3.zig", "\"zig\", \"cc\", \"-target\", cc_target");
+    try expectContains(allocator, io, "tools/run_distribution_debug_executable_m4.zig", "\"zig\", \"cc\", \"-target\", cc_target");
 
     var stdout_buffer: [256]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
