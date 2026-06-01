@@ -236,6 +236,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
+        try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -272,6 +274,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -566,6 +569,26 @@ fn writeRuntimeCallChainIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime call chain external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeTlsReadIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@tls_concurrency.tls_counter = internal thread_local(localexec) global i32 1, align 4
+        \\@main = alias i32 (), ptr @tls_concurrency.read_tls
+        \\
+        \\define private i32 @tls_concurrency.read_tls() local_unnamed_addr {{
+        \\entry:
+        \\  %value = load i32, ptr @tls_concurrency.tls_counter, align 4
+        \\  ret i32 %value
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime TLS read external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

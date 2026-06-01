@@ -93,7 +93,7 @@ optimizer/object path. Runtime writer rows now cover
 `global-load`, `i64-arithmetic`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr`,
 `runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, `global-update`,
-`abi-arg-call`, and `i64-call-return`; all 17 selected rows are
+`abi-arg-call`, `i64-call-return`, and `tls-read`; all 18 selected rows are
 runtime-emitted and the gate fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than

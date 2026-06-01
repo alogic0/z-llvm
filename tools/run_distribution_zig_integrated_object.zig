@@ -116,6 +116,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_runtime_tls_read",
+        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -261,6 +269,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "runtime-switch" },
         .{ .name = "global-update" },
         .{ .name = "abi-arg-call" },
+        .{ .name = "tls-read" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -486,6 +495,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_switch")) return 13;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
     if (std.mem.eql(u8, case.id, "releasesmall_globals_comptime")) return 5;
     return 0;
 }
@@ -509,6 +519,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     }
     if (std.mem.eql(u8, case.id, "releasesafe_tiny_scalar_runtime_boundary")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+    }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
     return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
 }
@@ -546,6 +559,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-switch")) return "runtime-switch";
     if (std.mem.eql(u8, contents[value_start..value_end], "global-update")) return "global-update";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
+    if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
