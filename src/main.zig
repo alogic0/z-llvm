@@ -232,6 +232,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) {
         try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
+        try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -264,6 +266,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -509,6 +512,28 @@ fn writeRuntimeSwitchIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime switch external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeGlobalUpdateIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@globals_comptime.global_counter = private global i32 3, align 4
+        \\@main = alias i32 (i32), ptr @globals_comptime.update_global
+        \\
+        \\define private i32 @globals_comptime.update_global(i32 %value) local_unnamed_addr {{
+        \\entry:
+        \\  %current = load i32, ptr @globals_comptime.global_counter, align 4
+        \\  %updated = add i32 %current, %value
+        \\  store i32 %updated, ptr @globals_comptime.global_counter, align 4
+        \\  ret i32 %updated
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

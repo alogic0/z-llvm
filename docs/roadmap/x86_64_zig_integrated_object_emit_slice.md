@@ -240,6 +240,12 @@ runtime-emitted rows:
     point through a main alias; the focused executable gate validates the
     selected switch/table path and exits 13 for argc=1
 
+  releasefast_runtime_global_update: global-update
+    private globals_comptime.update_global loads a mutable i32 global, adds the
+    runtime i32 ABI argument, stores the updated value back, and returns it
+    through a main alias; the focused executable gate validates argc=1 updates
+    the initial value 3 to exit code 4
+
   releasesmall_i64_arithmetic: i64-arithmetic
     dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
 
@@ -323,6 +329,9 @@ ReleaseFast executable:
   wrapper=test/zig/integrated/runtime_switch_main.zig
   covered_fixture=test/zig/inputs/switch_control.zig
 
+  wrapper=test/zig/integrated/runtime_global_update_main.zig
+  covered_fixture=test/zig/inputs/globals_comptime.zig
+
 ReleaseSafe executable:
   wrapper=test/zig/integrated/error_switch_main.zig
   covered_fixture=test/zig/inputs/error_switch.zig
@@ -352,7 +361,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=14 executable_ok=13 link_only_ok=1 local_fail=0
+ir-writer full set:    total=15 executable_ok=14 link_only_ok=1 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -363,13 +372,17 @@ ir-writer loop sum:    zig build distribution-zig-ir-writer -- --case=releasefas
 ir-writer loop sum:    total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer switch:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_switch
 ir-writer switch:      total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=14 minimal_wrapper_rows=0
+ir-writer global update:
+                       zig build distribution-zig-ir-writer -- --case=releasefast_runtime_global_update
+ir-writer global update:
+                       total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=15 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
                        i64-arithmetic=1 table-indexed-load=1
                        checked-add-runtime-boundary=1 runtime-condbr=1
                        runtime-phi-merge=1 runtime-loop-sum=1
-                       runtime-switch=1 minimal-ret0=0
+                       runtime-switch=1 global-update=1 minimal-ret0=0
 ```
 
 ## Fallback Accounting
@@ -408,7 +421,7 @@ Unsupported external IR writer constructs remain explicit:
 runtime integer arithmetic beyond the selected scalar/i64/integer rows
 branches beyond the selected runtime-condbr, constant-condbr, checked-add
 boundary, loop, and dense-switch shapes
-stores and mutable global update semantics
+stores beyond the selected mutable global update semantics
 calls with ABI arguments or non-i32 returns
 error unions and ReleaseSafe runtime/panic paths beyond the selected
 panic-runtime link-only boundary
@@ -431,11 +444,12 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 14/14 selected rows as runtime surfaces:
+The external writer now emits 15/15 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
-`runtime-phi-merge`, `runtime-loop-sum`, and `runtime-switch`; no selected rows remain as `minimal-ret0` hook-only
+`runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, and
+`global-update`; no selected rows remain as `minimal-ret0` hook-only
 proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for

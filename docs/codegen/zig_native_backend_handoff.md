@@ -92,7 +92,7 @@ optimizer/object path. Runtime writer rows now cover
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr`,
-`runtime-phi-merge`, `runtime-loop-sum`, and `runtime-switch`; all 14 selected rows are
+`runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, and `global-update`; all 15 selected rows are
 runtime-emitted and the gate fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than
