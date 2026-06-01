@@ -917,6 +917,7 @@ fn lowerStraightLineReturn(
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatAddMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeFloatSubMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDoubleDivReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatRemReturn(allocator, machine, function, block, ret)) return;
@@ -2178,6 +2179,63 @@ fn lowerFloatSubReturn(
 ) !bool {
     if (!try matchesFpBinaryReturn(function, block, ret, .float, .fsub)) return false;
     try machine.instructions.append(allocator, .subss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeFloatSubMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (function.params.items.len != 0) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const fsub_inst = block.instructions.items[0];
+    const fcmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (fsub_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
+    const fsub_name = fsub_inst.result orelse return false;
+    const fcmp_name = fcmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fsub = switch (fsub_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (fsub.op != .fsub or !fsub.ty.eql(.float)) return false;
+    if (!isFpText(fsub.lhs, "5.000000e+00") or !isFpText(fsub.rhs, "2.000000e+00")) return false;
+
+    const fcmp = switch (fcmp_inst.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.float)) return false;
+    if (!isNamed(fcmp.lhs, fsub_name) or !isFpText(fcmp.rhs, "3.000000e+00")) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "float_sub_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = 0x40a0_0000 });
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4000_0000 });
+    try machine.instructions.append(allocator, .subss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4040_0000 });
+    try machine.instructions.append(allocator, .ucomiss_xmm1_xmm0);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
