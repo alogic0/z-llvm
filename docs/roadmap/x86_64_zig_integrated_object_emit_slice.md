@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=22 executable_ok=22 link_only_ok=0 local_fail=0
+ir-writer full set:    total=23 executable_ok=23 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -435,7 +435,9 @@ ir-writer aggregate pair:
                        zig build distribution-zig-ir-writer -- --case=releasefast_runtime_aggregate_pair
 ir-writer aggregate pair:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=22 minimal_wrapper_rows=0
+ir-writer float less:  zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_less
+ir-writer float less:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=23 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
                        i64-arithmetic=1 i64-call-return=1
@@ -445,7 +447,7 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        runtime-switch=1 global-update=1 abi-arg-call=1
                        tls-read=1 tls-bump=1 atomic-add=1
                        inline-asm-barrier=1 aggregate-pair-abi=1
-                       minimal-ret0=0
+                       float-less=1 minimal-ret0=0
 ```
 
 ## Fallback Accounting
@@ -509,13 +511,13 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 22/22 selected rows as runtime surfaces:
+The external writer now emits 23/23 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
 `runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`, and
 `global-update`, `abi-arg-call`, `tls-read`, `tls-bump`, `atomic-add`,
-`inline-asm-barrier`, and `aggregate-pair-abi`; no selected rows remain as
+`inline-asm-barrier`, `aggregate-pair-abi`, and `float-less`; no selected rows remain as
 `minimal-ret0` hook-only
 proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
