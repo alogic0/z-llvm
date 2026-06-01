@@ -240,6 +240,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeVolatileRoundtripIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) {
         try writeRuntimeOptionalPointerIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) {
+        try writeRuntimePackedReadFlagIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -304,6 +306,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) return "volatile-roundtrip";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -692,6 +695,41 @@ fn writeRuntimeOptionalPointerIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime optional pointer external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimePackedReadFlagIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@read_flag = alias i1 (i8), ptr @packed_bits.read_flag
+        \\@replace_low = alias i8 (i8, i8), ptr @packed_bits.replace_low
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %flag = icmp slt i8 -128, 0
+        \\  %ret = select i1 %flag, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i1 @packed_bits.read_flag(i8 %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %2 = icmp slt i8 %0, 0
+        \\  ret i1 %2
+        \\}}
+        \\
+        \\define private i8 @packed_bits.replace_low(i8 %0, i8 %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = and i8 %0, -8
+        \\  %4 = and i8 %1, 7
+        \\  %5 = or i8 %4, %3
+        \\  ret i8 %5
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime packed read-flag external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
