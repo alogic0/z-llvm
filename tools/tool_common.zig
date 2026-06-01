@@ -174,6 +174,22 @@ pub fn expectLiteral(allocator: std.mem.Allocator, io: std.Io, path: []const u8,
     try validationError(io, "missing literal match in {s}: {s}\n", .{ path, needle });
 }
 
+pub fn expectNoRegex(allocator: std.mem.Allocator, io: std.Io, path: []const u8, pattern: []const u8) !void {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(128 * 1024 * 1024));
+    defer allocator.free(contents);
+
+    const normalized_pattern = try normalizeRgPattern(allocator, pattern);
+    defer allocator.free(normalized_pattern);
+
+    var compiled = regex.compileRe(allocator, normalized_pattern, .{}) catch |err| {
+        try validationError(io, "invalid regex pattern for {s}: {s}: {s}\n", .{ path, pattern, @errorName(err) });
+    };
+    defer compiled.deinit();
+
+    if (!try isMatchLinewise(&compiled, contents)) return;
+    try validationError(io, "unexpected regex match in {s}: {s}\n", .{ path, pattern });
+}
+
 fn isMatchLinewise(compiled: *const regex.Compiled, contents: []const u8) !bool {
     var start: usize = 0;
     while (start <= contents.len) {
