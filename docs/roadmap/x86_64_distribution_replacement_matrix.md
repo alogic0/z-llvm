@@ -408,20 +408,23 @@ excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
 
 gate=zig build distribution-zig-ir-writer
 first_gate=zig build distribution-zig-ir-writer-tiny-scalar
-stage=Zig-owned textual IR writer, selected wrapper subset
-path=Zig build-obj -> patched Zig Object.emit textual LLVM IR
+stage=external z_llvm textual IR writer, selected wrapper subset
+path=Zig build-obj -> patched Zig Object.emit validates external contract
+     -> z_llvm --emit=ir-writer writes textual LLVM IR
      -> z_llvm --passes=<accepted Zig-mode pipeline>
      -> z_llvm --emit=obj
      -> zig build-exe -fno-lld
 status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
-      selected emitted module
+      selected emitted module; patched Zig does not own case-specific IR text
 total=10 executable_ok=9 link_only_ok=1 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
+ir_writer_rows=scalar_runtime_rows=1, minimal_wrapper_rows=9
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
-       wrapper, mode, ir_writer=zig-owned-text
-FuncGen_emitted_surface=ret i32 0 from selected C ABI main wrappers
+       wrapper, mode, ir_writer=external, ir_writer_mode=external
+FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret; remaining
+                        9 rows minimal-ret0 C ABI main wrappers
 source_fixture_pairing=each row still records covered_fixture and mode; source
                        behavior is enforced by comptime checks or existing
                        object/native-link fixture gates

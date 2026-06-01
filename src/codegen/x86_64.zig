@@ -7909,6 +7909,24 @@ fn lowerReturnValue(
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
                     const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+                    const lhs_const: ?i128 = switch (binary.lhs) {
+                        .int => |lhs| lhs,
+                        else => null,
+                    };
+                    const rhs_const: ?i128 = switch (binary.rhs) {
+                        .int => |rhs| rhs,
+                        else => null,
+                    };
+                    if (lhs_const) |lhs| {
+                        if (rhs_const) |rhs| {
+                            try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(lhs) });
+                            switch (op) {
+                                .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(rhs) }),
+                                else => return error.UnsupportedCodegenInstruction,
+                            }
+                            return;
+                        }
+                    }
                     const lhs = try paramValueReg(function, binary.lhs, .{ .int = 32 });
                     const rhs = try paramValueReg(function, binary.rhs, .{ .int = 32 });
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });

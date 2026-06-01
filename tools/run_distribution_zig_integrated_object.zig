@@ -161,6 +161,7 @@ pub fn main(init: std.process.Init) !void {
     try copyEnvironment(&env_map, init.environ_map);
     if (use_ir_writer) {
         try env_map.put("ZIG_USE_ZLLVM_IR_WRITER", "1");
+        try env_map.put("ZLLVM_IR_WRITER_MODE", "external");
     } else {
         try env_map.put("ZIG_USE_ZLLVM_OBJECT", "1");
     }
@@ -181,6 +182,8 @@ pub fn main(init: std.process.Init) !void {
     var executable_ok: usize = 0;
     var link_only_ok: usize = 0;
     var total: usize = 0;
+    var scalar_runtime_rows: usize = 0;
+    var minimal_wrapper_rows: usize = 0;
     for (cases) |case| {
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
@@ -194,34 +197,50 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(exe);
         const object = try common.allocTempFile(allocator, temp, case.id, ".o");
         defer allocator.free(object);
+        const ir_path = try common.allocTempFile(allocator, temp, case.id, ".external.ll");
+        defer allocator.free(ir_path);
         const marker = try common.allocTempFile(allocator, temp, case.id, "_zllvm_marker.txt");
         defer allocator.free(marker);
         try env_map.put("ZLLVM_MARKER_PATH", marker);
         try env_map.put("ZLLVM_ZIG_MODE", case.mode);
         try env_map.put("ZLLVM_CASE_ID", case.id);
         try env_map.put("ZLLVM_WRAPPER", case.wrapper);
+        if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
-        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer);
+        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null);
+        const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
+        if (use_ir_writer) {
+            if (std.mem.eql(u8, surface, "minimal-ret0")) {
+                minimal_wrapper_rows += 1;
+            } else {
+                scalar_runtime_rows += 1;
+            }
+        }
         try linkIntegratedObject(allocator, io, target, object, exe);
         if (case.validation == .executable) {
-            const run_argv = [_][]const u8{exe};
-            const run_result = try common.runCapture(allocator, io, &run_argv, exe);
-            common.freeRunResult(allocator, run_result);
+            try runExecutableCase(allocator, io, exe, case, use_ir_writer);
             executable_ok += 1;
         } else {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), effectiveFallback(case, use_ir_writer) },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), effectiveFallback(case, use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
 
-    try stdout_writer.interface.print(
-        "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} local_fail=0\n",
-        .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok },
-    );
+    if (use_ir_writer) {
+        try stdout_writer.interface.print(
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, minimal_wrapper_rows },
+        );
+    } else {
+        try stdout_writer.interface.print(
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok },
+        );
+    }
     try stdout_writer.interface.flush();
 }
 
@@ -246,6 +265,7 @@ fn requireHookMarker(
     case: Case,
     pipeline: Pipeline,
     use_ir_writer: bool,
+    expected_ir_path: ?[]const u8,
 ) !void {
     const contents = std.Io.Dir.cwd().readFileAlloc(io, marker, allocator, .limited(1024 * 1024)) catch |err| {
         try common.validationError(io, "missing z_llvm hook marker for {s}: {t}\n", .{ case.id, err });
@@ -258,11 +278,13 @@ fn requireHookMarker(
     try requireMarkerField(io, contents, "case_id", case.id, case);
     try requireMarkerField(io, contents, "wrapper", case.wrapper, case);
     try requireMarkerField(io, contents, "mode", case.mode, case);
+    if (expected_ir_path) |ir_path| try requireMarkerField(io, contents, "ir", ir_path, case);
     switch (pipeline) {
         .postopt => try requireMarkerField(io, contents, "zllvm_passes", "", case),
         .preopt => try requireMarkerField(io, contents, "zllvm_passes", acceptedPipeline(case.mode), case),
     }
-    if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer", "zig-owned-text", case);
+    if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer", "external", case);
+    if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer_mode", "external", case);
 }
 
 fn requireMarkerField(io: std.Io, contents: []const u8, field: []const u8, value: []const u8, case: Case) !void {
@@ -334,6 +356,29 @@ fn linkIntegratedObject(
     common.freeRunResult(allocator, result);
 }
 
+fn runExecutableCase(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    exe: []const u8,
+    case: Case,
+    use_ir_writer: bool,
+) !void {
+    const argv = [_][]const u8{exe};
+    const result = try std.process.run(allocator, io, .{
+        .argv = &argv,
+        .stdout_limit = .limited(128 * 1024 * 1024),
+        .stderr_limit = .limited(32 * 1024 * 1024),
+    });
+    defer common.freeRunResult(allocator, result);
+
+    const expected_code: u8 = if (use_ir_writer and std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) 42 else 0;
+    switch (result.term) {
+        .exited => |code| if (code == expected_code) return,
+        else => {},
+    }
+    try common.validationError(io, "integrated executable {s} exited with {any}, expected exit code {}\n", .{ case.id, result.term, expected_code });
+}
+
 fn validationName(validation: Validation) []const u8 {
     return switch (validation) {
         .executable => "executable",
@@ -342,16 +387,39 @@ fn validationName(validation: Validation) []const u8 {
 }
 
 fn effectiveProof(use_ir_writer: bool) []const u8 {
-    if (use_ir_writer) return "integrated Zig-owned textual IR writer plus z_llvm optimizer/object path plus Zig build-exe native link";
+    if (use_ir_writer) return "integrated external z_llvm textual IR writer plus z_llvm optimizer/object path plus Zig build-exe native link";
     return "integrated Zig build-obj object path plus Zig build-exe native link";
 }
 
 fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (!use_ir_writer) return case.fallback;
     if (case.validation == .link_only) {
-        return "ir-construction:zig-owned-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
     }
-    return "ir-construction:zig-owned-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
+    return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
+}
+
+fn readIrWriterSurface(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    ir_path: []const u8,
+    case: Case,
+) ![]const u8 {
+    const contents = std.Io.Dir.cwd().readFileAlloc(io, ir_path, allocator, .limited(1024 * 1024)) catch |err| {
+        try common.validationError(io, "missing external IR writer output for {s}: {t}\n", .{ case.id, err });
+    };
+    defer allocator.free(contents);
+    const prefix = "; zllvm_ir_writer_surface = \"";
+    const start = std.mem.indexOf(u8, contents, prefix) orelse {
+        try common.validationError(io, "external IR writer output for {s} missing zllvm_ir_writer_surface comment\n", .{case.id});
+    };
+    const value_start = start + prefix.len;
+    const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
+        try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_surface comment\n", .{case.id});
+    };
+    if (std.mem.eql(u8, contents[value_start..value_end], "scalar-add-ret")) return "scalar-add-ret";
+    if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
+    try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
 
 fn pipelineName(pipeline: Pipeline) []const u8 {

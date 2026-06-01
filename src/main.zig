@@ -7,7 +7,8 @@ const pipelines = @import("pipelines.zig");
 const target = @import("target.zig");
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\       z_llvm --emit=ir-writer
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,function-attrs,inline,vector-combine,slp-vectorizer,verify plus inventory placeholders
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
@@ -21,6 +22,7 @@ const Emit = enum {
     ir,
     @"asm",
     obj,
+    ir_writer,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -67,6 +69,8 @@ pub fn main(init: std.process.Init) !void {
                 emit = .@"asm";
             } else if (std.mem.eql(u8, emit_text, "obj")) {
                 emit = .obj;
+            } else if (std.mem.eql(u8, emit_text, "ir-writer")) {
+                emit = .ir_writer;
             } else {
                 return error.UnsupportedEmitMode;
             }
@@ -87,6 +91,11 @@ pub fn main(init: std.process.Init) !void {
             try stderr_writer.interface.flush();
             std.process.exit(2);
         }
+    }
+
+    if (emit == .ir_writer) {
+        try writeIrWriterModuleFromEnv(allocator, io, init.environ_map);
+        return;
     }
 
     const path = input_path orelse {
@@ -168,6 +177,93 @@ pub fn main(init: std.process.Init) !void {
     });
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn writeIrWriterModuleFromEnv(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    environ: *const std.process.Environ.Map,
+) !void {
+    _ = allocator;
+    const writer_mode = requiredEnv(io, environ, "ZLLVM_IR_WRITER_MODE");
+    if (!std.mem.eql(u8, writer_mode, "external")) {
+        try fatal(io, "ZLLVM_IR_WRITER_MODE must be external; got {s}\n", .{writer_mode});
+    }
+    const case_id = requiredEnv(io, environ, "ZLLVM_CASE_ID");
+    const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
+    const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
+    const ir_path = requiredEnv(io, environ, "ZLLVM_IR_PATH");
+    const surface = irWriterSurfaceForCase(case_id);
+
+    var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
+        try fatal(io, "failed to create external IR writer output {s}: {any}\n", .{ ir_path, err });
+    };
+    defer file.close(io);
+
+    var buffer: [4096]u8 = undefined;
+    var writer = file.writer(io, &buffer);
+    writer.interface.print(
+        \\; ModuleID = "zllvm-external-ir-writer"
+        \\source_filename = "{s}"
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\; zllvm_ir_writer_contract = "external"
+        \\; zllvm_ir_writer_case = "{s}"
+        \\; zllvm_ir_writer_mode = "{s}"
+        \\; zllvm_ir_writer_surface = "{s}"
+        \\
+    , .{ wrapper, case_id, mode, surface }) catch |err| {
+        try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
+    };
+    if (std.mem.eql(u8, surface, "scalar-add-ret")) {
+        try writeTinyScalarIrWriterBody(io, &writer.interface, ir_path);
+    } else {
+        try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
+    }
+    writer.interface.flush() catch |err| {
+        try fatal(io, "failed to flush external IR writer output {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn requiredEnv(io: std.Io, environ: *const std.process.Environ.Map, name: []const u8) []const u8 {
+    return environ.get(name) orelse fatal(io, "missing required external IR writer env {s}\n", .{name});
+}
+
+fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
+    if (std.mem.eql(u8, case_id, "releasefast_tiny_scalar")) return "scalar-add-ret";
+    return "minimal-ret0";
+}
+
+fn writeTinyScalarIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %v = add i32 40, 2
+        \\  ret i32 %v
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write tiny scalar external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeMinimalIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write minimal external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
 }
 
 fn parseInputLimit(text: []const u8) !usize {

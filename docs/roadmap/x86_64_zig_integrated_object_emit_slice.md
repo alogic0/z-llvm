@@ -26,9 +26,8 @@ preopt:
 ir-writer:
   Zig build-obj
     -> Zig frontend validates the selected wrapper and comptime fixture checks
-    -> patched Zig Object.emit writes a whitelisted textual LLVM IR module
-       directly, without serializing/parsing the Builder module through
-       libLLVM
+    -> patched Zig Object.emit validates the external IR writer contract
+    -> z_llvm --emit=ir-writer writes the selected textual LLVM IR module
     -> z_llvm runs the accepted Zig-mode pipeline
     -> z_llvm emits x86_64 relocatable .o
     -> Zig native linker links C ABI main wrappers with
@@ -62,18 +61,18 @@ checkout:
 
 ```text
 src/codegen/llvm.zig:771 Object.emit
-  first checks the experimental Zig-owned IR writer hook at
+  first checks the experimental external IR writer hook at
   src/codegen/llvm.zig:777 and returns early when it emits a selected object.
 
 src/codegen/llvm.zig:1137 emitZllvmIrWriterObject
-  validates ZIG_USE_ZLLVM_IR_WRITER=1, the selected case, mode, x86_64 Linux
-  target, and object-only emission before writing textual LLVM IR.
+  validates ZIG_USE_ZLLVM_IR_WRITER=1, ZLLVM_IR_WRITER_MODE=external, case,
+  mode, wrapper, ZLLVM_IR_PATH, x86_64 Linux target, and object-only emission.
 
-src/codegen/llvm.zig:1192 writeZllvmIrWriterModule
-  writes the current minimal Zig-owned textual LLVM IR surface for selected
-  wrappers: target triple plus dso_local i32 @main() returning zero.
+src/codegen/llvm.zig:1233 runZllvmIrWriterEmitIr
+  calls z_llvm --emit=ir-writer. z_llvm, not patched Zig, owns the case model
+  and emitted textual IR body.
 
-src/codegen/llvm.zig:1262 runZllvmIrWriterCommand
+src/codegen/llvm.zig:1246 runZllvmIrWriterCommand
   runs z_llvm --passes=<accepted Zig-mode pipeline> and z_llvm --emit=obj.
 
 src/codegen/llvm.zig:780 normal libLLVM path
@@ -115,6 +114,8 @@ ZLLVM_PIPELINE=postopt|preopt
 ZLLVM_ZIG_MODE=ReleaseFast|ReleaseSafe|ReleaseSmall
 ZLLVM_CASE_ID=<case>
 ZLLVM_WRAPPER=<wrapper source>
+ZLLVM_IR_WRITER_MODE=external
+ZLLVM_IR_PATH=<path>
 ```
 
 Contract:
@@ -122,8 +123,8 @@ Contract:
 ```text
 postopt_input=optimized LLVM IR text file written by patched Zig
 preopt_input=pre-optimization LLVM IR text file written by patched Zig
-ir_writer_input=selected textual LLVM IR module written directly by patched
-                Zig Object.emit
+ir_writer_input=selected textual LLVM IR module written by z_llvm
+                --emit=ir-writer into ZLLVM_IR_PATH
 output=x86_64 Linux relocatable object
 object_target=x86_64-unknown-linux-gnu
 link_target=x86_64-linux-gnu
@@ -141,10 +142,12 @@ reports the source wrapper metadata, mode, IR path, object path, target,
 command, exit status, and failure category.
 
 If `ZIG_USE_ZLLVM_IR_WRITER=1` is set, the hook is intentionally stricter: it
-requires `ZLLVM_PIPELINE=preopt`, a supported mode, a whitelisted `ZLLVM_CASE_ID`,
-x86_64 Linux object emission, and `ZLLVM_EXE`. If any of those are missing or
-unsupported, patched Zig fails clearly. With the env var unset, the libLLVM
-fallback path is untouched.
+requires `ZLLVM_PIPELINE=preopt`, `ZLLVM_IR_WRITER_MODE=external`, a supported
+mode, case ID, wrapper path, `ZLLVM_IR_PATH`, x86_64 Linux object emission, and
+`ZLLVM_EXE`. If any of those are missing or unsupported, patched Zig fails
+clearly. With the env var unset, the libLLVM fallback path is untouched. Case
+expansion belongs in z_llvm's `--emit=ir-writer` implementation, not in patched
+Zig.
 
 Marker fields:
 
@@ -158,7 +161,8 @@ ir=<path>
 case_id=<case>
 wrapper=<path>
 mode=<mode>
-ir_writer=zig-owned-text   # only for ZIG_USE_ZLLVM_IR_WRITER=1
+ir_writer=external         # only for ZIG_USE_ZLLVM_IR_WRITER=1
+ir_writer_mode=external
 ```
 
 ## FuncGen Inventory
@@ -169,29 +173,42 @@ object-emitted `FuncGen.zig` surface for these rows much smaller than the
 source fixtures they cover:
 
 ```text
-needed for emitted wrapper objects:
+needed for the first runtime-emitted writer row:
   ../ziglang/src/codegen/llvm/FuncGen.zig:446 dispatches .ret AIR
   ../ziglang/src/codegen/llvm/FuncGen.zig:934 airRet
   ../ziglang/src/codegen/llvm/FuncGen.zig:1027 emits wip.ret(operand)
+  ../ziglang/src/codegen/llvm/FuncGen.zig:3344 airAdd
 
 source-backed fixture constructs checked at comptime or in separate
-object/native-link fixture gates, not yet emitted by the Zig-owned IR writer:
+object/native-link fixture gates, not yet emitted by the external IR writer:
   ../ziglang/src/codegen/llvm/FuncGen.zig:570  airCall
   ../ziglang/src/codegen/llvm/FuncGen.zig:1533 airCondBr
   ../ziglang/src/codegen/llvm/FuncGen.zig:1686 airSwitchBr
-  ../ziglang/src/codegen/llvm/FuncGen.zig:3344 airAdd
   ../ziglang/src/codegen/llvm/FuncGen.zig:4702 airStore
   ../ziglang/src/codegen/llvm/FuncGen.zig:4760 airLoad
   ../ziglang/src/codegen/llvm/FuncGen.zig:5499 airSelect
 ```
 
-Minimal Zig-owned IR emission surface for this slice:
+External IR writer emission surface for this slice:
 
 ```text
-module header: source_filename, x86_64 Linux target triple
-function: dso_local i32 @main() local_unnamed_addr
-basic block: entry
-terminator: ret i32 0
+releasefast_tiny_scalar:
+  module header: source_filename, x86_64 Linux target triple,
+                 zllvm_ir_writer_contract=external,
+                 zllvm_ir_writer_surface=scalar-add-ret
+  function: dso_local i32 @main() local_unnamed_addr
+  basic block: entry
+  instruction: %v = add i32 40, 2
+  terminator: ret i32 %v
+
+remaining 9 rows:
+  module header: source_filename, x86_64 Linux target triple,
+                 zllvm_ir_writer_contract=external,
+                 zllvm_ir_writer_surface=minimal-ret0
+  function: dso_local i32 @main() local_unnamed_addr
+  basic block: entry
+  terminator: ret i32 0
+
 metadata: none
 globals: none
 attributes: none
@@ -199,7 +216,7 @@ attributes: none
 
 This is intentionally not a generic replacement for `FuncGen.zig`. The next
 expansion should promote one concrete runtime-emitted construct from the
-unsupported list into the textual writer, then add a focused wrapper that
+unsupported list into z_llvm's external textual writer, then add a focused wrapper that
 requires it.
 
 ## Fixture Pairing
@@ -271,7 +288,9 @@ Expected summary:
 postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
 ir-writer full set:    total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ir-writer full set:    scalar_runtime_rows=1 minimal_wrapper_rows=9
 ```
 
 ## Fallback Accounting
@@ -291,10 +310,12 @@ For `ZIG_USE_ZLLVM_IR_WRITER=1` selected rows:
 
 ```text
 still uses Zig LLVM Builder for general backend state: yes
-still serializes/parses/prints the Builder module through libLLVM: no
+still serializes/parses/prints the Builder module through libLLVM for the
+selected emitted object module: no
 still uses LLVM module optimization pipeline: no
 still uses LLVM target-machine object emission: no
 still uses LLVM linker/LLD: no, final link uses Zig build-exe -fno-lld
+textual IR bodies owned by patched Zig: no, z_llvm owns --emit=ir-writer
 ```
 
 The claim is intentionally x86_64-only and excludes AArch64, wasm, LTO, Debug
@@ -302,10 +323,10 @@ expansion, Zig startup runtime replacement, compiler_rt sub-compilation
 replacement, broad runtime behavior, dynamic TLS, libc/compiler-rt replacement,
 and target-complete object/codegen coverage.
 
-Unsupported Zig-owned IR writer constructs remain explicit:
+Unsupported external IR writer constructs remain explicit:
 
 ```text
-runtime integer arithmetic beyond ret i32 0
+runtime integer arithmetic beyond the releasefast_tiny_scalar scalar-add-ret row
 branches, switches, phi/select emission, loops
 loads, stores, globals, constants, table data
 calls and calling-convention variants
@@ -325,9 +346,13 @@ TargetMachine codegen and LLVM's module optimization pipeline are bypassed for
 those selected preopt rows. Zig still uses libLLVM to parse, hold, and print
 the LLVM module after Zig IR construction.
 
-For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig writes the
-minimal whitelisted textual LLVM IR module itself, `z_llvm` performs the
-accepted Zig-mode optimization pipeline and emits the relocatable object, and
-Zig's native linker links the executable. LLVM's module optimization pipeline,
-LLVM TargetMachine codegen, and libLLVM bitcode parse/print of the selected
-object module are bypassed for those rows.
+For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
+external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
+IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
+and emits the relocatable object, and Zig's native linker links the executable.
+The `releasefast_tiny_scalar` row now emits real scalar runtime behavior
+(`scalar-add-ret`) and exits 42; the remaining 9 rows remain minimal wrapper
+proofs (`minimal-ret0`). LLVM's module optimization pipeline, LLVM
+TargetMachine codegen, libLLVM bitcode parse/print of the selected object
+module, and patched-Zig ownership of case-specific IR text are bypassed for
+those rows.

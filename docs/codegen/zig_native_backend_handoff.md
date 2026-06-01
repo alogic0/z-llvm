@@ -73,7 +73,7 @@ COMDAT, alignment, ABI, or unknown linker compatibility.
 
 The experimental integrated object-emission proofs are
 `zig build distribution-zig-integrated-object` and
-`zig build distribution-zig-integrated-preopt`; the Zig-owned textual IR writer
+`zig build distribution-zig-integrated-preopt`; the external z_llvm textual IR writer
 proofs are `zig build distribution-zig-ir-writer-tiny-scalar` and
 `zig build distribution-zig-ir-writer`. The postopt/preopt hooks require a
 patched local `../ziglang` with `ZIG_USE_ZLLVM_OBJECT=1`,
@@ -83,10 +83,14 @@ pipeline and the hook replaces only LLVM target-machine object emission with
 `z_llvm --emit=obj`. In preopt mode, patched Zig writes IR before
 `module_pm.run(...)`, `z_llvm` runs the accepted mode pipeline and emits the
 object, and LLVM's module optimization pipeline is bypassed for the selected
-rows. With `ZIG_USE_ZLLVM_IR_WRITER=1`, patched `Object.emit` writes a
-whitelisted textual LLVM IR module directly for selected wrapper rows before
+rows. With `ZIG_USE_ZLLVM_IR_WRITER=1`, patched `Object.emit` validates the
+external writer contract (`ZLLVM_IR_WRITER_MODE=external`,
+`ZLLVM_CASE_ID`, `ZLLVM_ZIG_MODE`, `ZLLVM_WRAPPER`, `ZLLVM_IR_PATH`) and calls
+`z_llvm --emit=ir-writer` to write the selected textual LLVM IR module before
 the libLLVM bitcode parse/print path, then uses the same preopt `z_llvm`
-optimizer/object path. All modes link through Zig native linking with
+optimizer/object path. The first runtime row is
+`releasefast_tiny_scalar` with `ir_writer_surface=scalar-add-ret`; the other
+selected rows remain `minimal-ret0` hook proofs. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than
 standalone toy programs. The current wrappers expose C ABI `main`; the gate

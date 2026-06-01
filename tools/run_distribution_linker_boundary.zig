@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
 
     const help_argv = [_][]const u8{ "zig-out/bin/z_llvm", "--help" };
     try common.runToFile(allocator, io, &help_argv, "zig-out/bin/z_llvm --help", help_out);
-    try expectContains(allocator, io, help_out, "usage: z_llvm [--emit=ir|asm|obj]");
+    try expectContains(allocator, io, help_out, "usage: z_llvm [--emit=ir|asm|obj|ir-writer]");
 
     const exe_argv = [_][]const u8{ "zig-out/bin/z_llvm", "--emit=exe", "--target=x86_64-unknown-linux-gnu", fixture };
     const exe_result = try std.process.run(allocator, io, .{
@@ -47,7 +47,7 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [256]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    try stdout_writer.interface.writeAll("ok distribution linker boundary [local emit=ir/asm/obj, executable handoff=zig cc, native proof=zig build-exe -fno-lld]\n");
+    try stdout_writer.interface.writeAll("ok distribution linker boundary [local emit=ir/asm/obj/ir-writer, executable handoff=zig cc, native proof=zig build-exe -fno-lld]\n");
     try stdout_writer.interface.flush();
 }
 
