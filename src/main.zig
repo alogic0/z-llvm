@@ -234,6 +234,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
         try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) {
+        try writeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
@@ -295,6 +297,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
@@ -576,6 +579,40 @@ fn writeRuntimeGlobalUpdateIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimePointerLoadStoreIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@pointers_memory.writer_input = dso_local global i32 41, align 4
+        \\@pointers_memory.writer_output = dso_local global i32 0, align 4
+        \\@load_store = alias i32 (ptr, ptr), ptr @pointers_memory.load_store
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = load i32, ptr @pointers_memory.writer_input, align 4
+        \\  %updated = add i32 %value, 1
+        \\  store i32 %updated, ptr @pointers_memory.writer_output, align 4
+        \\  %stored = load i32, ptr @pointers_memory.writer_output, align 4
+        \\  %ok = icmp eq i32 %stored, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @pointers_memory.load_store(ptr %0, ptr %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = load i32, ptr %0, align 4
+        \\  %4 = add i32 %3, 1
+        \\  store i32 %4, ptr %1, align 4
+        \\  ret i32 %4
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime pointer load/store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

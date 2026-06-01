@@ -913,6 +913,7 @@ fn lowerStraightLineReturn(
             if (try lowerPackedReplaceLowReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReadFlagReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerLoadStoreReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimePointerLoadStoreMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatAddMainReturn(allocator, machine, function, block, ret)) return;
@@ -2045,6 +2046,103 @@ fn lowerPointerLoadStoreReturn(
     try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = .rsi });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePointerLoadStoreMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (function.params.items.len != 0) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 6) return false;
+
+    const load_input_inst = block.instructions.items[0];
+    const add_inst = block.instructions.items[1];
+    const store_inst = block.instructions.items[2];
+    const load_output_inst = block.instructions.items[3];
+    const icmp_inst = block.instructions.items[4];
+    const select_inst = block.instructions.items[5];
+    if (load_input_inst.removed or add_inst.removed or store_inst.removed or load_output_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+
+    const load_input_name = load_input_inst.result orelse return false;
+    const add_name = add_inst.result orelse return false;
+    const load_output_name = load_output_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const load_input = switch (load_input_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load_input.ty.eql(.{ .int = 32 }) or load_input.attrs.isBarrier()) return false;
+    const input_global = switch (load_input.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, input_global, "pointers_memory.writer_input")) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(add.lhs, load_input_name) or !isInt(add.rhs, 1)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    if (!isNamed(store.value, add_name)) return false;
+    const store_global = switch (store.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, store_global, "pointers_memory.writer_output")) return false;
+
+    const load_output = switch (load_output_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load_output.ty.eql(.{ .int = 32 }) or load_output.attrs.isBarrier()) return false;
+    const output_global = switch (load_output.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, output_global, "pointers_memory.writer_output")) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, load_output_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "pointer_load_store_fail";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = input_global });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = store_global });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = output_global });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

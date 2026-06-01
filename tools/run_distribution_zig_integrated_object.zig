@@ -108,6 +108,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_runtime_pointer_load_store",
+        .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig",
+        .covered_fixture = "test/zig/inputs/pointers_memory.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-load-store",
+    },
+    .{
         .id = "releasefast_runtime_call_chain",
         .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
         .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
@@ -356,6 +364,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "runtime-loop-sum" },
         .{ .name = "runtime-switch" },
         .{ .name = "global-update" },
+        .{ .name = "pointer-load-store" },
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
@@ -628,6 +637,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_pointer_load_store")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-load-store";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -693,6 +705,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-loop-sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-switch")) return "runtime-switch";
     if (std.mem.eql(u8, contents[value_start..value_end], "global-update")) return "global-update";
+    if (std.mem.eql(u8, contents[value_start..value_end], "pointer-load-store")) return "pointer-load-store";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";
