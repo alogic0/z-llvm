@@ -177,6 +177,11 @@ Executable validation should emit local `.o` files with `z_llvm` and then hand
 them to Zig's linker/toolchain through `zig cc` or the selected Zig driver
 path. Treat failures as object ABI, symbol, relocation, section, or Zig-linker
 integration gaps unless evidence proves a Zig linker change is required.
+Because `zig cc` may still select an LLD-backed path internally, current
+executable gates prove Zig-driver/toolchain handoff only. They do not prove
+native Zig linker coverage unless the gate explicitly selects and records a
+native-linker path. Native linker replacement is Zig-owned; this repository can
+only validate that its emitted objects are acceptable inputs to that path.
 
 ## Validation Scope
 

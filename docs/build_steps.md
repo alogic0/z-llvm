@@ -23,6 +23,10 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-musl-object` | Run selected x86_64 musl object subset gates. Use when target, object, ABI, relocation, or musl-specific object behavior changes. |
 | `zig build distribution-musl-executable` | Run selected x86_64 musl executable ABI proof gates. Use when object output must be proven through Zig's musl linker/toolchain handoff. |
 
+The executable gates hand local objects to Zig's driver through `zig cc`. They
+prove Zig-driver/toolchain handoff, not necessarily native Zig linker use,
+because Zig may still select an LLD-backed linker path internally.
+
 ## Utility Steps
 
 These steps forward arguments after `--`.

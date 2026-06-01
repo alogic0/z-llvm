@@ -54,6 +54,11 @@ The current linker boundary is checked directly by
 validation continues to hand local objects to Zig's toolchain through `zig cc`
 or the selected Zig driver path. `zig build distribution-all` composes that
 boundary proof with the selected positive no-LLVM-codegen distribution subset.
+This is not, by itself, proof that Zig's native linker was used: `zig cc` may
+still choose an LLD-backed implementation for a target or configuration. A
+native-linker claim requires a separate gate that selects a native-linker path
+and records that fact; this repository should validate object compatibility
+with that path, not implement the linker.
 
 Default non-goals:
 
@@ -152,7 +157,8 @@ zig build distribution-boundary
 ```
 
 That boundary gate verifies the local linker non-goal separately from the
-positive no-LLVM-codegen distribution subset.
+positive no-LLVM-codegen distribution subset. It proves that final linking is
+outside `z_llvm`; it does not prove that Zig avoided LLD internally.
 
 ## Out Of Scope
 
