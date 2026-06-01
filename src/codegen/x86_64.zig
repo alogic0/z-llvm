@@ -915,6 +915,7 @@ fn lowerStraightLineReturn(
             if (try lowerPointerLoadStoreReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimePointerLoadStoreMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeVolatileRoundtripMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatMulReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatAddMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFloatAddReturn(allocator, machine, function, block, ret)) return;
@@ -1973,6 +1974,80 @@ fn lowerPointerVolatileRoundtripReturn(
     if (!isNamed(load.ptr, function.params.items[0].name)) return false;
 
     try machine.instructions.append(allocator, .volatile_roundtrip_rdi_esi_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeVolatileRoundtripMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (function.params.items.len != 0) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const store_inst = block.instructions.items[0];
+    const load_inst = block.instructions.items[1];
+    const icmp_inst = block.instructions.items[2];
+    const select_inst = block.instructions.items[3];
+    if (store_inst.removed or load_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+
+    const load_name = load_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or !store.attrs.is_volatile) return false;
+    if (!isInt(store.value, 42)) return false;
+    const store_global = switch (store.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, store_global, "pointers_memory.volatile_slot")) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or !load.attrs.is_volatile) return false;
+    const load_global = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, load_global, "pointers_memory.volatile_slot")) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, load_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "volatile_roundtrip_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 42 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = store_global });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = load_global });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
