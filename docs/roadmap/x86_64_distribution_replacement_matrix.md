@@ -420,11 +420,19 @@ claim=selected wrapper objects bypass LLVM module optimization, LLVM
       selected emitted module; patched Zig does not own case-specific IR text
 total=10 executable_ok=9 link_only_ok=1 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
-ir_writer_rows=scalar_runtime_rows=1, minimal_wrapper_rows=9
+ir_writer_rows=scalar_runtime_rows=6, minimal_wrapper_rows=4
+surface_counts=scalar-add-ret=1, integer-arithmetic=1,
+               error-switch-select=1, direct-call=1, global-load=1,
+               i64-arithmetic=1, minimal-ret0=4
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
-FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret; remaining
-                        9 rows minimal-ret0 C ABI main wrappers
+FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
+                        releasefast_integers integer-arithmetic,
+                        releasefast_error_switch error-switch-select,
+                        releasefast_control_flow_calls direct-call,
+                        releasefast_globals_comptime global-load,
+                        releasesmall_i64_arithmetic i64-arithmetic;
+                        remaining 4 rows minimal-ret0 C ABI main wrappers
 source_fixture_pairing=each row still records covered_fixture and mode; source
                        behavior is enforced by comptime checks or existing
                        object/native-link fixture gates

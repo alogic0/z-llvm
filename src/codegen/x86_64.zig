@@ -3218,16 +3218,27 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
         else => return false,
     };
 
-    const cond_name = switch (condbr.cond) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-    };
-    const cond_reg = try paramReg(function, cond_name, .{ .int = 1 });
     const then_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
     const else_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
     const then_block = function.blocks.items[then_index];
     const else_block = function.blocks.items[else_index];
     if (then_block.instructions.items.len != 0 or else_block.instructions.items.len != 0) return false;
+
+    const cond_reg = switch (condbr.cond) {
+        .named => |name| try paramReg(function, name, .{ .int = 1 }),
+        .int => |value| {
+            if (value == 0) {
+                try lowerReturnTerminator(allocator, machine, function, else_block);
+                return true;
+            }
+            if (value == 1) {
+                try lowerReturnTerminator(allocator, machine, function, then_block);
+                return true;
+            }
+            return error.UnsupportedCodegenValue;
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
 
     try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
     try machine.instructions.append(allocator, .{ .je = else_block.name });

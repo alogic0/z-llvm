@@ -214,8 +214,18 @@ fn writeIrWriterModuleFromEnv(
     , .{ wrapper, case_id, mode, surface }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
-    if (std.mem.eql(u8, surface, "scalar-add-ret")) {
+    if (std.mem.eql(u8, case_id, "releasefast_tiny_scalar")) {
         try writeTinyScalarIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_integers")) {
+        try writeIntegersIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_error_switch")) {
+        try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) {
+        try writeControlFlowCallsIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) {
+        try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
+        try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
     }
@@ -230,6 +240,11 @@ fn requiredEnv(io: std.Io, environ: *const std.process.Environ.Map, name: []cons
 
 fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_tiny_scalar")) return "scalar-add-ret";
+    if (std.mem.eql(u8, case_id, "releasefast_integers")) return "integer-arithmetic";
+    if (std.mem.eql(u8, case_id, "releasefast_error_switch")) return "error-switch-select";
+    if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) return "direct-call";
+    if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
+    if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     return "minimal-ret0";
 }
 
@@ -247,6 +262,131 @@ fn writeTinyScalarIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write tiny scalar external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeIntegersIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %wrap = add i32 2147483647, 1
+        \\  %wrap_ok = icmp eq i32 %wrap, -2147483648
+        \\  %cmp = icmp slt i32 7, 3
+        \\  %sel = select i1 %cmp, i32 7, i32 3
+        \\  %sel_ok = icmp eq i32 %sel, 3
+        \\  %shift = and i32 4, 31
+        \\  %left = shl i32 305419896, %shift
+        \\  %right = lshr i32 305419896, %shift
+        \\  %mixed = xor i32 %left, %right
+        \\  %mixed_ok = icmp eq i32 %mixed, 577118951
+        \\  %ok_a = and i1 %wrap_ok, %sel_ok
+        \\  %ok = and i1 %ok_a, %mixed_ok
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write integers external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeErrorSwitchIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %is_one = icmp eq i8 1, 1
+        \\  %first = select i1 %is_one, i32 -1, i32 -2
+        \\  %first_ok = icmp eq i32 %first, -1
+        \\  %is_zero = icmp eq i8 0, 0
+        \\  %second = select i1 %is_zero, i32 0, i32 %first
+        \\  %second_ok = icmp eq i32 %second, 0
+        \\  %ok = and i1 %first_ok, %second_ok
+        \\  br i1 %ok, label %success, label %failure
+        \\
+        \\success:
+        \\  ret i32 0
+        \\
+        \\failure:
+        \\  ret i32 1
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write error_switch external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeControlFlowCallsIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define internal i32 @control_flow_calls.writer_callee() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 41
+        \\}}
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %base = call i32 @control_flow_calls.writer_callee()
+        \\  %ret = add i32 %base, 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write control_flow_calls external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeGlobalsComptimeIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@globals_comptime.writer_counter = private global i32 5, align 4
+        \\
+        \\define dso_local i32 @globals_comptime.read_global() local_unnamed_addr {{
+        \\entry:
+        \\  %value = load i32, ptr @globals_comptime.writer_counter, align 4
+        \\  ret i32 %value
+        \\}}
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @globals_comptime.read_global()
+        \\  ret i32 %value
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write globals_comptime external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeI64ArithmeticIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %wide = add i64 2, 2
+        \\  %ok = icmp eq i64 %wide, 4
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write i64 arithmetic external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

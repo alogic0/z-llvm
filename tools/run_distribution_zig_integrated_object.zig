@@ -21,6 +21,11 @@ const Case = struct {
     fallback: []const u8,
 };
 
+const SurfaceCounter = struct {
+    name: []const u8,
+    count: usize = 0,
+};
+
 const cases = [_]Case{
     .{
         .id = "releasefast_tiny_scalar",
@@ -184,6 +189,15 @@ pub fn main(init: std.process.Init) !void {
     var total: usize = 0;
     var scalar_runtime_rows: usize = 0;
     var minimal_wrapper_rows: usize = 0;
+    var surface_counters = [_]SurfaceCounter{
+        .{ .name = "scalar-add-ret" },
+        .{ .name = "integer-arithmetic" },
+        .{ .name = "error-switch-select" },
+        .{ .name = "direct-call" },
+        .{ .name = "global-load" },
+        .{ .name = "i64-arithmetic" },
+        .{ .name = "minimal-ret0" },
+    };
     for (cases) |case| {
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
@@ -210,6 +224,7 @@ pub fn main(init: std.process.Init) !void {
         try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null);
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
         if (use_ir_writer) {
+            countSurface(&surface_counters, surface);
             if (std.mem.eql(u8, surface, "minimal-ret0")) {
                 minimal_wrapper_rows += 1;
             } else {
@@ -235,6 +250,11 @@ pub fn main(init: std.process.Init) !void {
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} minimal_wrapper_rows={} local_fail=0\n",
             .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, minimal_wrapper_rows },
         );
+        try stdout_writer.interface.print("surface-counts", .{});
+        for (surface_counters) |counter| {
+            try stdout_writer.interface.print(" {s}={}", .{ counter.name, counter.count });
+        }
+        try stdout_writer.interface.writeByte('\n');
     } else {
         try stdout_writer.interface.print(
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} local_fail=0\n",
@@ -242,6 +262,15 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     try stdout_writer.interface.flush();
+}
+
+fn countSurface(counters: []SurfaceCounter, surface: []const u8) void {
+    for (counters) |*counter| {
+        if (std.mem.eql(u8, counter.name, surface)) {
+            counter.count += 1;
+            return;
+        }
+    }
 }
 
 fn copyEnvironment(dst: *std.process.Environ.Map, src: *const std.process.Environ.Map) !void {
@@ -371,12 +400,22 @@ fn runExecutableCase(
     });
     defer common.freeRunResult(allocator, result);
 
-    const expected_code: u8 = if (use_ir_writer and std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) 42 else 0;
+    const expected_code: u8 = if (use_ir_writer)
+        irWriterExpectedExitCode(case)
+    else
+        0;
     switch (result.term) {
         .exited => |code| if (code == expected_code) return,
         else => {},
     }
     try common.validationError(io, "integrated executable {s} exited with {any}, expected exit code {}\n", .{ case.id, result.term, expected_code });
+}
+
+fn irWriterExpectedExitCode(case: Case) u8 {
+    if (std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) return 42;
+    if (std.mem.eql(u8, case.id, "releasefast_control_flow_calls")) return 42;
+    if (std.mem.eql(u8, case.id, "releasefast_globals_comptime")) return 5;
+    return 0;
 }
 
 fn validationName(validation: Validation) []const u8 {
@@ -418,6 +457,11 @@ fn readIrWriterSurface(
         try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_surface comment\n", .{case.id});
     };
     if (std.mem.eql(u8, contents[value_start..value_end], "scalar-add-ret")) return "scalar-add-ret";
+    if (std.mem.eql(u8, contents[value_start..value_end], "integer-arithmetic")) return "integer-arithmetic";
+    if (std.mem.eql(u8, contents[value_start..value_end], "error-switch-select")) return "error-switch-select";
+    if (std.mem.eql(u8, contents[value_start..value_end], "direct-call")) return "direct-call";
+    if (std.mem.eql(u8, contents[value_start..value_end], "global-load")) return "global-load";
+    if (std.mem.eql(u8, contents[value_start..value_end], "i64-arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

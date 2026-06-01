@@ -173,35 +173,54 @@ object-emitted `FuncGen.zig` surface for these rows much smaller than the
 source fixtures they cover:
 
 ```text
-needed for the first runtime-emitted writer row:
+covered by promoted runtime-emitted writer rows:
+  ../ziglang/src/codegen/llvm/FuncGen.zig:570  airCall
   ../ziglang/src/codegen/llvm/FuncGen.zig:446 dispatches .ret AIR
   ../ziglang/src/codegen/llvm/FuncGen.zig:934 airRet
   ../ziglang/src/codegen/llvm/FuncGen.zig:1027 emits wip.ret(operand)
   ../ziglang/src/codegen/llvm/FuncGen.zig:3344 airAdd
+  ../ziglang/src/codegen/llvm/FuncGen.zig:4760 airLoad
+  ../ziglang/src/codegen/llvm/FuncGen.zig:5499 airSelect
+  ../ziglang/src/codegen/llvm/FuncGen.zig:1533 airCondBr
 
 source-backed fixture constructs checked at comptime or in separate
 object/native-link fixture gates, not yet emitted by the external IR writer:
-  ../ziglang/src/codegen/llvm/FuncGen.zig:570  airCall
-  ../ziglang/src/codegen/llvm/FuncGen.zig:1533 airCondBr
   ../ziglang/src/codegen/llvm/FuncGen.zig:1686 airSwitchBr
   ../ziglang/src/codegen/llvm/FuncGen.zig:4702 airStore
-  ../ziglang/src/codegen/llvm/FuncGen.zig:4760 airLoad
-  ../ziglang/src/codegen/llvm/FuncGen.zig:5499 airSelect
 ```
 
 External IR writer emission surface for this slice:
 
 ```text
-releasefast_tiny_scalar:
+runtime-emitted rows:
   module header: source_filename, x86_64 Linux target triple,
                  zllvm_ir_writer_contract=external,
-                 zllvm_ir_writer_surface=scalar-add-ret
-  function: dso_local i32 @main() local_unnamed_addr
-  basic block: entry
-  instruction: %v = add i32 40, 2
-  terminator: ret i32 %v
+                 zllvm_ir_writer_surface=<surface>
 
-remaining 9 rows:
+  releasefast_tiny_scalar: scalar-add-ret
+    dso_local i32 @main computes add i32 40, 2 and exits 42
+
+  releasefast_integers: integer-arithmetic
+    dso_local i32 @main checks wrapping add, compare/select, and shift/xor mix
+    against constants and exits 0 only if all checks pass
+
+  releasefast_error_switch: error-switch-select
+    dso_local i32 @main emits icmp/select error-switch-style results plus a
+    constant conditional branch; local x86_64 lowering now accepts the reduced
+    constant-condbr object shape
+
+  releasefast_control_flow_calls: direct-call
+    internal no-arg callee returns 41; dso_local i32 @main calls it, adds one,
+    and exits 42
+
+  releasefast_globals_comptime: global-load
+    private i32 global is loaded by globals_comptime.read_global; main calls
+    that function and exits 5
+
+  releasesmall_i64_arithmetic: i64-arithmetic
+    dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
+
+remaining 4 rows:
   module header: source_filename, x86_64 Linux target triple,
                  zllvm_ir_writer_contract=external,
                  zllvm_ir_writer_surface=minimal-ret0
@@ -209,8 +228,6 @@ remaining 9 rows:
   basic block: entry
   terminator: ret i32 0
 
-metadata: none
-globals: none
 attributes: none
 ```
 
@@ -290,7 +307,10 @@ preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
 ir-writer full set:    total=10 executable_ok=9 link_only_ok=1 local_fail=0
-ir-writer full set:    scalar_runtime_rows=1 minimal_wrapper_rows=9
+ir-writer full set:    scalar_runtime_rows=6 minimal_wrapper_rows=4
+ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
+                       error-switch-select=1 direct-call=1 global-load=1
+                       i64-arithmetic=1 minimal-ret0=4
 ```
 
 ## Fallback Accounting
@@ -326,11 +346,13 @@ and target-complete object/codegen coverage.
 Unsupported external IR writer constructs remain explicit:
 
 ```text
-runtime integer arithmetic beyond the releasefast_tiny_scalar scalar-add-ret row
-branches, switches, phi/select emission, loops
-loads, stores, globals, constants, table data
-calls and calling-convention variants
-error unions and ReleaseSafe runtime/panic paths
+runtime integer arithmetic beyond the selected scalar/i64/integer rows
+branches beyond the selected constant-condbr shape, switches, phi emission,
+and loops
+stores, table data, and mutable global update semantics
+calls with ABI arguments or non-i32 returns
+error unions and ReleaseSafe runtime/panic paths beyond selected ReleaseFast
+error-switch-style icmp/select checks
 TLS, atomics, inline asm, vectors
 aggregate ABI lowering, sret/byval, varargs
 debug metadata, DWARF, unwind/personality records
@@ -350,9 +372,10 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The `releasefast_tiny_scalar` row now emits real scalar runtime behavior
-(`scalar-add-ret`) and exits 42; the remaining 9 rows remain minimal wrapper
-proofs (`minimal-ret0`). LLVM's module optimization pipeline, LLVM
+The external writer now emits six runtime surfaces: `scalar-add-ret`,
+`integer-arithmetic`, `error-switch-select`, `direct-call`, `global-load`, and
+`i64-arithmetic`; the remaining 4 rows remain minimal wrapper proofs
+(`minimal-ret0`). LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.

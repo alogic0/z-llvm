@@ -88,9 +88,10 @@ external writer contract (`ZLLVM_IR_WRITER_MODE=external`,
 `ZLLVM_CASE_ID`, `ZLLVM_ZIG_MODE`, `ZLLVM_WRAPPER`, `ZLLVM_IR_PATH`) and calls
 `z_llvm --emit=ir-writer` to write the selected textual LLVM IR module before
 the libLLVM bitcode parse/print path, then uses the same preopt `z_llvm`
-optimizer/object path. The first runtime row is
-`releasefast_tiny_scalar` with `ir_writer_surface=scalar-add-ret`; the other
-selected rows remain `minimal-ret0` hook proofs. All modes link through Zig native linking with
+optimizer/object path. Runtime writer rows now cover
+`scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
+`global-load`, and `i64-arithmetic`; the other selected rows remain
+`minimal-ret0` hook proofs. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than
 standalone toy programs. The current wrappers expose C ABI `main`; the gate
