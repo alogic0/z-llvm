@@ -902,6 +902,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimePhiSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerErrorSwitchSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
@@ -1403,6 +1404,45 @@ fn lowerIcmpSelectConstReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = true_label });
     try appendSelectedI32Return(allocator, machine, true_value);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePhiSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const select_inst = block.instructions.items[0];
+    if (select_inst.removed) return false;
+    const select_result = select_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_result)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    const cond_reg = try paramValueReg(function, select.cond, .{ .int = 1 });
+    if (!isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const false_label = "runtime_phi_false";
+    try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

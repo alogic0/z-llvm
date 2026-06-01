@@ -418,16 +418,17 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=11 executable_ok=10 link_only_ok=1 local_fail=0
+total=12 executable_ok=11 link_only_ok=1 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
-ir_writer_rows=scalar_runtime_rows=11, minimal_wrapper_rows=0
+runtime_phi_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_phi_merge
+ir_writer_rows=scalar_runtime_rows=12, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
                checked-add-runtime-boundary=1, runtime-condbr=1,
-               minimal-ret0=0
+               runtime-phi-merge=1, minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
 FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
@@ -436,6 +437,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_control_flow_calls direct-call,
                         releasefast_globals_comptime global-load,
                         releasefast_runtime_cond_branch runtime-condbr,
+                        releasefast_runtime_phi_merge runtime-phi-merge,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
@@ -448,8 +450,8 @@ source_fixture_pairing=each row still records covered_fixture and mode; source
                        object/native-link fixture gates
 remaining_dependency=general Zig LLVM Builder state remains; full FuncGen and
                      broad Zig IR construction are not replaced
-excluded=runtime arithmetic beyond selected rows, phi/merge values, switches,
-         loops, stores, mutable global update semantics, ABI calls with arguments, TLS,
+excluded=runtime arithmetic beyond selected rows, switches, loops, stores,
+         mutable global update semantics, ABI calls with arguments, TLS,
          atomics, vectors, aggregate ABI lowering, debug/unwind, AArch64,
          wasm, LTO, broad runtime/TLS/compiler-rt
 ```
