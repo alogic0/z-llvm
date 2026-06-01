@@ -84,6 +84,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_runtime_loop_sum",
+        .wrapper = "test/zig/integrated/runtime_loop_sum_main.zig",
+        .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
         .id = "releasesafe_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -216,6 +224,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "checked-add-runtime-boundary" },
         .{ .name = "runtime-condbr" },
         .{ .name = "runtime-phi-merge" },
+        .{ .name = "runtime-loop-sum" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -490,6 +499,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-add-runtime-boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-condbr")) return "runtime-condbr";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-phi-merge")) return "runtime-phi-merge";
+    if (std.mem.eql(u8, contents[value_start..value_end], "runtime-loop-sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

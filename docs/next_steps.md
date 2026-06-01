@@ -10,18 +10,19 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Add the next external IR-writer runtime surface after conditional branches and
-phi/merge values: a source-backed x86_64 ReleaseFast loop row.
+Add the next external IR-writer runtime surface after conditional branches,
+phi/merge values, and loops: a source-backed x86_64 ReleaseFast switch row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
 `releasefast_runtime_phi_merge` rows are paired with
-`test/zig/inputs/switch_control.zig`. The next source-backed shape is
-`test/zig/inputs/control_flow_calls.zig`, whose `loop_sum` function already
-backs object/native-link loop evidence.
+`test/zig/inputs/switch_control.zig`; `releasefast_runtime_loop_sum` is paired
+with `test/zig/inputs/control_flow_calls.zig`. The next source-backed shape is
+`test/zig/inputs/switch_control.zig` again, this time using the `dense_switch`
+family that already backs object/native-link switch evidence.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for simple counted loops. This does not
+Reduce the remaining external writer gap for selected switch lowering. This does not
 claim full `FuncGen` replacement or generic CFG lowering.
 
 Mode/target/stage row:
@@ -29,24 +30,24 @@ ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
-LLVM loop lowering maps to LLVM IR branch/phi backedge semantics and backend
-lowering of simple counted loops. Source behavior is represented by Zig's
-`control_flow_calls.loop_sum` shape. Record more precise upstream files if the
-slice needs optimizer/codegen behavior beyond the selected loop.
+LLVM switch lowering maps to LLVM IR `switch` terminators and backend lowering
+of selected integer switch shapes. Source behavior is represented by Zig's
+`switch_control.dense_switch` shape. Record more precise upstream files if the
+slice needs optimizer/codegen behavior beyond the selected switch.
 
 Known boundary:
-Only one selected counted i32 accumulation loop. Switches, stores, mutable
-globals, ABI calls with arguments, TLS, atomics, vectors, and aggregate ABI
-remain out of scope.
+Only one selected i8-to-i32 switch/control-flow shape. Stores, mutable globals,
+ABI calls with arguments, TLS, atomics, vectors, and aggregate ABI remain out of
+scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_loop_sum`
+`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_switch`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the loop slice separately with the policy in
+Commit the switch slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -85,15 +86,16 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 12-row
+also passes: the first ReleaseFast tiny-scalar row and the full 13-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 12 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 13 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall table indexed load, and the ReleaseSafe checked-add panic-runtime
-boundary, plus ReleaseFast runtime conditional branch and phi/merge rows. Broad
+boundary, plus ReleaseFast runtime conditional branch, phi/merge, and loop
+rows. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -142,13 +144,13 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=12 executable_ok=11 link_only_ok=1 local_fail=0
-             scalar_runtime_rows=12 minimal_wrapper_rows=0
+             full set total=13 executable_ok=12 link_only_ok=1 local_fail=0
+             scalar_runtime_rows=13 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 table-indexed-load=1
              checked-add-runtime-boundary=1 runtime-condbr=1
-             runtime-phi-merge=1 minimal-ret0=0
+             runtime-phi-merge=1 runtime-loop-sum=1 minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0

@@ -228,6 +228,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeCondBranchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) {
         try writeRuntimePhiMergeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) {
+        try writeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -258,6 +260,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) return "runtime-condbr";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -434,6 +437,39 @@ fn writeRuntimePhiMergeIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime phi merge external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeLoopSumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@main = alias i32 (i32), ptr @control_flow_calls.loop_sum
+        \\
+        \\define private i32 @control_flow_calls.loop_sum(i32 %limit) local_unnamed_addr {{
+        \\entry:
+        \\  %is_zero = icmp eq i32 %limit, 0
+        \\  br i1 %is_zero, label %exit_zero, label %loop
+        \\
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %next, %loop ]
+        \\  %sum = phi i32 [ 0, %entry ], [ %sum_next, %loop ]
+        \\  %sum_next = add i32 %sum, %index
+        \\  %next = add i32 %index, 1
+        \\  %done = icmp eq i32 %next, %limit
+        \\  br i1 %done, label %exit, label %loop
+        \\
+        \\exit_zero:
+        \\  ret i32 0
+        \\
+        \\exit:
+        \\  ret i32 %sum_next
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime loop sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
