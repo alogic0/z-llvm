@@ -69,14 +69,14 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build handoff` | optimizer-to-codegen handoff smoke coverage plus selected Debug/O0 handoff | pass |
 | `zig build distribution-no-llvm` | selected no-LLVM-codegen distribution subset, including ReleaseSmall and Debug executable gates | pass |
 | `zig build distribution-native-link` | selected native Zig linker handoff proof for ABI-stable ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug/O0 objects, using `zig build-exe -fno-lld` | pass |
-| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 40 accepted / 0 failed |
+| `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 44 accepted / 0 failed |
 | `zig build distribution-native-link-releasefast` | ReleaseFast native-link proof for the full current executable harness set | pass, 27 executed |
 | `zig build distribution-native-link-releasesafe` | ReleaseSafe native-link proof for the full current executable ABI set | pass, 9 executed |
-| `zig build distribution-native-link-releasesmall` | selected ReleaseSmall native-link proof | pass, 3 executed |
+| `zig build distribution-native-link-releasesmall` | ReleaseSmall native-link proof for the full current executable ABI set | pass, 7 executed |
 | `zig build distribution-native-link-debug` | selected Debug/O0 native-link proof | pass, 1 executed |
 | `zig build probe-native-linker-releasefast` | ReleaseFast native-link compatibility probe for the full current executable harness set | pass, 27 accepted / 0 failed |
 | `zig build probe-native-linker-releasesafe` | ReleaseSafe native-link compatibility probe for the full current executable ABI set | pass, 9 accepted / 0 failed |
-| `zig build probe-native-linker-releasesmall` | selected ReleaseSmall native-link compatibility probe | pass, 3 accepted / 0 failed |
+| `zig build probe-native-linker-releasesmall` | ReleaseSmall native-link compatibility probe for the full current executable ABI set | pass, 7 accepted / 0 failed |
 | `zig build probe-native-linker-debug` | selected Debug/O0 native-link compatibility probe | pass, 1 accepted / 0 failed |
 | `zig build distribution-musl-object` | selected x86_64 musl object subset plus embedded ReleaseSafe ABI checks, no broad Zig-linker integration proof | pass |
 | `zig build distribution-musl-executable` | selected x86_64 musl executable subset including ReleaseFast, ReleaseSafe M2, ReleaseSmall M3, and Debug fixtures | pass |

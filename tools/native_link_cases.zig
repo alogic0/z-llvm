@@ -731,6 +731,80 @@ pub const cases = [_]Case{
         ,
     },
     .{
+        .id = "releasesmall_mix_c_files_add_zig",
+        .mode = "ReleaseSmall",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_zig.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t add_zig(int32_t value);
+        \\__thread int32_t C_k = 7;
+        \\int main(void) {
+        \\    if (add_zig(10) != 18) return 1;
+        \\    C_k = -3;
+        \\    if (add_zig(10) != 8) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesmall_mix_c_files_add_may_panic",
+        .mode = "ReleaseSmall",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t add_may_panic(int32_t value);
+        \\void panic_stub(const char *message, int64_t len) __asm__("debug.defaultPanic");
+        \\void panic_stub(const char *message, int64_t len) {
+        \\    (void)message;
+        \\    (void)len;
+        \\    __builtin_trap();
+        \\}
+        \\int main(void) {
+        \\    if (add_may_panic(0) != 1) return 1;
+        \\    if (add_may_panic(41) != 42) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesmall_libfuzzer_runner_futex_wait",
+        .mode = "ReleaseSmall",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll",
+        .harness =
+        \\#include <stdbool.h>
+        \\#include <stdint.h>
+        \\extern bool runner_futex_wait(const int32_t *address, int32_t expected);
+        \\int main(void) {
+        \\    int32_t value = 7;
+        \\    return runner_futex_wait(&value, 7) ? 1 : 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesmall_libfuzzer_runner_test_name",
+        .mode = "ReleaseSmall",
+        .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\#include <string.h>
+        \\struct Slice {
+        \\    uintptr_t ptr;
+        \\    uint64_t len;
+        \\};
+        \\extern struct Slice runner_test_name(int32_t index);
+        \\int main(void) {
+        \\    struct Slice name = runner_test_name(0);
+        \\    if (name.len != 4) return 1;
+        \\    if (memcmp((const void *)name.ptr, "test", 4) != 0) return 2;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
         .id = "debug_shared_library_mathtest_add_o0",
         .mode = "Debug",
         .fixture = "test/distribution/debug_x86_64/inputs/shared_library_mathtest_add_o0.ll",

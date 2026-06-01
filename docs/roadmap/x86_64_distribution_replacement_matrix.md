@@ -285,10 +285,10 @@ clean for the same selected subset:
 gate=zig build probe-native-linker
 target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
-accepted=40
+accepted=44
 failed=0
 per_mode=ReleaseFast 27/27 accepted, ReleaseSafe 9/9 accepted,
-         ReleaseSmall 3/3 accepted, Debug 1/1 accepted
+         ReleaseSmall 7/7 accepted, Debug 1/1 accepted
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
 next_blocker=none measured; first future failure becomes a local object

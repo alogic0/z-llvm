@@ -96,6 +96,10 @@ ReleaseSmall:
   releasesmall_i64_return
   releasesmall_unchecked_arith_i64
   releasesmall_hidden_access
+  releasesmall_mix_c_files_add_zig
+  releasesmall_mix_c_files_add_may_panic
+  releasesmall_libfuzzer_runner_futex_wait
+  releasesmall_libfuzzer_runner_test_name
 
 Debug:
   debug_shared_library_mathtest_add_o0
@@ -104,11 +108,11 @@ Debug:
 Latest probe result:
 
 ```text
-accepted=40
+accepted=44
 failed=0
 ReleaseFast accepted=27 failed=0
 ReleaseSafe accepted=9 failed=0
-ReleaseSmall accepted=3 failed=0
+ReleaseSmall accepted=7 failed=0
 Debug accepted=1 failed=0
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
                    ABI, unknown linker compatibility
