@@ -513,6 +513,74 @@ pub const cases = [_]Case{
         ,
     },
     .{
+        .id = "releasesafe_aggregates_checked_sums",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\struct Pair { int32_t a; int32_t b; };
+        \\extern int32_t slice_sum(const int32_t *values, int64_t len);
+        \\extern int32_t struct_sum(const struct Pair *pair);
+        \\extern int32_t array_sum(int32_t a, int32_t b, int32_t c);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    int32_t values[] = { 4, -2, 9, 1 };
+        \\    struct Pair pair = { 7, 11 };
+        \\    if (slice_sum(values, 0) != 0) return 1;
+        \\    if (slice_sum(values, 4) != 12) return 2;
+        \\    if (struct_sum(&pair) != 18) return 3;
+        \\    if (array_sum(1, 2, 3) != 6) return 4;
+        \\    if (array_sum(-4, 9, 5) != 10) return 5;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_atomics_debug_location_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t debug_location(int32_t value);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    if (debug_location(0) != 1) return 1;
+        \\    if (debug_location(41) != 42) return 2;
+        \\    if (debug_location(-2) != -1) return 3;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_control_flow_calls_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/control_flow_calls_checked.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t loop_sum(uint32_t limit);
+        \\extern int32_t call_chain(int32_t value);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\void panic_out_of_bounds_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
+        \\void panic_out_of_bounds_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    if (loop_sum(0) != 0) return 1;
+        \\    if (loop_sum(1) != 0) return 2;
+        \\    if (loop_sum(5) != 10) return 3;
+        \\    if (loop_sum(13) != 78) return 4;
+        \\    if (call_chain(0) != 1) return 5;
+        \\    if (call_chain(5) != 11) return 6;
+        \\    if (call_chain(17) != 35) return 7;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
         .id = "releasesafe_error_switch",
         .mode = "ReleaseSafe",
         .fixture = "test/distribution/releasesafe_x86_64/inputs/error_switch_select.ll",
@@ -524,6 +592,94 @@ pub const cases = [_]Case{
         \\    if (error_switch(1) != -1) return 2;
         \\    if (error_switch(2) != -2) return 3;
         \\    if (error_switch(255) != -2) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_globals_comptime_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t comptime_const(int32_t value);
+        \\extern int32_t update_global(int32_t value);
+        \\extern int32_t read_global(void);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    if (comptime_const(0) != 0) return 1;
+        \\    if (comptime_const(7) != 35) return 2;
+        \\    if (comptime_const(-3) != -15) return 3;
+        \\    if (read_global() != 3) return 4;
+        \\    if (update_global(4) != 7) return 5;
+        \\    if (read_global() != 7) return 6;
+        \\    if (update_global(-2) != 5) return 7;
+        \\    if (read_global() != 5) return 8;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_pointers_memory_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/pointers_memory_checked.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t load_store(const int32_t *input, int32_t *output);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    int32_t input = 41;
+        \\    int32_t output = 0;
+        \\    if (load_store(&input, &output) != 42) return 1;
+        \\    if (output != 42) return 2;
+        \\    input = -3;
+        \\    if (load_store(&input, &output) != -2) return 3;
+        \\    if (output != -2) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_branch_mix_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/switch_control_branch_mix_checked.ll",
+        .harness =
+        \\#include <stdbool.h>
+        \\#include <stdint.h>
+        \\extern int32_t branch_mix(int32_t base, int32_t delta, bool add);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    if (branch_mix(10, 4, true) != 14) return 1;
+        \\    if (branch_mix(10, 4, false) != 6) return 2;
+        \\    if (branch_mix(-7, 3, true) != -4) return 3;
+        \\    if (branch_mix(-7, 3, false) != -10) return 4;
+        \\    return 0;
+        \\}
+        \\
+        ,
+    },
+    .{
+        .id = "releasesafe_tls_concurrency_checked",
+        .mode = "ReleaseSafe",
+        .fixture = "test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll",
+        .harness =
+        \\#include <stdint.h>
+        \\extern int32_t bump_tls(int32_t delta);
+        \\extern int32_t read_tls(void);
+        \\void panic_overflow_stub(void) __asm__("debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        \\void panic_overflow_stub(void) { __builtin_trap(); }
+        \\int main(void) {
+        \\    if (read_tls() != 1) return 1;
+        \\    if (bump_tls(4) != 5) return 2;
+        \\    if (read_tls() != 5) return 3;
+        \\    if (bump_tls(-2) != 3) return 4;
+        \\    if (read_tls() != 3) return 5;
         \\    return 0;
         \\}
         \\

@@ -83,7 +83,14 @@ ReleaseFast:
 
 ReleaseSafe:
   releasesafe_checked_add
+  releasesafe_aggregates_checked_sums
+  releasesafe_atomics_debug_location_checked
+  releasesafe_control_flow_calls_checked
   releasesafe_error_switch
+  releasesafe_globals_comptime_checked
+  releasesafe_pointers_memory_checked
+  releasesafe_branch_mix_checked
+  releasesafe_tls_concurrency_checked
 
 ReleaseSmall:
   releasesmall_i64_return
@@ -97,10 +104,10 @@ Debug:
 Latest probe result:
 
 ```text
-accepted=33
+accepted=40
 failed=0
 ReleaseFast accepted=27 failed=0
-ReleaseSafe accepted=2 failed=0
+ReleaseSafe accepted=9 failed=0
 ReleaseSmall accepted=3 failed=0
 Debug accepted=1 failed=0
 failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,

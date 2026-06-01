@@ -49,9 +49,9 @@ Debug        x86_64 asm/object: conservative boundary, adjusted continuous 463-r
              object-clean, 2 explicit exclusions
 musl         selected x86_64 object/executable subset gates pass
 linking      final executable/library/archive/linker-script ownership remains Zig-owned
-native link  33 selected ABI-stable objects link and run through
-             `zig build-exe -fno-lld`; probe accepted=33 failed=0
-             per-mode: ReleaseFast 27/27, ReleaseSafe 2/2,
+native link  40 selected ABI-stable objects link and run through
+             `zig build-exe -fno-lld`; probe accepted=40 failed=0
+             per-mode: ReleaseFast 27/27, ReleaseSafe 9/9,
              ReleaseSmall 3/3, Debug 1/1
 AArch64      object emission remains an explicit target boundary
 ```
