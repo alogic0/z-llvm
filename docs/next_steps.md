@@ -11,8 +11,9 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Replacement goal:
 Add the next external IR-writer runtime surface after conditional branches,
-phi/merge values, loops, dense-switch, and mutable global update rows: a
-source-backed x86_64 ReleaseFast ABI-argument direct call row.
+phi/merge values, loops, dense-switch, mutable global update, and i32
+ABI-argument direct-call rows: a source-backed x86_64 ReleaseSmall non-i32 call
+return row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -21,14 +22,15 @@ The completed `releasefast_runtime_cond_branch` and
 with `test/zig/inputs/control_flow_calls.zig`; `releasefast_runtime_switch` is
 paired with `test/zig/inputs/switch_control.zig`;
 `releasefast_runtime_global_update` is paired with
-`test/zig/inputs/globals_comptime.zig`. The next source-backed shape is
-`test/zig/inputs/control_flow_calls.zig`, using the exported
-`call_chain(value: i32)` family that already backs object/native-link call and
-ABI-argument evidence.
+`test/zig/inputs/globals_comptime.zig`; `releasefast_runtime_call_chain` is
+paired with `test/zig/inputs/control_flow_calls.zig`. The next source-backed
+shape is `test/zig/inputs/i64_arithmetic.zig`, using the exported
+`i64_value() i64` family that already backs ReleaseSmall object/native-link
+evidence.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected direct calls with ABI
-arguments. This does not claim full call lowering, varargs, non-C calling
+Reduce the remaining external writer gap for selected calls with non-i32 return
+values. This does not claim full call lowering, varargs, non-C calling
 conventions, or aggregate ABI coverage.
 
 Mode/target/stage row:
@@ -36,25 +38,25 @@ ReleaseFast / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
-LLVM call lowering maps to direct call instructions, scalar ABI argument
-passing, and scalar integer return values emitted from Zig's LLVM backend.
-Source behavior is represented by Zig's `control_flow_calls.call_chain` shape.
+LLVM call lowering maps to direct call instructions and scalar return values
+emitted from Zig's LLVM backend. Source behavior is represented by Zig's
+`i64_arithmetic.i64_value` shape.
 Record more precise upstream files if the slice needs optimizer/codegen behavior
-beyond the selected direct call and i32 ABI argument.
+beyond the selected direct call and i64 return check.
 
 Known boundary:
-Only one selected i32 ABI-argument direct call shape. Generic call lowering,
-non-i32 returns, varargs, indirect calls, TLS, vectors, and aggregate ABI remain
-out of scope.
+Only one selected i64-returning direct call checked by an i32 C ABI main.
+Generic call lowering, varargs, indirect calls, TLS, vectors, and aggregate ABI
+remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasefast_runtime_call_chain`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_i64_call`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the ABI-argument direct call slice separately with the policy in
+Commit the non-i32 call return slice separately with the policy in
 `docs/commit_policy.md`.
 
 ## Current Evidence
@@ -93,16 +95,17 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 15-row
+also passes: the first ReleaseFast tiny-scalar row and the full 16-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 15 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 16 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall table indexed load, and the ReleaseSafe checked-add panic-runtime
 boundary, plus ReleaseFast runtime conditional branch, phi/merge, loop, and
-dense-switch rows, plus the mutable global update row. Broad
+dense-switch rows, plus the mutable global update and ABI-argument direct-call
+rows. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -151,14 +154,14 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=15 executable_ok=14 link_only_ok=1 local_fail=0
-             scalar_runtime_rows=15 minimal_wrapper_rows=0
+             full set total=16 executable_ok=15 link_only_ok=1 local_fail=0
+             scalar_runtime_rows=16 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 table-indexed-load=1
              checked-add-runtime-boundary=1 runtime-condbr=1
              runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1
-             global-update=1 minimal-ret0=0
+             global-update=1 abi-arg-call=1 minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0

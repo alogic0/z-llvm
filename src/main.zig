@@ -234,6 +234,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
         try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
+        try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -267,6 +269,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -534,6 +537,32 @@ fn writeRuntimeGlobalUpdateIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeCallChainIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@main = alias i32 (i32), ptr @control_flow_calls.call_chain
+        \\
+        \\define dso_local i32 @control_flow_calls.callee(i32 %value) local_unnamed_addr {{
+        \\entry:
+        \\  %doubled = add i32 %value, %value
+        \\  ret i32 %doubled
+        \\}}
+        \\
+        \\define private i32 @control_flow_calls.call_chain(i32 %value) local_unnamed_addr {{
+        \\entry:
+        \\  %base = call i32 @control_flow_calls.callee(i32 %value)
+        \\  %ret = add i32 %base, 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime call chain external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
