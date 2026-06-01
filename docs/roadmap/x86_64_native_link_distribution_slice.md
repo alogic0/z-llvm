@@ -5,6 +5,8 @@ owns LLVM-compatible IR parsing, selected optimization, selected object
 emission, and final executable proof through Zig's native linker path.
 The narrower captured release-mode claim is tracked in
 `docs/roadmap/x86_64_captured_release_native_link_claim.md`.
+The source-starting integration gate is tracked in
+`docs/roadmap/x86_64_zig_source_native_link_slice.md`.
 
 ## Contract
 
@@ -199,6 +201,7 @@ zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
 zig build probe-native-linker-broad -- --mode=Debug
 zig build distribution-native-link-boundary2
+zig build distribution-zig-source-native-link
 ```
 
 ## Boundaries

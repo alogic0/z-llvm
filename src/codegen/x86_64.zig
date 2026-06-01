@@ -163,6 +163,7 @@ pub const Instruction = union(enum) {
     add_rdi_rcx4_ptr_eax,
     inc_rcx,
     movzx_dil_edi,
+    and_edi_imm8: u8,
     load_rax_rdi_u8_eax,
     smin_i32_edi_esi_eax,
     shift_mix_i32_edi_esi_eax,
@@ -956,7 +957,6 @@ fn lowerSelectedI64ConstReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "inherit_want_safety.entry")) return false;
     if (!ret.ty.eql(.{ .int = 64 })) return false;
     if (function.params.items.len != 0 or block.instructions.items.len != 0) return false;
     const value = switch (ret.value orelse return error.InvalidRet) {
@@ -2547,14 +2547,23 @@ fn lowerBase64TableLookupReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "base64.table_lookup")) return false;
+    if (!std.mem.eql(u8, function.name, "base64.table_lookup") and
+        !std.mem.eql(u8, function.name, "base64_table_lookup.base64_table_lookup"))
+    {
+        return false;
+    }
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
-    if (block.instructions.items.len != 4) return false;
+    if (block.instructions.items.len != 4 and block.instructions.items.len != 5) return false;
 
-    const zext_index_name = block.instructions.items[0].result orelse return false;
-    const gep_name = block.instructions.items[1].result orelse return false;
-    const load_name = block.instructions.items[2].result orelse return false;
-    const zext_result_name = block.instructions.items[3].result orelse return false;
+    const has_mask = block.instructions.items.len == 5;
+    const zext_index_index: usize = if (has_mask) 1 else 0;
+    const gep_index: usize = if (has_mask) 2 else 1;
+    const load_index: usize = if (has_mask) 3 else 2;
+    const zext_result_index: usize = if (has_mask) 4 else 3;
+    const zext_index_name = block.instructions.items[zext_index_index].result orelse return false;
+    const gep_name = block.instructions.items[gep_index].result orelse return false;
+    const load_name = block.instructions.items[load_index].result orelse return false;
+    const zext_result_name = block.instructions.items[zext_result_index].result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
@@ -2562,30 +2571,55 @@ fn lowerBase64TableLookupReturn(
     if (!std.mem.eql(u8, ret_name, zext_result_name)) return false;
 
     const param_name = function.params.items[0].name;
-    const first_zext = switch (block.instructions.items[0].kind) {
+    var zext_value_name = param_name;
+    if (has_mask) {
+        const mask_name = block.instructions.items[0].result orelse return false;
+        const mask = switch (block.instructions.items[0].kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (mask.op != .@"and" or !mask.ty.eql(.{ .int = 8 })) return false;
+        if (!((isNamed(mask.lhs, param_name) and isInt(mask.rhs, 3)) or
+            (isNamed(mask.rhs, param_name) and isInt(mask.lhs, 3))))
+        {
+            return false;
+        }
+        zext_value_name = mask_name;
+    }
+
+    const first_zext = switch (block.instructions.items[zext_index_index].kind) {
         .cast => |cast| cast,
         else => return false,
     };
     if (first_zext.op != .zext or !first_zext.from_ty.eql(.{ .int = 8 }) or !first_zext.to_ty.eql(.{ .int = 64 })) return false;
-    if (!isNamed(first_zext.value, param_name)) return false;
+    if (!isNamed(first_zext.value, zext_value_name)) return false;
 
-    const gep = switch (block.instructions.items[1].kind) {
+    const gep = switch (block.instructions.items[gep_index].kind) {
         .gep => |gep| gep,
         else => return false,
     };
-    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
-    if (!isNamed(gep.ptr, "@__anon_base64_table")) return false;
-    if (gep.indices.items.len != 2) return false;
-    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !gep.indices.items[0].value.eql(.{ .int = 0 })) return false;
-    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[1].value, zext_index_name)) return false;
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" }) and !gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return false;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.startsWith(u8, table_symbol, "__anon_") and !std.mem.eql(u8, table_symbol, "__anon_base64_table")) return false;
+    if (gep.indices.items.len == 2) {
+        if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !gep.indices.items[0].value.eql(.{ .int = 0 })) return false;
+        if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[1].value, zext_index_name)) return false;
+    } else if (gep.indices.items.len == 1) {
+        if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[0].value, zext_index_name)) return false;
+    } else {
+        return false;
+    }
 
-    const load = switch (block.instructions.items[2].kind) {
+    const load = switch (block.instructions.items[load_index].kind) {
         .load => |load| load,
         else => return false,
     };
     if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
 
-    const result_zext = switch (block.instructions.items[3].kind) {
+    const result_zext = switch (block.instructions.items[zext_result_index].kind) {
         .cast => |cast| cast,
         else => return false,
     };
@@ -2593,7 +2627,8 @@ fn lowerBase64TableLookupReturn(
     if (!isNamed(result_zext.value, load_name)) return false;
 
     try machine.instructions.append(allocator, .movzx_dil_edi);
-    try machine.instructions.append(allocator, .{ .lea_global_rax = "__anon_base64_table" });
+    if (has_mask) try machine.instructions.append(allocator, .{ .and_edi_imm8 = 3 });
+    try machine.instructions.append(allocator, .{ .lea_global_rax = table_symbol });
     try machine.instructions.append(allocator, .load_rax_rdi_u8_eax);
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -8176,6 +8211,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
         .movzx_dil_edi,
+        .and_edi_imm8,
         .load_rax_rdi_u8_eax,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,
@@ -8287,7 +8323,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -8327,6 +8363,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_rdi_rcx4_ptr_eax,
         .inc_rcx,
         .movzx_dil_edi,
+        .and_edi_imm8,
         .load_rax_rdi_u8_eax,
         .smin_i32_edi_esi_eax,
         .shift_mix_i32_edi_esi_eax,

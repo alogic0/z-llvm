@@ -345,8 +345,25 @@ The named distribution slice is
 [x86_64_native_link_distribution_slice.md](x86_64_native_link_distribution_slice.md).
 The captured release-mode native-link claim is
 [x86_64_captured_release_native_link_claim.md](x86_64_captured_release_native_link_claim.md).
+The Zig-source integration slice is
+[x86_64_zig_source_native_link_slice.md](x86_64_zig_source_native_link_slice.md).
 Per-mode native-link build aliases exist for ReleaseFast, ReleaseSafe,
 ReleaseSmall, and Debug so each promotion can be refreshed independently.
+
+Zig source integration is now a first-class evidence block above fixture-only
+object/native-link proof:
+
+```text
+gate=zig build distribution-zig-source-native-link
+path=Zig source -> stage4 LLVM IR -> z_llvm object -> zig build-exe -fno-lld
+total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ReleaseFast executable=5 source rows
+ReleaseSafe executable=1 source row
+ReleaseSafe link_only=1 zig-panic-runtime boundary row
+ReleaseSmall executable=3 source rows
+fallback=stage4 Zig still emits LLVM IR; no LLVM codegen after IR emission for
+         executable rows in this selected slice
+```
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,
 not a future `z_llvm` linker plan. `z_llvm` emits LLVM-compatible IR, assembly,

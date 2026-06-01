@@ -52,6 +52,21 @@ selected_total=45 accepted=45 failed=0
 per_mode=ReleaseFast 27/27, ReleaseSafe 9/9, ReleaseSmall 8/8, Debug 1/1
 ```
 
+Zig source integration proof is stronger than checked-IR fixture proof for the
+selected rows:
+
+```text
+zig build distribution-zig-source-native-link
+path=Zig source -> stage4 LLVM IR -> z_llvm object -> Zig native linker
+total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ReleaseFast executable source rows=5
+ReleaseSafe executable source rows=1
+ReleaseSafe link-only runtime boundary rows=1
+ReleaseSmall executable source rows=3
+claim=LLVM codegen is not needed after Zig emits LLVM IR for this selected
+      x86_64 source-backed release slice
+```
+
 ## Boundaries
 
 This is not a broad Zig distribution replacement claim. It does not include

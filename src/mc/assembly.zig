@@ -28,6 +28,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
             .inc_rcx => try writer.writeAll("\tincq %rcx\n"),
             .movzx_dil_edi => try writer.writeAll("\tmovzbl %dil, %edi\n"),
+            .and_edi_imm8 => |value| try writer.print("\tandl ${}, %edi\n", .{value}),
             .load_rax_rdi_u8_eax => try writer.writeAll("\tmovzbl (%rax,%rdi), %eax\n"),
             .smin_i32_edi_esi_eax => try writer.writeAll("\tmovl %edi, %eax\n\tcmpl %esi, %edi\n\tcmovgl %esi, %eax\n"),
             .shift_mix_i32_edi_esi_eax => try writer.writeAll("\tmovl %esi, %ecx\n\tandl $31, %ecx\n\tmovl %edi, %eax\n\tshll %cl, %eax\n\tmovl %edi, %edx\n\tshrl %cl, %edx\n\txorl %edx, %eax\n"),

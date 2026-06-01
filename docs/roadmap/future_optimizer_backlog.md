@@ -591,6 +591,11 @@ linker acceptance for the same selected object set. The current probe result is
 `zig build distribution-native-link-boundary2`; ReleaseFast, ReleaseSafe,
 ReleaseSmall, and Debug currently report `local_fail=0` with Zig runtime, TLS,
 compiler-rt/libc, and explicit ReleaseSmall exclusions classified separately.
+The first source-starting integration gate is
+`zig build distribution-zig-source-native-link`; it proves 10 selected Zig
+source rows through stage4 LLVM IR emission, local `z_llvm` object emission,
+and Zig native linking, with 9 executable proofs and 1 ReleaseSafe panic-runtime
+link-only boundary.
 
 The first non-x86_64 object target boundary is validated by
 `zig build distribution-aarch64-boundary`: a source-backed

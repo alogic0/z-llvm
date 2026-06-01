@@ -27,6 +27,7 @@ zig build readiness
 zig build distribution-all
 zig build distribution-native-link
 zig build probe-native-linker
+zig build distribution-zig-source-native-link
 zig build probe-native-linker-broad -- --mode=ReleaseFast
 zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
@@ -37,7 +38,10 @@ zig build distribution-native-link-boundary2
 The focused gates passed after the script runner cleanup, shared tool helper
 refactor, selected native-linker proof expansion, native-linker compatibility
 probe addition, exact broad-probe category split, and ReleaseSmall base64 table
-lookup reduction. Broad native-link probes are link-only evidence: every
+lookup reduction. The Zig source integration gate also passes: 10 source rows
+go from stage4 Zig-emitted LLVM IR through local `z_llvm` object emission and
+Zig native linking, with 9 executable proofs and 1 ReleaseSafe link-only
+panic-runtime boundary. Broad native-link probes are link-only evidence: every
 current ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug row is accepted,
 accounted for by an exact Zig runtime/TLS/compiler-rt category, or explicitly
 excluded as a documented boundary. No broad probe currently reports an
@@ -51,6 +55,8 @@ The selected native-link distribution slice is recorded in
 [x86_64_native_link_distribution_slice.md](roadmap/x86_64_native_link_distribution_slice.md):
 the captured release-mode claim is recorded in
 [x86_64_captured_release_native_link_claim.md](roadmap/x86_64_captured_release_native_link_claim.md).
+The Zig source integration slice is recorded in
+[x86_64_zig_source_native_link_slice.md](roadmap/x86_64_zig_source_native_link_slice.md).
 
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
@@ -65,6 +71,10 @@ native link  45 selected ABI-stable objects link and run through
              `zig build-exe -fno-lld`; probe accepted=45 failed=0
              per-mode: ReleaseFast 27/27, ReleaseSafe 9/9,
              ReleaseSmall 8/8, Debug 1/1
+source link  Zig source -> stage4 LLVM IR -> z_llvm object -> Zig native link:
+             total=10 executable_ok=9 link_only_ok=1 local_fail=0
+             ReleaseFast executable=5, ReleaseSafe executable=1 plus
+             1 panic-runtime link-only boundary, ReleaseSmall executable=3
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0
