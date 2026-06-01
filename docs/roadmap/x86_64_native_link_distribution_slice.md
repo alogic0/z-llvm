@@ -7,6 +7,8 @@ The narrower captured release-mode claim is tracked in
 `docs/roadmap/x86_64_captured_release_native_link_claim.md`.
 The source-starting integration gate is tracked in
 `docs/roadmap/x86_64_zig_source_native_link_slice.md`.
+The experimental patched-Zig object-emission hook is tracked in
+`docs/roadmap/x86_64_zig_integrated_object_emit_slice.md`.
 
 ## Contract
 

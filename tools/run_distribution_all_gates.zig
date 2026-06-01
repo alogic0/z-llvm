@@ -6,6 +6,7 @@ const tools = [_][]const u8{
     "tools/run_distribution_native_link_m5.zig",
     "tools/probe_native_linker_compatibility.zig",
     "tools/run_distribution_zig_source_native_link.zig",
+    "tools/run_distribution_zig_integrated_object.zig",
     "tools/run_distribution_boundary_gates.zig",
 };
 

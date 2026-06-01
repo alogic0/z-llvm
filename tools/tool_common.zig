@@ -64,6 +64,25 @@ pub fn runCapture(
     return result;
 }
 
+pub fn runCaptureEnv(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    argv: []const []const u8,
+    label: []const u8,
+    environ_map: *const std.process.Environ.Map,
+) !std.process.RunResult {
+    const result = try std.process.run(allocator, io, .{
+        .argv = argv,
+        .environ_map = environ_map,
+        .stdout_limit = .limited(128 * 1024 * 1024),
+        .stderr_limit = .limited(32 * 1024 * 1024),
+    });
+    if (!termOk(result.term)) {
+        try forwardCommandFailure(io, label, result);
+    }
+    return result;
+}
+
 pub fn freeRunResult(allocator: std.mem.Allocator, result: std.process.RunResult) void {
     allocator.free(result.stdout);
     allocator.free(result.stderr);

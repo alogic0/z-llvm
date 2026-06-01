@@ -347,6 +347,8 @@ The captured release-mode native-link claim is
 [x86_64_captured_release_native_link_claim.md](x86_64_captured_release_native_link_claim.md).
 The Zig-source integration slice is
 [x86_64_zig_source_native_link_slice.md](x86_64_zig_source_native_link_slice.md).
+The Zig integrated object-emission slice is
+[x86_64_zig_integrated_object_emit_slice.md](x86_64_zig_integrated_object_emit_slice.md).
 Per-mode native-link build aliases exist for ReleaseFast, ReleaseSafe,
 ReleaseSmall, and Debug so each promotion can be refreshed independently.
 
@@ -363,6 +365,23 @@ ReleaseSafe link_only=1 zig-panic-runtime boundary row
 ReleaseSmall executable=3 source rows
 fallback=stage4 Zig still emits LLVM IR; no LLVM codegen after IR emission for
          executable rows in this selected slice
+```
+
+Zig integrated object emission is the experimental in-Zig hook stage above the
+external source capture pipeline:
+
+```text
+gate=zig build distribution-zig-integrated-object
+stage=Zig integrated object emit
+path=Zig build-obj -> patched Zig optimized IR -> z_llvm object
+     -> zig build-exe -fno-lld
+status=experimental conservative boundary
+claim=LLVM target-machine object emission removed for selected x86_64 source
+      rows after Zig constructs LLVM IR
+total=10 executable_ok=9 link_only_ok=1 local_fail=0
+fixture_pairing=each wrapper row records covered_fixture, mode, and proof
+remaining_libllvm_dependency=Zig IR construction still uses libLLVM
+excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
 ```
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,

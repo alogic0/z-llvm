@@ -28,6 +28,7 @@ zig build distribution-all
 zig build distribution-native-link
 zig build probe-native-linker
 zig build distribution-zig-source-native-link
+zig build distribution-zig-integrated-object
 zig build probe-native-linker-broad -- --mode=ReleaseFast
 zig build probe-native-linker-broad -- --mode=ReleaseSafe
 zig build probe-native-linker-broad -- --mode=ReleaseSmall
@@ -37,15 +38,19 @@ zig build distribution-native-link-boundary2
 
 The focused gates passed after the script runner cleanup, shared tool helper
 refactor, selected native-linker proof expansion, native-linker compatibility
-probe addition, exact broad-probe category split, and ReleaseSmall base64 table
-lookup reduction. The Zig source integration gate also passes: 10 source rows
-go from stage4 Zig-emitted LLVM IR through local `z_llvm` object emission and
-Zig native linking, with 9 executable proofs and 1 ReleaseSafe link-only
-panic-runtime boundary. Broad native-link probes are link-only evidence: every
-current ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug row is accepted,
-accounted for by an exact Zig runtime/TLS/compiler-rt category, or explicitly
-excluded as a documented boundary. No broad probe currently reports an
-unclassified local object/link failure.
+probe addition, exact broad-probe category split, ReleaseSmall base64 table
+lookup reduction, and the experimental patched-Zig object-emission hook. The
+Zig source integration gate passes: 10 source rows go from stage4 Zig-emitted
+LLVM IR through local `z_llvm` object emission and Zig native linking, with 9
+executable proofs and 1 ReleaseSafe link-only panic-runtime boundary. The Zig
+integrated object-emission gate uses paired C ABI wrapper objects and a patched
+`../ziglang` hook so the selected rows go through Zig's `build-obj` object
+boundary before `z_llvm --emit=obj` and `zig build-exe -fno-lld`. Broad
+native-link probes are link-only evidence: every current ReleaseFast,
+ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
+Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
+boundary. No broad probe currently reports an unclassified local object/link
+failure.
 
 Current distribution evidence is recorded in
 [x86_64_distribution_object_dashboard.md](roadmap/x86_64_distribution_object_dashboard.md)
@@ -57,6 +62,8 @@ the captured release-mode claim is recorded in
 [x86_64_captured_release_native_link_claim.md](roadmap/x86_64_captured_release_native_link_claim.md).
 The Zig source integration slice is recorded in
 [x86_64_zig_source_native_link_slice.md](roadmap/x86_64_zig_source_native_link_slice.md).
+The experimental patched-Zig object-emission slice is recorded in
+[x86_64_zig_integrated_object_emit_slice.md](roadmap/x86_64_zig_integrated_object_emit_slice.md).
 
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
@@ -75,6 +82,10 @@ source link  Zig source -> stage4 LLVM IR -> z_llvm object -> Zig native link:
              total=10 executable_ok=9 link_only_ok=1 local_fail=0
              ReleaseFast executable=5, ReleaseSafe executable=1 plus
              1 panic-runtime link-only boundary, ReleaseSmall executable=3
+integrated   patched Zig build-obj -> optimized IR -> z_llvm object
+             -> Zig native link:
+             total=10 executable_ok=9 link_only_ok=1 local_fail=0
+             each wrapper records covered_fixture, mode, and proof
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0

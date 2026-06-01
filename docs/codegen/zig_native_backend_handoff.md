@@ -71,6 +71,19 @@ same selected object set as a compatibility probe and classifies the first
 native-linker acceptance failure by symbol, relocation, section, TLS model,
 COMDAT, alignment, ABI, or unknown linker compatibility.
 
+The experimental integrated object-emission proof is
+`zig build distribution-zig-integrated-object`. It requires a patched local
+`../ziglang` with `ZIG_USE_ZLLVM_OBJECT=1` and `ZLLVM_EXE=/path/to/z_llvm`;
+Zig still constructs LLVM IR, but the LLVM target-machine object emission call
+is replaced for selected x86_64 release rows by `z_llvm --emit=obj`, followed
+by Zig native linking with `-fno-lld`. Each wrapper row records the existing
+source-backed fixture it covers so this gate remains connected to captured
+evidence rather than standalone toy programs. The current wrappers expose C ABI
+`main`; the gate emits the wrapper object with patched Zig `build-obj`, then
+links it with `zig build-exe -fno-lld -fno-compiler-rt -lc`. Zig startup runtime
+and compiler_rt sub-compilations are documented boundaries rather than part of
+this object-emission slice.
+
 Default non-goals:
 
 ```text
