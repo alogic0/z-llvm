@@ -26,11 +26,11 @@ pub fn main(init: std.process.Init) !void {
         try common.validationError(io, "missing Zig source: {s}\n", .{source_path});
     };
 
-    const zig_source_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_SOURCE_DIR");
+    const zig_source_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_SOURCE_DIR");
     defer if (zig_source_env) |value| allocator.free(value);
     const zig_source_dir = zig_source_env orelse "../ziglang";
 
-    const zig_emitter_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_EMITTER");
+    const zig_emitter_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_EMITTER");
     defer if (zig_emitter_env) |value| allocator.free(value);
     const default_zig_emitter = try std.fs.path.join(allocator, &.{ zig_source_dir, "build/stage4/bin/zig" });
     defer allocator.free(default_zig_emitter);
@@ -103,13 +103,6 @@ fn defaultOutputPath(allocator: std.mem.Allocator, source_path: []const u8, mode
     else
         "test/zig/captured";
     return std.fmt.allocPrint(allocator, "{s}/{s}.{s}.{s}.ll", .{ dir, source_name, mode, target_tag });
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }
 
 fn usageError(io: std.Io, comptime fmt: []const u8, args: anytype) !noreturn {

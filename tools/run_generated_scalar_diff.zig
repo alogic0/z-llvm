@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
-    const opt_bin = try getEnvOwnedOrNull(allocator, init.minimal.environ, "OPT_BIN");
+    const opt_bin = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "OPT_BIN");
     defer if (opt_bin) |value| allocator.free(value);
 
     const temp = try common.TempDir.init(allocator, io, "generated_scalar_diff");
@@ -172,11 +172,4 @@ fn runExecutionCase(allocator: std.mem.Allocator, io: std.Io, temp: common.TempD
     if (status != 42) {
         try common.validationError(io, "expected lli-22 exit status 42, got {}\n", .{status});
     }
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

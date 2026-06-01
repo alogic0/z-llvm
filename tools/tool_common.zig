@@ -151,6 +151,13 @@ pub fn commandExists(allocator: std.mem.Allocator, io: std.Io, command: []const 
     return termOk(result.term);
 }
 
+pub fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
+    return environ.getAlloc(allocator, name) catch |err| switch (err) {
+        error.EnvironmentVariableMissing => null,
+        else => err,
+    };
+}
+
 pub fn expectRegex(allocator: std.mem.Allocator, io: std.Io, path: []const u8, pattern: []const u8) !void {
     const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(128 * 1024 * 1024));
     defer allocator.free(contents);

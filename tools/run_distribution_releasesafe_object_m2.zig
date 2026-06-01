@@ -220,9 +220,9 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
-    const target_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
-    const cc_target_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "CC_TARGET");
+    const cc_target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "CC_TARGET");
     defer if (cc_target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
     const cc_target = cc_target_env orelse defaultCcTarget(target);
@@ -290,11 +290,4 @@ fn defaultCcTarget(target: []const u8) []const u8 {
     if (std.mem.eql(u8, target, "x86_64-unknown-linux-gnu")) return "x86_64-linux-gnu";
     if (std.mem.eql(u8, target, "x86_64-unknown-linux-musl")) return "x86_64-linux-musl";
     return target;
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

@@ -5,9 +5,9 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
-    const target_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
-    const fixture_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "FIXTURE");
+    const fixture_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "FIXTURE");
     defer if (fixture_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
     const fixture = fixture_env orelse "test/zig/expected/debug_metadata.reduced.ll";
@@ -40,11 +40,4 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print("ok distribution debug unwind boundary target={s} [no-dwarf-or-unwind-sections]\n", .{target});
     try stdout_writer.interface.flush();
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

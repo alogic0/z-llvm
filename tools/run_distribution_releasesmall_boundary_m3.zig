@@ -24,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
-    const target_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const target = target_env orelse "x86_64-unknown-linux-gnu";
 
@@ -87,11 +87,4 @@ fn expectControlFlowBoundary(
     if (std.mem.indexOf(u8, combined.items, function_diag) == null) {
         try common.validationError(io, "missing function diagnostic for {s}\n", .{case.name});
     }
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

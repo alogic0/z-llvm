@@ -1,5 +1,6 @@
 const std = @import("std");
 const manifest_parser = @import("zig_ir_manifest.zig");
+const common = @import("tool_common.zig");
 
 const usage =
     \\usage: zig run tools/run_zig_corpus.zig -- [manifest]
@@ -16,7 +17,7 @@ pub fn main(init: std.process.Init) !void {
     const manifest_arg = try parseManifestArg(allocator, io, init);
     defer if (manifest_arg.owned) allocator.free(manifest_arg.path);
 
-    const passes_override = try getEnvOwnedOrNull(allocator, init.minimal.environ, "PASSES");
+    const passes_override = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "PASSES");
     defer if (passes_override) |passes| allocator.free(passes);
 
     var manifest = manifest_parser.load(allocator, io, manifest_arg.path, 64 * 1024 * 1024) catch |err| switch (err) {
@@ -102,13 +103,6 @@ fn parseManifestArg(allocator: std.mem.Allocator, io: std.Io, init: std.process.
         try validationError(io, "unexpected argument: {s}\n{s}", .{ extra, usage });
     }
     return .{ .path = try allocator.dupe(u8, first), .owned = true };
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }
 
 fn makeTempDir(allocator: std.mem.Allocator, io: std.Io) ![]const u8 {

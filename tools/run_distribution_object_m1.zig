@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !void {
     const manifest_arg = try parseManifestArg(allocator, io, init);
     defer if (manifest_arg.owned) allocator.free(manifest_arg.path);
 
-    const target = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target) |value| allocator.free(value);
 
     const temp = try common.TempDir.init(allocator, io, "distribution_object_m1");
@@ -179,11 +179,4 @@ fn runKnownBlocker(
 
 fn expectRegex(allocator: std.mem.Allocator, io: std.Io, path: []const u8, pattern: []const u8) !void {
     try common.expectRegex(allocator, io, path, pattern);
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

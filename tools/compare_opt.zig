@@ -29,7 +29,7 @@ pub fn main(init: std.process.Init) !void {
     const metadata_arg = try parseMetadataArg(allocator, io, init);
     defer if (metadata_arg.owned) allocator.free(metadata_arg.path);
 
-    const opt_bin = try getEnvOwnedOrNull(allocator, init.minimal.environ, "OPT_BIN");
+    const opt_bin = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "OPT_BIN");
     defer if (opt_bin) |value| allocator.free(value);
 
     const temp = try common.TempDir.init(allocator, io, "compare_opt");
@@ -154,11 +154,4 @@ fn runRow(
     } else {
         try common.validationError(io, "unknown fixture kind for {s}: {s}\n", .{ row.id, row.fixture_kind });
     }
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

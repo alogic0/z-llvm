@@ -5,11 +5,11 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
-    const zig_source_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_SOURCE_DIR");
+    const zig_source_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_SOURCE_DIR");
     defer if (zig_source_env) |value| allocator.free(value);
     const zig_source_dir = zig_source_env orelse "../ziglang";
 
-    const zig_emitter_env = try getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_EMITTER");
+    const zig_emitter_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_EMITTER");
     defer if (zig_emitter_env) |value| allocator.free(value);
     const default_zig_emitter = try std.fs.path.join(allocator, &.{ zig_source_dir, "build/stage4/bin/zig" });
     defer allocator.free(default_zig_emitter);
@@ -41,11 +41,4 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print("ok stage4 emitter {s} matches {s} HEAD {s}\n", .{ version, zig_source_dir, head_rev });
     try stdout_writer.interface.flush();
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

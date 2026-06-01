@@ -16,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     const mode = try parseModeArg(allocator, io, init);
-    const target = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target) |value| allocator.free(value);
 
     const temp = try common.TempDir.init(allocator, io, "compare_codegen");
@@ -196,12 +196,5 @@ fn modeName(mode: Mode) []const u8 {
         .assembly => "asm",
         .objdump => "objdump",
         .readelf => "readelf",
-    };
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
     };
 }

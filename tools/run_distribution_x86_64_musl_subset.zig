@@ -16,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     const mode = try parseMode(allocator, io, init);
-    const target = try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
+    const target = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target) |value| allocator.free(value);
     const selected_target = target orelse "x86_64-unknown-linux-musl";
 
@@ -84,11 +84,4 @@ fn runGate(allocator: std.mem.Allocator, io: std.Io, target: []const u8, script:
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.writeAll(result.stdout);
     try stdout_writer.interface.flush();
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }

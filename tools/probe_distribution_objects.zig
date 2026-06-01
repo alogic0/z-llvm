@@ -178,8 +178,8 @@ pub fn main(init: std.process.Init) !void {
 
 fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !Options {
     var opts: Options = .{};
-    if (try getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET")) |target| opts.target = target;
-    if (try getEnvOwnedOrNull(allocator, init.minimal.environ, "INPUT_LIMIT")) |input_limit| {
+    if (try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET")) |target| opts.target = target;
+    if (try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "INPUT_LIMIT")) |input_limit| {
         opts.input_limit = try parseNonZeroUsize(input_limit);
     }
 
@@ -214,13 +214,6 @@ fn parseArgs(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !
     }
 
     return opts;
-}
-
-fn getEnvOwnedOrNull(allocator: std.mem.Allocator, environ: std.process.Environ, name: []const u8) !?[]const u8 {
-    return environ.getAlloc(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableMissing => null,
-        else => err,
-    };
 }
 
 fn parseExclude(text: []const u8) Exclude {
