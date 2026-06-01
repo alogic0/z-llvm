@@ -168,9 +168,11 @@ ir_writer_mode=external
 ## FuncGen Inventory
 
 The current 10 wrappers deliberately enforce source behavior with `comptime`
-checks and expose a minimal runtime C ABI `main` returning zero. That makes the
-object-emitted `FuncGen.zig` surface for these rows much smaller than the
-source fixtures they cover:
+checks and, for the normal postopt/preopt hook path, expose a minimal runtime
+C ABI `main` returning zero. The external writer path replaces the emitted
+wrapper IR with z_llvm-owned runtime surfaces for all 10 selected rows. That
+makes the object-emitted `FuncGen.zig` surface for these rows much smaller than
+the source fixtures they cover:
 
 ```text
 covered by promoted runtime-emitted writer rows:
@@ -220,21 +222,31 @@ runtime-emitted rows:
   releasesmall_i64_arithmetic: i64-arithmetic
     dso_local i32 @main computes an i64 add, checks the i64 result, and exits 0
 
-remaining 4 rows:
-  module header: source_filename, x86_64 Linux target triple,
-                 zllvm_ir_writer_contract=external,
-                 zllvm_ir_writer_surface=minimal-ret0
-  function: dso_local i32 @main() local_unnamed_addr
-  basic block: entry
-  terminator: ret i32 0
+  releasesafe_error_switch: error-switch-select
+    same compare/select error-switch-style surface under the ReleaseSafe
+    accepted pipeline, exiting 0 only if the checks pass
+
+  releasesafe_tiny_scalar_runtime_boundary: checked-add-runtime-boundary
+    dso_local i32 @main emits llvm.sadd.with.overflow.i32, branches to a
+    panic-runtime declaration on overflow, and lowers the selected constant
+    non-overflow object path as link-only boundary evidence
+
+  releasesmall_globals_comptime: global-load
+    same private global load surface under the ReleaseSmall accepted pipeline,
+    exiting 5
+
+  releasesmall_base64_table_lookup: table-indexed-load
+    private [4 x i8] table, trunc/zext index, getelementptr, i8 load, zext to
+    i32, and a runtime check before returning 0
 
 attributes: none
 ```
 
 This is intentionally not a generic replacement for `FuncGen.zig`. The next
 expansion should promote one concrete runtime-emitted construct from the
-unsupported list into z_llvm's external textual writer, then add a focused wrapper that
-requires it.
+unsupported list into z_llvm's external textual writer, then add a focused
+wrapper that requires it. The full writer gate now fails on unexpected
+`minimal-ret0` for selected rows.
 
 ## Fixture Pairing
 
@@ -250,11 +262,12 @@ proof=integrated Zig build-obj object path plus Zig build-exe native link
 ```
 
 The wrappers use compile-time semantic checks against the paired source shape
-and expose a minimal C ABI `main` returning zero. That keeps the preopt gate
-focused on the integrated hook, local accepted optimizer pipeline, object
-emission, and native-link handoff. Runtime behavior is still executed for the
-wrapper binary itself; broader callable ABI behavior remains covered by the
-object/native-link fixture gates.
+and expose a minimal C ABI `main` returning zero in the normal postopt/preopt
+hook path. The external IR writer path substitutes z_llvm-owned runtime IR for
+the selected rows. That keeps the preopt gate focused on the integrated hook,
+local accepted optimizer pipeline, object emission, and native-link handoff,
+while the writer gate proves selected runtime surfaces. Broader callable ABI
+behavior remains covered by the object/native-link fixture gates.
 
 Selected rows:
 
@@ -307,10 +320,13 @@ preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
 ir-writer full set:    total=10 executable_ok=9 link_only_ok=1 local_fail=0
-ir-writer full set:    scalar_runtime_rows=6 minimal_wrapper_rows=4
+ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
+ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer full set:    scalar_runtime_rows=10 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
-                       error-switch-select=1 direct-call=1 global-load=1
-                       i64-arithmetic=1 minimal-ret0=4
+                       error-switch-select=2 direct-call=1 global-load=2
+                       i64-arithmetic=1 table-indexed-load=1
+                       checked-add-runtime-boundary=1 minimal-ret0=0
 ```
 
 ## Fallback Accounting
@@ -347,12 +363,12 @@ Unsupported external IR writer constructs remain explicit:
 
 ```text
 runtime integer arithmetic beyond the selected scalar/i64/integer rows
-branches beyond the selected constant-condbr shape, switches, phi emission,
-and loops
-stores, table data, and mutable global update semantics
+branches beyond selected constant-condbr and checked-add boundary shapes,
+switches, phi emission, and loops
+stores and mutable global update semantics
 calls with ABI arguments or non-i32 returns
-error unions and ReleaseSafe runtime/panic paths beyond selected ReleaseFast
-error-switch-style icmp/select checks
+error unions and ReleaseSafe runtime/panic paths beyond the selected
+panic-runtime link-only boundary
 TLS, atomics, inline asm, vectors
 aggregate ABI lowering, sret/byval, varargs
 debug metadata, DWARF, unwind/personality records
@@ -372,10 +388,11 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits six runtime surfaces: `scalar-add-ret`,
-`integer-arithmetic`, `error-switch-select`, `direct-call`, `global-load`, and
-`i64-arithmetic`; the remaining 4 rows remain minimal wrapper proofs
-(`minimal-ret0`). LLVM's module optimization pipeline, LLVM
+The external writer now emits 10/10 selected rows as runtime surfaces:
+`scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
+`global-load`, `i64-arithmetic`, `table-indexed-load`, and
+`checked-add-runtime-boundary`; no selected rows remain as `minimal-ret0`
+hook-only proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.

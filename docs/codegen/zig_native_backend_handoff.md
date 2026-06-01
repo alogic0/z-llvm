@@ -90,8 +90,9 @@ external writer contract (`ZLLVM_IR_WRITER_MODE=external`,
 the libLLVM bitcode parse/print path, then uses the same preopt `z_llvm`
 optimizer/object path. Runtime writer rows now cover
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
-`global-load`, and `i64-arithmetic`; the other selected rows remain
-`minimal-ret0` hook proofs. All modes link through Zig native linking with
+`global-load`, `i64-arithmetic`, `table-indexed-load`, and
+`checked-add-runtime-boundary`; all 10 selected rows are runtime-emitted and
+the gate fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
 `-fno-lld`. Each wrapper row records the existing source-backed fixture it
 covers so this gate remains connected to captured evidence rather than
 standalone toy programs. The current wrappers expose C ABI `main`; the gate

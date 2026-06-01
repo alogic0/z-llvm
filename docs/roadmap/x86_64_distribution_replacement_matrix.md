@@ -420,10 +420,12 @@ claim=selected wrapper objects bypass LLVM module optimization, LLVM
       selected emitted module; patched Zig does not own case-specific IR text
 total=10 executable_ok=9 link_only_ok=1 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
-ir_writer_rows=scalar_runtime_rows=6, minimal_wrapper_rows=4
+table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
+ir_writer_rows=scalar_runtime_rows=10, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
-               error-switch-select=1, direct-call=1, global-load=1,
-               i64-arithmetic=1, minimal-ret0=4
+               error-switch-select=2, direct-call=1, global-load=2,
+               i64-arithmetic=1, table-indexed-load=1,
+               checked-add-runtime-boundary=1, minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
 FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
@@ -431,16 +433,22 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_error_switch error-switch-select,
                         releasefast_control_flow_calls direct-call,
                         releasefast_globals_comptime global-load,
-                        releasesmall_i64_arithmetic i64-arithmetic;
-                        remaining 4 rows minimal-ret0 C ABI main wrappers
+                        releasesafe_error_switch error-switch-select,
+                        releasesafe_tiny_scalar_runtime_boundary
+                        checked-add-runtime-boundary,
+                        releasesmall_globals_comptime global-load,
+                        releasesmall_i64_arithmetic i64-arithmetic,
+                        releasesmall_base64_table_lookup table-indexed-load;
+                        no selected rows use minimal-ret0
 source_fixture_pairing=each row still records covered_fixture and mode; source
                        behavior is enforced by comptime checks or existing
                        object/native-link fixture gates
 remaining_dependency=general Zig LLVM Builder state remains; full FuncGen and
                      broad Zig IR construction are not replaced
-excluded=runtime arithmetic, branches, switches, loops, loads/stores, globals,
-         calls, TLS, atomics, vectors, aggregate ABI lowering, debug/unwind,
-         AArch64, wasm, LTO, broad runtime/TLS/compiler-rt
+excluded=runtime arithmetic beyond selected rows, switches, loops, stores,
+         mutable global update semantics, ABI calls with arguments, TLS,
+         atomics, vectors, aggregate ABI lowering, debug/unwind, AArch64,
+         wasm, LTO, broad runtime/TLS/compiler-rt
 ```
 
 The linker/CRT boundary is now explicit and validated as an ownership boundary,

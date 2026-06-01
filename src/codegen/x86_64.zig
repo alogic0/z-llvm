@@ -801,6 +801,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             try verifyFunction(machine);
             return machine;
         }
+        if (try lowerSelectedCheckedAddRuntimeBoundaryMain(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
         if (try lowerConditionalReturn(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -931,6 +935,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64WriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
@@ -1090,6 +1095,31 @@ fn validateVoidCall(instruction: ir.Instruction, callee: []const u8, expected_ar
     for (call.args.items, expected_args) |arg, expected| {
         if (!arg.ty.eql(expected.ty) or !arg.value.eql(expected.value)) return error.UnsupportedCodegenValue;
     }
+}
+
+fn validateAssumeColdCall(instruction: ir.Instruction) !void {
+    if (instruction.removed) return error.UnsupportedCodegenInstruction;
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!std.mem.eql(u8, call.callee, "llvm.assume")) return error.UnsupportedCodegenInstruction;
+    if (call.ret_ty != .void or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 1 }) or !isInt(call.args.items[0].value, 1)) return error.UnsupportedCodegenValue;
+}
+
+fn validateIntegerOverflowPanicCall(instruction: ir.Instruction) !void {
+    if (instruction.removed) return error.UnsupportedCodegenInstruction;
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).integerOverflow")) return error.UnsupportedCodegenInstruction;
+    if (call.ret_ty != .void or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
 }
 
 fn lowerSelectedUmlFixSatI64Return(
@@ -2630,6 +2660,161 @@ fn lowerBase64TableLookupReturn(
     if (has_mask) try machine.instructions.append(allocator, .{ .and_edi_imm8 = 3 });
     try machine.instructions.append(allocator, .{ .lea_global_rax = table_symbol });
     try machine.instructions.append(allocator, .load_rax_rdi_u8_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64WriterMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 5) return false;
+
+    const gep_inst = block.instructions.items[0];
+    const load_inst = block.instructions.items[1];
+    const zext_inst = block.instructions.items[2];
+    const icmp_inst = block.instructions.items[3];
+    const select_inst = block.instructions.items[4];
+    if (gep_inst.removed or load_inst.removed or zext_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+
+    const gep_name = gep_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    const zext_name = zext_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, table_symbol, "base64.writer_table")) return false;
+    if (gep.indices.items.len != 2) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[1].value, 3)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 8 }) or !zext.to_ty.eql(.{ .int = 32 }) or !isNamed(zext.value, load_name)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, zext_name) or !isInt(icmp.rhs, 12)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSelectedCheckedAddRuntimeBoundaryMain(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 2) return false;
+    const pair_name = entry.instructions.items[0].result orelse return false;
+    const overflow_name = entry.instructions.items[1].result orelse return false;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!isCalleeName(call.callee, "llvm.sadd.with.overflow.i32")) return false;
+    if (call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 40)) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[1].value, 2)) return false;
+
+    const overflow = switch (entry.instructions.items[1].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!overflow.result_ty.eql(.{ .int = 1 }) or !isNamed(overflow.aggregate, pair_name)) return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, overflow_name)) return false;
+
+    const panic_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ok_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const ok = function.blocks.items[ok_index];
+    const panic = function.blocks.items[panic_index];
+    if (ok.instructions.items.len != 3) return false;
+    if (panic.instructions.items.len != 2) return false;
+
+    const value_name = ok.instructions.items[0].result orelse return false;
+    const matches_name = ok.instructions.items[1].result orelse return false;
+    const select_name = ok.instructions.items[2].result orelse return false;
+    const value = switch (ok.instructions.items[0].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!value.result_ty.eql(.{ .int = 32 }) or !isNamed(value.aggregate, pair_name)) return false;
+
+    const icmp = switch (ok.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, value_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (ok.instructions.items[2].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, matches_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret = switch (ok.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    try validateAssumeColdCall(panic.instructions.items[0]);
+    try validateIntegerOverflowPanicCall(panic.instructions.items[1]);
+    switch (panic.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return false,
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

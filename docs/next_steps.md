@@ -57,9 +57,11 @@ also passes: the first ReleaseFast tiny-scalar row and the full 10-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has six runtime surfaces: tiny scalar add, integer arithmetic,
-error-switch-style compare/select, direct call, global load, and i64
-arithmetic. The other 4 rows are still minimal-wrapper hook proofs. Broad
+writer now has 10 runtime-emitted selected rows and 0 minimal-wrapper hook
+proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
+error-switch-style compare/select, direct call, global load, i64 arithmetic,
+ReleaseSmall table indexed load, and the ReleaseSafe checked-add panic-runtime
+boundary. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -109,10 +111,11 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
              full set total=10 executable_ok=9 link_only_ok=1 local_fail=0
-             scalar_runtime_rows=6 minimal_wrapper_rows=4
+             scalar_runtime_rows=10 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
-             error-switch-select=1 direct-call=1 global-load=1
-             i64-arithmetic=1 minimal-ret0=4
+             error-switch-select=2 direct-call=1 global-load=2
+             i64-arithmetic=1 table-indexed-load=1
+             checked-add-runtime-boundary=1 minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0

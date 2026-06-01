@@ -224,8 +224,16 @@ fn writeIrWriterModuleFromEnv(
         try writeControlFlowCallsIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) {
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
+        try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
+        try writeCheckedAddRuntimeBoundaryIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) {
+        try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) {
+        try writeBase64TableLookupIrWriterBody(io, &writer.interface, ir_path);
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
     }
@@ -244,7 +252,11 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) return "direct-call";
     if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
+    if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
+    if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
+    if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
     return "minimal-ret0";
 }
 
@@ -387,6 +399,64 @@ fn writeI64ArithmeticIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write i64 arithmetic external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeBase64TableLookupIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.writer_table = private unnamed_addr constant [4 x i8] c"\00\04\08\0C", align 4
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %idx8 = trunc i32 3 to i8
+        \\  %idx = zext i8 %idx8 to i64
+        \\  %ptr = getelementptr inbounds [4 x i8], ptr @base64.writer_table, i64 0, i64 %idx
+        \\  %byte = load i8, ptr %ptr, align 1
+        \\  %value = zext i8 %byte to i32
+        \\  %ok = icmp eq i32 %value, 12
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write base64 table lookup external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeCheckedAddRuntimeBoundaryIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %pair = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 40, i32 2)
+        \\  %overflow = extractvalue {{ i32, i1 }} %pair, 1
+        \\  br i1 %overflow, label %panic, label %ok
+        \\
+        \\ok:
+        \\  %value = extractvalue {{ i32, i1 }} %pair, 0
+        \\  %matches = icmp eq i32 %value, 42
+        \\  %ret = select i1 %matches, i32 0, i32 1
+        \\  ret i32 %ret
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\}}
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1 noundef)
+        \\declare fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write checked-add runtime boundary external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

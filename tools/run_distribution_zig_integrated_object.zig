@@ -196,6 +196,8 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "direct-call" },
         .{ .name = "global-load" },
         .{ .name = "i64-arithmetic" },
+        .{ .name = "table-indexed-load" },
+        .{ .name = "checked-add-runtime-boundary" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -246,6 +248,9 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (use_ir_writer) {
+        if (minimal_wrapper_rows != 0) {
+            try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
+        }
         try stdout_writer.interface.print(
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} minimal_wrapper_rows={} local_fail=0\n",
             .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, minimal_wrapper_rows },
@@ -415,6 +420,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_control_flow_calls")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_globals_comptime")) return 5;
+    if (std.mem.eql(u8, case.id, "releasesmall_globals_comptime")) return 5;
     return 0;
 }
 
@@ -462,6 +468,8 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "direct-call")) return "direct-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "global-load")) return "global-load";
     if (std.mem.eql(u8, contents[value_start..value_end], "i64-arithmetic")) return "i64-arithmetic";
+    if (std.mem.eql(u8, contents[value_start..value_end], "table-indexed-load")) return "table-indexed-load";
+    if (std.mem.eql(u8, contents[value_start..value_end], "checked-add-runtime-boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
