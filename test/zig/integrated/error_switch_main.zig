@@ -1,10 +1,13 @@
+comptime {
+    if (errorSwitch(0) != 0) @compileError("error switch success check failed");
+    if (errorSwitch(1) != -1) @compileError("error switch low check failed");
+    if (errorSwitch(2) != -2) @compileError("error switch high check failed");
+    if (errorSwitch(255) != -2) @compileError("error switch fallback check failed");
+}
+
 const SmallError = error{ Low, High };
 
 export fn main() c_int {
-    if (errorSwitch(0) != 0) return 1;
-    if (errorSwitch(1) != -1) return 2;
-    if (errorSwitch(2) != -2) return 3;
-    if (errorSwitch(255) != -2) return 4;
     return 0;
 }
 

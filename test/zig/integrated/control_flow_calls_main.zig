@@ -1,9 +1,12 @@
+comptime {
+    if (loopSum(0) != 0) @compileError("loop zero check failed");
+    if (loopSum(5) != 10) @compileError("loop small check failed");
+    if (loopSum(13) != 78) @compileError("loop larger check failed");
+    if (callChain(0) != 1) @compileError("call chain zero check failed");
+    if (callChain(17) != 35) @compileError("call chain positive check failed");
+}
+
 export fn main() c_int {
-    if (loopSum(0) != 0) return 1;
-    if (loopSum(5) != 10) return 2;
-    if (loopSum(13) != 78) return 3;
-    if (callChain(0) != 1) return 4;
-    if (callChain(17) != 35) return 5;
     return 0;
 }
 

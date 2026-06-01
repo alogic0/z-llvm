@@ -1,13 +1,19 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const tools = [_][]const u8{
-    "tools/run_distribution_no_llvm_codegen_subset.zig",
-    "tools/run_distribution_native_link_m5.zig",
-    "tools/probe_native_linker_compatibility.zig",
-    "tools/run_distribution_zig_source_native_link.zig",
-    "tools/run_distribution_zig_integrated_object.zig",
-    "tools/run_distribution_boundary_gates.zig",
+const Tool = struct {
+    path: []const u8,
+    args: []const []const u8 = &.{},
+};
+
+const tools = [_]Tool{
+    .{ .path = "tools/run_distribution_no_llvm_codegen_subset.zig" },
+    .{ .path = "tools/run_distribution_native_link_m5.zig" },
+    .{ .path = "tools/probe_native_linker_compatibility.zig" },
+    .{ .path = "tools/run_distribution_zig_source_native_link.zig" },
+    .{ .path = "tools/run_distribution_zig_integrated_object.zig" },
+    .{ .path = "tools/run_distribution_zig_integrated_object.zig", .args = &.{"--pipeline=preopt"} },
+    .{ .path = "tools/run_distribution_boundary_gates.zig" },
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -26,8 +32,14 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.flush();
 
     for (tools) |tool| {
-        const argv = [_][]const u8{ "env", target_assignment, "zig", "run", tool };
-        const result = try common.runCapture(allocator, io, &argv, tool);
+        var argv: std.ArrayList([]const u8) = .empty;
+        defer argv.deinit(allocator);
+        try argv.appendSlice(allocator, &.{ "env", target_assignment, "zig", "run", tool.path });
+        if (tool.args.len != 0) {
+            try argv.append(allocator, "--");
+            try argv.appendSlice(allocator, tool.args);
+        }
+        const result = try common.runCapture(allocator, io, argv.items, tool.path);
         defer common.freeRunResult(allocator, result);
         try stdout_writer.interface.writeAll(result.stdout);
         try stdout_writer.interface.flush();

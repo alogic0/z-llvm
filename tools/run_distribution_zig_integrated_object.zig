@@ -6,6 +6,11 @@ const Validation = enum {
     link_only,
 };
 
+const Pipeline = enum {
+    postopt,
+    preopt,
+};
+
 const Case = struct {
     id: []const u8,
     wrapper: []const u8,
@@ -103,6 +108,23 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
 
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    _ = args.next();
+    var pipeline: Pipeline = .postopt;
+    var mode_filter: ?[]const u8 = null;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
+            pipeline = .postopt;
+        } else if (std.mem.eql(u8, arg, "--pipeline=preopt")) {
+            pipeline = .preopt;
+        } else if (std.mem.startsWith(u8, arg, "--mode=")) {
+            mode_filter = arg["--mode=".len..];
+        } else {
+            try common.validationError(io, "unexpected argument for integrated object runner: {s}\n", .{arg});
+        }
+    }
+
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const zig_source_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_SOURCE_DIR");
@@ -131,6 +153,7 @@ pub fn main(init: std.process.Init) !void {
     defer env_map.deinit();
     try copyEnvironment(&env_map, init.environ_map);
     try env_map.put("ZIG_USE_ZLLVM_OBJECT", "1");
+    try env_map.put("ZLLVM_PIPELINE", pipelineName(pipeline));
     try env_map.put("ZLLVM_EXE", zllvm_exe);
 
     const temp = try common.TempDir.init(allocator, io, "zig_integrated_object");
@@ -139,15 +162,20 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "zig-integrated-object target={s} linker=zig build-exe -fno-lld hook=ZIG_USE_ZLLVM_OBJECT zllvm={s}\n",
-        .{ target, zllvm_exe },
+        "zig-integrated-object target={s} pipeline={s} linker=zig build-exe -fno-lld hook=ZIG_USE_ZLLVM_OBJECT zllvm={s}\n",
+        .{ target, pipelineName(pipeline), zllvm_exe },
     );
     try stdout_writer.interface.flush();
 
     var executable_ok: usize = 0;
     var link_only_ok: usize = 0;
+    var total: usize = 0;
     for (cases) |case| {
+        if (mode_filter) |filter| {
+            if (!std.mem.eql(u8, filter, case.mode)) continue;
+        }
         try requirePairing(case);
+        total += 1;
         const exe = try common.allocTempFile(allocator, temp, case.id, "_integrated");
         defer allocator.free(exe);
         const object = try common.allocTempFile(allocator, temp, case.id, ".o");
@@ -155,8 +183,11 @@ pub fn main(init: std.process.Init) !void {
         const marker = try common.allocTempFile(allocator, temp, case.id, "_zllvm_marker.txt");
         defer allocator.free(marker);
         try env_map.put("ZLLVM_MARKER_PATH", marker);
+        try env_map.put("ZLLVM_ZIG_MODE", case.mode);
+        try env_map.put("ZLLVM_CASE_ID", case.id);
+        try env_map.put("ZLLVM_WRAPPER", case.wrapper);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
-        try requireHookMarker(allocator, io, marker, case);
+        try requireHookMarker(allocator, io, marker, case, pipeline);
         try linkIntegratedObject(allocator, io, target, object, exe);
         if (case.validation == .executable) {
             const run_argv = [_][]const u8{exe};
@@ -174,8 +205,8 @@ pub fn main(init: std.process.Init) !void {
     }
 
     try stdout_writer.interface.print(
-        "summary zig-integrated-object total={} executable_ok={} link_only_ok={} local_fail=0\n",
-        .{ cases.len, executable_ok, link_only_ok },
+        "summary zig-integrated-object pipeline={s} total={} executable_ok={} link_only_ok={} local_fail=0\n",
+        .{ pipelineName(pipeline), total, executable_ok, link_only_ok },
     );
     try stdout_writer.interface.flush();
 }
@@ -199,13 +230,34 @@ fn requireHookMarker(
     io: std.Io,
     marker: []const u8,
     case: Case,
+    pipeline: Pipeline,
 ) !void {
     const contents = std.Io.Dir.cwd().readFileAlloc(io, marker, allocator, .limited(1024 * 1024)) catch |err| {
         try common.validationError(io, "missing z_llvm hook marker for {s}: {t}\n", .{ case.id, err });
     };
     defer allocator.free(contents);
-    if (std.mem.indexOf(u8, contents, "target=x86_64") != null) return;
-    try common.validationError(io, "z_llvm hook marker for {s} did not record x86_64 object emission\n", .{case.id});
+    try requireMarkerField(io, contents, "pipeline", pipelineName(pipeline), case);
+    try requireMarkerField(io, contents, "target", "x86_64-unknown-linux-gnu", case);
+    try requireMarkerContains(io, contents, "zig_target=x86_64", case);
+    try requireMarkerContains(io, contents, "object=", case);
+    try requireMarkerField(io, contents, "case_id", case.id, case);
+    try requireMarkerField(io, contents, "wrapper", case.wrapper, case);
+    try requireMarkerField(io, contents, "mode", case.mode, case);
+    switch (pipeline) {
+        .postopt => try requireMarkerField(io, contents, "zllvm_passes", "", case),
+        .preopt => try requireMarkerField(io, contents, "zllvm_passes", acceptedPipeline(case.mode), case),
+    }
+}
+
+fn requireMarkerField(io: std.Io, contents: []const u8, field: []const u8, value: []const u8, case: Case) !void {
+    var buffer: [512]u8 = undefined;
+    const needle = try std.fmt.bufPrint(&buffer, "{s}={s}", .{ field, value });
+    try requireMarkerContains(io, contents, needle, case);
+}
+
+fn requireMarkerContains(io: std.Io, contents: []const u8, needle: []const u8, case: Case) !void {
+    if (std.mem.indexOf(u8, contents, needle) != null) return;
+    try common.validationError(io, "z_llvm hook marker for {s} missing {s}\n", .{ case.id, needle });
 }
 
 fn buildIntegratedObject(
@@ -228,6 +280,9 @@ fn buildIntegratedObject(
         "-fllvm",
         "-flibllvm",
         "-fno-compiler-rt",
+    });
+    if (shouldStrip(case.mode)) try argv.append(allocator, "-fstrip");
+    try argv.appendSlice(allocator, &.{
         "-O",
         case.mode,
         "-target",
@@ -268,6 +323,24 @@ fn validationName(validation: Validation) []const u8 {
         .executable => "executable",
         .link_only => "link-only",
     };
+}
+
+fn pipelineName(pipeline: Pipeline) []const u8 {
+    return switch (pipeline) {
+        .postopt => "postopt",
+        .preopt => "preopt",
+    };
+}
+
+fn acceptedPipeline(mode: []const u8) []const u8 {
+    if (std.mem.eql(u8, mode, "ReleaseFast")) return "zig-release-fast-accepted";
+    if (std.mem.eql(u8, mode, "ReleaseSafe")) return "zig-release-safe-accepted";
+    if (std.mem.eql(u8, mode, "ReleaseSmall")) return "zig-release-small-accepted";
+    return "";
+}
+
+fn shouldStrip(mode: []const u8) bool {
+    return std.mem.eql(u8, mode, "ReleaseFast") or std.mem.eql(u8, mode, "ReleaseSmall");
 }
 
 fn normalizeZigTarget(target: []const u8) []const u8 {

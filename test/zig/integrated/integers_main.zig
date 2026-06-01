@@ -1,9 +1,12 @@
+comptime {
+    if (addWrap(2147483647, 1) != -2147483648) @compileError("wrapping add check failed");
+    if (cmpSelect(7, 3) != 3) @compileError("cmp select high check failed");
+    if (cmpSelect(-4, 2) != -4) @compileError("cmp select low check failed");
+    if (shiftMix(0x12345678, 4) != expectedShiftMix(0x12345678, 4)) @compileError("shift mix positive check failed");
+    if (shiftMix(@bitCast(@as(i32, -7)), 35) != expectedShiftMix(@bitCast(@as(i32, -7)), 35)) @compileError("shift mix negative check failed");
+}
+
 export fn main() c_int {
-    if (addWrap(2147483647, 1) != -2147483648) return 1;
-    if (cmpSelect(7, 3) != 3) return 2;
-    if (cmpSelect(-4, 2) != -4) return 3;
-    if (shiftMix(0x12345678, 4) != expectedShiftMix(0x12345678, 4)) return 4;
-    if (shiftMix(@bitCast(@as(i32, -7)), 35) != expectedShiftMix(@bitCast(@as(i32, -7)), 35)) return 5;
     return 0;
 }
 

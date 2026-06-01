@@ -368,11 +368,11 @@ fallback=stage4 Zig still emits LLVM IR; no LLVM codegen after IR emission for
 ```
 
 Zig integrated object emission is the experimental in-Zig hook stage above the
-external source capture pipeline:
+external source capture pipeline. It is tracked in two levels:
 
 ```text
 gate=zig build distribution-zig-integrated-object
-stage=Zig integrated object emit
+stage=Zig integrated object emit, postopt hook
 path=Zig build-obj -> patched Zig optimized IR -> z_llvm object
      -> zig build-exe -fno-lld
 status=experimental conservative boundary
@@ -381,6 +381,29 @@ claim=LLVM target-machine object emission removed for selected x86_64 source
 total=10 executable_ok=9 link_only_ok=1 local_fail=0
 fixture_pairing=each wrapper row records covered_fixture, mode, and proof
 remaining_libllvm_dependency=Zig IR construction still uses libLLVM
+excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
+
+gate=zig build distribution-zig-integrated-preopt
+stage=Zig integrated object emit, preopt hook
+path=Zig build-obj -> patched Zig pre-optimization IR
+     -> z_llvm --passes=<accepted Zig-mode pipeline>
+     -> z_llvm --emit=obj
+     -> zig build-exe -fno-lld
+status=experimental conservative boundary
+claim=LLVM target-machine object emission and LLVM's module optimization
+      pipeline are bypassed for selected x86_64 source rows
+total=10 executable_ok=9 link_only_ok=1 local_fail=0
+ReleaseFast_narrow_gate=zig build distribution-zig-integrated-preopt -- --mode=ReleaseFast
+mode_pipelines=ReleaseFast:zig-release-fast-accepted,
+               ReleaseSafe:zig-release-safe-accepted,
+               ReleaseSmall:zig-release-small-accepted
+marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
+       wrapper, mode
+remaining_libllvm_dependency=Zig still uses libLLVM to parse, hold, and print
+                            the module after Zig IR construction
+wrapper_scope=compile-time semantic checks plus minimal C ABI main; broader
+              callable ABI behavior remains covered by object/native-link
+              fixture gates
 excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
 ```
 
