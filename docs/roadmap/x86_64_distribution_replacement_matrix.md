@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=21 executable_ok=21 link_only_ok=0 local_fail=0
+total=22 executable_ok=22 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -432,7 +432,8 @@ tls_read_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime
 tls_bump_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_tls_bump
 atomic_add_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_atomic_add
 inline_asm_barrier_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_inline_asm_barrier
-ir_writer_rows=scalar_runtime_rows=21, minimal_wrapper_rows=0
+aggregate_pair_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_aggregate_pair
+ir_writer_rows=scalar_runtime_rows=22, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -440,7 +441,8 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                runtime-phi-merge=1, runtime-loop-sum=1,
                runtime-switch=1, global-update=1, abi-arg-call=1,
                i64-call-return=1, tls-read=1, tls-bump=1,
-               atomic-add=1, inline-asm-barrier=1, minimal-ret0=0
+               atomic-add=1, inline-asm-barrier=1,
+               aggregate-pair-abi=1, minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
 FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
@@ -459,6 +461,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_runtime_atomic_add atomic-add,
                         releasefast_runtime_inline_asm_barrier
                         inline-asm-barrier,
+                        releasefast_runtime_aggregate_pair
+                        aggregate-pair-abi,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
@@ -476,8 +480,8 @@ excluded=runtime arithmetic beyond selected rows, stores beyond the selected
          mutable global update, ABI calls beyond the selected i32 argument
          direct call and selected i64 call return, TLS beyond selected
          local-exec read/update, atomics beyond selected monotonic add,
-         inline asm beyond the selected memory barrier, vectors, aggregate ABI
-         lowering, debug/unwind, AArch64, wasm, LTO,
+         inline asm beyond the selected memory barrier, aggregate ABI beyond
+         the selected two-i32 pair, vectors, debug/unwind, AArch64, wasm, LTO,
          broad runtime/TLS/compiler-rt
 ```
 

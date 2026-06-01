@@ -244,6 +244,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeAtomicAddIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) {
         try writeRuntimeInlineAsmBarrierIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) {
+        try writeRuntimeAggregatePairIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
@@ -284,6 +286,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) return "inline-asm-barrier";
+    if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) return "aggregate-pair-abi";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
@@ -659,6 +662,36 @@ fn writeRuntimeInlineAsmBarrierIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime inline asm barrier external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeRuntimeAggregatePairIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@pair_first = alias i32 (i64), ptr @aggregate_abi.pair_first
+        \\@make_pair = alias i64 (i32, i32), ptr @aggregate_abi.make_pair
+        \\@main = alias i32 (i64), ptr @aggregate_abi.pair_first
+        \\
+        \\define private i32 @aggregate_abi.pair_first(i64 %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.sroa.01.0.extract.trunc = trunc i64 %0 to i32
+        \\  ret i32 %.sroa.01.0.extract.trunc
+        \\}}
+        \\
+        \\define private i64 @aggregate_abi.make_pair(i32 %0, i32 %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.sroa.2.0.insert.ext = zext i32 %1 to i64
+        \\  %.sroa.2.0.insert.shift = shl nuw i64 %.sroa.2.0.insert.ext, 32
+        \\  %.sroa.0.0.insert.ext = zext i32 %0 to i64
+        \\  %.sroa.0.0.insert.insert = or disjoint i64 %.sroa.2.0.insert.shift, %.sroa.0.0.insert.ext
+        \\  ret i64 %.sroa.0.0.insert.insert
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime aggregate pair external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
