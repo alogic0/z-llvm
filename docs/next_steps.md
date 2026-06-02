@@ -10,25 +10,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Add the next external IR-writer runtime surface after conditional branches,
-phi/merge values, loops, dense-switch, mutable global update, i32 ABI-argument
-direct-call, i64 call-return, local-exec TLS read/update, selected atomic add,
-selected inline-asm memory barrier, selected small aggregate ABI, selected
-float compare/multiply/add/select/subtract/divide/remainder/literal-return,
-selected comptime constant multiply, selected add-immediate return,
-ReleaseSafe checked add-immediate boundary, ReleaseSafe checked comptime
-constant multiply boundary, ReleaseSafe checked global update boundary, pointer
-load/store/volatile-roundtrip/optional-pointer, ReleaseSafe checked pointer
-load/store boundary, ReleaseSafe checked branch-mix boundary, ReleaseSafe
-checked call-chain boundary, ReleaseSafe checked TLS bump boundary, packed
-bitfield, extern-struct field-load, scalarized array-sum, optional scalar
-payload, error-union payload, pointer-indexed slice-sum, and selected
-ReleaseSmall base64 decode/store/residual-byte/padding-byte/padding-loop and
-padding length-adjustment, chunk-loop guard, source-byte stride, first three
-four-byte source-bundle surfaces, bit-buffer combine/store,
-loop-advance/backedge, residual/preheader guard, residual table-bundle, and
-residual output store/backedge surfaces: a source-backed x86_64 ReleaseSmall
-base64 residual padding-check row.
+Refresh the selected ReleaseSmall executable proof after the 87-row external
+IR-writer gate and selected ReleaseSmall object gate are clean. If the
+executable gate finds a blocker, promote the first sorted failure into one
+focused implementation slice. If it is clean, record the clean executable
+evidence and move to the next x86_64 ReleaseSmall or native-link boundary.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -523,8 +509,8 @@ selected slice is the decode exit/lifetime cleanup around
 `base64.Base64Decoder.decode.exit`, the two `llvm.lifetime.end.p0` calls, and
 `ret i64 %.sroa.0.0.ph`, and is now covered by
 `releasesmall_runtime_base64_decode_exit_step`. The next selected task is to
-refresh the ReleaseSmall object probe and promote the first measured remaining
-blocker from the sorted output.
+refresh the ReleaseSmall executable gate after the object probe completed
+cleanly.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -532,18 +518,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the next measured ReleaseSmall object or IR-writer blocker selected from
-the refreshed probe.
+Only the next measured ReleaseSmall executable blocker selected from the
+refreshed gate, if one appears.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-releasesmall-object`
+`zig build distribution-releasesmall-executable`
 then promote the first sorted local blocker into this file with a focused gate.
 
 Commit:
-Commit the selected measured ReleaseSmall blocker/probe update
+Commit the selected measured ReleaseSmall executable blocker/probe update
 separately with the policy in
 `docs/commit_policy.md`.
 
