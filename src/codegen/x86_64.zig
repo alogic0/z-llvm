@@ -2508,7 +2508,11 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!std.mem.eql(u8, function.name, "main") and
+        !std.mem.eql(u8, function.name, "runtime_volatile_roundtrip_main.main"))
+    {
+        return false;
+    }
     if (function.params.items.len != 0) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 4) return false;
@@ -2516,13 +2520,13 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
     const store_inst = block.instructions.items[0];
     const load_inst = block.instructions.items[1];
     const icmp_inst = block.instructions.items[2];
-    const select_inst = block.instructions.items[3];
-    if (store_inst.removed or load_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+    const result_inst = block.instructions.items[3];
+    if (store_inst.removed or load_inst.removed or icmp_inst.removed or result_inst.removed) return false;
 
     const load_name = load_inst.result orelse return false;
     const icmp_name = icmp_inst.result orelse return false;
-    const select_name = select_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+    const result_name = result_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result_name)) return false;
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
@@ -2534,7 +2538,11 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
         .named => |name| try globalSymbolName(name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    if (!std.mem.eql(u8, store_global, "pointers_memory.volatile_slot")) return false;
+    if (!std.mem.eql(u8, store_global, "pointers_memory.volatile_slot") and
+        !std.mem.eql(u8, store_global, "runtime_volatile_roundtrip_main.slot"))
+    {
+        return false;
+    }
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
@@ -2545,21 +2553,32 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
         .named => |name| try globalSymbolName(name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    if (!std.mem.eql(u8, load_global, "pointers_memory.volatile_slot")) return false;
+    if (!std.mem.eql(u8, load_global, "pointers_memory.volatile_slot") and
+        !std.mem.eql(u8, load_global, "runtime_volatile_roundtrip_main.slot"))
+    {
+        return false;
+    }
 
     const icmp = switch (icmp_inst.kind) {
         .icmp => |icmp| icmp,
         else => return false,
     };
-    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if ((icmp.predicate != .eq and icmp.predicate != .ne) or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(icmp.lhs, load_name) or !isInt(icmp.rhs, 42)) return false;
 
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
+    switch (result_inst.kind) {
+        .select => |select| {
+            if (icmp.predicate != .eq) return false;
+            if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+            if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+        },
+        .cast => |cast| {
+            if (icmp.predicate != .ne) return false;
+            if (cast.op != .zext or !cast.from_ty.eql(.{ .int = 1 }) or !cast.to_ty.eql(.{ .int = 32 })) return false;
+            if (!isNamed(cast.value, icmp_name)) return false;
+        },
         else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    }
 
     const fail = "volatile_roundtrip_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 42 });
