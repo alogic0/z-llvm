@@ -326,6 +326,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeMixCAddZigIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_may_panic")) {
         try writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) {
+        try writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -401,6 +403,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) return "hidden-global-access";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_zig")) return "mixed-c-zig-add";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_may_panic")) return "mixed-c-zig-panic-add";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -666,6 +669,28 @@ fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime mixed C/Zig panic add external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@main = alias i64 (), ptr @no_compile_panic_for_unchecked_arith.entry
+        \\@entry = alias i64 (), ptr @no_compile_panic_for_unchecked_arith.entry
+        \\
+        \\declare i64 @llvm.umul.fix.sat.i64(i64, i64, i32 immarg)
+        \\
+        \\define private i64 @no_compile_panic_for_unchecked_arith.entry() unnamed_addr align 1 {{
+        \\entry:
+        \\  %value = tail call i64 @llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)
+        \\  ret i64 %value
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime umul.fix.sat.i64 external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
