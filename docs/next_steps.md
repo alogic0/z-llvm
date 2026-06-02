@@ -10,12 +10,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Refresh the selected Debug object gate after the 87-row external IR-writer
-gate and selected/broad ReleaseSmall object, executable, native-link, and
-boundary-exclusion gates are clean. If the Debug object gate finds a blocker,
-promote the first sorted failure into one focused implementation slice. If it
-is clean, record the clean Debug object evidence and move to the next x86_64
-boundary.
+Refresh the selected Debug executable gate after the 87-row external IR-writer
+gate and selected/broad ReleaseSmall gates plus the selected Debug object gate
+are clean. If the Debug executable gate finds a blocker, promote the first
+sorted failure into one focused implementation slice. If it is clean, record
+the clean Debug executable evidence and move to the next x86_64 boundary.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -519,18 +518,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the next measured Debug object blocker selected from the refreshed gate,
-if one appears.
+Only the next measured Debug executable blocker selected from the refreshed
+gate, if one appears.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-debug-object`
+`zig build distribution-debug-executable`
 then promote the first sorted local blocker into this file with a focused gate.
 
 Commit:
-Commit the selected measured Debug object gate update
+Commit the selected measured Debug executable gate update
 separately with the policy in
 `docs/commit_policy.md`.
 
