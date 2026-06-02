@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64SourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceStrideStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ChunkGuardStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4137,6 +4138,228 @@ fn lowerBase64SourceStrideStepMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerBase64SourceBundleStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 25) return false;
+
+    const first = (try validateBase64SourceBundleGlobalByteLoad(
+        block.instructions.items[0],
+        block.instructions.items[1],
+        "base64.source_bundle_input",
+        4,
+    )) orelse return false;
+    const idx0_name = validateBase64SourceBundleZext(block.instructions.items[2], first.byte_name) orelse return false;
+    const word0_name = (try validateBase64SourceBundleTableLoad(
+        block.instructions.items[3],
+        block.instructions.items[4],
+        "base64.source_bundle_table0",
+        idx0_name,
+    )) orelse return false;
+
+    const second = validateBase64SourceBundleRelativeByteLoad(
+        block.instructions.items[5],
+        block.instructions.items[6],
+        first.ptr_name,
+        1,
+    ) orelse return false;
+    const idx1_name = validateBase64SourceBundleZext(block.instructions.items[7], second.byte_name) orelse return false;
+    const word1_name = (try validateBase64SourceBundleTableLoad(
+        block.instructions.items[8],
+        block.instructions.items[9],
+        "base64.source_bundle_table1",
+        idx1_name,
+    )) orelse return false;
+    const merged1_name = validateBase64SourceBundleOr(block.instructions.items[10], word1_name, word0_name) orelse return false;
+
+    const third = validateBase64SourceBundleRelativeByteLoad(
+        block.instructions.items[11],
+        block.instructions.items[12],
+        first.ptr_name,
+        2,
+    ) orelse return false;
+    const idx2_name = validateBase64SourceBundleZext(block.instructions.items[13], third.byte_name) orelse return false;
+    const word2_name = (try validateBase64SourceBundleTableLoad(
+        block.instructions.items[14],
+        block.instructions.items[15],
+        "base64.source_bundle_table2",
+        idx2_name,
+    )) orelse return false;
+    const merged2_name = validateBase64SourceBundleOr(block.instructions.items[16], merged1_name, word2_name) orelse return false;
+
+    const fourth = validateBase64SourceBundleRelativeByteLoad(
+        block.instructions.items[17],
+        block.instructions.items[18],
+        first.ptr_name,
+        3,
+    ) orelse return false;
+    const idx3_name = validateBase64SourceBundleZext(block.instructions.items[19], fourth.byte_name) orelse return false;
+    const word3_name = (try validateBase64SourceBundleTableLoad(
+        block.instructions.items[20],
+        block.instructions.items[21],
+        "base64.source_bundle_table3",
+        idx3_name,
+    )) orelse return false;
+    const word_name = validateBase64SourceBundleOr(block.instructions.items[22], merged2_name, word3_name) orelse return false;
+
+    const valid_name = block.instructions.items[23].result orelse return false;
+    const icmp = switch (block.instructions.items[23].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, word_name) or !isInt(icmp.rhs, 16777216)) return false;
+
+    const select_name = block.instructions.items[24].result orelse return false;
+    const select = switch (block.instructions.items[24].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, valid_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+const Base64SourceBundleByteLoad = struct {
+    ptr_name: []const u8,
+    byte_name: []const u8,
+};
+
+fn validateBase64SourceBundleGlobalByteLoad(
+    gep_inst: ir.Instruction,
+    load_inst: ir.Instruction,
+    symbol_name: []const u8,
+    offset: i128,
+) !?Base64SourceBundleByteLoad {
+    if (gep_inst.removed or load_inst.removed) return null;
+    const gep_name = gep_inst.result orelse return null;
+    const byte_name = load_inst.result orelse return null;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .int = 8 })) return null;
+    const symbol = switch (gep.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, symbol_name)) return null;
+    if (gep.indices.items.len != 1) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, offset)) return null;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return null;
+    return .{ .ptr_name = gep_name, .byte_name = byte_name };
+}
+
+fn validateBase64SourceBundleRelativeByteLoad(
+    gep_inst: ir.Instruction,
+    load_inst: ir.Instruction,
+    base_name: []const u8,
+    offset: i128,
+) ?Base64SourceBundleByteLoad {
+    if (gep_inst.removed or load_inst.removed) return null;
+    const gep_name = gep_inst.result orelse return null;
+    const byte_name = load_inst.result orelse return null;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, base_name)) return null;
+    if (gep.indices.items.len != 1) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, offset)) return null;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return null;
+    return .{ .ptr_name = gep_name, .byte_name = byte_name };
+}
+
+fn validateBase64SourceBundleZext(instruction: ir.Instruction, byte_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const idx_name = instruction.result orelse return null;
+    const zext = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 8 }) or !zext.to_ty.eql(.{ .int = 64 }) or !isNamed(zext.value, byte_name)) return null;
+    return idx_name;
+}
+
+fn validateBase64SourceBundleTableLoad(
+    gep_inst: ir.Instruction,
+    load_inst: ir.Instruction,
+    table_symbol_name: []const u8,
+    idx_name: []const u8,
+) !?[]const u8 {
+    if (gep_inst.removed or load_inst.removed) return null;
+    const gep_name = gep_inst.result orelse return null;
+    const word_name = load_inst.result orelse return null;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return null;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, table_symbol, table_symbol_name)) return null;
+    if (gep.indices.items.len != 1) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[0].value, idx_name)) return null;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return null;
+    return word_name;
+}
+
+fn validateBase64SourceBundleOr(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const @"or" = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (@"or".op != .@"or" or !@"or".ty.eql(.{ .int = 32 })) return null;
+    if (!((isNamed(@"or".lhs, lhs_name) and isNamed(@"or".rhs, rhs_name)) or
+        (isNamed(@"or".lhs, rhs_name) and isNamed(@"or".rhs, lhs_name))))
+    {
+        return null;
+    }
+    return result_name;
 }
 
 fn validateBase64ChunkGuardAdd(instruction: ir.Instruction, lhs_value: i128, rhs_value: i128) bool {
