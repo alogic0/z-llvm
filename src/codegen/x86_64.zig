@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64NextSourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceStrideStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ChunkGuardStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4147,6 +4148,56 @@ fn lowerBase64SourceBundleStepMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    return lowerBase64SourceBundleStepMainReturnWithSymbols(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "base64.source_bundle_input",
+        "base64.source_bundle_table0",
+        "base64.source_bundle_table1",
+        "base64.source_bundle_table2",
+        "base64.source_bundle_table3",
+        4,
+    );
+}
+
+fn lowerBase64NextSourceBundleStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    return lowerBase64SourceBundleStepMainReturnWithSymbols(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "base64.next_source_bundle_input",
+        "base64.next_source_bundle_table0",
+        "base64.next_source_bundle_table1",
+        "base64.next_source_bundle_table2",
+        "base64.next_source_bundle_table3",
+        8,
+    );
+}
+
+fn lowerBase64SourceBundleStepMainReturnWithSymbols(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    input_symbol: []const u8,
+    table0_symbol: []const u8,
+    table1_symbol: []const u8,
+    table2_symbol: []const u8,
+    table3_symbol: []const u8,
+    first_offset: i128,
+) !bool {
     if (!std.mem.eql(u8, function.name, "main")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 25) return false;
@@ -4154,14 +4205,14 @@ fn lowerBase64SourceBundleStepMainReturn(
     const first = (try validateBase64SourceBundleGlobalByteLoad(
         block.instructions.items[0],
         block.instructions.items[1],
-        "base64.source_bundle_input",
-        4,
+        input_symbol,
+        first_offset,
     )) orelse return false;
     const idx0_name = validateBase64SourceBundleZext(block.instructions.items[2], first.byte_name) orelse return false;
     const word0_name = (try validateBase64SourceBundleTableLoad(
         block.instructions.items[3],
         block.instructions.items[4],
-        "base64.source_bundle_table0",
+        table0_symbol,
         idx0_name,
     )) orelse return false;
 
@@ -4175,7 +4226,7 @@ fn lowerBase64SourceBundleStepMainReturn(
     const word1_name = (try validateBase64SourceBundleTableLoad(
         block.instructions.items[8],
         block.instructions.items[9],
-        "base64.source_bundle_table1",
+        table1_symbol,
         idx1_name,
     )) orelse return false;
     const merged1_name = validateBase64SourceBundleOr(block.instructions.items[10], word1_name, word0_name) orelse return false;
@@ -4190,7 +4241,7 @@ fn lowerBase64SourceBundleStepMainReturn(
     const word2_name = (try validateBase64SourceBundleTableLoad(
         block.instructions.items[14],
         block.instructions.items[15],
-        "base64.source_bundle_table2",
+        table2_symbol,
         idx2_name,
     )) orelse return false;
     const merged2_name = validateBase64SourceBundleOr(block.instructions.items[16], merged1_name, word2_name) orelse return false;
@@ -4205,7 +4256,7 @@ fn lowerBase64SourceBundleStepMainReturn(
     const word3_name = (try validateBase64SourceBundleTableLoad(
         block.instructions.items[20],
         block.instructions.items[21],
-        "base64.source_bundle_table3",
+        table3_symbol,
         idx3_name,
     )) orelse return false;
     const word_name = validateBase64SourceBundleOr(block.instructions.items[22], merged2_name, word3_name) orelse return false;

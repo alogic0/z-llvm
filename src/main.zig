@@ -352,6 +352,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_bundle_step")) {
         try writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_next_source_bundle_step")) {
+        try writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -440,6 +442,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) return "base64-chunk-guard-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_stride_step")) return "base64-source-stride-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_bundle_step")) return "base64-source-bundle-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_next_source_bundle_step")) return "base64-next-source-bundle-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1068,6 +1071,53 @@ fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.next_source_bundle_input = private unnamed_addr global i128 0, align 16
+        \\@base64.next_source_bundle_table0 = private unnamed_addr global [1 x i32] [i32 0], align 4
+        \\@base64.next_source_bundle_table1 = private unnamed_addr global [1 x i32] [i32 4096], align 4
+        \\@base64.next_source_bundle_table2 = private unnamed_addr global [1 x i32] [i32 8192], align 4
+        \\@base64.next_source_bundle_table3 = private unnamed_addr global [1 x i32] [i32 196608], align 4
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %src0 = getelementptr i8, ptr @base64.next_source_bundle_input, i64 8
+        \\  %byte0 = load i8, ptr %src0, align 1
+        \\  %idx0 = zext i8 %byte0 to i64
+        \\  %entry0 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table0, i64 %idx0
+        \\  %word0 = load i32, ptr %entry0, align 4
+        \\  %src1 = getelementptr i8, ptr %src0, i64 1
+        \\  %byte1 = load i8, ptr %src1, align 1
+        \\  %idx1 = zext i8 %byte1 to i64
+        \\  %entry1 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table1, i64 %idx1
+        \\  %word1 = load i32, ptr %entry1, align 4
+        \\  %merged1 = or i32 %word1, %word0
+        \\  %src2 = getelementptr i8, ptr %src0, i64 2
+        \\  %byte2 = load i8, ptr %src2, align 1
+        \\  %idx2 = zext i8 %byte2 to i64
+        \\  %entry2 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table2, i64 %idx2
+        \\  %word2 = load i32, ptr %entry2, align 4
+        \\  %merged2 = or i32 %merged1, %word2
+        \\  %src3 = getelementptr i8, ptr %src0, i64 3
+        \\  %byte3 = load i8, ptr %src3, align 1
+        \\  %idx3 = zext i8 %byte3 to i64
+        \\  %entry3 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table3, i64 %idx3
+        \\  %word3 = load i32, ptr %entry3, align 4
+        \\  %word = or i32 %merged2, %word3
+        \\  %valid = icmp ult i32 %word, 16777216
+        \\  %ret = select i1 %valid, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
