@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=77 executable_ok=77 link_only_ok=0 local_fail=0
+ir-writer full set:    total=78 executable_ok=78 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer base64 step: zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
@@ -587,7 +587,7 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=77 minimal_wrapper_rows=0
+ir-writer full set:    scalar_runtime_rows=78 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=3
                        i64-arithmetic=1 i64-call-return=1
@@ -625,6 +625,7 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        base64-bit-buffer-store-step=1
                        base64-loop-advance-step=1
                        base64-residual-guard-step=1
+                       base64-residual-bundle-step=1
                        struct-field-sum=1
                        array-scalar-sum=1 optional-scalar-payload=1
                        error-union-payload=1
@@ -704,7 +705,7 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 77/77 selected rows as runtime surfaces:
+The external writer now emits 78/78 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
@@ -732,6 +733,7 @@ The external writer now emits 77/77 selected rows as runtime surfaces:
 `base64-bit-buffer-store-step`,
 `base64-loop-advance-step`,
 `base64-residual-guard-step`,
+`base64-residual-bundle-step`,
 `atomic-add`,
 `inline-asm-barrier`, `aggregate-pair-abi`, `float-less`, `float-mul`,
 `float-add`, `float-select`, `float-sub`, `double-div`, `float-rem`, and

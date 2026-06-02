@@ -620,6 +620,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-guard-step",
     },
     .{
+        .id = "releasesmall_runtime_base64_residual_bundle_step",
+        .wrapper = "test/zig/integrated/runtime_base64_residual_bundle_step_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-bundle-step",
+    },
+    .{
         .id = "releasesmall_i64_arithmetic",
         .wrapper = "test/zig/integrated/i64_arithmetic_main.zig",
         .covered_fixture = "test/zig/inputs/i64_arithmetic.zig",
@@ -799,6 +807,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "base64-bit-buffer-store-step" },
         .{ .name = "base64-loop-advance-step" },
         .{ .name = "base64-residual-guard-step" },
+        .{ .name = "base64-residual-bundle-step" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -1133,6 +1142,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_guard_step")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-guard-step";
     }
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_bundle_step")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-bundle-step";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
@@ -1332,6 +1344,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-bit-buffer-store-step")) return "base64-bit-buffer-store-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-loop-advance-step")) return "base64-loop-advance-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-residual-guard-step")) return "base64-residual-guard-step";
+    if (std.mem.eql(u8, contents[value_start..value_end], "base64-residual-bundle-step")) return "base64-residual-bundle-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
