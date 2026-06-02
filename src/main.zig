@@ -232,6 +232,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) {
         try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_branch_mix")) {
+        try writeReleaseSafeRuntimeBranchMixIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
         try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) {
@@ -328,6 +330,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_branch_mix")) return "checked-branch-mix-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) return "checked-global-update-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
@@ -605,6 +608,63 @@ fn writeRuntimeSwitchIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime switch external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeBranchMixIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@branch_mix = alias i32 (i32, i32, i1), ptr @switch_control.branch_mix
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare {{ i32, i1 }} @llvm.ssub.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define private i32 @switch_control.branch_mix(i32 %a, i32 %b, i1 %flag) unnamed_addr align 1 {{
+        \\entry:
+        \\  br i1 %flag, label %add_path, label %sub_path
+        \\
+        \\merge:
+        \\  %value = phi {{ i32, i1 }} [ %add_checked, %add_path ], [ %sub_checked, %sub_path ]
+        \\  %result = extractvalue {{ i32, i1 }} %value, 0
+        \\  ret i32 %result
+        \\
+        \\add_path:
+        \\  %add_checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)
+        \\  %add_overflow = extractvalue {{ i32, i1 }} %add_checked, 1
+        \\  br i1 %add_overflow, label %panic_add, label %merge
+        \\
+        \\sub_path:
+        \\  %sub_checked = tail call {{ i32, i1 }} @llvm.ssub.with.overflow.i32(i32 %a, i32 %b)
+        \\  %sub_overflow = extractvalue {{ i32, i1 }} %sub_checked, 1
+        \\  br i1 %sub_overflow, label %panic_sub, label %merge
+        \\
+        \\panic_add:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\panic_sub:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime branch_mix external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

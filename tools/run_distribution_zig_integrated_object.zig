@@ -356,6 +356,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_runtime_branch_mix",
+        .wrapper = "test/zig/integrated/runtime_branch_mix_main.zig",
+        .covered_fixture = "test/zig/inputs/switch_control.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_tiny_scalar_runtime_boundary",
         .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig",
         .covered_fixture = "test/zig/inputs/tiny_scalar.zig",
@@ -491,6 +499,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "runtime-phi-merge" },
         .{ .name = "runtime-loop-sum" },
         .{ .name = "runtime-switch" },
+        .{ .name = "checked-branch-mix-boundary" },
         .{ .name = "global-update" },
         .{ .name = "pointer-load-store" },
         .{ .name = "volatile-roundtrip" },
@@ -833,6 +842,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_pointer_load_store")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_branch_mix")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -897,6 +909,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-phi-merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-loop-sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, contents[value_start..value_end], "runtime-switch")) return "runtime-switch";
+    if (std.mem.eql(u8, contents[value_start..value_end], "checked-branch-mix-boundary")) return "checked-branch-mix-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "global-update")) return "global-update";
     if (std.mem.eql(u8, contents[value_start..value_end], "pointer-load-store")) return "pointer-load-store";
     if (std.mem.eql(u8, contents[value_start..value_end], "volatile-roundtrip")) return "volatile-roundtrip";
