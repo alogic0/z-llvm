@@ -286,6 +286,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSafeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
         try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_read")) {
+        try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) {
         try writeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) {
@@ -371,6 +373,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) return "checked-call-chain-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) return "checked-tls-bump-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";

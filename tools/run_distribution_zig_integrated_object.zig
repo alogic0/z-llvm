@@ -396,6 +396,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls;validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_runtime_tls_read",
+        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls",
+    },
+    .{
         .id = "releasesafe_runtime_array_sum",
         .wrapper = "test/zig/integrated/runtime_array_sum_main.zig",
         .covered_fixture = "test/zig/inputs/aggregates.zig",
@@ -822,6 +830,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_read")) return 1;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) return 2;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_bump")) return 2;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_inline_asm_barrier")) return 1;
@@ -851,6 +860,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
+    }
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_read")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
