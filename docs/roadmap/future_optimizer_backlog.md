@@ -125,551 +125,134 @@ all 17 rows, including the selected `aggregate_abi`, `aggregates`,
 floating-point, globals, integer, pointer/memory, switch, and local-exec TLS
 shapes.
 
-The next measured object row is ReleaseSafe. The bounded capture
-`tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` has 17 optimizer
-successes. Object probing with `--input-limit=67108864` originally found 8
-successes and 9 failures. The selected
-`aggregates.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
-the checked aggregate sum aliases. The current probe is 9 successes and 8
-failures. The selected
-`atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now
-object-ok for the checked `@debug_location` alias and the already covered
-inline-asm/atomic aliases. The current probe is 10 successes and 7 failures.
-The selected `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` blocker
-is now object-ok for checked `@loop_sum` and guarded `@call_chain`. The current
-probe is 11 successes and 6 failures. The selected
-`error_switch.zig.ReleaseSafe.x86_64.optimized.ll` blocker is now object-ok for
-straight-line `@error_switch` `icmp`/`select` lowering. The current probe is 12
-successes and 5 failures. The first sorted blocker is
-`globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll`, selected
-`@comptime_const` checked multiply-by-constant and panic-edge lowering. That
-blocker is now object-ok for `@comptime_const`, `@update_global`, and
-`@read_global`. The current probe is 13 successes and 4 failures. The first
-sorted blocker is `pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll`,
-selected `@load_store` checked pointer load/add/store and panic-edge lowering.
-That blocker is now object-ok for `@load_store`. The current probe is 14
-successes and 3 failures. The first sorted blocker is
-`switch_control.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@branch_mix`
-checked add-or-sub branch phi and panic-edge lowering. That blocker is now
-object-ok for `@branch_mix` and the already covered `@dense_switch`. The
-current probe is 15 successes and 2 failures. The first sorted blocker is
-`tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll`, selected `@add` checked
-scalar add and panic-edge lowering. That blocker is now object-ok for `@add`
-and `@sideEffectFree`. The current probe is 16 successes and 1 failure. The
-first sorted blocker is `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll`,
-selected `@bump_tls` checked local-exec TLS update and panic-edge lowering.
-That blocker is now object-ok for `@bump_tls` and `@read_tls`. The ReleaseSafe
-object probe is now clean at 17 successes and 0 failures, promoting
-ReleaseSafe / x86_64-linux-gnu / asm-object to a conservative boundary for the
-captured optimized-output object subset.
+## Object Evidence
 
-The next measured object row is ReleaseSmall. The bounded capture
-`tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` has 465
-optimizer successes, 1009 Zig compile skips, and 0 local optimizer failures.
-Object probing with `--input-limit=67108864` found 263 successes and 202
-failures. The first sorted blocker is
-`behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@writeToVRam` volatile absolute-address store lowering. That blocker is now
-object-ok for `@writeToVRam` and `@testPackedStuff`. The current ReleaseSmall
-object probe is 264 successes and 201 failures. The first sorted blocker was
-`behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@c_fopen` noreturn unreachable-stub lowering. That blocker is now object-ok
-for `@c_fopen`, `@c_ftell`, `@c_fputs`, and `@c_printf`. The current
-ReleaseSmall object probe is 265 successes and 200 failures. The first sorted
-blocker is `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll`, selected
-`@zig_f128_f128_struct` C ABI fp128 byval/sret lowering with `__eqtf2`
-comparison calls and panic branches. That focused selected shape is now
-object-ok. The broad `c_abi_main` row remains the first sorted blocker; the
-next selected alias in that row is `@zig_f128_struct`, a C ABI fp128
-aggregate-return shape with an `__eqtf2` guard and panic edge. The selected
-`@zig_f128_struct` and adjacent `@zig_f128` scalar fp128 return shapes are now
-object-ok in the focused ReleaseSmall gate. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_assert_PD`, a mixed
-integer/double assertion shape with stack local aggregate setup, floating-point
-comparison, and a diagnostic failure edge. The selected return-code branch
-behavior for `@zig_assert_PD` is now object-ok in the focused ReleaseSmall
-gate, with diagnostic printing side effects explicitly outside the local
-replacement boundary. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_ret_PD`, a mixed integer/double aggregate
-return. That focused shape is now object-ok. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_ret_CFF`, a mixed
-integer/float aggregate return. That focused shape is now object-ok. The broad
-row still remains the first sorted blocker; the next selected alias is
-`@zig_assert_CFF`, a mixed integer/float assertion shape with floating-point
-comparison and diagnostic failure edge. The selected return-code branch
-behavior for `@zig_assert_CFF` is now object-ok in the focused ReleaseSmall
-gate, with diagnostic printing side effects explicitly outside the local
-replacement boundary. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_ret_DC`, a mixed double/integer aggregate
-return. That focused shape is now object-ok. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_assert_DC`, a mixed
-double/integer assertion shape with floating-point comparison, low-byte integer
-comparison, and diagnostic failure edge. The selected return-code branch
-behavior for `@zig_assert_DC` is now object-ok in the focused ReleaseSmall
-gate, with diagnostic printing side effects explicitly outside the local
-replacement boundary. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_ret_split_struct_mixed`, a two-register
-aggregate return. That focused shape is now object-ok. The broad row still
-remains the first sorted blocker; the next selected alias is
-`@zig_ret_med_struct_mixed`, another two-register aggregate return with
-different constant bit patterns. That focused shape is now object-ok. The
-broad row still remains the first sorted blocker; the next selected alias is
-`@zig_ret_med_struct_ints`, an integer aggregate return. That focused shape is
-now object-ok. The broad row also advances past the adjacent existing
-`@zig_ret_small_struct_ints` i32 return. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_ret_i64`, a straight-line i64
-return. That focused shape is now object-ok. The broad row also advances past
-the adjacent existing `@zig_ret_i32` return. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_ret_i16`, a
-straight-line i16 return. That focused shape is now object-ok. The broad row
-still remains the first sorted blocker; the next selected alias is
-`@zig_ret_i8`, a straight-line i8 return. That focused shape is now object-ok.
-The broad row still remains the first sorted blocker; the next selected alias
-is `@zig_ret_u16`, a straight-line zero-extended u16 return. That focused
-shape is now object-ok. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_ret_u8`, a straight-line zero-extended u8
-return. That focused shape is now object-ok. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_ret_bool`, a
-straight-line boolean return. That focused shape is now object-ok. The broad
-row still remains the first sorted blocker; the next selected alias is
-`@zig_multiple_struct_floats`, a vector-parameter floating comparison
-control-flow shape. That focused shape is now object-ok with local trap
-failure edges. The broad row still remains the first sorted blocker; the next
-selected alias is `@zig_multiple_struct_ints`, a packed-integer comparison
-control-flow shape.
-That focused shape is now object-ok with local trap failure edges. The broad
-row still remains the first sorted blocker; the next selected alias is
-`@zig_big_struct_both`, a large byval/sret struct check-and-copy shape.
-That focused shape is now object-ok with local trap failure edges and selected
-sret stores. The broad row still remains the first sorted blocker; the next
-selected alias is `@zig_split_struct_mixed`, a split mixed integer/float
-comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and an exact
-selected packed bit-pattern check. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_split_struct_ints`, a split
-integer struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and an exact
-selected packed integer register payload check. The broad row still remains
-the first sorted blocker; the next selected alias is
-`@zig_big_packed_struct`, a packed i128 struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-low/high register checks. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_small_packed_struct`, a packed i8
-struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and an exact
-selected byte payload check. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_med_struct_ints`, a medium integer
-struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-packed integer register checks. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_small_struct_ints`, a small integer
-struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and a
-selected packed i32 payload check. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_med_struct_mixed`, a medium
-mixed struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-packed mixed integer/float register checks. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_big_union`, a byval
-aggregate comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-byval field-load checks. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_big_struct`, a byval aggregate comparison
-control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-byval field-load checks. The broad row still remains the first sorted blocker;
-the next selected alias is `@zig_struct_i32_i32`, a packed i32 pair comparison
-control-flow shape.
-That focused shape is now object-ok with local trap failure edges and a
-selected packed i32-pair register check. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_struct_f32_f32f32`, a
-vector/scalar float struct comparison control-flow shape.
-That focused shape is now object-ok for both public aliases
-`@zig_struct_f32_f32f32` and `@zig_struct_f32f32_f32` with local trap failure
-edges and selected vector/scalar float register checks. The broad row still
-remains the first sorted blocker; the next selected alias is
-`@zig_ret_struct_f32_f32f32`, a vector/scalar float struct return shape.
-That focused shape is now object-ok for both public aliases
-`@zig_ret_struct_f32_f32f32` and `@zig_ret_struct_f32f32_f32` with selected
-`%xmm0`/`%xmm1` return materialization. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_struct_f32a8_f32a8`, a
-vector/scalar float struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-low-lane float register checks. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_ret_struct_f32a8_f32a8`, a
-vector/scalar float struct return shape.
-That focused shape is now object-ok with selected `%xmm0`/`%xmm1` return
-materialization while leaving the undef vector lane unconstrained. The broad
-row still remains the first sorted blocker; the next selected alias is
-`@zig_struct_f32a8`, a scalar float struct comparison control-flow shape.
-That focused shape is now object-ok with local trap failure edges and selected
-low-lane float register checks. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_ret_struct_f32a8`, a scalar float
-struct return shape.
-That focused shape is now object-ok with selected `%xmm0` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_f64`, a scalar double struct comparison
-control-flow shape.
-That focused shape is now object-ok with local trap failure edges and a
-selected scalar double register check. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_ret_struct_f64`, a scalar
-double struct return shape.
-That focused shape is now object-ok with selected `%xmm0` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_f32`, a scalar float struct comparison
-control-flow shape.
-That focused shape is now object-ok with local trap failure edges and a
-selected scalar float register check. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_ret_struct_f32`, a scalar
-float struct return shape.
-That focused shape is now object-ok with selected `%xmm0` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u64_u64_8`, a byval two-u64 struct
-control-flow shape after eight leading integer arguments.
-That focused shape is now object-ok with selected stack argument loads, byval
-field loads, and local trap failure edges. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_struct_u64_u64_7`, a
-byval two-u64 struct control-flow shape after seven leading integer arguments.
-That focused shape is now object-ok with selected stack argument loads, byval
-field loads, and local trap failure edges. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_struct_u64_u64_6`, a
-byval two-u64 struct control-flow shape after six leading integer arguments.
-That focused shape is now object-ok with selected stack argument loads, byval
-field loads, and local trap failure edges. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_struct_u64_u64_5`, a
-byval two-u64 struct control-flow shape after five leading integer arguments.
-That focused shape is now object-ok with selected `%r9` byval field loads,
-stack argument load, and local trap failure edges. The broad row still remains
-the first sorted blocker; the next selected alias is `@zig_struct_u64_u64_4`,
-a split u64 pair struct control-flow shape with the final field stack-passed.
-That focused shape is now object-ok with selected register and stack argument
-checks plus local trap failure edges. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_struct_u64_u64_3`, a split
-u64 pair struct control-flow shape entirely in argument registers.
-That focused shape is now object-ok with selected register checks and local
-trap failure edges. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u64_u64_2`, a split u64 pair struct
-control-flow shape entirely in argument registers.
-That focused shape is now object-ok with selected register checks and local
-trap failure edges. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u64_u64_1`, a split u64 pair struct
-control-flow shape entirely in argument registers.
-That focused shape is now object-ok with selected register checks and local
-trap failure edges. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u64_u64_0`, a split u64 pair struct
-control-flow shape entirely in argument registers.
-That focused shape is now object-ok with selected register checks and local
-trap failure edges. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_ret_struct_u64_u64`, a two-register u64 pair
-return shape.
-That focused shape is now object-ok with selected `%rax`/`%rdx` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u64`, a two-u64 control-flow shape.
-That focused shape is now object-ok with selected register checks and local
-trap failure edges. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_ret_struct_u64`, an i64 return shape.
-That focused shape is now object-ok with selected `%rax` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u32`, an i32/i64 control-flow shape.
-That focused shape is now object-ok with selected i32/i64 register checks and
-local trap failure edges. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_ret_struct_u32`, an i32 return
-shape.
-That focused shape is now object-ok through existing straight-line i32 return
-lowering. The broad row still remains the first sorted blocker; the next
-selected alias is `@zig_struct_u16`, an i16/i64 control-flow shape.
-That focused shape is now object-ok with selected 16-bit and 64-bit register
-checks plus local trap failure edges. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_ret_struct_u16`, an i16
-return shape.
-That focused shape is now object-ok with selected `%eax` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_struct_u8`, an i8/i64 control-flow shape.
-That focused shape is now object-ok with selected 8-bit and 64-bit register
-checks plus local trap failure edges. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_ret_struct_u8`, an i8 return
-shape.
-That focused shape is now object-ok with selected `%eax` return
-materialization. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_cmultd_comp`, a double-comparison control-flow
-shape returning two doubles.
-That focused shape is now object-ok with selected `ucomisd` comparisons and
-`%xmm0`/`%xmm1` return materialization. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_cmultf_comp`, a
-float-comparison control-flow shape returning a packed two-float vector.
-That focused shape is now object-ok with selected low-lane float comparisons
-and packed `%xmm0` vector return materialization. The broad row still remains
-the first sorted blocker; the next selected alias is `@zig_cmultd`, a
-double-comparison control-flow shape returning two doubles.
-That focused shape is now object-ok through the shared selected `ucomisd`
-comparison path. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_cmultf`, a two-vector float comparison shape
-returning a packed two-float vector.
-That focused shape is now object-ok with selected packed vector comparisons
-and packed `%xmm0` return materialization. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_bool`, an i1
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with selected low-byte compare and local
-trap failure edge. The broad row still remains the first sorted blocker; the
-next selected alias is `@zig_ptr`, a pointer equality branch-to-return-or-trap
-shape.
-That focused shape is now object-ok with selected 64-bit pointer compare and
-local trap failure edge. `@zig_longdouble` is already object-ok through
-existing straight-line void return lowering. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_f64`, a double equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with selected `ucomisd` equality
-comparison and local trap failure edge. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_f32`, a float equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with selected `ucomiss` equality
-comparison and local trap failure edge. The broad row still remains the first
-sorted blocker; the next selected alias is `@zig_five_floats`, a five-argument
-float equality ladder ending in return-or-trap.
-That focused shape is now object-ok with selected low-lane float comparisons
-through `%xmm4` and a local trap failure edge. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_struct_u128`, a split
-u128 equality branch-to-return-or-trap shape.
-That focused shape is now object-ok with selected low/high i64 comparisons
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_struct_i128`, a split i128 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with selected low/high i64 comparisons
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_i64`, an i64 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with a selected 64-bit argument comparison
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_i32`, an i32 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with a selected 32-bit argument comparison
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_i16`, an i16 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with a selected 16-bit argument comparison
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_i8`, an i8 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok with a selected 8-bit argument comparison
-and a local trap failure edge. The broad row still remains the first sorted
-blocker; the next selected alias is `@zig_u64`, a u64 equality
-branch-to-return-or-trap shape.
-That focused shape is now object-ok through the selected 64-bit scalar branch
-path. The broad row still remains the first sorted blocker; the next selected
-alias is `@zig_u32`, a u32 equality branch-to-return-or-trap shape.
-That focused shape is now object-ok through the selected 32-bit scalar branch
-path. The broad row still remains the first sorted blocker; the next selected
-alias is `@zig_u16`, a u16 equality branch-to-return-or-trap shape.
-That focused shape is now object-ok through the selected 16-bit scalar branch
-path. The broad row still remains the first sorted blocker; the next selected
-alias is `@zig_u8`, a u8 equality branch-to-return-or-trap shape.
-That focused shape is now object-ok through the selected 8-bit scalar branch
-path. The broad row still remains the first sorted blocker; the next selected
-alias is `@zig_five_integers`, a five-argument integer equality ladder ending
-in return-or-trap.
-That focused shape is now object-ok with selected integer argument comparisons
-through `%r8d` and a local trap failure edge. The broad row still remains the
-first sorted blocker; the next selected alias is `@zig_panic`, a noreturn
-panic stub ending in unreachable.
-That focused shape is now object-ok with a selected local `ud2` panic stub.
-The broad `c_abi_main` row is object-clean. The current ReleaseSmall object
-probe is 266 successes and 199 failures. The next sorted blocker is
-`cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll`;
-the selected alias is `@_start -> @start._start`, a naked startup inline-asm
-trampoline ending in unreachable.
-That focused shape is now object-ok with selected startup trampoline lowering
-and an `R_X86_64_PLT32` relocation to `start.posixCallMainAndExit`. The
-current ReleaseSmall object probe is 327 successes and 138 failures. The next
-sorted blocker is `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll`;
-the selected alias target is `@getauxval -> @os.linux.getauxvalImpl`, an auxv
-scan loop over `@os.linux.elf_aux_maybe`.
-That focused shape is now object-ok with PC-relative global-pointer load,
-tag/value loop lowering, and a `getauxval` public alias. The current
-ReleaseSmall object probe is 455 successes and 10 failures. The next sorted
-blocker is
-`cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll`;
-the selected alias is `@elemPtr -> @illegal_operation_on_logical_ptr.elemPtr`,
-an empty noreturn unreachable compile-error stub.
-That focused shape is now object-ok through the selected `ud2` unreachable
-stub path. The current ReleaseSmall object probe is 456 successes and 9
-failures. The next sorted blocker is
-`cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
-alias is `@entry -> @inherit_want_safety.entry`, an i64 constant return. That
-shape is now object-ok through selected `%rax` constant return materialization.
-The current ReleaseSmall object probe is 457 successes and 8 failures. The
-next sorted blocker is
-`cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll`;
-the selected alias is
-`@entry -> @no_compile_panic_for_unchecked_arith.entry`, a selected
-`llvm.umul.fix.sat.i64` constant-call return. That shape is now object-ok
-through selected constant-call materialization. The current ReleaseSmall object
-probe is 458 successes and 7 failures. The next sorted blocker is
-`standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@main -> @main.main`, an empty noreturn unreachable stub.
-That shape is now object-ok through the selected `ud2` unreachable-stub path.
-The current ReleaseSmall object probe is 459 successes and 6 failures. The
-next sorted blocker is
-`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@strFromFloatHelp -> @main.strFromFloatHelp`, a multi-block
-float-format helper. That row is a boundary exclusion for the current
-ReleaseSmall object subset because it is broad float-format/backend work, not a
-single defensible lowering slice. A direct no-exclusion probe at
-`tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir` confirms the
-row still fails as `unsupported-control-flow` by itself. The tracked boundary
-fixture is
-`test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`.
-With that row excluded, the selected
-`standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll`
-`@getHidden`/`@updateHidden` hidden i32 global access shapes are now object-ok.
-The adjusted ReleaseSmall object probe is 460 successes, 4 failures, and 1
-excluded row. The next sorted implementation blocker is
-`standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@_start -> @main._start`, a two-block infinite loop. That
-shape is now object-ok through selected unconditional self-branch lowering. The
-adjusted ReleaseSmall object probe is 461 successes, 3 failures, and 1
-excluded row. The next sorted implementation blocker is
-`standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll`; the selected
-alias is `@runner_futex_wait -> @main.runner_futex_wait`, an i1 constant
-return. That focused shape is now object-ok, but the broad row still fails on
-the next selected public alias:
-`@runner_test_name -> @main.runner_test_name`, a string-slice aggregate return
-for the `"test"` name. That focused shape is now object-ok, but the broad row
-still fails on the next selected public alias:
-`@runner_test_run -> @main.runner_test_run`, a selected libfuzzer runtime-call
-shape. That focused shape is now object-ok through selected call argument
-materialization, PC-relative symbol addresses, PLT32 call relocations, and
-private string constants. The adjusted ReleaseSmall object probe is 462
-successes, 2 failures, and 1 excluded row. The next sorted implementation
-blocker is
-`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@add_zig -> @main.add_zig`, a mixed Zig/C global-add i32
-return shape. That focused shape is now object-ok through selected private
-global load, external TLS global add, and `R_X86_64_TPOFF32` relocation
-support. The adjusted broad row still fails in
-`standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll`, so the
-adjusted ReleaseSmall object probe remains 462 successes, 2 failures, and 1
-excluded row. The next selected public alias in that row is
-`@add_may_panic -> @main.add_may_panic`, a checked add/panic branch shape.
-That focused shape is now object-ok through selected negative-branch lowering,
-panic-edge call relocation, selected panic string data, and private global add
-return lowering. The `standalone_mix_c_files_main` row is object-clean. The
-adjusted ReleaseSmall object probe is 463 successes, 1 failure, and 1 excluded
-row. The next sorted implementation blocker is
-`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`; the
-selected alias is `@decode_base_64 -> @base64.decode_base_64`, a large
-table-driven base64 decoder. This row is a documented boundary exclusion for
-the current ReleaseSmall object subset: it is broad multi-block decoder/table
-lowering, not a defensible one-slice backend reduction. A direct no-exclusion
-probe at `tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir`
-confirms the row still fails as `unsupported-control-flow` by itself. The
-tracked boundary fixture is
-`test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll`,
-and `zig build distribution-releasesmall-boundary` validates both
-ReleaseSmall exclusions as the current negative boundary. With that row and the
-existing float-format helper excluded, the adjusted ReleaseSmall object probe
-is clean: 463 successes, 0 failures, and 2 excluded rows. ReleaseSmall
-asm/object is now a conservative boundary for the named captured subset.
-The first named no-LLVM-codegen x86_64 distribution subset gate is
-`zig build distribution-no-llvm`; it composes the
-ReleaseFast object/executable gates, ReleaseSafe object/executable gate,
-selected ReleaseSmall object/executable gates, selected Debug
-object/executable gates, and handoff validation, and it passes locally for
-`TARGET=x86_64-unknown-linux-gnu`.
+The release-mode object evidence is closed for the selected x86_64 captured
+subsets:
 
-The linker/CRT boundary is also validated by
-`zig build distribution-linker-boundary`: local `z_llvm` emit modes
-stop at `ir`, `asm`, and `obj`; `--emit=exe` fails closed; selected executable
-validation remains an explicit handoff to Zig's linker/toolchain through
-`zig cc -target "$cc_target"`, which is driver/toolchain handoff evidence
-rather than native-linker evidence.
+| Mode | Capture | Result | Status |
+| --- | --- | --- | --- |
+| ReleaseFast | `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` | 17 ok / 0 fail | Conservative boundary for the selected Zig-backed object subset. |
+| ReleaseSafe | `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` | 17 ok / 0 fail | Conservative boundary for the captured optimized-output object subset. |
+| ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 463 ok / 0 fail / 2 excluded | Conservative boundary for the named captured subset. |
 
-The selected native-linker proof is separate and stricter:
-`zig build distribution-native-link` links ABI-stable local objects with
-`zig build-exe -fno-lld`, and `zig build probe-native-linker` classifies native
-linker acceptance for the same selected object set. The current probe result is
-45 accepted, 0 failed. The broad accounting gate is
-`zig build distribution-native-link-boundary2`; ReleaseFast, ReleaseSafe,
-ReleaseSmall, and Debug currently report `local_fail=0` with Zig runtime, TLS,
-compiler-rt/libc, and explicit ReleaseSmall exclusions classified separately.
-The first source-starting integration gate is
-`zig build distribution-zig-source-native-link`; it proves 10 selected Zig
-source rows through stage4 LLVM IR emission, local `z_llvm` object emission,
-and Zig native linking, with 9 executable proofs and 1 ReleaseSafe panic-runtime
-link-only boundary.
+ReleaseFast covers the selected `aggregate_abi`, `aggregates`,
+`atomics_inline_asm_debug`, `control_flow_calls`, `error_switch`,
+floating-point, globals, integer, pointer/memory, switch, and local-exec TLS
+shapes.
 
-The first non-x86_64 object target boundary is validated by
-`zig build distribution-aarch64-boundary`: a source-backed
-ReleaseFast fixture rejects `--emit=obj --target=aarch64-unknown-linux-gnu`
-with the explicit unsupported-codegen-target diagnostic. AArch64 backend,
-ABI, relocation, and object ownership remain outside the current local
-distribution subset.
+### ReleaseSafe Closure
 
-The Debug DWARF/unwind boundary is validated by
-`zig build distribution-debug-unwind`: selected Debug object
-fixtures emit normal object sections but no `.debug_*` or `.eh_frame` sections.
-Debug object support remains a conservative boundary, not debugger-quality
-metadata, CFI, unwind, or variable-location ownership.
+The ReleaseSafe probe started at 8 successes and 9 failures. The closed
+blocker rows were:
 
-The composed conservative boundary gate is
-`zig build distribution-boundary`, covering linker/CRT,
-ReleaseSmall exclusions, Debug DWARF/unwind, and AArch64 object target
-boundaries.
+| Row | Selected closure |
+| --- | --- |
+| `aggregates.zig.ReleaseSafe.x86_64.optimized.ll` | Checked aggregate sum aliases. |
+| `atomics_inline_asm_debug.zig.ReleaseSafe.x86_64.optimized.ll` | Checked `@debug_location`, plus already covered inline-asm/atomic aliases. |
+| `control_flow_calls.zig.ReleaseSafe.x86_64.optimized.ll` | Checked `@loop_sum` and guarded `@call_chain`. |
+| `error_switch.zig.ReleaseSafe.x86_64.optimized.ll` | Straight-line `@error_switch` `icmp`/`select` lowering. |
+| `globals_comptime.zig.ReleaseSafe.x86_64.optimized.ll` | `@comptime_const`, `@update_global`, and `@read_global`. |
+| `pointers_memory.zig.ReleaseSafe.x86_64.optimized.ll` | Checked `@load_store` pointer load/add/store and panic edge. |
+| `switch_control.zig.ReleaseSafe.x86_64.optimized.ll` | Checked `@branch_mix` and already covered `@dense_switch`. |
+| `tiny_scalar.zig.ReleaseSafe.x86_64.optimized.ll` | Checked `@add` and `@sideEffectFree`. |
+| `tls_concurrency.zig.ReleaseSafe.x86_64.optimized.ll` | Checked local-exec `@bump_tls` and `@read_tls`. |
 
-The combined selected distribution validation entrypoint is
-`zig build distribution-all`, which composes the positive
-no-LLVM-codegen subset with the selected native-link proof/probe and the
-conservative boundary gates.
+### ReleaseSmall Closure
 
-The bounded Debug x86_64 asm/object feasibility probe over
-`test/zig/expected/debug_*.reduced.ll` is clean: 9 object successes and 0
-failures in `zig build distribution-debug-object`. The closed
-selected blockers are call-result plus immediate-add lowering,
-`llvm.dbg.declare`/`llvm.dbg.value` object no-ops, the reduced Debug loop-sum
-shape, the reduced Debug scope-branch phi shape, and the selected O0 alloca
-debug prologue before a volatile pointer roundtrip, and Debug/O0 c_* panic-call
-unreachable stubs, and the Debug/O0 f128 sret C ABI shape from
-`c_abi_main.zig.Debug.x86_64.ll`. Broad Debug asm/object still requires LLVM
-fallback because DWARF/unwind emission, full O0 codegen,
-variable-location salvage, broad std Debug rows, and target-complete ABI
-lowering remain outside this reduced subset.
+The ReleaseSmall probe started at 263 successes and 202 failures. The broad
+row was reduced by closing selected shapes in order, while leaving broad,
+multi-slice rows as explicit boundaries where appropriate.
 
-Broad object probes are now reproducible with
+Early closures:
+
+| Row | Selected closure |
+| --- | --- |
+| `behavior_export_keyword.zig.ReleaseSmall.x86_64.optimized.ll` | Volatile absolute-address store for `@writeToVRam` and `@testPackedStuff`. |
+| `behavior_sizeof_and_typeof.zig.ReleaseSmall.x86_64.optimized.ll` | Noreturn unreachable stubs for `@c_fopen`, `@c_ftell`, `@c_fputs`, and `@c_printf`. |
+| `c_abi_main.zig.ReleaseSmall.x86_64.optimized.ll` | C ABI fp128, scalar returns, aggregate returns, comparisons, split structs, byval/sret, vector/scalar float shapes, pointer/integer equality, and local panic/trap stubs. |
+| `cases_address_space_pointer_access_chaining_pointer_to_optional_array.zig.ReleaseSmall.x86_64.optimized.ll` | Naked startup inline-asm trampoline with `R_X86_64_PLT32` relocation. |
+| `cases_array_in_anon_struct.zig.ReleaseSmall.x86_64.optimized.ll` | `getauxval` auxv scan loop over `@os.linux.elf_aux_maybe`. |
+| `cases_compile_errors_illegal_operation_on_logical_ptr.zig.ReleaseSmall.x86_64.optimized.ll` | Empty noreturn unreachable compile-error stub. |
+| `cases_inherit_want_safety.zig.ReleaseSmall.x86_64.optimized.ll` | i64 constant return materialization. |
+| `cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll` | Selected `llvm.umul.fix.sat.i64` constant-call return. |
+| `standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll` | Empty noreturn unreachable stub. |
+
+Final adjusted closures:
+
+| Row | Selected closure |
+| --- | --- |
+| `standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll` | Hidden `@getHidden` / `@updateHidden` i32 global access. |
+| `standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll` | Two-block infinite loop through unconditional self-branch lowering. |
+| `standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll` | `@runner_futex_wait`, string-slice `@runner_test_name`, and runtime-call `@runner_test_run`. |
+| `standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll` | Mixed Zig/C `@add_zig` global-add and checked `@add_may_panic` panic-edge branch. |
+
+The two ReleaseSmall exclusions are explicit boundaries, validated by
+`zig build distribution-releasesmall-boundary`:
+
+- `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
+  - Reason: broad multi-block float-format helper, not a single defensible
+    lowering slice.
+  - Fixture:
+    `test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`
+
+- `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
+  - Reason: large table-driven base64 decoder, not a single defensible backend
+    reduction.
+  - Fixture:
+    `test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll`
+
+## Distribution And Boundary Gates
+
+| Gate | Evidence |
+| --- | --- |
+| `zig build distribution-no-llvm` | Composes ReleaseFast, ReleaseSafe, selected ReleaseSmall, selected Debug, and handoff validation for `TARGET=x86_64-unknown-linux-gnu`. |
+| `zig build distribution-linker-boundary` | Confirms local `z_llvm` stops at `ir`, `asm`, and `obj`; `--emit=exe` fails closed. |
+| `zig build distribution-native-link` | Links ABI-stable local objects with `zig build-exe -fno-lld`; current selected probe result is 45 accepted / 0 failed. |
+| `zig build distribution-native-link-boundary2` | Broad ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug native-link accounting reports `local_fail=0` with Zig runtime/TLS/compiler-rt/libc boundaries classified separately. |
+| `zig build distribution-zig-source-native-link` | Proves 10 selected Zig source rows through stage4 LLVM IR emission, local `z_llvm` object emission, and Zig native linking: 9 executable proofs and 1 ReleaseSafe panic-runtime link-only boundary. |
+| `zig build distribution-aarch64-boundary` | Confirms non-x86_64 object target rejection for `--emit=obj --target=aarch64-unknown-linux-gnu`. |
+| `zig build distribution-debug-unwind` | Confirms selected Debug objects emit normal object sections but no `.debug_*` or `.eh_frame` ownership. |
+| `zig build distribution-boundary` | Composes linker/CRT, ReleaseSmall exclusions, Debug DWARF/unwind, and AArch64 target boundaries. |
+| `zig build distribution-all` | Composes the positive no-LLVM-codegen subset, selected native-link proof/probe, and conservative boundary gates. |
+
+Selected executable validation through `zig cc -target "$cc_target"` is
+driver/toolchain handoff evidence. Native-linker-only evidence is recorded by
+the stricter `zig build distribution-native-link` and
+`zig build probe-native-linker` gates.
+
+Broad object probes are reproducible with
 `zig build probe-distribution-objects --`, a compatibility shim over
 `tools/probe_distribution_objects.zig`. It reports stable per-row
 ok/fail/excluded lines, first failure, failure categories, and exclusion
-categories. The Zig helper reproduced the current release-mode evidence:
-ReleaseFast 17 ok / 0 fail, ReleaseSafe 17 ok / 0 fail, and adjusted
-ReleaseSmall 463 ok / 0 fail / 2 excluded.
+categories.
 
-The selected broad Debug raw rows are now object-clean:
-`tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
-`tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
-`tmp/zig_ir/raw/pointers_memory.Debug.ll`, and
-`tmp/zig_ir/raw/tiny_scalar.Debug.ll`. The closed broad-Debug parser/verifier
-boundaries are LLVM `#dbg_*` debug records, `ret`/`unreachable` metadata,
-sizeless `DIBasicType`, and columnless `DILocation` nodes. The selected
-`pointers_memory` row also closes the bounded O0 local-variable alloca/store
-prologue in front of volatile pointer roundtrip lowering. This does not
-promote broad Debug asm/object beyond the selected rows.
+## Debug Evidence
 
-The continuous Debug object probe now has a clean first-100-row prefix from
-`tmp/zig_ir/continuous_20260530_151319_debug/report.tsv`:
-`tmp/zig_ir/debug_object_probe_continuous_prefix100_20260531/ir` reports
-100 ok / 0 fail after closing the selected `behavior_sizeof_and_typeof`
-c_* panic-call unreachable stubs. The first-200-row prefix reports
-200 ok / 0 fail. The previous failures, `c_abi_main.zig.Debug.x86_64.ll` and
-the selected address-space pointer rows, are object-clean after selected
-Debug/O0 C ABI aliases, stack-materialized aggregate returns, scalar returns,
-packed struct/union checks, panic-call stubs, the Debug/O0 start trampoline
-trap tail, the Debug/O0 `getauxval` auxv scan shape, and the selected
-object-only logical-pointer compile-error and SPIR-V logical-pointer merge
-fixtures, plus selected Debug/O0 `inherit_want_safety` counter return lowering.
-The first-200 prefix is now object-clean after selected Debug/O0 unchecked and
-saturating arithmetic chain return lowering.
+Debug remains a conservative subset:
 
-The continuous Debug first-300 optimizer-ok prefix is also object-clean:
-`tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir` reports
-300 ok / 0 fail.
+- `zig build distribution-debug-object` reports 9 object successes and 0
+  failures over `test/zig/expected/debug_*.reduced.ll`.
+- Closed selected blockers include call-result plus immediate-add lowering,
+  `llvm.dbg.declare` / `llvm.dbg.value` object no-ops, reduced Debug loop-sum,
+  reduced Debug scope-branch phi, selected O0 alloca debug prologue before
+  volatile pointer roundtrip, Debug/O0 c_* panic-call unreachable stubs, and
+  the Debug/O0 f128 sret C ABI shape from `c_abi_main.zig.Debug.x86_64.ll`.
+- Selected raw rows are object-clean:
+  `tmp/zig_ir/raw/tiny_scalar.Debug.x86_64.ll`,
+  `tmp/zig_ir/raw/control_flow_calls.Debug.ll`,
+  `tmp/zig_ir/raw/pointers_memory.Debug.ll`, and
+  `tmp/zig_ir/raw/tiny_scalar.Debug.ll`.
+- Closed broad-Debug parser/verifier boundaries include LLVM `#dbg_*` records,
+  `ret` / `unreachable` metadata, sizeless `DIBasicType`, and columnless
+  `DILocation` nodes.
+- Continuous Debug first-100, first-200, and first-300 optimizer-ok prefixes
+  are object-clean; the first-300 prefix is recorded at
+  `tmp/zig_ir/debug_object_probe_continuous_prefix300_20260531/ir`.
+
+Broad Debug asm/object still requires LLVM fallback because DWARF/unwind
+emission, full O0 codegen, variable-location salvage, broad std Debug rows, and
+target-complete ABI lowering remain outside this reduced subset.
 
 ## Activation Rule
 
