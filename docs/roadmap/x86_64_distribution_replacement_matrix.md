@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=70 executable_ok=70 link_only_ok=0 local_fail=0
+total=71 executable_ok=71 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -482,7 +482,8 @@ releasesmall_base64_padding_loop_step_gate=zig build distribution-zig-ir-writer 
 releasesmall_base64_padding_length_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_padding_length_step
 releasesmall_base64_chunk_guard_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_chunk_guard_step
 releasesmall_base64_source_stride_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_source_stride_step
-ir_writer_rows=scalar_runtime_rows=70, minimal_wrapper_rows=0
+releasesmall_base64_source_bundle_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_source_bundle_step
+ir_writer_rows=scalar_runtime_rows=71, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
@@ -512,6 +513,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                base64-padding-loop-step=1,
                base64-padding-length-step=1,
                base64-chunk-guard-step=1,
+               base64-source-stride-step=1,
                struct-field-sum=1,
                array-scalar-sum=1,
                optional-scalar-payload=1,
@@ -636,6 +638,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         base64-padding-length-step,
                         releasesmall_runtime_base64_chunk_guard_step
                         base64-chunk-guard-step,
+                        releasesmall_runtime_base64_source_stride_step
+                        base64-source-stride-step,
                         releasesmall_globals_comptime global-load,
                         releasesmall_i64_arithmetic i64-arithmetic,
                         releasesmall_runtime_i64_call i64-call-return,
@@ -837,6 +841,8 @@ reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected trailing
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_padding_length_step
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected wide-chunk loop guard
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_chunk_guard_step
+reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected source-byte stride/table load
+reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_source_stride_step
 reduced_closed_fixture=test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll
 reduced_closed_shape=@base64_table_lookup -> @base64.table_lookup four-byte table constant plus indexed i8 load
 reduced_gates=zig build distribution-releasesmall-object, zig build distribution-native-link-releasesmall

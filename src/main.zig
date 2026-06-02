@@ -348,6 +348,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) {
         try writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_stride_step")) {
+        try writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -434,6 +436,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) return "base64-padding-loop-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_length_step")) return "base64-padding-length-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) return "base64-chunk-guard-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_stride_step")) return "base64-source-stride-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -989,6 +992,32 @@ fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 chunk-guard external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.source_stride_input = private unnamed_addr global i32 0, align 4
+        \\@base64.source_stride_table = private unnamed_addr global [8 x i32] [i32 42, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0], align 4
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %src = getelementptr i8, ptr @base64.source_stride_input, i64 4
+        \\  %byte = load i8, ptr %src, align 1
+        \\  %idx = zext i8 %byte to i64
+        \\  %entry_ptr = getelementptr [4 x i8], ptr @base64.source_stride_table, i64 %idx
+        \\  %word = load i32, ptr %entry_ptr, align 4
+        \\  %ok = icmp eq i32 %word, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 source-stride external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

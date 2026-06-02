@@ -1,0 +1,6 @@
+Add ReleaseSmall external writer base64 source stride slice
+
+- Add a reduced external writer row for the selected base64 source-byte stride and table load.
+- Add focused x86_64 recognition for source GEP/load, zext, table GEP/load, and result check.
+- Track base64-source-stride-step evidence in the runner and roadmap docs.
+- Promote the ReleaseSmall base64 four-byte source bundle boundary as the next active slice.

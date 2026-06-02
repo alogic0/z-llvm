@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64SourceStrideStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ChunkGuardStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4040,6 +4041,92 @@ fn lowerBase64ChunkGuardStepMainReturn(
     };
     if (!ret_select.cond_ty.eql(.{ .int = 1 }) or !ret_select.ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(ret_select.cond, wide_ok_name) or !isInt(ret_select.true_value, 0) or !isInt(ret_select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64SourceStrideStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 7) return false;
+
+    const src_name = block.instructions.items[0].result orelse return false;
+    const src_gep = switch (block.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!src_gep.source_ty.eql(.{ .int = 8 })) return false;
+    const src_symbol = switch (src_gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, src_symbol, "base64.source_stride_input")) return false;
+    if (src_gep.indices.items.len != 1) return false;
+    if (!src_gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(src_gep.indices.items[0].value, 4)) return false;
+
+    const byte_name = block.instructions.items[1].result orelse return false;
+    const byte_load = switch (block.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!byte_load.ty.eql(.{ .int = 8 }) or byte_load.attrs.isBarrier() or !isNamed(byte_load.ptr, src_name)) return false;
+
+    const idx_name = block.instructions.items[2].result orelse return false;
+    const zext = switch (block.instructions.items[2].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 8 }) or !zext.to_ty.eql(.{ .int = 64 }) or !isNamed(zext.value, byte_name)) return false;
+
+    const entry_ptr_name = block.instructions.items[3].result orelse return false;
+    const table_gep = switch (block.instructions.items[3].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!table_gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    const table_symbol = switch (table_gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, table_symbol, "base64.source_stride_table")) return false;
+    if (table_gep.indices.items.len != 1) return false;
+    if (!table_gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isNamed(table_gep.indices.items[0].value, idx_name)) return false;
+
+    const word_name = block.instructions.items[4].result orelse return false;
+    const word_load = switch (block.instructions.items[4].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!word_load.ty.eql(.{ .int = 32 }) or word_load.attrs.isBarrier() or !isNamed(word_load.ptr, entry_ptr_name)) return false;
+
+    const ok_name = block.instructions.items[5].result orelse return false;
+    const ok = switch (block.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (ok.predicate != .eq or !ok.operand_ty.eql(.{ .int = 32 }) or !isNamed(ok.lhs, word_name) or !isInt(ok.rhs, 42)) return false;
+
+    const select_name = block.instructions.items[6].result orelse return false;
+    const select = switch (block.instructions.items[6].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
 
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
