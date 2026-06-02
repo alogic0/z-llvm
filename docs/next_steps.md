@@ -10,15 +10,14 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated postopt ReleaseSmall i64 executable expectation blocker after
-the top-level distribution gate advanced past the selected volatile-roundtrip
-object gap, selected aggregate-pair value-returning wrapper, and selected
-hidden-global plus mixed C/Zig value-returning wrappers. The previous blocker,
-`releasesmall_runtime_mix_c_add_may_panic`, now uses its source-backed
-expected exit code 5 in the integrated runner. The next measured blocker is
-`releasesmall_runtime_inherit_want_safety_i64`, which object-emits and
-native-links but exits with code 4 instead of the runner's current expected
-code 0.
+Refresh the top-level distribution gate after the integrated postopt object
+gate is clean for all 87 selected rows. The previous blocker,
+`releasesmall_runtime_inherit_want_safety_i64`, now uses its source-backed
+expected exit code 4 in the integrated runner. The selected integrated object
+gate now reports `total=87 executable_ok=87 link_only_ok=0 local_fail=0`.
+If the top-level distribution gate finds a blocker, promote the first sorted
+failure into one focused implementation slice. If it is clean, record the
+clean distribution evidence and move to the next x86_64 boundary.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -526,8 +525,11 @@ with the expected source-level exit code 1, and
 exit code 7. `releasesmall_runtime_mix_c_add_zig` now passes with the
 expected source-level exit code 7, and
 `releasesmall_runtime_mix_c_add_may_panic` now passes with the expected
-source-level exit code 5. The next selected blocker is
-`releasesmall_runtime_inherit_want_safety_i64` executable behavior.
+source-level exit code 5. `releasesmall_runtime_inherit_want_safety_i64` now
+passes with the expected source-level exit code 4. The selected integrated
+postopt object gate is clean with
+`total=87 executable_ok=87 link_only_ok=0 local_fail=0`; the next selected
+task is to refresh the top-level distribution gate.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -535,20 +537,19 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated postopt ReleaseSmall i64 executable mismatch:
-`releasesmall_runtime_inherit_want_safety_i64` exits 4 where the gate expects
-0.
+Only the next measured top-level distribution blocker selected from the
+refreshed gate, if one appears.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-integrated-object`
+`zig build distribution-all`
 then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated ReleaseSmall i64 executable expectation update
+Commit the selected measured top-level distribution gate update
 separately with the policy in
 `docs/commit_policy.md`.
 
