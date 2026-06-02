@@ -169,18 +169,23 @@ ReleaseSafe x86_64 IR as a direct local-exec TLS `i32` load and return and
 is now covered by `releasesafe_runtime_tls_read`. The next source-backed
 shape is `tiny_scalar.sideEffectFree() void` under ReleaseSafe, which appears
 in captured ReleaseSafe x86_64 IR as a private void function with a direct
-`ret void`.
+`ret void` and is now covered by
+`releasesafe_runtime_side_effect_free`. The next source-backed shape is the
+ReleaseSmall `standalone_extern_exports_hidden_access` row, which exposes a
+private hidden `i32` global through `getHidden() i32` and
+`updateHidden(value: i32) void` aliases.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSafe no-op
-coverage after the TLS-read row: emit `tiny_scalar.sideEffectFree` under the
-ReleaseSafe accepted pipeline, plus an executable wrapper proof that calls the
-void helper and returns success. Do not claim broad ReleaseSafe runtime
-semantics, arbitrary TLS models, threading behavior, linker/runtime ownership,
-or all safety paths.
+Reduce the remaining external writer gap for selected ReleaseSmall hidden
+global update coverage after the side-effect-free row: emit the
+`standalone_extern_exports_hidden_access` private global load/store pair under
+the ReleaseSmall accepted pipeline, plus an executable wrapper proof that
+stores a value and reads it back. Do not claim broad ReleaseSmall runtime
+semantics, arbitrary symbol visibility/linkage parity, mutable global coverage,
+or all object/linker behavior.
 
 Mode/target/stage row:
-ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
+ReleaseSmall / x86_64-linux-gnu / external IR writer -> accepted optimizer
 pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
@@ -267,7 +272,11 @@ and direct `ret i32` and is now covered by
 `@tls_concurrency.tls_counter` and `ret i32` and is now covered by
 `releasesafe_runtime_tls_read`. The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/tiny_scalar_checked_add.ll` to
-`tiny_scalar.sideEffectFree` with a direct `ret void`.
+`tiny_scalar.sideEffectFree` with a direct `ret void` and is now covered by
+`releasesafe_runtime_side_effect_free`. The next selected row lowers in
+`test/distribution/releasesmall_x86_64/inputs/standalone_extern_exports_hidden_access.ll`
+to `exports.getHidden` and `exports.updateHidden` over private
+`@exports.hidden` storage.
 Record more precise upstream files if the slice needs optimizer/codegen
 behavior beyond the selected ReleaseSafe TLS read shape.
 
@@ -277,18 +286,19 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected ReleaseSafe no-op void-return helper with executable wrapper
-proof. Broad ReleaseSafe runtime semantics, arbitrary TLS models, threading
-behavior, linker runtime ownership, and all safety paths remain out of scope.
+Only the selected ReleaseSmall hidden-global load/store pair with executable
+wrapper proof. Broad ReleaseSmall runtime semantics, arbitrary symbol
+visibility/linkage parity, mutable global coverage, and all object/linker
+behavior remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_side_effect_free`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_hidden_access`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe side-effect-free slice
+Commit the selected ReleaseSmall hidden-global access slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -328,11 +338,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 55-row
+also passes: the first ReleaseFast tiny-scalar row and the full 56-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 55 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 56 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -403,8 +413,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=55 executable_ok=55 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=55 minimal_wrapper_rows=0
+             full set total=56 executable_ok=56 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=56 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -421,6 +431,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              error-union-payload=1
              slice-loop-sum=1 fp-literal-return=1
              comptime-const-mul=1
+             void-noop-call=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1

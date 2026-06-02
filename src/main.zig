@@ -316,6 +316,8 @@ fn writeIrWriterModuleFromEnv(
         try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
         try writeCheckedAddRuntimeBoundaryIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) {
+        try writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) {
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
@@ -388,6 +390,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_float_rem")) return "float-rem";
     if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) return "void-noop-call";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
@@ -2144,6 +2147,30 @@ fn writeCheckedAddRuntimeBoundaryIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write checked-add runtime boundary external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@sideEffectFree = alias void (), ptr @tiny_scalar.sideEffectFree
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  call void @tiny_scalar.sideEffectFree()
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define private void @tiny_scalar.sideEffectFree() unnamed_addr align 1 {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime side-effect-free external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

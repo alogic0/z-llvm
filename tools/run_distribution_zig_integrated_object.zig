@@ -436,6 +436,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_runtime_side_effect_free",
+        .wrapper = "test/zig/integrated/runtime_side_effect_free_main.zig",
+        .covered_fixture = "test/zig/inputs/tiny_scalar.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-void-noop-call",
+    },
+    .{
         .id = "releasesmall_globals_comptime",
         .wrapper = "test/zig/integrated/globals_comptime_small_main.zig",
         .covered_fixture = "test/zig/inputs/globals_comptime.zig",
@@ -601,6 +609,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "float-sub" },
         .{ .name = "double-div" },
         .{ .name = "float-rem" },
+        .{ .name = "void-noop-call" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -865,6 +874,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_read")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_side_effect_free")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-void-noop-call";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
@@ -1042,6 +1054,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "float-sub")) return "float-sub";
     if (std.mem.eql(u8, contents[value_start..value_end], "double-div")) return "double-div";
     if (std.mem.eql(u8, contents[value_start..value_end], "float-rem")) return "float-rem";
+    if (std.mem.eql(u8, contents[value_start..value_end], "void-noop-call")) return "void-noop-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
