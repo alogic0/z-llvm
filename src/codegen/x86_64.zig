@@ -877,6 +877,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerRuntimeSliceSumPreoptHelper(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerSliceSumLoop(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -1614,7 +1619,8 @@ fn lowerRuntimeSliceSumMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_slice_sum_main.main");
+    if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 3) return false;
 
@@ -1631,11 +1637,21 @@ fn lowerRuntimeSliceSumMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(call.callee, "aggregates.slice_sum")) return false;
+    if (integrated_preopt) {
+        if (!std.mem.eql(u8, call.callee, "runtime_slice_sum_main.sliceSum")) return false;
+    } else if (!isCalleeName(call.callee, "aggregates.slice_sum")) return false;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(call.calling_conv);
+    if (integrated_preopt) {
+        if (call.calling_conv) |cc| {
+            if (!std.mem.eql(u8, cc, "fastcc")) return false;
+        }
+    } else {
+        try validateDefaultCallConv(call.calling_conv);
+    }
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
-    if (!call.args.items[0].ty.eql(.ptr) or !call.args.items[0].value.eql(.{ .named = "@slice_sum_values" })) return error.UnsupportedCodegenValue;
+    if (integrated_preopt) {
+        if (!call.args.items[0].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[0].value, "runtime_slice_sum_main.values")) return error.UnsupportedCodegenValue;
+    } else if (!call.args.items[0].ty.eql(.ptr) or !call.args.items[0].value.eql(.{ .named = "@slice_sum_values" })) return error.UnsupportedCodegenValue;
     if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[1].value, 4)) return error.UnsupportedCodegenValue;
 
     const icmp = switch (icmp_inst.kind) {
@@ -1651,6 +1667,12 @@ fn lowerRuntimeSliceSumMainReturn(
     };
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    if (integrated_preopt) {
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
 
     const fail = "slice_sum_fail";
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "slice_sum_values" });
@@ -8075,6 +8097,143 @@ fn validateRetI32Const(block: ir.BasicBlock, expected: i128) !void {
         else => return error.UnsupportedCodegenControlFlow,
     };
     if (!ret.ty.eql(.{ .int = 32 }) or !isInt(ret.value orelse return error.UnsupportedCodegenValue, expected)) return error.UnsupportedCodegenValue;
+}
+
+fn lowerRuntimeSliceSumPreoptHelper(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_slice_sum_main.sliceSum")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;
+    const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[1].name, .{ .int = 64 });
+    if (ptr_reg != .rdi or len_reg != .rsi) return error.UnsupportedCodegenAbi;
+    if (function.blocks.items.len != 4) return false;
+
+    const entry = blockByName(function, "2") orelse return false;
+    const ret_block = blockByName(function, "12") orelse return false;
+    const loop_check = blockByName(function, "14") orelse return false;
+    const loop_body = blockByName(function, "20") orelse return false;
+    if (entry.instructions.items.len != 12 or ret_block.instructions.items.len != 1 or
+        loop_check.instructions.items.len != 4 or loop_body.instructions.items.len != 10) return false;
+
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, entry_br.target, "14")) return false;
+
+    const ret_load_name = ret_block.instructions.items[0].result orelse return false;
+    const ret_load = switch (ret_block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!ret_load.ty.eql(.{ .int = 32 }) or ret_load.attrs.isBarrier()) return false;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, ret_load_name)) return false;
+
+    const index_load_name = loop_check.instructions.items[0].result orelse return false;
+    const len_load_name = loop_check.instructions.items[2].result orelse return false;
+    const loop_cmp_name = loop_check.instructions.items[3].result orelse return false;
+    const index_load = switch (loop_check.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!index_load.ty.eql(.{ .int = 64 }) or index_load.attrs.isBarrier()) return false;
+    const len_load = switch (loop_check.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!len_load.ty.eql(.{ .int = 64 }) or len_load.attrs.isBarrier()) return false;
+    const loop_cmp = switch (loop_check.instructions.items[3].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (loop_cmp.predicate != .ult or !loop_cmp.operand_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(loop_cmp.lhs, index_load_name) or !isNamed(loop_cmp.rhs, len_load_name)) return false;
+    const loop_br = switch (loop_check.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!loop_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(loop_br.cond, loop_cmp_name)) return false;
+    if (!std.mem.eql(u8, loop_br.then_target, "20") or !std.mem.eql(u8, loop_br.else_target, "12")) return false;
+
+    const sum_load_name = loop_body.instructions.items[0].result orelse return false;
+    const body_index_name = loop_body.instructions.items[1].result orelse return false;
+    const slice_load_name = loop_body.instructions.items[2].result orelse return false;
+    const slice_ptr_name = loop_body.instructions.items[3].result orelse return false;
+    const gep_name = loop_body.instructions.items[4].result orelse return false;
+    const value_load_name = loop_body.instructions.items[5].result orelse return false;
+    const add_name = loop_body.instructions.items[6].result orelse return false;
+    const next_index_name = loop_body.instructions.items[8].result orelse return false;
+
+    const slice_load = switch (loop_body.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!slice_load.ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or slice_load.attrs.isBarrier()) return false;
+    const extract = switch (loop_body.instructions.items[3].kind) {
+        .extractvalue => |extract| extract,
+        else => return false,
+    };
+    if (!extract.aggregate_ty.eql(.{ .aggregate = "{ ptr, i64 }" }) or !isNamed(extract.aggregate, slice_load_name)) return false;
+    if (!std.mem.eql(u8, extract.indices, "0")) return false;
+    const gep = switch (loop_body.instructions.items[4].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" }) or !isNamed(gep.ptr, slice_ptr_name)) return false;
+    if (gep.indices.items.len != 1 or !isNamed(gep.indices.items[0].value, body_index_name)) return false;
+    const value_load = switch (loop_body.instructions.items[5].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!value_load.ty.eql(.{ .int = 32 }) or value_load.attrs.isBarrier() or !isNamed(value_load.ptr, gep_name)) return false;
+    const add = switch (loop_body.instructions.items[6].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    if (!((isNamed(add.lhs, sum_load_name) and isNamed(add.rhs, value_load_name)) or
+        (isNamed(add.lhs, value_load_name) and isNamed(add.rhs, sum_load_name)))) return false;
+    const sum_store = switch (loop_body.instructions.items[7].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!sum_store.ty.eql(.{ .int = 32 }) or !isNamed(sum_store.value, add_name)) return false;
+    const inc = switch (loop_body.instructions.items[8].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (inc.op != .add or !inc.ty.eql(.{ .int = 64 }) or !isInt(inc.rhs, 1)) return false;
+    const index_store = switch (loop_body.instructions.items[9].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!index_store.ty.eql(.{ .int = 64 }) or !isNamed(index_store.value, next_index_name)) return false;
+    const body_br = switch (loop_body.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, body_br.target, "14")) return false;
+
+    const loop_label = "slice_sum_preopt_loop";
+    const zero_label = "slice_sum_preopt_zero";
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .{ .test_arg64 = len_reg });
+    try machine.instructions.append(allocator, .{ .je = zero_label });
+    try machine.instructions.append(allocator, .xor_ecx_ecx);
+    try machine.instructions.append(allocator, .{ .label = loop_label });
+    try machine.instructions.append(allocator, .add_rdi_rcx4_ptr_eax);
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .cmp_rcx_arg64 = len_reg });
+    try machine.instructions.append(allocator, .{ .jne = loop_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

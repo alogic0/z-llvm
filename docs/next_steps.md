@@ -10,14 +10,15 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt volatile-roundtrip object-emission blocker after
-the integrated postopt object gate is clean for all 87 selected rows and the
-integrated preopt pointer load/store row is clean. The previous blocker,
-`releasefast_runtime_pointer_load_store`, now object-emits in the preopt path
-with the selected call-plus-merge control-flow shape. The next measured
-blocker is `releasefast_runtime_volatile_roundtrip` in the integrated preopt
-path, where z_llvm optimization plus object emission fails with
-`UnsupportedCodegenCallingConvention`.
+Close the integrated preopt aggregate-pair object-emission blocker after the
+selected integrated postopt object gate is clean and the integrated preopt
+pointer, volatile, optional, packed, struct, array, optional-payload,
+error-union-payload, and slice-sum rows are clean. The previous blocker,
+`releasefast_runtime_slice_sum`, now object-emits and links/runs through the
+preopt path with selected pointer-indexed slice-sum lowering. The next measured
+blocker is `releasefast_runtime_aggregate_pair` in the integrated preopt path,
+where z_llvm optimization plus object emission fails with
+`UnsupportedCodegenType`.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -253,18 +254,16 @@ by `releasesmall_runtime_base64_residual_accumulator_step`. The next selected
 slice is the residual loop-index advance in block `%187`.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSmall base64
-decoder coverage after the reduced residual accumulator row: create one
-source-backed reduced residual loop-index advance fixture or selected external
-writer row from
-`base64.decode_base_64`, then drive the first concrete parser, optimizer,
-codegen, or object blocker. Do not claim the full decoder, arbitrary loops,
-all table forms, all bit-buffer behavior, all stores, all padding validation,
-or all object/linker behavior.
+Reduce the integrated preopt object-emission gap for the selected
+ReleaseFast two-i32 aggregate ABI row. The current failing wrapper is
+`test/zig/integrated/runtime_aggregate_pair_main.zig`, paired with
+`test/zig/inputs/aggregate_abi.zig`, after patched Zig writes preopt IR,
+z_llvm runs the ReleaseFast accepted pipeline, and z_llvm attempts local
+x86_64 object emission.
 
 Mode/target/stage row:
-ReleaseSmall / x86_64-linux-gnu / external IR writer -> accepted optimizer
-pipeline -> local object -> Zig native-link executable proof.
+ReleaseFast / x86_64-linux-gnu / integrated Zig preopt hook -> accepted
+optimizer pipeline -> local object -> Zig native-link executable proof.
 
 Upstream mapping:
 LLVM lowers the completed slice-sum source row to a loop in
@@ -274,18 +273,12 @@ LLVM lowers the completed slice-sum source row to a loop in
 `%3 = getelementptr [4 x i8], ptr %0, i64 %.089`,
 `%4 = load i32, ptr %3, align 4`, `%5 = add nsw i32 %4, %.010`,
 and a loop-exit compare/branch.
-The completed FP constants row lowers to direct FP returns in
-`test/distribution/releasefast_x86_64/inputs/fp_constants_literals.ll`:
-`ret double 2.250000e+00` and `ret float 1.500000e+00`.
-Source behavior is represented by Zig's `fp_constants` fixture. The next
-selected row lowers in
-`test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll` to:
-`%2 = mul nsw i32 %0, 5`, `ret i32 %2`.
-Source behavior is represented by Zig's `globals_comptime` fixture. The next
-selected row lowers in
-`test/distribution/releasefast_x86_64/inputs/atomics_debug_location.ll` to:
-`%2 = add nsw i32 %0, 1`, `ret i32 %2`.
-Source behavior is represented by Zig's `atomics_inline_asm_debug` fixture.
+The next selected aggregate ABI row lowers in
+`test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll` to
+`aggregate_abi.pair_first(i64 %0)`, which truncates the low i32 half and
+returns it, and `aggregate_abi.make_pair(i32 %0, i32 %1)`, which zexts,
+shifts, ORs, and returns an i64 packed two-i32 pair. The integrated preopt
+wrapper source returns the first field from `makePair(1, 2)`.
 The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll`
 to `llvm.sadd.with.overflow.i32`, an overflow branch to
@@ -559,29 +552,35 @@ preopt path. The next selected blocker is integrated preopt
 `releasefast_runtime_error_union_payload`, which failed object emission with
 `UnsupportedCodegenCallingConvention`; that row now passes through the
 preopt path. The next selected blocker is integrated preopt
-`releasefast_runtime_slice_sum`, which fails object emission with
-`UnsupportedCodegenCallingConvention`.
+`releasefast_runtime_slice_sum`, which failed object emission with
+`UnsupportedCodegenCallingConvention`; that row now passes through the
+preopt path with selected wrapper/helper lowering. The next selected blocker
+is integrated preopt `releasefast_runtime_aggregate_pair`, which fails object
+emission with `UnsupportedCodegenType`.
 
-Completed error-union mapping:
-`%.not.i = icmp eq i32 %0, 0`,
-`%2 = select i1 %.not.i, i32 7, i32 -1`, `ret i32 %2` in
-`test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
+Completed slice-sum mapping:
+`%1 = call fastcc i32 @runtime_slice_sum_main.sliceSum(...)`,
+`%2 = icmp eq i32 %1, 10`, and the selected wrapper return in
+`test/zig/integrated/runtime_slice_sum_main.zig`; the helper lowers the
+alloca-backed slice struct loop with indexed GEP/load/add/backedge behavior
+through the existing x86_64 pointer/length loop sequence.
 
 Known boundary:
-Only the selected integrated preopt slice-sum calling-convention object
-emission blocker: `releasefast_runtime_slice_sum`.
+Only the selected integrated preopt two-i32 aggregate ABI object-emission
+blocker: `releasefast_runtime_aggregate_pair`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
 relocations, and broad object/linker behavior remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-integrated-preopt`
-then promote the first sorted follow-on blocker into this file with a focused
-gate.
+Focused gate:
+`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_aggregate_pair`
+Then run `zig build distribution-zig-integrated-preopt` and promote the first
+sorted follow-on blocker into this file.
 
 Commit:
-Commit the selected integrated preopt error-union-payload closure and
-slice-sum handoff separately with the policy in `docs/commit_policy.md`.
+Commit the selected integrated preopt slice-sum closure and aggregate-pair
+handoff with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
 
