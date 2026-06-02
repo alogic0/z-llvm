@@ -332,6 +332,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) {
         try writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) {
+        try writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -410,6 +412,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-prologue";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -739,6 +742,40 @@ fn writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime compile-asm unreachable external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@strFromFloatHelp = alias void (double), ptr @main.strFromFloatHelp
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define private void @main.strFromFloatHelp(double %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %bits = bitcast double %0 to i64
+        \\  %expbits = lshr i64 %bits, 52
+        \\  %exp = trunc i64 %expbits to i32
+        \\  %masked = and i32 %exp, 2047
+        \\  %special = icmp eq i32 %masked, 2047
+        \\  br i1 %special, label %special_block, label %done
+        \\
+        \\special_block:
+        \\  unreachable
+        \\
+        \\done:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime strFromFloatHelp external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

@@ -196,15 +196,19 @@ aliases `@main` to `@main.main` and lowers to an empty noreturn
 `releasesmall_runtime_compile_asm_unreachable`. The next measured ReleaseSmall
 boundary is the `standalone_emit_llvm_no_bin_main` row, whose selected alias is
 `@strFromFloatHelp -> @main.strFromFloatHelp`, a multi-block float-format
-helper.
+helper. That boundary now has a reduced external writer prologue slice covered
+by `releasesmall_runtime_str_from_float_help`. The next measured ReleaseSmall
+boundary is the `standalone_mix_o_files_base64` row, whose selected alias is
+`@decode_base_64 -> @base64.decode_base_64`, a table-driven multi-block
+decoder.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSmall
-float-format helper coverage after the compile-asm unreachable row: create a
-tracked reduced `strFromFloatHelp` fixture or selected external writer row,
-then drive the first concrete parser/optimizer/codegen blocker. Do not claim
-broad float formatting, all FP helper lowering, libc/runtime behavior, or all
-object/linker behavior.
+Reduce the remaining external writer gap for selected ReleaseSmall base64
+decoder coverage after the reduced float-format prologue row: create one
+source-backed reduced decode-step fixture or selected external writer row from
+`base64.decode_base_64`, then drive the first concrete parser, optimizer,
+codegen, or object blocker. Do not claim the full decoder, arbitrary loops,
+all table forms, or all object/linker behavior.
 
 Mode/target/stage row:
 ReleaseSmall / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -324,7 +328,13 @@ to `@main = alias void (i32, i32, i32), ptr @main.main`, where
 ReleaseSmall boundary exclusion
 `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`,
 where `@strFromFloatHelp` aliases `@main.strFromFloatHelp`, a multi-block
-float-format helper.
+float-format helper. The reduced prologue slice covers the selected double
+bitcast, exponent extraction, special-value branch, and `ret void`/`unreachable`
+edge and is now covered by `releasesmall_runtime_str_from_float_help`. The
+next selected boundary row is
+`test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll`,
+where `@decode_base_64` aliases `@base64.decode_base_64`, a table-driven
+multi-block decoder.
 Record more precise upstream files if the slice needs optimizer/codegen
 behavior beyond the selected ReleaseSafe TLS read shape.
 
@@ -334,18 +344,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected ReleaseSmall float-format helper boundary-reduction slice.
-Broad float formatting, all FP helper lowering, libc/runtime behavior, and all
-object/linker behavior remain out of scope.
+Only the selected ReleaseSmall base64 decoder boundary-reduction slice. Full
+decoder coverage, arbitrary loops, all table forms, and all object/linker
+behavior remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSmall strFromFloatHelp boundary-reduction slice
+Commit the selected ReleaseSmall base64 decode-step boundary-reduction slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -385,11 +395,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 62-row
+also passes: the first ReleaseFast tiny-scalar row and the full 63-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 62 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 63 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -460,8 +470,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=62 executable_ok=62 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=62 minimal_wrapper_rows=0
+             full set total=63 executable_ok=63 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=63 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -485,6 +495,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              umul-fix-sat-i64=1
              inherit-i64-return=1
              compile-asm-unreachable=1
+             str-from-float-prologue=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1

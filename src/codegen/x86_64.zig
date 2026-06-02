@@ -155,6 +155,8 @@ pub const Instruction = union(enum) {
     shl_eax_imm5: u5,
     or_eax_imm32: i32,
     imul_eax_imm32: i32,
+    and_eax_imm32: i32,
+    shr_rax_imm6: u6,
     shl_rdx_imm6: u6,
     or_rdx_rax,
     add_rax_imm8: u8,
@@ -329,6 +331,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerUnreachableStub(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerReleaseSmallStrFromFloatHelp(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -5324,6 +5331,81 @@ fn lowerUnreachableStub(allocator: std.mem.Allocator, machine: *MachineFunction,
     return true;
 }
 
+fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main.strFromFloatHelp")) return false;
+    if (function.ret_ty != .void) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.double)) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 5) return error.UnsupportedCodegenInstruction;
+    const bits_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const bitcast = switch (entry.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (bitcast.op != .bitcast or !bitcast.from_ty.eql(.double) or !bitcast.to_ty.eql(.{ .int = 64 }) or !isNamed(bitcast.value, function.params.items[0].name)) return error.UnsupportedCodegenInstruction;
+
+    const shifted_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+    const shifted = switch (entry.instructions.items[1].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (shifted.op != .lshr or !shifted.ty.eql(.{ .int = 64 }) or !isNamed(shifted.lhs, bits_name) or !shifted.rhs.eql(.{ .int = 52 })) return error.UnsupportedCodegenInstruction;
+
+    const trunc_name = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+    const trunc = switch (entry.instructions.items[2].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 }) or !isNamed(trunc.value, shifted_name)) return error.UnsupportedCodegenInstruction;
+
+    const masked_name = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
+    const masked = switch (entry.instructions.items[3].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (masked.op != .@"and" or !masked.ty.eql(.{ .int = 32 }) or !isNamed(masked.lhs, trunc_name) or !masked.rhs.eql(.{ .int = 2047 })) return error.UnsupportedCodegenInstruction;
+
+    const cmp_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
+    const cmp = switch (entry.instructions.items[4].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (cmp.predicate != .eq or !cmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(cmp.lhs, masked_name) or !cmp.rhs.eql(.{ .int = 2047 })) return error.UnsupportedCodegenInstruction;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cmp_name)) return error.UnsupportedCodegenControlFlow;
+
+    const special = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
+    if (special.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    switch (special.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return error.UnsupportedCodegenControlFlow,
+    }
+
+    const normal = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
+    if (normal.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (normal.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (ret.ty != .void or ret.value != null) return error.UnsupportedCodegenInstruction;
+
+    try machine.instructions.append(allocator, .{ .movq_xmm_rax = .xmm0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 52 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 2047 });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 2047 });
+    try machine.instructions.append(allocator, .{ .je = condbr.then_target });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = condbr.then_target });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
 fn lowerDebugLogicalPointerCompileError(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.startsWith(u8, function.name, "illegal_operation_on_logical_ptr.")) return false;
     if (function.ret_ty != .void or function.params.items.len != 0) return false;
@@ -9638,6 +9720,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,
+        .and_eax_imm32,
+        .shr_rax_imm6,
         .shl_rdx_imm6,
         .or_rdx_rax,
         .add_rax_imm8,
@@ -9732,7 +9816,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -9792,6 +9876,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shl_eax_imm5,
         .or_eax_imm32,
         .imul_eax_imm32,
+        .and_eax_imm32,
+        .shr_rax_imm6,
         .shl_rdx_imm6,
         .or_rdx_rax,
         .add_rax_imm8,

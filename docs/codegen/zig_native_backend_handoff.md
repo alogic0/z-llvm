@@ -108,8 +108,8 @@ optimizer/object path. Runtime writer rows now cover
 `checked-struct-sum-boundary`, `checked-slice-loop-sum-boundary`, and
 `checked-loop-sum-boundary`, `void-noop-call`, and
 `hidden-global-access`, `mixed-c-zig-add`, `mixed-c-zig-panic-add`,
-`umul-fix-sat-i64`, `inherit-i64-return`, and
-`compile-asm-unreachable`; all 62
+`umul-fix-sat-i64`, `inherit-i64-return`, `compile-asm-unreachable`, and
+`str-from-float-prologue`; all 63
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with

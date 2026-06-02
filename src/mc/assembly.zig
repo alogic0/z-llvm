@@ -20,6 +20,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .shl_eax_imm5 => |amount| try writer.print("\tshll ${}, %eax\n", .{amount}),
             .or_eax_imm32 => |value| try writer.print("\torl ${}, %eax\n", .{value}),
             .imul_eax_imm32 => |value| try writer.print("\timull ${}, %eax, %eax\n", .{value}),
+            .and_eax_imm32 => |value| try writer.print("\tandl ${}, %eax\n", .{value}),
+            .shr_rax_imm6 => |amount| try writer.print("\tshrq ${}, %rax\n", .{amount}),
             .shl_rdx_imm6 => |amount| try writer.print("\tshlq ${}, %rdx\n", .{amount}),
             .or_rdx_rax => try writer.writeAll("\torq %rdx, %rax\n"),
             .add_rax_imm8 => |value| try writer.print("\taddq ${}, %rax\n", .{value}),

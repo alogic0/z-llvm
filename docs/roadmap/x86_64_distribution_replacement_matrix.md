@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=62 executable_ok=62 link_only_ok=0 local_fail=0
+total=63 executable_ok=63 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -474,7 +474,8 @@ releasesmall_umul_fix_sat_i64_gate=zig build distribution-zig-ir-writer -- --cas
 releasesmall_inherit_want_safety_i64_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_inherit_want_safety_i64
 releasesmall_compile_asm_unreachable_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_compile_asm_unreachable
 releasesmall_str_from_float_help_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
-ir_writer_rows=scalar_runtime_rows=62, minimal_wrapper_rows=0
+releasesmall_base64_decode_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
+ir_writer_rows=scalar_runtime_rows=63, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
@@ -496,6 +497,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                umul-fix-sat-i64=1,
                inherit-i64-return=1,
                compile-asm-unreachable=1,
+               str-from-float-prologue=1,
                struct-field-sum=1,
                array-scalar-sum=1,
                optional-scalar-payload=1,
@@ -604,6 +606,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         inherit-i64-return,
                         releasesmall_runtime_compile_asm_unreachable
                         compile-asm-unreachable,
+                        releasesmall_runtime_str_from_float_help
+                        str-from-float-prologue,
                         releasesmall_globals_comptime global-load,
                         releasesmall_i64_arithmetic i64-arithmetic,
                         releasesmall_runtime_i64_call i64-call-return,
@@ -772,6 +776,8 @@ closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll 
 boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
 boundary_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
+reduced_closed_shape=@strFromFloatHelp -> @main.strFromFloatHelp selected double bitcast/exponent branch prologue
+reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
