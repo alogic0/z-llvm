@@ -144,12 +144,16 @@ updated value and is now covered by `releasesafe_runtime_tls_bump`. The next
 source-backed shape is `aggregates.array_sum(a: i32, b: i32, c: i32) i32`
 under ReleaseSafe, which appears in captured ReleaseSafe x86_64 IR as two
 checked `llvm.sadd.with.overflow.i32` operations and two integer-overflow
-panic edges.
+panic edges and is now covered by `releasesafe_runtime_array_sum`. The next
+source-backed shape is `aggregates.struct_sum(pair: *const Pair) i32` under
+ReleaseSafe, which appears in captured ReleaseSafe x86_64 IR as two `i32`
+field loads, one checked `llvm.sadd.with.overflow.i32` operation, and one
+integer-overflow panic edge.
 
 LLVM fallback removed or reduced:
 Reduce the remaining external writer gap for selected ReleaseSafe checked
-aggregate/scalarized arithmetic after the checked TLS bump row: emit
-`aggregates.array_sum` with two checked add operations and selected Zig
+aggregate pointer-load arithmetic after the checked array-sum row: emit
+`aggregates.struct_sum` with two field loads, one checked add operation, and selected Zig
 integer-overflow panic edges, plus a C ABI executable proof for the
 non-overflow path. Do not claim broad ReleaseSafe panic semantics, arbitrary
 checked arithmetic, all aggregate ABI lowering, runtime ownership, or all
@@ -218,9 +222,14 @@ and `ret i32` of the updated value and is now covered by
 `test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll` to
 `aggregates.array_sum` with checked add of `%0 + %1`, overflow branch, checked
 add of that result plus `%2`, a second overflow branch, and `ret i32` of the
-second extractvalue result.
+second extractvalue result and is now covered by
+`releasesafe_runtime_array_sum`. The next selected row lowers in the same file
+to `aggregates.struct_sum` with `load i32, ptr %0`,
+`getelementptr i8, ptr %0, i64 4`, `load i32, ptr %3`,
+`llvm.sadd.with.overflow.i32(i32 %2, i32 %4)`, an integer-overflow panic edge,
+and `ret i32` of the extractvalue result.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected ReleaseSafe checked array-sum shape.
+behavior beyond the selected ReleaseSafe checked struct-sum shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -228,20 +237,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected scalarized three-argument array-sum checked adds with
-integer-overflow panic edges stubbed for non-overflow executable proof. Broad
+Only selected pointer-loaded two-field struct-sum checked add with
+integer-overflow panic edge stubbed for non-overflow executable proof. Broad
 ReleaseSafe runtime semantics, all panic functions, arbitrary checked
 arithmetic, aggregate ABI generalization, and runtime ownership remain out of
 scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_array_sum`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_struct_sum`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe checked array-sum slice
+Commit the selected ReleaseSafe checked struct-sum slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -281,11 +290,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 49-row
+also passes: the first ReleaseFast tiny-scalar row and the full 50-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 49 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 50 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -305,7 +314,7 @@ literal-return row, selected comptime constant multiply row, and selected
 add-immediate return row, plus the selected ReleaseSafe checked add-immediate,
 checked comptime-const, checked global-update, and checked pointer-load/store
 panic-edge rows, plus the selected checked branch-mix and checked call-chain
-rows and selected checked TLS bump row. Broad
+rows, selected checked TLS bump row, and selected checked array-sum row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -354,8 +363,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=49 executable_ok=49 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=49 minimal_wrapper_rows=0
+             full set total=50 executable_ok=50 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=50 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -379,6 +388,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              checked-branch-mix-boundary=1
              checked-call-chain-boundary=1
              checked-tls-bump-boundary=1
+             checked-array-sum-boundary=1
              minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
