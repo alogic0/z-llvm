@@ -332,6 +332,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_runtime_comptime_const",
+        .wrapper = "test/zig/integrated/runtime_comptime_const_main.zig",
+        .covered_fixture = "test/zig/inputs/globals_comptime.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_tiny_scalar_runtime_boundary",
         .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig",
         .covered_fixture = "test/zig/inputs/tiny_scalar.zig",
@@ -482,6 +490,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "comptime-const-mul" },
         .{ .name = "add-imm-return" },
         .{ .name = "checked-add-imm-boundary" },
+        .{ .name = "checked-comptime-const-boundary" },
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
@@ -796,6 +805,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_debug_location")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_comptime_const")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -875,6 +887,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "comptime-const-mul")) return "comptime-const-mul";
     if (std.mem.eql(u8, contents[value_start..value_end], "add-imm-return")) return "add-imm-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-add-imm-boundary")) return "checked-add-imm-boundary";
+    if (std.mem.eql(u8, contents[value_start..value_end], "checked-comptime-const-boundary")) return "checked-comptime-const-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";
