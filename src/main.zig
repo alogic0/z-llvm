@@ -322,6 +322,8 @@ fn writeIrWriterModuleFromEnv(
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) {
         try writeReleaseSmallRuntimeHiddenAccessIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_zig")) {
+        try writeReleaseSmallRuntimeMixCAddZigIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -395,6 +397,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) return "void-noop-call";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) return "hidden-global-access";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_zig")) return "mixed-c-zig-add";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -582,6 +585,38 @@ fn writeReleaseSmallRuntimeHiddenAccessIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime hidden-access external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeMixCAddZigIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@C_k = thread_local(localexec) global i32 2, align 4
+        \\@main.zig_k = private unnamed_addr global i32 1, align 4
+        \\
+        \\@add_zig = alias i32 (i32), ptr @main.add_zig
+        \\@zig_k = alias i32, ptr @main.zig_k
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @main.add_zig(i32 4)
+        \\  ret i32 %value
+        \\}}
+        \\
+        \\define private i32 @main.add_zig(i32 %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %zig = load i32, ptr @main.zig_k, align 4
+        \\  %with_arg = add nsw i32 %zig, %0
+        \\  %c = load i32, ptr @C_k, align 4
+        \\  %sum = add nsw i32 %with_arg, %c
+        \\  ret i32 %sum
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime mixed C/Zig add external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

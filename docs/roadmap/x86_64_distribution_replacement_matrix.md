@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=57 executable_ok=57 link_only_ok=0 local_fail=0
+total=58 executable_ok=58 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -469,7 +469,8 @@ releasesafe_tls_read_gate=zig build distribution-zig-ir-writer -- --case=release
 releasesafe_side_effect_free_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_side_effect_free
 releasesmall_hidden_access_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_hidden_access
 releasesmall_mix_c_add_zig_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_mix_c_add_zig
-ir_writer_rows=scalar_runtime_rows=57, minimal_wrapper_rows=0
+releasesmall_mix_c_add_may_panic_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_mix_c_add_may_panic
+ir_writer_rows=scalar_runtime_rows=58, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
@@ -486,7 +487,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                aggregate-pair-abi=1, float-less=1, float-mul=1,
                float-add=1, float-select=1, float-sub=1,
                double-div=1, float-rem=1, void-noop-call=1,
-               hidden-global-access=1,
+               hidden-global-access=1, mixed-c-zig-add=1,
                struct-field-sum=1,
                array-scalar-sum=1,
                optional-scalar-payload=1,
@@ -585,6 +586,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         void-noop-call,
                         releasesmall_runtime_hidden_access
                         hidden-global-access,
+                        releasesmall_runtime_mix_c_add_zig
+                        mixed-c-zig-add,
                         releasesmall_globals_comptime global-load,
                         releasesmall_i64_arithmetic i64-arithmetic,
                         releasesmall_runtime_i64_call i64-call-return,
