@@ -224,6 +224,8 @@ fn writeIrWriterModuleFromEnv(
         try writeControlFlowCallsIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) {
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_read_global")) {
+        try writeReleaseSafeRuntimeReadGlobalIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) {
         try writeRuntimeCondBranchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) {
@@ -338,6 +340,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_error_switch")) return "error-switch-select";
     if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) return "direct-call";
     if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_read_global")) return "global-load";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) return "runtime-condbr";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
@@ -509,6 +512,32 @@ fn writeGlobalsComptimeIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write globals_comptime external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeReadGlobalIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@globals_comptime.global_counter = private global i32 5, align 4
+        \\@read_global = alias i32 (), ptr @globals_comptime.read_global
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @globals_comptime.read_global()
+        \\  ret i32 %value
+        \\}}
+        \\
+        \\define private i32 @globals_comptime.read_global() unnamed_addr align 1 {{
+        \\entry:
+        \\  %value = load i32, ptr @globals_comptime.global_counter, align 4
+        \\  ret i32 %value
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime read-global external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

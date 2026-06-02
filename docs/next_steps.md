@@ -162,15 +162,17 @@ the selected integer-out-of-bounds panic edge and is now covered by
 `releasesafe_runtime_loop_sum`. The next source-backed shape is
 `globals_comptime.read_global() i32` under ReleaseSafe, which appears in
 captured ReleaseSafe x86_64 IR as a private global `i32` load and direct
-return through the ReleaseSafe accepted pipeline.
+return through the ReleaseSafe accepted pipeline and is now covered by
+`releasesafe_runtime_read_global`. The next source-backed shape is
+`tls_concurrency.read_tls() i32` under ReleaseSafe, which appears in captured
+ReleaseSafe x86_64 IR as a direct local-exec TLS `i32` load and return.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSafe checked
-global-load coverage after the checked loop-sum row: emit
-`globals_comptime.read_global` under the ReleaseSafe accepted pipeline, plus a
-C ABI executable proof for the loaded value. Do not claim broad ReleaseSafe
-runtime semantics, arbitrary global initialization, linker/runtime ownership,
-or all safety paths.
+Reduce the remaining external writer gap for selected ReleaseSafe TLS-load
+coverage after the read-global row: emit `tls_concurrency.read_tls` under the
+ReleaseSafe accepted pipeline, plus a C ABI executable proof for the loaded
+value. Do not claim broad ReleaseSafe runtime semantics, arbitrary TLS models,
+threading behavior, linker/runtime ownership, or all safety paths.
 
 Mode/target/stage row:
 ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -253,9 +255,13 @@ integer-out-of-bounds panic edge and is now covered by
 `releasesafe_runtime_loop_sum`. The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll` to
 `globals_comptime.read_global` with `load i32, ptr @globals_comptime.global_counter`
-and direct `ret i32`.
+and direct `ret i32` and is now covered by
+`releasesafe_runtime_read_global`. The next selected row lowers in
+`test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll` to
+`tls_concurrency.read_tls` with a direct load from
+`@tls_concurrency.tls_counter` and `ret i32`.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected ReleaseSafe read-global shape.
+behavior beyond the selected ReleaseSafe TLS read shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -263,18 +269,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected ReleaseSafe direct private-global load with executable proof.
-Broad ReleaseSafe runtime semantics, arbitrary global initialization, linker
-runtime ownership, and all safety paths remain out of scope.
+Only selected ReleaseSafe local-exec TLS read with executable proof. Broad
+ReleaseSafe runtime semantics, arbitrary TLS models, threading behavior,
+linker runtime ownership, and all safety paths remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_read_global`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_read`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe read-global slice
+Commit the selected ReleaseSafe TLS-read slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -314,11 +320,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 53-row
+also passes: the first ReleaseFast tiny-scalar row and the full 54-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 53 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 54 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -340,7 +346,7 @@ checked comptime-const, checked global-update, and checked pointer-load/store
 panic-edge rows, plus the selected checked branch-mix and checked call-chain
 rows, selected checked TLS bump row, selected checked array-sum row, and
 selected checked struct-sum row, selected checked slice-sum row, and selected
-checked loop-sum row. Broad
+checked loop-sum row, plus the selected ReleaseSafe read-global row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -389,10 +395,10 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=53 executable_ok=53 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=53 minimal_wrapper_rows=0
+             full set total=54 executable_ok=54 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=54 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
-             error-switch-select=2 direct-call=1 global-load=2
+             error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
              checked-add-runtime-boundary=1 runtime-condbr=1
              runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1

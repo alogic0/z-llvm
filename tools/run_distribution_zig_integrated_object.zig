@@ -60,6 +60,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasesafe_runtime_read_global",
+        .wrapper = "test/zig/integrated/globals_comptime_main.zig",
+        .covered_fixture = "test/zig/inputs/globals_comptime.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
         .id = "releasefast_error_switch",
         .wrapper = "test/zig/integrated/error_switch_main.zig",
         .covered_fixture = "test/zig/inputs/error_switch.zig",
@@ -807,6 +815,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_tiny_scalar")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_control_flow_calls")) return 42;
     if (std.mem.eql(u8, case.id, "releasefast_globals_comptime")) return 5;
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_read_global")) return 5;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_switch")) return 13;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_global_update")) return 4;

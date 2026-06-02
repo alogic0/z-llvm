@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=53 executable_ok=53 link_only_ok=0 local_fail=0
+total=54 executable_ok=54 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -465,9 +465,10 @@ releasesafe_read_global_gate=zig build distribution-zig-ir-writer -- --case=rele
 releasesafe_pointer_load_store_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_pointer_load_store
 releasesafe_call_chain_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_call_chain
 releasesafe_tls_bump_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_bump
-ir_writer_rows=scalar_runtime_rows=53, minimal_wrapper_rows=0
+releasesafe_tls_read_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_read
+ir_writer_rows=scalar_runtime_rows=54, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
-               error-switch-select=2, direct-call=1, global-load=2,
+               error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
                checked-add-runtime-boundary=1, runtime-condbr=1,
                runtime-phi-merge=1, runtime-loop-sum=1,
@@ -505,6 +506,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasefast_error_switch error-switch-select,
                         releasefast_control_flow_calls direct-call,
                         releasefast_globals_comptime global-load,
+                        releasesafe_runtime_read_global global-load,
                         releasefast_runtime_cond_branch runtime-condbr,
                         releasefast_runtime_phi_merge runtime-phi-merge,
                         releasefast_runtime_loop_sum runtime-loop-sum,
