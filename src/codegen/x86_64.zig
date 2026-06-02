@@ -992,6 +992,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualAccumulatorStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4115,6 +4116,131 @@ fn validateBase64ResidualTableCheckI8Eq(instruction: ir.Instruction, lhs_name: [
     if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 })) return null;
     if (!isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return null;
     return result_name;
+}
+
+fn lowerBase64ResidualAccumulatorStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 13) return false;
+
+    const bits_raw_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[0], "base64.residual_accumulator_bits", 16)) orelse return false;
+    const bits_name = validateBase64ResidualAccumulatorCast(block.instructions.items[1], .trunc, bits_raw_name, 16, 12) orelse return false;
+    const shifted_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[2], .shl, bits_name, null, 6, 12, false) orelse return false;
+    const entry_raw_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[3], "base64.residual_accumulator_entry", 8)) orelse return false;
+    const entry_bits_name = validateBase64ResidualAccumulatorCast(block.instructions.items[4], .zext, entry_raw_name, 8, 12) orelse return false;
+    const next_bits_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[5], .add, shifted_name, entry_bits_name, 0, 12, true) orelse return false;
+    try validateBase64ResidualAccumulatorStore(block.instructions.items[6], next_bits_name, "base64.residual_accumulator_bits", 12);
+
+    const count_raw_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[7], "base64.residual_accumulator_count", 8)) orelse return false;
+    const count_name = validateBase64ResidualAccumulatorCast(block.instructions.items[8], .trunc, count_raw_name, 8, 4) orelse return false;
+    const next_count_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[9], .add, count_name, null, 6, 4, true) orelse return false;
+    try validateBase64ResidualAccumulatorStore(block.instructions.items[10], next_count_name, "base64.residual_accumulator_count", 4);
+
+    const ok_name = (try validateBase64ResidualTableCheckI8EqTyped(block.instructions.items[11], next_count_name, 6, 4)) orelse return false;
+    const select_name = block.instructions.items[12].result orelse return false;
+    const select = switch (block.instructions.items[12].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ResidualAccumulatorGlobalLoad(instruction: ir.Instruction, symbol_name: []const u8, bits: u16) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = bits }) or load.attrs.isBarrier()) return null;
+    if (!try valueIsGlobalSymbol(load.ptr, symbol_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualAccumulatorCast(
+    instruction: ir.Instruction,
+    op: ir.CastOp,
+    value_name: []const u8,
+    from_bits: u16,
+    to_bits: u16,
+) ?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (cast.op != op or !cast.from_ty.eql(.{ .int = from_bits }) or !cast.to_ty.eql(.{ .int = to_bits }) or !isNamed(cast.value, value_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualAccumulatorBinary(
+    instruction: ir.Instruction,
+    op: ir.BinaryOp,
+    lhs_name: []const u8,
+    rhs_name: ?[]const u8,
+    rhs_value: i128,
+    bits: u16,
+    require_nuw: bool,
+) ?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != op or !binary.ty.eql(.{ .int = bits })) return null;
+    if (binary.flags.nuw != require_nuw or binary.flags.nsw or binary.flags.exact or binary.flags.disjoint) return null;
+    if (!isNamed(binary.lhs, lhs_name)) return null;
+    if (rhs_name) |name| {
+        if (!isNamed(binary.rhs, name)) return null;
+    } else if (!isInt(binary.rhs, rhs_value)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualAccumulatorStore(instruction: ir.Instruction, value_name: []const u8, symbol_name: []const u8, bits: u16) !void {
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.{ .int = bits }) or store.attrs.isBarrier() or !isNamed(store.value, value_name)) return error.UnsupportedCodegenInstruction;
+    if (!try valueIsGlobalSymbol(store.ptr, symbol_name)) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateBase64ResidualTableCheckI8EqTyped(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128, bits: u16) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = bits })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return null;
+    return result_name;
+}
+
+fn valueIsGlobalSymbol(value: ir.Value, symbol_name: []const u8) !bool {
+    const symbol = switch (value) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return false;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    return std.mem.eql(u8, symbol, symbol_name);
 }
 
 fn lowerBase64PaddingTailStepMainReturn(
