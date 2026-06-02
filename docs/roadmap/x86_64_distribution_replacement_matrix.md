@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=79 executable_ok=79 link_only_ok=0 local_fail=0
+total=80 executable_ok=80 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -491,7 +491,8 @@ releasesmall_base64_residual_guard_step_gate=zig build distribution-zig-ir-write
 releasesmall_base64_residual_bundle_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_bundle_step
 releasesmall_base64_residual_store_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_store_step
 releasesmall_base64_residual_length_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_length_step
-ir_writer_rows=scalar_runtime_rows=79, minimal_wrapper_rows=0
+releasesmall_base64_residual_table_check_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_table_check_step
+ir_writer_rows=scalar_runtime_rows=80, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
@@ -530,6 +531,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                base64-residual-guard-step=1,
                base64-residual-bundle-step=1,
                base64-residual-store-step=1,
+               base64-residual-length-step=1,
                struct-field-sum=1,
                array-scalar-sum=1,
                optional-scalar-payload=1,
@@ -672,6 +674,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         base64-residual-bundle-step,
                         releasesmall_runtime_base64_residual_store_step
                         base64-residual-store-step,
+                        releasesmall_runtime_base64_residual_length_step
+                        base64-residual-length-step,
                         releasesmall_globals_comptime global-load,
                         releasesmall_i64_arithmetic i64-arithmetic,
                         releasesmall_runtime_i64_call i64-call-return,
@@ -891,6 +895,8 @@ reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected residual
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_bundle_step
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected residual output store/backedge
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_store_step
+reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected residual remaining-length calculation
+reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_length_step
 reduced_closed_fixture=test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll
 reduced_closed_shape=@base64_table_lookup -> @base64.table_lookup four-byte table constant plus indexed i8 load
 reduced_gates=zig build distribution-releasesmall-object, zig build distribution-native-link-releasesmall
