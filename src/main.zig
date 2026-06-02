@@ -264,6 +264,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeErrorUnionPayloadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) {
         try writeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_slice_sum")) {
+        try writeReleaseSafeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) {
         try writeRuntimeFpConstantsIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) {
@@ -354,6 +356,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) return "slice-loop-sum";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_slice_sum")) return "checked-slice-loop-sum-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) return "fp-literal-return";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) return "comptime-const-mul";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_comptime_const")) return "checked-comptime-const-boundary";
@@ -1232,6 +1235,66 @@ fn writeRuntimeSliceSumIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime slice-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeSliceSumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@slice_sum_values = constant [4 x i32] [i32 1, i32 2, i32 3, i32 4], align 4
+        \\@slice_sum = alias i32 (ptr, i64), ptr @aggregates.slice_sum
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @aggregates.slice_sum(ptr @slice_sum_values, i64 4)
+        \\  %ok = icmp eq i32 %value, 10
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.slice_sum(ptr %0, i64 %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %.not = icmp eq i64 %1, 0
+        \\  br i1 %.not, label %exit, label %loop
+        \\
+        \\loop:
+        \\  %sum = phi i32 [ 0, %entry ], [ %sum_next, %cont ]
+        \\  %index = phi i64 [ 0, %entry ], [ %next, %cont ]
+        \\  %ptr = getelementptr [4 x i8], ptr %0, i64 %index
+        \\  %loaded = load i32, ptr %ptr, align 4
+        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %sum, i32 %loaded)
+        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
+        \\  br i1 %overflow, label %panic, label %cont
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\cont:
+        \\  %sum_next = extractvalue {{ i32, i1 }} %checked, 0
+        \\  %next = add i64 %index, 1
+        \\  %done = icmp eq i64 %next, %1
+        \\  br i1 %done, label %exit, label %loop
+        \\
+        \\exit:
+        \\  %result = phi i32 [ 0, %entry ], [ %sum_next, %cont ]
+        \\  ret i32 %result
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime slice-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
