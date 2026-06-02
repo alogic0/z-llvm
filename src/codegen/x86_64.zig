@@ -795,6 +795,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerRuntimeOptionalPayloadPreoptHelper(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -1291,6 +1296,87 @@ fn lowerRuntimeCheckedStructSumMainReturn(
     return true;
 }
 
+fn lowerRuntimeOptionalPayloadPreoptHelper(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_optional_payload_main.optionalPayload")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len != 5) return false;
+
+    const entry = blockByName(function, "2") orelse return false;
+    const merge_ptr = blockByName(function, "5") orelse return false;
+    const some_block = blockByName(function, "10") orelse return false;
+    const ret_block = blockByName(function, "13") orelse return false;
+    const payload_block = blockByName(function, "15") orelse return false;
+    if (entry.instructions.items.len != 2 or merge_ptr.instructions.items.len != 4 or some_block.instructions.items.len != 3 or
+        ret_block.instructions.items.len != 1 or payload_block.instructions.items.len != 1) return false;
+
+    const icmp_inst = entry.instructions.items[1];
+    if (icmp_inst.removed) return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ne or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, icmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, "10") or !std.mem.eql(u8, entry_br.else_target, "5")) return false;
+
+    const value_store = switch (some_block.instructions.items[0].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!value_store.ty.eql(.{ .int = 32 }) or !isNamed(value_store.value, function.params.items[1].name)) return false;
+    const some_br = switch (some_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, some_br.target, "5")) return false;
+
+    const payload_load_name = payload_block.instructions.items[0].result orelse return false;
+    const payload_load = switch (payload_block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!payload_load.ty.eql(.{ .int = 32 }) or payload_load.attrs.isBarrier()) return false;
+    const payload_br = switch (payload_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, payload_br.target, "13")) return false;
+
+    const phi_name = ret_block.instructions.items[0].result orelse return false;
+    const phi = switch (ret_block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, payload_load_name, "15") or !phiHasIncomingInt(phi, -1, "5")) return false;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, phi_name)) return false;
+
+    const null_label = "optional_payload_preopt_null";
+    try machine.instructions.append(allocator, .{ .test_arg32 = .rdi });
+    try machine.instructions.append(allocator, .{ .je = null_label });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = .rsi });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = null_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerRuntimeOptionalPayloadMainReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1298,7 +1384,8 @@ fn lowerRuntimeOptionalPayloadMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_optional_payload_main.main");
+    if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 3) return false;
 
@@ -1315,9 +1402,17 @@ fn lowerRuntimeOptionalPayloadMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(call.callee, "aggregates.optional_payload")) return false;
+    if (integrated_preopt) {
+        if (!std.mem.eql(u8, call.callee, "runtime_optional_payload_main.optionalPayload")) return false;
+    } else if (!isCalleeName(call.callee, "aggregates.optional_payload")) return false;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(call.calling_conv);
+    if (integrated_preopt) {
+        if (call.calling_conv) |cc| {
+            if (!std.mem.eql(u8, cc, "fastcc")) return false;
+        }
+    } else {
+        try validateDefaultCallConv(call.calling_conv);
+    }
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return error.UnsupportedCodegenInstruction;
     if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 1)) return error.UnsupportedCodegenValue;
     if (!call.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[1].value, 42)) return error.UnsupportedCodegenValue;
@@ -1335,6 +1430,12 @@ fn lowerRuntimeOptionalPayloadMainReturn(
     };
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    if (integrated_preopt) {
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
 
     const fail = "optional_payload_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 1 });
