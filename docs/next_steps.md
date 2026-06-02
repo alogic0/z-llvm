@@ -10,15 +10,14 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt pointer load/store object-emission blocker after
-the integrated postopt object gate is clean for all 87 selected rows. The
-previous blocker, `releasesmall_runtime_inherit_want_safety_i64`, now uses
-its source-backed expected exit code 4 in the integrated runner. The selected
-integrated postopt object gate reports
-`total=87 executable_ok=87 link_only_ok=0 local_fail=0`. The next measured
-blocker is `releasefast_runtime_pointer_load_store` in the integrated preopt
+Close the integrated preopt volatile-roundtrip object-emission blocker after
+the integrated postopt object gate is clean for all 87 selected rows and the
+integrated preopt pointer load/store row is clean. The previous blocker,
+`releasefast_runtime_pointer_load_store`, now object-emits in the preopt path
+with the selected call-plus-merge control-flow shape. The next measured
+blocker is `releasefast_runtime_volatile_roundtrip` in the integrated preopt
 path, where z_llvm optimization plus object emission fails with
-`UnsupportedCodegenControlFlow`.
+`UnsupportedCodegenCallingConvention`.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -532,7 +531,10 @@ postopt object gate is clean with
 `total=87 executable_ok=87 link_only_ok=0 local_fail=0`. The top-level
 distribution gate then exposed the next selected blocker:
 integrated preopt `releasefast_runtime_pointer_load_store` object emission
-fails with `UnsupportedCodegenControlFlow`.
+failure with `UnsupportedCodegenControlFlow`; that row now passes. The next
+selected blocker is integrated preopt
+`releasefast_runtime_volatile_roundtrip`, which fails object emission with
+`UnsupportedCodegenCallingConvention`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -540,9 +542,8 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated preopt pointer load/store control-flow object
-emission blocker:
-`releasefast_runtime_pointer_load_store`.
+Only the selected integrated preopt volatile-roundtrip calling-convention
+object emission blocker: `releasefast_runtime_volatile_roundtrip`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
@@ -553,7 +554,7 @@ then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated preopt pointer load/store update
+Commit the selected integrated preopt volatile-roundtrip update
 separately with the policy in
 `docs/commit_policy.md`.
 

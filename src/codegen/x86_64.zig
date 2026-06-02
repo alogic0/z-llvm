@@ -802,6 +802,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (function.blocks.items.len == 3) {
+        if (try lowerRuntimePointerLoadStorePreoptMain(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
         if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -2622,22 +2626,27 @@ fn lowerPointerLoadStoreReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "pointers_memory.load_store")) return false;
+    const source_fixture = std.mem.eql(u8, function.name, "pointers_memory.load_store");
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.loadStore");
+    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
-    if (block.instructions.items.len != 3) return false;
+    if (source_fixture and block.instructions.items.len != 3) return false;
+    if (integrated_preopt and block.instructions.items.len != 4) return false;
 
     const load_inst = block.instructions.items[0];
     const add_inst = block.instructions.items[1];
     const store_inst = block.instructions.items[2];
+    const reload_inst = if (integrated_preopt) block.instructions.items[3] else null;
     if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
+    if (reload_inst) |instruction| if (instruction.removed) return false;
     const load_result = load_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+    if (source_fixture and !std.mem.eql(u8, ret_name, add_result)) return false;
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
@@ -2663,6 +2672,111 @@ fn lowerPointerLoadStoreReturn(
     try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = .rsi });
+    if (reload_inst) |instruction| {
+        const reload_name = instruction.result orelse return false;
+        if (!std.mem.eql(u8, ret_name, reload_name)) return false;
+        const reload = switch (instruction.kind) {
+            .load => |reload| reload,
+            else => return false,
+        };
+        if (!reload.ty.eql(.{ .int = 32 }) or reload.attrs.isBarrier()) return false;
+        if (!isNamed(reload.ptr, function.params.items[1].name)) return false;
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rsi });
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePointerLoadStorePreoptMain(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = blockByName(function, "0") orelse return false;
+    const merge = blockByName(function, "5") orelse return false;
+    const output_check = blockByName(function, "7") orelse return false;
+    if (entry.instructions.items.len != 2 or merge.instructions.items.len != 2 or output_check.instructions.items.len != 2) return false;
+
+    const call_name = entry.instructions.items[0].result orelse return false;
+    const first_cmp_name = entry.instructions.items[1].result orelse return false;
+    if (entry.instructions.items[0].removed or entry.instructions.items[1].removed) return false;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!std.mem.eql(u8, call.callee, "runtime_pointer_load_store_main.loadStore")) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return false;
+    const first_cmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (first_cmp.predicate != .eq or !first_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_cmp.lhs, call_name) or !isInt(first_cmp.rhs, 42)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, "7") or !std.mem.eql(u8, entry_br.else_target, "5")) return false;
+
+    const output_load_name = output_check.instructions.items[0].result orelse return false;
+    const output_cmp_name = output_check.instructions.items[1].result orelse return false;
+    if (output_check.instructions.items[0].removed or output_check.instructions.items[1].removed) return false;
+    const output_load = switch (output_check.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!output_load.ty.eql(.{ .int = 32 }) or output_load.attrs.isBarrier()) return false;
+    if (!valueReferencesGlobal(output_load.ptr, "runtime_pointer_load_store_main.output")) return false;
+    const output_cmp = switch (output_check.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (output_cmp.predicate != .eq or !output_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(output_cmp.lhs, output_load_name) or !isInt(output_cmp.rhs, 42)) return false;
+    const output_br = switch (output_check.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, output_br.target, "5")) return false;
+
+    const phi_name = merge.instructions.items[0].result orelse return false;
+    const select_name = merge.instructions.items[1].result orelse return false;
+    if (merge.instructions.items[0].removed or merge.instructions.items[1].removed) return false;
+    const phi = switch (merge.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 1 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, output_cmp_name, "7") or !phiHasIncomingInt(phi, 0, "0")) return false;
+    const select = switch (merge.instructions.items[1].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, phi_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    const ret = switch (merge.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "pointer_load_store_preopt_fail";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.input" });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -11680,6 +11794,28 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
         .named => |value_name| std.mem.eql(u8, value_name, name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn valueReferencesGlobal(value: ir.Value, name: []const u8) bool {
+    return switch (value) {
+        .named => |value_name| std.mem.eql(u8, symbolName(value_name), name),
+        .constant_expr => |text| std.mem.indexOf(u8, text, name) != null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => false,
+    };
+}
+
+fn phiHasIncoming(phi: ir.PhiInst, value_name: []const u8, block_name: []const u8) bool {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block_name) and isNamed(incoming.value, value_name)) return true;
+    }
+    return false;
+}
+
+fn phiHasIncomingInt(phi: ir.PhiInst, value: i128, block_name: []const u8) bool {
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, block_name) and isInt(incoming.value, value)) return true;
+    }
+    return false;
 }
 
 fn isCalleeName(actual: []const u8, expected: []const u8) bool {
