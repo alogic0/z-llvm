@@ -992,6 +992,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64StoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64DecodeStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64WriterMainReturn(allocator, machine, function, block, ret)) return;
@@ -3888,6 +3889,98 @@ fn lowerBase64ResidualByteStepMainReturn(
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 63 });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "base64.residual_output" });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64ResidualStoreStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 10) return false;
+
+    const word_name = (try validateBase64BitBufferI32GlobalLoad(block.instructions.items[0], "base64.residual_store_word")) orelse return false;
+    const dst_name = block.instructions.items[1].result orelse return false;
+    const check_name = block.instructions.items[3].result orelse return false;
+    const store_ok_name = block.instructions.items[4].result orelse return false;
+    const remaining_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[5], "base64.residual_store_remaining")) orelse return false;
+    const next_name = block.instructions.items[6].result orelse return false;
+    const next_ok_name = block.instructions.items[7].result orelse return false;
+    const ok_name = block.instructions.items[8].result orelse return false;
+    const select_name = block.instructions.items[9].result orelse return false;
+
+    const gep = switch (block.instructions.items[1].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return false;
+    const output_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, output_symbol, "base64.residual_store_output")) return false;
+    if (gep.indices.items.len != 1) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+
+    const store = switch (block.instructions.items[2].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier() or !isNamed(store.value, word_name) or !isNamed(store.ptr, dst_name)) return false;
+
+    const check_load = switch (block.instructions.items[3].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!check_load.ty.eql(.{ .int = 32 }) or check_load.attrs.isBarrier() or !isNamed(check_load.ptr, dst_name)) return false;
+
+    const store_ok = switch (block.instructions.items[4].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (store_ok.predicate != .eq or !store_ok.operand_ty.eql(.{ .int = 32 }) or !isNamed(store_ok.lhs, check_name) or !isNamed(store_ok.rhs, word_name)) return false;
+
+    const next = switch (block.instructions.items[6].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (next.op != .add or !next.ty.eql(.{ .int = 64 }) or next.flags.any()) return false;
+    if (!isNamed(next.lhs, remaining_name) or !isInt(next.rhs, -4)) return false;
+
+    const next_ok = switch (block.instructions.items[7].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (next_ok.predicate != .eq or !next_ok.operand_ty.eql(.{ .int = 64 }) or !isNamed(next_ok.lhs, next_name) or !isInt(next_ok.rhs, 0)) return false;
+
+    const ok_select = switch (block.instructions.items[8].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!ok_select.cond_ty.eql(.{ .int = 1 }) or !ok_select.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(ok_select.cond, store_ok_name) or !isNamed(ok_select.true_value, next_ok_name) or !isInt(ok_select.false_value, 0)) return false;
+
+    const ret_select = switch (block.instructions.items[9].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!ret_select.cond_ty.eql(.{ .int = 1 }) or !ret_select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(ret_select.cond, ok_name) or !isInt(ret_select.true_value, 0) or !isInt(ret_select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 2105344 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "base64.residual_store_output" });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;

@@ -364,6 +364,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_bundle_step")) {
         try writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_store_step")) {
+        try writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -458,6 +460,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_loop_advance_step")) return "base64-loop-advance-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_guard_step")) return "base64-residual-guard-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_bundle_step")) return "base64-residual-bundle-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_store_step")) return "base64-residual-store-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1340,6 +1343,36 @@ fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.residual_store_output = private unnamed_addr global i32 0, align 4
+        \\@base64.residual_store_word = private unnamed_addr global i32 2105344, align 4
+        \\@base64.residual_store_remaining = private unnamed_addr global i64 4, align 8
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %word = load i32, ptr @base64.residual_store_word, align 4
+        \\  %dst = getelementptr [1 x i8], ptr @base64.residual_store_output, i64 0
+        \\  store i32 %word, ptr %dst, align 1
+        \\  %check = load i32, ptr %dst, align 1
+        \\  %store.ok = icmp eq i32 %check, %word
+        \\  %remaining = load i64, ptr @base64.residual_store_remaining, align 8
+        \\  %next = add i64 %remaining, -4
+        \\  %next.ok = icmp eq i64 %next, 0
+        \\  %ok = select i1 %store.ok, i1 %next.ok, i1 0
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
