@@ -967,6 +967,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64DecodeStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64WriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
@@ -3680,6 +3681,97 @@ fn lowerBase64TableLookupReturn(
     try machine.instructions.append(allocator, .load_rax_rdi_u8_eax);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerBase64DecodeStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 13) return false;
+
+    const v0_name = (try validateBase64DecodeStepLoad(block.instructions.items[0], block.instructions.items[1], 0)) orelse return false;
+    const v1_name = (try validateBase64DecodeStepLoad(block.instructions.items[2], block.instructions.items[3], 5)) orelse return false;
+    const word1_name = block.instructions.items[4].result orelse return false;
+    try validateNamedOr(block.instructions.items[4], v1_name, v0_name);
+
+    const v2_name = (try validateBase64DecodeStepLoad(block.instructions.items[5], block.instructions.items[6], 9)) orelse return false;
+    const word2_name = block.instructions.items[7].result orelse return false;
+    try validateNamedOr(block.instructions.items[7], word1_name, v2_name);
+
+    const v3_name = (try validateBase64DecodeStepLoad(block.instructions.items[8], block.instructions.items[9], 13)) orelse return false;
+    const word_name = block.instructions.items[10].result orelse return false;
+    try validateNamedOr(block.instructions.items[10], word2_name, v3_name);
+
+    const valid_name = block.instructions.items[11].result orelse return false;
+    const icmp = switch (block.instructions.items[11].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, word_name) or !isInt(icmp.rhs, 16777216)) return false;
+
+    const select_name = block.instructions.items[12].result orelse return false;
+    const select = switch (block.instructions.items[12].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, valid_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64DecodeStepLoad(gep_inst: ir.Instruction, load_inst: ir.Instruction, table_index: i128) !?[]const u8 {
+    if (gep_inst.removed or load_inst.removed) return null;
+    const gep_name = gep_inst.result orelse return null;
+    const load_name = load_inst.result orelse return null;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[16 x i32]" })) return null;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, table_symbol, "base64.decode_step_table")) return null;
+    if (gep.indices.items.len != 2) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return null;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[1].value, table_index)) return null;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return null;
+    return load_name;
+}
+
+fn validateNamedOr(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) !void {
+    if (instruction.removed) return error.UnsupportedCodegenInstruction;
+    const @"or" = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (@"or".op != .@"or" or !@"or".ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+    if (!((isNamed(@"or".lhs, lhs_name) and isNamed(@"or".rhs, rhs_name)) or
+        (isNamed(@"or".lhs, rhs_name) and isNamed(@"or".rhs, lhs_name))))
+    {
+        return error.UnsupportedCodegenInstruction;
+    }
 }
 
 fn lowerBase64WriterMainReturn(

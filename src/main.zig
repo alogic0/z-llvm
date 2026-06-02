@@ -334,6 +334,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) {
         try writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) {
+        try writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -413,6 +415,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-prologue";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) return "base64-decode-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -776,6 +779,37 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime strFromFloatHelp external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.decode_step_table = private unnamed_addr global [16 x i32] [i32 0, i32 248, i32 -16777216, i32 252, i32 0, i32 4096, i32 -16777216, i32 61443, i32 0, i32 8192, i32 -16777216, i32 12586752, i32 0, i32 196608, i32 -16777216, i32 4128768], align 4
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %p0 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 0
+        \\  %v0 = load i32, ptr %p0, align 4
+        \\  %p1 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 5
+        \\  %v1 = load i32, ptr %p1, align 4
+        \\  %word1 = or i32 %v1, %v0
+        \\  %p2 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 9
+        \\  %v2 = load i32, ptr %p2, align 4
+        \\  %word2 = or i32 %word1, %v2
+        \\  %p3 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 13
+        \\  %v3 = load i32, ptr %p3, align 4
+        \\  %word = or i32 %word2, %v3
+        \\  %valid = icmp ult i32 %word, 16777216
+        \\  %ret = select i1 %valid, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 decode-step external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
