@@ -839,6 +839,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         }
     }
 
+    if (try lowerBase64LoopAdvanceStep(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerBase64PaddingLoopStep(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -4324,6 +4329,118 @@ fn validateBase64BitBufferOr(instruction: ir.Instruction, lhs_name: []const u8, 
     {
         return null;
     }
+    return result_name;
+}
+
+fn lowerBase64LoopAdvanceStep(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+    if (!std.mem.eql(u8, entry.name, "entry") or
+        !std.mem.eql(u8, loop.name, "loop") or
+        !std.mem.eql(u8, exit.name, "exit"))
+        return false;
+
+    if (entry.instructions.items.len != 2) return false;
+    const out_start_name = (try validateBase64LoopAdvanceI64GlobalLoad(entry.instructions.items[0], "base64.loop_advance_output")) orelse return false;
+    const src_start_name = (try validateBase64LoopAdvanceI64GlobalLoad(entry.instructions.items[1], "base64.loop_advance_source")) orelse return false;
+    if (!std.mem.eql(u8, try validateTerminatorBr(entry), loop.name)) return false;
+
+    if (loop.instructions.items.len != 5) return false;
+    const out_name = loop.instructions.items[0].result orelse return false;
+    const src_name = loop.instructions.items[1].result orelse return false;
+    const out_next_name = loop.instructions.items[2].result orelse return false;
+    const src_next_name = loop.instructions.items[3].result orelse return false;
+    const done_name = loop.instructions.items[4].result orelse return false;
+
+    const out_phi = switch (loop.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!out_phi.ty.eql(.{ .int = 64 }) or out_phi.incoming.items.len != 2) return false;
+    if (!isNamed(out_phi.incoming.items[0].value, out_start_name) or !std.mem.eql(u8, out_phi.incoming.items[0].block, entry.name)) return false;
+    if (!isNamed(out_phi.incoming.items[1].value, out_next_name) or !std.mem.eql(u8, out_phi.incoming.items[1].block, loop.name)) return false;
+
+    const src_phi = switch (loop.instructions.items[1].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!src_phi.ty.eql(.{ .int = 64 }) or src_phi.incoming.items.len != 2) return false;
+    if (!isNamed(src_phi.incoming.items[0].value, src_start_name) or !std.mem.eql(u8, src_phi.incoming.items[0].block, entry.name)) return false;
+    if (!isNamed(src_phi.incoming.items[1].value, src_next_name) or !std.mem.eql(u8, src_phi.incoming.items[1].block, loop.name)) return false;
+
+    const out_next = switch (loop.instructions.items[2].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (out_next.op != .add or !out_next.ty.eql(.{ .int = 64 }) or !out_next.flags.nuw or out_next.flags.nsw or out_next.flags.exact or out_next.flags.disjoint) return false;
+    if (!isNamed(out_next.lhs, out_name) or !isInt(out_next.rhs, 12)) return false;
+
+    const src_next = switch (loop.instructions.items[3].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (src_next.op != .add or !src_next.ty.eql(.{ .int = 64 }) or src_next.flags.any()) return false;
+    if (!isNamed(src_next.lhs, src_name) or !isInt(src_next.rhs, -16)) return false;
+
+    const done = switch (loop.instructions.items[4].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (done.predicate != .eq or !done.operand_ty.eql(.{ .int = 64 }) or !isNamed(done.lhs, out_next_name) or !isInt(done.rhs, 12)) return false;
+
+    const loop_branch = switch (loop.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!loop_branch.cond_ty.eql(.{ .int = 1 }) or !isNamed(loop_branch.cond, done_name)) return false;
+    if (!std.mem.eql(u8, loop_branch.then_target, exit.name) or !std.mem.eql(u8, loop_branch.else_target, loop.name)) return false;
+
+    if (exit.instructions.items.len != 2) return false;
+    const src_ok_name = exit.instructions.items[0].result orelse return false;
+    const select_name = exit.instructions.items[1].result orelse return false;
+    const src_ok = switch (exit.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (src_ok.predicate != .eq or !src_ok.operand_ty.eql(.{ .int = 64 }) or !isNamed(src_ok.lhs, src_next_name) or !isInt(src_ok.rhs, 0)) return false;
+    const select = switch (exit.instructions.items[1].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, src_ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    const ret = switch (exit.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64LoopAdvanceI64GlobalLoad(instruction: ir.Instruction, symbol_name: []const u8) !?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier()) return null;
+    const symbol = switch (load.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, symbol_name)) return null;
     return result_name;
 }
 
