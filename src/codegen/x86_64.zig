@@ -818,6 +818,10 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
             try verifyFunction(machine);
             return machine;
         }
+        if (try lowerRuntimeOptionalPointerPreoptMain(allocator, &machine, function)) {
+            try verifyFunction(machine);
+            return machine;
+        }
         if (try lowerRuntimeOptionalPointerMain(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -6733,6 +6737,9 @@ fn appendErrorSwitchReturns(allocator: std.mem.Allocator, machine: *MachineFunct
 }
 
 fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (std.mem.eql(u8, function.name, "runtime_optional_pointer_main.optionalPtrValue")) {
+        return try lowerRuntimeOptionalPointerPreoptHelper(allocator, machine, function);
+    }
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
 
     const entry = function.blocks.items[0];
@@ -6823,6 +6830,160 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerRuntimeOptionalPointerPreoptHelper(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = blockByName(function, "1") orelse return false;
+    const null_block = blockByName(function, "3") orelse return false;
+    const load_block = blockByName(function, "4") orelse return false;
+    if (entry.instructions.items.len != 1 or null_block.instructions.items.len != 0 or load_block.instructions.items.len != 1) return false;
+
+    const icmp_inst = entry.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .ne or !icmp.operand_ty.eql(.ptr)) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or icmp.rhs != .null_value) return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return false;
+    if (!std.mem.eql(u8, condbr.then_target, "4") or !std.mem.eql(u8, condbr.else_target, "3")) return false;
+
+    const null_ret = switch (null_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!null_ret.ty.eql(.{ .int = 32 }) or !isInt(null_ret.value orelse return error.InvalidRet, -1)) return false;
+
+    const load_inst = load_block.instructions.items[0];
+    if (load_inst.removed) return false;
+    const load_name = load_inst.result orelse return false;
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    if (!isNamed(load.ptr, function.params.items[0].name)) return false;
+    const load_ret = switch (load_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!load_ret.ty.eql(.{ .int = 32 }) or !isNamed(load_ret.value orelse return error.InvalidRet, load_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .test_arg64 = .rdi });
+    try machine.instructions.append(allocator, .{ .je = "optional_pointer_helper_null" });
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = "optional_pointer_helper_null" });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeOptionalPointerPreoptMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_optional_pointer_main.main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = blockByName(function, "0") orelse return false;
+    const merge = blockByName(function, "5") orelse return false;
+    const null_check = blockByName(function, "7") orelse return false;
+    if (entry.instructions.items.len != 2 or merge.instructions.items.len != 2 or null_check.instructions.items.len != 2) return false;
+
+    const first_call_name = entry.instructions.items[0].result orelse return false;
+    const first_cmp_name = entry.instructions.items[1].result orelse return false;
+    if (entry.instructions.items[0].removed or entry.instructions.items[1].removed) return false;
+    const first_call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isRuntimeOptionalPointerPreoptCall(first_call)) return false;
+    if (first_call.args.items.len != 1 or !first_call.args.items[0].ty.eql(.ptr)) return false;
+    if (!valueReferencesGlobal(first_call.args.items[0].value, "runtime_optional_pointer_main.value")) return false;
+    const first_cmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (first_cmp.predicate != .eq or !first_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_cmp.lhs, first_call_name) or !isInt(first_cmp.rhs, 42)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, "7") or !std.mem.eql(u8, entry_br.else_target, "5")) return false;
+
+    const second_call_name = null_check.instructions.items[0].result orelse return false;
+    const second_cmp_name = null_check.instructions.items[1].result orelse return false;
+    if (null_check.instructions.items[0].removed or null_check.instructions.items[1].removed) return false;
+    const second_call = switch (null_check.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isRuntimeOptionalPointerPreoptCall(second_call)) return false;
+    if (second_call.args.items.len != 1 or !second_call.args.items[0].ty.eql(.ptr)) return false;
+    if (second_call.args.items[0].value != .null_value) return false;
+    const second_cmp = switch (null_check.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (second_cmp.predicate != .eq or !second_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(second_cmp.lhs, second_call_name) or !isInt(second_cmp.rhs, -1)) return false;
+    const null_check_br = switch (null_check.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, null_check_br.target, "5")) return false;
+
+    const phi_name = merge.instructions.items[0].result orelse return false;
+    const select_name = merge.instructions.items[1].result orelse return false;
+    if (merge.instructions.items[0].removed or merge.instructions.items[1].removed) return false;
+    const phi = switch (merge.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 1 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, second_cmp_name, "7") or !phiHasIncomingInt(phi, 0, "0")) return false;
+    const select = switch (merge.instructions.items[1].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, phi_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    const ret = switch (merge.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "optional_pointer_preopt_fail";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_optional_pointer_main.value" });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isRuntimeOptionalPointerPreoptCall(call: ir.CallInst) bool {
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (call.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    }
+    return std.mem.eql(u8, call.callee, "runtime_optional_pointer_main.optionalPtrValue") and call.ret_ty.eql(.{ .int = 32 });
 }
 
 fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

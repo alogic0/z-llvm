@@ -536,8 +536,11 @@ selected blocker is integrated preopt
 `releasefast_runtime_volatile_roundtrip`, which failed object emission with
 `UnsupportedCodegenCallingConvention`; that row now passes through the
 preopt path. The next selected blocker is integrated preopt
-`releasefast_runtime_optional_pointer`, which fails object emission with
-`UnsupportedCodegenControlFlow`.
+`releasefast_runtime_optional_pointer`, which failed object emission with
+`UnsupportedCodegenControlFlow`; that row now passes through the preopt
+path. The next selected blocker is integrated preopt
+`releasefast_runtime_packed_read_flag`, which fails object emission with
+`UnsupportedCodegenCallingConvention`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -545,8 +548,8 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated preopt optional-pointer control-flow object
-emission blocker: `releasefast_runtime_optional_pointer`.
+Only the selected integrated preopt packed-read-flag calling-convention
+object emission blocker: `releasefast_runtime_packed_read_flag`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
@@ -557,8 +560,8 @@ then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated preopt volatile-roundtrip closure and
-optional-pointer handoff separately with the policy in `docs/commit_policy.md`.
+Commit the selected integrated preopt optional-pointer closure and
+packed-read-flag handoff separately with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
 
