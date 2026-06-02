@@ -994,6 +994,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualAccumulatorStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLoopAdvanceStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualPaddingCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4274,6 +4275,51 @@ fn lowerBase64ResidualLoopAdvanceStepMainReturn(
     if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 64 }) or !isNamed(icmp.lhs, next_name) or !isInt(icmp.rhs, 1)) return false;
 
     const select = switch (block.instructions.items[3].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64ResidualPaddingCheckStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 8) return false;
+
+    const index_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[0], "base64.residual_padding_index")) orelse return false;
+    const base_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[1], "base64.residual_padding_base")) orelse return false;
+    const offset_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[2], .add, index_name, base_name, 0, 64, true) orelse return false;
+    const offset_ok_name = (try validateBase64ResidualTableCheckI8EqTyped(block.instructions.items[3], offset_name, 4, 64)) orelse return false;
+    const byte_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[4], "base64.residual_padding_byte", 8)) orelse return false;
+    const pad_ok_name = (try validateBase64ResidualTableCheckI8EqTyped(block.instructions.items[5], byte_name, 61, 8)) orelse return false;
+
+    const ok_name = block.instructions.items[6].result orelse return false;
+    const ok_select = switch (block.instructions.items[6].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!ok_select.cond_ty.eql(.{ .int = 1 }) or !ok_select.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(ok_select.cond, offset_ok_name) or !isNamed(ok_select.true_value, pad_ok_name) or !isInt(ok_select.false_value, 0)) return false;
+
+    const select_name = block.instructions.items[7].result orelse return false;
+    const select = switch (block.instructions.items[7].kind) {
         .select => |select| select,
         else => return false,
     };
