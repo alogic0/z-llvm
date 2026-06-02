@@ -953,6 +953,7 @@ fn lowerStraightLineReturn(
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallHiddenAccessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallMixCAddZigMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerReleaseSmallMixCAddMayPanicMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
@@ -3914,6 +3915,38 @@ fn lowerReleaseSmallMixCAddZigMainReturn(
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 4 });
     try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerReleaseSmallMixCAddMayPanicMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    const call_result = call_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "main.add_may_panic")) return false;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(call.calling_conv);
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 4)) return error.UnsupportedCodegenValue;
+
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 4 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

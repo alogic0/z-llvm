@@ -468,6 +468,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-localexec-c-tls-input",
     },
     .{
+        .id = "releasesmall_runtime_mix_c_add_may_panic",
+        .wrapper = "test/zig/integrated/runtime_mix_c_add_may_panic_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-panic-edge",
+    },
+    .{
         .id = "releasesmall_i64_arithmetic",
         .wrapper = "test/zig/integrated/i64_arithmetic_main.zig",
         .covered_fixture = "test/zig/inputs/i64_arithmetic.zig",
@@ -628,6 +636,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "void-noop-call" },
         .{ .name = "hidden-global-access" },
         .{ .name = "mixed-c-zig-add" },
+        .{ .name = "mixed-c-zig-panic-add" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -856,6 +865,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_hidden_access")) return 7;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) return 7;
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_may_panic")) return 5;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
@@ -902,6 +912,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-localexec-c-tls-input";
+    }
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_may_panic")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
@@ -1083,6 +1096,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "void-noop-call")) return "void-noop-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "hidden-global-access")) return "hidden-global-access";
     if (std.mem.eql(u8, contents[value_start..value_end], "mixed-c-zig-add")) return "mixed-c-zig-add";
+    if (std.mem.eql(u8, contents[value_start..value_end], "mixed-c-zig-panic-add")) return "mixed-c-zig-panic-add";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }

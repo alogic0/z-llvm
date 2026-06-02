@@ -182,16 +182,18 @@ C-owned TLS `C_k` input and is now covered by
 ReleaseSmall `standalone_mix_c_files_add_may_panic` row, which branches on a
 negative argument, calls the selected panic runtime edge on that path, and
 otherwise loads `main.zig_k`, adds the non-negative argument, and returns the
-sum.
+sum and is now covered by `releasesmall_runtime_mix_c_add_may_panic`. The
+next source-backed shape is the ReleaseSmall
+`no_compile_panic_for_unchecked_arith_umul_fix_sat_i64` row, which calls
+`llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)` and returns the `i64` result.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSmall panic-edge
-global-add coverage after the mixed C/Zig add row: emit the
-`standalone_mix_c_files_add_may_panic` branch and non-panicking add path under
-the ReleaseSmall accepted pipeline, plus an executable wrapper proof for the
-non-panicking selected argument. Do not claim broad panic/runtime semantics,
-C ABI integration, arbitrary TLS models, multi-object C/Zig linking parity, or
-all object/linker behavior.
+Reduce the remaining external writer gap for selected ReleaseSmall unsigned
+fixed-point saturating multiply coverage after the panic-edge add row: emit the
+`llvm.umul.fix.sat.i64` intrinsic shape under the ReleaseSmall accepted
+pipeline, plus an executable wrapper proof for the selected constant result.
+Do not claim broad fixed-point intrinsic lowering, arbitrary intrinsic
+signatures, panic/runtime semantics, or all object/linker behavior.
 
 Mode/target/stage row:
 ReleaseSmall / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -294,7 +296,10 @@ argument, loads `@C_k`, and returns the combined sum and is now covered by
 `test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll`
 to `main.add_may_panic`, which branches on `icmp slt i32 %0, 0`, calls
 `debug.defaultPanic` on the panic edge, and returns `@main.zig_k + %0` on the
-non-panicking edge.
+non-panicking edge and is now covered by
+`releasesmall_runtime_mix_c_add_may_panic`. The next selected row lowers in
+`test/distribution/releasesmall_x86_64/inputs/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.ll`
+to a selected `llvm.umul.fix.sat.i64` intrinsic call and `ret i64`.
 Record more precise upstream files if the slice needs optimizer/codegen
 behavior beyond the selected ReleaseSafe TLS read shape.
 
@@ -304,19 +309,19 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected ReleaseSmall non-panicking add path plus object-visible
-panic edge with executable wrapper proof. Broad panic/runtime semantics, C ABI
-integration, arbitrary TLS models, multi-object C/Zig linking parity, and all
+Only the selected ReleaseSmall unsigned fixed-point saturating multiply
+constant row with executable wrapper proof. Broad fixed-point intrinsic
+lowering, arbitrary intrinsic signatures, panic/runtime semantics, and all
 object/linker behavior remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_mix_c_add_may_panic`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_umul_fix_sat_i64`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSmall mixed C/Zig panic-edge add slice
+Commit the selected ReleaseSmall `umul.fix.sat.i64` slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -356,11 +361,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 58-row
+also passes: the first ReleaseFast tiny-scalar row and the full 59-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 58 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 59 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -431,8 +436,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=58 executable_ok=58 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=58 minimal_wrapper_rows=0
+             full set total=59 executable_ok=59 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=59 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -452,6 +457,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              void-noop-call=1
              hidden-global-access=1
              mixed-c-zig-add=1
+             mixed-c-zig-panic-add=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1

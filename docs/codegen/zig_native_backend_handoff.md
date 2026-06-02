@@ -107,7 +107,8 @@ optimizer/object path. Runtime writer rows now cover
 `checked-tls-bump-boundary`, `tls-read`, `checked-array-sum-boundary`, and
 `checked-struct-sum-boundary`, `checked-slice-loop-sum-boundary`, and
 `checked-loop-sum-boundary`, `void-noop-call`, and
-`hidden-global-access`, and `mixed-c-zig-add`; all 58
+`hidden-global-access`, `mixed-c-zig-add`, and
+`mixed-c-zig-panic-add`; all 59
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
