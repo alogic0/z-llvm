@@ -1110,6 +1110,7 @@ fn runExecutableCase(
 fn integratedExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_aggregate_pair")) return 1;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_hidden_access")) return 7;
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) return 7;
     return 0;
 }
 
