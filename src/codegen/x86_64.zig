@@ -992,6 +992,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64StoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4033,6 +4034,87 @@ fn lowerBase64ResidualLengthStepMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerBase64ResidualTableCheckStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 7) return false;
+
+    const src_name = (try validateBase64ResidualTableCheckGep(block.instructions.items[0], "base64.residual_table_check_input", null)) orelse return false;
+    const byte_name = (try validateBase64ResidualTableCheckI8Load(block.instructions.items[1], src_name)) orelse return false;
+    const idx_name = validateBase64SourceBundleZext(block.instructions.items[2], byte_name) orelse return false;
+    const entry_ptr_name = (try validateBase64ResidualTableCheckGep(block.instructions.items[3], "base64.residual_table_check_table", idx_name)) orelse return false;
+    const entry_name = (try validateBase64ResidualTableCheckI8Load(block.instructions.items[4], entry_ptr_name)) orelse return false;
+    const invalid_name = (try validateBase64ResidualTableCheckI8Eq(block.instructions.items[5], entry_name, -1)) orelse return false;
+
+    const select_name = block.instructions.items[6].result orelse return false;
+    const select = switch (block.instructions.items[6].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, invalid_name) or !isInt(select.true_value, 1) or !isInt(select.false_value, 0)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ResidualTableCheckGep(instruction: ir.Instruction, symbol_name: []const u8, index_name: ?[]const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return null;
+    const symbol = switch (gep.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, symbol_name)) return null;
+    if (gep.indices.items.len != 1) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 })) return null;
+    if (index_name) |name| {
+        if (!isNamed(gep.indices.items[0].value, name)) return null;
+    } else if (!isInt(gep.indices.items[0].value, 0)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualTableCheckI8Load(instruction: ir.Instruction, ptr_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualTableCheckI8Eq(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return null;
+    return result_name;
 }
 
 fn lowerBase64PaddingTailStepMainReturn(

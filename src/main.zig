@@ -368,6 +368,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_length_step")) {
         try writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_table_check_step")) {
+        try writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -464,6 +466,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_bundle_step")) return "base64-residual-bundle-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_store_step")) return "base64-residual-store-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_length_step")) return "base64-residual-length-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_table_check_step")) return "base64-residual-table-check-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1400,6 +1403,32 @@ fn writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-length external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.residual_table_check_input = private unnamed_addr global [1 x i8] c"\00", align 1
+        \\@base64.residual_table_check_table = private unnamed_addr global [1 x i8] c"\00", align 1
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %src = getelementptr [1 x i8], ptr @base64.residual_table_check_input, i64 0
+        \\  %byte = load i8, ptr %src, align 1
+        \\  %idx = zext i8 %byte to i64
+        \\  %entry_ptr = getelementptr [1 x i8], ptr @base64.residual_table_check_table, i64 %idx
+        \\  %entry = load i8, ptr %entry_ptr, align 1
+        \\  %invalid = icmp eq i8 %entry, -1
+        \\  %ret = select i1 %invalid, i32 1, i32 0
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-table-check external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
