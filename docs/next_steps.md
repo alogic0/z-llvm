@@ -24,9 +24,9 @@ checked call-chain boundary, ReleaseSafe checked TLS bump boundary, packed
 bitfield, extern-struct field-load, scalarized array-sum, optional scalar
 payload, error-union payload, pointer-indexed slice-sum, and selected
 ReleaseSmall base64 decode/store/residual-byte/padding-byte/padding-loop and
-padding length-adjustment, chunk-loop guard, source-byte stride, and first
-three four-byte source-bundle surfaces: a source-backed x86_64 ReleaseSmall
-base64 bit-buffer combine row.
+padding length-adjustment, chunk-loop guard, source-byte stride, first three
+four-byte source-bundle surfaces, and bit-buffer combine/store surface: a
+source-backed x86_64 ReleaseSmall base64 loop-advance/backedge row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -241,12 +241,15 @@ selected slice from the same decoder is the third four-byte source bundle in
 block `%97`, and is now covered by
 `releasesmall_runtime_base64_third_source_bundle_step`. The next selected
 slice from the same decoder is the wide `i128` bit-buffer combine and output
-store in block `%121`.
+store in block `%121`, and is now covered by
+`releasesmall_runtime_base64_bit_buffer_store_step`. The next selected slice
+from the same decoder is the source/output index advance and backedge at the
+end of block `%121`.
 
 LLVM fallback removed or reduced:
 Reduce the remaining external writer gap for selected ReleaseSmall base64
-decoder coverage after the reduced third four-byte source bundle row: create
-one source-backed reduced bit-buffer combine fixture or selected external
+decoder coverage after the reduced bit-buffer combine/store row: create one
+source-backed reduced loop-advance/backedge fixture or selected external
 writer row from
 `base64.decode_base_64`, then drive the first concrete parser, optimizer,
 codegen, or object blocker. Do not claim the full decoder, arbitrary loops,
@@ -431,7 +434,11 @@ slice is the bit-buffer combine and output store around `%122 = zext nneg i32
 `%124 = shl nsw nuw i128 %123, 24`, `%125 = or disjoint i128 %124, %48`,
 `%126 = zext nneg i32 %96 to i128`, `%127 = shl nsw nuw i128 %126, 48`,
 `%128 = or disjoint i128 %125, %127`, `%129 = shl nsw nuw i128 %122, 72`,
-`%130 = or disjoint i128 %128, %129`, and `store i128 %130, ptr %131`.
+`%130 = or disjoint i128 %128, %129`, and `store i128 %130, ptr %131`, and
+is now covered by `releasesmall_runtime_base64_bit_buffer_store_step`. The
+next selected slice is the loop advance and backedge around
+`%132 = add nuw i64 %.0303.i, 12`,
+`%indvars.iv.next.i = add i64 %indvars.iv.i, -16`, and `br label %18`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -439,20 +446,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected ReleaseSmall base64 bit-buffer combine/store
+Only the selected ReleaseSmall base64 loop-advance/backedge
 boundary-reduction slice.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_bit_buffer_store_step`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_loop_advance_step`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSmall base64 bit-buffer combine/store
+Commit the selected ReleaseSmall base64 loop-advance/backedge
 boundary-reduction slice
 separately with the policy in
 `docs/commit_policy.md`.
@@ -493,11 +500,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 74-row
+also passes: the first ReleaseFast tiny-scalar row and the full 75-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 74 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 75 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -568,8 +575,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=74 executable_ok=74 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=74 minimal_wrapper_rows=0
+             full set total=75 executable_ok=75 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=75 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -605,6 +612,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              base64-source-bundle-step=1
              base64-next-source-bundle-step=1
              base64-third-source-bundle-step=1
+             base64-bit-buffer-store-step=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1

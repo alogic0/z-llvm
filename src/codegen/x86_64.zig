@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64BitBufferStoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ThirdSourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64NextSourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4206,6 +4207,124 @@ fn lowerBase64ThirdSourceBundleStepMainReturn(
         "base64.third_source_bundle_table3",
         12,
     );
+}
+
+fn lowerBase64BitBufferStoreStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 16) return false;
+
+    const word0_raw_name = (try validateBase64BitBufferI32GlobalLoad(block.instructions.items[0], "base64.bit_buffer_word0")) orelse return false;
+    const word0_name = validateBase64BitBufferZext(block.instructions.items[1], word0_raw_name, false) orelse return false;
+    const word3_raw_name = (try validateBase64BitBufferI32GlobalLoad(block.instructions.items[2], "base64.bit_buffer_word3")) orelse return false;
+    const word3_name = validateBase64BitBufferZext(block.instructions.items[3], word3_raw_name, true) orelse return false;
+    const word1_raw_name = (try validateBase64BitBufferI32GlobalLoad(block.instructions.items[4], "base64.bit_buffer_word1")) orelse return false;
+    const word1_name = validateBase64BitBufferZext(block.instructions.items[5], word1_raw_name, true) orelse return false;
+    const shift1_name = validateBase64BitBufferShl(block.instructions.items[6], word1_name, 24) orelse return false;
+    const merged1_name = validateBase64BitBufferOr(block.instructions.items[7], shift1_name, word0_name) orelse return false;
+    const word2_raw_name = (try validateBase64BitBufferI32GlobalLoad(block.instructions.items[8], "base64.bit_buffer_word2")) orelse return false;
+    const word2_name = validateBase64BitBufferZext(block.instructions.items[9], word2_raw_name, true) orelse return false;
+    const shift2_name = validateBase64BitBufferShl(block.instructions.items[10], word2_name, 48) orelse return false;
+    const merged2_name = validateBase64BitBufferOr(block.instructions.items[11], merged1_name, shift2_name) orelse return false;
+    const shift3_name = validateBase64BitBufferShl(block.instructions.items[12], word3_name, 72) orelse return false;
+    const merged_name = validateBase64BitBufferOr(block.instructions.items[13], merged2_name, shift3_name) orelse return false;
+
+    const dst_name = block.instructions.items[14].result orelse return false;
+    const dst_gep = switch (block.instructions.items[14].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!dst_gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return false;
+    const dst_symbol = switch (dst_gep.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return false;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, dst_symbol, "base64.bit_buffer_output")) return false;
+    if (dst_gep.indices.items.len != 1) return false;
+    if (!dst_gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(dst_gep.indices.items[0].value, 0)) return false;
+
+    const store = switch (block.instructions.items[15].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 128 }) or store.attrs.isBarrier() or !isNamed(store.value, merged_name) or !isNamed(store.ptr, dst_name)) return false;
+
+    const ret_value = ret.value orelse return error.InvalidRet;
+    if (!isInt(ret_value, 0)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64BitBufferI32GlobalLoad(instruction: ir.Instruction, symbol_name: []const u8) !?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
+    const symbol = switch (load.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, symbol_name)) return null;
+    return result_name;
+}
+
+fn validateBase64BitBufferZext(instruction: ir.Instruction, value_name: []const u8, expected_nneg: bool) ?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const zext = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 32 }) or !zext.to_ty.eql(.{ .int = 128 }) or !isNamed(zext.value, value_name)) return null;
+    if (zext.flags.nneg != expected_nneg or zext.flags.nsw or zext.flags.nuw) return null;
+    return result_name;
+}
+
+fn validateBase64BitBufferShl(instruction: ir.Instruction, lhs_name: []const u8, shift: i128) ?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const shl = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (shl.op != .shl or !shl.ty.eql(.{ .int = 128 })) return null;
+    if (!shl.flags.nsw or !shl.flags.nuw or shl.flags.exact or shl.flags.disjoint) return null;
+    if (!isNamed(shl.lhs, lhs_name) or !isInt(shl.rhs, shift)) return null;
+    return result_name;
+}
+
+fn validateBase64BitBufferOr(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const @"or" = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (@"or".op != .@"or" or !@"or".ty.eql(.{ .int = 128 })) return null;
+    if (!@"or".flags.disjoint or @"or".flags.nsw or @"or".flags.nuw or @"or".flags.exact) return null;
+    if (!((isNamed(@"or".lhs, lhs_name) and isNamed(@"or".rhs, rhs_name)) or
+        (isNamed(@"or".lhs, rhs_name) and isNamed(@"or".rhs, lhs_name))))
+    {
+        return null;
+    }
+    return result_name;
 }
 
 fn lowerBase64SourceBundleStepMainReturnWithSymbols(

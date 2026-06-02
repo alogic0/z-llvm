@@ -356,6 +356,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_third_source_bundle_step")) {
         try writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_bit_buffer_store_step")) {
+        try writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -446,6 +448,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_bundle_step")) return "base64-source-bundle-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_next_source_bundle_step")) return "base64-next-source-bundle-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_third_source_bundle_step")) return "base64-third-source-bundle-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_bit_buffer_store_step")) return "base64-bit-buffer-store-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1168,6 +1171,44 @@ fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.bit_buffer_word0 = private unnamed_addr global i32 1, align 4
+        \\@base64.bit_buffer_word1 = private unnamed_addr global i32 2, align 4
+        \\@base64.bit_buffer_word2 = private unnamed_addr global i32 3, align 4
+        \\@base64.bit_buffer_word3 = private unnamed_addr global i32 4, align 4
+        \\@base64.bit_buffer_output = private unnamed_addr global i128 0, align 16
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %word0.raw = load i32, ptr @base64.bit_buffer_word0, align 4
+        \\  %word0 = zext i32 %word0.raw to i128
+        \\  %word3.raw = load i32, ptr @base64.bit_buffer_word3, align 4
+        \\  %word3 = zext nneg i32 %word3.raw to i128
+        \\  %word1.raw = load i32, ptr @base64.bit_buffer_word1, align 4
+        \\  %word1 = zext nneg i32 %word1.raw to i128
+        \\  %shift1 = shl nsw nuw i128 %word1, 24
+        \\  %merged1 = or disjoint i128 %shift1, %word0
+        \\  %word2.raw = load i32, ptr @base64.bit_buffer_word2, align 4
+        \\  %word2 = zext nneg i32 %word2.raw to i128
+        \\  %shift2 = shl nsw nuw i128 %word2, 48
+        \\  %merged2 = or disjoint i128 %merged1, %shift2
+        \\  %shift3 = shl nsw nuw i128 %word3, 72
+        \\  %merged = or disjoint i128 %merged2, %shift3
+        \\  %dst = getelementptr [1 x i8], ptr @base64.bit_buffer_output, i64 0
+        \\  store i128 %merged, ptr %dst, align 1
+        \\  ret i32 0
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 bit-buffer-store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
