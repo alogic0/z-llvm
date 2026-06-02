@@ -110,7 +110,8 @@ optimizer/object path. Runtime writer rows now cover
 `hidden-global-access`, `mixed-c-zig-add`, `mixed-c-zig-panic-add`,
 `umul-fix-sat-i64`, `inherit-i64-return`, `compile-asm-unreachable`,
 `str-from-float-prologue`, `base64-decode-step`, `base64-store-step`,
-`base64-residual-byte-step`, and `base64-padding-tail-step`; all 67
+`base64-residual-byte-step`, `base64-padding-tail-step`, and
+`base64-padding-loop-step`; all 68
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with

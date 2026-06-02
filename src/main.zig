@@ -342,6 +342,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_tail_step")) {
         try writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) {
+        try writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -425,6 +427,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) return "base64-store-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_byte_step")) return "base64-residual-byte-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_tail_step")) return "base64-padding-tail-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) return "base64-padding-loop-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -891,6 +894,42 @@ fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 padding-tail external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.padding_loop = private unnamed_addr global i32 61, align 4
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  br label %loop
+        \\
+        \\loop:
+        \\  %index = phi i64 [ 0, %entry ], [ %next, %body ]
+        \\  %done = icmp eq i64 %index, 2
+        \\  br i1 %done, label %exit, label %body
+        \\
+        \\body:
+        \\  %src = getelementptr [1 x i8], ptr @base64.padding_loop, i64 0
+        \\  %byte = load i8, ptr %src, align 1
+        \\  %is_pad = icmp eq i8 %byte, 61
+        \\  %next = add i64 %index, 1
+        \\  br i1 %is_pad, label %loop, label %fail
+        \\
+        \\fail:
+        \\  ret i32 1
+        \\
+        \\exit:
+        \\  ret i32 0
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 padding-loop external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

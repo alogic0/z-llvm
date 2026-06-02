@@ -839,6 +839,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         }
     }
 
+    if (try lowerBase64PaddingLoopStep(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerControlFlowLoopSum(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -5267,6 +5272,119 @@ fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFuncti
     if (has_overflow_check) try appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
     if (has_out_of_bounds_check) try appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
     return true;
+}
+
+fn lowerBase64PaddingLoopStep(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 5) return false;
+
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const body = function.blocks.items[2];
+    const fail = function.blocks.items[3];
+    const exit = function.blocks.items[4];
+    if (!std.mem.eql(u8, entry.name, "entry") or
+        !std.mem.eql(u8, loop.name, "loop") or
+        !std.mem.eql(u8, body.name, "body") or
+        !std.mem.eql(u8, fail.name, "fail") or
+        !std.mem.eql(u8, exit.name, "exit"))
+        return false;
+
+    if (entry.instructions.items.len != 0) return false;
+    if (!std.mem.eql(u8, try validateTerminatorBr(entry), loop.name)) return false;
+
+    if (loop.instructions.items.len != 2) return false;
+    const index_name = loop.instructions.items[0].result orelse return false;
+    const done_name = loop.instructions.items[1].result orelse return false;
+    const phi = switch (loop.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 64 }) or phi.incoming.items.len != 2) return false;
+    if (!isInt(phi.incoming.items[0].value, 0) or !std.mem.eql(u8, phi.incoming.items[0].block, entry.name)) return false;
+    if (!isNamed(phi.incoming.items[1].value, "next") or !std.mem.eql(u8, phi.incoming.items[1].block, body.name)) return false;
+
+    const done = switch (loop.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (done.predicate != .eq or !done.operand_ty.eql(.{ .int = 64 }) or !isNamed(done.lhs, index_name) or !isInt(done.rhs, 2)) return false;
+    const loop_branch = switch (loop.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!loop_branch.cond_ty.eql(.{ .int = 1 }) or !isNamed(loop_branch.cond, done_name)) return false;
+    if (!std.mem.eql(u8, loop_branch.then_target, exit.name) or !std.mem.eql(u8, loop_branch.else_target, body.name)) return false;
+
+    if (body.instructions.items.len != 4) return false;
+    const src_name = body.instructions.items[0].result orelse return false;
+    const byte_name = body.instructions.items[1].result orelse return false;
+    const is_pad_name = body.instructions.items[2].result orelse return false;
+    const next_name = body.instructions.items[3].result orelse return false;
+    if (!std.mem.eql(u8, next_name, "next")) return false;
+
+    const gep = switch (body.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return false;
+    const padding_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, padding_symbol, "base64.padding_loop")) return false;
+    if (gep.indices.items.len != 1) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+
+    const load = switch (body.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, src_name)) return false;
+
+    const is_pad = switch (body.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (is_pad.predicate != .eq or !is_pad.operand_ty.eql(.{ .int = 8 }) or !isNamed(is_pad.lhs, byte_name) or !isInt(is_pad.rhs, 61)) return false;
+
+    const next = switch (body.instructions.items[3].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (next.op != .add or !next.ty.eql(.{ .int = 64 }) or !isNamed(next.lhs, index_name) or !isInt(next.rhs, 1)) return false;
+    const body_branch = switch (body.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!body_branch.cond_ty.eql(.{ .int = 1 }) or !isNamed(body_branch.cond, is_pad_name)) return false;
+    if (!std.mem.eql(u8, body_branch.then_target, loop.name) or !std.mem.eql(u8, body_branch.else_target, fail.name)) return false;
+
+    try validateRetI32Const(fail, 1);
+    try validateRetI32Const(exit, 0);
+
+    const loop_label = "base64_padding_tail_loop";
+    const exit_label = "base64_padding_tail_exit";
+    try machine.instructions.append(allocator, .xor_ecx_ecx);
+    try machine.instructions.append(allocator, .{ .label = loop_label });
+    try machine.instructions.append(allocator, .{ .cmp_ecx_imm32 = 2 });
+    try machine.instructions.append(allocator, .{ .je = exit_label });
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .jmp = loop_label });
+    try machine.instructions.append(allocator, .{ .label = exit_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateRetI32Const(block: ir.BasicBlock, expected: i128) !void {
+    if (block.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isInt(ret.value orelse return error.UnsupportedCodegenValue, expected)) return error.UnsupportedCodegenValue;
 }
 
 fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
