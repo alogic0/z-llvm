@@ -995,6 +995,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64ResidualAccumulatorStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLoopAdvanceStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualPaddingCheckStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualFinalMaskStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4335,6 +4336,84 @@ fn lowerBase64ResidualPaddingCheckStepMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerBase64ResidualFinalMaskStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 14) return false;
+
+    const index_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[0], "base64.residual_final_index")) orelse return false;
+    const remaining_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[1], "base64.residual_final_remaining")) orelse return false;
+    const done_name = (try validateBase64ResidualFinalMaskI64IcmpUge(block.instructions.items[2], index_name, remaining_name)) orelse return false;
+    const bits_raw_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[3], "base64.residual_final_bits", 16)) orelse return false;
+    const bits_name = validateBase64ResidualAccumulatorCast(block.instructions.items[4], .trunc, bits_raw_name, 16, 12) orelse return false;
+    const shift_raw_name = (try validateBase64ResidualAccumulatorGlobalLoad(block.instructions.items[5], "base64.residual_final_shift", 8)) orelse return false;
+    const shift_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[6], .@"and", shift_raw_name, null, 7, 8, false) orelse return false;
+    const shift_bits_name = validateBase64ResidualAccumulatorCast(block.instructions.items[7], .zext, shift_name, 8, 12) orelse return false;
+    const notmask_name = validateBase64ResidualFinalMaskIntNamedShl(block.instructions.items[8], -1, shift_bits_name, 12) orelse return false;
+    const mask_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[9], .xor, notmask_name, null, -1, 12, false) orelse return false;
+    const residual_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[10], .@"and", bits_name, mask_name, 0, 12, false) orelse return false;
+    const has_residual_name = (try validateBase64ResidualFinalMaskIcmpTyped(block.instructions.items[11], .ne, residual_name, 0, 12)) orelse return false;
+    const fail_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[12], .@"or", done_name, has_residual_name, 0, 1, false) orelse return false;
+
+    const select_name = block.instructions.items[13].result orelse return false;
+    const select = switch (block.instructions.items[13].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, fail_name) or !isInt(select.true_value, 1) or !isInt(select.false_value, 0)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ResidualFinalMaskI64IcmpUge(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .uge or !icmp.operand_ty.eql(.{ .int = 64 })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isNamed(icmp.rhs, rhs_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualFinalMaskIntNamedShl(instruction: ir.Instruction, lhs_value: i128, rhs_name: []const u8, bits: u16) ?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .shl or !binary.ty.eql(.{ .int = bits })) return null;
+    if (binary.flags.nuw or !binary.flags.nsw or binary.flags.exact or binary.flags.disjoint) return null;
+    if (!isInt(binary.lhs, lhs_value) or !isNamed(binary.rhs, rhs_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualFinalMaskIcmpTyped(instruction: ir.Instruction, predicate: ir.IcmpPredicate, lhs_name: []const u8, rhs_value: i128, bits: u16) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = bits })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return null;
+    return result_name;
 }
 
 fn lowerBase64PaddingTailStepMainReturn(

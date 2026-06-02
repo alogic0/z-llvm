@@ -509,7 +509,15 @@ to i12`, `%.mask314.i = and i8 ... , 7`, `%199 = zext nneg i8 %.mask314.i
 to i12`, `%notmask.i = shl nsw i12 -1, %199`, `%200 = xor i12 %notmask.i,
 -1`, `%201 = and i12 %198, %200`, `%.not315.i = icmp ne i12 %201, 0`,
 `%brmerge.i = or i1 %.not316.not361.i, %.not315.i`, and the branch on
-`%brmerge.i`.
+`%brmerge.i`, and is now covered by
+`releasesmall_runtime_base64_residual_final_mask_step`. The next selected
+slice is the residual final padding loop around
+`%203 = getelementptr [1 x i8], ptr %2, i64 %.sroa.0282.0.i`,
+`%204 = sub nuw i64 %3, %.sroa.0282.0.i`,
+`%exitcond348.not.i = icmp eq i64 %.0301.i, %204`,
+`%207 = getelementptr [1 x i8], ptr %203, i64 %.0301.i`,
+`%208 = load i8, ptr %207`, `%.not318.i = icmp eq i8 %208, 61`,
+`%209 = add i64 %.0301.i, 1`, and the branch on `%.not318.i`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -517,20 +525,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected ReleaseSmall base64 residual final mask
+Only the selected ReleaseSmall base64 residual final padding loop
 boundary-reduction slice.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_final_mask_step`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_loop_step`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSmall base64 residual final mask
+Commit the selected ReleaseSmall base64 residual final padding loop
 boundary-reduction slice
 separately with the policy in
 `docs/commit_policy.md`.
@@ -571,11 +579,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 84-row
+also passes: the first ReleaseFast tiny-scalar row and the full 85-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 83 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 85 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -646,8 +654,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=84 executable_ok=84 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=84 minimal_wrapper_rows=0
+             full set total=85 executable_ok=85 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=85 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -693,6 +701,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              base64-residual-accumulator-step=1
              base64-residual-loop-advance-step=1
              base64-residual-padding-check-step=1
+             base64-residual-final-mask-step=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1
