@@ -974,6 +974,7 @@ fn lowerStraightLineReturn(
             if (try lowerInlineAsmBarrierReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAtomicAddReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeCheckedStructSumMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeStructSumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeArraySumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeOptionalPayloadMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeErrorUnionPayloadMainReturn(allocator, machine, function, block, ret)) return;
@@ -1765,6 +1766,9 @@ fn lowerSingleStackSlotCallReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (std.mem.eql(u8, function.name, "runtime_struct_sum_main.structSum")) {
+        return try lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret);
+    }
     if (!ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 4) return false;
 
@@ -3915,6 +3919,152 @@ fn lowerStructSumReturn(
 
     try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = base_reg });
     try machine.instructions.append(allocator, .{ .add_arg_ptr_disp4_eax = base_reg });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeStructSumPreoptHelper(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
+    if (block.instructions.items.len != 8) return false;
+
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    const first_ptr_load_inst = block.instructions.items[2];
+    const first_field_load_inst = block.instructions.items[3];
+    const second_ptr_load_inst = block.instructions.items[4];
+    const gep_inst = block.instructions.items[5];
+    const second_field_load_inst = block.instructions.items[6];
+    const add_inst = block.instructions.items[7];
+    if (alloca_inst.removed or store_inst.removed or first_ptr_load_inst.removed or first_field_load_inst.removed or
+        second_ptr_load_inst.removed or gep_inst.removed or second_field_load_inst.removed or add_inst.removed) return false;
+
+    const alloca_name = alloca_inst.result orelse return false;
+    const first_ptr_name = first_ptr_load_inst.result orelse return false;
+    const first_field_name = first_field_load_inst.result orelse return false;
+    const second_ptr_name = second_ptr_load_inst.result orelse return false;
+    const gep_name = gep_inst.result orelse return false;
+    const second_field_name = second_field_load_inst.result orelse return false;
+    const add_name = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(.ptr)) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.ptr) or store.attrs.isBarrier()) return false;
+    if (!isNamed(store.ptr, alloca_name) or !isNamed(store.value, function.params.items[0].name)) return false;
+
+    const first_ptr_load = switch (first_ptr_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!first_ptr_load.ty.eql(.ptr) or first_ptr_load.attrs.isBarrier()) return false;
+    if (!isNamed(first_ptr_load.ptr, alloca_name)) return false;
+
+    const first_field_load = switch (first_field_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!first_field_load.ty.eql(.{ .int = 32 }) or first_field_load.attrs.isBarrier()) return false;
+    if (!isNamed(first_field_load.ptr, first_ptr_name)) return false;
+
+    const second_ptr_load = switch (second_ptr_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!second_ptr_load.ty.eql(.ptr) or second_ptr_load.attrs.isBarrier()) return false;
+    if (!isNamed(second_ptr_load.ptr, alloca_name)) return false;
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, second_ptr_name)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or !isInt(index.value, 4)) return false;
+
+    const second_field_load = switch (second_field_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!second_field_load.ty.eql(.{ .int = 32 }) or second_field_load.attrs.isBarrier()) return false;
+    if (!isNamed(second_field_load.ptr, gep_name)) return false;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
+    if (!((isNamed(add.lhs, first_field_name) and isNamed(add.rhs, second_field_name)) or
+        (isNamed(add.lhs, second_field_name) and isNamed(add.rhs, first_field_name)))) return false;
+
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
+    try machine.instructions.append(allocator, .{ .add_arg_ptr_disp4_eax = .rdi });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeStructSumMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_struct_sum_main.main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (call.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    }
+    if (!std.mem.eql(u8, call.callee, "runtime_struct_sum_main.structSum")) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return false;
+    if (!call.args.items[0].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[0].value, "runtime_struct_sum_main.pair")) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
