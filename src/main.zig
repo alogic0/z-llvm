@@ -378,6 +378,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_final_mask_step")) {
         try writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) {
+        try writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -479,6 +481,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_loop_advance_step")) return "base64-residual-loop-advance-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_check_step")) return "base64-residual-padding-check-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_final_mask_step")) return "base64-residual-final-mask-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) return "base64-residual-padding-loop-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1559,6 +1562,40 @@ fn writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-final-mask external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.residual_padding_loop_source = private unnamed_addr global [1 x i8] c"=", align 1
+        \\@base64.residual_padding_loop_start = private unnamed_addr global i64 0, align 8
+        \\@base64.residual_padding_loop_total = private unnamed_addr global i64 1, align 8
+        \\@base64.residual_padding_loop_index = private unnamed_addr global i64 0, align 8
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %start = load i64, ptr @base64.residual_padding_loop_start, align 8
+        \\  %total = load i64, ptr @base64.residual_padding_loop_total, align 8
+        \\  %limit = sub nuw i64 %total, %start
+        \\  %loop.index = load i64, ptr @base64.residual_padding_loop_index, align 8
+        \\  %done = icmp eq i64 %loop.index, %limit
+        \\  %ptr = getelementptr [1 x i8], ptr @base64.residual_padding_loop_source, i64 %loop.index
+        \\  %byte = load i8, ptr %ptr, align 1
+        \\  %is.pad = icmp eq i8 %byte, 61
+        \\  %next = add i64 %loop.index, 1
+        \\  %next.ok = icmp eq i64 %next, 1
+        \\  %body.ok = select i1 %is.pad, i1 %next.ok, i1 0
+        \\  %ok = select i1 %done, i1 1, i1 %body.ok
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-padding-loop external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

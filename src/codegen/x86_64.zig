@@ -996,6 +996,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64ResidualLoopAdvanceStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualPaddingCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualFinalMaskStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ResidualPaddingLoopStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4413,6 +4414,74 @@ fn validateBase64ResidualFinalMaskIcmpTyped(instruction: ir.Instruction, predica
     };
     if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = bits })) return null;
     if (!isNamed(icmp.lhs, lhs_name) or !isInt(icmp.rhs, rhs_value)) return null;
+    return result_name;
+}
+
+fn lowerBase64ResidualPaddingLoopStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 13) return false;
+
+    const start_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[0], "base64.residual_padding_loop_start")) orelse return false;
+    const total_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[1], "base64.residual_padding_loop_total")) orelse return false;
+    const limit_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[2], .sub, total_name, start_name, 0, 64, true) orelse return false;
+    const loop_index_name = (try validateBase64ResidualGuardI64GlobalLoad(block.instructions.items[3], "base64.residual_padding_loop_index")) orelse return false;
+    const done_name = (try validateBase64ResidualPaddingLoopIcmpNamed(block.instructions.items[4], .eq, loop_index_name, limit_name, 64)) orelse return false;
+    const ptr_name = (try validateBase64ResidualTableCheckGep(block.instructions.items[5], "base64.residual_padding_loop_source", loop_index_name)) orelse return false;
+    const byte_name = (try validateBase64ResidualTableCheckI8Load(block.instructions.items[6], ptr_name)) orelse return false;
+    const is_pad_name = (try validateBase64ResidualTableCheckI8EqTyped(block.instructions.items[7], byte_name, 61, 8)) orelse return false;
+    const next_name = validateBase64ResidualAccumulatorBinary(block.instructions.items[8], .add, loop_index_name, null, 1, 64, false) orelse return false;
+    const next_ok_name = (try validateBase64ResidualTableCheckI8EqTyped(block.instructions.items[9], next_name, 1, 64)) orelse return false;
+
+    const body_ok_name = block.instructions.items[10].result orelse return false;
+    const body_ok = switch (block.instructions.items[10].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!body_ok.cond_ty.eql(.{ .int = 1 }) or !body_ok.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(body_ok.cond, is_pad_name) or !isNamed(body_ok.true_value, next_ok_name) or !isInt(body_ok.false_value, 0)) return false;
+
+    const ok_name = block.instructions.items[11].result orelse return false;
+    const ok = switch (block.instructions.items[11].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!ok.cond_ty.eql(.{ .int = 1 }) or !ok.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(ok.cond, done_name) or !isInt(ok.true_value, 1) or !isNamed(ok.false_value, body_ok_name)) return false;
+
+    const select_name = block.instructions.items[12].result orelse return false;
+    const select = switch (block.instructions.items[12].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ResidualPaddingLoopIcmpNamed(instruction: ir.Instruction, predicate: ir.IcmpPredicate, lhs_name: []const u8, rhs_name: []const u8, bits: u16) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = bits })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isNamed(icmp.rhs, rhs_name)) return null;
     return result_name;
 }
 
