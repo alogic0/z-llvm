@@ -484,6 +484,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-umul-fix-sat-i64",
     },
     .{
+        .id = "releasesmall_runtime_inherit_want_safety_i64",
+        .wrapper = "test/zig/integrated/runtime_inherit_want_safety_i64_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/inherit_want_safety_i64_return.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inherit-want-safety-i64-return",
+    },
+    .{
         .id = "releasesmall_i64_arithmetic",
         .wrapper = "test/zig/integrated/i64_arithmetic_main.zig",
         .covered_fixture = "test/zig/inputs/i64_arithmetic.zig",
@@ -646,6 +654,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "mixed-c-zig-add" },
         .{ .name = "mixed-c-zig-panic-add" },
         .{ .name = "umul-fix-sat-i64" },
+        .{ .name = "inherit-i64-return" },
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
@@ -875,6 +884,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_hidden_access")) return 7;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) return 7;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_may_panic")) return 5;
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_inherit_want_safety_i64")) return 4;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
@@ -927,6 +937,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_umul_fix_sat_i64")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-umul-fix-sat-i64";
+    }
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_inherit_want_safety_i64")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inherit-want-safety-i64-return";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
@@ -1110,6 +1123,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "mixed-c-zig-add")) return "mixed-c-zig-add";
     if (std.mem.eql(u8, contents[value_start..value_end], "mixed-c-zig-panic-add")) return "mixed-c-zig-panic-add";
     if (std.mem.eql(u8, contents[value_start..value_end], "umul-fix-sat-i64")) return "umul-fix-sat-i64";
+    if (std.mem.eql(u8, contents[value_start..value_end], "inherit-i64-return")) return "inherit-i64-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
 }
