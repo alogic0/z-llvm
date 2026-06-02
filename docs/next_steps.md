@@ -10,14 +10,14 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt float-sub object-emission blocker after the
+Close the integrated preopt double-div object-emission blocker after the
 selected integrated postopt object gate is clean and the integrated preopt
 pointer, volatile, optional, packed, struct, array, optional-payload,
 error-union-payload, slice-sum, aggregate-pair, float-less, float-mul, and
-float-add, and float-select rows are clean. The previous blocker,
-`releasefast_runtime_float_select`, now object-emits and links/runs through
-the preopt path with selected `f64` select wrapper lowering. The next measured
-blocker is `releasefast_runtime_float_sub` in the
+float-add, float-select, and float-sub rows are clean. The previous blocker,
+`releasefast_runtime_float_sub`, now object-emits and links/runs through the
+preopt path with selected `f32` subtract wrapper lowering. The next measured
+blocker is `releasefast_runtime_double_div` in the
 integrated preopt path, where z_llvm optimization plus object emission fails
 with `UnsupportedCodegenCallingConvention`.
 
@@ -47,8 +47,8 @@ now covers `float_mul(a: f64, b: f64) f64` from the same fixture. The next
 `releasefast_runtime_float_select` row covers
 `float_select(a: f64, b: f64, flag: bool) f64` from
 `test/zig/inputs/floats_math.zig`. The external-writer completed
-`releasefast_runtime_float_sub` row covers
-`float_sub(a: f32, b: f32) f32`, and the completed
+`releasefast_runtime_float_sub` row now covers
+`float_sub(a: f32, b: f32) f32`, and the next
 `releasefast_runtime_double_div` row covers
 `double_div(a: f64, b: f64) f64` from
 `test/zig/inputs/fp_extended_ops.zig`. The completed
@@ -258,8 +258,8 @@ slice is the residual loop-index advance in block `%187`.
 
 LLVM fallback removed or reduced:
 Reduce the integrated preopt object-emission gap for the selected
-ReleaseFast `f32` subtract row. The current failing wrapper is
-`test/zig/integrated/runtime_float_sub_main.zig`, paired with
+ReleaseFast `f64` divide row. The current failing wrapper is
+`test/zig/integrated/runtime_double_div_main.zig`, paired with
 `test/zig/inputs/fp_extended_ops.zig`, after patched Zig writes preopt IR,
 z_llvm runs the ReleaseFast accepted pipeline, and z_llvm attempts local
 x86_64 object emission.
@@ -305,7 +305,11 @@ float row lowers in
 `test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll` to
 `fp_extended_ops.float_sub(float %0, float %1)` with
 `%3 = fsub float %0, %1` and `ret float %3`; the integrated wrapper checks
-`floatSub(5.0, 2.0) == 3.0` and returns 0 on success.
+`floatSub(5.0, 2.0) == 3.0` and returns 0 on success, and is now covered by
+`releasefast_runtime_float_sub`. The next selected row lowers in the same
+fixture to `fp_extended_ops.double_div(double %0, double %1)` with
+`%3 = fdiv double %0, %1` and `ret double %3`; the integrated wrapper checks
+`doubleDiv(6.0, 2.0) == 3.0` and returns 0 on success.
 The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll`
 to `llvm.sadd.with.overflow.i32`, an overflow branch to
@@ -598,30 +602,33 @@ selected blocker is integrated preopt `releasefast_runtime_float_select`,
 which fails object emission with `UnsupportedCodegenCallingConvention`; that
 row now passes through the preopt path with selected wrapper lowering. The
 next selected blocker is integrated preopt `releasefast_runtime_float_sub`,
+which fails object emission with `UnsupportedCodegenCallingConvention`; that
+row now passes through the preopt path with selected wrapper lowering. The
+next selected blocker is integrated preopt `releasefast_runtime_double_div`,
 which fails object emission with `UnsupportedCodegenCallingConvention`.
 
-Completed float-select mapping:
-`runtime_float_select_main.main` calls the selected `fastcc` helper with
-`double 4.000000e+00`, `double 5.000000e+00`, and `i1 true`, compares the
-result with `double 4.000000e+00`, selects `i32 0` on equality and `i32 1`
-otherwise, and returns the source-level executable result. The private helper
-remains covered by the selected `select i1` over two double arguments.
+Completed float-sub mapping:
+`runtime_float_sub_main.main` calls the selected `fastcc` helper with
+`float 5.000000e+00` and `float 2.000000e+00`, compares the result with
+`float 3.000000e+00`, selects `i32 0` on equality and `i32 1` otherwise,
+and returns the source-level executable result. The private helper remains
+covered by the selected `fsub float` lowering.
 
 Known boundary:
-Only the selected integrated preopt `f32` subtract wrapper object-emission
-blocker: `releasefast_runtime_float_sub`.
+Only the selected integrated preopt `f64` divide wrapper object-emission
+blocker: `releasefast_runtime_double_div`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
 relocations, and broad object/linker behavior remain out of scope.
 
 Validation gate:
 Focused gate:
-`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_float_sub`
+`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_double_div`
 Then run `zig build distribution-zig-integrated-preopt` and promote the first
 sorted follow-on blocker into this file.
 
 Commit:
-Commit the selected integrated preopt float-select closure and float-sub
+Commit the selected integrated preopt float-sub closure and double-div
 handoff with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
