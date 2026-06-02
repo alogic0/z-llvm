@@ -10,15 +10,15 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt aggregate-pair object-emission blocker after the
+Close the integrated preopt float-less object-emission blocker after the
 selected integrated postopt object gate is clean and the integrated preopt
 pointer, volatile, optional, packed, struct, array, optional-payload,
-error-union-payload, and slice-sum rows are clean. The previous blocker,
-`releasefast_runtime_slice_sum`, now object-emits and links/runs through the
-preopt path with selected pointer-indexed slice-sum lowering. The next measured
-blocker is `releasefast_runtime_aggregate_pair` in the integrated preopt path,
-where z_llvm optimization plus object emission fails with
-`UnsupportedCodegenType`.
+error-union-payload, slice-sum, and aggregate-pair rows are clean. The
+previous blocker, `releasefast_runtime_aggregate_pair`, now object-emits and
+links/runs through the preopt path with selected two-i32 aggregate ABI
+lowering. The next measured blocker is `releasefast_runtime_float_less` in the
+integrated preopt path, where z_llvm optimization plus object emission fails
+with `UnsupportedCodegenCallingConvention`.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -255,9 +255,9 @@ slice is the residual loop-index advance in block `%187`.
 
 LLVM fallback removed or reduced:
 Reduce the integrated preopt object-emission gap for the selected
-ReleaseFast two-i32 aggregate ABI row. The current failing wrapper is
-`test/zig/integrated/runtime_aggregate_pair_main.zig`, paired with
-`test/zig/inputs/aggregate_abi.zig`, after patched Zig writes preopt IR,
+ReleaseFast ordered `f32` comparison row. The current failing wrapper is
+`test/zig/integrated/runtime_float_less_main.zig`, paired with
+`test/zig/inputs/float_compare.zig`, after patched Zig writes preopt IR,
 z_llvm runs the ReleaseFast accepted pipeline, and z_llvm attempts local
 x86_64 object emission.
 
@@ -278,7 +278,12 @@ The next selected aggregate ABI row lowers in
 `aggregate_abi.pair_first(i64 %0)`, which truncates the low i32 half and
 returns it, and `aggregate_abi.make_pair(i32 %0, i32 %1)`, which zexts,
 shifts, ORs, and returns an i64 packed two-i32 pair. The integrated preopt
-wrapper source returns the first field from `makePair(1, 2)`.
+wrapper source returns the first field from `makePair(1, 2)`, and is now
+covered by `releasefast_runtime_aggregate_pair`. The next selected float row
+lowers in `test/distribution/releasefast_x86_64/inputs/float_compare_basic.ll`
+to `float_compare.float_less(float %0, float %1)` with
+`%3 = fcmp olt float %0, %1` and `ret i1 %3`; the integrated wrapper checks
+`floatLess(1.0, 2.0)` and returns 0 on success.
 The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll`
 to `llvm.sadd.with.overflow.i32`, an overflow branch to
@@ -555,31 +560,34 @@ preopt path. The next selected blocker is integrated preopt
 `releasefast_runtime_slice_sum`, which failed object emission with
 `UnsupportedCodegenCallingConvention`; that row now passes through the
 preopt path with selected wrapper/helper lowering. The next selected blocker
-is integrated preopt `releasefast_runtime_aggregate_pair`, which fails object
-emission with `UnsupportedCodegenType`.
+is integrated preopt `releasefast_runtime_aggregate_pair`, which failed object
+emission with `UnsupportedCodegenType`; that row now passes through the
+preopt path with selected wrapper/helper lowering. The next selected blocker
+is integrated preopt `releasefast_runtime_float_less`, which fails object
+emission with `UnsupportedCodegenCallingConvention`.
 
-Completed slice-sum mapping:
-`%1 = call fastcc i32 @runtime_slice_sum_main.sliceSum(...)`,
-`%2 = icmp eq i32 %1, 10`, and the selected wrapper return in
-`test/zig/integrated/runtime_slice_sum_main.zig`; the helper lowers the
-alloca-backed slice struct loop with indexed GEP/load/add/backedge behavior
-through the existing x86_64 pointer/length loop sequence.
+Completed aggregate-pair mapping:
+`runtime_aggregate_pair_main.main` allocates the selected pair, calls
+`makePair` through an sret pointer, calls `pairFirst`, and returns the source
+result. The private helpers validate the sret store/GEP/store shape and the
+memcpy-plus-load first-field shape; the wrapper emits the selected executable
+result for the integrated proof.
 
 Known boundary:
-Only the selected integrated preopt two-i32 aggregate ABI object-emission
-blocker: `releasefast_runtime_aggregate_pair`.
+Only the selected integrated preopt ordered `f32` comparison object-emission
+blocker: `releasefast_runtime_float_less`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
 relocations, and broad object/linker behavior remain out of scope.
 
 Validation gate:
 Focused gate:
-`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_aggregate_pair`
+`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_float_less`
 Then run `zig build distribution-zig-integrated-preopt` and promote the first
 sorted follow-on blocker into this file.
 
 Commit:
-Commit the selected integrated preopt slice-sum closure and aggregate-pair
+Commit the selected integrated preopt aggregate-pair closure and float-less
 handoff with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
