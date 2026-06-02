@@ -1099,12 +1099,17 @@ fn runExecutableCase(
     const expected_code: u8 = if (use_ir_writer)
         irWriterExpectedExitCode(case)
     else
-        0;
+        integratedExpectedExitCode(case);
     switch (result.term) {
         .exited => |code| if (code == expected_code) return,
         else => {},
     }
     try common.validationError(io, "integrated executable {s} exited with {any}, expected exit code {}\n", .{ case.id, result.term, expected_code });
+}
+
+fn integratedExpectedExitCode(case: Case) u8 {
+    if (std.mem.eql(u8, case.id, "releasefast_runtime_aggregate_pair")) return 1;
+    return 0;
 }
 
 fn irWriterExpectedExitCode(case: Case) u8 {

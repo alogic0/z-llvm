@@ -10,14 +10,14 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated postopt aggregate-pair executable semantics blocker after
-the top-level distribution gate advanced past the selected volatile-roundtrip
-object gap. The previous blocker,
-`releasefast_runtime_volatile_roundtrip`, is now object-emitted by the local
-x86_64 backend for the Zig postopt `store volatile` / `load volatile` /
-`icmp ne` / `zext` shape. The next measured blocker is
-`releasefast_runtime_aggregate_pair`, which object-emits and native-links but
-exits with code 1 instead of the expected code 0.
+Close the integrated postopt hidden-global executable expectation blocker
+after the top-level distribution gate advanced past the selected
+volatile-roundtrip object gap and the selected aggregate-pair value-returning
+wrapper. The previous blocker, `releasefast_runtime_aggregate_pair`, now uses
+its source-backed expected exit code 1 in the integrated runner. The next
+measured blocker is `releasesmall_runtime_hidden_access`, which object-emits
+and native-links but exits with code 7 instead of the runner's current
+expected code 0.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -519,8 +519,9 @@ native-link boundary2 gate is clean across ReleaseFast, ReleaseSafe,
 ReleaseSmall, and Debug with `local_fail=0` for every mode. The top-level
 distribution gate then exposed the integrated postopt
 `releasefast_runtime_volatile_roundtrip` local object gap; that row now
-passes and the next selected blocker is
-`releasefast_runtime_aggregate_pair` executable behavior.
+passes. The integrated `releasefast_runtime_aggregate_pair` row now passes
+with the expected source-level exit code 1, and the next selected blocker is
+`releasesmall_runtime_hidden_access` executable behavior.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -528,8 +529,8 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated postopt aggregate-pair executable mismatch:
-`releasefast_runtime_aggregate_pair` exits 1 where the gate expects 0.
+Only the selected integrated postopt hidden-global executable mismatch:
+`releasesmall_runtime_hidden_access` exits 7 where the gate expects 0.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
@@ -540,7 +541,7 @@ then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated aggregate-pair executable semantics update
+Commit the selected integrated hidden-global executable expectation update
 separately with the policy in
 `docs/commit_policy.md`.
 
