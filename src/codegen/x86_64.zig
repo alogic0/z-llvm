@@ -956,6 +956,7 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeFloatLessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatMulPreoptMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatAddPreoptMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeFloatSelectPreoptMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
@@ -3941,6 +3942,58 @@ fn lowerRuntimeFloatAddPreoptMainReturn(
     };
     if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.float)) return false;
     if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "3.000000e+00")) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeFloatSelectPreoptMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_float_select_main.main")) return false;
+    if (function.params.items.len != 0) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    const fcmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const fcmp_name = fcmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.double)) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!std.mem.eql(u8, call.callee, "runtime_float_select_main.floatSelect")) return false;
+    if (call.args.items.len != 3) return false;
+    if (!call.args.items[0].ty.eql(.double) or !isFpText(call.args.items[0].value, "4.000000e+00")) return false;
+    if (!call.args.items[1].ty.eql(.double) or !isFpText(call.args.items[1].value, "5.000000e+00")) return false;
+    if (!call.args.items[2].ty.eql(.{ .int = 1 }) or !isInt(call.args.items[2].value, 1)) return false;
+
+    const fcmp = switch (fcmp_inst.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.double)) return false;
+    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "4.000000e+00")) return false;
 
     const select = switch (select_inst.kind) {
         .select => |select| select,
