@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=52 executable_ok=52 link_only_ok=0 local_fail=0
+ir-writer full set:    total=53 executable_ok=53 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer condbr:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -413,6 +413,10 @@ ir-writer phi merge:   zig build distribution-zig-ir-writer -- --case=releasefas
 ir-writer phi merge:   total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer loop sum:    zig build distribution-zig-ir-writer -- --case=releasefast_runtime_loop_sum
 ir-writer loop sum:    total=1 executable_ok=1 link_only_ok=0 local_fail=0
+ir-writer releasesafe loop sum:
+                       zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_loop_sum
+ir-writer releasesafe loop sum:
+                       total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer switch:      zig build distribution-zig-ir-writer -- --case=releasefast_runtime_switch
 ir-writer switch:      total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer releasesafe branch mix:
@@ -537,13 +541,14 @@ ir-writer releasesafe slice sum:
                        zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_slice_sum
 ir-writer releasesafe slice sum:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=52 minimal_wrapper_rows=0
+ir-writer full set:    scalar_runtime_rows=53 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=2
                        i64-arithmetic=1 i64-call-return=1
                        table-indexed-load=1
                        checked-add-runtime-boundary=1 runtime-condbr=1
                        runtime-phi-merge=1 runtime-loop-sum=1
+                       checked-loop-sum-boundary=1
                        runtime-switch=1 checked-branch-mix-boundary=1
                        global-update=1
                        pointer-load-store=1 volatile-roundtrip=1
@@ -632,12 +637,12 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 52/52 selected rows as runtime surfaces:
+The external writer now emits 53/53 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
 `runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`,
-`checked-branch-mix-boundary`, and
+`checked-loop-sum-boundary`, `checked-branch-mix-boundary`, and
 `global-update`, `pointer-load-store`, `volatile-roundtrip`,
 `optional-pointer`, `packed-read-flag`, `packed-replace-low`,
 `abi-arg-call`, `tls-read`, `tls-bump`, `atomic-add`,

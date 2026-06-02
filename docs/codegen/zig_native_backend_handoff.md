@@ -92,8 +92,8 @@ optimizer/object path. Runtime writer rows now cover
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr`,
-`runtime-phi-merge`, `runtime-loop-sum`, `runtime-switch`,
-`checked-branch-mix-boundary`, `global-update`,
+`runtime-phi-merge`, `runtime-loop-sum`, `checked-loop-sum-boundary`,
+`runtime-switch`, `checked-branch-mix-boundary`, `global-update`,
 `pointer-load-store`, `volatile-roundtrip`, `optional-pointer`,
 `packed-read-flag`, `packed-replace-low`, `abi-arg-call`,
 `i64-call-return`, `tls-read`, `tls-bump`, `atomic-add`,
@@ -105,7 +105,8 @@ optimizer/object path. Runtime writer rows now cover
 `checked-comptime-const-boundary`, `checked-global-update-boundary`,
 `checked-pointer-load-store-boundary`, `checked-call-chain-boundary`, and
 `checked-tls-bump-boundary`, `checked-array-sum-boundary`, and
-`checked-struct-sum-boundary`, and `checked-slice-loop-sum-boundary`; all 52
+`checked-struct-sum-boundary`, `checked-slice-loop-sum-boundary`, and
+`checked-loop-sum-boundary`; all 53
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with

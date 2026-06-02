@@ -158,16 +158,19 @@ body, and an integer-overflow panic edge and is now covered by
 `control_flow_calls.loop_sum(count: i32) i32` under ReleaseSafe, which appears
 in captured ReleaseSafe x86_64 IR as a counted loop with phi values, checked
 `llvm.sadd.with.overflow.i32` operations, integer-overflow panic edges, and
-the selected integer-out-of-bounds panic edge.
+the selected integer-out-of-bounds panic edge and is now covered by
+`releasesafe_runtime_loop_sum`. The next source-backed shape is
+`globals_comptime.read_global() i32` under ReleaseSafe, which appears in
+captured ReleaseSafe x86_64 IR as a private global `i32` load and direct
+return through the ReleaseSafe accepted pipeline.
 
 LLVM fallback removed or reduced:
 Reduce the remaining external writer gap for selected ReleaseSafe checked
-control-flow loop arithmetic after the checked slice-sum row: emit
-`control_flow_calls.loop_sum` with loop phis, checked add operations, and
-selected Zig integer-overflow and integer-out-of-bounds panic edges, plus a C ABI executable proof for the
-non-overflow path. Do not claim broad ReleaseSafe panic semantics, arbitrary
-checked arithmetic, all aggregate ABI lowering, runtime ownership, or all
-safety paths.
+global-load coverage after the checked loop-sum row: emit
+`globals_comptime.read_global` under the ReleaseSafe accepted pipeline, plus a
+C ABI executable proof for the loaded value. Do not claim broad ReleaseSafe
+runtime semantics, arbitrary global initialization, linker/runtime ownership,
+or all safety paths.
 
 Mode/target/stage row:
 ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -246,9 +249,13 @@ and loop-exit branch to the final sum and is now covered by
 `test/distribution/releasesafe_x86_64/inputs/control_flow_calls_checked.ll` to
 `control_flow_calls.loop_sum` with counted-loop phi values, checked add
 operations in the loop body, integer-overflow panic edges, and the selected
-integer-out-of-bounds panic edge.
+integer-out-of-bounds panic edge and is now covered by
+`releasesafe_runtime_loop_sum`. The next selected row lowers in
+`test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll` to
+`globals_comptime.read_global` with `load i32, ptr @globals_comptime.global_counter`
+and direct `ret i32`.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected ReleaseSafe checked loop-sum shape.
+behavior beyond the selected ReleaseSafe read-global shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -256,20 +263,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected counted loop-sum with checked add and selected panic edges
-stubbed for non-overflow executable proof. Broad
-ReleaseSafe runtime semantics, all panic functions, arbitrary checked
-arithmetic, aggregate ABI generalization, and runtime ownership remain out of
-scope.
+Only selected ReleaseSafe direct private-global load with executable proof.
+Broad ReleaseSafe runtime semantics, arbitrary global initialization, linker
+runtime ownership, and all safety paths remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_loop_sum`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_read_global`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe checked loop-sum slice
+Commit the selected ReleaseSafe read-global slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -309,11 +314,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 52-row
+also passes: the first ReleaseFast tiny-scalar row and the full 53-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 52 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 53 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -334,7 +339,8 @@ add-immediate return row, plus the selected ReleaseSafe checked add-immediate,
 checked comptime-const, checked global-update, and checked pointer-load/store
 panic-edge rows, plus the selected checked branch-mix and checked call-chain
 rows, selected checked TLS bump row, selected checked array-sum row, and
-selected checked struct-sum row, and selected checked slice-sum row. Broad
+selected checked struct-sum row, selected checked slice-sum row, and selected
+checked loop-sum row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -383,13 +389,14 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=52 executable_ok=52 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=52 minimal_wrapper_rows=0
+             full set total=53 executable_ok=53 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=53 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
              checked-add-runtime-boundary=1 runtime-condbr=1
              runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1
+             checked-loop-sum-boundary=1
              global-update=1 pointer-load-store=1 volatile-roundtrip=1
              optional-pointer=1 packed-read-flag=1 abi-arg-call=1
              packed-replace-low=1 tls-read=1 tls-bump=1 atomic-add=1
