@@ -20,10 +20,11 @@ ReleaseSafe checked add-immediate boundary, ReleaseSafe checked comptime
 constant multiply boundary, ReleaseSafe checked global update boundary, pointer
 load/store/volatile-roundtrip/optional-pointer, ReleaseSafe checked pointer
 load/store boundary, ReleaseSafe checked branch-mix boundary, ReleaseSafe
-checked call-chain boundary, packed bitfield, extern-struct
+checked call-chain boundary, ReleaseSafe checked TLS bump boundary, packed
+bitfield, extern-struct
 field-load, scalarized array-sum, optional scalar payload, error-union
 payload, and pointer-indexed slice-sum surfaces: a source-backed x86_64
-ReleaseSafe checked TLS bump row.
+ReleaseSafe checked array-sum row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -139,16 +140,20 @@ by `releasesafe_runtime_call_chain`. The next source-backed shape is
 `tls_concurrency.bump_tls(value: i32) i32` under ReleaseSafe, which appears in
 captured ReleaseSafe x86_64 IR as a local-exec TLS load, checked add with
 `llvm.sadd.with.overflow.i32`, overflow panic edge, TLS store, and returned
-updated value.
+updated value and is now covered by `releasesafe_runtime_tls_bump`. The next
+source-backed shape is `aggregates.array_sum(a: i32, b: i32, c: i32) i32`
+under ReleaseSafe, which appears in captured ReleaseSafe x86_64 IR as two
+checked `llvm.sadd.with.overflow.i32` operations and two integer-overflow
+panic edges.
 
 LLVM fallback removed or reduced:
-Reduce the remaining external writer gap for selected ReleaseSafe checked TLS
-arithmetic after the checked call-chain row: emit `tls_concurrency.bump_tls`
-with local-exec TLS load, checked add, non-overflow TLS store, and selected
-Zig integer-overflow panic edge, plus a C ABI executable proof through the
-stable alias main path. Do not claim broad ReleaseSafe panic semantics,
-arbitrary checked arithmetic, dynamic TLS, runtime ownership, or all safety
-paths.
+Reduce the remaining external writer gap for selected ReleaseSafe checked
+aggregate/scalarized arithmetic after the checked TLS bump row: emit
+`aggregates.array_sum` with two checked add operations and selected Zig
+integer-overflow panic edges, plus a C ABI executable proof for the
+non-overflow path. Do not claim broad ReleaseSafe panic semantics, arbitrary
+checked arithmetic, all aggregate ABI lowering, runtime ownership, or all
+safety paths.
 
 Mode/target/stage row:
 ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -208,9 +213,14 @@ non-overflow result construction with `shl nsw i32 %0, 1` and
 `test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll` to a
 private `thread_local` `@tls_concurrency.tls_counter`, TLS load,
 `llvm.sadd.with.overflow.i32`, overflow panic edge, non-overflow TLS store,
-and `ret i32` of the updated value.
+and `ret i32` of the updated value and is now covered by
+`releasesafe_runtime_tls_bump`. The next selected row lowers in
+`test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll` to
+`aggregates.array_sum` with checked add of `%0 + %1`, overflow branch, checked
+add of that result plus `%2`, a second overflow branch, and `ret i32` of the
+second extractvalue result.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected ReleaseSafe checked TLS bump shape.
+behavior beyond the selected ReleaseSafe checked array-sum shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -218,19 +228,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected local-exec TLS checked add/store with integer-overflow panic
-edge stubbed for non-overflow executable proof. Broad ReleaseSafe runtime
-semantics, all panic functions, arbitrary checked arithmetic, dynamic TLS,
-thread runtime behavior, and runtime ownership remain out of scope.
+Only selected scalarized three-argument array-sum checked adds with
+integer-overflow panic edges stubbed for non-overflow executable proof. Broad
+ReleaseSafe runtime semantics, all panic functions, arbitrary checked
+arithmetic, aggregate ABI generalization, and runtime ownership remain out of
+scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_bump`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_array_sum`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe checked TLS bump slice
+Commit the selected ReleaseSafe checked array-sum slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -270,11 +281,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 48-row
+also passes: the first ReleaseFast tiny-scalar row and the full 49-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 48 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 49 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -294,7 +305,7 @@ literal-return row, selected comptime constant multiply row, and selected
 add-immediate return row, plus the selected ReleaseSafe checked add-immediate,
 checked comptime-const, checked global-update, and checked pointer-load/store
 panic-edge rows, plus the selected checked branch-mix and checked call-chain
-rows. Broad
+rows and selected checked TLS bump row. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -343,8 +354,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=48 executable_ok=48 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=48 minimal_wrapper_rows=0
+             full set total=49 executable_ok=49 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=49 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -367,6 +378,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              checked-pointer-load-store-boundary=1
              checked-branch-mix-boundary=1
              checked-call-chain-boundary=1
+             checked-tls-bump-boundary=1
              minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0

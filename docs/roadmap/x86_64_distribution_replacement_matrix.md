@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=48 executable_ok=48 link_only_ok=0 local_fail=0
+total=49 executable_ok=49 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -459,7 +459,8 @@ releasesafe_comptime_const_gate=zig build distribution-zig-ir-writer -- --case=r
 releasesafe_global_update_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_global_update
 releasesafe_pointer_load_store_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_pointer_load_store
 releasesafe_call_chain_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_call_chain
-ir_writer_rows=scalar_runtime_rows=48, minimal_wrapper_rows=0
+releasesafe_tls_bump_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_bump
+ir_writer_rows=scalar_runtime_rows=49, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -486,6 +487,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                checked-global-update-boundary=1,
                checked-pointer-load-store-boundary=1,
                checked-call-chain-boundary=1,
+               checked-tls-bump-boundary=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -549,6 +551,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         checked-pointer-load-store-boundary,
                         releasesafe_runtime_call_chain
                         checked-call-chain-boundary,
+                        releasesafe_runtime_tls_bump
+                        checked-tls-bump-boundary,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,

@@ -278,6 +278,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) {
         try writeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) {
+        try writeReleaseSafeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) {
         try writeRuntimeAtomicAddIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) {
@@ -355,6 +357,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) return "checked-call-chain-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) return "checked-tls-bump-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) return "inline-asm-barrier";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) return "aggregate-pair-abi";
@@ -1397,6 +1400,47 @@ fn writeRuntimeTlsBumpIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime TLS bump external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeTlsBumpIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@tls_concurrency.tls_counter = internal thread_local(localexec) global i32 1, align 4
+        \\@main = alias i32 (i32), ptr @tls_concurrency.bump_tls
+        \\@bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define private i32 @tls_concurrency.bump_tls(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  %current = load i32, ptr @tls_concurrency.tls_counter, align 4
+        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
+        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
+        \\  br i1 %overflow, label %panic, label %ok
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\ok:
+        \\  %updated = extractvalue {{ i32, i1 }} %checked, 0
+        \\  store i32 %updated, ptr @tls_concurrency.tls_counter, align 4
+        \\  ret i32 %updated
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime TLS bump external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
