@@ -17,11 +17,11 @@ selected inline-asm memory barrier, selected small aggregate ABI, selected
 float compare/multiply/add/select/subtract/divide/remainder/literal-return,
 selected comptime constant multiply, selected add-immediate return,
 ReleaseSafe checked add-immediate boundary, ReleaseSafe checked comptime
-constant multiply boundary, pointer
+constant multiply boundary, ReleaseSafe checked global update boundary, pointer
 load/store/volatile-roundtrip/optional-pointer, packed bitfield, extern-struct
 field-load, scalarized array-sum, optional scalar payload, error-union
 payload, and pointer-indexed slice-sum surfaces: a source-backed x86_64
-ReleaseSafe checked global update row.
+ReleaseSafe checked pointer load/store row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -118,16 +118,22 @@ integer-overflow panic edge and is now covered by
 appears in captured ReleaseSafe x86_64 IR as a private `i32` global load,
 checked add with `llvm.sadd.with.overflow.i32`, overflow branch to the same
 integer-overflow panic edge, non-overflow store back to the private global,
-and returned updated value.
+and returned updated value and is now covered by
+`releasesafe_runtime_global_update`. The next source-backed shape is
+`pointers_memory.load_store(p: *i32, q: *i32) i32` under ReleaseSafe, which
+appears in captured ReleaseSafe x86_64 IR as an `i32` pointer load, checked
+add-one with `llvm.sadd.with.overflow.i32`, overflow branch to the same
+integer-overflow panic edge, non-overflow pointer store, and returned updated
+value.
 
 LLVM fallback removed or reduced:
 Reduce the remaining external writer gap for selected ReleaseSafe checked
-stateful arithmetic after the checked add-immediate and checked comptime-const
-rows: emit `globals_comptime.update_global` as private global load, checked
-add, non-overflow store, and selected Zig integer-overflow panic edge, plus a
-C ABI executable proof for the non-overflow path. Do not claim broad
-ReleaseSafe panic semantics, arbitrary checked arithmetic, runtime ownership,
-or all safety paths.
+pointer memory arithmetic after the checked global update row: emit
+`pointers_memory.load_store` as pointer load, checked add-one, non-overflow
+pointer store, and selected Zig integer-overflow panic edge, plus a C ABI
+executable proof for the non-overflow path. Do not claim broad ReleaseSafe
+panic semantics, arbitrary checked arithmetic, alias analysis, volatile memory,
+runtime ownership, or all safety paths.
 
 Mode/target/stage row:
 ReleaseSafe / x86_64-linux-gnu / external IR writer -> accepted optimizer
@@ -167,9 +173,14 @@ represented by Zig's `globals_comptime` fixture. The next selected row lowers
 in the same file to private global load from
 `@globals_comptime.global_counter`, `llvm.sadd.with.overflow.i32`, overflow
 branch to the same panic edge, non-overflow `store i32` back to the private
-global, and `ret i32` of the updated value.
+global, and `ret i32` of the updated value and is now covered by
+`releasesafe_runtime_global_update`. The next selected row lowers in
+`test/distribution/releasesafe_x86_64/inputs/pointers_memory_checked.ll` to
+`load i32, ptr %0`, `llvm.sadd.with.overflow.i32(i32 %3, i32 1)`, an overflow
+branch to the same panic edge, non-overflow `store i32 %8, ptr %1`, and
+`ret i32 %8`.
 Record more precise upstream files if the slice needs optimizer/codegen
-behavior beyond the selected ReleaseSafe checked global update shape.
+behavior beyond the selected ReleaseSafe checked pointer load/store shape.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -177,19 +188,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only selected private `i32` global checked add/store with the integer-overflow
-panic edge stubbed for non-overflow executable proof. Broad ReleaseSafe runtime
-semantics, all panic functions, arbitrary checked arithmetic, data layout
-generalization, and runtime ownership remain out of scope.
+Only selected `i32` pointer load, checked add-one, and pointer store with the
+integer-overflow panic edge stubbed for non-overflow executable proof. Broad
+ReleaseSafe runtime semantics, all panic functions, arbitrary checked
+arithmetic, volatile memory, aliasing semantics, and runtime ownership remain
+out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_global_update`
+`zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_pointer_load_store`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSafe checked global update slice
+Commit the selected ReleaseSafe checked pointer load/store slice
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -229,11 +241,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 44-row
+also passes: the first ReleaseFast tiny-scalar row and the full 45-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 44 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 45 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -250,8 +262,8 @@ selected ordered `f32` less-than row, selected `f64` multiply row, selected
 `f32` add row, selected `f64` select row, selected `f32` subtract row, and
 selected `f64` divide row, selected `f32` remainder row, and selected f32/f64
 literal-return row, selected comptime constant multiply row, and selected
-add-immediate return row, plus the selected ReleaseSafe checked add-immediate
-and checked comptime-const panic-edge rows. Broad
+add-immediate return row, plus the selected ReleaseSafe checked add-immediate,
+checked comptime-const, and checked global-update panic-edge rows. Broad
 native-link probes are link-only evidence: every current ReleaseFast,
 ReleaseSafe, ReleaseSmall, and Debug row is accepted, accounted for by an exact
 Zig runtime/TLS/compiler-rt category, or explicitly excluded as a documented
@@ -300,8 +312,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=44 executable_ok=44 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=44 minimal_wrapper_rows=0
+             full set total=45 executable_ok=45 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=45 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=2
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -320,6 +332,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1
+             checked-global-update-boundary=1
              minimal-ret0=0
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0

@@ -234,6 +234,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
         try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) {
+        try writeReleaseSafeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) {
         try writeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) {
@@ -325,6 +327,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) return "checked-global-update-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) return "volatile-roundtrip";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
@@ -621,6 +624,46 @@ fn writeRuntimeGlobalUpdateIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeGlobalUpdateIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@globals_comptime.global_counter = private global i32 3, align 4
+        \\@main = alias i32 (i32), ptr @globals_comptime.update_global
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define private i32 @globals_comptime.update_global(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  %current = load i32, ptr @globals_comptime.global_counter, align 4
+        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
+        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
+        \\  br i1 %overflow, label %panic, label %ok
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\ok:
+        \\  %updated = extractvalue {{ i32, i1 }} %checked, 0
+        \\  store i32 %updated, ptr @globals_comptime.global_counter, align 4
+        \\  ret i32 %updated
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

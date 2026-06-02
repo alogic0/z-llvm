@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=44 executable_ok=44 link_only_ok=0 local_fail=0
+total=45 executable_ok=45 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -455,7 +455,8 @@ comptime_const_gate=zig build distribution-zig-ir-writer -- --case=releasefast_r
 debug_location_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_debug_location
 releasesafe_debug_location_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_debug_location
 releasesafe_comptime_const_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_comptime_const
-ir_writer_rows=scalar_runtime_rows=44, minimal_wrapper_rows=0
+releasesafe_global_update_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_global_update
+ir_writer_rows=scalar_runtime_rows=45, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -478,6 +479,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                add-imm-return=1,
                checked-add-imm-boundary=1,
                checked-comptime-const-boundary=1,
+               checked-global-update-boundary=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -533,6 +535,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         checked-add-imm-boundary,
                         releasesafe_runtime_comptime_const
                         checked-comptime-const-boundary,
+                        releasesafe_runtime_global_update
+                        checked-global-update-boundary,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,
