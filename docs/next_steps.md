@@ -10,13 +10,13 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt float-less object-emission blocker after the
+Close the integrated preopt float-mul object-emission blocker after the
 selected integrated postopt object gate is clean and the integrated preopt
 pointer, volatile, optional, packed, struct, array, optional-payload,
-error-union-payload, slice-sum, and aggregate-pair rows are clean. The
-previous blocker, `releasefast_runtime_aggregate_pair`, now object-emits and
-links/runs through the preopt path with selected two-i32 aggregate ABI
-lowering. The next measured blocker is `releasefast_runtime_float_less` in the
+error-union-payload, slice-sum, aggregate-pair, and float-less rows are clean.
+The previous blocker, `releasefast_runtime_float_less`, now object-emits and
+links/runs through the preopt path with selected ordered `f32` comparison
+lowering. The next measured blocker is `releasefast_runtime_float_mul` in the
 integrated preopt path, where z_llvm optimization plus object emission fails
 with `UnsupportedCodegenCallingConvention`.
 
@@ -255,8 +255,8 @@ slice is the residual loop-index advance in block `%187`.
 
 LLVM fallback removed or reduced:
 Reduce the integrated preopt object-emission gap for the selected
-ReleaseFast ordered `f32` comparison row. The current failing wrapper is
-`test/zig/integrated/runtime_float_less_main.zig`, paired with
+ReleaseFast `f64` multiply row. The current failing wrapper is
+`test/zig/integrated/runtime_float_mul_main.zig`, paired with
 `test/zig/inputs/float_compare.zig`, after patched Zig writes preopt IR,
 z_llvm runs the ReleaseFast accepted pipeline, and z_llvm attempts local
 x86_64 object emission.
@@ -283,7 +283,11 @@ covered by `releasefast_runtime_aggregate_pair`. The next selected float row
 lowers in `test/distribution/releasefast_x86_64/inputs/float_compare_basic.ll`
 to `float_compare.float_less(float %0, float %1)` with
 `%3 = fcmp olt float %0, %1` and `ret i1 %3`; the integrated wrapper checks
-`floatLess(1.0, 2.0)` and returns 0 on success.
+`floatLess(1.0, 2.0)` and returns 0 on success, and is now covered by
+`releasefast_runtime_float_less`. The next selected float row lowers in the
+same fixture to `float_compare.float_mul(double %0, double %1)` with
+`%3 = fmul double %0, %1` and `ret double %3`; the integrated wrapper checks
+`floatMul(3.0, 2.0) == 6.0` and returns 0 on success.
 The next selected row lowers in
 `test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll`
 to `llvm.sadd.with.overflow.i32`, an overflow branch to
@@ -564,30 +568,32 @@ is integrated preopt `releasefast_runtime_aggregate_pair`, which failed object
 emission with `UnsupportedCodegenType`; that row now passes through the
 preopt path with selected wrapper/helper lowering. The next selected blocker
 is integrated preopt `releasefast_runtime_float_less`, which fails object
-emission with `UnsupportedCodegenCallingConvention`.
+emission with `UnsupportedCodegenCallingConvention`; that row now passes
+through the preopt path with selected wrapper lowering. The next selected
+blocker is integrated preopt `releasefast_runtime_float_mul`, which fails
+object emission with `UnsupportedCodegenCallingConvention`.
 
-Completed aggregate-pair mapping:
-`runtime_aggregate_pair_main.main` allocates the selected pair, calls
-`makePair` through an sret pointer, calls `pairFirst`, and returns the source
-result. The private helpers validate the sret store/GEP/store shape and the
-memcpy-plus-load first-field shape; the wrapper emits the selected executable
-result for the integrated proof.
+Completed float-less mapping:
+`runtime_float_less_main.main` calls the selected `fastcc` helper with
+`float 1.000000e+00` and `float 2.000000e+00`, selects `i32 0` on true and
+`i32 1` on false, and returns the source-level executable result. The private
+helper remains covered by the selected `fcmp olt float` lowering.
 
 Known boundary:
-Only the selected integrated preopt ordered `f32` comparison object-emission
-blocker: `releasefast_runtime_float_less`.
+Only the selected integrated preopt `f64` multiply wrapper object-emission
+blocker: `releasefast_runtime_float_mul`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
 relocations, and broad object/linker behavior remain out of scope.
 
 Validation gate:
 Focused gate:
-`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_float_less`
+`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_float_mul`
 Then run `zig build distribution-zig-integrated-preopt` and promote the first
 sorted follow-on blocker into this file.
 
 Commit:
-Commit the selected integrated preopt aggregate-pair closure and float-less
+Commit the selected integrated preopt float-less closure and float-mul
 handoff with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
