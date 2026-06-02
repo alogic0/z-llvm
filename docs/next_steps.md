@@ -556,7 +556,10 @@ preopt path. The next selected blocker is integrated preopt
 `releasefast_runtime_optional_payload`, which failed object emission with
 `UnsupportedCodegenCallingConvention`; that row now passes through the
 preopt path. The next selected blocker is integrated preopt
-`releasefast_runtime_error_union_payload`, which fails object emission with
+`releasefast_runtime_error_union_payload`, which failed object emission with
+`UnsupportedCodegenCallingConvention`; that row now passes through the
+preopt path. The next selected blocker is integrated preopt
+`releasefast_runtime_slice_sum`, which fails object emission with
 `UnsupportedCodegenCallingConvention`.
 
 Completed error-union mapping:
@@ -565,8 +568,8 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated preopt error-union-payload calling-convention
-object emission blocker: `releasefast_runtime_error_union_payload`.
+Only the selected integrated preopt slice-sum calling-convention object
+emission blocker: `releasefast_runtime_slice_sum`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
 relocations, and broad object/linker behavior remain out of scope.
@@ -577,9 +580,8 @@ then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated preopt optional-payload closure and
-error-union-payload handoff separately with the policy in
-`docs/commit_policy.md`.
+Commit the selected integrated preopt error-union-payload closure and
+slice-sum handoff separately with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
 
