@@ -970,6 +970,7 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeSliceSumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeComptimeConstMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeDebugLocationMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerControlFlowCallsWriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
@@ -997,6 +998,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64ResidualPaddingCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualFinalMaskStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualPaddingLoopStepMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64DecodeExitStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualTableCheckStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualStoreStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -1037,6 +1039,48 @@ fn lowerSelectedI64ConstReturn(
     };
 
     try machine.instructions.append(allocator, .{ .mov_imm_rax = try i64Value(value) });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerControlFlowCallsWriterMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const call_inst = block.instructions.items[0];
+    const add_inst = block.instructions.items[1];
+    if (call_inst.removed or add_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const add_name = add_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(call.callee, "control_flow_calls.writer_callee")) return false;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(call.calling_conv);
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
+
+    const add = switch (add_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or add.flags.any()) return false;
+    if (!isNamed(add.lhs, call_name) or !isInt(add.rhs, 1)) return false;
+
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -4483,6 +4527,29 @@ fn validateBase64ResidualPaddingLoopIcmpNamed(instruction: ir.Instruction, predi
     if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = bits })) return null;
     if (!isNamed(icmp.lhs, lhs_name) or !isNamed(icmp.rhs, rhs_name)) return null;
     return result_name;
+}
+
+fn lowerBase64DecodeExitStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const count_arg = [_]ExpectedCallArg{.{ .ty = .ptr, .value = .{ .named = "@base64.decode_exit_count" } }};
+    const bits_arg = [_]ExpectedCallArg{.{ .ty = .ptr, .value = .{ .named = "@base64.decode_exit_bits" } }};
+    try validateVoidCall(block.instructions.items[0], "llvm.lifetime.end.p0", &count_arg);
+    try validateVoidCall(block.instructions.items[1], "llvm.lifetime.end.p0", &bits_arg);
+
+    if (!isInt(ret.value orelse return error.InvalidRet, 0)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerBase64PaddingTailStepMainReturn(

@@ -122,7 +122,8 @@ optimizer/object path. Runtime writer rows now cover
 `base64-residual-loop-advance-step`, and
 `base64-residual-padding-check-step`, and
 `base64-residual-final-mask-step`, and
-`base64-residual-padding-loop-step`; all 86
+`base64-residual-padding-loop-step`, and
+`base64-decode-exit-step`; all 87
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with

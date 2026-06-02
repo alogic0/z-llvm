@@ -380,6 +380,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) {
         try writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_exit_step")) {
+        try writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -482,6 +484,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_check_step")) return "base64-residual-padding-check-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_final_mask_step")) return "base64-residual-final-mask-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) return "base64-residual-padding-loop-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_exit_step")) return "base64-decode-exit-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -1596,6 +1599,29 @@ fn writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-padding-loop external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.decode_exit_bits = private unnamed_addr global i16 0, align 2
+        \\@base64.decode_exit_count = private unnamed_addr global i8 0, align 1
+        \\
+        \\declare void @llvm.lifetime.end.p0(ptr)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  call void @llvm.lifetime.end.p0(ptr @base64.decode_exit_count)
+        \\  call void @llvm.lifetime.end.p0(ptr @base64.decode_exit_bits)
+        \\  ret i32 0
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 decode-exit external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
