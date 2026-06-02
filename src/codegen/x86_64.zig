@@ -844,6 +844,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerBase64ResidualGuardStep(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerBase64PaddingLoopStep(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -4441,6 +4446,164 @@ fn validateBase64LoopAdvanceI64GlobalLoad(instruction: ir.Instruction, symbol_na
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
     if (!std.mem.eql(u8, symbol, symbol_name)) return null;
+    return result_name;
+}
+
+fn lowerBase64ResidualGuardStep(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const decode = function.blocks.items[1];
+    const done = function.blocks.items[2];
+    if (!std.mem.eql(u8, entry.name, "entry") or
+        !std.mem.eql(u8, decode.name, "decode") or
+        !std.mem.eql(u8, done.name, "done"))
+        return false;
+
+    if (entry.instructions.items.len != 10) return false;
+    const source_index_name = (try validateBase64ResidualGuardI64GlobalLoad(entry.instructions.items[0], "base64.residual_guard_source_index")) orelse return false;
+    const output_index_name = (try validateBase64ResidualGuardI64GlobalLoad(entry.instructions.items[1], "base64.residual_guard_output_index")) orelse return false;
+    const source_len_name = (try validateBase64ResidualGuardI64GlobalLoad(entry.instructions.items[2], "base64.residual_guard_source_len")) orelse return false;
+    const output_len_name = (try validateBase64ResidualGuardI64GlobalLoad(entry.instructions.items[3], "base64.residual_guard_output_len")) orelse return false;
+    const source_next_name = (try validateBase64ResidualGuardI64Add(entry.instructions.items[4], source_index_name, 4)) orelse return false;
+    const source_ok_name = (try validateBase64ResidualGuardI64IcmpUlt(entry.instructions.items[5], source_next_name, source_len_name)) orelse return false;
+    const output_next_name = (try validateBase64ResidualGuardI64Add(entry.instructions.items[6], output_index_name, 3)) orelse return false;
+    const output_ok_name = (try validateBase64ResidualGuardI64IcmpUlt(entry.instructions.items[7], output_next_name, output_len_name)) orelse return false;
+    const guard_name = (try validateBase64ResidualGuardSelect(entry.instructions.items[8], source_ok_name, output_ok_name)) orelse return false;
+    const src_ptr_name = (try validateBase64ResidualGuardSourceGep(entry.instructions.items[9], source_index_name)) orelse return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, guard_name)) return false;
+    if (!std.mem.eql(u8, condbr.then_target, decode.name) or !std.mem.eql(u8, condbr.else_target, done.name)) return false;
+
+    if (decode.instructions.items.len != 3) return false;
+    const byte_name = (try validateBase64ResidualGuardI8Load(decode.instructions.items[0], src_ptr_name)) orelse return false;
+    const byte_ok_name = (try validateBase64ResidualGuardI8Eq(decode.instructions.items[1], byte_name, 65)) orelse return false;
+    const ret_ok_name = (try validateBase64ResidualGuardReturnSelect(decode.instructions.items[2], byte_ok_name)) orelse return false;
+    const decode_ret = switch (decode.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!decode_ret.ty.eql(.{ .int = 32 }) or !isNamed(decode_ret.value orelse return error.InvalidRet, ret_ok_name)) return false;
+
+    if (done.instructions.items.len != 0) return false;
+    const done_ret = switch (done.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!done_ret.ty.eql(.{ .int = 32 }) or !isInt(done_ret.value orelse return error.InvalidRet, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ResidualGuardI64GlobalLoad(instruction: ir.Instruction, symbol_name: []const u8) !?[]const u8 {
+    if (instruction.removed) return null;
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier()) return null;
+    const symbol = switch (load.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, symbol_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardI64Add(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != .add or !binary.ty.eql(.{ .int = 64 }) or !binary.flags.nuw or binary.flags.nsw or binary.flags.exact or binary.flags.disjoint) return null;
+    if (!isNamed(binary.lhs, lhs_name) or !isInt(binary.rhs, rhs_value)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardI64IcmpUlt(instruction: ir.Instruction, lhs_name: []const u8, rhs_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .ult or !icmp.operand_ty.eql(.{ .int = 64 })) return null;
+    if (!isNamed(icmp.lhs, lhs_name) or !isNamed(icmp.rhs, rhs_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardSelect(instruction: ir.Instruction, source_ok_name: []const u8, output_ok_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return null,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 1 })) return null;
+    if (!isNamed(select.cond, source_ok_name) or !isNamed(select.true_value, output_ok_name) or !isInt(select.false_value, 0)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardSourceGep(instruction: ir.Instruction, source_index_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return null;
+    const symbol = switch (gep.ptr) {
+        .named => |name| blk: {
+            if (!std.mem.startsWith(u8, name, "@")) return null;
+            break :blk try globalSymbolName(name);
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    if (!std.mem.eql(u8, symbol, "base64.residual_guard_source")) return null;
+    if (gep.indices.items.len != 1) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[0].value, source_index_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardI8Load(instruction: ir.Instruction, ptr_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardI8Eq(instruction: ir.Instruction, byte_name: []const u8, value: i128) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 })) return null;
+    if (!isNamed(icmp.lhs, byte_name) or !isInt(icmp.rhs, value)) return null;
+    return result_name;
+}
+
+fn validateBase64ResidualGuardReturnSelect(instruction: ir.Instruction, byte_ok_name: []const u8) !?[]const u8 {
+    const result_name = instruction.result orelse return null;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return null,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return null;
+    if (!isNamed(select.cond, byte_ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 2)) return null;
     return result_name;
 }
 
