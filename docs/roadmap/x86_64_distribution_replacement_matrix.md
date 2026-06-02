@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=50 executable_ok=50 link_only_ok=0 local_fail=0
+total=51 executable_ok=51 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -447,6 +447,7 @@ float_sub_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtim
 double_div_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_double_div
 float_rem_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_float_rem
 struct_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_struct_sum
+releasesafe_struct_sum_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_struct_sum
 array_sum_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_array_sum
 releasesafe_array_sum_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_array_sum
 optional_payload_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_optional_payload
@@ -461,7 +462,7 @@ releasesafe_global_update_gate=zig build distribution-zig-ir-writer -- --case=re
 releasesafe_pointer_load_store_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_pointer_load_store
 releasesafe_call_chain_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_call_chain
 releasesafe_tls_bump_gate=zig build distribution-zig-ir-writer -- --case=releasesafe_runtime_tls_bump
-ir_writer_rows=scalar_runtime_rows=50, minimal_wrapper_rows=0
+ir_writer_rows=scalar_runtime_rows=51, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=2,
                i64-arithmetic=1, table-indexed-load=1,
@@ -490,6 +491,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                checked-call-chain-boundary=1,
                checked-tls-bump-boundary=1,
                checked-array-sum-boundary=1,
+               checked-struct-sum-boundary=1,
                minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
@@ -557,6 +559,8 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         checked-tls-bump-boundary,
                         releasesafe_runtime_array_sum
                         checked-array-sum-boundary,
+                        releasesafe_runtime_struct_sum
+                        checked-struct-sum-boundary,
                         releasesafe_error_switch error-switch-select,
                         releasesafe_tiny_scalar_runtime_boundary
                         checked-add-runtime-boundary,

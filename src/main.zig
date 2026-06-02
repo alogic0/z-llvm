@@ -252,6 +252,8 @@ fn writeIrWriterModuleFromEnv(
         try writeRuntimePackedReplaceLowIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) {
         try writeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_struct_sum")) {
+        try writeReleaseSafeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) {
         try writeRuntimeArraySumIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_array_sum")) {
@@ -346,6 +348,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) return "packed-replace-low";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) return "struct-field-sum";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_struct_sum")) return "checked-struct-sum-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) return "array-scalar-sum";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_array_sum")) return "checked-array-sum-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
@@ -998,6 +1001,55 @@ fn writeRuntimeStructSumIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeStructSumIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@struct_sum_value = constant [2 x i32] [i32 20, i32 22], align 4
+        \\@struct_sum = alias i32 (ptr), ptr @aggregates.struct_sum
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = call i32 @aggregates.struct_sum(ptr @struct_sum_value)
+        \\  %ok = icmp eq i32 %value, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @aggregates.struct_sum(ptr %0) unnamed_addr align 1 {{
+        \\entry:
+        \\  %2 = load i32, ptr %0, align 4
+        \\  %3 = getelementptr i8, ptr %0, i64 4
+        \\  %4 = load i32, ptr %3, align 4
+        \\  %5 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %2, i32 %4)
+        \\  %6 = extractvalue {{ i32, i1 }} %5, 1
+        \\  br i1 %6, label %7, label %8
+        \\
+        \\7:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\8:
+        \\  %9 = extractvalue {{ i32, i1 }} %5, 0
+        \\  ret i32 %9
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

@@ -104,7 +104,8 @@ optimizer/object path. Runtime writer rows now cover
 `comptime-const-mul`, `add-imm-return`, `checked-add-imm-boundary`,
 `checked-comptime-const-boundary`, `checked-global-update-boundary`,
 `checked-pointer-load-store-boundary`, `checked-call-chain-boundary`, and
-`checked-tls-bump-boundary`, and `checked-array-sum-boundary`; all 50
+`checked-tls-bump-boundary`, `checked-array-sum-boundary`, and
+`checked-struct-sum-boundary`; all 51
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
