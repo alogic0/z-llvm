@@ -10,11 +10,11 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Refresh the selected ReleaseSmall native-link proof after the 87-row external
-IR-writer gate, selected ReleaseSmall object gate, and selected ReleaseSmall
-executable gate are clean. If the native-link gate finds a blocker, promote
-the first sorted failure into one focused implementation slice. If it is clean,
-record the clean native-link evidence and move to the next x86_64 boundary.
+Refresh the ReleaseSmall native-link probe after the 87-row external IR-writer
+gate and selected ReleaseSmall object, executable, and native-link gates are
+clean. If the probe finds a blocker, promote the first sorted failure into one
+focused implementation slice. If it is clean, record the clean probe evidence
+and move to the next x86_64 boundary.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -518,18 +518,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the next measured ReleaseSmall native-link blocker selected from the
-refreshed native-link gate, if one appears.
+Only the next measured ReleaseSmall native-link probe blocker selected from
+the refreshed probe, if one appears.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-native-link-releasesmall`
+`zig build probe-native-linker-releasesmall`
 then promote the first sorted local blocker into this file with a focused gate.
 
 Commit:
-Commit the selected measured ReleaseSmall native-link blocker/probe update
+Commit the selected measured ReleaseSmall native-link probe update
 separately with the policy in
 `docs/commit_policy.md`.
 
