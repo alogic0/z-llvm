@@ -10,13 +10,13 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Refresh the selected Debug native-link gate after the 87-row
+Refresh the selected Debug native-link compatibility probe after the 87-row
 external IR-writer gate, selected/broad ReleaseSmall gates, selected Debug
 object gate, selected Debug executable gate, and selected Debug unwind/DWARF
-boundary gate are clean. If the Debug native-link gate finds a blocker,
-promote the first sorted failure into one focused implementation slice. If it
-is clean, record the clean Debug native-link evidence and move to the next
-x86_64 boundary.
+boundary gate, and selected Debug native-link gate are clean. If the Debug
+native-link probe finds a blocker, promote the first sorted failure into one
+focused implementation slice. If it is clean, record the clean Debug
+native-link probe evidence and move to the next x86_64 boundary.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -510,9 +510,10 @@ covered by `releasesmall_runtime_base64_residual_padding_loop_step`. The next
 selected slice is the decode exit/lifetime cleanup around
 `base64.Base64Decoder.decode.exit`, the two `llvm.lifetime.end.p0` calls, and
 `ret i64 %.sroa.0.0.ph`, and is now covered by
-`releasesmall_runtime_base64_decode_exit_step`. The selected Debug executable
-and Debug unwind/DWARF boundary gates completed cleanly; the next selected
-task is to refresh the selected Debug native-link gate.
+`releasesmall_runtime_base64_decode_exit_step`. The selected Debug executable,
+Debug unwind/DWARF boundary, and Debug native-link gates completed cleanly;
+the next selected task is to refresh the selected Debug native-link
+compatibility probe.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -520,18 +521,18 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the next measured Debug native-link blocker selected from the refreshed
-gate, if one appears.
+Only the next measured Debug native-link compatibility blocker selected from
+the refreshed probe, if one appears.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-native-link-debug`
+`zig build probe-native-linker-debug`
 then promote the first sorted local blocker into this file with a focused gate.
 
 Commit:
-Commit the selected measured Debug native-link gate update
+Commit the selected measured Debug native-link probe update
 separately with the policy in
 `docs/commit_policy.md`.
 
@@ -557,6 +558,7 @@ zig build probe-native-linker-broad -- --mode=Debug
 zig build distribution-native-link-boundary2
 zig build distribution-debug-executable
 zig build distribution-debug-unwind
+zig build distribution-native-link-debug
 ```
 
 The focused gates passed after the script runner cleanup, shared tool helper
