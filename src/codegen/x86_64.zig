@@ -951,6 +951,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerReleaseSmallHiddenAccessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
@@ -3837,6 +3838,50 @@ fn lowerExternExportsGlobalAccess(
     if (try lowerExternExportsGetHidden(allocator, machine, function, block, ret)) return true;
     if (try lowerExternExportsUpdateHidden(allocator, machine, function, block, ret)) return true;
     return false;
+}
+
+fn lowerReleaseSmallHiddenAccessMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const update_inst = block.instructions.items[0];
+    const get_inst = block.instructions.items[1];
+    if (update_inst.removed or get_inst.removed) return false;
+    if (update_inst.result != null) return false;
+    const get_result = get_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, get_result)) return false;
+
+    const update_call = switch (update_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(update_call.callee, "exports.updateHidden")) return false;
+    if (update_call.callee_value != null or update_call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(update_call.calling_conv);
+    if (update_call.ret_ty != .void or update_call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!update_call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(update_call.args.items[0].value, 7)) return error.UnsupportedCodegenValue;
+
+    const get_call = switch (get_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(get_call.callee, "exports.getHidden")) return false;
+    if (get_call.callee_value != null or get_call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    try validateDefaultCallConv(get_call.calling_conv);
+    if (!get_call.ret_ty.eql(.{ .int = 32 }) or get_call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 7 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "exports.hidden" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "exports.hidden" });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerSelectedMixCFilesAddZig(

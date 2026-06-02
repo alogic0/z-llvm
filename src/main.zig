@@ -320,6 +320,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) {
         try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) {
+        try writeReleaseSmallRuntimeHiddenAccessIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -392,6 +394,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) return "void-noop-call";
     if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) return "hidden-global-access";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -544,6 +547,41 @@ fn writeReleaseSafeRuntimeReadGlobalIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime read-global external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeHiddenAccessIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@exports.hidden = private unnamed_addr global i32 0, align 4
+        \\
+        \\@getHidden = alias i32 (), ptr @exports.getHidden
+        \\@updateHidden = alias void (i32), ptr @exports.updateHidden
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  call void @exports.updateHidden(i32 7)
+        \\  %value = call i32 @exports.getHidden()
+        \\  ret i32 %value
+        \\}}
+        \\
+        \\define private i32 @exports.getHidden() unnamed_addr align 1 {{
+        \\entry:
+        \\  %value = load i32, ptr @exports.hidden, align 4
+        \\  ret i32 %value
+        \\}}
+        \\
+        \\define private void @exports.updateHidden(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  store i32 %value, ptr @exports.hidden, align 4
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime hidden-access external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
