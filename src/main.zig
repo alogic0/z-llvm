@@ -238,6 +238,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSafeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) {
         try writeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_pointer_load_store")) {
+        try writeReleaseSafeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) {
         try writeRuntimeVolatileRoundtripIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) {
@@ -329,6 +331,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) return "checked-global-update-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_pointer_load_store")) return "checked-pointer-load-store-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) return "volatile-roundtrip";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
@@ -698,6 +701,58 @@ fn writeRuntimePointerLoadStoreIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime pointer load/store external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimePointerLoadStoreIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@pointers_memory.writer_input = dso_local global i32 41, align 4
+        \\@pointers_memory.writer_output = dso_local global i32 0, align 4
+        \\@load_store = alias i32 (ptr, ptr), ptr @pointers_memory.load_store
+        \\
+        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %value = load i32, ptr @pointers_memory.writer_input, align 4
+        \\  %updated = add i32 %value, 1
+        \\  store i32 %updated, ptr @pointers_memory.writer_output, align 4
+        \\  %stored = load i32, ptr @pointers_memory.writer_output, align 4
+        \\  %ok = icmp eq i32 %stored, 42
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define private i32 @pointers_memory.load_store(ptr %0, ptr %1) unnamed_addr align 1 {{
+        \\entry:
+        \\  %3 = load i32, ptr %0, align 4
+        \\  %4 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %3, i32 1)
+        \\  %5 = extractvalue {{ i32, i1 }} %4, 1
+        \\  br i1 %5, label %panic, label %ok
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\ok:
+        \\  %8 = extractvalue {{ i32, i1 }} %4, 0
+        \\  store i32 %8, ptr %1, align 4
+        \\  ret i32 %8
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime pointer load/store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
