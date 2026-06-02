@@ -330,6 +330,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) {
         try writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) {
+        try writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -407,6 +409,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_may_panic")) return "mixed-c-zig-panic-add";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -713,6 +716,29 @@ fn writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime inherit-want-safety i64 external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@compile_asm_main = alias void (i32, i32, i32), ptr @main.main
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define private void @main.main(i32 %0, i32 %1, i32 %2) unnamed_addr align 1 {{
+        \\entry:
+        \\  unreachable
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime compile-asm unreachable external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
