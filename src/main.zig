@@ -346,6 +346,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_length_step")) {
         try writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) {
+        try writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
         try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
@@ -431,6 +433,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_tail_step")) return "base64-padding-tail-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) return "base64-padding-loop-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_length_step")) return "base64-padding-length-step";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) return "base64-chunk-guard-step";
     if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
     if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
@@ -964,6 +967,28 @@ fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 padding-length external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %source_next = add nuw i64 0, 16
+        \\  %source_ok = icmp ult i64 %source_next, 64
+        \\  %output_next = add nuw i64 0, 15
+        \\  %output_ok = icmp ult i64 %output_next, 63
+        \\  %wide_ok = select i1 %source_ok, i1 %output_ok, i1 0
+        \\  %ret = select i1 %wide_ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 chunk-guard external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 

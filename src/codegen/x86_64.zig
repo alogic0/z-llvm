@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ChunkGuardStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingLengthStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4001,6 +4002,70 @@ fn lowerBase64PaddingLengthStepMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerBase64ChunkGuardStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 6) return false;
+
+    const source_next_name = block.instructions.items[0].result orelse return false;
+    if (!validateBase64ChunkGuardAdd(block.instructions.items[0], 0, 16)) return false;
+    const source_ok_name = block.instructions.items[1].result orelse return false;
+    if (!validateBase64ChunkGuardIcmp(block.instructions.items[1], source_next_name, 64)) return false;
+
+    const output_next_name = block.instructions.items[2].result orelse return false;
+    if (!validateBase64ChunkGuardAdd(block.instructions.items[2], 0, 15)) return false;
+    const output_ok_name = block.instructions.items[3].result orelse return false;
+    if (!validateBase64ChunkGuardIcmp(block.instructions.items[3], output_next_name, 63)) return false;
+
+    const wide_ok_name = block.instructions.items[4].result orelse return false;
+    const wide_select = switch (block.instructions.items[4].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!wide_select.cond_ty.eql(.{ .int = 1 }) or !wide_select.ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(wide_select.cond, source_ok_name) or !isNamed(wide_select.true_value, output_ok_name) or !isInt(wide_select.false_value, 0)) return false;
+
+    const select_name = block.instructions.items[5].result orelse return false;
+    const ret_select = switch (block.instructions.items[5].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!ret_select.cond_ty.eql(.{ .int = 1 }) or !ret_select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(ret_select.cond, wide_ok_name) or !isInt(ret_select.true_value, 0) or !isInt(ret_select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBase64ChunkGuardAdd(instruction: ir.Instruction, lhs_value: i128, rhs_value: i128) bool {
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    return binary.op == .add and binary.ty.eql(.{ .int = 64 }) and isInt(binary.lhs, lhs_value) and isInt(binary.rhs, rhs_value);
+}
+
+fn validateBase64ChunkGuardIcmp(instruction: ir.Instruction, lhs_name: []const u8, rhs_value: i128) bool {
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    return icmp.predicate == .ult and icmp.operand_ty.eql(.{ .int = 64 }) and isNamed(icmp.lhs, lhs_name) and isInt(icmp.rhs, rhs_value);
 }
 
 fn validateBase64PaddingLengthEnd(instruction: ir.Instruction, expected_offset: i128) !?[]const u8 {
