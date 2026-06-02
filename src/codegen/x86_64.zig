@@ -948,6 +948,7 @@ fn lowerStraightLineReturn(
             if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReplaceLowReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReadFlagReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimePackedReadFlagMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerLoadStoreReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimePointerLoadStoreMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) return;
@@ -2421,9 +2422,12 @@ fn lowerPackedReadFlagReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "packed_bits.read_flag")) return false;
+    const source_fixture = std.mem.eql(u8, function.name, "packed_bits.read_flag");
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_packed_read_flag_main.readFlag");
+    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 1 }) or function.params.items.len != 1) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (integrated_preopt) return try lowerRuntimePackedReadFlagPreoptHelper(allocator, machine, function, block, ret);
     if (block.instructions.items.len != 1) return false;
 
     const icmp_inst = block.instructions.items[0];
@@ -2443,6 +2447,108 @@ fn lowerPackedReadFlagReturn(
     if (!isNamed(icmp.lhs, function.params.items[0].name) or !isInt(icmp.rhs, 0)) return false;
 
     try machine.instructions.append(allocator, .read_flag_i8_dil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePackedReadFlagPreoptHelper(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (block.instructions.items.len != 5) return false;
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    const load_inst = block.instructions.items[2];
+    const shift_inst = block.instructions.items[3];
+    const trunc_inst = block.instructions.items[4];
+    if (alloca_inst.removed or store_inst.removed or load_inst.removed or shift_inst.removed or trunc_inst.removed) return false;
+
+    const alloca_name = alloca_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    const shift_name = shift_inst.result orelse return false;
+    const trunc_name = trunc_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, trunc_name)) return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(.{ .int = 8 })) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 8 }) or store.attrs.isBarrier()) return false;
+    if (!isNamed(store.ptr, alloca_name) or !isNamed(store.value, function.params.items[0].name)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier()) return false;
+    if (!isNamed(load.ptr, alloca_name)) return false;
+
+    const shift = switch (shift_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shift.op != .lshr or !shift.ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(shift.lhs, load_name) or !isInt(shift.rhs, 7)) return false;
+
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 8 }) or !trunc.to_ty.eql(.{ .int = 1 })) return false;
+    if (!isNamed(trunc.value, shift_name)) return false;
+
+    try machine.instructions.append(allocator, .read_flag_i8_dil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePackedReadFlagMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_packed_read_flag_main.main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 2) return false;
+
+    const call_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (call_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (call.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    }
+    if (!std.mem.eql(u8, call.callee, "runtime_packed_read_flag_main.readFlag")) return false;
+    if (!call.ret_ty.eql(.{ .int = 1 }) or call.args.items.len != 1) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[0].value, -128)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, call_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

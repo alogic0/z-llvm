@@ -539,7 +539,10 @@ preopt path. The next selected blocker is integrated preopt
 `releasefast_runtime_optional_pointer`, which failed object emission with
 `UnsupportedCodegenControlFlow`; that row now passes through the preopt
 path. The next selected blocker is integrated preopt
-`releasefast_runtime_packed_read_flag`, which fails object emission with
+`releasefast_runtime_packed_read_flag`, which failed object emission with
+`UnsupportedCodegenCallingConvention`; that row now passes through the
+preopt path. The next selected blocker is integrated preopt
+`releasefast_runtime_packed_replace_low`, which fails object emission with
 `UnsupportedCodegenCallingConvention`.
 
 Completed error-union mapping:
@@ -548,8 +551,8 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected integrated preopt packed-read-flag calling-convention
-object emission blocker: `releasefast_runtime_packed_read_flag`.
+Only the selected integrated preopt packed-replace-low calling-convention
+object emission blocker: `releasefast_runtime_packed_replace_low`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
@@ -560,8 +563,8 @@ then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected integrated preopt optional-pointer closure and
-packed-read-flag handoff separately with the policy in `docs/commit_policy.md`.
+Commit the selected integrated preopt packed-read-flag closure and
+packed-replace-low handoff separately with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
 
