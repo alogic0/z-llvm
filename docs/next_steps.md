@@ -10,14 +10,15 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Refresh the top-level distribution gate after the integrated postopt object
-gate is clean for all 87 selected rows. The previous blocker,
-`releasesmall_runtime_inherit_want_safety_i64`, now uses its source-backed
-expected exit code 4 in the integrated runner. The selected integrated object
-gate now reports `total=87 executable_ok=87 link_only_ok=0 local_fail=0`.
-If the top-level distribution gate finds a blocker, promote the first sorted
-failure into one focused implementation slice. If it is clean, record the
-clean distribution evidence and move to the next x86_64 boundary.
+Close the integrated preopt pointer load/store object-emission blocker after
+the integrated postopt object gate is clean for all 87 selected rows. The
+previous blocker, `releasesmall_runtime_inherit_want_safety_i64`, now uses
+its source-backed expected exit code 4 in the integrated runner. The selected
+integrated postopt object gate reports
+`total=87 executable_ok=87 link_only_ok=0 local_fail=0`. The next measured
+blocker is `releasefast_runtime_pointer_load_store` in the integrated preopt
+path, where z_llvm optimization plus object emission fails with
+`UnsupportedCodegenControlFlow`.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -528,8 +529,10 @@ expected source-level exit code 7, and
 source-level exit code 5. `releasesmall_runtime_inherit_want_safety_i64` now
 passes with the expected source-level exit code 4. The selected integrated
 postopt object gate is clean with
-`total=87 executable_ok=87 link_only_ok=0 local_fail=0`; the next selected
-task is to refresh the top-level distribution gate.
+`total=87 executable_ok=87 link_only_ok=0 local_fail=0`. The top-level
+distribution gate then exposed the next selected blocker:
+integrated preopt `releasefast_runtime_pointer_load_store` object emission
+fails with `UnsupportedCodegenControlFlow`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -537,19 +540,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the next measured top-level distribution blocker selected from the
-refreshed gate, if one appears.
+Only the selected integrated preopt pointer load/store control-flow object
+emission blocker:
+`releasefast_runtime_pointer_load_store`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-all`
+`zig build distribution-zig-integrated-preopt`
 then promote the first sorted follow-on blocker into this file with a focused
 gate.
 
 Commit:
-Commit the selected measured top-level distribution gate update
+Commit the selected integrated preopt pointer load/store update
 separately with the policy in
 `docs/commit_policy.md`.
 
