@@ -364,6 +364,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_runtime_call_chain",
+        .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
+        .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_tiny_scalar_runtime_boundary",
         .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig",
         .covered_fixture = "test/zig/inputs/tiny_scalar.zig",
@@ -518,6 +526,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "checked-comptime-const-boundary" },
         .{ .name = "checked-global-update-boundary" },
         .{ .name = "checked-pointer-load-store-boundary" },
+        .{ .name = "checked-call-chain-boundary" },
         .{ .name = "abi-arg-call" },
         .{ .name = "tls-read" },
         .{ .name = "tls-bump" },
@@ -757,6 +766,7 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) return 2;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_inline_asm_barrier")) return 1;
@@ -845,6 +855,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_branch_mix")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
+    if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+    }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
@@ -928,6 +941,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-comptime-const-boundary")) return "checked-comptime-const-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-global-update-boundary")) return "checked-global-update-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "checked-pointer-load-store-boundary")) return "checked-pointer-load-store-boundary";
+    if (std.mem.eql(u8, contents[value_start..value_end], "checked-call-chain-boundary")) return "checked-call-chain-boundary";
     if (std.mem.eql(u8, contents[value_start..value_end], "abi-arg-call")) return "abi-arg-call";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-read")) return "tls-read";
     if (std.mem.eql(u8, contents[value_start..value_end], "tls-bump")) return "tls-bump";

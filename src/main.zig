@@ -272,6 +272,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSafeRuntimeDebugLocationIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
         try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) {
+        try writeReleaseSafeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
         try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) {
@@ -350,6 +352,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasefast_runtime_debug_location")) return "add-imm-return";
     if (std.mem.eql(u8, case_id, "releasesafe_runtime_debug_location")) return "checked-add-imm-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
+    if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) return "checked-call-chain-boundary";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
     if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
@@ -1314,6 +1317,44 @@ fn writeRuntimeCallChainIrWriterBody(
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write runtime call chain external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSafeRuntimeCallChainIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@main = alias i32 (i32), ptr @control_flow_calls.call_chain
+        \\@call_chain = alias i32 (i32), ptr @control_flow_calls.call_chain
+        \\
+        \\declare void @llvm.assume(i1)
+        \\
+        \\define private i32 @control_flow_calls.call_chain(i32 %value) unnamed_addr align 1 {{
+        \\entry:
+        \\  %biased = add i32 %value, 1073741824
+        \\  %overflow = icmp slt i32 %biased, 0
+        \\  br i1 %overflow, label %panic, label %ok
+        \\
+        \\panic:
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+        \\ok:
+        \\  %shifted = shl nsw i32 %value, 1
+        \\  %ret = or disjoint i32 %shifted, 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
+        \\entry:
+        \\  ret void
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSafe runtime call_chain external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
 
