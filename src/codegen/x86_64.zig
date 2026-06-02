@@ -972,6 +972,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64ThirdSourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64NextSourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceBundleStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64SourceStrideStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -4182,6 +4183,28 @@ fn lowerBase64NextSourceBundleStepMainReturn(
         "base64.next_source_bundle_table2",
         "base64.next_source_bundle_table3",
         8,
+    );
+}
+
+fn lowerBase64ThirdSourceBundleStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    return lowerBase64SourceBundleStepMainReturnWithSymbols(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "base64.third_source_bundle_input",
+        "base64.third_source_bundle_table0",
+        "base64.third_source_bundle_table1",
+        "base64.third_source_bundle_table2",
+        "base64.third_source_bundle_table3",
+        12,
     );
 }
 

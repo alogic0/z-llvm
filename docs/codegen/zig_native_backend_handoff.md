@@ -113,7 +113,8 @@ optimizer/object path. Runtime writer rows now cover
 `base64-residual-byte-step`, `base64-padding-tail-step`, and
 `base64-padding-loop-step`, `base64-padding-length-step`, and
 `base64-chunk-guard-step`, `base64-source-stride-step`, and
-`base64-source-bundle-step`, and `base64-next-source-bundle-step`; all 73
+`base64-source-bundle-step`, `base64-next-source-bundle-step`, and
+`base64-third-source-bundle-step`; all 74
 selected rows are
 runtime-emitted and the gate
 fails on unexpected `minimal-ret0` rows. All modes link through Zig native linking with
