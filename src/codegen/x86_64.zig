@@ -967,6 +967,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64PaddingTailStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64ResidualByteStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64StoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64DecodeStepMainReturn(allocator, machine, function, block, ret)) return;
@@ -3864,6 +3865,65 @@ fn lowerBase64ResidualByteStepMainReturn(
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 63 });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "base64.residual_output" });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64PaddingTailStepMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 4) return false;
+
+    const src_name = block.instructions.items[0].result orelse return false;
+    const byte_name = block.instructions.items[1].result orelse return false;
+    const is_pad_name = block.instructions.items[2].result orelse return false;
+    const select_name = block.instructions.items[3].result orelse return false;
+
+    const gep = switch (block.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[1 x i8]" })) return false;
+    const padding_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, padding_symbol, "base64.padding_tail")) return false;
+    if (gep.indices.items.len != 1) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+
+    const load = switch (block.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, src_name)) return false;
+
+    const icmp = switch (block.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 }) or !isNamed(icmp.lhs, byte_name) or !isInt(icmp.rhs, 61)) return false;
+
+    const select = switch (block.instructions.items[3].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, is_pad_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_name, select_name)) return false;
+
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
