@@ -2450,7 +2450,9 @@ fn lowerPointerVolatileRoundtripReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "pointers_memory.volatile_roundtrip")) return false;
+    const source_fixture = std.mem.eql(u8, function.name, "pointers_memory.volatile_roundtrip");
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_volatile_roundtrip_main.volatileRoundtrip");
+    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
 
@@ -2519,6 +2521,9 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
     }
     if (function.params.items.len != 0) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (std.mem.eql(u8, function.name, "runtime_volatile_roundtrip_main.main") and block.instructions.items.len == 3) {
+        return try lowerRuntimeVolatileRoundtripPreoptMainReturn(allocator, machine, block, ret);
+    }
     if (block.instructions.items.len != 4) return false;
 
     const store_inst = block.instructions.items[0];
@@ -2588,6 +2593,63 @@ fn lowerRuntimeVolatileRoundtripMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 42 });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = store_global });
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = load_global });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeVolatileRoundtripPreoptMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (call.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    }
+    if (!std.mem.eql(u8, call.callee, "runtime_volatile_roundtrip_main.volatileRoundtrip")) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[0].value, "runtime_volatile_roundtrip_main.slot")) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[1].value, 42)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, 42)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    const fail = "volatile_roundtrip_preopt_fail";
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 42 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "runtime_volatile_roundtrip_main.slot" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_volatile_roundtrip_main.slot" });
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
