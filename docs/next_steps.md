@@ -28,7 +28,7 @@ padding length-adjustment, chunk-loop guard, source-byte stride, first three
 four-byte source-bundle surfaces, bit-buffer combine/store,
 loop-advance/backedge, residual/preheader guard, residual table-bundle, and
 residual output store/backedge surfaces: a source-backed x86_64 ReleaseSmall
-base64 residual loop-advance row.
+base64 residual padding-check row.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -497,7 +497,11 @@ slice is the residual accumulator update around the `i16` load/trunc to `i12`,
 `releasesmall_runtime_base64_residual_accumulator_step`. The next selected
 slice is the residual loop-index advance around
 `%.3.i = phi i64 [ %196, %189 ], [ %.2.i, %176 ]`,
-`%188 = add nuw i64 %.0302.i, 1`, and `br label %168`.
+`%188 = add nuw i64 %.0302.i, 1`, and `br label %168`, and is now covered
+by `releasesmall_runtime_base64_residual_loop_advance_step`. The next selected
+slice is the residual padding check around `%186 = add nuw i64 %.0302.i,
+%.1305.i`, `%.not313.i = icmp eq i8 %171, 61`, and the branch on
+`%.not313.i`.
 
 Completed error-union mapping:
 `%.not.i = icmp eq i32 %0, 0`,
@@ -505,20 +509,20 @@ Completed error-union mapping:
 `test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll`.
 
 Known boundary:
-Only the selected ReleaseSmall base64 residual loop-index advance
+Only the selected ReleaseSmall base64 residual padding check
 boundary-reduction slice.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, and all object/linker behavior
 remain out of scope.
 
 Validation gate:
-`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_loop_advance_step`
+`zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_check_step`
 then `zig build distribution-zig-ir-writer`. If x86_64 codegen changes, also
 run `zig build handoff`; if only the writer/runner/docs change and the focused
 gate passes through existing lowering, run `zig build test`.
 
 Commit:
-Commit the selected ReleaseSmall base64 residual loop-index advance
+Commit the selected ReleaseSmall base64 residual padding check
 boundary-reduction slice
 separately with the policy in
 `docs/commit_policy.md`.
@@ -559,11 +563,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 82-row
+also passes: the first ReleaseFast tiny-scalar row and the full 83-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 82 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 83 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -634,8 +638,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=82 executable_ok=82 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=82 minimal_wrapper_rows=0
+             full set total=83 executable_ok=83 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=83 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -679,6 +683,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              base64-residual-length-step=1
              base64-residual-table-check-step=1
              base64-residual-accumulator-step=1
+             base64-residual-loop-advance-step=1
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1
