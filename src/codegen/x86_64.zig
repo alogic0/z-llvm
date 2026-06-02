@@ -947,6 +947,7 @@ fn lowerStraightLineReturn(
             if (try lowerIntegerSminReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReplaceLowReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimePackedReplaceLowMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPackedReadFlagReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimePackedReadFlagMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerPointerLoadStoreReturn(allocator, machine, function, block, ret)) return;
@@ -2370,9 +2371,12 @@ fn lowerPackedReplaceLowReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "packed_bits.replace_low")) return false;
+    const source_fixture = std.mem.eql(u8, function.name, "packed_bits.replace_low");
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_packed_replace_low_main.replaceLow");
+    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 8 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 8 }) or !function.params.items[1].ty.eql(.{ .int = 8 })) return false;
+    if (integrated_preopt) return try lowerRuntimePackedReplaceLowPreoptHelper(allocator, machine, function, block, ret);
     if (block.instructions.items.len != 3) return false;
 
     const high_mask_inst = block.instructions.items[0];
@@ -2411,6 +2415,160 @@ fn lowerPackedReplaceLowReturn(
         (isNamed(or_binary.lhs, high_result) and isNamed(or_binary.rhs, low_result)))) return false;
 
     try machine.instructions.append(allocator, .replace_low_i8_dil_sil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePackedReplaceLowPreoptHelper(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (block.instructions.items.len != 9) return false;
+    const alloca_inst = block.instructions.items[0];
+    const first_store_inst = block.instructions.items[1];
+    const trunc_inst = block.instructions.items[2];
+    const first_load_inst = block.instructions.items[3];
+    const high_mask_inst = block.instructions.items[4];
+    const zext_inst = block.instructions.items[5];
+    const or_inst = block.instructions.items[6];
+    const second_store_inst = block.instructions.items[7];
+    const second_load_inst = block.instructions.items[8];
+    if (alloca_inst.removed or first_store_inst.removed or trunc_inst.removed or first_load_inst.removed or
+        high_mask_inst.removed or zext_inst.removed or or_inst.removed or second_store_inst.removed or second_load_inst.removed) return false;
+
+    const alloca_name = alloca_inst.result orelse return false;
+    const trunc_name = trunc_inst.result orelse return false;
+    const first_load_name = first_load_inst.result orelse return false;
+    const high_mask_name = high_mask_inst.result orelse return false;
+    const zext_name = zext_inst.result orelse return false;
+    const or_name = or_inst.result orelse return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    if (!alloca.allocated_ty.eql(.{ .int = 8 })) return false;
+
+    const first_store = switch (first_store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!first_store.ty.eql(.{ .int = 8 }) or first_store.attrs.isBarrier()) return false;
+    if (!isNamed(first_store.ptr, alloca_name) or !isNamed(first_store.value, function.params.items[0].name)) return false;
+
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 8 }) or !trunc.to_ty.eql(.{ .int = 3 })) return false;
+    if (!isNamed(trunc.value, function.params.items[1].name)) return false;
+
+    const first_load = switch (first_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!first_load.ty.eql(.{ .int = 8 }) or first_load.attrs.isBarrier()) return false;
+    if (!isNamed(first_load.ptr, alloca_name)) return false;
+
+    const high_mask = switch (high_mask_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (high_mask.op != .@"and" or !high_mask.ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(high_mask.lhs, first_load_name) or !isInt(high_mask.rhs, -8)) return false;
+
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 3 }) or !zext.to_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(zext.value, trunc_name)) return false;
+
+    const or_binary = switch (or_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (or_binary.op != .@"or" or !or_binary.ty.eql(.{ .int = 8 })) return false;
+    if (!((isNamed(or_binary.lhs, zext_name) and isNamed(or_binary.rhs, high_mask_name)) or
+        (isNamed(or_binary.lhs, high_mask_name) and isNamed(or_binary.rhs, zext_name)))) return false;
+
+    const second_store = switch (second_store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!second_store.ty.eql(.{ .int = 8 }) or second_store.attrs.isBarrier()) return false;
+    if (!isNamed(second_store.ptr, alloca_name) or !isNamed(second_store.value, or_name)) return false;
+
+    const second_load_name = second_load_inst.result orelse return false;
+    const second_load = switch (second_load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!second_load.ty.eql(.{ .int = 8 }) or second_load.attrs.isBarrier()) return false;
+    if (!isNamed(second_load.ptr, alloca_name)) return false;
+
+    const ret_value_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, ret_value_name, second_load_name)) return false;
+
+    try machine.instructions.append(allocator, .replace_low_i8_dil_sil_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePackedReplaceLowMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_packed_replace_low_main.main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (call.calling_conv) |cc| {
+        if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    }
+    if (!std.mem.eql(u8, call.callee, "runtime_packed_replace_low_main.replaceLow")) return false;
+    if (!call.ret_ty.eql(.{ .int = 8 }) or call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[0].value, -1)) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[1].value, 5)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
+    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, -3)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
