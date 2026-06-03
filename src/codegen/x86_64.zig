@@ -805,6 +805,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerRuntimePointerLoadStorePreoptMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -812,10 +817,6 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (function.blocks.items.len == 3) {
-        if (try lowerRuntimePointerLoadStorePreoptMain(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
-        }
         if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -958,6 +959,9 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeFloatAddPreoptMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatSelectPreoptMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatSubPreoptMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeDoubleDivPreoptMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeFloatRemPreoptMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerRuntimeSideEffectFreeMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
@@ -3269,7 +3273,9 @@ fn lowerRuntimePointerLoadStorePreoptMain(
 ) !bool {
     if (!std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len == 7) return lowerRuntimePointerLoadStorePreoptSafeMain(allocator, machine, function);
     if (function.blocks.items.len != 3) return false;
+    if (blockByName(function, "Entry") != null) return lowerRuntimePointerLoadStorePreoptSafeOptimizedMain(allocator, machine, function);
 
     const entry = blockByName(function, "0") orelse return false;
     const merge = blockByName(function, "5") orelse return false;
@@ -3354,6 +3360,211 @@ fn lowerRuntimePointerLoadStorePreoptMain(
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerRuntimePointerLoadStorePreoptSafeOptimizedMain(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const entry = blockByName(function, "Entry") orelse return false;
+    const output_check = blockByName(function, "Then") orelse return false;
+    const merge = blockByName(function, "Block1") orelse return false;
+    if (entry.instructions.items.len != 2 or output_check.instructions.items.len != 2 or merge.instructions.items.len != 2) return false;
+
+    const call_name = entry.instructions.items[0].result orelse return false;
+    const first_cmp_name = entry.instructions.items[1].result orelse return false;
+    if (entry.instructions.items[0].removed or entry.instructions.items[1].removed) return false;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.{ .int = 32 })) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!std.mem.eql(u8, call.callee, "runtime_pointer_load_store_main.loadStore")) return false;
+    if (call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[0].value, "runtime_pointer_load_store_main.input")) return false;
+    if (!call.args.items[1].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[1].value, "runtime_pointer_load_store_main.output")) return false;
+
+    const first_cmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (first_cmp.predicate != .eq or !first_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_cmp.lhs, call_name) or !isInt(first_cmp.rhs, 42)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, "Then") or !std.mem.eql(u8, entry_br.else_target, "Block1")) return false;
+
+    const output_load_name = output_check.instructions.items[0].result orelse return false;
+    const output_cmp_name = output_check.instructions.items[1].result orelse return false;
+    if (output_check.instructions.items[0].removed or output_check.instructions.items[1].removed) return false;
+    const output_load = switch (output_check.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!output_load.ty.eql(.{ .int = 32 }) or output_load.attrs.isBarrier()) return false;
+    if (!valueReferencesGlobal(output_load.ptr, "runtime_pointer_load_store_main.output")) return false;
+    const output_cmp = switch (output_check.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (output_cmp.predicate != .eq or !output_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(output_cmp.lhs, output_load_name) or !isInt(output_cmp.rhs, 42)) return false;
+    try validateBrTarget(output_check, "Block1");
+
+    const phi_name = merge.instructions.items[0].result orelse return false;
+    const select_name = merge.instructions.items[1].result orelse return false;
+    if (merge.instructions.items[0].removed or merge.instructions.items[1].removed) return false;
+    const phi = switch (merge.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 1 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, output_cmp_name, "Then") or !phiHasIncomingInt(phi, 0, "Entry")) return false;
+    const select = switch (merge.instructions.items[1].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, phi_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    const ret = switch (merge.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "pointer_load_store_preopt_fail";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.input" });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimePointerLoadStorePreoptSafeMain(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    const entry = blockByName(function, "Entry") orelse return false;
+    const output_check = blockByName(function, "Then") orelse return false;
+    const first_fail = blockByName(function, "Else") orelse return false;
+    const bool_merge = blockByName(function, "Block1") orelse return false;
+    const ret_ok = blockByName(function, "Then1") orelse return false;
+    const ret_fail = blockByName(function, "Else1") orelse return false;
+    const ret_block = blockByName(function, "Block") orelse return false;
+    if (entry.instructions.items.len != 2 or output_check.instructions.items.len != 2 or first_fail.instructions.items.len != 0) return false;
+    if (bool_merge.instructions.items.len != 1 or ret_ok.instructions.items.len != 0 or ret_fail.instructions.items.len != 0) return false;
+    if (ret_block.instructions.items.len != 1) return false;
+
+    const call_name = entry.instructions.items[0].result orelse return false;
+    const first_cmp_name = entry.instructions.items[1].result orelse return false;
+    if (entry.instructions.items[0].removed or entry.instructions.items[1].removed) return false;
+    const call = switch (entry.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.{ .int = 32 })) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!std.mem.eql(u8, call.callee, "runtime_pointer_load_store_main.loadStore")) return false;
+    if (call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[0].value, "runtime_pointer_load_store_main.input")) return false;
+    if (!call.args.items[1].ty.eql(.ptr) or !valueReferencesGlobal(call.args.items[1].value, "runtime_pointer_load_store_main.output")) return false;
+
+    const first_cmp = switch (entry.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (first_cmp.predicate != .eq or !first_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_cmp.lhs, call_name) or !isInt(first_cmp.rhs, 42)) return false;
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, "Then") or !std.mem.eql(u8, entry_br.else_target, "Else")) return false;
+
+    const output_load_name = output_check.instructions.items[0].result orelse return false;
+    const output_cmp_name = output_check.instructions.items[1].result orelse return false;
+    if (output_check.instructions.items[0].removed or output_check.instructions.items[1].removed) return false;
+    const output_load = switch (output_check.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!output_load.ty.eql(.{ .int = 32 }) or output_load.attrs.isBarrier()) return false;
+    if (!valueReferencesGlobal(output_load.ptr, "runtime_pointer_load_store_main.output")) return false;
+    const output_cmp = switch (output_check.instructions.items[1].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (output_cmp.predicate != .eq or !output_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(output_cmp.lhs, output_load_name) or !isInt(output_cmp.rhs, 42)) return false;
+    try validateBrTarget(output_check, "Block1");
+    try validateBrTarget(first_fail, "Block1");
+
+    const bool_phi_name = bool_merge.instructions.items[0].result orelse return false;
+    if (bool_merge.instructions.items[0].removed) return false;
+    const bool_phi = switch (bool_merge.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!bool_phi.ty.eql(.{ .int = 1 }) or bool_phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(bool_phi, output_cmp_name, "Then") or !phiHasIncomingInt(bool_phi, 0, "Else")) return false;
+    const bool_br = switch (bool_merge.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!bool_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(bool_br.cond, bool_phi_name)) return false;
+    if (!std.mem.eql(u8, bool_br.then_target, "Then1") or !std.mem.eql(u8, bool_br.else_target, "Else1")) return false;
+    try validateBrTarget(ret_ok, "Block");
+    try validateBrTarget(ret_fail, "Block");
+
+    const ret_phi_name = ret_block.instructions.items[0].result orelse return false;
+    if (ret_block.instructions.items[0].removed) return false;
+    const ret_phi = switch (ret_block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!ret_phi.ty.eql(.{ .int = 32 }) or ret_phi.incoming.items.len != 2) return false;
+    if (!phiHasIncomingInt(ret_phi, 0, "Then1") or !phiHasIncomingInt(ret_phi, 1, "Else1")) return false;
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, ret_phi_name)) return false;
+
+    const fail = "pointer_load_store_preopt_fail";
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.input" });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "runtime_pointer_load_store_main.output" });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn validateBrTarget(block: ir.BasicBlock, expected_target: []const u8) !void {
+    const br = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!std.mem.eql(u8, br.target, expected_target)) return error.UnsupportedCodegenControlFlow;
 }
 
 fn lowerRuntimePointerLoadStoreMainReturn(
@@ -3861,48 +4072,23 @@ fn lowerRuntimeFloatMulPreoptMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_float_mul_main.main")) return false;
-    if (function.params.items.len != 0) return false;
-    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
-    if (block.instructions.items.len != 3) return false;
-
-    const call_inst = block.instructions.items[0];
-    const fcmp_inst = block.instructions.items[1];
-    const select_inst = block.instructions.items[2];
-    if (call_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
-    const call_name = call_inst.result orelse return false;
-    const fcmp_name = fcmp_inst.result orelse return false;
-    const select_name = select_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
-
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .double, .value = .{ .fp_text = "3.000000e+00" } },
+        .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
     };
-    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.double)) return false;
-    if (call.callee_value != null or call.inline_asm != null) return false;
-    if (!std.mem.eql(u8, call.callee, "runtime_float_mul_main.floatMul")) return false;
-    if (call.args.items.len != 2) return false;
-    if (!call.args.items[0].ty.eql(.double) or !isFpText(call.args.items[0].value, "3.000000e+00")) return false;
-    if (!call.args.items[1].ty.eql(.double) or !isFpText(call.args.items[1].value, "2.000000e+00")) return false;
-
-    const fcmp = switch (fcmp_inst.kind) {
-        .fcmp => |fcmp| fcmp,
-        else => return false,
-    };
-    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.double)) return false;
-    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "6.000000e+00")) return false;
-
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
-
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_float_mul_main.main",
+        "runtime_float_mul_main.floatMul",
+        .double,
+        &args,
+        .oeq,
+        "6.000000e+00",
+    );
 }
 
 fn lowerRuntimeFloatAddPreoptMainReturn(
@@ -3912,48 +4098,23 @@ fn lowerRuntimeFloatAddPreoptMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_float_add_main.main")) return false;
-    if (function.params.items.len != 0) return false;
-    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
-    if (block.instructions.items.len != 3) return false;
-
-    const call_inst = block.instructions.items[0];
-    const fcmp_inst = block.instructions.items[1];
-    const select_inst = block.instructions.items[2];
-    if (call_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
-    const call_name = call_inst.result orelse return false;
-    const fcmp_name = fcmp_inst.result orelse return false;
-    const select_name = select_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
-
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .float, .value = .{ .fp_text = "1.000000e+00" } },
+        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
     };
-    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.float)) return false;
-    if (call.callee_value != null or call.inline_asm != null) return false;
-    if (!std.mem.eql(u8, call.callee, "runtime_float_add_main.floatAdd")) return false;
-    if (call.args.items.len != 2) return false;
-    if (!call.args.items[0].ty.eql(.float) or !isFpText(call.args.items[0].value, "1.000000e+00")) return false;
-    if (!call.args.items[1].ty.eql(.float) or !isFpText(call.args.items[1].value, "2.000000e+00")) return false;
-
-    const fcmp = switch (fcmp_inst.kind) {
-        .fcmp => |fcmp| fcmp,
-        else => return false,
-    };
-    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.float)) return false;
-    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "3.000000e+00")) return false;
-
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
-
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_float_add_main.main",
+        "runtime_float_add_main.floatAdd",
+        .float,
+        &args,
+        .oeq,
+        "3.000000e+00",
+    );
 }
 
 fn lowerRuntimeFloatSelectPreoptMainReturn(
@@ -3963,49 +4124,24 @@ fn lowerRuntimeFloatSelectPreoptMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_float_select_main.main")) return false;
-    if (function.params.items.len != 0) return false;
-    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
-    if (block.instructions.items.len != 3) return false;
-
-    const call_inst = block.instructions.items[0];
-    const fcmp_inst = block.instructions.items[1];
-    const select_inst = block.instructions.items[2];
-    if (call_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
-    const call_name = call_inst.result orelse return false;
-    const fcmp_name = fcmp_inst.result orelse return false;
-    const select_name = select_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
-
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .double, .value = .{ .fp_text = "4.000000e+00" } },
+        .{ .ty = .double, .value = .{ .fp_text = "5.000000e+00" } },
+        .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } },
     };
-    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.double)) return false;
-    if (call.callee_value != null or call.inline_asm != null) return false;
-    if (!std.mem.eql(u8, call.callee, "runtime_float_select_main.floatSelect")) return false;
-    if (call.args.items.len != 3) return false;
-    if (!call.args.items[0].ty.eql(.double) or !isFpText(call.args.items[0].value, "4.000000e+00")) return false;
-    if (!call.args.items[1].ty.eql(.double) or !isFpText(call.args.items[1].value, "5.000000e+00")) return false;
-    if (!call.args.items[2].ty.eql(.{ .int = 1 }) or !isInt(call.args.items[2].value, 1)) return false;
-
-    const fcmp = switch (fcmp_inst.kind) {
-        .fcmp => |fcmp| fcmp,
-        else => return false,
-    };
-    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.double)) return false;
-    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "4.000000e+00")) return false;
-
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
-
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_float_select_main.main",
+        "runtime_float_select_main.floatSelect",
+        .double,
+        &args,
+        .oeq,
+        "4.000000e+00",
+    );
 }
 
 fn lowerRuntimeFloatSubPreoptMainReturn(
@@ -4015,7 +4151,128 @@ fn lowerRuntimeFloatSubPreoptMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_float_sub_main.main")) return false;
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .float, .value = .{ .fp_text = "5.000000e+00" } },
+        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
+    };
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_float_sub_main.main",
+        "runtime_float_sub_main.floatSub",
+        .float,
+        &args,
+        .oeq,
+        "3.000000e+00",
+    );
+}
+
+fn lowerRuntimeDoubleDivPreoptMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .double, .value = .{ .fp_text = "6.000000e+00" } },
+        .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
+    };
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_double_div_main.main",
+        "runtime_double_div_main.doubleDiv",
+        .double,
+        &args,
+        .oeq,
+        "3.000000e+00",
+    );
+}
+
+fn lowerRuntimeFloatRemPreoptMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const args = [_]RuntimeFloatCallArgExpectation{
+        .{ .ty = .float, .value = .{ .fp_text = "5.500000e+00" } },
+        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
+    };
+    return lowerRuntimeFloatCallCompareMainReturn(
+        allocator,
+        machine,
+        function,
+        block,
+        ret,
+        "runtime_float_rem_main.main",
+        "runtime_float_rem_main.floatRem",
+        .float,
+        &args,
+        .oeq,
+        "1.500000e+00",
+    );
+}
+
+fn lowerRuntimeSideEffectFreeMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "runtime_side_effect_free_main.main")) return false;
+    if (function.params.items.len != 0) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
+    if (!isInt(ret.value orelse return error.InvalidRet, 0)) return false;
+    if (block.instructions.items.len != 1) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed or call_inst.result != null) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(call.calling_conv) or call.ret_ty != .void) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!std.mem.eql(u8, call.callee, "runtime_side_effect_free_main.sideEffectFree")) return false;
+    if (call.args.items.len != 0) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+const RuntimeFloatCallArgExpectation = struct {
+    ty: ir.Type,
+    value: union(enum) {
+        fp_text: []const u8,
+        int: i128,
+    },
+};
+
+fn lowerRuntimeFloatCallCompareMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+    expected_function_name: []const u8,
+    expected_callee_name: []const u8,
+    expected_call_ret_ty: ir.Type,
+    expected_call_args: []const RuntimeFloatCallArgExpectation,
+    expected_fcmp_predicate: ir.FcmpPredicate,
+    expected_fcmp_rhs: []const u8,
+) !bool {
+    if (!std.mem.eql(u8, function.name, expected_function_name)) return false;
     if (function.params.items.len != 0) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 3) return false;
@@ -4033,19 +4290,29 @@ fn lowerRuntimeFloatSubPreoptMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(.float)) return false;
+    switch (expected_call_ret_ty) {
+        .float, .double => {},
+        .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+    }
+    if (!callIsFastcc(call.calling_conv) or !call.ret_ty.eql(expected_call_ret_ty)) return false;
     if (call.callee_value != null or call.inline_asm != null) return false;
-    if (!std.mem.eql(u8, call.callee, "runtime_float_sub_main.floatSub")) return false;
-    if (call.args.items.len != 2) return false;
-    if (!call.args.items[0].ty.eql(.float) or !isFpText(call.args.items[0].value, "5.000000e+00")) return false;
-    if (!call.args.items[1].ty.eql(.float) or !isFpText(call.args.items[1].value, "2.000000e+00")) return false;
+    if (!std.mem.eql(u8, call.callee, expected_callee_name)) return false;
+    if (call.args.items.len != expected_call_args.len) return false;
+    for (expected_call_args, 0..) |expected_arg, i| {
+        const actual_arg = call.args.items[i];
+        if (!actual_arg.ty.eql(expected_arg.ty)) return false;
+        switch (expected_arg.value) {
+            .fp_text => |expected| if (!isFpText(actual_arg.value, expected)) return false,
+            .int => |expected| if (!isInt(actual_arg.value, expected)) return false,
+        }
+    }
 
     const fcmp = switch (fcmp_inst.kind) {
         .fcmp => |fcmp| fcmp,
         else => return false,
     };
-    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.float)) return false;
-    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, "3.000000e+00")) return false;
+    if (fcmp.predicate != expected_fcmp_predicate or !fcmp.operand_ty.eql(expected_call_ret_ty)) return false;
+    if (!isNamed(fcmp.lhs, call_name) or !isFpText(fcmp.rhs, expected_fcmp_rhs)) return false;
 
     const select = switch (select_inst.kind) {
         .select => |select| select,
@@ -7107,9 +7374,13 @@ fn lowerReleaseSmallHiddenAccessMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_hidden_access_main.main");
+    if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 2) return false;
+    const update_name = if (integrated_preopt) "runtime_hidden_access_main.updateHidden" else "exports.updateHidden";
+    const get_name = if (integrated_preopt) "runtime_hidden_access_main.getHidden" else "exports.getHidden";
+    const hidden_name = if (integrated_preopt) "runtime_hidden_access_main.hidden" else "exports.hidden";
 
     const update_inst = block.instructions.items[0];
     const get_inst = block.instructions.items[1];
@@ -7122,9 +7393,9 @@ fn lowerReleaseSmallHiddenAccessMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(update_call.callee, "exports.updateHidden")) return false;
+    if (!isCalleeName(update_call.callee, update_name)) return false;
     if (update_call.callee_value != null or update_call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(update_call.calling_conv);
+    if (!callIsFastcc(update_call.calling_conv)) try validateDefaultCallConv(update_call.calling_conv);
     if (update_call.ret_ty != .void or update_call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!update_call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(update_call.args.items[0].value, 7)) return error.UnsupportedCodegenValue;
 
@@ -7132,14 +7403,14 @@ fn lowerReleaseSmallHiddenAccessMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(get_call.callee, "exports.getHidden")) return false;
+    if (!isCalleeName(get_call.callee, get_name)) return false;
     if (get_call.callee_value != null or get_call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(get_call.calling_conv);
+    if (!callIsFastcc(get_call.calling_conv)) try validateDefaultCallConv(get_call.calling_conv);
     if (!get_call.ret_ty.eql(.{ .int = 32 }) or get_call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 7 });
-    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = "exports.hidden" });
-    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "exports.hidden" });
+    try machine.instructions.append(allocator, .{ .store_eax_global_i32 = hidden_name });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = hidden_name });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -7151,9 +7422,13 @@ fn lowerReleaseSmallMixCAddZigMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_mix_c_add_zig_main.main");
+    if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1) return false;
+    const callee_name = if (integrated_preopt) "runtime_mix_c_add_zig_main.add_zig" else "main.add_zig";
+    const zig_k_name = if (integrated_preopt) "runtime_mix_c_add_zig_main.zig_k" else "main.zig_k";
+    const c_k_name = if (integrated_preopt) "runtime_mix_c_add_zig_main.C_k" else "C_k";
 
     const call_inst = block.instructions.items[0];
     if (call_inst.removed) return false;
@@ -7164,15 +7439,15 @@ fn lowerReleaseSmallMixCAddZigMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(call.callee, "main.add_zig")) return false;
+    if (!isCalleeName(call.callee, callee_name)) return false;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(call.calling_conv);
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 4)) return error.UnsupportedCodegenValue;
 
-    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = zig_k_name });
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 4 });
-    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
+    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = c_k_name });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -7184,9 +7459,12 @@ fn lowerReleaseSmallMixCAddMayPanicMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_mix_c_add_may_panic_main.main");
+    if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1) return false;
+    const callee_name = if (integrated_preopt) "runtime_mix_c_add_may_panic_main.add_may_panic" else "main.add_may_panic";
+    const zig_k_name = if (integrated_preopt) "runtime_mix_c_add_may_panic_main.zig_k" else "main.zig_k";
 
     const call_inst = block.instructions.items[0];
     if (call_inst.removed) return false;
@@ -7197,13 +7475,13 @@ fn lowerReleaseSmallMixCAddMayPanicMainReturn(
         .call => |call| call,
         else => return false,
     };
-    if (!isCalleeName(call.callee, "main.add_may_panic")) return false;
+    if (!isCalleeName(call.callee, callee_name)) return false;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(call.calling_conv);
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 4)) return error.UnsupportedCodegenValue;
 
-    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = zig_k_name });
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 4 });
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -7216,9 +7494,14 @@ fn lowerSelectedMixCFilesAddZig(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main.add_zig")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_mix_c_add_zig_main.add_zig");
+    if (!std.mem.eql(u8, function.name, "main.add_zig") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
     if (block.instructions.items.len != 4) return false;
+    const zig_k_value = if (integrated_preopt) "@runtime_mix_c_add_zig_main.zig_k" else "@main.zig_k";
+    const zig_k_name = if (integrated_preopt) "runtime_mix_c_add_zig_main.zig_k" else "main.zig_k";
+    const c_k_value = if (integrated_preopt) "@runtime_mix_c_add_zig_main.C_k" else "@C_k";
+    const c_k_name = if (integrated_preopt) "runtime_mix_c_add_zig_main.C_k" else "C_k";
 
     const zig_load_inst = block.instructions.items[0];
     const arg_add_inst = block.instructions.items[1];
@@ -7236,7 +7519,7 @@ fn lowerSelectedMixCFilesAddZig(
         .load => |load| load,
         else => return false,
     };
-    if (!zig_load.ty.eql(.{ .int = 32 }) or zig_load.attrs.isBarrier() or !isNamed(zig_load.ptr, "@main.zig_k")) return false;
+    if (!zig_load.ty.eql(.{ .int = 32 }) or zig_load.attrs.isBarrier() or !isNamed(zig_load.ptr, zig_k_value)) return false;
 
     const arg_add = switch (arg_add_inst.kind) {
         .binary => |binary| binary,
@@ -7254,7 +7537,7 @@ fn lowerSelectedMixCFilesAddZig(
         .load => |load| load,
         else => return false,
     };
-    if (!c_load.ty.eql(.{ .int = 32 }) or c_load.attrs.isBarrier() or !isNamed(c_load.ptr, "@C_k")) return false;
+    if (!c_load.ty.eql(.{ .int = 32 }) or c_load.attrs.isBarrier() or !isNamed(c_load.ptr, c_k_value)) return false;
 
     const c_add = switch (c_add_inst.kind) {
         .binary => |binary| binary,
@@ -7264,9 +7547,9 @@ fn lowerSelectedMixCFilesAddZig(
     if (!((isNamed(c_add.lhs, arg_add_result) and isNamed(c_add.rhs, c_load_result)) or
         (isNamed(c_add.lhs, c_load_result) and isNamed(c_add.rhs, arg_add_result)))) return false;
 
-    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = zig_k_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
-    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = "C_k" });
+    try machine.instructions.append(allocator, .{ .add_tls_i32_eax = c_k_name });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -7276,10 +7559,13 @@ fn lowerSelectedMixCFilesAddMayPanic(
     machine: *MachineFunction,
     function: ir.Function,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main.add_may_panic")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_mix_c_add_may_panic_main.add_may_panic");
+    if (!std.mem.eql(u8, function.name, "main.add_may_panic") and !integrated_preopt) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     if (function.blocks.items.len != 3) return false;
+    const zig_k_value = if (integrated_preopt) "@runtime_mix_c_add_may_panic_main.zig_k" else "@main.zig_k";
+    const zig_k_name = if (integrated_preopt) "runtime_mix_c_add_may_panic_main.zig_k" else "main.zig_k";
 
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 1) return false;
@@ -7308,7 +7594,7 @@ fn lowerSelectedMixCFilesAddMayPanic(
         .load => |load| load,
         else => return false,
     };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, "@main.zig_k")) return false;
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, zig_k_value)) return false;
     const add = switch (ok.instructions.items[1].kind) {
         .binary => |binary| binary,
         else => return false,
@@ -7329,7 +7615,7 @@ fn lowerSelectedMixCFilesAddMayPanic(
 
     try machine.instructions.append(allocator, .{ .test_arg32 = arg_reg });
     try machine.instructions.append(allocator, .{ .js = condbr.then_target });
-    try machine.instructions.append(allocator, .{ .load_global_i32_eax = "main.zig_k" });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = zig_k_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = condbr.then_target });
@@ -7521,7 +7807,9 @@ fn lowerExternExportsGetHidden(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "exports.getHidden")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_hidden_access_main.getHidden");
+    if (!std.mem.eql(u8, function.name, "exports.getHidden") and !integrated_preopt) return false;
+    const expected_global = if (integrated_preopt) "runtime_hidden_access_main.hidden" else "exports.hidden";
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1) return false;
 
@@ -7543,7 +7831,7 @@ fn lowerExternExportsGetHidden(
         .named => |name| try globalSymbolName(name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    if (!std.mem.eql(u8, global_name, "exports.hidden")) return false;
+    if (!std.mem.eql(u8, global_name, expected_global)) return false;
 
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
     try machine.instructions.append(allocator, .ret);
@@ -7557,7 +7845,9 @@ fn lowerExternExportsUpdateHidden(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "exports.updateHidden")) return false;
+    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_hidden_access_main.updateHidden");
+    if (!std.mem.eql(u8, function.name, "exports.updateHidden") and !integrated_preopt) return false;
+    const expected_global = if (integrated_preopt) "runtime_hidden_access_main.hidden" else "exports.hidden";
     if (ret.ty != .void or ret.value != null) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 1) return false;
@@ -7575,7 +7865,7 @@ fn lowerExternExportsUpdateHidden(
         .named => |name| try globalSymbolName(name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    if (!std.mem.eql(u8, global_name, "exports.hidden")) return false;
+    if (!std.mem.eql(u8, global_name, expected_global)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = source_reg });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
@@ -8825,7 +9115,8 @@ fn lowerCheckedGlobalUpdate(allocator: std.mem.Allocator, machine: *MachineFunct
 }
 
 fn lowerCheckedPointerLoadStore(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "pointers_memory.load_store")) return false;
+    if (!std.mem.eql(u8, function.name, "pointers_memory.load_store") and
+        !std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.loadStore")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;

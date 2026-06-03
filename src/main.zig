@@ -2911,14 +2911,11 @@ fn writeRuntimeFloatMulIrWriterBody(
         \\@float_mul = alias double (double, double), ptr @float_compare.float_mul
         \\@float_less = alias i1 (float, float), ptr @float_compare.float_less
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %mul = fmul double 3.000000e+00, 2.000000e+00
-        \\  %ok = fcmp oeq double %mul, 6.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime float multiply external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "mul", "fmul", "double", "3.000000e+00", "2.000000e+00", "6.000000e+00");
+    writer.print(
         \\define private double @float_compare.float_mul(double %0, double %1) unnamed_addr align 1 {{
         \\entry:
         \\  %3 = fmul double %0, %1
@@ -2945,14 +2942,11 @@ fn writeRuntimeFloatAddIrWriterBody(
         \\@float_add = alias float (float, float), ptr @floats_math.float_add
         \\@float_select = alias double (double, double, i1), ptr @floats_math.float_select
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %sum = fadd float 1.000000e+00, 2.000000e+00
-        \\  %ok = fcmp oeq float %sum, 3.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime float add external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "sum", "fadd", "float", "1.000000e+00", "2.000000e+00", "3.000000e+00");
+    writer.print(
         \\define private float @floats_math.float_add(float %0, float %1) unnamed_addr align 1 {{
         \\entry:
         \\  %3 = fadd float %0, %1
@@ -3014,14 +3008,11 @@ fn writeRuntimeFloatSubIrWriterBody(
         \\@double_div = alias double (double, double), ptr @fp_extended_ops.double_div
         \\@float_rem = alias float (float, float), ptr @fp_extended_ops.float_rem
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %diff = fsub float 5.000000e+00, 2.000000e+00
-        \\  %ok = fcmp oeq float %diff, 3.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime float subtract external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "diff", "fsub", "float", "5.000000e+00", "2.000000e+00", "3.000000e+00");
+    writer.print(
         \\define private float @fp_extended_ops.float_sub(float %0, float %1) unnamed_addr align 1 {{
         \\entry:
         \\  %3 = fsub float %0, %1
@@ -3045,6 +3036,31 @@ fn writeRuntimeFloatSubIrWriterBody(
     };
 }
 
+fn writeRuntimeFloatBinaryCheckIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+    result_name: []const u8,
+    op: []const u8,
+    ty: []const u8,
+    lhs: []const u8,
+    rhs: []const u8,
+    expected: []const u8,
+) !void {
+    writer.print(
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  %{s} = {s} {s} {s}, {s}
+        \\  %ok = fcmp oeq {s} %{s}, {s}
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}}
+        \\
+    , .{ result_name, op, ty, lhs, rhs, ty, result_name, expected }) catch |err| {
+        try fatal(io, "failed to write runtime float binary check external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
 fn writeRuntimeDoubleDivIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
@@ -3055,14 +3071,11 @@ fn writeRuntimeDoubleDivIrWriterBody(
         \\@float_sub = alias float (float, float), ptr @fp_extended_ops.float_sub
         \\@float_rem = alias float (float, float), ptr @fp_extended_ops.float_rem
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %quot = fdiv double 6.000000e+00, 2.000000e+00
-        \\  %ok = fcmp oeq double %quot, 3.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime double divide external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "quot", "fdiv", "double", "6.000000e+00", "2.000000e+00", "3.000000e+00");
+    writer.print(
         \\define private double @fp_extended_ops.double_div(double %0, double %1) unnamed_addr align 1 {{
         \\entry:
         \\  %3 = fdiv double %0, %1
@@ -3096,14 +3109,11 @@ fn writeRuntimeFloatRemIrWriterBody(
         \\@float_sub = alias float (float, float), ptr @fp_extended_ops.float_sub
         \\@double_div = alias double (double, double), ptr @fp_extended_ops.double_div
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %rem = frem float 5.500000e+00, 2.000000e+00
-        \\  %ok = fcmp oeq float %rem, 1.500000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write runtime float remainder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "rem", "frem", "float", "5.500000e+00", "2.000000e+00", "1.500000e+00");
+    writer.print(
         \\define private float @fp_extended_ops.float_rem(float %0, float %1) unnamed_addr align 1 {{
         \\entry:
         \\  %3 = frem float %0, %1

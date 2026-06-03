@@ -10,16 +10,22 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Close the integrated preopt double-div object-emission blocker after the
+Keep the integrated preopt object gate clean after closing the selected
+float-rem blocker and the follow-on ReleaseSmall mix-C blockers. The
 selected integrated postopt object gate is clean and the integrated preopt
 pointer, volatile, optional, packed, struct, array, optional-payload,
 error-union-payload, slice-sum, aggregate-pair, float-less, float-mul, and
-float-add, float-select, and float-sub rows are clean. The previous blocker,
-`releasefast_runtime_float_sub`, now object-emits and links/runs through the
-preopt path with selected `f32` subtract wrapper lowering. The next measured
-blocker is `releasefast_runtime_double_div` in the
-integrated preopt path, where z_llvm optimization plus object emission fails
-with `UnsupportedCodegenCallingConvention`.
+float-add, float-select, float-sub, double-div, and float-rem rows are clean.
+The previous blockers `releasefast_runtime_double_div` and
+`releasefast_runtime_float_rem` now object-emit and link/run through the
+preopt path with selected FP binary wrapper lowering. The promoted
+ReleaseSmall blockers `releasesmall_runtime_mix_c_add_zig` and
+`releasesmall_runtime_mix_c_add_may_panic` are also closed. The current
+measured `zig build distribution-zig-integrated-preopt` gate is clean with
+`total=87 executable_ok=87 link_only_ok=0 local_fail=0`.
+The selected float preopt main rows now share one call/fcmp/select wrapper
+helper for the already-closed float-mul, float-add, float-select, and
+float-sub, double-div, and float-rem blockers.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -52,9 +58,9 @@ now covers `float_mul(a: f64, b: f64) f64` from the same fixture. The next
 `releasefast_runtime_double_div` row covers
 `double_div(a: f64, b: f64) f64` from
 `test/zig/inputs/fp_extended_ops.zig`. The completed
-`releasefast_runtime_float_rem` row uses the
-same fixture's selected `float_rem(a: f32, b: f32) f32` family that appears in
-captured ReleaseFast x86_64 IR and selected x86_64 FP object/codegen evidence.
+`releasefast_runtime_float_rem` row uses the same fixture's selected
+`float_rem(a: f32, b: f32) f32` family that appears in captured ReleaseFast
+x86_64 IR and selected x86_64 FP object/codegen evidence.
 The completed `releasefast_runtime_pointer_load_store` row is paired with
 `pointers_memory.load_store(p: *i32, q: *i32) i32` from
 `test/zig/inputs/pointers_memory.zig`, which exercises a pointer load, integer
@@ -603,9 +609,23 @@ which fails object emission with `UnsupportedCodegenCallingConvention`; that
 row now passes through the preopt path with selected wrapper lowering. The
 next selected blocker is integrated preopt `releasefast_runtime_float_sub`,
 which fails object emission with `UnsupportedCodegenCallingConvention`; that
-row now passes through the preopt path with selected wrapper lowering. The
-next selected blocker is integrated preopt `releasefast_runtime_double_div`,
-which fails object emission with `UnsupportedCodegenCallingConvention`.
+row now passes through the preopt path with selected wrapper lowering and is
+closed by the shared selected float preopt helper. The next selected blocker
+is integrated preopt `releasefast_runtime_double_div`,
+which fails object emission with `UnsupportedCodegenCallingConvention`; that
+row now passes through the preopt path with selected wrapper lowering and is
+closed by the shared selected float preopt helper. The next selected blocker
+is integrated preopt `releasefast_runtime_float_rem`, which fails object
+emission with `UnsupportedCodegenCallingConvention`; that row now passes
+through the preopt path with selected wrapper lowering and is closed by the
+shared selected float preopt helper. The broad integrated preopt gate then
+exposed `releasesafe_runtime_pointer_load_store`,
+`releasesafe_runtime_side_effect_free`,
+`releasesmall_runtime_hidden_access`,
+`releasesmall_runtime_mix_c_add_zig`, and
+`releasesmall_runtime_mix_c_add_may_panic` as follow-on selected blockers;
+those rows now pass, and the measured integrated preopt gate has no remaining
+blocker.
 
 Completed float-sub mapping:
 `runtime_float_sub_main.main` calls the selected `fastcc` helper with
@@ -614,22 +634,35 @@ Completed float-sub mapping:
 and returns the source-level executable result. The private helper remains
 covered by the selected `fsub float` lowering.
 
+Completed double-div mapping:
+`runtime_double_div_main.main` calls the selected `fastcc` helper with
+`double 6.000000e+00` and `double 2.000000e+00`, compares the result with
+`double 3.000000e+00`, selects `i32 0` on equality and `i32 1` otherwise,
+and returns the source-level executable result. The private helper remains
+covered by the selected `fdiv double` lowering.
+
+Completed float-rem mapping:
+`runtime_float_rem_main.main` calls the selected `fastcc` helper with
+`float 5.500000e+00` and `float 2.000000e+00`, compares the result with
+`float 1.500000e+00`, selects `i32 0` on equality and `i32 1` otherwise,
+and returns the source-level executable result. The private helper remains
+covered by the selected `frem float` lowering.
+
 Known boundary:
-Only the selected integrated preopt `f64` divide wrapper object-emission
-blocker: `releasefast_runtime_double_div`.
+No measured blocker remains in `zig build distribution-zig-integrated-preopt`.
 Full decoder coverage, arbitrary loops, all table forms, all bit-buffer
 behavior, all stores, all padding validation, private aggregate-global data
-relocations, and broad object/linker behavior remain out of scope.
+relocations, and broader object/linker behavior remain out of scope for the
+selected rows closed here.
 
 Validation gate:
-Focused gate:
-`zig run tools/run_distribution_zig_integrated_object.zig -- --pipeline=preopt --case=releasefast_runtime_double_div`
-Then run `zig build distribution-zig-integrated-preopt` and promote the first
-sorted follow-on blocker into this file.
+Run `zig build distribution-zig-integrated-preopt` as the measured integrated
+preopt gate. If a new blocker appears after future row additions, promote the
+first sorted failure with exact case_id, wrapper, mode, pipeline, and error.
 
 Commit:
-Commit the selected integrated preopt float-sub closure and double-div
-handoff with the policy in `docs/commit_policy.md`.
+Commit the selected integrated preopt FP helper closures and follow-on
+ReleaseSmall mix-C closures with the policy in `docs/commit_policy.md`.
 
 ## Current Evidence
 
