@@ -768,3 +768,9 @@ proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.
+The next milestone starts after that frozen 87-row claim: the
+`releasesmall_runtime_base64_decode_base_64_full` row registers a full
+`@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
+boundary closure. Its current object path is a selected boundary stub, so the
+base64 matrix row remains reduced-boundary evidence until real whole-function
+lowering replaces that stub.

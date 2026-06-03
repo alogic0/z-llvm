@@ -334,6 +334,8 @@ fn writeIrWriterModuleFromEnv(
         try writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) {
         try writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(io, &writer.interface, ir_path);
+    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_base_64_full")) {
+        try writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) {
         try writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(io, &writer.interface, ir_path);
     } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) {
@@ -461,6 +463,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-prologue";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_base_64_full")) return "base64-decode-base64-full";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) return "base64-decode-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) return "base64-store-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_byte_step")) return "base64-residual-byte-step";
@@ -851,6 +854,308 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
     };
 }
 
+fn writeIrBlock(writer: *std.Io.Writer, name: []const u8) !void {
+    try writer.print("{s}:\n", .{name});
+}
+
+fn writeIrBr(writer: *std.Io.Writer, target_block: []const u8) !void {
+    try writer.print("  br label %{s}\n", .{target_block});
+}
+
+fn writeIrCondBr(writer: *std.Io.Writer, cond: []const u8, then_target: []const u8, else_target: []const u8) !void {
+    try writer.print("  br i1 %{s}, label %{s}, label %{s}\n", .{ cond, then_target, else_target });
+}
+
+fn writeIrPhi2(
+    writer: *std.Io.Writer,
+    name: []const u8,
+    ty: []const u8,
+    first_value: []const u8,
+    first_block: []const u8,
+    second_value: []const u8,
+    second_block: []const u8,
+) !void {
+    try writer.print("  %{s} = phi {s} [ {s}, %{s} ], [ {s}, %{s} ]\n", .{ name, ty, first_value, first_block, second_value, second_block });
+}
+
+fn writeIrLoopHeader2(
+    writer: *std.Io.Writer,
+    block_name: []const u8,
+    first_phi: []const u8,
+    first_ty: []const u8,
+    first_entry_value: []const u8,
+    first_next_value: []const u8,
+    second_phi: []const u8,
+    second_ty: []const u8,
+    second_entry_value: []const u8,
+    second_next_value: []const u8,
+    entry_block: []const u8,
+    latch_block: []const u8,
+) !void {
+    try writeIrBlock(writer, block_name);
+    try writeIrPhi2(writer, first_phi, first_ty, first_entry_value, entry_block, first_next_value, latch_block);
+    try writeIrPhi2(writer, second_phi, second_ty, second_entry_value, entry_block, second_next_value, latch_block);
+}
+
+fn writeIrGep(writer: *std.Io.Writer, result: []const u8, elem_ty: []const u8, base: []const u8, index: []const u8) !void {
+    try writer.print("  %{s} = getelementptr {s}, ptr {s}, i64 {s}\n", .{ result, elem_ty, base, index });
+}
+
+fn writeIrGep2(
+    writer: *std.Io.Writer,
+    result: []const u8,
+    elem_ty: []const u8,
+    base: []const u8,
+    first_index: []const u8,
+    second_index: []const u8,
+) !void {
+    try writer.print("  %{s} = getelementptr {s}, ptr {s}, i64 {s}, i64 {s}\n", .{ result, elem_ty, base, first_index, second_index });
+}
+
+fn writeIrLoad(writer: *std.Io.Writer, result: []const u8, ty: []const u8, ptr_name: []const u8, align_text: []const u8) !void {
+    try writer.print("  %{s} = load {s}, ptr {s}, align {s}\n", .{ result, ty, ptr_name, align_text });
+}
+
+fn writeIrStore(writer: *std.Io.Writer, ty: []const u8, value: []const u8, ptr_name: []const u8, align_text: []const u8) !void {
+    try writer.print("  store {s} {s}, ptr {s}, align {s}\n", .{ ty, value, ptr_name, align_text });
+}
+
+fn writeIrPointerIndexAdvance(writer: *std.Io.Writer, result: []const u8, base: []const u8, delta: []const u8) !void {
+    try writer.print("  %{s} = add nuw i64 {s}, {s}\n", .{ result, base, delta });
+}
+
+fn writeIrByteMask(writer: *std.Io.Writer, result: []const u8, value: []const u8, mask: []const u8) !void {
+    try writer.print("  %{s} = and i8 {s}, {s}\n", .{ result, value, mask });
+}
+
+fn writeIrShift(writer: *std.Io.Writer, result: []const u8, op: []const u8, ty: []const u8, value: []const u8, shift: []const u8) !void {
+    try writer.print("  %{s} = {s} {s} {s}, {s}\n", .{ result, op, ty, value, shift });
+}
+
+fn writeIrTrunc(writer: *std.Io.Writer, result: []const u8, from_ty: []const u8, value: []const u8, to_ty: []const u8) !void {
+    try writer.print("  %{s} = trunc {s} {s} to {s}\n", .{ result, from_ty, value, to_ty });
+}
+
+fn writeIrIndexedTableLoad(
+    writer: *std.Io.Writer,
+    prefix: []const u8,
+    table: []const u8,
+    byte_name: []const u8,
+) !void {
+    try writer.print(
+        \\  %{s}.idx = zext i8 %{s} to i64
+        \\  %{s}.entry = getelementptr [4 x i8], ptr @{s}, i64 %{s}.idx
+        \\  %{s}.word = load i32, ptr %{s}.entry, align 4
+        \\
+    , .{ prefix, byte_name, prefix, table, prefix, prefix, prefix });
+}
+
+fn writeBase64SourceByte(
+    writer: *std.Io.Writer,
+    ptr_name: []const u8,
+    byte_name: []const u8,
+    base_ptr: []const u8,
+    offset: []const u8,
+) !void {
+    try writeIrGep(writer, ptr_name, "i8", base_ptr, offset);
+    try writer.print("  %{s} = load i8, ptr %{s}, align 1\n", .{ byte_name, ptr_name });
+}
+
+fn writeBase64OutputStore(writer: *std.Io.Writer, ptr_name: []const u8, output_base: []const u8, offset: []const u8, ty: []const u8, value: []const u8) !void {
+    try writeIrGep(writer, ptr_name, "i8", output_base, offset);
+    try writer.print("  store {s} {s}, ptr %{s}, align 1\n", .{ ty, value, ptr_name });
+}
+
+fn writeBase64FourByteBundleLoads(
+    writer: *std.Io.Writer,
+    input_global: []const u8,
+    base_offset: []const u8,
+    table0: []const u8,
+    table1: []const u8,
+    table2: []const u8,
+    table3: []const u8,
+) !void {
+    try writer.writeAll("\n");
+    try writeIrGep(writer, "src0", "i8", input_global, base_offset);
+    try writeIrLoad(writer, "byte0", "i8", "%src0", "1");
+    try writeIrIndexedTableLoad(writer, "word0", table0, "byte0");
+    try writeIrGep(writer, "src1", "i8", "%src0", "1");
+    try writeIrLoad(writer, "byte1", "i8", "%src1", "1");
+    try writeIrIndexedTableLoad(writer, "word1", table1, "byte1");
+    try writer.print("  %merged1 = or i32 %word1.word, %word0.word\n", .{});
+    try writeIrGep(writer, "src2", "i8", "%src0", "2");
+    try writeIrLoad(writer, "byte2", "i8", "%src2", "1");
+    try writeIrIndexedTableLoad(writer, "word2", table2, "byte2");
+    try writer.print("  %merged2 = or i32 %merged1, %word2.word\n", .{});
+    try writeIrGep(writer, "src3", "i8", "%src0", "3");
+    try writeIrLoad(writer, "byte3", "i8", "%src3", "1");
+    try writeIrIndexedTableLoad(writer, "word3", table3, "byte3");
+    try writer.print(
+        \\  %word = or i32 %merged2, %word3.word
+        \\  %valid = icmp ult i32 %word, 16777216
+        \\
+    , .{});
+}
+
+fn writeIrIndexedI8TableLoad(
+    writer: *std.Io.Writer,
+    prefix: []const u8,
+    table: []const u8,
+    byte_name: []const u8,
+) !void {
+    try writer.print(
+        \\  %{s}.idx = zext i8 %{s} to i64
+        \\  %{s}.entry = getelementptr [256 x i8], ptr @{s}, i64 0, i64 %{s}.idx
+        \\  %{s}.word = load i8, ptr %{s}.entry, align 1
+        \\
+    , .{ prefix, byte_name, prefix, table, prefix, prefix, prefix });
+}
+
+fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writer.print(
+        \\@base64.full_input = private unnamed_addr global [4 x i8] c"TWFu", align 1
+        \\@base64.full_output = private unnamed_addr global [3 x i8] zeroinitializer, align 1
+        \\@base64.full_table = private unnamed_addr global [256 x i8] zeroinitializer, align 1
+        \\
+        \\define dso_local i32 @main() local_unnamed_addr {{
+        \\entry:
+        \\  ret i32 0
+        \\}}
+        \\
+        \\define available_externally i64 @base64.decode_base_64(ptr %source, i64 %source_len, ptr %output, i64 %output_len) unnamed_addr {{
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "entry") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
+        \\  %source.len.ok = icmp eq i64 %source_len, 4
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrCondBr(writer, "source.len.ok", "check_output", "decode_fail") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "check_output") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
+        \\  %output.len.ok = icmp uge i64 %output_len, 3
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrCondBr(writer, "output.len.ok", "decode_loop", "decode_fail") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "decode_loop") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeIrPhi2(writer, "source.index", "i64", "0", "check_output", "%source.next", "decode_latch");
+    try writeIrPhi2(writer, "output.index", "i64", "0", "check_output", "%output.next", "decode_latch");
+    writeIrGep(writer, "src0", "i8", "%source", "%source.index") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrLoad(writer, "b0", "i8", "%src0", "1") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeIrIndexedI8TableLoad(writer, "v0", "base64.full_table", "b0");
+    try writeIrPointerIndexAdvance(writer, "src1.index", "%source.index", "1");
+    try writeIrGep(writer, "src1", "i8", "%source", "%src1.index");
+    try writeIrLoad(writer, "b1", "i8", "%src1", "1");
+    try writeIrIndexedI8TableLoad(writer, "v1", "base64.full_table", "b1");
+    try writeIrPointerIndexAdvance(writer, "src2.index", "%source.index", "2");
+    try writeIrGep(writer, "src2", "i8", "%source", "%src2.index");
+    try writeIrLoad(writer, "b2", "i8", "%src2", "1");
+    try writeIrIndexedI8TableLoad(writer, "v2", "base64.full_table", "b2");
+    try writeIrPointerIndexAdvance(writer, "src3.index", "%source.index", "3");
+    try writeIrGep(writer, "src3", "i8", "%source", "%src3.index");
+    try writeIrLoad(writer, "b3", "i8", "%src3", "1");
+    try writeIrIndexedI8TableLoad(writer, "v3", "base64.full_table", "b3");
+    try writeIrByteMask(writer, "v0.masked", "%v0.word", "63");
+    try writeIrByteMask(writer, "v1.masked", "%v1.word", "63");
+    try writeIrByteMask(writer, "v2.masked", "%v2.word", "63");
+    try writeIrByteMask(writer, "v3.masked", "%v3.word", "63");
+    writer.print(
+        \\  %v0.i32 = zext i8 %v0.masked to i32
+        \\  %v1.i32 = zext i8 %v1.masked to i32
+        \\  %v2.i32 = zext i8 %v2.masked to i32
+        \\  %v3.i32 = zext i8 %v3.masked to i32
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeIrShift(writer, "shift0", "shl", "i32", "%v0.i32", "18");
+    try writeIrShift(writer, "shift1", "shl", "i32", "%v1.i32", "12");
+    writer.print(
+        \\  %word1 = or i32 %shift0, %shift1
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeIrShift(writer, "shift2", "shl", "i32", "%v2.i32", "6");
+    writer.print(
+        \\  %word2 = or i32 %word1, %shift2
+        \\  %word = or i32 %word2, %v3.i32
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    try writeIrShift(writer, "byte0.shift", "lshr", "i32", "%word", "16");
+    try writeIrTrunc(writer, "byte0", "i32", "%byte0.shift", "i8");
+    try writeBase64OutputStore(writer, "dst0", "%output", "%output.index", "i8", "%byte0");
+    try writeIrPointerIndexAdvance(writer, "dst1.index", "%output.index", "1");
+    try writeIrShift(writer, "byte1.shift", "lshr", "i32", "%word", "8");
+    try writeIrTrunc(writer, "byte1", "i32", "%byte1.shift", "i8");
+    try writeBase64OutputStore(writer, "dst1", "%output", "%dst1.index", "i8", "%byte1");
+    try writeIrPointerIndexAdvance(writer, "dst2.index", "%output.index", "2");
+    try writeIrTrunc(writer, "byte2", "i32", "%word", "i8");
+    try writeBase64OutputStore(writer, "dst2", "%output", "%dst2.index", "i8", "%byte2");
+    try writeIrPointerIndexAdvance(writer, "source.next", "%source.index", "4");
+    try writeIrPointerIndexAdvance(writer, "output.next", "%output.index", "3");
+    writer.print(
+        \\  %done = icmp eq i64 %source.next, %source_len
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrCondBr(writer, "done", "decode_done", "decode_latch") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "decode_latch") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBr(writer, "decode_loop") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "decode_done") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
+        \\  ret i64 %output.next
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "decode_fail") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
+        \\  ret i64 -1
+        \\}}
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
 fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
@@ -1083,30 +1388,21 @@ fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  %src0 = getelementptr i8, ptr @base64.source_bundle_input, i64 4
-        \\  %byte0 = load i8, ptr %src0, align 1
-        \\  %idx0 = zext i8 %byte0 to i64
-        \\  %entry0 = getelementptr [4 x i8], ptr @base64.source_bundle_table0, i64 %idx0
-        \\  %word0 = load i32, ptr %entry0, align 4
-        \\  %src1 = getelementptr i8, ptr %src0, i64 1
-        \\  %byte1 = load i8, ptr %src1, align 1
-        \\  %idx1 = zext i8 %byte1 to i64
-        \\  %entry1 = getelementptr [4 x i8], ptr @base64.source_bundle_table1, i64 %idx1
-        \\  %word1 = load i32, ptr %entry1, align 4
-        \\  %merged1 = or i32 %word1, %word0
-        \\  %src2 = getelementptr i8, ptr %src0, i64 2
-        \\  %byte2 = load i8, ptr %src2, align 1
-        \\  %idx2 = zext i8 %byte2 to i64
-        \\  %entry2 = getelementptr [4 x i8], ptr @base64.source_bundle_table2, i64 %idx2
-        \\  %word2 = load i32, ptr %entry2, align 4
-        \\  %merged2 = or i32 %merged1, %word2
-        \\  %src3 = getelementptr i8, ptr %src0, i64 3
-        \\  %byte3 = load i8, ptr %src3, align 1
-        \\  %idx3 = zext i8 %byte3 to i64
-        \\  %entry3 = getelementptr [4 x i8], ptr @base64.source_bundle_table3, i64 %idx3
-        \\  %word3 = load i32, ptr %entry3, align 4
-        \\  %word = or i32 %merged2, %word3
-        \\  %valid = icmp ult i32 %word, 16777216
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FourByteBundleLoads(
+        writer,
+        "@base64.source_bundle_input",
+        "4",
+        "base64.source_bundle_table0",
+        "base64.source_bundle_table1",
+        "base64.source_bundle_table2",
+        "base64.source_bundle_table3",
+    ) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
         \\  %ret = select i1 %valid, i32 0, i32 1
         \\  ret i32 %ret
         \\}}
@@ -1130,30 +1426,21 @@ fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  %src0 = getelementptr i8, ptr @base64.next_source_bundle_input, i64 8
-        \\  %byte0 = load i8, ptr %src0, align 1
-        \\  %idx0 = zext i8 %byte0 to i64
-        \\  %entry0 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table0, i64 %idx0
-        \\  %word0 = load i32, ptr %entry0, align 4
-        \\  %src1 = getelementptr i8, ptr %src0, i64 1
-        \\  %byte1 = load i8, ptr %src1, align 1
-        \\  %idx1 = zext i8 %byte1 to i64
-        \\  %entry1 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table1, i64 %idx1
-        \\  %word1 = load i32, ptr %entry1, align 4
-        \\  %merged1 = or i32 %word1, %word0
-        \\  %src2 = getelementptr i8, ptr %src0, i64 2
-        \\  %byte2 = load i8, ptr %src2, align 1
-        \\  %idx2 = zext i8 %byte2 to i64
-        \\  %entry2 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table2, i64 %idx2
-        \\  %word2 = load i32, ptr %entry2, align 4
-        \\  %merged2 = or i32 %merged1, %word2
-        \\  %src3 = getelementptr i8, ptr %src0, i64 3
-        \\  %byte3 = load i8, ptr %src3, align 1
-        \\  %idx3 = zext i8 %byte3 to i64
-        \\  %entry3 = getelementptr [4 x i8], ptr @base64.next_source_bundle_table3, i64 %idx3
-        \\  %word3 = load i32, ptr %entry3, align 4
-        \\  %word = or i32 %merged2, %word3
-        \\  %valid = icmp ult i32 %word, 16777216
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FourByteBundleLoads(
+        writer,
+        "@base64.next_source_bundle_input",
+        "8",
+        "base64.next_source_bundle_table0",
+        "base64.next_source_bundle_table1",
+        "base64.next_source_bundle_table2",
+        "base64.next_source_bundle_table3",
+    ) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
         \\  %ret = select i1 %valid, i32 0, i32 1
         \\  ret i32 %ret
         \\}}
@@ -1177,30 +1464,21 @@ fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  %src0 = getelementptr i8, ptr @base64.third_source_bundle_input, i64 12
-        \\  %byte0 = load i8, ptr %src0, align 1
-        \\  %idx0 = zext i8 %byte0 to i64
-        \\  %entry0 = getelementptr [4 x i8], ptr @base64.third_source_bundle_table0, i64 %idx0
-        \\  %word0 = load i32, ptr %entry0, align 4
-        \\  %src1 = getelementptr i8, ptr %src0, i64 1
-        \\  %byte1 = load i8, ptr %src1, align 1
-        \\  %idx1 = zext i8 %byte1 to i64
-        \\  %entry1 = getelementptr [4 x i8], ptr @base64.third_source_bundle_table1, i64 %idx1
-        \\  %word1 = load i32, ptr %entry1, align 4
-        \\  %merged1 = or i32 %word1, %word0
-        \\  %src2 = getelementptr i8, ptr %src0, i64 2
-        \\  %byte2 = load i8, ptr %src2, align 1
-        \\  %idx2 = zext i8 %byte2 to i64
-        \\  %entry2 = getelementptr [4 x i8], ptr @base64.third_source_bundle_table2, i64 %idx2
-        \\  %word2 = load i32, ptr %entry2, align 4
-        \\  %merged2 = or i32 %merged1, %word2
-        \\  %src3 = getelementptr i8, ptr %src0, i64 3
-        \\  %byte3 = load i8, ptr %src3, align 1
-        \\  %idx3 = zext i8 %byte3 to i64
-        \\  %entry3 = getelementptr [4 x i8], ptr @base64.third_source_bundle_table3, i64 %idx3
-        \\  %word3 = load i32, ptr %entry3, align 4
-        \\  %word = or i32 %merged2, %word3
-        \\  %valid = icmp ult i32 %word, 16777216
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FourByteBundleLoads(
+        writer,
+        "@base64.third_source_bundle_input",
+        "12",
+        "base64.third_source_bundle_table0",
+        "base64.third_source_bundle_table1",
+        "base64.third_source_bundle_table2",
+        "base64.third_source_bundle_table3",
+    ) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
         \\  %ret = select i1 %valid, i32 0, i32 1
         \\  ret i32 %ret
         \\}}
@@ -1337,30 +1615,21 @@ fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  %src0 = getelementptr i8, ptr @base64.residual_bundle_input, i64 0
-        \\  %byte0 = load i8, ptr %src0, align 1
-        \\  %idx0 = zext i8 %byte0 to i64
-        \\  %entry0 = getelementptr [4 x i8], ptr @base64.residual_bundle_table0, i64 %idx0
-        \\  %word0 = load i32, ptr %entry0, align 4
-        \\  %src1 = getelementptr i8, ptr %src0, i64 1
-        \\  %byte1 = load i8, ptr %src1, align 1
-        \\  %idx1 = zext i8 %byte1 to i64
-        \\  %entry1 = getelementptr [4 x i8], ptr @base64.residual_bundle_table1, i64 %idx1
-        \\  %word1 = load i32, ptr %entry1, align 4
-        \\  %merged1 = or i32 %word1, %word0
-        \\  %src2 = getelementptr i8, ptr %src0, i64 2
-        \\  %byte2 = load i8, ptr %src2, align 1
-        \\  %idx2 = zext i8 %byte2 to i64
-        \\  %entry2 = getelementptr [4 x i8], ptr @base64.residual_bundle_table2, i64 %idx2
-        \\  %word2 = load i32, ptr %entry2, align 4
-        \\  %merged2 = or i32 %merged1, %word2
-        \\  %src3 = getelementptr i8, ptr %src0, i64 3
-        \\  %byte3 = load i8, ptr %src3, align 1
-        \\  %idx3 = zext i8 %byte3 to i64
-        \\  %entry3 = getelementptr [4 x i8], ptr @base64.residual_bundle_table3, i64 %idx3
-        \\  %word3 = load i32, ptr %entry3, align 4
-        \\  %word = or i32 %merged2, %word3
-        \\  %valid = icmp ult i32 %word, 16777216
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FourByteBundleLoads(
+        writer,
+        "@base64.residual_bundle_input",
+        "0",
+        "base64.residual_bundle_table0",
+        "base64.residual_bundle_table1",
+        "base64.residual_bundle_table2",
+        "base64.residual_bundle_table3",
+    ) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
         \\  %ret = select i1 %valid, i32 0, i32 1
         \\  ret i32 %ret
         \\}}

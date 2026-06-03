@@ -10,22 +10,25 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Keep the integrated preopt object gate clean after closing the selected
-float-rem blocker and the follow-on ReleaseSmall mix-C blockers. The
-selected integrated postopt object gate is clean and the integrated preopt
-pointer, volatile, optional, packed, struct, array, optional-payload,
-error-union-payload, slice-sum, aggregate-pair, float-less, float-mul, and
-float-add, float-select, float-sub, double-div, and float-rem rows are clean.
-The previous blockers `releasefast_runtime_double_div` and
-`releasefast_runtime_float_rem` now object-emit and link/run through the
-preopt path with selected FP binary wrapper lowering. The promoted
-ReleaseSmall blockers `releasesmall_runtime_mix_c_add_zig` and
-`releasesmall_runtime_mix_c_add_may_panic` are also closed. The current
-measured `zig build distribution-zig-integrated-preopt` gate is clean with
-`total=87 executable_ok=87 link_only_ok=0 local_fail=0`.
-The selected float preopt main rows now share one call/fcmp/select wrapper
-helper for the already-closed float-mul, float-add, float-select, and
-float-sub, double-div, and float-rem blockers.
+Freeze the completed x86_64 selected external IR-writer milestone and start
+the next ReleaseSmall whole-function boundary milestone. The frozen milestone
+is green under `zig build distribution-all`: the x86_64 selected 87-row
+external IR-writer gate has `total=87 executable_ok=87 link_only_ok=0
+local_fail=0`, `scalar_runtime_rows=87`, `minimal_wrapper_rows=0`, and no
+active local failure remains. The selected integrated postopt object gate and
+the selected integrated preopt object gate are also clean.
+
+Next target:
+x86_64 whole-function ReleaseSmall boundary closure for the two current
+explicit exclusions:
+`standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
+(`@decode_base_64 -> @base64.decode_base_64`) and
+`standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
+(`@strFromFloatHelp -> @main.strFromFloatHelp`). Start with the full
+`base64.decode_base_64` external IR-writer body, then replace the current
+selected boundary stub with real whole-function lowering before promoting the
+matrix row from reduced boundary evidence to whole-function evidence. Attack
+`strFromFloatHelp` after inventorying its full block/FP-formatting shape.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -61,6 +64,13 @@ now covers `float_mul(a: f64, b: f64) f64` from the same fixture. The next
 `releasefast_runtime_float_rem` row uses the same fixture's selected
 `float_rem(a: f32, b: f32) f32` family that appears in captured ReleaseFast
 x86_64 IR and selected x86_64 FP object/codegen evidence.
+The new `releasesmall_runtime_base64_decode_base_64_full` row starts the
+whole-function ReleaseSmall boundary milestone by emitting a full
+`@base64.decode_base_64` textual IR body with named blocks, loop phis,
+source/table loads, byte masks, shifts, truncation, output stores, and pointer
+index advancement. Its current backend path is deliberately recorded as a
+selected boundary stub; the row is not yet promoted from reduced boundary
+evidence to whole-function closure.
 The completed `releasefast_runtime_pointer_load_store` row is paired with
 `pointers_memory.load_store(p: *i32, q: *i32) i32` from
 `test/zig/inputs/pointers_memory.zig`, which exercises a pointer load, integer

@@ -891,6 +891,9 @@ boundary_exclusion=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimiz
 boundary_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
 focused_boundary_gate=zig build distribution-releasesmall-boundary
+whole_function_boundary_inventory=@decode_base_64 -> @base64.decode_base_64 full textual IR body registered as releasesmall_runtime_base64_decode_base_64_full
+whole_function_boundary_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_base_64_full
+whole_function_boundary_status=started; current backend path is a selected boundary stub, not promoted whole-function closure
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected four-entry decode table load/OR/validity step
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected output pointer store step

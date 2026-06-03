@@ -508,6 +508,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-str-from-float-prologue",
     },
     .{
+        .id = "releasesmall_runtime_base64_decode_base_64_full",
+        .wrapper = "test/zig/integrated/runtime_base64_decode_base_64_full_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-base-64-full",
+    },
+    .{
         .id = "releasesmall_runtime_base64_decode_step",
         .wrapper = "test/zig/integrated/runtime_base64_decode_step_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll",
@@ -865,6 +873,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "inherit-i64-return" },
         .{ .name = "compile-asm-unreachable" },
         .{ .name = "str-from-float-prologue" },
+        .{ .name = "base64-decode-base64-full" },
         .{ .name = "base64-decode-step" },
         .{ .name = "base64-store-step" },
         .{ .name = "base64-residual-byte-step" },
@@ -1190,6 +1199,9 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_str_from_float_help")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-str-from-float-prologue";
     }
+    if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_base_64_full")) {
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-base-64-full";
+    }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_step")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-step";
     }
@@ -1447,6 +1459,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "inherit-i64-return")) return "inherit-i64-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "compile-asm-unreachable")) return "compile-asm-unreachable";
     if (std.mem.eql(u8, contents[value_start..value_end], "str-from-float-prologue")) return "str-from-float-prologue";
+    if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-base64-full")) return "base64-decode-base64-full";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-step")) return "base64-decode-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-store-step")) return "base64-store-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-residual-byte-step")) return "base64-residual-byte-step";
