@@ -44,12 +44,44 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_source_integers_add_wrap",
+        .wrapper = "test/zig/integrated/integers_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/integers_add_wrap.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:integers-add-wrap",
+    },
+    .{
+        .id = "releasefast_source_integers_cmp_shift",
+        .wrapper = "test/zig/integrated/integers_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/integers_cmp_shift.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:integers-cmp-shift",
+    },
+    .{
         .id = "releasefast_control_flow_calls",
         .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
         .covered_fixture = "test/zig/inputs/control_flow_calls.zig",
         .mode = "ReleaseFast",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
+    },
+    .{
+        .id = "releasefast_source_control_flow_loop_sum",
+        .wrapper = "test/zig/integrated/runtime_loop_sum_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/control_flow_calls_loop_sum.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:control-flow-loop-sum",
+    },
+    .{
+        .id = "releasefast_source_control_flow_call_chain",
+        .wrapper = "test/zig/integrated/control_flow_calls_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:control-flow-call-chain",
     },
     .{
         .id = "releasefast_globals_comptime",
@@ -84,6 +116,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_source_switch_branch_mix",
+        .wrapper = "test/zig/integrated/runtime_cond_branch_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:switch-branch-mix",
+    },
+    .{
         .id = "releasefast_runtime_phi_merge",
         .wrapper = "test/zig/integrated/runtime_phi_merge_main.zig",
         .covered_fixture = "test/zig/inputs/switch_control.zig",
@@ -116,6 +156,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld",
     },
     .{
+        .id = "releasefast_source_switch_dense",
+        .wrapper = "test/zig/integrated/runtime_switch_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:switch-dense",
+    },
+    .{
         .id = "releasefast_runtime_global_update",
         .wrapper = "test/zig/integrated/runtime_global_update_main.zig",
         .covered_fixture = "test/zig/inputs/globals_comptime.zig",
@@ -130,6 +178,14 @@ const cases = [_]Case{
         .mode = "ReleaseFast",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-load-store",
+    },
+    .{
+        .id = "releasefast_source_pointers_memory",
+        .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:pointers-memory",
     },
     .{
         .id = "releasefast_runtime_volatile_roundtrip",
@@ -172,12 +228,28 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-struct-field-sum",
     },
     .{
+        .id = "releasefast_source_aggregates_struct_sum",
+        .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_struct_sum.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:aggregates-struct-sum",
+    },
+    .{
         .id = "releasefast_runtime_array_sum",
         .wrapper = "test/zig/integrated/runtime_array_sum_main.zig",
         .covered_fixture = "test/zig/inputs/aggregates.zig",
         .mode = "ReleaseFast",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-array-scalar-sum",
+    },
+    .{
+        .id = "releasefast_source_aggregates_array_sum",
+        .wrapper = "test/zig/integrated/runtime_array_sum_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_array_sum.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:aggregates-array-sum",
     },
     .{
         .id = "releasefast_runtime_optional_payload",
@@ -202,6 +274,14 @@ const cases = [_]Case{
         .mode = "ReleaseFast",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-indexed-slice-sum",
+    },
+    .{
+        .id = "releasefast_source_aggregates_slice_sum",
+        .wrapper = "test/zig/integrated/runtime_slice_sum_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:aggregates-slice-sum",
     },
     .{
         .id = "releasefast_runtime_fp_constants",
@@ -284,6 +364,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-ordered-less-than",
     },
     .{
+        .id = "releasefast_source_float_compare",
+        .wrapper = "test/zig/integrated/runtime_float_less_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/float_compare_basic.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:float-compare",
+    },
+    .{
         .id = "releasefast_runtime_float_mul",
         .wrapper = "test/zig/integrated/runtime_float_mul_main.zig",
         .covered_fixture = "test/zig/inputs/float_compare.zig",
@@ -300,6 +388,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-add",
     },
     .{
+        .id = "releasefast_source_floats_math",
+        .wrapper = "test/zig/integrated/runtime_float_add_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/floats_math_basic.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:floats-math",
+    },
+    .{
         .id = "releasefast_runtime_float_select",
         .wrapper = "test/zig/integrated/runtime_float_select_main.zig",
         .covered_fixture = "test/zig/inputs/floats_math.zig",
@@ -314,6 +410,14 @@ const cases = [_]Case{
         .mode = "ReleaseFast",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-subtract",
+    },
+    .{
+        .id = "releasefast_source_fp_extended_ops",
+        .wrapper = "test/zig/integrated/runtime_float_sub_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:fp-extended-ops",
     },
     .{
         .id = "releasefast_runtime_double_div",
@@ -364,6 +468,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_source_globals_checked",
+        .wrapper = "test/zig/integrated/runtime_global_update_main.zig",
+        .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:globals-checked;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_runtime_pointer_load_store",
         .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig",
         .covered_fixture = "test/zig/inputs/pointers_memory.zig",
@@ -372,12 +484,28 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_source_pointers_memory_checked",
+        .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig",
+        .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/pointers_memory_checked.ll",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:pointers-memory-checked;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_runtime_branch_mix",
         .wrapper = "test/zig/integrated/runtime_branch_mix_main.zig",
         .covered_fixture = "test/zig/inputs/switch_control.zig",
         .mode = "ReleaseSafe",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
+    },
+    .{
+        .id = "releasesafe_source_switch_branch_mix_checked",
+        .wrapper = "test/zig/integrated/runtime_branch_mix_main.zig",
+        .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/switch_control_branch_mix_checked.ll",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:switch-branch-mix-checked;boundary:validated-zig-panic-edge",
     },
     .{
         .id = "releasesafe_runtime_call_chain",
@@ -412,6 +540,14 @@ const cases = [_]Case{
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
     },
     .{
+        .id = "releasesafe_source_aggregates_checked_array",
+        .wrapper = "test/zig/integrated/runtime_array_sum_main.zig",
+        .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:aggregates-checked-array;boundary:validated-zig-panic-edge",
+    },
+    .{
         .id = "releasesafe_runtime_struct_sum",
         .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig",
         .covered_fixture = "test/zig/inputs/aggregates.zig",
@@ -434,6 +570,14 @@ const cases = [_]Case{
         .mode = "ReleaseSafe",
         .validation = .executable,
         .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge",
+    },
+    .{
+        .id = "releasesafe_source_tiny_scalar_checked_add",
+        .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig",
+        .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/tiny_scalar_checked_add.ll",
+        .mode = "ReleaseSafe",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:tiny-scalar-checked-add;boundary:validated-zig-panic-edge",
     },
     .{
         .id = "releasesafe_runtime_side_effect_free",
@@ -1131,13 +1275,16 @@ fn irWriterExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasefast_globals_comptime")) return 5;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_read_global")) return 5;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_switch")) return 13;
+    if (std.mem.eql(u8, case.id, "releasefast_source_switch_dense")) return 13;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_global_update")) return 4;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_global_update")) return 4;
+    if (std.mem.eql(u8, case.id, "releasesafe_source_globals_checked")) return 4;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_hidden_access")) return 7;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) return 7;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_may_panic")) return 5;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_inherit_want_safety_i64")) return 4;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_call_chain")) return 3;
+    if (std.mem.eql(u8, case.id, "releasefast_source_control_flow_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) return 3;
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) return 1;
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_read")) return 1;
