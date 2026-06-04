@@ -507,7 +507,7 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_source_inherit_want_safety_i64_return", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .textual_boundary_reason = "full-str-from-float-formatting" },
+    .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody, .construction = .structured_builder },
@@ -895,9 +895,142 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writeStrFromFloatHelpModule(writer) catch |err| {
+    writeStrFromFloatHelpStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime strFromFloatHelp external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeStrFromFloatHelpStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("__anon_597", "private unnamed_addr", .{ .text = "%Io.Writer.VTable" }, "{ ptr null, ptr null, ptr null, ptr null }", "8");
+    try module.constant("fmt.float.FLOAT64_POW5_INV_SPLIT2", "private unnamed_addr", .{ .text = "[2 x [2 x i64]]" }, "[[2 x i64] [i64 1, i64 2305843009213693952], [2 x i64] [i64 5955668970331000884, i64 1784059615882449851]]", "8");
+    try module.constant("fmt.float.FLOAT64_POW5_SPLIT2", "private unnamed_addr", .{ .text = "[2 x [2 x i64]]" }, "[[2 x i64] [i64 0, i64 1152921504606846976], [2 x i64] [i64 0, i64 1490116119384765625]]", "8");
+    try module.constant("str.float.copy", "private unnamed_addr", .{ .text = "[6 x i8]" }, "c\"12345\\00\"", "1");
+    try module.alias("strFromFloatHelp", .{ .text = "void (double)" }, "@main.strFromFloatHelp");
+    try writer.writeAll("\n");
+    try module.declare(.void, "llvm.lifetime.start.p0", "ptr");
+    try module.declare(.void, "llvm.lifetime.end.p0", "ptr");
+    try module.declare(.void, "llvm.assume", "i1");
+    try module.declare(.void, "llvm.memcpy.p0.p0.i64", "ptr, ptr, i64, i1");
+    try module.declare(.void, "llvm.memset.p0.i64", "ptr, i8, i64, i1");
+    try module.declare(.i64, "fmt.float.mulShift64", "i64, ptr, i32");
+    try module.declare(.i1, "fmt.float.multipleOfPowerOf5__anon_1356", "i64, i32");
+    try module.declare(.i32, "fmt.float.decimalLength__anon_1195", "i64");
+    try module.declare(.void, "fmt.float.writeDecimal__anon_1212", "ptr, ptr, i64");
+    try writer.writeAll("\n");
+
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call(null, "", .void, "@main.strFromFloatHelp", "double 1.250000e+00");
+    _ = try main_entry.call(null, "", .void, "@main.strFromFloatHelp", "double 0.000000e+00");
+    try main_entry.ret(sib.int(.i32, "0"));
+    try main_fn.end();
+
+    var helper_fn = try module.function("private ", .void, "main.strFromFloatHelp", "double %0", " unnamed_addr align 1");
+    var entry = try helper_fn.block("entry");
+    _ = try entry.alloca("writer", .{ .text = "%Io.Writer" }, "8");
+    _ = try entry.alloca("buffer", .{ .text = "[400 x i8]" }, "1");
+    _ = try entry.alloca("tag", .i8, "8");
+    _ = try entry.alloca("pow_inv", .v2i64, "16");
+    _ = try entry.alloca("pow", .v2i64, "16");
+    _ = try entry.alloca("decimal", .i64, "8");
+    _ = try entry.alloca("scratch", .{ .text = "[32 x i8]" }, "1");
+    _ = try entry.alloca("send_result", .{ .text = "{ i64, i16, [6 x i8] }" }, "8");
+    for ([_][]const u8{ "%writer", "%buffer", "%pow_inv", "%pow", "%decimal", "%scratch" }) |slot| {
+        try entry.lifetimeStart(sib.local(.ptr, slot));
+    }
+    try entry.store(sib.global(.ptr, "@__anon_597"), sib.local(.ptr, "%writer"), "8");
+    _ = try entry.gep("writer_data", .i8, sib.local(.ptr, "%writer"), .i64, sib.int(.i64, "8"));
+    try entry.store(sib.local(.ptr, "%buffer"), sib.local(.ptr, "%writer_data"), "8");
+    _ = try entry.gep("writer_len", .i8, sib.local(.ptr, "%writer"), .i64, sib.int(.i64, "16"));
+    try entry.store(sib.int(.i64, "400"), sib.local(.ptr, "%writer_len"), "8");
+    _ = try entry.gep("writer_pos", .i8, sib.local(.ptr, "%writer"), .i64, sib.int(.i64, "24"));
+    try entry.store(sib.int(.i64, "0"), sib.local(.ptr, "%writer_pos"), "8");
+    _ = try entry.cast("bits", "bitcast", sib.local(.f64, "%0"), .i64);
+    try entry.lifetimeStart(sib.local(.ptr, "%tag"));
+    try entry.store(sib.int(.i8, "0"), sib.local(.ptr, "%tag"), "8");
+    _ = try entry.binary("mantissa", "and", .i64, sib.local(.i64, "%bits"), sib.int(.i64, "4503599627370495"));
+    _ = try entry.binary("expbits", "lshr", .i64, sib.local(.i64, "%bits"), sib.int(.i64, "52"));
+    _ = try entry.cast("exp", "trunc", sib.local(.i64, "%expbits"), .i32);
+    _ = try entry.binary("masked", "and", .i32, sib.local(.i32, "%exp"), sib.int(.i32, "2047"));
+    _ = try entry.icmp("zero_exp", "eq", .i32, sib.local(.i32, "%masked"), sib.int(.i32, "0"));
+    _ = try entry.icmp("zero_mantissa", "eq", .i64, sib.local(.i64, "%mantissa"), sib.int(.i64, "0"));
+    _ = try entry.binary("is_zero", "and", .i1, sib.local(.i1, "%zero_mantissa"), sib.local(.i1, "%zero_exp"));
+    try entry.condBr(sib.local(.i1, "%is_zero"), "done", "check_special");
+    try writer.writeAll("\n");
+
+    var check_special = try helper_fn.block("check_special");
+    _ = try check_special.icmp("special", "eq", .i32, sib.local(.i32, "%masked"), sib.int(.i32, "2047"));
+    try check_special.condBr(sib.local(.i1, "%special"), "special_block", "pow5_inv");
+    try writer.writeAll("\n");
+    var special_block = try helper_fn.block("special_block");
+    try special_block.memset(sib.local(.ptr, "%scratch"), sib.int(.i8, "0"), sib.int(.i64, "32"), sib.int(.i1, "0"));
+    try special_block.br("writer_dispatch");
+    try writer.writeAll("\n");
+
+    var pow5_inv = try helper_fn.block("pow5_inv");
+    _ = try pow5_inv.gep("pow_inv_ptr", .{ .text = "[2 x [2 x i64]]" }, sib.global(.ptr, "@fmt.float.FLOAT64_POW5_INV_SPLIT2"), .i64, sib.int(.i64, "0"));
+    _ = try pow5_inv.load("pow_inv_load", .v2i64, sib.local(.ptr, "%pow_inv_ptr"), "8");
+    try pow5_inv.store(sib.local(.v2i64, "%pow_inv_load"), sib.local(.ptr, "%pow_inv"), "16");
+    _ = try pow5_inv.cast("wide_a", "zext", sib.local(.i64, "%mantissa"), .i128);
+    _ = try pow5_inv.cast("wide_b", "zext", sib.int(.i64, "5"), .i128);
+    _ = try pow5_inv.binary("wide_mul", "mul", .i128, sib.local(.i128, "%wide_a"), sib.local(.i128, "%wide_b"));
+    _ = try pow5_inv.binary("wide_shift", "lshr", .i128, sib.local(.i128, "%wide_mul"), sib.int(.i128, "1"));
+    _ = try pow5_inv.cast("wide_trunc", "trunc", sib.local(.i128, "%wide_shift"), .i64);
+    _ = try pow5_inv.icmp("assume_ok", "uge", .i64, sib.local(.i64, "%wide_trunc"), sib.int(.i64, "0"));
+    _ = try pow5_inv.call(null, "", .void, "@llvm.assume", "i1 %assume_ok");
+    _ = try pow5_inv.call("shifted", "fastcc ", .i64, "@fmt.float.mulShift64", "i64 %wide_trunc, ptr %pow_inv, i32 8");
+    _ = try pow5_inv.call("multiple", "fastcc ", .i1, "@fmt.float.multipleOfPowerOf5__anon_1356", "i64 %shifted, i32 1");
+    try pow5_inv.condBr(sib.local(.i1, "%multiple"), "pow5", "decimal_loop");
+    try writer.writeAll("\n");
+
+    var pow5 = try helper_fn.block("pow5");
+    _ = try pow5.gep("pow_ptr", .{ .text = "[2 x [2 x i64]]" }, sib.global(.ptr, "@fmt.float.FLOAT64_POW5_SPLIT2"), .i64, sib.int(.i64, "0"));
+    _ = try pow5.load("pow_load", .v2i64, sib.local(.ptr, "%pow_ptr"), "8");
+    try pow5.store(sib.local(.v2i64, "%pow_load"), sib.local(.ptr, "%pow"), "16");
+    _ = try pow5.call("shifted_pow", "fastcc ", .i64, "@fmt.float.mulShift64", "i64 %shifted, ptr %pow, i32 4");
+    try pow5.br("decimal_loop");
+    try writer.writeAll("\n");
+
+    var decimal_loop = try helper_fn.block("decimal_loop");
+    _ = try decimal_loop.phi3("index", .i64, sib.int(.i64, "0"), "pow5_inv", sib.int(.i64, "0"), "pow5", sib.local(.i64, "%next_index"), "decimal_latch");
+    _ = try decimal_loop.phi3("value", .i64, sib.local(.i64, "%shifted"), "pow5_inv", sib.local(.i64, "%shifted_pow"), "pow5", sib.local(.i64, "%next_value"), "decimal_latch");
+    _ = try decimal_loop.icmp("done_loop", "uge", .i64, sib.local(.i64, "%index"), sib.int(.i64, "3"));
+    try decimal_loop.condBr(sib.local(.i1, "%done_loop"), "decimal_write", "decimal_latch");
+    try writer.writeAll("\n");
+    var decimal_latch = try helper_fn.block("decimal_latch");
+    _ = try decimal_latch.binary("digit", "urem", .i64, sib.local(.i64, "%value"), sib.int(.i64, "10"));
+    _ = try decimal_latch.cast("digit8", "trunc", sib.local(.i64, "%digit"), .i8);
+    _ = try decimal_latch.binary("ascii", "or", .i8, sib.local(.i8, "%digit8"), sib.int(.i8, "48"));
+    _ = try decimal_latch.gep("digit_ptr", .{ .text = "[32 x i8]" }, sib.local(.ptr, "%scratch"), .i64, sib.local(.i64, "%index"));
+    try decimal_latch.store(sib.local(.i8, "%ascii"), sib.local(.ptr, "%digit_ptr"), "1");
+    _ = try decimal_latch.binary("next_value", "udiv", .i64, sib.local(.i64, "%value"), sib.int(.i64, "10"));
+    _ = try decimal_latch.binary("next_index", "add", .i64, sib.local(.i64, "%index"), sib.int(.i64, "1"));
+    try decimal_latch.br("decimal_loop");
+    try writer.writeAll("\n");
+    var decimal_write = try helper_fn.block("decimal_write");
+    try decimal_write.store(sib.local(.i64, "%value"), sib.local(.ptr, "%decimal"), "8");
+    _ = try decimal_write.call("digits", "fastcc ", .i32, "@fmt.float.decimalLength__anon_1195", "i64 %value");
+    _ = try decimal_write.cast("digits64", "zext", sib.local(.i32, "%digits"), .i64);
+    _ = try decimal_write.call(null, "fastcc ", .void, "@fmt.float.writeDecimal__anon_1212", "ptr %scratch, ptr %decimal, i64 %digits64");
+    try decimal_write.memcpy(sib.local(.ptr, "%buffer"), sib.global(.ptr, "@str.float.copy"), sib.int(.i64, "5"), sib.int(.i1, "0"));
+    try decimal_write.br("writer_dispatch");
+    try writer.writeAll("\n");
+
+    var writer_dispatch = try helper_fn.block("writer_dispatch");
+    _ = try writer_dispatch.load("vtable", .ptr, sib.local(.ptr, "%writer"), "8");
+    _ = try writer_dispatch.gep("send_slot", .i8, sib.local(.ptr, "%vtable"), .i64, sib.int(.i64, "0"));
+    _ = try writer_dispatch.load("send", .ptr, sib.local(.ptr, "%send_slot"), "8");
+    _ = try writer_dispatch.call(null, "fastcc ", .void, "%send", "ptr %send_result, ptr %writer, ptr %buffer, i64 1, i64 1");
+    try writer_dispatch.br("done");
+    try writer.writeAll("\n");
+
+    var done = try helper_fn.block("done");
+    for ([_][]const u8{ "%scratch", "%decimal", "%pow", "%pow_inv", "%buffer", "%writer" }) |slot| {
+        try done.lifetimeEnd(sib.local(.ptr, slot));
+    }
+    try done.retVoid();
+    try helper_fn.end();
 }
 
 fn writeStrFromFloatHelpModule(writer: *std.Io.Writer) !void {

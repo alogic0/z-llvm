@@ -13,6 +13,7 @@ pub const Type = union(enum) {
     i32,
     i64,
     i128,
+    v2i64,
     f32,
     f64,
     ptr,
@@ -29,6 +30,7 @@ pub const Type = union(enum) {
             .i32 => "i32",
             .i64 => "i64",
             .i128 => "i128",
+            .v2i64 => "<2 x i64>",
             .f32 => "float",
             .f64 => "double",
             .ptr => "ptr",
@@ -47,6 +49,7 @@ pub const Type = union(enum) {
             .i32 => .{ .int = 32 },
             .i64 => .{ .int = 64 },
             .i128 => .{ .int = 128 },
+            .v2i64 => .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } },
             .f32 => .float,
             .f64 => .double,
             .ptr => .ptr,
@@ -199,6 +202,22 @@ pub const Block = struct {
     pub fn phi2(self: *Block, result: []const u8, ty: Type, first_value: Value, first_block: []const u8, second_value: Value, second_block: []const u8) !Value {
         try self.writer.print("  %{s} = phi {s} [ {s}, %{s} ], [ {s}, %{s} ]\n", .{ result, ty.llvm(), first_value.ref, first_block, second_value.ref, second_block });
         if (active_direct) |direct| try direct.phi2(result, ty, first_value, first_block, second_value, second_block);
+        return Value.local(ty, result);
+    }
+
+    pub fn phi3(
+        self: *Block,
+        result: []const u8,
+        ty: Type,
+        first_value: Value,
+        first_block: []const u8,
+        second_value: Value,
+        second_block: []const u8,
+        third_value: Value,
+        third_block: []const u8,
+    ) !Value {
+        try self.writer.print("  %{s} = phi {s} [ {s}, %{s} ], [ {s}, %{s} ], [ {s}, %{s} ]\n", .{ result, ty.llvm(), first_value.ref, first_block, second_value.ref, second_block, third_value.ref, third_block });
+        if (active_direct) |direct| try direct.phi3(result, ty, first_value, first_block, second_value, second_block, third_value, third_block);
         return Value.local(ty, result);
     }
 
@@ -545,6 +564,25 @@ pub const DirectBuilder = struct {
         try self.appendInstruction(result, .{ .phi = phi });
     }
 
+    pub fn phi3(
+        self: *DirectBuilder,
+        result: []const u8,
+        ty: Type,
+        first_value: Value,
+        first_block: []const u8,
+        second_value: Value,
+        second_block: []const u8,
+        third_value: Value,
+        third_block: []const u8,
+    ) !void {
+        var phi: ir.PhiInst = .{ .ty = ty.toIr(), .incoming = .empty };
+        errdefer phi.deinit(self.allocator);
+        try phi.incoming.append(self.allocator, .{ .value = directValue(first_value), .block = first_block });
+        try phi.incoming.append(self.allocator, .{ .value = directValue(second_value), .block = second_block });
+        try phi.incoming.append(self.allocator, .{ .value = directValue(third_value), .block = third_block });
+        try self.appendInstruction(result, .{ .phi = phi });
+    }
+
     pub fn binary(self: *DirectBuilder, result: []const u8, op_text: []const u8, ty: Type, lhs: Value, rhs: Value) !void {
         const parsed = parseBinaryOpAndFlags(op_text) orelse return;
         try self.appendInstruction(result, .{ .binary = .{
@@ -708,7 +746,8 @@ pub const DirectBuilder = struct {
                 if (std.mem.eql(u8, trimmed, "undef")) return .{ .scalar = .undef };
                 if (std.mem.startsWith(u8, trimmed, "c\"")) return .{ .c_string = trimmed };
                 if (std.mem.startsWith(u8, trimmed, "[") and std.mem.endsWith(u8, trimmed, "]")) {
-                    return .{ .array = try self.parseGlobalArrayInitializer(ty, trimmed) };
+                    const array = self.parseGlobalArrayInitializer(ty, trimmed) catch return .{ .@"opaque" = trimmed };
+                    return .{ .array = array };
                 }
             },
             .void, .metadata, .vector => {},
