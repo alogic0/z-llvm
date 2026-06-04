@@ -1302,6 +1302,9 @@ pub fn main(init: std.process.Init) !void {
     if (broad_source_backed or release_source_owned) {
         skipped_with_reason = try validateBroadSourceBackedInventory(allocator, io, &stdout_writer.interface);
     }
+    if (release_source_owned) {
+        try reportSourceWrapperDiscoveryBucket(allocator, io, &stdout_writer.interface);
+    }
     try stdout_writer.interface.print(
         "zig-integrated-object target={s} pipeline={s} linker=zig build-exe -fno-lld hook={s} zllvm={s}\n",
         .{ target, pipelineName(pipeline), if (use_ir_writer) "ZIG_USE_ZLLVM_IR_WRITER" else "ZIG_USE_ZLLVM_OBJECT", zllvm_exe },
@@ -1690,6 +1693,44 @@ fn validateBroadSourceBackedInventory(
     );
     try writer.flush();
     return skipped_with_reason;
+}
+
+fn reportSourceWrapperDiscoveryBucket(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    writer: *std.Io.Writer,
+) !void {
+    var dir = std.Io.Dir.cwd().openDir(io, "test/zig/integrated", .{ .iterate = true }) catch |err| {
+        try common.validationError(io, "failed to open Zig source-wrapper discovery directory: {any}\n", .{err});
+    };
+    defer dir.close(io);
+
+    var discovered_source_wrappers: usize = 0;
+    var descriptor_supported_wrappers: usize = 0;
+    var iterator = dir.iterate();
+    while (try iterator.next(io)) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".zig")) continue;
+        discovered_source_wrappers += 1;
+        const wrapper = try std.fmt.allocPrint(allocator, "test/zig/integrated/{s}", .{entry.name});
+        defer allocator.free(wrapper);
+        if (sourceWrapperHasReleaseFixtureMetadata(wrapper)) {
+            descriptor_supported_wrappers += 1;
+        }
+    }
+    try writer.print(
+        "source-wrapper-discovery target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall discovered_source_wrappers={} descriptor_supported_wrappers={} unsupported_with_reason={} source=zig-wrapper-files\n",
+        .{ discovered_source_wrappers, descriptor_supported_wrappers, discovered_source_wrappers - descriptor_supported_wrappers },
+    );
+    try writer.flush();
+}
+
+fn sourceWrapperHasReleaseFixtureMetadata(wrapper: []const u8) bool {
+    for (cases) |case| {
+        if (!isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (std.mem.eql(u8, case.wrapper, wrapper)) return true;
+    }
+    return false;
 }
 
 fn collectReleaseLlFixtures(
