@@ -516,14 +516,14 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_residual_store_step", .surface = "base64-residual-store-step", .write = writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_residual_length_step", .surface = "base64-residual-length-step", .write = writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_residual_table_check_step", .surface = "base64-residual-table-check-step", .write = writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
@@ -1597,25 +1597,27 @@ fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.source_stride_input = private unnamed_addr global i32 0, align 4
-        \\@base64.source_stride_table = private unnamed_addr global [8 x i32] [i32 42, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %src = getelementptr i8, ptr @base64.source_stride_input, i64 4
-        \\  %byte = load i8, ptr %src, align 1
-        \\  %idx = zext i8 %byte to i64
-        \\  %entry_ptr = getelementptr [4 x i8], ptr @base64.source_stride_table, i64 %idx
-        \\  %word = load i32, ptr %entry_ptr, align 4
-        \\  %ok = icmp eq i32 %word, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64SourceStrideStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 source-stride external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64SourceStrideStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.source_stride_input", "private unnamed_addr", .i32, "0", "4");
+    try module.global("base64.source_stride_table", "private unnamed_addr", .{ .text = "[8 x i32]" }, "[i32 42, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0]", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep("src", .i8, sib.global(.ptr, "@base64.source_stride_input"), .i64, sib.int(.i64, "4"));
+    _ = try entry.load("byte", .i8, sib.local(.ptr, "%src"), "1");
+    _ = try entry.cast("idx", "zext", sib.local(.i8, "%byte"), .i64);
+    _ = try entry.gep("entry_ptr", .{ .text = "[4 x i8]" }, sib.global(.ptr, "@base64.source_stride_table"), .i64, sib.local(.i64, "%idx"));
+    _ = try entry.load("word", .i32, sib.local(.ptr, "%entry_ptr"), "4");
+    _ = try entry.icmp("ok", "eq", .i32, sib.local(.i32, "%word"), sib.int(.i32, "42"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
@@ -1623,35 +1625,7 @@ fn writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.source_bundle_input = private unnamed_addr global i64 0, align 8
-        \\@base64.source_bundle_table0 = private unnamed_addr global [1 x i32] [i32 0], align 4
-        \\@base64.source_bundle_table1 = private unnamed_addr global [1 x i32] [i32 4096], align 4
-        \\@base64.source_bundle_table2 = private unnamed_addr global [1 x i32] [i32 8192], align 4
-        \\@base64.source_bundle_table3 = private unnamed_addr global [1 x i32] [i32 196608], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writeBase64FourByteBundleLoads(
-        writer,
-        "@base64.source_bundle_input",
-        "4",
-        "base64.source_bundle_table0",
-        "base64.source_bundle_table1",
-        "base64.source_bundle_table2",
-        "base64.source_bundle_table3",
-    ) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writer.print(
-        \\  %ret = select i1 %valid, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64SourceBundleStructuredModule(writer, "source_bundle", "base64.source_bundle_input", "4") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
@@ -1661,35 +1635,7 @@ fn writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.next_source_bundle_input = private unnamed_addr global i128 0, align 16
-        \\@base64.next_source_bundle_table0 = private unnamed_addr global [1 x i32] [i32 0], align 4
-        \\@base64.next_source_bundle_table1 = private unnamed_addr global [1 x i32] [i32 4096], align 4
-        \\@base64.next_source_bundle_table2 = private unnamed_addr global [1 x i32] [i32 8192], align 4
-        \\@base64.next_source_bundle_table3 = private unnamed_addr global [1 x i32] [i32 196608], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writeBase64FourByteBundleLoads(
-        writer,
-        "@base64.next_source_bundle_input",
-        "8",
-        "base64.next_source_bundle_table0",
-        "base64.next_source_bundle_table1",
-        "base64.next_source_bundle_table2",
-        "base64.next_source_bundle_table3",
-    ) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writer.print(
-        \\  %ret = select i1 %valid, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64SourceBundleStructuredModule(writer, "next_source_bundle", "base64.next_source_bundle_input", "8") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 next-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
@@ -1699,37 +1645,60 @@ fn writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.third_source_bundle_input = private unnamed_addr global i128 0, align 16
-        \\@base64.third_source_bundle_table0 = private unnamed_addr global [1 x i32] [i32 0], align 4
-        \\@base64.third_source_bundle_table1 = private unnamed_addr global [1 x i32] [i32 4096], align 4
-        \\@base64.third_source_bundle_table2 = private unnamed_addr global [1 x i32] [i32 8192], align 4
-        \\@base64.third_source_bundle_table3 = private unnamed_addr global [1 x i32] [i32 196608], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-    , .{}) catch |err| {
+    writeBase64SourceBundleStructuredModule(writer, "third_source_bundle", "base64.third_source_bundle_input", "12") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
-    writeBase64FourByteBundleLoads(
-        writer,
-        "@base64.third_source_bundle_input",
-        "12",
-        "base64.third_source_bundle_table0",
-        "base64.third_source_bundle_table1",
-        "base64.third_source_bundle_table2",
-        "base64.third_source_bundle_table3",
-    ) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writer.print(
-        \\  %ret = select i1 %valid, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 third-source-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
+}
+
+fn writeBase64SourceBundleStructuredModule(writer: *std.Io.Writer, prefix: []const u8, input_symbol: []const u8, first_offset: []const u8) !void {
+    var module = sib.Module.init(writer);
+    try module.global(input_symbol, "private unnamed_addr", .i32, "0", "4");
+    const suffixes = [_][]const u8{ "0", "1", "2", "3" };
+    const values = [_][]const u8{ "0", "4096", "8192", "196608" };
+    for (suffixes, values) |suffix, value| {
+        const table_name = try std.fmt.allocPrint(std.heap.page_allocator, "base64.{s}_table{s}", .{ prefix, suffix });
+        const initializer = try std.fmt.allocPrint(std.heap.page_allocator, "[i32 {s}]", .{value});
+        try module.global(table_name, "private unnamed_addr", .{ .text = "[1 x i32]" }, initializer, "4");
+    }
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try writeBase64FourByteBundleStructured(&entry, input_symbol, first_offset, prefix);
+    _ = try entry.select("ret", sib.local(.i1, "%valid"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
+}
+
+fn writeBase64FourByteBundleStructured(entry: *sib.Block, input_symbol: []const u8, first_offset: []const u8, prefix: []const u8) !void {
+    const input_ref = try std.fmt.allocPrint(std.heap.page_allocator, "@{s}", .{input_symbol});
+    _ = try entry.gep("src0", .i8, sib.global(.ptr, input_ref), .i64, sib.int(.i64, first_offset));
+    _ = try entry.load("byte0", .i8, sib.local(.ptr, "%src0"), "1");
+    try writeBase64BundleTableLoad(entry, "word0", prefix, "0", "%byte0");
+    _ = try entry.gep("src1", .i8, sib.local(.ptr, "%src0"), .i64, sib.int(.i64, "1"));
+    _ = try entry.load("byte1", .i8, sib.local(.ptr, "%src1"), "1");
+    try writeBase64BundleTableLoad(entry, "word1", prefix, "1", "%byte1");
+    _ = try entry.binary("merged1", "or", .i32, sib.local(.i32, "%word1.word"), sib.local(.i32, "%word0.word"));
+    _ = try entry.gep("src2", .i8, sib.local(.ptr, "%src0"), .i64, sib.int(.i64, "2"));
+    _ = try entry.load("byte2", .i8, sib.local(.ptr, "%src2"), "1");
+    try writeBase64BundleTableLoad(entry, "word2", prefix, "2", "%byte2");
+    _ = try entry.binary("merged2", "or", .i32, sib.local(.i32, "%merged1"), sib.local(.i32, "%word2.word"));
+    _ = try entry.gep("src3", .i8, sib.local(.ptr, "%src0"), .i64, sib.int(.i64, "3"));
+    _ = try entry.load("byte3", .i8, sib.local(.ptr, "%src3"), "1");
+    try writeBase64BundleTableLoad(entry, "word3", prefix, "3", "%byte3");
+    _ = try entry.binary("word", "or", .i32, sib.local(.i32, "%merged2"), sib.local(.i32, "%word3.word"));
+    _ = try entry.icmp("valid", "ult", .i32, sib.local(.i32, "%word"), sib.int(.i32, "16777216"));
+}
+
+fn writeBase64BundleTableLoad(entry: *sib.Block, result_prefix: []const u8, prefix: []const u8, table_suffix: []const u8, byte_ref: []const u8) !void {
+    const idx = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.idx", .{result_prefix});
+    const entry_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.entry", .{result_prefix});
+    const word = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.word", .{result_prefix});
+    const table_ref = try std.fmt.allocPrint(std.heap.page_allocator, "@base64.{s}_table{s}", .{ prefix, table_suffix });
+    _ = try entry.cast(idx, "zext", sib.local(.i8, byte_ref), .i64);
+    const idx_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{idx});
+    _ = try entry.gep(entry_name, .{ .text = "[4 x i8]" }, sib.global(.ptr, table_ref), .i64, sib.local(.i64, idx_ref));
+    const entry_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{entry_name});
+    _ = try entry.load(word, .i32, sib.local(.ptr, entry_ref), "4");
 }
 
 fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
@@ -1737,37 +1706,39 @@ fn writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.bit_buffer_word0 = private unnamed_addr global i32 1, align 4
-        \\@base64.bit_buffer_word1 = private unnamed_addr global i32 2, align 4
-        \\@base64.bit_buffer_word2 = private unnamed_addr global i32 3, align 4
-        \\@base64.bit_buffer_word3 = private unnamed_addr global i32 4, align 4
-        \\@base64.bit_buffer_output = private unnamed_addr global i128 0, align 16
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %word0.raw = load i32, ptr @base64.bit_buffer_word0, align 4
-        \\  %word0 = zext i32 %word0.raw to i128
-        \\  %word3.raw = load i32, ptr @base64.bit_buffer_word3, align 4
-        \\  %word3 = zext nneg i32 %word3.raw to i128
-        \\  %word1.raw = load i32, ptr @base64.bit_buffer_word1, align 4
-        \\  %word1 = zext nneg i32 %word1.raw to i128
-        \\  %shift1 = shl nsw nuw i128 %word1, 24
-        \\  %merged1 = or disjoint i128 %shift1, %word0
-        \\  %word2.raw = load i32, ptr @base64.bit_buffer_word2, align 4
-        \\  %word2 = zext nneg i32 %word2.raw to i128
-        \\  %shift2 = shl nsw nuw i128 %word2, 48
-        \\  %merged2 = or disjoint i128 %merged1, %shift2
-        \\  %shift3 = shl nsw nuw i128 %word3, 72
-        \\  %merged = or disjoint i128 %merged2, %shift3
-        \\  %dst = getelementptr [1 x i8], ptr @base64.bit_buffer_output, i64 0
-        \\  store i128 %merged, ptr %dst, align 1
-        \\  ret i32 0
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64BitBufferStoreStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 bit-buffer-store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64BitBufferStoreStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.bit_buffer_word0", "private unnamed_addr", .i32, "1", "4");
+    try module.global("base64.bit_buffer_word1", "private unnamed_addr", .i32, "2", "4");
+    try module.global("base64.bit_buffer_word2", "private unnamed_addr", .i32, "3", "4");
+    try module.global("base64.bit_buffer_word3", "private unnamed_addr", .i32, "4", "4");
+    try module.global("base64.bit_buffer_output", "private unnamed_addr", .i32, "0", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.load("word0.raw", .i32, sib.global(.ptr, "@base64.bit_buffer_word0"), "4");
+    _ = try entry.cast("word0", "zext", sib.local(.i32, "%word0.raw"), .i128);
+    _ = try entry.load("word3.raw", .i32, sib.global(.ptr, "@base64.bit_buffer_word3"), "4");
+    _ = try entry.castFlags("word3", "zext nneg", sib.local(.i32, "%word3.raw"), .i128);
+    _ = try entry.load("word1.raw", .i32, sib.global(.ptr, "@base64.bit_buffer_word1"), "4");
+    _ = try entry.castFlags("word1", "zext nneg", sib.local(.i32, "%word1.raw"), .i128);
+    _ = try entry.binary("shift1", "shl nsw nuw", .i128, sib.local(.i128, "%word1"), sib.int(.i128, "24"));
+    _ = try entry.binary("merged1", "or disjoint", .i128, sib.local(.i128, "%shift1"), sib.local(.i128, "%word0"));
+    _ = try entry.load("word2.raw", .i32, sib.global(.ptr, "@base64.bit_buffer_word2"), "4");
+    _ = try entry.castFlags("word2", "zext nneg", sib.local(.i32, "%word2.raw"), .i128);
+    _ = try entry.binary("shift2", "shl nsw nuw", .i128, sib.local(.i128, "%word2"), sib.int(.i128, "48"));
+    _ = try entry.binary("merged2", "or disjoint", .i128, sib.local(.i128, "%merged1"), sib.local(.i128, "%shift2"));
+    _ = try entry.binary("shift3", "shl nsw nuw", .i128, sib.local(.i128, "%word3"), sib.int(.i128, "72"));
+    _ = try entry.binary("merged", "or disjoint", .i128, sib.local(.i128, "%merged2"), sib.local(.i128, "%shift3"));
+    _ = try entry.gep("dst", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.bit_buffer_output"), .i64, sib.int(.i64, "0"));
+    try entry.store(sib.local(.i128, "%merged"), sib.local(.ptr, "%dst"), "1");
+    try entry.ret(sib.int(.i32, "0"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(
@@ -1850,35 +1821,7 @@ fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.residual_bundle_input = private unnamed_addr global i32 0, align 4
-        \\@base64.residual_bundle_table0 = private unnamed_addr global [1 x i32] [i32 0], align 4
-        \\@base64.residual_bundle_table1 = private unnamed_addr global [1 x i32] [i32 4096], align 4
-        \\@base64.residual_bundle_table2 = private unnamed_addr global [1 x i32] [i32 8192], align 4
-        \\@base64.residual_bundle_table3 = private unnamed_addr global [1 x i32] [i32 196608], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writeBase64FourByteBundleLoads(
-        writer,
-        "@base64.residual_bundle_input",
-        "0",
-        "base64.residual_bundle_table0",
-        "base64.residual_bundle_table1",
-        "base64.residual_bundle_table2",
-        "base64.residual_bundle_table3",
-    ) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writer.print(
-        \\  %ret = select i1 %valid, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64SourceBundleStructuredModule(writer, "residual_bundle", "base64.residual_bundle_input", "0") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-bundle external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
