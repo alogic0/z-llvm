@@ -62,10 +62,20 @@ split is `structured_direct_rows=136`, `textual_boundary_rows=0`,
 Failure diagnostics and reproducibility inputs live in
 `docs/x86_64_selected_zllvm_diagnostics.md`.
 
+Broad source-backed gate:
+`zig build distribution-x86_64-source-backed-structured` is the discovery-based
+x86_64 release fixture gate. It walks the ReleaseFast, ReleaseSafe,
+ReleaseSmall, and former ReleaseSmall exclusion `.ll` fixture directories,
+runs every currently eligible source-backed structured-direct row, and prints
+explicit skip reasons for ineligible fixtures. Current measured output is
+`source_backed_rows=80`, `structured_direct_rows=80`,
+`generic_codegen_rows=80`, `skipped_with_reason=10`, `fallback_rows=0`, and
+`local_fail=0`.
+
 Next target:
-Continue broadening source-backed x86_64 release-mode external IR-writer
-coverage with reusable helper-backed rows; do not add new ad hoc bodies unless
-the row first exposes a genuinely new helper family.
+Close the remaining broad source-backed skips by adding reusable generic
+lowering/writer support for the repeated unsupported classes. Do not add new ad
+hoc bodies unless the row first exposes a genuinely new helper family.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over

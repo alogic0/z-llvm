@@ -27,6 +27,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-zig-ir-writer-tiny-scalar` | Run the first external z_llvm textual IR writer proof for `releasefast_tiny_scalar`. Patched stage4 Zig uses `ZIG_USE_ZLLVM_IR_WRITER=1` with `ZLLVM_IR_WRITER_MODE=external`, calls `z_llvm --emit=ir-writer` to write `scalar-add-ret` IR, then runs the existing preopt `z_llvm` optimizer/object path and Zig native linker. The executable exits 42. |
 | `zig build distribution-zig-ir-writer` | Run the selected 136-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 136 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct ownership counts, generic/case-specific x86_64 codegen counts, and downstream ownership summary. It fails on unexpected `minimal-ret0`, anything other than 136 structured-direct rows, any structured textual LLVM parsing, any textual boundary row, any case-specific codegen row, libLLVM module parse/print fallback, or LLVM TargetMachine fallback. All selected rows build z_llvm-owned internal IR modules directly and use generic x86_64 lowering. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
 | `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, `structured_direct_rows`, `structured_textual_rows`, `textual_boundary_rows`, `generic_codegen_rows`, `case_specific_codegen_rows`, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
+| `zig build distribution-x86_64-source-backed-structured` | Run the broad x86_64 release source-backed structured-direct gate. It discovers `.ll` fixtures under the ReleaseFast, ReleaseSafe, ReleaseSmall, and former ReleaseSmall exclusion directories, runs every currently eligible source-backed structured row, and prints explicit skip reasons for ineligible fixtures. The current gate reports `source_backed_rows=80`, `structured_direct_rows=80`, `generic_codegen_rows=80`, `skipped_with_reason=10`, `fallback_rows=0`, and `local_fail=0`. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
 | `zig build probe-native-linker-broad -- --mode=ReleaseFast\|ReleaseSafe\|ReleaseSmall\|Debug` | Probe broad optimized IR/input directories for link-only acceptance through Zig's native linker. This emits local `.o` files with `z_llvm`, generates safe stubs only for unresolved function symbols, links with `zig build-exe -fno-lld`, and records link-only counts separately from executable ABI proof. |
 | `zig build distribution-native-link-boundary2` | Run the broad x86_64 native-link boundary gate for ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug. This fails on any unclassified local object/link failure or generic `runtime-symbol` bucket, while accepting explicitly classified Zig runtime, TLS, compiler-rt/libc, or boundary-excluded rows. |
@@ -82,6 +83,15 @@ ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-us
 
 No selected row remains a textual boundary, so the selected claim no longer
 tracks textual-boundary reason accounting.
+
+The broad source-backed gate is separate from the fixed 136-row selected claim.
+It discovers 55 release fixture files, accepts 45 fixture families as 80
+structured-direct rows, and records 10 ReleaseSmall fixture skips with explicit
+reasons. Every accepted row must report
+`ir-construction=zllvm-structured-builder`, `llvm_text_parse=not-used`,
+`codegen=generic-x86_64-lowering`, no libLLVM module parse/print, no LLVM
+optimizer, no LLVM TargetMachine, `object-emission=z_llvm`, and
+`linker=zig-native-fno-lld`.
 
 CI/distribution runs should prefer the compact claim gate:
 

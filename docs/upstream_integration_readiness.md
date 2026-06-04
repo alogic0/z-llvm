@@ -29,6 +29,7 @@ command, and captured IR path for each Zig-emitted fixture.
 | Metadata and mode handling | Debug/profile/module flags, attributes, ReleaseSmall, target features preserved opaquely | Mode and metadata preservation input |
 | Backend handoff | Tiny x86_64 Machine IR, asm/object smoke checks | Validation-only, not a backend replacement |
 | Selected distribution replacement gate | `distribution-x86_64-selected-zllvm` proves 136 selected x86_64 release-mode structured-direct IR-writer rows, with 136/136 rows on generic x86_64 lowering, no textual boundary rows, no libLLVM module parse/print, no LLVM optimizer, no LLVM TargetMachine object emission, and Zig native `-fno-lld` linking | Selected release rows only; normal Zig/libLLVM fallback remains when env vars are unset |
+| Broad source-backed structured gate | `distribution-x86_64-source-backed-structured` discovers x86_64 release `.ll` fixtures and proves 80 accepted source-backed rows as structured-direct/generic-codegen with 10 explicit skips and no fallback rows | ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 fixture rows only; unsupported fixture classes remain explicitly skipped |
 | Differential testing | Generated scalar diff runner plus fail-closed negative generation | Regression infrastructure input |
 
 ## External Experiment Boundary

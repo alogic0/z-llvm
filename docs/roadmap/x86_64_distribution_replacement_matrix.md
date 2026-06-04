@@ -455,6 +455,22 @@ generic_codegen_rows=136 case_specific_codegen_rows=0
 minimal-ret0=0
 structured_inventory=docs/roadmap/x86_64_structured_ir_builder_milestone.md
 codegen_inventory=docs/roadmap/x86_64_codegen_genericity_audit.md
+source_backed_broad_gate=zig build distribution-x86_64-source-backed-structured
+source_backed_broad_claim=x86_64 release fixture discovery gate over
+                          ReleaseFast/ReleaseSafe/ReleaseSmall `.ll`
+                          fixtures; accepted rows are structured-direct and
+                          generic-codegen only, skipped fixtures require an
+                          explicit reason
+source_backed_broad_inventory=discovered_fixtures=55 accepted_fixtures=45
+                              skipped_with_reason=10
+source_backed_broad_rows=source_backed_rows=80 structured_direct_rows=80
+                         generic_codegen_rows=80 fallback_rows=0
+                         local_fail=0
+source_backed_remaining_unsupported=address-space/start trampoline, VRAM
+                                    stores, getauxval aggregate startup,
+                                    f128 sret C ABI, logical pointer
+                                    compile-error IR, raw start-loop, and
+                                    libfuzzer futex/vtable runtime boundaries
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
