@@ -40,6 +40,15 @@ ownership-summary structured-direct:90;structured-textual:0;textual-boundary:0;i
 codegen-summary generic-codegen:90;case-specific-codegen:0;textual-boundary-out-of-scope:0
 ```
 
+Source-wrapper structured-direct gate:
+
+```text
+zig build distribution-zig-source-structured-direct
+summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers=49 structured_direct_rows=49 case_id_rows=0 generic_codegen_rows=49 manifest_structured_rows=28 semantic_lowering_rows=21 case_specific_rows=0 fallback_rows=0 local_fail=0
+summary zig-integrated-object pipeline=preopt ir_writer=true total=49 executable_ok=49 link_only_ok=0 scalar_runtime_rows=49 structured_builder_rows=49 textual_subset_rows=0 structured_direct_rows=49 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=49 case_specific_codegen_rows=0 manifest_structured_rows=28 semantic_lowering_rows=21 minimal_wrapper_rows=0 local_fail=0
+lowering-summary manifest-structured:28;zig-semantic-records:21
+```
+
 Every accepted broad row must report
 `ir-construction=zllvm-structured-builder`, `structured_direct`,
 `codegen=generic-x86_64-lowering`, no textual LLVM IR parse fallback, no LLVM
@@ -50,6 +59,11 @@ Combined claim: the fixed selected 146-row proof and the broad 90-row
 source-backed proof are both green, but their counters remain separate. The
 selected proof is a stable surface claim; the broad proof is a discovery-based
 fixture inventory claim over the current x86_64 release corpus.
+
+The source-wrapper proof is separate again: it starts from Zig source wrappers
+and resolves the structured module from wrapper/source metadata for the 49
+unambiguous wrapper/mode rows. The semantic lowering subset is tracked in
+`docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`.
 
 ## Prior Source-Backed Expansion Rows
 

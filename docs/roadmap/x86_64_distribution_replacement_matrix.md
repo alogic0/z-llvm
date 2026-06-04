@@ -428,6 +428,7 @@ construction_split=structured_direct_rows=146 structured_textual_rows=0
                    textual_boundary_rows=0
 codegen_split=generic_codegen_rows=146 case_specific_codegen_rows=0
               textual_boundary_rows_out_of_scope=0
+lowering_split=semantic_lowering_rows=43 manifest_structured_rows=103
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
@@ -465,12 +466,20 @@ source_backed_broad_inventory=discovered_fixtures=55 accepted_fixtures=55
 source_backed_broad_rows=source_backed_rows=90 structured_direct_rows=90
                          generic_codegen_rows=90 fallback_rows=0
                          local_fail=0
+source_wrapper_gate=zig build distribution-zig-source-structured-direct
+source_wrapper_claim=selected Zig source-wrapper dispatch without case-id
+                     ownership for the unambiguous wrapper/mode subset
+source_wrapper_rows=source_wrappers=49 structured_direct_rows=49
+                    case_id_rows=0 generic_codegen_rows=49
+                    manifest_structured_rows=28 semantic_lowering_rows=21
+                    case_specific_rows=0 fallback_rows=0 local_fail=0
+semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
-                       counters remain separate; both gates require
-                       structured-direct construction, generic x86_64
-                       lowering, no textual LLVM parse fallback, no LLVM
-                       optimizer, no LLVM TargetMachine, z_llvm object
-                       emission, and Zig native linker handoff
+                       source_wrapper_rows=49; counters remain separate; all
+                       three gates require structured-direct construction,
+                       generic x86_64 lowering, no textual LLVM parse
+                       fallback, no LLVM optimizer, no LLVM TargetMachine,
+                       z_llvm object emission, and Zig native linker handoff
 source_backed_remaining_unsupported=none for the current
                                     ReleaseFast/ReleaseSafe/ReleaseSmall
                                     x86_64 fixture inventory

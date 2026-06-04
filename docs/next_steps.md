@@ -73,6 +73,29 @@ Current measured output is `discovered_fixtures=55`,
 `structured_direct_rows=90`, `generic_codegen_rows=90`,
 `skipped_with_reason=0`, `fallback_rows=0`, and `local_fail=0`.
 
+Source-wrapper structured-direct gate:
+`zig build distribution-zig-source-structured-direct` starts from standalone
+Zig source wrappers instead of using `ZLLVM_CASE_ID` as the primary selector.
+Patched Zig passes wrapper path, optimize mode, target, output path, and marker
+path; z_llvm resolves the structured module from wrapper/source metadata for
+the unambiguous wrapper/mode subset. Current measured output is
+`source_wrappers=49`, `structured_direct_rows=49`, `case_id_rows=0`,
+`generic_codegen_rows=49`, `manifest_structured_rows=28`,
+`semantic_lowering_rows=21`, `case_specific_rows=0`, `fallback_rows=0`, and
+`local_fail=0`.
+
+Ownership ladder:
+The current replacement evidence is split into three explicit rungs:
+selected case-id registry proof, source-wrapper dispatch proof, and
+semantic/AIR-shaped local records. `src/zig_semantic_lowering.zig` now lowers
+21 source-wrapper rows through Zig-level semantic records into
+`src/structured_ir_builder.zig`. The semantic subset covers scalar integer
+arithmetic, error/select, branches/phis/loops, pointer load/store, globals/TLS,
+simple calls, simple aggregates, FP literals, and simple atomics. Remaining
+source-wrapper rows are still manifest-structured, not textual, and remain
+owned by z_llvm's structured builder. The detailed milestone is recorded in
+`docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`.
+
 Next target:
 The current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall fixture inventory is
 fully accounted locally. Future expansion should add new fixtures or corpus

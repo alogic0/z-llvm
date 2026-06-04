@@ -40,6 +40,19 @@ ZLLVM_IR_PATH=<temporary external writer artifact path>
 ZLLVM_MARKER_PATH=<temporary marker path>
 ```
 
+The source-wrapper proof uses the same hook plus:
+
+```text
+gate: zig build distribution-zig-source-structured-direct
+ZLLVM_CASE_ID=source-wrapper-dispatch
+ZLLVM_IR_WRITER_DISPATCH=source-wrapper
+```
+
+That gate fails if any row reports `case_id_rows != 0`, fallback ownership,
+textual LLVM parsing, non-generic codegen, or missing semantic/manifest
+lowering accounting. It currently reports `source_wrappers=49`,
+`semantic_lowering_rows=21`, and `manifest_structured_rows=28`.
+
 `ZIG_EMITTER`, `ZIG_SOURCE_DIR`, `ZLLVM_EXE`, and `TARGET` may be overridden by
 the caller, but the selected claim is only for the target above and the
 currently patched stage4 Zig emitter.
@@ -51,6 +64,9 @@ The detailed runner failed to find a hook marker, or the marker lacks
 `ir_writer=external` / `ir_writer_mode=external`. Confirm the selected gate is
 used instead of a raw `zig build-obj` command, and confirm the patched Zig
 emitter is `../ziglang/build/stage4/bin/zig`.
+For the source-wrapper gate, also confirm the marker reports
+`case_id=source-wrapper-dispatch` and the emitted IR header reports
+`zllvm_ir_writer_dispatch = "source-wrapper"`.
 
 `wrong z_llvm`:
 The marker points at an unexpected tool, the binary is missing, or the emitted

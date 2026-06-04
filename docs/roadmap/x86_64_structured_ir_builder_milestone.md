@@ -17,6 +17,8 @@ structured_textual_rows=0
 textual_boundary_rows=0
 generic_codegen_rows=146
 case_specific_codegen_rows=0
+manifest_structured_rows=103
+semantic_lowering_rows=43
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
@@ -78,3 +80,14 @@ explicit external writer environment. It does not replace Zig's normal
 libLLVM-backed IR construction, Debug/LTO/AArch64 paths, arbitrary source
 lowering, LLVM IR parsing for normal fallback builds, compiler-rt/libc
 replacement, or target-complete object coverage.
+
+## Semantic Lowering Rung
+
+The next ownership rung is tracked separately in
+`docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`. The selected
+146-row gate now reports `semantic_lowering_rows=43` and
+`manifest_structured_rows=103`; the source-wrapper gate reports
+`semantic_lowering_rows=21` and `manifest_structured_rows=28`. These semantic
+rows are still emitted through `src/structured_ir_builder.zig`; the improvement
+is that z_llvm now starts from small Zig-level semantic records for those
+families instead of manifest-shaped structured templates.
