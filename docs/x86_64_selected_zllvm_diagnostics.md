@@ -5,7 +5,7 @@ the current selected x86_64 release-mode replacement claim. It runs the
 selected IR-writer integration path and prints one machine-readable result line:
 
 ```text
-selected-zllvm status=ok total=<rows> executable_ok=<count> link_only_ok=<count> structured_direct_rows=<count> structured_textual_rows=0 textual_boundary_rows=<count> textual_boundary_reason_missing_rows=0 minimal-ret0=0 ownership=<marker> first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=- first_failure_error=-
+selected-zllvm status=ok total=<rows> executable_ok=<count> link_only_ok=<count> structured_direct_rows=<count> structured_textual_rows=0 textual_boundary_rows=<count> generic_codegen_rows=<count> case_specific_codegen_rows=<count> textual_boundary_reason_missing_rows=0 minimal-ret0=0 ownership=<marker> first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=- first_failure_error=-
 ```
 
 The ownership marker for a passing selected row set is:
@@ -62,8 +62,8 @@ binary.
 The selected runner fails if a selected IR-writer row reports libLLVM-backed IR
 construction, libLLVM module parse/print, LLVM TargetMachine object emission,
 `minimal-ret0`, `structured_direct_rows < 100`, any structured row reports
-textual LLVM parsing, or a textual boundary row is missing
-`textual_boundary_reason`. Env var unset is normal Zig/libLLVM behavior, but the
+textual LLVM parsing, `generic_codegen_rows < 75`, or a textual boundary row is
+missing `textual_boundary_reason`. Env var unset is normal Zig/libLLVM behavior, but the
 selected gate treats fallback as a failure.
 
 `unsupported target`:

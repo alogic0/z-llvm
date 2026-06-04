@@ -419,23 +419,29 @@ path=Zig build-obj -> patched Zig Object.emit validates external contract
 status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
-      selected emitted module; z_llvm owns the selected IR body, while the
-      normal Zig/libLLVM fallback remains available when env vars are unset
+      selected emitted module; z_llvm owns structured IR construction and
+      mostly generic x86_64 lowering for the selected release subset, while
+      the normal Zig/libLLVM fallback remains available when env vars are unset
 construction=ir-construction=zllvm-structured-builder:104;
              ir-construction=z_llvm-external-textual-subset:32
 construction_split=structured_direct_rows=104 structured_textual_rows=0
                    textual_boundary_rows=32
+codegen_split=generic_codegen_rows=93 case_specific_codegen_rows=11
+              textual_boundary_rows_out_of_scope=32
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
 ownership_gate=selected IR-writer rows fail on libLLVM module parse/print,
                LLVM TargetMachine object emission fallback, minimal-ret0, or
                full-gate structured-direct count below 100, structured textual
-               parsing, or textual boundary row without reason
+               parsing, generic-codegen count below 75, or textual boundary
+               row without reason
 compact_output=selected-zllvm status=<ok|fail> total=<rows>
                executable_ok=<count> link_only_ok=<count>
                structured_direct_rows=<count> structured_textual_rows=<count>
                textual_boundary_rows=<count>
+               generic_codegen_rows=<count>
+               case_specific_codegen_rows=<count>
                textual_boundary_reason_missing_rows=<count>
                minimal-ret0=<count>
                ownership=<marker> first_failure_case_id=<case-or-->
@@ -446,8 +452,10 @@ compact_output=selected-zllvm status=<ok|fail> total=<rows>
 diagnostics=docs/x86_64_selected_zllvm_diagnostics.md
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
 structured_direct_rows=104 structured_textual_rows=0 textual_boundary_rows=32
+generic_codegen_rows=93 case_specific_codegen_rows=11
 textual_boundary_reason_missing_rows=0 minimal-ret0=0
 structured_inventory=docs/roadmap/x86_64_structured_ir_builder_milestone.md
+codegen_inventory=docs/roadmap/x86_64_codegen_genericity_audit.md
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -530,6 +538,7 @@ releasesmall_base64_decode_exit_step_gate=zig build distribution-zig-ir-writer -
 next_releasesmall_probe_gate=zig build distribution-releasesmall-object
 ir_writer_rows=scalar_runtime_rows=136, structured_direct_rows=104,
                structured_textual_rows=0, textual_boundary_rows=32,
+               generic_codegen_rows=93, case_specific_codegen_rows=11,
                textual_boundary_reason_missing_rows=0,
                minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=2, integer-arithmetic=3,
