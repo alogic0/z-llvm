@@ -187,17 +187,6 @@ pub fn main(init: std.process.Init) !void {
 
     const mode = opts.mode orelse try fatal(io, "missing required --mode\n{s}", .{usage});
     const input_dir = opts.input_dir orelse defaultInputDir(mode);
-    if (std.mem.eql(u8, mode, "ReleaseSmall") and opts.excludes.items.len == 0) {
-        try opts.excludes.append(allocator, .{
-            .name = "standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll",
-            .reason = "float-format-helper-boundary",
-        });
-        try opts.excludes.append(allocator, .{
-            .name = "standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll",
-            .reason = "table-decoder-boundary",
-        });
-    }
-
     var input_root = std.Io.Dir.cwd().openDir(io, input_dir, .{ .iterate = true }) catch |err| {
         try fatal(io, "input directory not found: {s}: {s}\n", .{ input_dir, @errorName(err) });
     };
