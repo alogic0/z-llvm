@@ -1199,6 +1199,9 @@ pub fn main(init: std.process.Init) !void {
     var minimal_wrapper_rows: usize = 0;
     var structured_builder_rows: usize = 0;
     var textual_subset_rows: usize = 0;
+    var structured_direct_rows: usize = 0;
+    var structured_textual_rows: usize = 0;
+    var textual_boundary_rows: usize = 0;
     var textual_boundary_reason_missing_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
@@ -1313,8 +1316,11 @@ pub fn main(init: std.process.Init) !void {
         try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null);
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
         const construction = if (use_ir_writer) try readIrWriterConstruction(allocator, io, ir_path, case) else "-";
+        defer if (use_ir_writer) allocator.free(construction);
         const textual_boundary_reason = if (use_ir_writer) try readIrWriterTextualBoundaryReason(allocator, io, ir_path, case) else "-";
         defer if (use_ir_writer) allocator.free(textual_boundary_reason);
+        const llvm_text_parse = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_llvm_text_parse = \"", "zllvm_ir_writer_llvm_text_parse") else "-";
+        defer if (use_ir_writer) allocator.free(llvm_text_parse);
         if (use_ir_writer) {
             countSurface(&surface_counters, surface);
             if (std.mem.eql(u8, surface, "minimal-ret0")) {
@@ -1324,8 +1330,14 @@ pub fn main(init: std.process.Init) !void {
             }
             if (std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder")) {
                 structured_builder_rows += 1;
+                if (std.mem.eql(u8, llvm_text_parse, "not-used")) {
+                    structured_direct_rows += 1;
+                } else {
+                    structured_textual_rows += 1;
+                }
             } else if (std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset")) {
                 textual_subset_rows += 1;
+                textual_boundary_rows += 1;
                 if (textual_boundary_reason.len == 0) {
                     textual_boundary_reason_missing_rows += 1;
                 }
@@ -1343,8 +1355,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} textual_boundary_reason={s} ownership={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, textual_boundary_reason, ownershipProof(use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} textual_boundary_reason={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, textual_boundary_reason, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1356,14 +1368,20 @@ pub fn main(init: std.process.Init) !void {
         if (textual_boundary_reason_missing_rows != 0) {
             try common.validationError(io, "external IR writer textual rows must include textual_boundary_reason; textual_boundary_reason_missing_rows={}\n", .{textual_boundary_reason_missing_rows});
         }
-        if (total >= 100 and structured_builder_rows < 100) {
-            try common.validationError(io, "external IR writer selected rows must include at least 100 structured-builder rows; structured_builder_rows={}\n", .{structured_builder_rows});
+        if (total >= 100 and structured_direct_rows < 100) {
+            try common.validationError(io, "external IR writer selected rows must include at least 100 structured-direct rows; structured_direct_rows={}\n", .{structured_direct_rows});
+        }
+        if (structured_textual_rows != 0) {
+            try common.validationError(io, "external IR writer structured rows must not use textual LLVM parse; structured_textual_rows={}\n", .{structured_textual_rows});
+        }
+        if (total == 136 and textual_boundary_rows != 32) {
+            try common.validationError(io, "external IR writer selected rows must keep exactly 32 textual boundary rows at total=136; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, textual_boundary_reason_missing_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, textual_boundary_reason_missing_rows, minimal_wrapper_rows },
         );
-        try stdout_writer.interface.print("ownership-summary ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};{s}\n", .{ structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
+        try stdout_writer.interface.print("ownership-summary structured-direct:{};structured-textual:{};textual-boundary:{};ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};llvm-text-parse=not-used-for-structured;{s}\n", .{ structured_direct_rows, structured_textual_rows, textual_boundary_rows, structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
             try stdout_writer.interface.print(" {s}={}", .{ counter.name, counter.count });
@@ -1592,7 +1610,7 @@ fn validationName(validation: Validation) []const u8 {
 }
 
 fn effectiveProof(use_ir_writer: bool) []const u8 {
-    if (use_ir_writer) return "integrated external z_llvm textual IR writer plus local z_llvm pipeline/object path plus Zig build-exe native link";
+    if (use_ir_writer) return "integrated z_llvm IR writer direct structured rows plus explicit textual boundary rows plus local z_llvm object path plus Zig build-exe native link";
     return "integrated Zig build-obj object path plus Zig build-exe native link";
 }
 
@@ -1957,21 +1975,11 @@ fn readIrWriterConstruction(
     ir_path: []const u8,
     case: Case,
 ) ![]const u8 {
-    const contents = std.Io.Dir.cwd().readFileAlloc(io, ir_path, allocator, .limited(1024 * 1024)) catch |err| {
-        try common.validationError(io, "missing external IR writer output for {s}: {t}\n", .{ case.id, err });
-    };
-    defer allocator.free(contents);
-    const prefix = "; zllvm_ir_writer_construction = \"";
-    const start = std.mem.indexOf(u8, contents, prefix) orelse {
-        try common.validationError(io, "external IR writer output for {s} missing zllvm_ir_writer_construction comment\n", .{case.id});
-    };
-    const value_start = start + prefix.len;
-    const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
-        try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_construction comment\n", .{case.id});
-    };
-    if (std.mem.eql(u8, contents[value_start..value_end], "ir-construction=zllvm-structured-builder")) return "ir-construction=zllvm-structured-builder";
-    if (std.mem.eql(u8, contents[value_start..value_end], "ir-construction=z_llvm-external-textual-subset")) return "ir-construction=z_llvm-external-textual-subset";
-    try common.validationError(io, "external IR writer output for {s} has unsupported construction ownership {s}\n", .{ case.id, contents[value_start..value_end] });
+    const value = try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_construction = \"", "zllvm_ir_writer_construction");
+    errdefer allocator.free(value);
+    if (std.mem.eql(u8, value, "ir-construction=zllvm-structured-builder")) return value;
+    if (std.mem.eql(u8, value, "ir-construction=z_llvm-external-textual-subset")) return value;
+    try common.validationError(io, "external IR writer output for {s} has unsupported construction ownership {s}\n", .{ case.id, value });
 }
 
 fn readIrWriterTextualBoundaryReason(
@@ -1991,6 +1999,28 @@ fn readIrWriterTextualBoundaryReason(
     const value_start = start + prefix.len;
     const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
         try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_textual_boundary_reason comment\n", .{case.id});
+    };
+    return try allocator.dupe(u8, contents[value_start..value_end]);
+}
+
+fn readIrWriterHeaderValue(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    ir_path: []const u8,
+    case: Case,
+    prefix: []const u8,
+    field_name: []const u8,
+) ![]const u8 {
+    const contents = std.Io.Dir.cwd().readFileAlloc(io, ir_path, allocator, .limited(1024 * 1024)) catch |err| {
+        try common.validationError(io, "missing external IR writer output for {s}: {t}\n", .{ case.id, err });
+    };
+    defer allocator.free(contents);
+    const start = std.mem.indexOf(u8, contents, prefix) orelse {
+        try common.validationError(io, "external IR writer output for {s} missing {s} comment\n", .{ case.id, field_name });
+    };
+    const value_start = start + prefix.len;
+    const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
+        try common.validationError(io, "external IR writer output for {s} has malformed {s} comment\n", .{ case.id, field_name });
     };
     return try allocator.dupe(u8, contents[value_start..value_end]);
 }

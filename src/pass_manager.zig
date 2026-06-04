@@ -67,6 +67,7 @@ pub const RunOptions = struct {
     trace: bool = false,
     timing: bool = false,
     pass_limit: ?usize = null,
+    verify_each_pass: bool = true,
 };
 
 pub const ModulePassManager = struct {
@@ -104,7 +105,7 @@ pub const ModulePassManager = struct {
                 try module.print(writer);
             }
             if (module.hasDebugVariableLocationIntrinsics() and isTransformPass(pass.category)) {
-                try module.verify();
+                if (options.verify_each_pass) try module.verify();
                 if (options.trace) try writer.print("; skipped {s}: debug variable-location salvage is not modeled\n", .{pass.name});
                 executed += 1;
                 continue;
@@ -113,7 +114,7 @@ pub const ModulePassManager = struct {
             const diagnostic_count_before = context.diagnostic_count;
             const pass_result = try pass.run(module, context);
             const elapsed_ns = elapsedNanoseconds(start, timestamp(context));
-            try module.verify();
+            if (options.verify_each_pass) try module.verify();
             if (options.timing) try writer.print("; time {s}: {} ns\n", .{ pass.name, elapsed_ns });
             if (options.trace and context.diagnostic_count != diagnostic_count_before) {
                 if (context.last_diagnostic) |diagnostic| {

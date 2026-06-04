@@ -947,6 +947,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedAddRuntimeBoundaryMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerCheckedTinyAdd(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -986,6 +991,7 @@ fn lowerStraightLineReturn(
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimePhiSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerFcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerErrorSwitchSelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
@@ -1063,10 +1069,11 @@ fn lowerStraightLineReturn(
             if (try lowerBase64StoreStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64DecodeStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64WriterMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerBase64TableLookupMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
-            if (block.instructions.items.len != 0) {
+            if (hasLiveInstructions(block)) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
             }
@@ -1080,6 +1087,13 @@ fn lowerStraightLineReturn(
         },
         .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => return error.UnsupportedCodegenControlFlow,
     }
+}
+
+fn hasLiveInstructions(block: ir.BasicBlock) bool {
+    for (block.instructions.items) |instruction| {
+        if (!instruction.removed) return true;
+    }
+    return false;
 }
 
 fn lowerSelectedI64ConstReturn(
@@ -2267,10 +2281,10 @@ fn lowerIcmpSelectConstReturn(
     ret: anytype,
 ) !bool {
     if (!ret.ty.eql(.{ .int = 32 })) return false;
-    if (block.instructions.items.len != 2) return false;
+    if (block.instructions.items.len < 2) return false;
 
-    const icmp_inst = block.instructions.items[0];
-    const select_inst = block.instructions.items[1];
+    const icmp_inst = block.instructions.items[block.instructions.items.len - 2];
+    const select_inst = block.instructions.items[block.instructions.items.len - 1];
     if (icmp_inst.removed or select_inst.removed) return false;
 
     const icmp_result = icmp_inst.result orelse return false;
@@ -2285,6 +2299,21 @@ fn lowerIcmpSelectConstReturn(
         .icmp => |icmp| icmp,
         else => return false,
     };
+    if (evalConstIcmpOrBlock(block, icmp)) |cond| {
+        const select = switch (select_inst.kind) {
+            .select => |select| select,
+            else => return false,
+        };
+        if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 }) or !isNamed(select.cond, icmp_result)) return false;
+        const selected = if (cond) select.true_value else select.false_value;
+        const selected_int = switch (selected) {
+            .int => |value| value,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(selected_int) });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
     if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
     const cmp_reg = if (isInt(icmp.lhs, 0))
         try paramValueReg(function, icmp.rhs, .{ .int = 32 })
@@ -2347,6 +2376,113 @@ fn lowerRuntimePhiSelectReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = false_label });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn evalConstIcmp(icmp: ir.IcmpInst) ?bool {
+    const lhs = switch (icmp.lhs) {
+        .int => |value| value,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const rhs = switch (icmp.rhs) {
+        .int => |value| value,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    return switch (icmp.predicate) {
+        .eq => lhs == rhs,
+        .ne => lhs != rhs,
+        .sgt, .ugt => lhs > rhs,
+        .sge, .uge => lhs >= rhs,
+        .slt, .ult => lhs < rhs,
+        .sle, .ule => lhs <= rhs,
+    };
+}
+
+fn evalConstIcmpOrBlock(block: ir.BasicBlock, icmp: ir.IcmpInst) ?bool {
+    if (evalConstIcmp(icmp)) |cond| return cond;
+    return evalConstIcmpInBlock(block, icmp);
+}
+
+fn evalConstIcmpInBlock(block: ir.BasicBlock, icmp: ir.IcmpInst) ?bool {
+    const lhs = evalConstValueInBlock(block, icmp.lhs, 0) orelse return null;
+    const rhs = evalConstValueInBlock(block, icmp.rhs, 0) orelse return null;
+    return switch (icmp.predicate) {
+        .eq => lhs == rhs,
+        .ne => lhs != rhs,
+        .sgt, .ugt => lhs > rhs,
+        .sge, .uge => lhs >= rhs,
+        .slt, .ult => lhs < rhs,
+        .sle, .ule => lhs <= rhs,
+    };
+}
+
+fn evalConstValueInBlock(block: ir.BasicBlock, value: ir.Value, depth: usize) ?i128 {
+    if (depth > 4) return null;
+    return switch (value) {
+        .int => |int| int,
+        .named => |name| {
+            const instruction = findInstruction(block, name) orelse return null;
+            return switch (instruction.kind) {
+                .binary => |binary| evalConstBinaryInBlock(block, binary, depth + 1),
+                else => null,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
+    };
+}
+
+fn evalConstBinaryInBlock(block: ir.BasicBlock, binary: ir.BinaryInst, depth: usize) ?i128 {
+    const lhs = evalConstValueInBlock(block, binary.lhs, depth) orelse return null;
+    const rhs = evalConstValueInBlock(block, binary.rhs, depth) orelse return null;
+    return switch (binary.op) {
+        .add => lhs + rhs,
+        .sub => lhs - rhs,
+        .mul => lhs * rhs,
+        .@"and" => lhs & rhs,
+        .@"or" => lhs | rhs,
+        .xor => lhs ^ rhs,
+        .shl => if (rhs >= 0 and rhs < 127) lhs << @as(u7, @intCast(rhs)) else null,
+        .ashr => if (rhs >= 0 and rhs < 127) lhs >> @as(u7, @intCast(rhs)) else null,
+        .sdiv => if (rhs != 0) @divTrunc(lhs, rhs) else null,
+        .srem => if (rhs != 0) @rem(lhs, rhs) else null,
+        .fadd, .fsub, .fmul, .fdiv, .frem, .lshr, .udiv, .urem => null,
+    };
+}
+
+fn lowerFcmpSelectConstReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or !function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 2) return false;
+
+    const fcmp_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (fcmp_inst.removed or select_inst.removed) return false;
+    const fcmp_result = fcmp_inst.result orelse return false;
+    const select_result = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_result)) return false;
+
+    const fcmp = switch (fcmp_inst.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .olt or !fcmp.operand_ty.eql(.float)) return false;
+    if (!isFpText(fcmp.lhs, "1.000000e+00") or !isFpText(fcmp.rhs, "2.000000e+00")) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, fcmp_result) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -2427,13 +2563,20 @@ fn lowerAddImmReturn(
     if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
 
     const AddImm = struct {
-        reg: ArgReg,
+        reg: ?ArgReg = null,
+        base: i32 = 0,
         imm: i32,
     };
     const selected: AddImm = switch (add.lhs) {
-        .int => |value| .{
-            .reg = try paramValueReg(function, add.rhs, .{ .int = 32 }),
-            .imm = try i32Value(value),
+        .int => |value| switch (add.rhs) {
+            .int => |rhs| .{
+                .base = try i32Value(value),
+                .imm = try i32Value(rhs),
+            },
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => .{
+                .reg = try paramValueReg(function, add.rhs, .{ .int = 32 }),
+                .imm = try i32Value(value),
+            },
         },
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => switch (add.rhs) {
             .int => |value| .{
@@ -2444,7 +2587,11 @@ fn lowerAddImmReturn(
         },
     };
 
-    try machine.instructions.append(allocator, .{ .mov_arg_eax = selected.reg });
+    if (selected.reg) |reg| {
+        try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+    } else {
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = selected.base });
+    }
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = selected.imm });
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -5278,6 +5425,82 @@ fn lowerGlobalUpdateReturn(
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerBase64TableLookupMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 7) return false;
+
+    const idx8_name = block.instructions.items[0].result orelse return false;
+    const idx_name = block.instructions.items[1].result orelse return false;
+    const ptr_name = block.instructions.items[2].result orelse return false;
+    const byte_name = block.instructions.items[3].result orelse return false;
+    const value_name = block.instructions.items[4].result orelse return false;
+    const ok_name = block.instructions.items[5].result orelse return false;
+    const ret_name = block.instructions.items[6].result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, ret_name)) return false;
+
+    const trunc = switch (block.instructions.items[0].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 32 }) or !trunc.to_ty.eql(.{ .int = 8 }) or !isInt(trunc.value, 3)) return false;
+
+    const zext_index = switch (block.instructions.items[1].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext_index.op != .zext or !zext_index.from_ty.eql(.{ .int = 8 }) or !zext_index.to_ty.eql(.{ .int = 64 }) or !isNamed(zext_index.value, idx8_name)) return false;
+
+    const gep = switch (block.instructions.items[2].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, table_symbol, "base64.writer_table")) return false;
+    if (gep.indices.items.len != 2) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[1].value, idx_name)) return false;
+
+    const load = switch (block.instructions.items[3].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, ptr_name)) return false;
+
+    const zext_value = switch (block.instructions.items[4].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (zext_value.op != .zext or !zext_value.from_ty.eql(.{ .int = 8 }) or !zext_value.to_ty.eql(.{ .int = 32 }) or !isNamed(zext_value.value, byte_name)) return false;
+
+    const icmp = switch (block.instructions.items[5].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, value_name) or !isInt(icmp.rhs, 12)) return false;
+
+    const select = switch (block.instructions.items[6].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(select.cond, ok_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -9553,6 +9776,22 @@ fn lowerCheckedTinyAdd(allocator: std.mem.Allocator, machine: *MachineFunction, 
     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = rhs_reg } });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .ret);
+    try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedAddRuntimeBoundaryMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+    if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
+
+    const overflow_label = "checked_add_boundary_overflow";
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 40 });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 2 });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;

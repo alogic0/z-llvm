@@ -111,6 +111,37 @@ pub fn main(init: std.process.Init) !void {
     const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
     defer allocator.free(input);
 
+    if (readDirectIrWriterCase(input)) |case_id| {
+        if (emit == .ir) {
+            var stdout_buffer: [4096]u8 = undefined;
+            var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+            try stdout_writer.interface.writeAll(input);
+            try stdout_writer.interface.flush();
+            return;
+        }
+        if (emit == .obj or emit == .@"asm") {
+            const ir_writer_case = findIrWriterCase(case_id) orelse {
+                try fatal(io, "direct IR writer artifact references unknown case: {s}\n", .{case_id});
+            };
+            if (ir_writer_case.construction != .structured_builder) {
+                try fatal(io, "direct IR writer artifact references non-direct case: {s}\n", .{case_id});
+            }
+            var module = buildStructuredDirectModule(allocator, io, ir_writer_case) catch |err| {
+                try fatal(io, "direct IR writer module build failed for {s}: {any}\n", .{ case_id, err });
+            };
+            defer module.deinit();
+            if (target_triple) |triple| {
+                _ = target.Triple.parse(triple) catch {
+                    try fatal(io, "invalid target triple: {s}\n", .{triple});
+                };
+                if (module.target_triple == null) module.target_triple = triple;
+            }
+            try runStructuredDirectAcceptedPipeline(allocator, io, &module, init.environ_map, ir_writer_case);
+            try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
+            return;
+        }
+    }
+
     var module = try ir.Module.parse(allocator, input);
     defer module.deinit();
     if (target_triple) |triple| {
@@ -134,36 +165,7 @@ pub fn main(init: std.process.Init) !void {
     const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
 
     if (emit == .@"asm" or emit == .obj) {
-        const triple = target_triple orelse module.target_triple orelse {
-            try fatal(io, "missing target triple for codegen emit; pass --target=<triple> or include target triple in the input\n", .{});
-        };
-        const parsed_triple = target.Triple.parse(triple) catch {
-            try fatal(io, "invalid target triple for codegen emit: {s}\n", .{triple});
-        };
-        if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) {
-            try fatal(io, "unsupported codegen target: {s}; supported target subset is x86_64-linux\n", .{triple});
-        }
-
-        var machines: std.ArrayList(codegen.x86_64.MachineFunction) = .empty;
-        defer {
-            for (machines.items) |*machine| machine.deinit(allocator);
-            machines.deinit(allocator);
-        }
-        for (module.functions.items) |function| {
-            if (!shouldLowerCodegenFunction(module, function)) continue;
-            var machine = codegen.x86_64.lowerFunction(allocator, triple, function) catch |err| {
-                try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
-            };
-            errdefer machine.deinit(allocator);
-            try machines.append(allocator, machine);
-        }
-
-        if (emit == .@"asm") {
-            for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
-        } else {
-            try mc.elf.writeObjectWithModuleData(allocator, machines.items, module.aliases.items, module.globals.items, stdout);
-        }
-        try stdout.flush();
+        try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
         return;
     }
 
@@ -186,7 +188,6 @@ fn writeIrWriterModuleFromEnv(
     io: std.Io,
     environ: *const std.process.Environ.Map,
 ) !void {
-    _ = allocator;
     const writer_mode = requiredEnv(io, environ, "ZLLVM_IR_WRITER_MODE");
     if (!std.mem.eql(u8, writer_mode, "external")) {
         try fatal(io, "ZLLVM_IR_WRITER_MODE must be external; got {s}\n", .{writer_mode});
@@ -207,6 +208,7 @@ fn writeIrWriterModuleFromEnv(
 
     var buffer: [4096]u8 = undefined;
     var writer = file.writer(io, &buffer);
+    const is_structured_direct = if (ir_writer_case) |case| case.construction == .structured_builder else false;
     writer.interface.print(
         \\; ModuleID = "zllvm-external-ir-writer"
         \\source_filename = "{s}"
@@ -217,18 +219,142 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_surface = "{s}"
         \\; zllvm_ir_writer_construction = "{s}"
         \\; zllvm_ir_writer_textual_boundary_reason = "{s}"
+        \\; zllvm_ir_writer_llvm_text_parse = "{s}"
+        \\; zllvm_ir_writer_direct_module = "{s}"
         \\
-    , .{ wrapper, case_id, mode, surface, construction, textual_boundary_reason }) catch |err| {
+    , .{
+        wrapper,
+        case_id,
+        mode,
+        surface,
+        construction,
+        textual_boundary_reason,
+        if (is_structured_direct) "not-used" else "required-for-textual-boundary",
+        if (is_structured_direct) "z_llvm-owned-internal-ir" else "not-used",
+    }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
     if (ir_writer_case) |case| {
-        try case.write(io, &writer.interface, ir_path);
+        if (case.construction == .structured_builder) {
+            var direct_module = buildStructuredDirectModule(allocator, io, case) catch |err| {
+                try fatal(io, "failed to build direct IR writer module for {s}: {any}\n", .{ case.id, err });
+            };
+            defer direct_module.deinit();
+        } else {
+            try case.write(io, &writer.interface, ir_path);
+        }
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
     }
     writer.interface.flush() catch |err| {
         try fatal(io, "failed to flush external IR writer output {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn emitCodegenModule(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    module: ir.Module,
+    emit: Emit,
+    target_triple: ?[]const u8,
+    quiet: bool,
+) !void {
+    const triple = target_triple orelse module.target_triple orelse {
+        try fatal(io, "missing target triple for codegen emit; pass --target=<triple> or include target triple in the input\n", .{});
+    };
+    const parsed_triple = target.Triple.parse(triple) catch {
+        try fatal(io, "invalid target triple for codegen emit: {s}\n", .{triple});
+    };
+    if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) {
+        try fatal(io, "unsupported codegen target: {s}; supported target subset is x86_64-linux\n", .{triple});
+    }
+
+    var machines: std.ArrayList(codegen.x86_64.MachineFunction) = .empty;
+    defer {
+        for (machines.items) |*machine| machine.deinit(allocator);
+        machines.deinit(allocator);
+    }
+    for (module.functions.items) |function| {
+        if (!shouldLowerCodegenFunction(module, function)) continue;
+        var machine = codegen.x86_64.lowerFunction(allocator, triple, function) catch |err| {
+            try fatal(io, "codegen failed for function {s}: {any}\n", .{ function.name, err });
+        };
+        errdefer machine.deinit(allocator);
+        try machines.append(allocator, machine);
+    }
+
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    var discard_buffer: [4096]u8 = undefined;
+    var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
+    const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
+    if (emit == .@"asm") {
+        for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
+    } else {
+        try mc.elf.writeObjectWithModuleData(allocator, machines.items, module.aliases.items, module.globals.items, stdout);
+    }
+    try stdout.flush();
+}
+
+fn buildStructuredDirectModule(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    case: IrWriterCase,
+) !ir.Module {
+    var direct = try sib.DirectBuilder.init(allocator, "zllvm-structured-direct", "x86_64-unknown-linux-gnu");
+    errdefer direct.deinit();
+    direct.activate();
+    defer direct.deactivate();
+
+    var discard_buffer: [4096]u8 = undefined;
+    var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
+    try case.write(io, &discard_writer.writer, "<zllvm-structured-direct>");
+    return direct.finish();
+}
+
+fn runStructuredDirectAcceptedPipeline(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    module: *ir.Module,
+    environ: *const std.process.Environ.Map,
+    case: IrWriterCase,
+) !void {
+    const pipeline_mode = environ.get("ZLLVM_PIPELINE") orelse return;
+    if (!std.mem.eql(u8, pipeline_mode, "preopt")) return;
+    if (environ.get("ZLLVM_ZIG_MODE") == null) return;
+    if (!structuredDirectNeedsFoldPipeline(case.surface)) return;
+
+    var pm = pass_manager.ModulePassManager.init(allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "sccp,simplifycfg,instcombine,dce");
+
+    var discard_buffer: [4096]u8 = undefined;
+    var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
+    var context: pass_manager.Context = .{ .allocator = allocator, .io = io };
+    _ = try pm.runWithOptions(module, &context, &discard_writer.writer, .{ .verify_each_pass = false });
+}
+
+fn structuredDirectNeedsFoldPipeline(surface: []const u8) bool {
+    return std.mem.eql(u8, surface, "scalar-add-ret") or
+        std.mem.eql(u8, surface, "integer-arithmetic") or
+        std.mem.eql(u8, surface, "error-switch-select") or
+        std.mem.eql(u8, surface, "runtime-phi-merge") or
+        std.mem.eql(u8, surface, "struct-field-sum") or
+        std.mem.eql(u8, surface, "float-select") or
+        std.mem.eql(u8, surface, "packed-replace-low");
+}
+
+fn readDirectIrWriterCase(contents: []const u8) ?[]const u8 {
+    const construction = readHeaderValue(contents, "; zllvm_ir_writer_construction = \"") orelse return null;
+    if (!std.mem.eql(u8, construction, IrConstruction.structured_builder.marker())) return null;
+    return readHeaderValue(contents, "; zllvm_ir_writer_case = \"");
+}
+
+fn readHeaderValue(contents: []const u8, prefix: []const u8) ?[]const u8 {
+    const start = std.mem.indexOf(u8, contents, prefix) orelse return null;
+    const value_start = start + prefix.len;
+    const end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse return null;
+    return contents[value_start..end];
 }
 
 fn requiredEnv(io: std.Io, environ: *const std.process.Environ.Map, name: []const u8) []const u8 {
@@ -2070,70 +2196,74 @@ fn writeReleaseSafeRuntimeLoopSumIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main = alias i32 (i32), ptr @control_flow_calls.loop_sum
-        \\@loop_sum = alias i32 (i32), ptr @control_flow_calls.loop_sum
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeLoopSumStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime loop sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
-    try irw.functionHeader(writer, "private ", "i32", "control_flow_calls.loop_sum", "i32 %limit", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try writer.writeAll("  %is_zero = icmp eq i32 %limit, 0\n");
-    try irw.condBr(writer, "is_zero", "exit_zero", "loop");
+}
+
+fn writeReleaseSafeRuntimeLoopSumStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("main", .{ .text = "i32 (i32)" }, "@control_flow_calls.loop_sum");
+    try module.alias("loop_sum", .{ .text = "i32 (i32)" }, "@control_flow_calls.loop_sum");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
     try writer.writeAll("\n");
-    try irw.loopHeader2(writer, "loop", "index", "i32", "0", "%next", "sum", "i32", "0", "%sum_next", "entry", "cont");
-    try writer.writeAll("  %oob = icmp eq i32 %index, -2147483648\n");
-    try irw.condBr(writer, "oob", "panic_oob", "checked_add");
+
+    var function = try module.function("private ", .i32, "control_flow_calls.loop_sum", "i32 %limit", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.icmp("is_zero", "eq", .i32, sib.local(.i32, "%limit"), sib.int(.i32, "0"));
+    try entry.condBr(sib.local(.i1, "%is_zero"), "exit_zero", "loop");
     try writer.writeAll("\n");
-    try irw.block(writer, "checked_add");
-    try writer.writeAll(
-        \\  %checked = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 %sum, i32 %index)
-        \\  %overflow = extractvalue { i32, i1 } %checked, 1
-        \\
-    );
-    try irw.panicEdge(writer, "overflow", "cont", "panic_overflow");
+
+    var loop = try function.block("loop");
+    _ = try loop.phi2("index", .i32, sib.int(.i32, "0"), "entry", sib.local(.i32, "%next"), "cont");
+    _ = try loop.phi2("sum", .i32, sib.int(.i32, "0"), "entry", sib.local(.i32, "%sum_next"), "cont");
+    _ = try loop.icmp("oob", "eq", .i32, sib.local(.i32, "%index"), sib.int(.i32, "-2147483648"));
+    try loop.condBr(sib.local(.i1, "%oob"), "panic_oob", "checked_add");
     try writer.writeAll("\n");
-    try irw.block(writer, "panic_oob");
-    try writer.writeAll(
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds"()
-        \\  unreachable
-        \\
-    );
-    try irw.block(writer, "panic_overflow");
-    try writer.writeAll(
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-    );
-    try irw.block(writer, "cont");
-    try writer.writeAll(
-        \\  %sum_next = extractvalue { i32, i1 } %checked, 0
-        \\  %next = add i32 %index, 1
-        \\  %done = icmp eq i32 %next, %limit
-        \\
-    );
-    try irw.condBr(writer, "done", "exit", "loop");
+
+    var checked_add = try function.block("checked_add");
+    _ = try checked_add.call("checked", "tail ", .{ .text = "{ i32, i1 }" }, "@llvm.sadd.with.overflow.i32", "i32 %sum, i32 %index");
+    _ = try checked_add.extractValue("overflow", "{ i32, i1 }", "%checked", 1, .i1);
+    try checked_add.panicEdge(sib.local(.i1, "%overflow"), "cont", "panic_overflow");
     try writer.writeAll("\n");
-    try irw.block(writer, "exit_zero");
-    try irw.ret(writer, "i32", "0");
+
+    var panic_oob = try function.block("panic_oob");
+    _ = try panic_oob.call(null, "", .void, "@llvm.assume", "i1 1");
+    _ = try panic_oob.call(null, "tail fastcc ", .void, "@\"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds\"", "");
+    try panic_oob.emitUnreachable();
     try writer.writeAll("\n");
-    try irw.block(writer, "exit");
-    try irw.ret(writer, "i32", "%sum_next");
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "fastcc ", "void", "\"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds\"", "", "");
-    try irw.block(writer, "entry");
-    try irw.retVoid(writer);
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "fastcc ", "void", "\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "", "");
-    try irw.block(writer, "entry");
-    try irw.retVoid(writer);
-    try irw.functionEnd(writer);
+
+    var panic_overflow = try function.block("panic_overflow");
+    _ = try panic_overflow.call(null, "", .void, "@llvm.assume", "i1 1");
+    _ = try panic_overflow.call(null, "tail fastcc ", .void, "@\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "");
+    try panic_overflow.emitUnreachable();
+    try writer.writeAll("\n");
+
+    var cont = try function.block("cont");
+    _ = try cont.extractValue("sum_next", "{ i32, i1 }", "%checked", 0, .i32);
+    _ = try cont.binary("next", "add", .i32, sib.local(.i32, "%index"), sib.int(.i32, "1"));
+    _ = try cont.icmp("done", "eq", .i32, sib.local(.i32, "%next"), sib.local(.i32, "%limit"));
+    try cont.condBr(sib.local(.i1, "%done"), "exit", "loop");
+    try writer.writeAll("\n");
+
+    var exit_zero = try function.block("exit_zero");
+    try exit_zero.ret(sib.int(.i32, "0"));
+    try writer.writeAll("\n");
+
+    var exit = try function.block("exit");
+    try exit.ret(sib.local(.i32, "%sum_next"));
+    try function.end();
+
+    var oob = try module.function("fastcc ", .void, "\"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds\"", "", "");
+    var oob_entry = try oob.block("entry");
+    try oob_entry.retVoid();
+    try oob.end();
+
+    var overflow = try module.function("fastcc ", .void, "\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "", "");
+    var overflow_entry = try overflow.block("entry");
+    try overflow_entry.retVoid();
+    try overflow.end();
 }
 
 fn writeRuntimeSwitchIrWriterBody(
@@ -2274,13 +2404,13 @@ fn writeReleaseSafeGlobalUpdateModule(writer: *std.Io.Writer) !void {
     _ = try entry.checkedSAddI32("checked", sib.local(.i32, "%current"), sib.local(.i32, "%value"));
     try entry.panicEdge(sib.local(.i1, "%checked.overflow"), "ok", "panic");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "panic");
+    try writeIntegerOverflowPanicBlockStructured(&function, "panic");
     try writer.writeAll("\n");
     var ok = try function.block("ok");
     try ok.store(sib.local(.i32, "%checked.value"), sib.global(.ptr, "@globals_comptime.global_counter"), "4");
     try ok.ret(sib.local(.i32, "%checked.value"));
     try function.end();
-    try irw.integerOverflowPanicFunction(writer);
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimePointerLoadStoreIrWriterBody(
@@ -2353,13 +2483,13 @@ fn writeReleaseSafeRuntimePointerLoadStoreStructuredModule(writer: *std.Io.Write
     _ = try entry.checkedSAddI32("4", sib.local(.i32, "%3"), sib.int(.i32, "1"));
     try entry.panicEdge(sib.local(.i1, "%4.overflow"), "ok", "panic");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "panic");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic");
     try writer.writeAll("\n");
     var ok = try callee.block("ok");
     try ok.store(sib.local(.i32, "%4.value"), sib.local(.ptr, "%1"), "4");
     try ok.ret(sib.local(.i32, "%4.value"));
     try callee.end();
-    try irw.integerOverflowPanicFunction(writer);
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeVolatileRoundtripIrWriterBody(
@@ -2559,38 +2689,40 @@ fn writeReleaseSafeRuntimeStructSumIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@struct_sum_value = constant [2 x i32] [i32 20, i32 22], align 4
-        \\@struct_sum = alias i32 (ptr), ptr @aggregates.struct_sum
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @aggregates.struct_sum(ptr @struct_sum_value)
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeStructSumStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
-    try irw.functionHeader(writer, "private ", "i32", "aggregates.struct_sum", "ptr %0", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try irw.load(writer, "2", "i32", "%0", "4");
-    try irw.gep(writer, "3", "i8", "%0", "4");
-    try irw.load(writer, "4", "i32", "%3", "4");
-    try irw.checkedSAddI32Value(writer, "5", "%2", "%4", "6", "9");
-    try irw.panicEdge(writer, "6", "8", "7");
+}
+
+fn writeReleaseSafeRuntimeStructSumStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("struct_sum_value", "", .{ .text = "[2 x i32]" }, "[i32 20, i32 22]", "4");
+    try module.alias("struct_sum", .{ .text = "i32 (ptr)" }, "@aggregates.struct_sum");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "7");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
     try writer.writeAll("\n");
-    try irw.block(writer, "8");
-    try irw.ret(writer, "i32", "%9");
-    try irw.functionEnd(writer);
-    try irw.integerOverflowPanicFunction(writer);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@aggregates.struct_sum", "ptr @struct_sum_value");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "aggregates.struct_sum", "ptr %0", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.load("2", .i32, sib.local(.ptr, "%0"), "4");
+    _ = try entry.gep("3", .i8, sib.local(.ptr, "%0"), .i64, sib.int(.i64, "4"));
+    _ = try entry.load("4", .i32, sib.local(.ptr, "%3"), "4");
+    _ = try entry.checkedSAddI32("checked", sib.local(.i32, "%2"), sib.local(.i32, "%4"));
+    try entry.panicEdge(sib.local(.i1, "%checked.overflow"), "ok", "panic");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic");
+    try writer.writeAll("\n");
+    var ok = try callee.block("ok");
+    try ok.ret(sib.local(.i32, "%checked.value"));
+    try callee.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeArraySumIrWriterBody(
@@ -2627,40 +2759,42 @@ fn writeReleaseSafeRuntimeArraySumIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@array_sum = alias i32 (i32, i32, i32), ptr @aggregates.array_sum
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @aggregates.array_sum(i32 10, i32 20, i32 12)
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeArraySumStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime array-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
-    try irw.functionHeader(writer, "private ", "i32", "aggregates.array_sum", "i32 %0, i32 %1, i32 %2", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try irw.checkedSAddI32Value(writer, "4", "%0", "%1", "5", "8");
-    try irw.panicEdge(writer, "5", "7", "6");
+}
+
+fn writeReleaseSafeRuntimeArraySumStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("array_sum", .{ .text = "i32 (i32, i32, i32)" }, "@aggregates.array_sum");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "6");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
     try writer.writeAll("\n");
-    try irw.block(writer, "7");
-    try irw.checkedSAddI32Value(writer, "9", "%8", "%2", "10", "13");
-    try irw.panicEdge(writer, "10", "12", "11");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@aggregates.array_sum", "i32 10, i32 20, i32 12");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "aggregates.array_sum", "i32 %0, i32 %1, i32 %2", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.checkedSAddI32("first", sib.local(.i32, "%0"), sib.local(.i32, "%1"));
+    try entry.panicEdge(sib.local(.i1, "%first.overflow"), "second", "panic_first");
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "11");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic_first");
     try writer.writeAll("\n");
-    try irw.block(writer, "12");
-    try irw.ret(writer, "i32", "%13");
-    try irw.functionEnd(writer);
-    try irw.integerOverflowPanicFunction(writer);
+    var second = try callee.block("second");
+    _ = try second.checkedSAddI32("second", sib.local(.i32, "%first.value"), sib.local(.i32, "%2"));
+    try second.panicEdge(sib.local(.i1, "%second.overflow"), "ok", "panic_second");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic_second");
+    try writer.writeAll("\n");
+    var ok = try callee.block("ok");
+    try ok.ret(sib.local(.i32, "%second.value"));
+    try callee.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeOptionalPayloadIrWriterBody(
@@ -2769,59 +2903,52 @@ fn writeReleaseSafeRuntimeSliceSumIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@slice_sum_values = constant [4 x i32] [i32 1, i32 2, i32 3, i32 4], align 4
-        \\@slice_sum = alias i32 (ptr, i64), ptr @aggregates.slice_sum
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @aggregates.slice_sum(ptr @slice_sum_values, i64 4)
-        \\  %ok = icmp eq i32 %value, 10
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @aggregates.slice_sum(ptr %0, i64 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.not = icmp eq i64 %1, 0
-        \\  br i1 %.not, label %exit, label %loop
-        \\
-        \\loop:
-        \\  %sum = phi i32 [ 0, %entry ], [ %sum_next, %cont ]
-        \\  %index = phi i64 [ 0, %entry ], [ %next, %cont ]
-        \\  %ptr = getelementptr [4 x i8], ptr %0, i64 %index
-        \\  %loaded = load i32, ptr %ptr, align 4
-        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %sum, i32 %loaded)
-        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
-        \\  br i1 %overflow, label %panic, label %cont
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\cont:
-        \\  %sum_next = extractvalue {{ i32, i1 }} %checked, 0
-        \\  %next = add i64 %index, 1
-        \\  %done = icmp eq i64 %next, %1
-        \\  br i1 %done, label %exit, label %loop
-        \\
-        \\exit:
-        \\  %result = phi i32 [ 0, %entry ], [ %sum_next, %cont ]
-        \\  ret i32 %result
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeSliceSumStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime slice-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeRuntimeSliceSumStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("slice_sum_values", "", .{ .text = "[4 x i32]" }, "[i32 1, i32 2, i32 3, i32 4]", "4");
+    try module.alias("slice_sum", .{ .text = "i32 (ptr, i64)" }, "@aggregates.slice_sum");
+    try writer.writeAll("\n");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@aggregates.slice_sum", "ptr @slice_sum_values, i64 4");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "10"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "aggregates.slice_sum", "ptr %0, i64 %1", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.icmp(".not", "eq", .i64, sib.local(.i64, "%1"), sib.int(.i64, "0"));
+    try entry.condBr(sib.local(.i1, "%.not"), "exit", "loop");
+    try writer.writeAll("\n");
+    var loop = try callee.block("loop");
+    _ = try loop.phi2("sum", .i32, sib.int(.i32, "0"), "entry", sib.local(.i32, "%sum_next"), "cont");
+    _ = try loop.phi2("index", .i64, sib.int(.i64, "0"), "entry", sib.local(.i64, "%next"), "cont");
+    _ = try loop.gep("ptr", .{ .text = "[4 x i8]" }, sib.local(.ptr, "%0"), .i64, sib.local(.i64, "%index"));
+    _ = try loop.load("loaded", .i32, sib.local(.ptr, "%ptr"), "4");
+    _ = try loop.checkedSAddI32("checked", sib.local(.i32, "%sum"), sib.local(.i32, "%loaded"));
+    try loop.panicEdge(sib.local(.i1, "%checked.overflow"), "cont", "panic");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic");
+    try writer.writeAll("\n");
+    var cont = try callee.block("cont");
+    _ = try cont.binary("sum_next", "add", .i32, sib.local(.i32, "%checked.value"), sib.int(.i32, "0"));
+    _ = try cont.binary("next", "add", .i64, sib.local(.i64, "%index"), sib.int(.i64, "1"));
+    _ = try cont.icmp("done", "eq", .i64, sib.local(.i64, "%next"), sib.local(.i64, "%1"));
+    try cont.condBr(sib.local(.i1, "%done"), "exit", "loop");
+    try writer.writeAll("\n");
+    var exit = try callee.block("exit");
+    _ = try exit.phi2("result", .i32, sib.int(.i32, "0"), "entry", sib.local(.i32, "%sum_next"), "cont");
+    try exit.ret(sib.local(.i32, "%result"));
+    try callee.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeFpConstantsIrWriterBody(
@@ -2886,44 +3013,36 @@ fn writeReleaseSafeRuntimeComptimeConstIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@comptime_const = alias i32 (i32), ptr @globals_comptime.comptime_const
-        \\
-        \\declare {{ i32, i1 }} @llvm.smul.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @globals_comptime.comptime_const(i32 7)
-        \\  %ok = icmp eq i32 %value, 35
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @globals_comptime.comptime_const(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  %checked = tail call {{ i32, i1 }} @llvm.smul.with.overflow.i32(i32 %value, i32 5)
-        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
-        \\  br i1 %overflow, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %result = extractvalue {{ i32, i1 }} %checked, 0
-        \\  ret i32 %result
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeComptimeConstStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime comptime const external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeRuntimeComptimeConstStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("comptime_const", .{ .text = "i32 (i32)" }, "@globals_comptime.comptime_const");
+    try writer.writeAll("\n");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.smul.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@globals_comptime.comptime_const", "i32 7");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "35"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "globals_comptime.comptime_const", "i32 %value", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.checkedSMulI32("checked", sib.local(.i32, "%value"), sib.int(.i32, "5"));
+    try entry.panicEdge(sib.local(.i1, "%checked.overflow"), "ok", "panic");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic");
+    try writer.writeAll("\n");
+    var ok = try callee.block("ok");
+    try ok.ret(sib.local(.i32, "%checked.value"));
+    try callee.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeDebugLocationIrWriterBody(
@@ -2959,44 +3078,50 @@ fn writeReleaseSafeRuntimeDebugLocationIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@debug_location = alias i32 (i32), ptr @atomics_inline_asm_debug.debug_location
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @atomics_inline_asm_debug.debug_location(i32 41)
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @atomics_inline_asm_debug.debug_location(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %value, i32 1)
-        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
-        \\  br i1 %overflow, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %result = extractvalue {{ i32, i1 }} %checked, 0
-        \\  ret i32 %result
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeDebugLocationStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime debug_location external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeRuntimeDebugLocationStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("debug_location", .{ .text = "i32 (i32)" }, "@atomics_inline_asm_debug.debug_location");
+    try writer.writeAll("\n");
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@atomics_inline_asm_debug.debug_location", "i32 41");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "atomics_inline_asm_debug.debug_location", "i32 %value", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.checkedSAddI32("checked", sib.local(.i32, "%value"), sib.int(.i32, "1"));
+    try entry.panicEdge(sib.local(.i1, "%checked.overflow"), "ok", "panic");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&callee, "panic");
+    try writer.writeAll("\n");
+    var ok = try callee.block("ok");
+    try ok.ret(sib.local(.i32, "%checked.value"));
+    try callee.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
+}
+
+fn writeIntegerOverflowPanicBlockStructured(function: *sib.Function, name: []const u8) !void {
+    var panic = try function.block(name);
+    _ = try panic.call(null, "", .void, "@llvm.assume", "i1 1");
+    _ = try panic.call(null, "tail fastcc ", .void, "@\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "");
+    try panic.emitUnreachable();
+}
+
+fn writeIntegerOverflowPanicFunctionStructured(module: *sib.Module) !void {
+    var panic_fn = try module.function("fastcc ", .void, "\"debug.FullPanic((function 'defaultPanic')).integerOverflow\"", "", "");
+    var panic_entry = try panic_fn.block("entry");
+    try panic_entry.retVoid();
+    try panic_fn.end();
 }
 
 fn writeRuntimeCallChainIrWriterBody(
@@ -3031,37 +3156,32 @@ fn writeReleaseSafeRuntimeCallChainIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main = alias i32 (i32), ptr @control_flow_calls.call_chain
-        \\@call_chain = alias i32 (i32), ptr @control_flow_calls.call_chain
-        \\
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define private i32 @control_flow_calls.call_chain(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  %biased = add i32 %value, 1073741824
-        \\  %overflow = icmp slt i32 %biased, 0
-        \\  br i1 %overflow, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %shifted = shl nsw i32 %value, 1
-        \\  %ret = or disjoint i32 %shifted, 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeCallChainStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime call_chain external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeRuntimeCallChainStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("main", .{ .text = "i32 (i32)" }, "@control_flow_calls.call_chain");
+    try module.alias("call_chain", .{ .text = "i32 (i32)" }, "@control_flow_calls.call_chain");
+    try writer.writeAll("\n");
+    try module.declare(.void, "llvm.assume", "i1");
+    try writer.writeAll("\n");
+    var chain = try module.function("private ", .i32, "control_flow_calls.call_chain", "i32 %value", " unnamed_addr align 1");
+    var entry = try chain.block("entry");
+    _ = try entry.binary("biased", "add", .i32, sib.local(.i32, "%value"), sib.int(.i32, "1073741824"));
+    _ = try entry.icmp("overflow", "slt", .i32, sib.local(.i32, "%biased"), sib.int(.i32, "0"));
+    try entry.panicEdge(sib.local(.i1, "%overflow"), "ok", "panic");
+    try writer.writeAll("\n");
+    try writeIntegerOverflowPanicBlockStructured(&chain, "panic");
+    try writer.writeAll("\n");
+    var ok = try chain.block("ok");
+    _ = try ok.binary("shifted", "shl nsw", .i32, sib.local(.i32, "%value"), sib.int(.i32, "1"));
+    _ = try ok.binary("ret", "or disjoint", .i32, sib.local(.i32, "%shifted"), sib.int(.i32, "1"));
+    try ok.ret(sib.local(.i32, "%ret"));
+    try chain.end();
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeTlsReadIrWriterBody(
@@ -3121,25 +3241,21 @@ fn writeTlsBumpModule(writer: *std.Io.Writer, checked: bool) !void {
     var entry = try function.block("entry");
     _ = try entry.load("current", .i32, sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
     if (checked) {
-        try writer.writeAll(
-            \\  %checked = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
-            \\  %overflow = extractvalue { i32, i1 } %checked, 1
-            \\  %updated = extractvalue { i32, i1 } %checked, 0
-            \\
-        );
-        try entry.panicEdge(sib.local(.i1, "%overflow"), "ok", "panic");
+        _ = try entry.checkedSAddI32("checked", sib.local(.i32, "%current"), sib.local(.i32, "%value"));
+        try entry.panicEdge(sib.local(.i1, "%checked.overflow"), "ok", "panic");
         try writer.writeAll("\n");
-        try irw.integerOverflowPanicBlock(writer, "panic");
+        try writeIntegerOverflowPanicBlockStructured(&function, "panic");
         try writer.writeAll("\n");
-        _ = try function.block("ok");
+        var ok_block = try function.block("ok");
+        try ok_block.store(sib.local(.i32, "%checked.value"), sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
+        try ok_block.ret(sib.local(.i32, "%checked.value"));
     } else {
         _ = try entry.binary("updated", "add", .i32, sib.local(.i32, "%current"), sib.local(.i32, "%value"));
+        try entry.store(sib.local(.i32, "%updated"), sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
+        try entry.ret(sib.local(.i32, "%updated"));
     }
-    var ok_block = sib.Block{ .writer = writer };
-    try ok_block.store(sib.local(.i32, "%updated"), sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
-    try ok_block.ret(sib.local(.i32, "%updated"));
     try function.end();
-    if (checked) try irw.integerOverflowPanicFunction(writer);
+    if (checked) try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeRuntimeAtomicAddIrWriterBody(
@@ -3581,32 +3697,22 @@ fn writeCheckedAddRuntimeBoundaryIrWriterBody(
 
 fn writeCheckedAddRuntimeBoundaryModule(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);
+    try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+    try module.declare(.void, "llvm.assume", "i1 noundef");
+    try writer.writeAll("\n");
     var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
     var entry = try function.block("entry");
-    try writer.writeAll(
-        \\  %pair = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 40, i32 2)
-        \\  %overflow = extractvalue { i32, i1 } %pair, 1
-        \\
-    );
-    try entry.panicEdge(sib.local(.i1, "%overflow"), "ok", "panic");
+    _ = try entry.checkedSAddI32("pair", sib.int(.i32, "40"), sib.int(.i32, "2"));
+    try entry.panicEdge(sib.local(.i1, "%pair.overflow"), "ok", "panic");
     try writer.writeAll("\n");
     var ok = try function.block("ok");
-    try writer.writeAll(
-        \\  %value = extractvalue { i32, i1 } %pair, 0
-        \\
-    );
-    _ = try ok.icmp("matches", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try ok.icmp("matches", "eq", .i32, sib.local(.i32, "%pair.value"), sib.int(.i32, "42"));
     _ = try ok.select("ret", sib.local(.i1, "%matches"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
     try ok.ret(sib.local(.i32, "%ret"));
     try writer.writeAll("\n");
-    try irw.integerOverflowPanicBlock(writer, "panic");
+    try writeIntegerOverflowPanicBlockStructured(&function, "panic");
     try function.end();
-    try writer.writeAll(
-        \\declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1 noundef)
-        \\declare fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\
-    );
+    try writeIntegerOverflowPanicFunctionStructured(&module);
 }
 
 fn writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(
