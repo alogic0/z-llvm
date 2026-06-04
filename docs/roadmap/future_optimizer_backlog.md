@@ -134,7 +134,7 @@ subsets:
 | --- | --- | --- | --- |
 | ReleaseFast | `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` | 17 ok / 0 fail | Conservative boundary for the selected Zig-backed object subset. |
 | ReleaseSafe | `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` | 17 ok / 0 fail | Conservative boundary for the captured optimized-output object subset. |
-| ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 463 ok / 0 fail / 2 excluded | Conservative boundary for the named captured subset. |
+| ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 465 ok / 0 fail / 0 excluded | Conservative boundary for the named captured subset. |
 
 ReleaseFast covers the selected `aggregate_abi`, `aggregates`,
 `atomics_inline_asm_debug`, `control_flow_calls`, `error_switch`,
@@ -187,18 +187,16 @@ Final adjusted closures:
 | `standalone_libfuzzer_main.zig.ReleaseSmall.x86_64.optimized.ll` | `@runner_futex_wait`, string-slice `@runner_test_name`, and runtime-call `@runner_test_run`. |
 | `standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll` | Mixed Zig/C `@add_zig` global-add and checked `@add_may_panic` panic-edge branch. |
 
-The two ReleaseSmall exclusions are explicit boundaries, validated by
-`zig build distribution-releasesmall-boundary`:
+The former ReleaseSmall exclusions are closed local object boundaries,
+validated by `zig build distribution-releasesmall-boundary`:
 
 - `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
-  - Reason: broad multi-block float-format helper, not a single defensible
-    lowering slice.
+  - Proof: `whole-function:str-from-float-help`
   - Fixture:
     `test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`
 
 - `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
-  - Reason: large table-driven base64 decoder, not a single defensible backend
-    reduction.
+  - Proof: `whole-function:base64-decode-base-64`
   - Fixture:
     `test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll`
 

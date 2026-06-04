@@ -147,7 +147,7 @@ first_failure=-
 
 summary=tmp/zig_ir/native_link_boundary2_releasesmall.summary
 mode=ReleaseSmall
-total=465 accepted=271 accounted=192 local_fail=0 excluded=2 accounted_total=465
+total=465 accepted=273 accounted=192 local_fail=0 excluded=0 accounted_total=465
 accounted_category=libc/compiler-rt=1
 accounted_category=zig-startup-runtime=190
 accounted_category=zig-tls-runtime=1

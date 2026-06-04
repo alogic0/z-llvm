@@ -10,25 +10,21 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 ## Active Cycle
 
 Replacement goal:
-Freeze the completed x86_64 selected external IR-writer milestone and start
-the next ReleaseSmall whole-function boundary milestone. The frozen milestone
-is green under `zig build distribution-all`: the x86_64 selected 87-row
-external IR-writer gate has `total=87 executable_ok=87 link_only_ok=0
-local_fail=0`, `scalar_runtime_rows=87`, `minimal_wrapper_rows=0`, and no
-active local failure remains. The selected integrated postopt object gate and
-the selected integrated preopt object gate are also clean.
-
-Next target:
-x86_64 whole-function ReleaseSmall boundary closure for the two current
-explicit exclusions:
+Freeze the completed ReleaseSmall no-exclusion boundary. The x86_64 selected
+88-row external IR-writer gate is green under `zig build distribution-all`, and
+the two former ReleaseSmall explicit exclusions now have local object evidence:
 `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
 (`@decode_base_64 -> @base64.decode_base_64`) and
 `standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll`
-(`@strFromFloatHelp -> @main.strFromFloatHelp`). Start with the full
-`base64.decode_base_64` external IR-writer body, then replace the current
-selected boundary stub with real whole-function lowering before promoting the
-matrix row from reduced boundary evidence to whole-function evidence. Attack
-`strFromFloatHelp` after inventorying its full block/FP-formatting shape.
+(`@strFromFloatHelp -> @main.strFromFloatHelp`). No active local failure
+remains for the captured ReleaseSmall boundary.
+
+Next target:
+Replace curated case bodies with reusable writer/lowering machinery. Start by
+turning the long external IR-writer `case_id` dispatch into a registry and move
+the base64, strFromFloat, and selected loop/phi rows behind shared helpers for
+function definitions, block emission, phis, branches, GEP/load/store, table
+loads, loop headers/latches, calls, and lifetime/memcpy/memset intrinsics.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -74,22 +70,22 @@ exit. Its executable `@main` validates `TWFu -> Man`, `TWE= -> Ma`,
 through the real table-driven loop path rather than the former selected
 boundary shortcut.
 
-`strFromFloatHelp` full-function inventory has started from
+`strFromFloatHelp` full-function closure is promoted from
 `test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`.
 The tracked helper is 1005 lines overall, with `@main.strFromFloatHelp`
 running from line 37 through line 670 before the helper callees. The full
 function has the initial double bitcast/exponent branch, pow5/inv-pow5 table
 paths, `fmt.float.mulShift64` calls, multiple-of-power-of-5 calls, decimal
 length/write loops, fixed/scientific formatting branches, writer buffer
-copies, and final buffer-print writer dispatch. The first real implementation
-slice now covers the writer/buffer/tag stack slots, `llvm.lifetime.start`
-markers, writer buffer pointer/length/index stores, the double-to-i64 bitcast,
-mantissa/exponent extraction, zero classification branch, and special-exponent
-branch under `releasesmall_runtime_str_from_float_help`. The next missing
-writer and lowering helper families are structured loop-header/latch emission
-for the decimal loops, vector `<2 x i64>` table loads/stores, `i128`
+copies, and final buffer-print writer dispatch. The
+`releasesmall_runtime_str_from_float_help` executable row now calls the helper
+from `@main`, covers stack slots, lifetime markers, double bitcast/exponent
+classification, pow5/inv-pow5 table loads, decimal loop CFG, `i128`
 arithmetic/truncation, `llvm.assume`, `llvm.memcpy`/`llvm.memset`, fastcc
-helper calls with pointer arguments, and indirect writer-vtable calls.
+pointer helper calls, and the writer-vtable indirect-call boundary. The proof
+label is `whole-function:str-from-float-help`, and
+`zig build distribution-releasesmall-boundary` now reports both former
+ReleaseSmall exclusions as `[local-object]`.
 The completed `releasefast_runtime_pointer_load_store` row is paired with
 `pointers_memory.load_store(p: *i32, q: *i32) i32` from
 `test/zig/inputs/pointers_memory.zig`, which exercises a pointer load, integer
@@ -587,7 +583,7 @@ expected source-level exit code 7, and
 source-level exit code 5. `releasesmall_runtime_inherit_want_safety_i64` now
 passes with the expected source-level exit code 4. The selected integrated
 postopt object gate is clean with
-`total=87 executable_ok=87 link_only_ok=0 local_fail=0`. The top-level
+`total=88 executable_ok=88 link_only_ok=0 local_fail=0`. The top-level
 distribution gate then exposed the next selected blocker:
 integrated preopt `releasefast_runtime_pointer_load_store` object emission
 failure with `UnsupportedCodegenControlFlow`; that row now passes. The next
@@ -735,7 +731,7 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 87-row
+also passes: the first ReleaseFast tiny-scalar row and the full 88-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
@@ -784,8 +780,8 @@ The experimental patched-Zig object-emission slice is recorded in
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
 ReleaseSafe  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
-ReleaseSmall x86_64 asm/object: conservative boundary, 463/465 captured rows object-clean,
-             2 explicit exclusions
+ReleaseSmall x86_64 asm/object: conservative boundary, 465/465 captured rows object-clean,
+             0 explicit exclusions
 Debug        x86_64 asm/object: conservative boundary, adjusted continuous 463-row subset
              object-clean, 2 explicit exclusions
 musl         selected x86_64 object/executable subset gates pass
@@ -810,8 +806,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=87 executable_ok=87 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=87 minimal_wrapper_rows=0
+             full set total=88 executable_ok=88 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=88 minimal_wrapper_rows=0
              surface-counts scalar-add-ret=1 integer-arithmetic=1
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
@@ -835,7 +831,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              umul-fix-sat-i64=1
              inherit-i64-return=1
              compile-asm-unreachable=1
-             str-from-float-stack-exponent=1
+             str-from-float-help=1
              base64-decode-step=1
              base64-store-step=1
              base64-residual-byte-step=1
@@ -875,8 +871,8 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
 broad link   link-only native-link boundary2:
              ReleaseFast total=17 accepted=16 accounted=1 local_fail=0
              ReleaseSafe total=17 accepted=8 accounted=9 local_fail=0
-             ReleaseSmall total=465 accepted=271 accounted=192 local_fail=0,
-             2 explicit exclusions, accounted_total=465
+             ReleaseSmall total=465 accepted=273 accounted=192 local_fail=0,
+             0 explicit exclusions, accounted_total=465
              Debug total=10 accepted=6 accounted=4 local_fail=0
 AArch64      object emission remains an explicit target boundary
 ```

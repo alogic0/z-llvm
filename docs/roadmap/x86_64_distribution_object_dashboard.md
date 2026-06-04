@@ -23,7 +23,7 @@ Current automated summaries:
 | --- | --- | ---: | ---: | ---: | ---: | --- |
 | ReleaseFast | `tmp/zig_ir/distribution_m1_releasefast_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
 | ReleaseSafe | `tmp/zig_ir/distribution_m2_releasesafe_20260530/optimized-ir` | 17 | 17 | 0 | 0 | `-` |
-| ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 465 | 463 | 0 | 2 | `-` |
+| ReleaseSmall | `tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir` | 465 | 465 | 0 | 0 | `-` |
 | Debug reduced | `test/zig/expected/debug_*.reduced.ll` | 9 | 9 | 0 | 0 | `-` |
 | Debug broad tiny scalar | `tmp/zig_ir/debug_object_probe_tiny_scalar_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
 | Debug broad control flow calls | `tmp/zig_ir/debug_object_probe_control_flow_calls_20260531/ir` | 1 | 1 | 0 | 0 | `-` |
@@ -39,21 +39,14 @@ ReleaseSmall exclusions:
 
 ```text
 standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
-  reason=float-format-helper-boundary
-  boundary=multi-block float-format helper, not a one-slice object reduction
-  direct_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
+  status=closed local object evidence
   tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
-  result=1 fail, category=unsupported-control-flow
+  proof=whole-function:str-from-float-help
 
 standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
-  reason=table-decoder-boundary
-  boundary=table-driven decoder with broad loop/control-flow lowering
-  direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
+  status=closed local object and executable evidence
   tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
-  result=1 fail, category=unsupported-control-flow
-  reduced_closed_fixture=test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll
-  reduced_gate=zig build distribution-releasesmall-object
-  reduced_native_link=zig build distribution-native-link-releasesmall
+  proof=whole-function:base64-decode-base-64
 ```
 
 ## Focused Gates
@@ -76,7 +69,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | `zig build probe-native-linker` | selected native Zig linker compatibility probe for the same ABI-stable object set; classifies first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility | pass, 45 accepted / 0 failed |
 | `zig build probe-native-linker-broad -- --mode=ReleaseFast` | broad ReleaseFast link-only native-link acceptance over the 17 captured optimized IR rows | pass, 16 accepted / 1 compiler-rt accounted / 0 local failures |
 | `zig build probe-native-linker-broad -- --mode=ReleaseSafe` | broad ReleaseSafe link-only native-link accounting over the 17 captured optimized IR rows | boundary, 8 accepted / 9 accounted / 0 local failures |
-| `zig build probe-native-linker-broad -- --mode=ReleaseSmall` | broad ReleaseSmall link-only native-link accounting over the 465 captured optimized IR rows, preserving the 2 explicit object exclusions | boundary, 271 accepted / 192 accounted / 2 excluded / 0 local failures |
+| `zig build probe-native-linker-broad -- --mode=ReleaseSmall` | broad ReleaseSmall link-only native-link accounting over the 465 captured optimized IR rows | boundary, 273 accepted / 192 accounted / 0 excluded / 0 local failures |
 | `zig build probe-native-linker-broad -- --mode=Debug` | broad selected Debug/O0 link-only native-link accounting over `test/distribution/debug_x86_64/inputs` | boundary, 6 accepted / 4 accounted / 0 local failures |
 | `zig build distribution-native-link-boundary2` | composed broad native-link boundary gate for ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug; fails on generic runtime buckets or unclassified local failures | pass, local_fail=0 for all modes |
 | `zig build distribution-native-link-releasefast` | ReleaseFast native-link proof for the full current executable harness set | pass, 27 executed |
@@ -100,7 +93,7 @@ standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
 | --- | --- | --- |
 | ReleaseFast | conservative boundary | captured 17-row optimized-output object set, selected executable proof |
 | ReleaseSafe | conservative boundary | captured 17-row optimized-output object set, selected safety/runtime-call executable proof |
-| ReleaseSmall | conservative boundary | adjusted 463-row object-clean subset with 2 explicit exclusions, selected executable proof |
+| ReleaseSmall | conservative boundary | captured 465-row object-clean subset with no explicit exclusions, selected executable proof |
 | Debug | conservative boundary | adjusted continuous 463-row object-clean subset with 2 explicit exclusions |
 
 ## Native-Link Acceptance
@@ -145,11 +138,9 @@ after a reviewed probe result and explicit boundary decision.
 ## Remaining Object Gaps
 
 ```text
-ReleaseSmall excluded:
-  standalone_emit_llvm_no_bin_main: float-format helper
-    direct no-exclusion probe fails unsupported-control-flow
-  standalone_mix_o_files_base64: table decoder
-    direct no-exclusion probe fails unsupported-control-flow
+ReleaseSmall former exclusions:
+  standalone_emit_llvm_no_bin_main: closed by whole-function:str-from-float-help
+  standalone_mix_o_files_base64: closed by whole-function:base64-decode-base-64
 
 Debug broad:
   tiny_scalar.Debug.x86_64.ll object-clean as a selected broad row
@@ -216,7 +207,7 @@ Debug broad:
     1 excluded row
   continuous Debug full 465 uses the full available optimizer-ok Debug corpus
     from tmp/zig_ir/continuous_20260530_151319_debug/report.tsv; the adjusted
-    probe is 463 object successes, 0 object failures, and 2 excluded rows
+    probe is 465 object successes, 0 object failures, and 0 excluded rows
   continuous Debug full 465 excludes
     standalone_mix_o_files_base64.zig.Debug.x86_64.ll under the
     debug-table-decoder-boundary, matching the existing ReleaseSmall base64

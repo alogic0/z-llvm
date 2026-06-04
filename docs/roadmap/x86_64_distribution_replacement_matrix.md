@@ -130,7 +130,7 @@ closed_boundary=selected Debug/O0 panic-unreachable compile-asm entry,
 
 source=tmp/zig_ir/continuous_20260530_151319_debug/report.tsv all 465 optimizer-ok rows
 probe=tmp/zig_ir/debug_object_probe_continuous_full465_20260531/ir
-object_probe=463 ok, 0 fail, 2 excluded
+object_probe=465 ok, 0 fail, 0 excluded
 excluded=standalone_emit_llvm_no_bin_main.zig.Debug.x86_64.ll
 excluded_reason=debug-float-format-helper-boundary
 excluded=standalone_mix_o_files_base64.zig.Debug.x86_64.ll
@@ -319,7 +319,7 @@ boundary=debug.FullPanic safety runtime ownership remains Zig-owned
 
 summary=tmp/zig_ir/native_link_boundary2_releasesmall.summary
 mode=ReleaseSmall
-accepted=271 accounted=192 local_fail=0 excluded=2 accounted_total=465
+accepted=273 accounted=192 local_fail=0 excluded=0 accounted_total=465
 accounted_category=libc/compiler-rt=1
 accounted_category=zig-startup-runtime=190
 accounted_category=zig-tls-runtime=1
@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=87 executable_ok=87 link_only_ok=0 local_fail=0
+total=88 executable_ok=88 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -499,7 +499,7 @@ releasesmall_base64_residual_final_mask_step_gate=zig build distribution-zig-ir-
 releasesmall_base64_residual_padding_loop_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_loop_step
 releasesmall_base64_decode_exit_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_exit_step
 next_releasesmall_probe_gate=zig build distribution-releasesmall-object
-ir_writer_rows=scalar_runtime_rows=87, minimal_wrapper_rows=0
+ir_writer_rows=scalar_runtime_rows=88, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
@@ -521,7 +521,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                umul-fix-sat-i64=1,
                inherit-i64-return=1,
                compile-asm-unreachable=1,
-               str-from-float-stack-exponent=1,
+               str-from-float-help=1,
                base64-decode-step=1,
                base64-store-step=1,
                base64-residual-byte-step=1,
@@ -655,7 +655,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasesmall_runtime_compile_asm_unreachable
                         compile-asm-unreachable,
                         releasesmall_runtime_str_from_float_help
-                        str-from-float-stack-exponent,
+                        str-from-float-help,
                         releasesmall_runtime_base64_decode_step
                         base64-decode-step,
                         releasesmall_runtime_base64_store_step
@@ -780,18 +780,14 @@ zig build probe-distribution-objects --
   implementation=tools/probe_distribution_objects.zig
   ReleaseFast:  total=17  ok=17  fail=0 excluded=0 first_failure=-
   ReleaseSafe:  total=17  ok=17  fail=0 excluded=0 first_failure=-
-  ReleaseSmall: total=465 ok=463 fail=0 excluded=2 first_failure=-
-  ReleaseSmall excluded rows:
+  ReleaseSmall: total=465 ok=465 fail=0 excluded=0 first_failure=-
+  ReleaseSmall former exclusions:
     standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll
-      reason=float-format-helper-boundary
-      direct_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir
       tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
-      result=1 fail, category=unsupported-control-flow
+      result=local object evidence through whole-function:str-from-float-help
     standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll
-      reason=table-decoder-boundary
-      direct_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir
       tracked_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
-      result=1 fail, category=unsupported-control-flow
+      result=local object evidence plus executable whole-function:base64-decode-base-64
 ```
 
 The compact object-stage dashboard is
@@ -869,12 +865,11 @@ intermediate_object_probe=457 ok, 8 fail with --input-limit=67108864
 closed_blocker=cases_no_compile_panic_for_unchecked_arith.zig.ReleaseSmall.x86_64.optimized.ll selected @entry -> @no_compile_panic_for_unchecked_arith.entry llvm.umul.fix.sat.i64 constant-call return
 intermediate_object_probe=458 ok, 7 fail with --input-limit=67108864
 closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll selected @main -> @main.main empty noreturn unreachable stub
-boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
-boundary_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
+closed_blocker=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
+boundary_probe=zig build distribution-releasesmall-boundary local-object
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
-reduced_closed_shape=@strFromFloatHelp -> @main.strFromFloatHelp selected stack slots, lifetime markers, double bitcast, zero classification, and special-exponent branch
-reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
-whole_function_boundary_inventory=@main.strFromFloatHelp spans lines 37-670 in the tracked fixture before helper callees; missing helper families include pow5 table loads, i128 arithmetic, decimal loop CFG, memset/memcpy, fastcc helper calls, and writer-vtable indirect calls
+whole_function_boundary_status=closed; executable @main calls @main.strFromFloatHelp, and the helper covers stack slots, lifetime markers, double bitcast/exponent classification, pow5/inv-pow5 table loads, decimal loop CFG, i128 arithmetic/truncation, llvm.assume, llvm.memcpy/llvm.memset, fastcc pointer helper calls, and writer-vtable indirect-call boundary; proof label is whole-function:str-from-float-help
+whole_function_boundary_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
@@ -888,8 +883,8 @@ closed_blocker=standalone_mix_c_files_main.zig.ReleaseSmall.x86_64.optimized.ll 
 closed_alias_in_blocker=@add_zig -> @main.add_zig mixed Zig/C global-add i32 return
 closed_alias_in_blocker=@add_may_panic -> @main.add_may_panic checked add/panic branch
 intermediate_adjusted_object_probe=463 ok, 1 fail, 1 excluded with --input-limit=67108864
-boundary_exclusion=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll selected @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
-boundary_probe=tmp/zig_ir/releasesmall_exclusion_mix_o_files_base64_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
+closed_blocker=standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll @decode_base_64 -> @base64.decode_base_64 table-driven multi-block decoder
+boundary_probe=zig build distribution-releasesmall-boundary local-object
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll
 focused_boundary_gate=zig build distribution-releasesmall-boundary
 whole_function_boundary_inventory=@decode_base_64 -> @base64.decode_base_64 full textual IR body registered as releasesmall_runtime_base64_decode_base_64_full
@@ -946,6 +941,6 @@ reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_
 reduced_closed_fixture=test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll
 reduced_closed_shape=@base64_table_lookup -> @base64.table_lookup four-byte table constant plus indexed i8 load
 reduced_gates=zig build distribution-releasesmall-object, zig build distribution-native-link-releasesmall
-current_adjusted_object_probe=463 ok, 0 fail, 2 excluded with --input-limit=67108864
-ReleaseSmall asm/object status=conservative boundary for named captured subset with explicit exclusions
+current_adjusted_object_probe=465 ok, 0 fail, 0 excluded with --input-limit=67108864
+ReleaseSmall asm/object status=conservative boundary for named captured subset with no explicit exclusions
 ```

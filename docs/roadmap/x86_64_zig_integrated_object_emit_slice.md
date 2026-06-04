@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=87 executable_ok=87 link_only_ok=0 local_fail=0
+ir-writer full set:    total=88 executable_ok=88 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer base64 step: zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
@@ -587,7 +587,7 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=87 minimal_wrapper_rows=0
+ir-writer full set:    scalar_runtime_rows=88 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        error-switch-select=2 direct-call=1 global-load=3
                        i64-arithmetic=1 i64-call-return=1
@@ -610,7 +610,7 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        umul-fix-sat-i64=1
                        inherit-i64-return=1
                        compile-asm-unreachable=1
-                       str-from-float-stack-exponent=1
+                       str-from-float-help=1
                        base64-decode-step=1
                        base64-store-step=1
                        base64-residual-byte-step=1
@@ -727,7 +727,7 @@ The external writer now emits 87/87 selected rows as runtime surfaces:
 `umul-fix-sat-i64`,
 `inherit-i64-return`,
 `compile-asm-unreachable`,
-`str-from-float-stack-exponent`,
+`str-from-float-help`,
 `base64-decode-step`,
 `base64-store-step`,
 `base64-residual-byte-step`,
@@ -768,7 +768,7 @@ proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.
-The next milestone starts after that frozen 87-row claim: the
+The next milestone starts after that frozen 88-row claim: the
 `releasesmall_runtime_base64_decode_base_64_full` row registers a full
 `@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
 boundary closure. Its `@main` performs executable validation for

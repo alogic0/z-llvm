@@ -109,7 +109,7 @@ optimizer/object path. Runtime writer rows now cover
 `checked-loop-sum-boundary`, `void-noop-call`, and
 `hidden-global-access`, `mixed-c-zig-add`, `mixed-c-zig-panic-add`,
 `umul-fix-sat-i64`, `inherit-i64-return`, `compile-asm-unreachable`,
-`str-from-float-stack-exponent`, `base64-decode-step`, `base64-store-step`,
+`str-from-float-help`, `base64-decode-step`, `base64-store-step`,
 `base64-residual-byte-step`, `base64-padding-tail-step`, and
 `base64-padding-loop-step`, `base64-padding-length-step`, and
 `base64-chunk-guard-step`, `base64-source-stride-step`, and

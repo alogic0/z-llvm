@@ -30,8 +30,8 @@ ReleaseSafe captured set:
 
 ReleaseSmall captured set:
   input=tmp/zig_ir/distribution_m3_releasesmall_20260531/optimized-ir
-  broad_native_link=total=465 accepted=271 accounted=192 local_fail=0
-  excluded=2 accounted_total=465
+  broad_native_link=total=465 accepted=273 accounted=192 local_fail=0
+  excluded=0 accounted_total=465
   accounted=zig-startup-runtime=190, zig-tls-runtime=1, libc/compiler-rt=1
   exclusions=float-format-helper-boundary, full base64 decoder boundary
   reduced_closed=base64_table_lookup selected table lookup fixture
