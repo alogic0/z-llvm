@@ -91,3 +91,11 @@ The next ownership rung is tracked separately in
 rows are still emitted through `src/structured_ir_builder.zig`; the improvement
 is that z_llvm now starts from small Zig-level semantic records for those
 families instead of manifest-shaped structured templates.
+
+The strongest current release-mode source-owned gate is
+`zig build distribution-x86_64-release-source-owned`. It keeps the broad
+90-row source-backed fixture inventory, resolves each row from wrapper,
+fixture, and source-tag metadata, and requires
+`semantic_lowering_rows=90`, `manifest_structured_rows=0`,
+`case_id_rows=0`, `structured_direct_rows=90`, and
+`generic_codegen_rows=90`.

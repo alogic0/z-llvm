@@ -1,6 +1,6 @@
 # x86_64 Source Wrapper and Semantic Lowering Milestone
 
-This milestone separates three local ownership proofs for the x86_64 release
+This milestone separates four local ownership proofs for the x86_64 release
 subset:
 
 1. Fixed selected-row proof: `ZLLVM_CASE_ID` still selects the 146 stable
@@ -9,10 +9,13 @@ subset:
    mode, target, output, and marker metadata; z_llvm resolves the structured
    module from wrapper/source metadata instead of using the case id as the
    primary selector.
-3. Semantic lowering proof: a subset of source-wrapper rows now lowers
-   Zig-level semantic records through `src/zig_semantic_lowering.zig` into
-   `src/structured_ir_builder.zig`, instead of being built from
-   manifest-shaped structured templates.
+3. Source-owned release proof: the full current 90-row source-backed release
+   inventory is selected from wrapper, fixture, and source-tag metadata, not
+   from case-id ownership.
+4. Semantic lowering proof: source-owned rows lower Zig-level semantic records
+   through `src/zig_semantic_lowering.zig` into
+   `src/structured_ir_builder.zig`, instead of reporting manifest-shaped
+   structured templates.
 
 ## Source-Wrapper Gate
 
@@ -47,10 +50,33 @@ object-emission=z_llvm
 linker=zig-native-fno-lld
 ```
 
+## Source-Owned Release Gate
+
+```text
+gate=zig build distribution-x86_64-release-source-owned
+release_source_rows=90
+source_wrapper_rows=90
+semantic_lowering_rows=90
+manifest_structured_rows=0
+case_id_rows=0
+structured_direct_rows=90
+generic_codegen_rows=90
+fallback_rows=0
+local_fail=0
+```
+
+This gate closes the wrapper/mode collision gap by passing source fixture
+metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
+`tls-concurrency-checked-read`. The emitted writer header records
+`zllvm_ir_writer_dispatch = "source-owned"`,
+`zllvm_ir_writer_source_fixture`, and `zllvm_ir_writer_source_tag`; the row
+selector remains `ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not
+the ownership selector for this gate.
+
 ## Semantic-Lowered Families
 
 `src/zig_semantic_lowering.zig` currently models these source-level program
-families before building structured IR:
+families before building structured IR in the source-owned gate:
 
 - scalar integer arithmetic and wrap/cmp/shift checks
 - error-switch/select rows
@@ -64,13 +90,17 @@ families before building structured IR:
 - debug-location add-immediate rows
 - local-exec TLS read
 - simple atomic add
+- checked ReleaseSafe panic-edge families
+- packed/volatile/optional-pointer details
+- FP compare/binary/div/rem source-backed shapes
+- inline asm and aggregate ABI pair boundaries
+- ReleaseSmall mixed C/Zig/i64 boundary rows
+- full base64, reduced base64 slices, and `strFromFloatHelp`
 
-The remaining source-wrapper rows are still `manifest-structured`: they build
-z_llvm-owned structured IR directly, but their source-level semantic record has
-not been factored out yet. Those rows include checked ReleaseSafe panic-edge
-families, packed/volatile/optional-pointer details, FP compare/binary/div/rem,
-inline asm, aggregate ABI pair, ReleaseSmall mixed C/Zig/i64 boundaries, full
-base64, and `strFromFloatHelp`.
+The narrower source-wrapper compatibility gate still reports 21 semantic rows
+and 28 manifest rows because it deliberately omits source fixture/tag metadata.
+The source-owned gate is the stronger current claim for release source-backed
+ownership.
 
 ## Boundary
 

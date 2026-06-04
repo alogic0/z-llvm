@@ -228,6 +228,33 @@ status=deferred until a source-backed activation criterion requires bitcode or
        linker LTO handoff
 ```
 
+The strongest current release-mode source-owned replacement gate is:
+
+```text
+gate=zig build distribution-x86_64-release-source-owned
+target=x86_64
+modes=ReleaseFast,ReleaseSafe,ReleaseSmall
+release_source_rows=90
+source_wrapper_rows=90
+semantic_lowering_rows=90
+manifest_structured_rows=0
+case_id_rows=0
+structured_direct_rows=90
+generic_codegen_rows=90
+fallback_rows=0
+local_fail=0
+ownership=llvm-module=not-used;llvm-optimizer=not-used;
+          llvm-targetmachine=not-used;object-emission=z_llvm;
+          linker=zig-native-fno-lld
+```
+
+This supersedes the older claim shape for the current release source-backed
+inventory: rows are selected from Zig wrapper/source metadata, including source
+fixture and source-backed tag disambiguation for wrapper/mode collisions, then
+lowered through `src/zig_semantic_lowering.zig` into structured-direct IR.
+The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
+source-wrapper gate remain regression checks with separate counters.
+
 The selected x86_64 musl object subset is a target-boundary proof. It also
 inherits the selected ReleaseSafe executable harnesses embedded in the M2 gate,
 but does not claim broad executable replacement or local linker ownership for

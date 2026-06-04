@@ -53,6 +53,23 @@ textual LLVM parsing, non-generic codegen, or missing semantic/manifest
 lowering accounting. It currently reports `source_wrappers=49`,
 `semantic_lowering_rows=21`, and `manifest_structured_rows=28`.
 
+The stronger source-owned release proof uses:
+
+```text
+gate: zig build distribution-x86_64-release-source-owned
+ZLLVM_CASE_ID=source-wrapper-dispatch
+ZLLVM_IR_WRITER_DISPATCH=source-owned
+ZLLVM_SOURCE_FIXTURE=<covered release fixture path>
+ZLLVM_SOURCE_TAG=<source-backed tag or ->
+```
+
+That gate covers the full current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall
+source-backed inventory and fails unless it reports
+`release_source_rows=90`, `source_wrapper_rows=90`,
+`semantic_lowering_rows=90`, `manifest_structured_rows=0`,
+`case_id_rows=0`, `structured_direct_rows=90`,
+`generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`.
+
 `ZIG_EMITTER`, `ZIG_SOURCE_DIR`, `ZLLVM_EXE`, and `TARGET` may be overridden by
 the caller, but the selected claim is only for the target above and the
 currently patched stage4 Zig emitter.
@@ -67,6 +84,9 @@ emitter is `../ziglang/build/stage4/bin/zig`.
 For the source-wrapper gate, also confirm the marker reports
 `case_id=source-wrapper-dispatch` and the emitted IR header reports
 `zllvm_ir_writer_dispatch = "source-wrapper"`.
+For the source-owned gate, also confirm the emitted IR header reports
+`zllvm_ir_writer_dispatch = "source-owned"` plus the expected
+`zllvm_ir_writer_source_fixture` and `zllvm_ir_writer_source_tag` fields.
 
 `wrong z_llvm`:
 The marker points at an unexpected tool, the binary is missing, or the emitted

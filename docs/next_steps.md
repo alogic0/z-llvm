@@ -51,7 +51,21 @@ reports case-specific codegen ownership. This is a selected x86_64 release-row
 claim only; the normal Zig/libLLVM fallback still exists when the external
 writer env vars are unset.
 
-Current distribution claim gate:
+Current strongest distribution claim gate:
+`zig build distribution-x86_64-release-source-owned` is the source-owned
+x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
+current source-backed inventory. Patched Zig still passes wrapper path, optimize
+mode, target, output path, and marker path; the runner also passes source
+fixture metadata and the source-backed tag used to disambiguate wrapper/mode
+collisions. z_llvm resolves the row from that source metadata, not from
+`ZLLVM_CASE_ID`, and every accepted row reports semantic lowering through
+`src/zig_semantic_lowering.zig` into structured-direct IR. Current measured
+output is `release_source_rows=90`, `source_wrapper_rows=90`,
+`semantic_lowering_rows=90`, `manifest_structured_rows=0`,
+`case_id_rows=0`, `structured_direct_rows=90`,
+`generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`.
+
+Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
 line with row counts, structured direct/textual boundary counts,
@@ -85,15 +99,15 @@ the unambiguous wrapper/mode subset. Current measured output is
 `local_fail=0`.
 
 Ownership ladder:
-The current replacement evidence is split into three explicit rungs:
-selected case-id registry proof, source-wrapper dispatch proof, and
-semantic/AIR-shaped local records. `src/zig_semantic_lowering.zig` now lowers
-21 source-wrapper rows through Zig-level semantic records into
-`src/structured_ir_builder.zig`. The semantic subset covers scalar integer
-arithmetic, error/select, branches/phis/loops, pointer load/store, globals/TLS,
-simple calls, simple aggregates, FP literals, and simple atomics. Remaining
-source-wrapper rows are still manifest-structured, not textual, and remain
-owned by z_llvm's structured builder. The detailed milestone is recorded in
+The current replacement evidence is split into four explicit rungs:
+selected case-id registry proof, broad source-backed structured proof,
+source-wrapper compatibility proof, and source-owned semantic proof. The
+source-owned rung is now strongest: all 90 current source-backed release rows
+are selected from wrapper/fixture/tag metadata and report
+`lowering=zig-semantic-records`, with no manifest-shaped structured rows in
+that gate. The narrower source-wrapper compatibility gate remains at
+21 semantic rows and 28 manifest rows because it intentionally covers only
+unambiguous wrapper/mode inputs. The detailed milestone is recorded in
 `docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`.
 
 Next target:

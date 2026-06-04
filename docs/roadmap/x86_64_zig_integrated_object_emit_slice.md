@@ -33,6 +33,15 @@ ir-writer:
     -> z_llvm emits x86_64 relocatable .o
     -> Zig native linker links C ABI main wrappers with
        zig build-exe -fno-lld -fno-compiler-rt -lc
+
+source-owned ir-writer:
+  Zig build-obj
+    -> patched Zig passes wrapper/mode/target/output/marker metadata
+    -> the runner supplies source fixture and source-backed tag metadata
+    -> z_llvm resolves the row from source metadata, not ZLLVM_CASE_ID
+    -> z_llvm lowers through src/zig_semantic_lowering.zig into structured IR
+    -> z_llvm emits x86_64 relocatable .o through generic lowering
+    -> Zig native linker links the executable
 ```
 
 The preopt hook bypasses LLVM's module optimization pipeline for selected rows,
@@ -53,6 +62,7 @@ zig build distribution-zig-integrated-preopt   # preopt
 zig build distribution-zig-integrated-preopt -- --mode=ReleaseFast
 zig build distribution-zig-ir-writer-tiny-scalar
 zig build distribution-zig-ir-writer
+zig build distribution-x86_64-release-source-owned
 ```
 
 ## Zig Object-Emission Boundary
@@ -150,6 +160,15 @@ mode, case ID, wrapper path, `ZLLVM_IR_PATH`, x86_64 Linux object emission, and
 clearly. With the env var unset, the libLLVM fallback path is untouched. Case
 expansion belongs in z_llvm's `--emit=ir-writer` implementation, not in patched
 Zig.
+
+The source-owned release gate keeps the patched Zig hook stable by passing the
+sentinel `ZLLVM_CASE_ID=source-wrapper-dispatch` plus
+`ZLLVM_IR_WRITER_DISPATCH=source-owned`, `ZLLVM_SOURCE_FIXTURE`, and
+`ZLLVM_SOURCE_TAG`. z_llvm uses the wrapper/mode/fixture/tag tuple to resolve
+the structured module. The gate requires all 90 current x86_64 release
+source-backed rows to report `lowering=zig-semantic-records`,
+`llvm_text_parse=not-used`, `codegen=generic-x86_64-lowering`, no fallback,
+and no case-id ownership.
 
 Marker fields:
 
