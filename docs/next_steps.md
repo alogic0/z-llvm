@@ -43,15 +43,18 @@ Selected IR-writer rows now print and enforce:
 `construction=ir-construction=z_llvm-external-textual-subset`, plus
 `ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
 The gate fails if a selected row reports libLLVM module parse/print,
-LLVM TargetMachine object emission, a minimal wrapper surface, or a full-gate
-structured-builder count below 30. This is a selected x86_64 release-row claim only; the
-normal Zig/libLLVM fallback still exists when the external writer env vars are
-unset.
+LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
+structured-builder count below 100, or a textual row without
+`textual_boundary_reason`. This is a selected x86_64 release-row claim only;
+the normal Zig/libLLVM fallback still exists when the external writer env vars
+are unset.
 
 Current distribution claim gate:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
-line with row counts, `minimal-ret0`, ownership, and first-failure fields.
+line with row counts, structured/textual construction counts,
+`textual_boundary_reason_missing_rows`, `minimal-ret0`, ownership, and
+first-failure fields.
 Failure diagnostics and reproducibility inputs live in
 `docs/x86_64_selected_zllvm_diagnostics.md`.
 
@@ -799,8 +802,8 @@ integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
 writer now has 136 runtime-surface selected rows and 0 minimal-wrapper hook
-proofs. Its construction ownership is measured per row: 51 rows are built
-through `src/structured_ir_builder.zig`, while 85 rows remain on the older
+proofs. Its construction ownership is measured per row: 104 rows are built
+through `src/structured_ir_builder.zig`, while 32 rows remain on the older
 external textual-subset writer helpers. Runtime surfaces cover tiny scalar add,
 integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
@@ -875,10 +878,11 @@ ir writer    patched Zig build-obj -> external z_llvm IR writer subset
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
              full set total=136 executable_ok=136 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=136 structured_builder_rows=51
-             textual_subset_rows=85 minimal_wrapper_rows=0
-             construction=ir-construction=zllvm-structured-builder:51;
-                          ir-construction=z_llvm-external-textual-subset:85
+             scalar_runtime_rows=136 structured_builder_rows=104
+             textual_subset_rows=32 textual_boundary_reason_missing_rows=0
+             minimal_wrapper_rows=0
+             construction=ir-construction=zllvm-structured-builder:104;
+                          ir-construction=z_llvm-external-textual-subset:32
              ownership=llvm-module=not-used; llvm-optimizer=not-used;
                        llvm-targetmachine=not-used; object-emission=z_llvm;
                        linker=zig-native-fno-lld

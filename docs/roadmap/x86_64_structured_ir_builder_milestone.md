@@ -9,16 +9,17 @@ local structured construction API that prints LLVM-compatible textual IR.
 ```text
 gate=zig build distribution-zig-ir-writer
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
-structured_builder_rows=51
-textual_subset_rows=85
+structured_builder_rows=104
+textual_subset_rows=32
+textual_boundary_reason_missing_rows=0
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
 ```
 
-The full selected gate fails if `structured_builder_rows < 30`, any selected
-row reports `minimal-ret0`, any selected row reports libLLVM module
+The full selected gate fails if `structured_builder_rows < 100`, any textual
+row lacks `textual_boundary_reason`, any selected row reports `minimal-ret0`, any selected row reports libLLVM module
 parse/print, or any selected row reports LLVM TargetMachine object emission.
 
 ## Converted Rows
@@ -43,6 +44,7 @@ releasefast_runtime_cond_branch
 releasefast_source_switch_branch_mix
 releasefast_runtime_phi_merge
 releasefast_runtime_loop_sum
+releasesafe_runtime_loop_sum
 releasefast_runtime_switch
 releasefast_source_switch_dense
 releasesafe_runtime_branch_mix
@@ -53,31 +55,83 @@ releasefast_runtime_pointer_load_store
 releasefast_source_pointers_memory
 releasesafe_runtime_pointer_load_store
 releasesafe_source_pointers_memory_checked
+releasefast_runtime_volatile_roundtrip
+releasefast_runtime_optional_pointer
+releasefast_source_optional_pointer_value
+releasefast_runtime_packed_read_flag
+releasefast_source_packed_bits_basic_read_flag
+releasefast_runtime_packed_replace_low
+releasefast_source_packed_bits_basic_replace_low
 releasefast_runtime_struct_sum
 releasefast_source_aggregates_struct_sum
+releasesafe_runtime_struct_sum
+releasesafe_source_aggregates_checked_struct
 releasefast_runtime_array_sum
 releasefast_source_aggregates_array_sum
+releasesafe_runtime_array_sum
+releasesafe_source_aggregates_checked_array
+releasefast_runtime_optional_payload
+releasefast_source_aggregates_optional_payload
+releasefast_runtime_error_union_payload
+releasefast_source_aggregates_error_union_payload
 releasefast_runtime_slice_sum
 releasefast_source_aggregates_slice_sum
+releasesafe_runtime_slice_sum
+releasesafe_source_aggregates_checked_slice
 releasefast_runtime_fp_constants
 releasefast_source_fp_constants_literals
 releasefast_runtime_comptime_const
 releasefast_source_globals_comptime_const
 releasefast_source_globals_comptime_global_counter
+releasesafe_runtime_comptime_const
 releasefast_runtime_debug_location
 releasefast_source_atomics_debug_location
+releasesafe_runtime_debug_location
+releasesafe_source_atomics_debug_location_checked
 releasefast_runtime_call_chain
+releasesafe_runtime_call_chain
+releasesafe_source_control_flow_calls_checked
+releasefast_runtime_tls_read
+releasefast_source_tls_concurrency_counter_read
+releasesafe_runtime_tls_read
+releasesafe_source_tls_concurrency_checked_read
+releasefast_runtime_tls_bump
+releasefast_source_tls_concurrency_counter_bump
+releasesafe_runtime_tls_bump
+releasesafe_source_tls_concurrency_checked_bump
+releasefast_runtime_atomic_add
+releasefast_source_atomics_atomic_add
+releasefast_runtime_aggregate_pair
+releasefast_source_aggregate_abi_pair
+releasefast_runtime_float_less
+releasefast_source_float_compare
 releasefast_runtime_float_mul
 releasefast_runtime_float_add
 releasefast_source_floats_math
+releasefast_runtime_float_select
 releasefast_runtime_float_sub
 releasefast_source_fp_extended_ops
+releasefast_runtime_double_div
+releasefast_runtime_float_rem
 releasesafe_error_switch
 releasesafe_source_error_switch_select
 releasesafe_tiny_scalar_runtime_boundary
 releasesafe_source_tiny_scalar_checked_add
 releasesafe_source_switch_branch_mix_checked
+releasesafe_runtime_side_effect_free
 releasesmall_globals_comptime
+releasesmall_runtime_hidden_access
+releasesmall_source_standalone_extern_exports_hidden_access
+releasesmall_runtime_mix_c_add_zig
+releasesmall_source_standalone_mix_c_files_add_zig
+releasesmall_runtime_umul_fix_sat_i64
+releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64
+releasesmall_runtime_inherit_want_safety_i64
+releasesmall_source_inherit_want_safety_i64_return
+releasesmall_i64_arithmetic
+releasesmall_runtime_i64_call
+releasesmall_base64_table_lookup
+releasesmall_source_base64_table_lookup
 ```
 
 ## Helper Families Covered
@@ -96,18 +150,49 @@ and branch panic-edge rows.
 
 ## Remaining Textual Rows
 
-The 85 textual-subset rows remain valid selected evidence, but their bodies are
-still emitted through the older helper/textual path. Remaining families include
-i64 call/arithmetic, base64 table/full/reduced decoder rows, full
-`strFromFloatHelp`, volatile/optional/packed/error-union rows, TLS and checked
-TLS rows, atomics, inline asm, aggregate pair ABI, selected float-less/select,
-double-div and float-rem rows, ReleaseSafe checked loop/call/aggregate/slice
-rows, ReleaseSmall mixed C/Zig rows, hidden globals, fixed-point saturation,
-inherit-want-safety, and compile-asm unreachable rows.
+The 32 textual-subset rows remain valid selected evidence, and every one now
+emits a `textual_boundary_reason` so the compact gate can distinguish intended
+boundaries from accidental fallback. Current textual reasons are:
 
-Those rows are future helper candidates only where repeated structure exists.
-Highly specific semantic fixtures should stay case-specific until a reusable
-structured helper removes real duplication.
+```text
+releasefast_runtime_inline_asm_barrier: inline-asm-memory-barrier
+releasefast_source_atomics_inline_asm_barrier: inline-asm-memory-barrier
+releasesmall_runtime_mix_c_add_may_panic: release-small-mixed-c-zig-panic-edge
+releasesmall_source_standalone_mix_c_files_add_may_panic: release-small-mixed-c-zig-panic-edge
+releasesmall_runtime_compile_asm_unreachable: compile-asm-unreachable-boundary
+releasesmall_source_standalone_compile_asm_main_unreachable: compile-asm-unreachable-boundary
+releasesmall_runtime_str_from_float_help: full-str-from-float-formatting
+releasesmall_runtime_base64_decode_base_64_full: full-base64-decoder-cfg
+releasesmall_runtime_base64_decode_step: base64-reduced-slice
+releasesmall_runtime_base64_store_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_byte_step: base64-reduced-slice
+releasesmall_runtime_base64_padding_tail_step: base64-reduced-slice
+releasesmall_runtime_base64_padding_loop_step: base64-reduced-slice
+releasesmall_runtime_base64_padding_length_step: base64-reduced-slice
+releasesmall_runtime_base64_chunk_guard_step: base64-reduced-slice
+releasesmall_runtime_base64_source_stride_step: base64-reduced-slice
+releasesmall_runtime_base64_source_bundle_step: base64-reduced-slice
+releasesmall_runtime_base64_next_source_bundle_step: base64-reduced-slice
+releasesmall_runtime_base64_third_source_bundle_step: base64-reduced-slice
+releasesmall_runtime_base64_bit_buffer_store_step: base64-reduced-slice
+releasesmall_runtime_base64_loop_advance_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_guard_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_bundle_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_store_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_length_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_table_check_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_accumulator_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_loop_advance_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_padding_check_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_final_mask_step: base64-reduced-slice
+releasesmall_runtime_base64_residual_padding_loop_step: base64-reduced-slice
+releasesmall_runtime_base64_decode_exit_step: base64-reduced-slice
+```
+
+The remaining textual rows are concentrated in the full base64 decoder, full
+`strFromFloatHelp`, reduced base64 slices, inline/compile-asm boundaries, and
+the panic-heavy mixed C/Zig ReleaseSmall row. They are future structured-builder
+candidates only when a reusable helper removes real duplication.
 
 ## Boundary
 

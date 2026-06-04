@@ -24,7 +24,7 @@ Current gate:
 ```text
 zig build distribution-zig-ir-writer
 summary zig-integrated-object pipeline=preopt ir_writer=true total=136 executable_ok=136 link_only_ok=0 scalar_runtime_rows=136 minimal_wrapper_rows=0 local_fail=0
-ownership-summary ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
+ownership-summary ir-construction=zllvm-structured-builder:104;ir-construction=z_llvm-external-textual-subset:32;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
 ```
 
 ## Added Rows

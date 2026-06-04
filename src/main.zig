@@ -198,6 +198,7 @@ fn writeIrWriterModuleFromEnv(
     const ir_writer_case = findIrWriterCase(case_id);
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
+    const textual_boundary_reason = if (ir_writer_case) |case| case.textual_boundary_reason else "minimal-ret0-fallback";
 
     var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
         try fatal(io, "failed to create external IR writer output {s}: {any}\n", .{ ir_path, err });
@@ -215,8 +216,9 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_mode = "{s}"
         \\; zllvm_ir_writer_surface = "{s}"
         \\; zllvm_ir_writer_construction = "{s}"
+        \\; zllvm_ir_writer_textual_boundary_reason = "{s}"
         \\
-    , .{ wrapper, case_id, mode, surface, construction }) catch |err| {
+    , .{ wrapper, case_id, mode, surface, construction, textual_boundary_reason }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
     if (ir_writer_case) |case| {
@@ -252,6 +254,7 @@ const IrWriterCase = struct {
     surface: []const u8,
     write: IrWriterBodyFn,
     construction: IrConstruction = .textual_subset,
+    textual_boundary_reason: []const u8 = "",
 };
 
 const ir_writer_cases = [_]IrWriterCase{
@@ -271,7 +274,7 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasefast_source_switch_branch_mix", .surface = "runtime-condbr", .write = writeRuntimeCondBranchIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_phi_merge", .surface = "runtime-phi-merge", .write = writeRuntimePhiMergeIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_loop_sum", .surface = "runtime-loop-sum", .write = writeRuntimeLoopSumIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_loop_sum", .surface = "checked-loop-sum-boundary", .write = writeReleaseSafeRuntimeLoopSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_loop_sum", .surface = "checked-loop-sum-boundary", .write = writeReleaseSafeRuntimeLoopSumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_switch", .surface = "runtime-switch", .write = writeRuntimeSwitchIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_switch_dense", .surface = "runtime-switch", .write = writeRuntimeSwitchIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_runtime_branch_mix", .surface = "checked-branch-mix-boundary", .write = writeReleaseSafeRuntimeBranchMixIrWriterBody, .construction = .structured_builder },
@@ -282,115 +285,115 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasefast_source_pointers_memory", .surface = "pointer-load-store", .write = writeRuntimePointerLoadStoreIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_runtime_pointer_load_store", .surface = "checked-pointer-load-store-boundary", .write = writeReleaseSafeRuntimePointerLoadStoreIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_source_pointers_memory_checked", .surface = "checked-pointer-load-store-boundary", .write = writeReleaseSafeRuntimePointerLoadStoreIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasefast_runtime_volatile_roundtrip", .surface = "volatile-roundtrip", .write = writeRuntimeVolatileRoundtripIrWriterBody },
-    .{ .id = "releasefast_runtime_optional_pointer", .surface = "optional-pointer", .write = writeRuntimeOptionalPointerIrWriterBody },
-    .{ .id = "releasefast_source_optional_pointer_value", .surface = "optional-pointer", .write = writeRuntimeOptionalPointerIrWriterBody },
-    .{ .id = "releasefast_runtime_packed_read_flag", .surface = "packed-read-flag", .write = writeRuntimePackedReadFlagIrWriterBody },
-    .{ .id = "releasefast_source_packed_bits_basic_read_flag", .surface = "packed-read-flag", .write = writeRuntimePackedReadFlagIrWriterBody },
-    .{ .id = "releasefast_runtime_packed_replace_low", .surface = "packed-replace-low", .write = writeRuntimePackedReplaceLowIrWriterBody },
-    .{ .id = "releasefast_source_packed_bits_basic_replace_low", .surface = "packed-replace-low", .write = writeRuntimePackedReplaceLowIrWriterBody },
+    .{ .id = "releasefast_runtime_volatile_roundtrip", .surface = "volatile-roundtrip", .write = writeRuntimeVolatileRoundtripIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_optional_pointer", .surface = "optional-pointer", .write = writeRuntimeOptionalPointerIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_optional_pointer_value", .surface = "optional-pointer", .write = writeRuntimeOptionalPointerIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_packed_read_flag", .surface = "packed-read-flag", .write = writeRuntimePackedReadFlagIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_packed_bits_basic_read_flag", .surface = "packed-read-flag", .write = writeRuntimePackedReadFlagIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_packed_replace_low", .surface = "packed-replace-low", .write = writeRuntimePackedReplaceLowIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_packed_bits_basic_replace_low", .surface = "packed-replace-low", .write = writeRuntimePackedReplaceLowIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_struct_sum", .surface = "struct-field-sum", .write = writeRuntimeStructSumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_aggregates_struct_sum", .surface = "struct-field-sum", .write = writeRuntimeStructSumIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_struct_sum", .surface = "checked-struct-sum-boundary", .write = writeReleaseSafeRuntimeStructSumIrWriterBody },
-    .{ .id = "releasesafe_source_aggregates_checked_struct", .surface = "checked-struct-sum-boundary", .write = writeReleaseSafeRuntimeStructSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_struct_sum", .surface = "checked-struct-sum-boundary", .write = writeReleaseSafeRuntimeStructSumIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_aggregates_checked_struct", .surface = "checked-struct-sum-boundary", .write = writeReleaseSafeRuntimeStructSumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_array_sum", .surface = "array-scalar-sum", .write = writeRuntimeArraySumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_aggregates_array_sum", .surface = "array-scalar-sum", .write = writeRuntimeArraySumIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_array_sum", .surface = "checked-array-sum-boundary", .write = writeReleaseSafeRuntimeArraySumIrWriterBody },
-    .{ .id = "releasesafe_source_aggregates_checked_array", .surface = "checked-array-sum-boundary", .write = writeReleaseSafeRuntimeArraySumIrWriterBody },
-    .{ .id = "releasefast_runtime_optional_payload", .surface = "optional-scalar-payload", .write = writeRuntimeOptionalPayloadIrWriterBody },
-    .{ .id = "releasefast_source_aggregates_optional_payload", .surface = "optional-scalar-payload", .write = writeRuntimeOptionalPayloadIrWriterBody },
-    .{ .id = "releasefast_runtime_error_union_payload", .surface = "error-union-payload", .write = writeRuntimeErrorUnionPayloadIrWriterBody },
-    .{ .id = "releasefast_source_aggregates_error_union_payload", .surface = "error-union-payload", .write = writeRuntimeErrorUnionPayloadIrWriterBody },
+    .{ .id = "releasesafe_runtime_array_sum", .surface = "checked-array-sum-boundary", .write = writeReleaseSafeRuntimeArraySumIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_aggregates_checked_array", .surface = "checked-array-sum-boundary", .write = writeReleaseSafeRuntimeArraySumIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_optional_payload", .surface = "optional-scalar-payload", .write = writeRuntimeOptionalPayloadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_aggregates_optional_payload", .surface = "optional-scalar-payload", .write = writeRuntimeOptionalPayloadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_error_union_payload", .surface = "error-union-payload", .write = writeRuntimeErrorUnionPayloadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_aggregates_error_union_payload", .surface = "error-union-payload", .write = writeRuntimeErrorUnionPayloadIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_slice_sum", .surface = "slice-loop-sum", .write = writeRuntimeSliceSumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_aggregates_slice_sum", .surface = "slice-loop-sum", .write = writeRuntimeSliceSumIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_slice_sum", .surface = "checked-slice-loop-sum-boundary", .write = writeReleaseSafeRuntimeSliceSumIrWriterBody },
-    .{ .id = "releasesafe_source_aggregates_checked_slice", .surface = "checked-slice-loop-sum-boundary", .write = writeReleaseSafeRuntimeSliceSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_slice_sum", .surface = "checked-slice-loop-sum-boundary", .write = writeReleaseSafeRuntimeSliceSumIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_aggregates_checked_slice", .surface = "checked-slice-loop-sum-boundary", .write = writeReleaseSafeRuntimeSliceSumIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_fp_constants", .surface = "fp-literal-return", .write = writeRuntimeFpConstantsIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_fp_constants_literals", .surface = "fp-literal-return", .write = writeRuntimeFpConstantsIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_comptime_const", .surface = "comptime-const-mul", .write = writeRuntimeComptimeConstIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_globals_comptime_const", .surface = "comptime-const-mul", .write = writeRuntimeComptimeConstIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_globals_comptime_global_counter", .surface = "global-update", .write = writeRuntimeGlobalUpdateIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_comptime_const", .surface = "checked-comptime-const-boundary", .write = writeReleaseSafeRuntimeComptimeConstIrWriterBody },
+    .{ .id = "releasesafe_runtime_comptime_const", .surface = "checked-comptime-const-boundary", .write = writeReleaseSafeRuntimeComptimeConstIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_debug_location", .surface = "add-imm-return", .write = writeRuntimeDebugLocationIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_atomics_debug_location", .surface = "add-imm-return", .write = writeRuntimeDebugLocationIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_debug_location", .surface = "checked-add-imm-boundary", .write = writeReleaseSafeRuntimeDebugLocationIrWriterBody },
-    .{ .id = "releasesafe_source_atomics_debug_location_checked", .surface = "checked-add-imm-boundary", .write = writeReleaseSafeRuntimeDebugLocationIrWriterBody },
+    .{ .id = "releasesafe_runtime_debug_location", .surface = "checked-add-imm-boundary", .write = writeReleaseSafeRuntimeDebugLocationIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_atomics_debug_location_checked", .surface = "checked-add-imm-boundary", .write = writeReleaseSafeRuntimeDebugLocationIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_call_chain", .surface = "abi-arg-call", .write = writeRuntimeCallChainIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_call_chain", .surface = "checked-call-chain-boundary", .write = writeReleaseSafeRuntimeCallChainIrWriterBody },
-    .{ .id = "releasesafe_source_control_flow_calls_checked", .surface = "checked-call-chain-boundary", .write = writeReleaseSafeRuntimeCallChainIrWriterBody },
-    .{ .id = "releasefast_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
-    .{ .id = "releasefast_source_tls_concurrency_counter_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
-    .{ .id = "releasesafe_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
-    .{ .id = "releasesafe_source_tls_concurrency_checked_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
-    .{ .id = "releasefast_runtime_tls_bump", .surface = "tls-bump", .write = writeRuntimeTlsBumpIrWriterBody },
-    .{ .id = "releasefast_source_tls_concurrency_counter_bump", .surface = "tls-bump", .write = writeRuntimeTlsBumpIrWriterBody },
-    .{ .id = "releasesafe_runtime_tls_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody },
-    .{ .id = "releasesafe_source_tls_concurrency_checked_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody },
-    .{ .id = "releasefast_runtime_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody },
-    .{ .id = "releasefast_source_atomics_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody },
-    .{ .id = "releasefast_runtime_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody },
-    .{ .id = "releasefast_source_atomics_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody },
-    .{ .id = "releasefast_runtime_aggregate_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody },
-    .{ .id = "releasefast_source_aggregate_abi_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody },
-    .{ .id = "releasefast_runtime_float_less", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody },
-    .{ .id = "releasefast_source_float_compare", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody },
+    .{ .id = "releasesafe_runtime_call_chain", .surface = "checked-call-chain-boundary", .write = writeReleaseSafeRuntimeCallChainIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_control_flow_calls_checked", .surface = "checked-call-chain-boundary", .write = writeReleaseSafeRuntimeCallChainIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_tls_concurrency_counter_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_tls_concurrency_checked_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_tls_bump", .surface = "tls-bump", .write = writeRuntimeTlsBumpIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_tls_concurrency_counter_bump", .surface = "tls-bump", .write = writeRuntimeTlsBumpIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_runtime_tls_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesafe_source_tls_concurrency_checked_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_atomics_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .textual_boundary_reason = "inline-asm-memory-barrier" },
+    .{ .id = "releasefast_source_atomics_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .textual_boundary_reason = "inline-asm-memory-barrier" },
+    .{ .id = "releasefast_runtime_aggregate_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_aggregate_abi_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_float_less", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_float_compare", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_float_mul", .surface = "float-mul", .write = writeRuntimeFloatMulIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_float_add", .surface = "float-add", .write = writeRuntimeFloatAddIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_floats_math", .surface = "float-add", .write = writeRuntimeFloatAddIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasefast_runtime_float_select", .surface = "float-select", .write = writeRuntimeFloatSelectIrWriterBody },
+    .{ .id = "releasefast_runtime_float_select", .surface = "float-select", .write = writeRuntimeFloatSelectIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_float_sub", .surface = "float-sub", .write = writeRuntimeFloatSubIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_fp_extended_ops", .surface = "float-sub", .write = writeRuntimeFloatSubIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasefast_runtime_double_div", .surface = "double-div", .write = writeRuntimeDoubleDivIrWriterBody },
-    .{ .id = "releasefast_runtime_float_rem", .surface = "float-rem", .write = writeRuntimeFloatRemIrWriterBody },
+    .{ .id = "releasefast_runtime_double_div", .surface = "double-div", .write = writeRuntimeDoubleDivIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_runtime_float_rem", .surface = "float-rem", .write = writeRuntimeFloatRemIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_error_switch", .surface = "error-switch-select", .write = writeErrorSwitchIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_source_error_switch_select", .surface = "error-switch-select", .write = writeErrorSwitchIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_tiny_scalar_runtime_boundary", .surface = "checked-add-runtime-boundary", .write = writeCheckedAddRuntimeBoundaryIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_source_tiny_scalar_checked_add", .surface = "checked-add-runtime-boundary", .write = writeCheckedAddRuntimeBoundaryIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesafe_source_switch_branch_mix_checked", .surface = "checked-branch-mix-boundary", .write = writeReleaseSafeRuntimeBranchMixIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesafe_runtime_side_effect_free", .surface = "void-noop-call", .write = writeReleaseSafeRuntimeSideEffectFreeIrWriterBody },
+    .{ .id = "releasesafe_runtime_side_effect_free", .surface = "void-noop-call", .write = writeReleaseSafeRuntimeSideEffectFreeIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_globals_comptime", .surface = "global-load", .write = writeGlobalsComptimeIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody },
-    .{ .id = "releasesmall_source_standalone_extern_exports_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody },
-    .{ .id = "releasesmall_runtime_mix_c_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody },
-    .{ .id = "releasesmall_source_standalone_mix_c_files_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody },
-    .{ .id = "releasesmall_runtime_mix_c_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody },
-    .{ .id = "releasesmall_source_standalone_mix_c_files_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody },
-    .{ .id = "releasesmall_runtime_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody },
-    .{ .id = "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody },
-    .{ .id = "releasesmall_runtime_inherit_want_safety_i64", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody },
-    .{ .id = "releasesmall_source_inherit_want_safety_i64_return", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody },
-    .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody },
-    .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody },
-    .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_padding_tail_step", .surface = "base64-padding-tail-step", .write = writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_store_step", .surface = "base64-residual-store-step", .write = writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_length_step", .surface = "base64-residual-length-step", .write = writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_table_check_step", .surface = "base64-residual-table-check-step", .write = writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_accumulator_step", .surface = "base64-residual-accumulator-step", .write = writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_loop_advance_step", .surface = "base64-residual-loop-advance-step", .write = writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_padding_check_step", .surface = "base64-residual-padding-check-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_final_mask_step", .surface = "base64-residual-final-mask-step", .write = writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_residual_padding_loop_step", .surface = "base64-residual-padding-loop-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody },
-    .{ .id = "releasesmall_runtime_base64_decode_exit_step", .surface = "base64-decode-exit-step", .write = writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody },
-    .{ .id = "releasesmall_i64_arithmetic", .surface = "i64-arithmetic", .write = writeI64ArithmeticIrWriterBody },
-    .{ .id = "releasesmall_runtime_i64_call", .surface = "i64-call-return", .write = writeRuntimeI64CallIrWriterBody },
-    .{ .id = "releasesmall_base64_table_lookup", .surface = "table-indexed-load", .write = writeBase64TableLookupIrWriterBody },
-    .{ .id = "releasesmall_source_base64_table_lookup", .surface = "table-indexed-load", .write = writeBase64TableLookupIrWriterBody },
+    .{ .id = "releasesmall_runtime_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_extern_exports_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_mix_c_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_mix_c_files_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_mix_c_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .textual_boundary_reason = "release-small-mixed-c-zig-panic-edge" },
+    .{ .id = "releasesmall_source_standalone_mix_c_files_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .textual_boundary_reason = "release-small-mixed-c-zig-panic-edge" },
+    .{ .id = "releasesmall_runtime_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_inherit_want_safety_i64", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_inherit_want_safety_i64_return", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .textual_boundary_reason = "compile-asm-unreachable-boundary" },
+    .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .textual_boundary_reason = "compile-asm-unreachable-boundary" },
+    .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .textual_boundary_reason = "full-str-from-float-formatting" },
+    .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .textual_boundary_reason = "full-base64-decoder-cfg" },
+    .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_padding_tail_step", .surface = "base64-padding-tail-step", .write = writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_store_step", .surface = "base64-residual-store-step", .write = writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_length_step", .surface = "base64-residual-length-step", .write = writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_table_check_step", .surface = "base64-residual-table-check-step", .write = writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_accumulator_step", .surface = "base64-residual-accumulator-step", .write = writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_loop_advance_step", .surface = "base64-residual-loop-advance-step", .write = writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_padding_check_step", .surface = "base64-residual-padding-check-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_final_mask_step", .surface = "base64-residual-final-mask-step", .write = writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_residual_padding_loop_step", .surface = "base64-residual-padding-loop-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_decode_exit_step", .surface = "base64-decode-exit-step", .write = writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_i64_arithmetic", .surface = "i64-arithmetic", .write = writeI64ArithmeticIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_i64_call", .surface = "i64-call-return", .write = writeRuntimeI64CallIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_base64_table_lookup", .surface = "table-indexed-load", .write = writeBase64TableLookupIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_base64_table_lookup", .surface = "table-indexed-load", .write = writeBase64TableLookupIrWriterBody, .construction = .structured_builder },
 };
 
 fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
@@ -569,27 +572,28 @@ fn writeReleaseSmallRuntimeHiddenAccessIrWriterBody(
 }
 
 fn writeReleaseSmallHiddenAccessModule(writer: *std.Io.Writer) !void {
-    try irw.global(writer, "exports.hidden", "private unnamed_addr", "i32", "0", "4");
+    var module = sib.Module.init(writer);
+    try module.global("exports.hidden", "private unnamed_addr", .i32, "0", "4");
     try writer.writeAll("\n");
-    try irw.alias(writer, "getHidden", "i32 ()", "exports.getHidden");
-    try irw.alias(writer, "updateHidden", "void (i32)", "exports.updateHidden");
+    try module.alias("getHidden", .{ .text = "i32 ()" }, "@exports.getHidden");
+    try module.alias("updateHidden", .{ .text = "void (i32)" }, "@exports.updateHidden");
     try writer.writeAll("\n");
-    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.call(writer, null, "", "void", "@exports.updateHidden", "i32 7");
-    try irw.call(writer, "value", "", "i32", "@exports.getHidden", "");
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "private ", "i32", "exports.getHidden", "", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try irw.load(writer, "value", "i32", "@exports.hidden", "4");
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "private ", "void", "exports.updateHidden", "i32 %value", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try irw.store(writer, "i32", "%value", "@exports.hidden", "4");
-    try irw.retVoid(writer);
-    try irw.functionEnd(writer);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call(null, "", .void, "@exports.updateHidden", "i32 7");
+    _ = try main_entry.call("value", "", .i32, "@exports.getHidden", "");
+    try main_entry.ret(sib.local(.i32, "%value"));
+    try main_fn.end();
+    var get_hidden = try module.function("private ", .i32, "exports.getHidden", "", " unnamed_addr align 1");
+    var get_entry = try get_hidden.block("entry");
+    _ = try get_entry.load("value", .i32, sib.global(.ptr, "@exports.hidden"), "4");
+    try get_entry.ret(sib.local(.i32, "%value"));
+    try get_hidden.end();
+    var update_hidden = try module.function("private ", .void, "exports.updateHidden", "i32 %value", " unnamed_addr align 1");
+    var update_entry = try update_hidden.block("entry");
+    try update_entry.store(sib.local(.i32, "%value"), sib.global(.ptr, "@exports.hidden"), "4");
+    try update_entry.retVoid();
+    try update_hidden.end();
 }
 
 fn writeReleaseSmallRuntimeMixCAddZigIrWriterBody(
@@ -603,25 +607,26 @@ fn writeReleaseSmallRuntimeMixCAddZigIrWriterBody(
 }
 
 fn writeReleaseSmallMixCAddZigModule(writer: *std.Io.Writer) !void {
-    try irw.tlsGlobal(writer, "C_k", "", "localexec", "i32", "2", "4");
-    try irw.global(writer, "main.zig_k", "private unnamed_addr", "i32", "1", "4");
+    var module = sib.Module.init(writer);
+    try module.tlsGlobal("C_k", "", "localexec", .i32, "2", "4");
+    try module.global("main.zig_k", "private unnamed_addr", .i32, "1", "4");
     try writer.writeAll("\n");
-    try irw.alias(writer, "add_zig", "i32 (i32)", "main.add_zig");
-    try irw.alias(writer, "zig_k", "i32", "main.zig_k");
+    try module.alias("add_zig", .{ .text = "i32 (i32)" }, "@main.add_zig");
+    try module.alias("zig_k", .i32, "@main.zig_k");
     try writer.writeAll("\n");
-    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.call(writer, "value", "", "i32", "@main.add_zig", "i32 4");
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "private ", "i32", "main.add_zig", "i32 %0", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try irw.load(writer, "zig", "i32", "@main.zig_k", "4");
-    try writer.writeAll("  %with_arg = add nsw i32 %zig, %0\n");
-    try irw.load(writer, "c", "i32", "@C_k", "4");
-    try writer.writeAll("  %sum = add nsw i32 %with_arg, %c\n");
-    try irw.ret(writer, "i32", "%sum");
-    try irw.functionEnd(writer);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@main.add_zig", "i32 4");
+    try main_entry.ret(sib.local(.i32, "%value"));
+    try main_fn.end();
+    var add_zig = try module.function("private ", .i32, "main.add_zig", "i32 %0", " unnamed_addr align 1");
+    var entry = try add_zig.block("entry");
+    _ = try entry.load("zig", .i32, sib.global(.ptr, "@main.zig_k"), "4");
+    _ = try entry.binary("with_arg", "add nsw", .i32, sib.local(.i32, "%zig"), sib.local(.i32, "%0"));
+    _ = try entry.load("c", .i32, sib.global(.ptr, "@C_k"), "4");
+    _ = try entry.binary("sum", "add nsw", .i32, sib.local(.i32, "%with_arg"), sib.local(.i32, "%c"));
+    try entry.ret(sib.local(.i32, "%sum"));
+    try add_zig.end();
 }
 
 fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
@@ -680,21 +685,23 @@ fn writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main = alias i64 (), ptr @no_compile_panic_for_unchecked_arith.entry
-        \\@entry = alias i64 (), ptr @no_compile_panic_for_unchecked_arith.entry
-        \\
-        \\declare i64 @llvm.umul.fix.sat.i64(i64, i64, i32 immarg)
-        \\
-        \\define private i64 @no_compile_panic_for_unchecked_arith.entry() unnamed_addr align 1 {{
-        \\entry:
-        \\  %value = tail call i64 @llvm.umul.fix.sat.i64(i64 0, i64 2, i32 0)
-        \\  ret i64 %value
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSmallUmulFixSatI64StructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime umul.fix.sat.i64 external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSmallUmulFixSatI64StructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("main", .{ .text = "i64 ()" }, "@no_compile_panic_for_unchecked_arith.entry");
+    try module.alias("entry", .{ .text = "i64 ()" }, "@no_compile_panic_for_unchecked_arith.entry");
+    try writer.writeAll("\n");
+    try module.declare(.i64, "llvm.umul.fix.sat.i64", "i64, i64, i32 immarg");
+    try writer.writeAll("\n");
+    var function = try module.function("private ", .i64, "no_compile_panic_for_unchecked_arith.entry", "", " unnamed_addr align 1");
+    var entry = try function.block("entry");
+    _ = try entry.call("value", "tail ", .i64, "@llvm.umul.fix.sat.i64", "i64 0, i64 2, i32 0");
+    try entry.ret(sib.local(.i64, "%value"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(
@@ -702,18 +709,20 @@ fn writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main = alias i64 (), ptr @inherit_want_safety.entry
-        \\@entry = alias i64 (), ptr @inherit_want_safety.entry
-        \\
-        \\define private i64 @inherit_want_safety.entry() unnamed_addr align 1 {{
-        \\entry:
-        \\  ret i64 4
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSmallInheritWantSafetyI64StructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime inherit-want-safety i64 external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSmallInheritWantSafetyI64StructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("main", .{ .text = "i64 ()" }, "@inherit_want_safety.entry");
+    try module.alias("entry", .{ .text = "i64 ()" }, "@inherit_want_safety.entry");
+    try writer.writeAll("\n");
+    var function = try module.function("private ", .i64, "inherit_want_safety.entry", "", " unnamed_addr align 1");
+    var entry = try function.block("entry");
+    try entry.ret(sib.int(.i64, "4"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(
@@ -2358,29 +2367,30 @@ fn writeRuntimeVolatileRoundtripIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@pointers_memory.volatile_slot = dso_local global i32 0, align 4
-        \\@volatile_roundtrip = alias i32 (ptr, i32), ptr @pointers_memory.volatile_roundtrip
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  store volatile i32 42, ptr @pointers_memory.volatile_slot, align 4
-        \\  %value = load volatile i32, ptr @pointers_memory.volatile_slot, align 4
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @pointers_memory.volatile_roundtrip(ptr %0, i32 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  store volatile i32 %1, ptr %0, align 4
-        \\  %3 = load volatile i32, ptr %0, align 4
-        \\  ret i32 %3
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeVolatileRoundtripStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime volatile roundtrip external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeVolatileRoundtripStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("pointers_memory.volatile_slot", "dso_local", .i32, "0", "4");
+    try module.alias("volatile_roundtrip", .{ .text = "i32 (ptr, i32)" }, "@pointers_memory.volatile_roundtrip");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    try main_entry.volatileStore(sib.int(.i32, "42"), sib.global(.ptr, "@pointers_memory.volatile_slot"), "4");
+    _ = try main_entry.volatileLoad("value", .i32, sib.global(.ptr, "@pointers_memory.volatile_slot"), "4");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "pointers_memory.volatile_roundtrip", "ptr %0, i32 %1", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    try entry.volatileStore(sib.local(.i32, "%1"), sib.local(.ptr, "%0"), "4");
+    _ = try entry.volatileLoad("3", .i32, sib.local(.ptr, "%0"), "4");
+    try entry.ret(sib.local(.i32, "%3"));
+    try callee.end();
 }
 
 fn writeRuntimeOptionalPointerIrWriterBody(
@@ -2388,42 +2398,43 @@ fn writeRuntimeOptionalPointerIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@optional_pointer.writer_value = dso_local global i32 42, align 4
-        \\@optional_ptr_value = alias i32 (ptr), ptr @optional_pointer.optional_ptr_value
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %.not = icmp eq ptr @optional_pointer.writer_value, null
-        \\  br i1 %.not, label %null, label %nonnull
-        \\
-        \\null:
-        \\  ret i32 1
-        \\
-        \\nonnull:
-        \\  %value = load i32, ptr @optional_pointer.writer_value, align 4
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @optional_pointer.optional_ptr_value(ptr %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.not = icmp eq ptr %0, null
-        \\  br i1 %.not, label %common.ret, label %nonnull
-        \\
-        \\common.ret:
-        \\  %common.ret.op = phi i32 [ %loaded, %nonnull ], [ -1, %entry ]
-        \\  ret i32 %common.ret.op
-        \\
-        \\nonnull:
-        \\  %loaded = load i32, ptr %0, align 4
-        \\  br label %common.ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeOptionalPointerStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime optional pointer external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeOptionalPointerStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("optional_pointer.writer_value", "dso_local", .i32, "42", "4");
+    try module.alias("optional_ptr_value", .{ .text = "i32 (ptr)" }, "@optional_pointer.optional_ptr_value");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.icmp(".not", "eq", .ptr, sib.global(.ptr, "@optional_pointer.writer_value"), sib.int(.ptr, "null"));
+    try main_entry.condBr(sib.local(.i1, "%.not"), "null", "nonnull");
+    try writer.writeAll("\n");
+    var null_block = try main_fn.block("null");
+    try null_block.ret(sib.int(.i32, "1"));
+    try writer.writeAll("\n");
+    var nonnull_main = try main_fn.block("nonnull");
+    _ = try nonnull_main.load("value", .i32, sib.global(.ptr, "@optional_pointer.writer_value"), "4");
+    _ = try nonnull_main.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try nonnull_main.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try nonnull_main.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "optional_pointer.optional_ptr_value", "ptr %0", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.icmp(".not", "eq", .ptr, sib.local(.ptr, "%0"), sib.int(.ptr, "null"));
+    try entry.condBr(sib.local(.i1, "%.not"), "common.ret", "nonnull");
+    try writer.writeAll("\n");
+    var common_ret = try callee.block("common.ret");
+    _ = try common_ret.phi2("common.ret.op", .i32, sib.local(.i32, "%loaded"), "nonnull", sib.int(.i32, "-1"), "entry");
+    try common_ret.ret(sib.local(.i32, "%common.ret.op"));
+    try writer.writeAll("\n");
+    var nonnull = try callee.block("nonnull");
+    _ = try nonnull.load("loaded", .i32, sib.local(.ptr, "%0"), "4");
+    try nonnull.br("common.ret");
+    try callee.end();
 }
 
 fn writeRuntimePackedReadFlagIrWriterBody(
@@ -2431,34 +2442,21 @@ fn writeRuntimePackedReadFlagIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@read_flag = alias i1 (i8), ptr @packed_bits.read_flag
-        \\@replace_low = alias i8 (i8, i8), ptr @packed_bits.replace_low
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %flag = icmp slt i8 -128, 0
-        \\  %ret = select i1 %flag, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i1 @packed_bits.read_flag(i8 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %2 = icmp slt i8 %0, 0
-        \\  ret i1 %2
-        \\}}
-        \\
-        \\define private i8 @packed_bits.replace_low(i8 %0, i8 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = and i8 %0, -8
-        \\  %4 = and i8 %1, 7
-        \\  %5 = or i8 %4, %3
-        \\  ret i8 %5
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimePackedReadFlagStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime packed read-flag external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimePackedReadFlagStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try writePackedBitsAliases(&module, writer, true);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.icmp("flag", "slt", .i8, sib.int(.i8, "-128"), sib.int(.i8, "0"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%flag"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    try writePackedBitsCallees(&module, true);
 }
 
 fn writeRuntimePackedReplaceLowIrWriterBody(
@@ -2466,37 +2464,63 @@ fn writeRuntimePackedReplaceLowIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@replace_low = alias i8 (i8, i8), ptr @packed_bits.replace_low
-        \\@read_flag = alias i1 (i8), ptr @packed_bits.read_flag
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %high = and i8 -1, -8
-        \\  %low = and i8 5, 7
-        \\  %packed = or i8 %low, %high
-        \\  %ok = icmp eq i8 %packed, -3
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i8 @packed_bits.replace_low(i8 %0, i8 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = and i8 %0, -8
-        \\  %4 = and i8 %1, 7
-        \\  %5 = or i8 %4, %3
-        \\  ret i8 %5
-        \\}}
-        \\
-        \\define private i1 @packed_bits.read_flag(i8 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %2 = icmp slt i8 %0, 0
-        \\  ret i1 %2
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimePackedReplaceLowStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime packed replace-low external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimePackedReplaceLowStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try writePackedBitsAliases(&module, writer, false);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.binary("high", "and", .i8, sib.int(.i8, "-1"), sib.int(.i8, "-8"));
+    _ = try main_entry.binary("low", "and", .i8, sib.int(.i8, "5"), sib.int(.i8, "7"));
+    _ = try main_entry.binary("packed", "or", .i8, sib.local(.i8, "%low"), sib.local(.i8, "%high"));
+    _ = try main_entry.icmp("ok", "eq", .i8, sib.local(.i8, "%packed"), sib.int(.i8, "-3"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    try writePackedBitsCallees(&module, false);
+}
+
+fn writePackedBitsAliases(module: *sib.Module, writer: *std.Io.Writer, read_first: bool) !void {
+    if (read_first) {
+        try module.alias("read_flag", .{ .text = "i1 (i8)" }, "@packed_bits.read_flag");
+        try module.alias("replace_low", .{ .text = "i8 (i8, i8)" }, "@packed_bits.replace_low");
+    } else {
+        try module.alias("replace_low", .{ .text = "i8 (i8, i8)" }, "@packed_bits.replace_low");
+        try module.alias("read_flag", .{ .text = "i1 (i8)" }, "@packed_bits.read_flag");
+    }
+    try writer.writeAll("\n");
+}
+
+fn writePackedBitsCallees(module: *sib.Module, replace_first: bool) !void {
+    if (replace_first) {
+        try writePackedReplaceLowCallee(module);
+        try writePackedReadFlagCallee(module);
+    } else {
+        try writePackedReadFlagCallee(module);
+        try writePackedReplaceLowCallee(module);
+    }
+}
+
+fn writePackedReadFlagCallee(module: *sib.Module) !void {
+    var callee = try module.function("private ", .i1, "packed_bits.read_flag", "i8 %0", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.icmp("2", "slt", .i8, sib.local(.i8, "%0"), sib.int(.i8, "0"));
+    try entry.ret(sib.local(.i1, "%2"));
+    try callee.end();
+}
+
+fn writePackedReplaceLowCallee(module: *sib.Module) !void {
+    var callee = try module.function("private ", .i8, "packed_bits.replace_low", "i8 %0, i8 %1", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.binary("3", "and", .i8, sib.local(.i8, "%0"), sib.int(.i8, "-8"));
+    _ = try entry.binary("4", "and", .i8, sib.local(.i8, "%1"), sib.int(.i8, "7"));
+    _ = try entry.binary("5", "or", .i8, sib.local(.i8, "%4"), sib.local(.i8, "%3"));
+    try entry.ret(sib.local(.i8, "%5"));
+    try callee.end();
 }
 
 fn writeRuntimeStructSumIrWriterBody(
@@ -2644,27 +2668,28 @@ fn writeRuntimeOptionalPayloadIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@optional_payload = alias i32 (i32, i32), ptr @aggregates.optional_payload
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @aggregates.optional_payload(i32 1, i32 42)
-        \\  %ok = icmp eq i32 %value, 42
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @aggregates.optional_payload(i32 %0, i32 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.not = icmp eq i32 %0, 0
-        \\  %spec.select = select i1 %.not, i32 -1, i32 %1
-        \\  ret i32 %spec.select
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeOptionalPayloadStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime optional-payload external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeOptionalPayloadStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("optional_payload", .{ .text = "i32 (i32, i32)" }, "@aggregates.optional_payload");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@aggregates.optional_payload", "i32 1, i32 42");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "42"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "aggregates.optional_payload", "i32 %0, i32 %1", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.icmp(".not", "eq", .i32, sib.local(.i32, "%0"), sib.int(.i32, "0"));
+    _ = try entry.select("spec.select", sib.local(.i1, "%.not"), .i32, sib.int(.i32, "-1"), sib.local(.i32, "%1"));
+    try entry.ret(sib.local(.i32, "%spec.select"));
+    try callee.end();
 }
 
 fn writeRuntimeErrorUnionPayloadIrWriterBody(
@@ -2672,27 +2697,28 @@ fn writeRuntimeErrorUnionPayloadIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@error_union_payload = alias i32 (i32), ptr @aggregates.error_union_payload
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @aggregates.error_union_payload(i32 0)
-        \\  %ok = icmp eq i32 %value, 7
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i32 @aggregates.error_union_payload(i32 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.not.i = icmp eq i32 %0, 0
-        \\  %2 = select i1 %.not.i, i32 7, i32 -1
-        \\  ret i32 %2
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeErrorUnionPayloadStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime error-union-payload external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeErrorUnionPayloadStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("error_union_payload", .{ .text = "i32 (i32)" }, "@aggregates.error_union_payload");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@aggregates.error_union_payload", "i32 0");
+    _ = try main_entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "7"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var callee = try module.function("private ", .i32, "aggregates.error_union_payload", "i32 %0", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    _ = try entry.icmp(".not.i", "eq", .i32, sib.local(.i32, "%0"), sib.int(.i32, "0"));
+    _ = try entry.select("2", sib.local(.i1, "%.not.i"), .i32, sib.int(.i32, "7"), sib.int(.i32, "-1"));
+    try entry.ret(sib.local(.i32, "%2"));
+    try callee.end();
 }
 
 fn writeRuntimeSliceSumIrWriterBody(
@@ -3049,14 +3075,15 @@ fn writeRuntimeTlsReadIrWriterBody(
 }
 
 fn writeTlsReadModule(writer: *std.Io.Writer) !void {
-    try irw.tlsGlobal(writer, "tls_concurrency.tls_counter", "internal", "localexec", "i32", "1", "4");
-    try irw.alias(writer, "main", "i32 ()", "tls_concurrency.read_tls");
+    var module = sib.Module.init(writer);
+    try module.tlsGlobal("tls_concurrency.tls_counter", "internal", "localexec", .i32, "1", "4");
+    try module.alias("main", .{ .text = "i32 ()" }, "@tls_concurrency.read_tls");
     try writer.writeAll("\n");
-    try irw.functionHeader(writer, "private ", "i32", "tls_concurrency.read_tls", "", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.load(writer, "value", "i32", "@tls_concurrency.tls_counter", "4");
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
+    var function = try module.function("private ", .i32, "tls_concurrency.read_tls", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.load("value", .i32, sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
+    try entry.ret(sib.local(.i32, "%value"));
+    try function.end();
 }
 
 fn writeRuntimeTlsBumpIrWriterBody(
@@ -3080,27 +3107,38 @@ fn writeReleaseSafeRuntimeTlsBumpIrWriterBody(
 }
 
 fn writeTlsBumpModule(writer: *std.Io.Writer, checked: bool) !void {
-    try irw.tlsGlobal(writer, "tls_concurrency.tls_counter", "internal", "localexec", "i32", "1", "4");
-    try irw.alias(writer, "main", "i32 (i32)", "tls_concurrency.bump_tls");
-    if (checked) try irw.alias(writer, "bump_tls", "i32 (i32)", "tls_concurrency.bump_tls");
+    var module = sib.Module.init(writer);
+    try module.tlsGlobal("tls_concurrency.tls_counter", "internal", "localexec", .i32, "1", "4");
+    try module.alias("main", .{ .text = "i32 (i32)" }, "@tls_concurrency.bump_tls");
+    if (checked) try module.alias("bump_tls", .{ .text = "i32 (i32)" }, "@tls_concurrency.bump_tls");
     try writer.writeAll("\n");
-    if (checked) try irw.integerOverflowDeclarations(writer);
-    try irw.functionHeader(writer, "private ", "i32", "tls_concurrency.bump_tls", "i32 %value", if (checked) " unnamed_addr align 1" else " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.load(writer, "current", "i32", "@tls_concurrency.tls_counter", "4");
     if (checked) {
-        try irw.checkedSAddI32Value(writer, "checked", "%current", "%value", "overflow", "updated");
-        try irw.panicEdge(writer, "overflow", "ok", "panic");
+        try module.declare(.{ .text = "{ i32, i1 }" }, "llvm.sadd.with.overflow.i32", "i32, i32");
+        try module.declare(.void, "llvm.assume", "i1");
+        try writer.writeAll("\n");
+    }
+    var function = try module.function("private ", .i32, "tls_concurrency.bump_tls", "i32 %value", if (checked) " unnamed_addr align 1" else " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.load("current", .i32, sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
+    if (checked) {
+        try writer.writeAll(
+            \\  %checked = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
+            \\  %overflow = extractvalue { i32, i1 } %checked, 1
+            \\  %updated = extractvalue { i32, i1 } %checked, 0
+            \\
+        );
+        try entry.panicEdge(sib.local(.i1, "%overflow"), "ok", "panic");
         try writer.writeAll("\n");
         try irw.integerOverflowPanicBlock(writer, "panic");
         try writer.writeAll("\n");
-        try irw.block(writer, "ok");
+        _ = try function.block("ok");
     } else {
-        try writer.writeAll("  %updated = add i32 %current, %value\n");
+        _ = try entry.binary("updated", "add", .i32, sib.local(.i32, "%current"), sib.local(.i32, "%value"));
     }
-    try irw.store(writer, "i32", "%updated", "@tls_concurrency.tls_counter", "4");
-    try irw.ret(writer, "i32", "%updated");
-    try irw.functionEnd(writer);
+    var ok_block = sib.Block{ .writer = writer };
+    try ok_block.store(sib.local(.i32, "%updated"), sib.global(.ptr, "@tls_concurrency.tls_counter"), "4");
+    try ok_block.ret(sib.local(.i32, "%updated"));
+    try function.end();
     if (checked) try irw.integerOverflowPanicFunction(writer);
 }
 
@@ -3109,19 +3147,21 @@ fn writeRuntimeAtomicAddIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@atomics_inline_asm_debug.atomic_counter = private global i32 0, align 4
-        \\@main = alias i32 (i32), ptr @atomics_inline_asm_debug.atomic_add
-        \\
-        \\define private i32 @atomics_inline_asm_debug.atomic_add(i32 %value) local_unnamed_addr {{
-        \\entry:
-        \\  %old = atomicrmw add ptr @atomics_inline_asm_debug.atomic_counter, i32 %value monotonic, align 4
-        \\  ret i32 %old
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeAtomicAddStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime atomic add external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeAtomicAddStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("atomics_inline_asm_debug.atomic_counter", "private", .i32, "0", "4");
+    try module.alias("main", .{ .text = "i32 (i32)" }, "@atomics_inline_asm_debug.atomic_add");
+    try writer.writeAll("\n");
+    var function = try module.function("private ", .i32, "atomics_inline_asm_debug.atomic_add", "i32 %value", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.atomicRmwAdd("old", sib.global(.ptr, "@atomics_inline_asm_debug.atomic_counter"), sib.local(.i32, "%value"), "monotonic", "4");
+    try entry.ret(sib.local(.i32, "%old"));
+    try function.end();
 }
 
 fn writeRuntimeInlineAsmBarrierIrWriterBody(
@@ -3149,29 +3189,30 @@ fn writeRuntimeAggregatePairIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@pair_first = alias i32 (i64), ptr @aggregate_abi.pair_first
-        \\@make_pair = alias i64 (i32, i32), ptr @aggregate_abi.make_pair
-        \\@main = alias i32 (i64), ptr @aggregate_abi.pair_first
-        \\
-        \\define private i32 @aggregate_abi.pair_first(i64 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.sroa.01.0.extract.trunc = trunc i64 %0 to i32
-        \\  ret i32 %.sroa.01.0.extract.trunc
-        \\}}
-        \\
-        \\define private i64 @aggregate_abi.make_pair(i32 %0, i32 %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %.sroa.2.0.insert.ext = zext i32 %1 to i64
-        \\  %.sroa.2.0.insert.shift = shl nuw i64 %.sroa.2.0.insert.ext, 32
-        \\  %.sroa.0.0.insert.ext = zext i32 %0 to i64
-        \\  %.sroa.0.0.insert.insert = or disjoint i64 %.sroa.2.0.insert.shift, %.sroa.0.0.insert.ext
-        \\  ret i64 %.sroa.0.0.insert.insert
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeAggregatePairStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime aggregate pair external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeAggregatePairStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("pair_first", .{ .text = "i32 (i64)" }, "@aggregate_abi.pair_first");
+    try module.alias("make_pair", .{ .text = "i64 (i32, i32)" }, "@aggregate_abi.make_pair");
+    try module.alias("main", .{ .text = "i32 (i64)" }, "@aggregate_abi.pair_first");
+    try writer.writeAll("\n");
+    var pair_first = try module.function("private ", .i32, "aggregate_abi.pair_first", "i64 %0", " unnamed_addr align 1");
+    var first_entry = try pair_first.block("entry");
+    _ = try first_entry.cast(".sroa.01.0.extract.trunc", "trunc", sib.local(.i64, "%0"), .i32);
+    try first_entry.ret(sib.local(.i32, "%.sroa.01.0.extract.trunc"));
+    try pair_first.end();
+    var make_pair = try module.function("private ", .i64, "aggregate_abi.make_pair", "i32 %0, i32 %1", " unnamed_addr align 1");
+    var entry = try make_pair.block("entry");
+    _ = try entry.cast(".sroa.2.0.insert.ext", "zext", sib.local(.i32, "%1"), .i64);
+    _ = try entry.binary(".sroa.2.0.insert.shift", "shl nuw", .i64, sib.local(.i64, "%.sroa.2.0.insert.ext"), sib.int(.i64, "32"));
+    _ = try entry.cast(".sroa.0.0.insert.ext", "zext", sib.local(.i32, "%0"), .i64);
+    _ = try entry.binary(".sroa.0.0.insert.insert", "or disjoint", .i64, sib.local(.i64, "%.sroa.2.0.insert.shift"), sib.local(.i64, "%.sroa.0.0.insert.ext"));
+    try entry.ret(sib.local(.i64, "%.sroa.0.0.insert.insert"));
+    try make_pair.end();
 }
 
 fn writeRuntimeFloatLessIrWriterBody(
@@ -3179,32 +3220,32 @@ fn writeRuntimeFloatLessIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@float_less = alias i1 (float, float), ptr @float_compare.float_less
-        \\@float_mul = alias double (double, double), ptr @float_compare.float_mul
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %ok = fcmp olt float 1.000000e+00, 2.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private i1 @float_compare.float_less(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fcmp olt float %0, %1
-        \\  ret i1 %3
-        \\}}
-        \\
-        \\define private double @float_compare.float_mul(double %0, double %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fmul double %0, %1
-        \\  ret double %3
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeFloatLessStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime float less external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeFloatLessStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("float_less", .{ .text = "i1 (float, float)" }, "@float_compare.float_less");
+    try module.alias("float_mul", .{ .text = "double (double, double)" }, "@float_compare.float_mul");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.fcmp("ok", "olt", .f32, sib.int(.f32, "1.000000e+00"), sib.int(.f32, "2.000000e+00"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var less = try module.function("private ", .i1, "float_compare.float_less", "float %0, float %1", " unnamed_addr align 1");
+    var less_entry = try less.block("entry");
+    _ = try less_entry.fcmp("3", "olt", .f32, sib.local(.f32, "%0"), sib.local(.f32, "%1"));
+    try less_entry.ret(sib.local(.i1, "%3"));
+    try less.end();
+    var mul = try module.function("private ", .f64, "float_compare.float_mul", "double %0, double %1", " unnamed_addr align 1");
+    var mul_entry = try mul.block("entry");
+    _ = try mul_entry.binary("3", "fmul", .f64, sib.local(.f64, "%0"), sib.local(.f64, "%1"));
+    try mul_entry.ret(sib.local(.f64, "%3"));
+    try mul.end();
 }
 
 fn writeRuntimeFloatMulIrWriterBody(
@@ -3274,33 +3315,33 @@ fn writeRuntimeFloatSelectIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@float_select = alias double (double, double, i1), ptr @floats_math.float_select
-        \\@float_add = alias float (float, float), ptr @floats_math.float_add
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %selected = select i1 true, double 4.000000e+00, double 5.000000e+00
-        \\  %ok = fcmp oeq double %selected, 4.000000e+00
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-        \\define private double @floats_math.float_select(double %0, double %1, i1 %2) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = select i1 %2, double %0, double %1
-        \\  ret double %3
-        \\}}
-        \\
-        \\define private float @floats_math.float_add(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fadd float %0, %1
-        \\  ret float %3
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeFloatSelectStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime float select external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeFloatSelectStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("float_select", .{ .text = "double (double, double, i1)" }, "@floats_math.float_select");
+    try module.alias("float_add", .{ .text = "float (float, float)" }, "@floats_math.float_add");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.select("selected", sib.int(.i1, "true"), .f64, sib.int(.f64, "4.000000e+00"), sib.int(.f64, "5.000000e+00"));
+    _ = try main_entry.fcmp("ok", "oeq", .f64, sib.local(.f64, "%selected"), sib.int(.f64, "4.000000e+00"));
+    _ = try main_entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
+    var select_fn = try module.function("private ", .f64, "floats_math.float_select", "double %0, double %1, i1 %2", " unnamed_addr align 1");
+    var select_entry = try select_fn.block("entry");
+    _ = try select_entry.select("3", sib.local(.i1, "%2"), .f64, sib.local(.f64, "%0"), sib.local(.f64, "%1"));
+    try select_entry.ret(sib.local(.f64, "%3"));
+    try select_fn.end();
+    var add_fn = try module.function("private ", .f32, "floats_math.float_add", "float %0, float %1", " unnamed_addr align 1");
+    var add_entry = try add_fn.block("entry");
+    _ = try add_entry.binary("3", "fadd", .f32, sib.local(.f32, "%0"), sib.local(.f32, "%1"));
+    try add_entry.ret(sib.local(.f32, "%3"));
+    try add_fn.end();
 }
 
 fn writeRuntimeFloatSubIrWriterBody(
@@ -3370,35 +3411,11 @@ fn writeRuntimeDoubleDivIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@double_div = alias double (double, double), ptr @fp_extended_ops.double_div
-        \\@float_sub = alias float (float, float), ptr @fp_extended_ops.float_sub
-        \\@float_rem = alias float (float, float), ptr @fp_extended_ops.float_rem
-        \\
-    , .{}) catch |err| {
+    writeFpExtendedOpsAliases(writer, .double_div_first) catch |err| {
         try fatal(io, "failed to write runtime double divide external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
     try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "quot", "fdiv", "double", "6.000000e+00", "2.000000e+00", "3.000000e+00");
-    writer.print(
-        \\define private double @fp_extended_ops.double_div(double %0, double %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fdiv double %0, %1
-        \\  ret double %3
-        \\}}
-        \\
-        \\define private float @fp_extended_ops.float_sub(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fsub float %0, %1
-        \\  ret float %3
-        \\}}
-        \\
-        \\define private float @fp_extended_ops.float_rem(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = frem float %0, %1
-        \\  ret float %3
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeFpExtendedOpsCallees(writer, .double_div_first) catch |err| {
         try fatal(io, "failed to write runtime double divide external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
@@ -3408,37 +3425,75 @@ fn writeRuntimeFloatRemIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@float_rem = alias float (float, float), ptr @fp_extended_ops.float_rem
-        \\@float_sub = alias float (float, float), ptr @fp_extended_ops.float_sub
-        \\@double_div = alias double (double, double), ptr @fp_extended_ops.double_div
-        \\
-    , .{}) catch |err| {
+    writeFpExtendedOpsAliases(writer, .float_rem_first) catch |err| {
         try fatal(io, "failed to write runtime float remainder external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
     try writeRuntimeFloatBinaryCheckIrWriterBody(io, writer, ir_path, "rem", "frem", "float", "5.500000e+00", "2.000000e+00", "1.500000e+00");
-    writer.print(
-        \\define private float @fp_extended_ops.float_rem(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = frem float %0, %1
-        \\  ret float %3
-        \\}}
-        \\
-        \\define private float @fp_extended_ops.float_sub(float %0, float %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fsub float %0, %1
-        \\  ret float %3
-        \\}}
-        \\
-        \\define private double @fp_extended_ops.double_div(double %0, double %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = fdiv double %0, %1
-        \\  ret double %3
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeFpExtendedOpsCallees(writer, .float_rem_first) catch |err| {
         try fatal(io, "failed to write runtime float remainder external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+const FpExtendedOrder = enum {
+    double_div_first,
+    float_rem_first,
+};
+
+fn writeFpExtendedOpsAliases(writer: *std.Io.Writer, order: FpExtendedOrder) !void {
+    var module = sib.Module.init(writer);
+    switch (order) {
+        .double_div_first => {
+            try module.alias("double_div", .{ .text = "double (double, double)" }, "@fp_extended_ops.double_div");
+            try module.alias("float_sub", .{ .text = "float (float, float)" }, "@fp_extended_ops.float_sub");
+            try module.alias("float_rem", .{ .text = "float (float, float)" }, "@fp_extended_ops.float_rem");
+        },
+        .float_rem_first => {
+            try module.alias("float_rem", .{ .text = "float (float, float)" }, "@fp_extended_ops.float_rem");
+            try module.alias("float_sub", .{ .text = "float (float, float)" }, "@fp_extended_ops.float_sub");
+            try module.alias("double_div", .{ .text = "double (double, double)" }, "@fp_extended_ops.double_div");
+        },
+    }
+    try writer.writeAll("\n");
+}
+
+fn writeFpExtendedOpsCallees(writer: *std.Io.Writer, order: FpExtendedOrder) !void {
+    var module = sib.Module.init(writer);
+    switch (order) {
+        .double_div_first => {
+            try writeFpExtendedDoubleDivCallee(&module);
+            try writeFpExtendedFloatSubCallee(&module);
+            try writeFpExtendedFloatRemCallee(&module);
+        },
+        .float_rem_first => {
+            try writeFpExtendedFloatRemCallee(&module);
+            try writeFpExtendedFloatSubCallee(&module);
+            try writeFpExtendedDoubleDivCallee(&module);
+        },
+    }
+}
+
+fn writeFpExtendedFloatSubCallee(module: *sib.Module) !void {
+    var function = try module.function("private ", .f32, "fp_extended_ops.float_sub", "float %0, float %1", " unnamed_addr align 1");
+    var entry = try function.block("entry");
+    _ = try entry.binary("3", "fsub", .f32, sib.local(.f32, "%0"), sib.local(.f32, "%1"));
+    try entry.ret(sib.local(.f32, "%3"));
+    try function.end();
+}
+
+fn writeFpExtendedDoubleDivCallee(module: *sib.Module) !void {
+    var function = try module.function("private ", .f64, "fp_extended_ops.double_div", "double %0, double %1", " unnamed_addr align 1");
+    var entry = try function.block("entry");
+    _ = try entry.binary("3", "fdiv", .f64, sib.local(.f64, "%0"), sib.local(.f64, "%1"));
+    try entry.ret(sib.local(.f64, "%3"));
+    try function.end();
+}
+
+fn writeFpExtendedFloatRemCallee(module: *sib.Module) !void {
+    var function = try module.function("private ", .f32, "fp_extended_ops.float_rem", "float %0, float %1", " unnamed_addr align 1");
+    var entry = try function.block("entry");
+    _ = try entry.binary("3", "frem", .f32, sib.local(.f32, "%0"), sib.local(.f32, "%1"));
+    try entry.ret(sib.local(.f32, "%3"));
+    try function.end();
 }
 
 fn writeI64ArithmeticIrWriterBody(
@@ -3446,18 +3501,20 @@ fn writeI64ArithmeticIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %wide = add i64 2, 2
-        \\  %ok = icmp eq i64 %wide, 4
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeI64ArithmeticStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write i64 arithmetic external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeI64ArithmeticStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try main_fn.block("entry");
+    _ = try entry.binary("wide", "add", .i64, sib.int(.i64, "2"), sib.int(.i64, "2"));
+    _ = try entry.icmp("ok", "eq", .i64, sib.local(.i64, "%wide"), sib.int(.i64, "4"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
 }
 
 fn writeRuntimeI64CallIrWriterBody(
@@ -3465,23 +3522,24 @@ fn writeRuntimeI64CallIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\define dso_local i64 @i64_arithmetic.i64_value() local_unnamed_addr {{
-        \\entry:
-        \\  ret i64 4
-        \\}}
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %wide = call i64 @i64_arithmetic.i64_value()
-        \\  %ok = icmp eq i64 %wide, 4
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeRuntimeI64CallStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write runtime i64 call external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeRuntimeI64CallStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    var value_fn = try module.function("dso_local ", .i64, "i64_arithmetic.i64_value", "", " local_unnamed_addr");
+    var value_entry = try value_fn.block("entry");
+    try value_entry.ret(sib.int(.i64, "4"));
+    try value_fn.end();
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try main_fn.block("entry");
+    _ = try entry.call("wide", "", .i64, "@i64_arithmetic.i64_value", "");
+    _ = try entry.icmp("ok", "eq", .i64, sib.local(.i64, "%wide"), sib.int(.i64, "4"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
 }
 
 fn writeBase64TableLookupIrWriterBody(
@@ -3489,24 +3547,26 @@ fn writeBase64TableLookupIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.writer_table = private unnamed_addr constant [4 x i8] c"\00\04\08\0C", align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %idx8 = trunc i32 3 to i8
-        \\  %idx = zext i8 %idx8 to i64
-        \\  %ptr = getelementptr inbounds [4 x i8], ptr @base64.writer_table, i64 0, i64 %idx
-        \\  %byte = load i8, ptr %ptr, align 1
-        \\  %value = zext i8 %byte to i32
-        \\  %ok = icmp eq i32 %value, 12
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64TableLookupStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write base64 table lookup external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64TableLookupStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("base64.writer_table", "private unnamed_addr", .{ .text = "[4 x i8]" }, "c\"\\00\\04\\08\\0C\"", "4");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try main_fn.block("entry");
+    _ = try entry.cast("idx8", "trunc", sib.int(.i32, "3"), .i8);
+    _ = try entry.cast("idx", "zext", sib.local(.i8, "%idx8"), .i64);
+    _ = try entry.gep2("ptr", .{ .text = "[4 x i8]" }, sib.global(.ptr, "@base64.writer_table"), sib.int(.i64, "0"), sib.local(.i64, "%idx"));
+    _ = try entry.load("byte", .i8, sib.local(.ptr, "%ptr"), "1");
+    _ = try entry.cast("value", "zext", sib.local(.i8, "%byte"), .i32);
+    _ = try entry.icmp("ok", "eq", .i32, sib.local(.i32, "%value"), sib.int(.i32, "12"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try main_fn.end();
 }
 
 fn writeCheckedAddRuntimeBoundaryIrWriterBody(
@@ -3554,23 +3614,24 @@ fn writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@sideEffectFree = alias void (), ptr @tiny_scalar.sideEffectFree
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  call void @tiny_scalar.sideEffectFree()
-        \\  ret i32 0
-        \\}}
-        \\
-        \\define private void @tiny_scalar.sideEffectFree() unnamed_addr align 1 {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeRuntimeSideEffectFreeStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime side-effect-free external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeRuntimeSideEffectFreeStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("sideEffectFree", .{ .text = "void ()" }, "@tiny_scalar.sideEffectFree");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call(null, "", .void, "@tiny_scalar.sideEffectFree", "");
+    try main_entry.ret(sib.int(.i32, "0"));
+    try main_fn.end();
+    var callee = try module.function("private ", .void, "tiny_scalar.sideEffectFree", "", " unnamed_addr align 1");
+    var entry = try callee.block("entry");
+    try entry.retVoid();
+    try callee.end();
 }
 
 fn writeMinimalIrWriterBody(

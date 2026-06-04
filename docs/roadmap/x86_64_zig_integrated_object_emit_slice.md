@@ -589,8 +589,10 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=136 structured_builder_rows=51
-                       textual_subset_rows=85 minimal_wrapper_rows=0
+ir-writer full set:    scalar_runtime_rows=136 structured_builder_rows=104
+                       textual_subset_rows=32
+                       textual_boundary_reason_missing_rows=0
+                       minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
                        error-switch-select=2 direct-call=1 global-load=3
                        i64-arithmetic=1 i64-call-return=1
@@ -684,8 +686,9 @@ linker=zig-native-fno-lld
 `zig build distribution-zig-ir-writer` now reports that ownership proof for
 each selected row and fails if a selected row falls back to libLLVM module
 parse/print, LLVM TargetMachine object emission, or a `minimal-ret0` surface.
-The full selected gate also fails if fewer than 30 rows are constructed through
-`src/structured_ir_builder.zig`.
+The full selected gate also fails if fewer than 100 rows are constructed through
+`src/structured_ir_builder.zig` or any textual row lacks a
+`textual_boundary_reason`.
 The normal Zig/libLLVM fallback remains available when the selected writer env
 vars are unset.
 
@@ -727,8 +730,8 @@ external contract and calls `z_llvm --emit=ir-writer` to write the selected
 LLVM IR module, then `z_llvm` performs the accepted Zig-mode optimization
 pipeline and emits the relocatable object, and Zig's native linker links the
 executable. The external writer now emits 136/136 selected rows as runtime
-surfaces with 51 rows constructed through `src/structured_ir_builder.zig` and
-85 rows remaining on the textual-subset helpers:
+surfaces with 104 rows constructed through `src/structured_ir_builder.zig` and
+32 rows remaining on the textual-subset helpers:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
@@ -791,7 +794,7 @@ downstream ownership marker.
 
 LLVM's module optimization pipeline, LLVM TargetMachine codegen, and libLLVM
 bitcode parse/print of the selected object module are bypassed for those rows.
-The structured-builder milestone removes handwritten body ownership for 51
+The structured-builder milestone removes handwritten body ownership for 104
 selected rows but does not claim full Zig IR construction replacement.
 
 The case registry is now backed by reusable writer helpers in

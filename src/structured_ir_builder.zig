@@ -215,8 +215,27 @@ pub const Block = struct {
         return Value.local(ty, result);
     }
 
+    pub fn volatileLoad(self: *Block, result: []const u8, ty: Type, ptr_value: Value, align_text: []const u8) !Value {
+        try self.writer.print("  %{s} = load volatile {s}, ptr {s}, align {s}\n", .{ result, ty.llvm(), ptr_value.ref, align_text });
+        return Value.local(ty, result);
+    }
+
     pub fn store(self: *Block, value: Value, ptr_value: Value, align_text: []const u8) !void {
         try self.writer.print("  store {s} {s}, ptr {s}, align {s}\n", .{ value.ty.llvm(), value.ref, ptr_value.ref, align_text });
+    }
+
+    pub fn volatileStore(self: *Block, value: Value, ptr_value: Value, align_text: []const u8) !void {
+        try self.writer.print("  store volatile {s} {s}, ptr {s}, align {s}\n", .{ value.ty.llvm(), value.ref, ptr_value.ref, align_text });
+    }
+
+    pub fn extractValue(self: *Block, result: []const u8, aggregate_ty: []const u8, aggregate: []const u8, index: usize, result_ty: Type) !Value {
+        try self.writer.print("  %{s} = extractvalue {s} {s}, {}\n", .{ result, aggregate_ty, aggregate, index });
+        return Value.local(result_ty, result);
+    }
+
+    pub fn atomicRmwAdd(self: *Block, result: []const u8, ptr_value: Value, value: Value, ordering: []const u8, align_text: []const u8) !Value {
+        try self.writer.print("  %{s} = atomicrmw add ptr {s}, {s} {s} {s}, align {s}\n", .{ result, ptr_value.ref, value.ty.llvm(), value.ref, ordering, align_text });
+        return Value.local(value.ty, result);
     }
 
     pub fn lifetimeStart(self: *Block, ptr_value: Value) !void {
