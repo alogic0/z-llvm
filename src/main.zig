@@ -474,8 +474,8 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesafe_source_tls_concurrency_checked_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_atomics_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasefast_runtime_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .textual_boundary_reason = "inline-asm-memory-barrier" },
-    .{ .id = "releasefast_source_atomics_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .textual_boundary_reason = "inline-asm-memory-barrier" },
+    .{ .id = "releasefast_runtime_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasefast_source_atomics_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_aggregate_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_source_aggregate_abi_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasefast_runtime_float_less", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody, .construction = .structured_builder },
@@ -499,14 +499,14 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_source_standalone_extern_exports_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_mix_c_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_standalone_mix_c_files_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_mix_c_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .textual_boundary_reason = "release-small-mixed-c-zig-panic-edge" },
-    .{ .id = "releasesmall_source_standalone_mix_c_files_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .textual_boundary_reason = "release-small-mixed-c-zig-panic-edge" },
+    .{ .id = "releasesmall_runtime_mix_c_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_mix_c_files_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_inherit_want_safety_i64", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_inherit_want_safety_i64_return", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .textual_boundary_reason = "compile-asm-unreachable-boundary" },
-    .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .textual_boundary_reason = "compile-asm-unreachable-boundary" },
+    .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .textual_boundary_reason = "full-str-from-float-formatting" },
     .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .textual_boundary_reason = "full-base64-decoder-cfg" },
     .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
@@ -788,44 +788,37 @@ fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
 }
 
 fn writeReleaseSmallMixCAddMayPanicModule(writer: *std.Io.Writer) !void {
-    try irw.global(writer, "main.zig_k", "private unnamed_addr", "i32", "1", "4");
-    try irw.constant(writer, "__anon_14658", "private unnamed_addr", "[13 x i8]", "c\"negative int\\00\"", "1");
+    var module = sib.Module.init(writer);
+    try module.global("main.zig_k", "private unnamed_addr", .i32, "1", "4");
+    try module.constant("__anon_14658", "private unnamed_addr", .{ .text = "[13 x i8]" }, "c\"negative int\\00\"", "1");
     try writer.writeAll("\n");
-    try irw.alias(writer, "add_may_panic", "i32 (i32)", "main.add_may_panic");
-    try irw.alias(writer, "zig_k", "i32", "main.zig_k");
+    try module.alias("add_may_panic", .{ .text = "i32 (i32)" }, "@main.add_may_panic");
+    try module.alias("zig_k", .i32, "@main.zig_k");
     try writer.writeAll("\n");
-    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.call(writer, "value", "", "i32", "@main.add_may_panic", "i32 4");
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
-    try irw.functionHeader(writer, "private ", "i32", "main.add_may_panic", "i32 %0", " unnamed_addr align 1");
-    try irw.block(writer, "entry");
-    try writer.writeAll("  %negative = icmp slt i32 %0, 0\n");
-    try irw.condBr(writer, "negative", "panic", "ok");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    _ = try main_entry.call("value", "", .i32, "@main.add_may_panic", "i32 4");
+    try main_entry.ret(sib.local(.i32, "%value"));
+    try main_fn.end();
+    var add_fn = try module.function("private ", .i32, "main.add_may_panic", "i32 %0", " unnamed_addr align 1");
+    var entry = try add_fn.block("entry");
+    _ = try entry.icmp("negative", "slt", .i32, sib.local(.i32, "%0"), sib.int(.i32, "0"));
+    try entry.condBr(sib.local(.i1, "%negative"), "panic", "ok");
     try writer.writeAll("\n");
-    try irw.block(writer, "panic");
-    try writer.writeAll(
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly align 1 @__anon_14658, i64 12)
-        \\  unreachable
-        \\
-    );
+    var panic = try add_fn.block("panic");
+    _ = try panic.call(null, "", .void, "@llvm.assume", "i1 1");
+    _ = try panic.call(null, "tail fastcc ", .void, "@debug.defaultPanic", "ptr @__anon_14658, i64 12");
+    try panic.emitUnreachable();
     try writer.writeAll("\n");
-    try irw.block(writer, "ok");
-    try irw.load(writer, "base", "i32", "@main.zig_k", "4");
-    try writer.writeAll("  %sum = add nsw i32 %base, %0\n");
-    try irw.ret(writer, "i32", "%sum");
-    try irw.functionEnd(writer);
-    try writer.writeAll(
-        \\declare void @llvm.assume(i1 noundef)
-        \\
-        \\define fastcc void @debug.defaultPanic(ptr nonnull readonly align 1 %msg, i64 %len) {
-        \\entry:
-        \\  ret void
-        \\}
-        \\
-    );
+    var ok = try add_fn.block("ok");
+    _ = try ok.load("base", .i32, sib.global(.ptr, "@main.zig_k"), "4");
+    _ = try ok.binary("sum", "add nsw", .i32, sib.local(.i32, "%base"), sib.local(.i32, "%0"));
+    try ok.ret(sib.local(.i32, "%sum"));
+    try add_fn.end();
+    var panic_fn = try module.function("fastcc ", .void, "debug.defaultPanic", "ptr %msg, i64 %len", "");
+    var panic_entry = try panic_fn.block("entry");
+    try panic_entry.retVoid();
+    try panic_fn.end();
 }
 
 fn writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(
@@ -878,22 +871,23 @@ fn writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@compile_asm_main = alias void (i32, i32, i32), ptr @main.main
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  ret i32 0
-        \\}}
-        \\
-        \\define private void @main.main(i32 %0, i32 %1, i32 %2) unnamed_addr align 1 {{
-        \\entry:
-        \\  unreachable
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSmallCompileAsmUnreachableStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime compile-asm unreachable external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSmallCompileAsmUnreachableStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("compile_asm_main", .{ .text = "void (i32, i32, i32)" }, "@main.main");
+    try writer.writeAll("\n");
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    try main_entry.ret(sib.int(.i32, "0"));
+    try main_fn.end();
+    var asm_fn = try module.function("private ", .void, "main.main", "i32 %0, i32 %1, i32 %2", " unnamed_addr align 1");
+    var asm_entry = try asm_fn.block("entry");
+    try asm_entry.emitUnreachable();
+    try asm_fn.end();
 }
 
 fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
@@ -3313,13 +3307,14 @@ fn writeRuntimeInlineAsmBarrierIrWriterBody(
 }
 
 fn writeInlineAsmBarrierModule(writer: *std.Io.Writer) !void {
-    try irw.alias(writer, "main", "i32 (i32)", "atomics_inline_asm_debug.inline_asm_barrier");
+    var module = sib.Module.init(writer);
+    try module.alias("main", .{ .text = "i32 (i32)" }, "@atomics_inline_asm_debug.inline_asm_barrier");
     try writer.writeAll("\n");
-    try irw.functionHeader(writer, "private ", "i32", "atomics_inline_asm_debug.inline_asm_barrier", "i32 %value", " local_unnamed_addr");
-    try irw.block(writer, "entry");
-    try irw.inlineAsmBarrier(writer);
-    try irw.ret(writer, "i32", "%value");
-    try irw.functionEnd(writer);
+    var function = try module.function("private ", .i32, "atomics_inline_asm_debug.inline_asm_barrier", "i32 %value", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try entry.inlineAsmBarrier();
+    try entry.ret(sib.local(.i32, "%value"));
+    try function.end();
 }
 
 fn writeRuntimeAggregatePairIrWriterBody(

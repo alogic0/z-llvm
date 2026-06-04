@@ -247,6 +247,11 @@ pub const Block = struct {
         return null;
     }
 
+    pub fn inlineAsmBarrier(self: *Block) !void {
+        try self.writer.writeAll("  tail call void asm sideeffect \"\", \"~{memory},~{dirflag},~{fpsr},~{flags}\"()\n");
+        if (active_direct) |direct| try direct.inlineAsmBarrier();
+    }
+
     pub fn alloca(self: *Block, result: []const u8, ty: Type, align_text: []const u8) !Value {
         try self.writer.print("  %{s} = alloca {s}, align {s}\n", .{ result, ty.llvm(), align_text });
         if (active_direct) |direct| try direct.alloca(result, ty, align_text);
@@ -590,6 +595,23 @@ pub const DirectBuilder = struct {
         errdefer call_inst.deinit(self.allocator);
         try self.appendCallArgs(&call_inst, args_text);
         try self.appendInstructionOptional(result, .{ .call = call_inst });
+    }
+
+    pub fn inlineAsmBarrier(self: *DirectBuilder) !void {
+        var call_inst: ir.CallInst = .{
+            .ret_ty = .void,
+            .callee = "asm",
+            .tail_kind = "tail",
+            .inline_asm = .{
+                .template = "",
+                .constraints = "~{memory},~{dirflag},~{fpsr},~{flags}",
+                .sideeffect = true,
+                .has_memory_clobber = true,
+            },
+            .args = .empty,
+        };
+        errdefer call_inst.deinit(self.allocator);
+        try self.appendInstructionOptional(null, .{ .call = call_inst });
     }
 
     pub fn alloca(self: *DirectBuilder, result: []const u8, ty: Type, align_text: []const u8) !void {
