@@ -6,7 +6,9 @@ var active_direct: ?*DirectBuilder = null;
 pub const Type = union(enum) {
     void,
     i1,
+    i4,
     i8,
+    i12,
     i16,
     i32,
     i64,
@@ -20,7 +22,9 @@ pub const Type = union(enum) {
         return switch (self) {
             .void => "void",
             .i1 => "i1",
+            .i4 => "i4",
             .i8 => "i8",
+            .i12 => "i12",
             .i16 => "i16",
             .i32 => "i32",
             .i64 => "i64",
@@ -36,7 +40,9 @@ pub const Type = union(enum) {
         return switch (self) {
             .void => .void,
             .i1 => .{ .int = 1 },
+            .i4 => .{ .int = 4 },
             .i8 => .{ .int = 8 },
+            .i12 => .{ .int = 12 },
             .i16 => .{ .int = 16 },
             .i32 => .{ .int = 32 },
             .i64 => .{ .int = 64 },
@@ -210,6 +216,10 @@ pub const Block = struct {
         try self.writer.print("  %{s} = {s} {s} {s} to {s}\n", .{ result, op, from.ty.llvm(), from.ref, to_ty.llvm() });
         if (active_direct) |direct| try direct.cast(result, op, from, to_ty);
         return Value.local(to_ty, result);
+    }
+
+    pub fn castFlags(self: *Block, result: []const u8, op_and_flags: []const u8, from: Value, to_ty: Type) !Value {
+        return self.cast(result, op_and_flags, from, to_ty);
     }
 
     pub fn icmp(self: *Block, result: []const u8, pred: []const u8, ty: Type, lhs: Value, rhs: Value) !Value {
@@ -548,8 +558,10 @@ pub const DirectBuilder = struct {
     }
 
     pub fn cast(self: *DirectBuilder, result: []const u8, op_text: []const u8, from: Value, to_ty: Type) !void {
+        const parsed = parseCastOpAndFlags(op_text);
         try self.appendInstruction(result, .{ .cast = .{
-            .op = ir.CastOp.parse(firstToken(op_text) orelse op_text) orelse .bitcast,
+            .op = parsed.op,
+            .flags = parsed.flags,
             .from_ty = from.ty.toIr(),
             .value = directValue(from),
             .to_ty = to_ty.toIr(),
@@ -858,6 +870,11 @@ const ParsedBinary = struct {
     fp_flags: ir.FastMathFlags = .{},
 };
 
+const ParsedCast = struct {
+    op: ir.CastOp,
+    flags: ir.CastFlags = .{},
+};
+
 fn parseBinaryOpAndFlags(text: []const u8) ?ParsedBinary {
     var parsed: ParsedBinary = .{ .op = .add };
     var saw_op = false;
@@ -879,6 +896,23 @@ fn parseBinaryOpAndFlags(text: []const u8) ?ParsedBinary {
         }
     }
     return if (saw_op) parsed else null;
+}
+
+fn parseCastOpAndFlags(text: []const u8) ParsedCast {
+    var parsed: ParsedCast = .{ .op = .bitcast };
+    var iter = std.mem.tokenizeAny(u8, text, " \t");
+    while (iter.next()) |token| {
+        if (ir.CastOp.parse(token)) |op| {
+            parsed.op = op;
+        } else if (std.mem.eql(u8, token, "nneg")) {
+            parsed.flags.nneg = true;
+        } else if (std.mem.eql(u8, token, "nsw")) {
+            parsed.flags.nsw = true;
+        } else if (std.mem.eql(u8, token, "nuw")) {
+            parsed.flags.nuw = true;
+        }
+    }
+    return parsed;
 }
 
 fn parseU64(text: []const u8) ?u64 {

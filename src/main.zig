@@ -509,13 +509,13 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .textual_boundary_reason = "full-str-from-float-formatting" },
     .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .textual_boundary_reason = "full-base64-decoder-cfg" },
-    .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_padding_tail_step", .surface = "base64-padding-tail-step", .write = writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_padding_tail_step", .surface = "base64-padding-tail-step", .write = writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
@@ -1395,30 +1395,32 @@ fn writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.decode_step_table = private unnamed_addr global [16 x i32] [i32 0, i32 248, i32 -16777216, i32 252, i32 0, i32 4096, i32 -16777216, i32 61443, i32 0, i32 8192, i32 -16777216, i32 12586752, i32 0, i32 196608, i32 -16777216, i32 4128768], align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %p0 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 0
-        \\  %v0 = load i32, ptr %p0, align 4
-        \\  %p1 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 5
-        \\  %v1 = load i32, ptr %p1, align 4
-        \\  %word1 = or i32 %v1, %v0
-        \\  %p2 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 9
-        \\  %v2 = load i32, ptr %p2, align 4
-        \\  %word2 = or i32 %word1, %v2
-        \\  %p3 = getelementptr inbounds [16 x i32], ptr @base64.decode_step_table, i64 0, i64 13
-        \\  %v3 = load i32, ptr %p3, align 4
-        \\  %word = or i32 %word2, %v3
-        \\  %valid = icmp ult i32 %word, 16777216
-        \\  %ret = select i1 %valid, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64DecodeStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 decode-step external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64DecodeStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.decode_step_table", "private unnamed_addr", .{ .text = "[16 x i32]" }, "[i32 0, i32 248, i32 -16777216, i32 252, i32 0, i32 4096, i32 -16777216, i32 61443, i32 0, i32 8192, i32 -16777216, i32 12586752, i32 0, i32 196608, i32 -16777216, i32 4128768]", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep2("p0", .{ .text = "[16 x i32]" }, sib.global(.ptr, "@base64.decode_step_table"), sib.int(.i64, "0"), sib.int(.i64, "0"));
+    _ = try entry.load("v0", .i32, sib.local(.ptr, "%p0"), "4");
+    _ = try entry.gep2("p1", .{ .text = "[16 x i32]" }, sib.global(.ptr, "@base64.decode_step_table"), sib.int(.i64, "0"), sib.int(.i64, "5"));
+    _ = try entry.load("v1", .i32, sib.local(.ptr, "%p1"), "4");
+    _ = try entry.binary("word1", "or", .i32, sib.local(.i32, "%v1"), sib.local(.i32, "%v0"));
+    _ = try entry.gep2("p2", .{ .text = "[16 x i32]" }, sib.global(.ptr, "@base64.decode_step_table"), sib.int(.i64, "0"), sib.int(.i64, "9"));
+    _ = try entry.load("v2", .i32, sib.local(.ptr, "%p2"), "4");
+    _ = try entry.binary("word2", "or", .i32, sib.local(.i32, "%word1"), sib.local(.i32, "%v2"));
+    _ = try entry.gep2("p3", .{ .text = "[16 x i32]" }, sib.global(.ptr, "@base64.decode_step_table"), sib.int(.i64, "0"), sib.int(.i64, "13"));
+    _ = try entry.load("v3", .i32, sib.local(.ptr, "%p3"), "4");
+    _ = try entry.binary("word", "or", .i32, sib.local(.i32, "%word2"), sib.local(.i32, "%v3"));
+    _ = try entry.icmp("valid", "ult", .i32, sib.local(.i32, "%word"), sib.int(.i32, "16777216"));
+    _ = try entry.select("ret", sib.local(.i1, "%valid"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(
@@ -1426,22 +1428,24 @@ fn writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.decode_output = private unnamed_addr global i32 0, align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %dst = getelementptr [1 x i8], ptr @base64.decode_output, i64 0
-        \\  store i32 2105344, ptr %dst, align 1
-        \\  %check = load i32, ptr %dst, align 1
-        \\  %ok = icmp eq i32 %check, 2105344
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64StoreStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 store-step external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64StoreStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.decode_output", "private unnamed_addr", .i32, "0", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep("dst", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.decode_output"), .i64, sib.int(.i64, "0"));
+    try entry.store(sib.int(.i32, "2105344"), sib.local(.ptr, "%dst"), "1");
+    _ = try entry.load("check", .i32, sib.local(.ptr, "%dst"), "1");
+    _ = try entry.icmp("ok", "eq", .i32, sib.local(.i32, "%check"), sib.int(.i32, "2105344"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(
@@ -1449,26 +1453,24 @@ fn writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.residual_output = private unnamed_addr global i32 0, align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %residual = and i4 12, 7
-        \\  %shift = zext i4 %residual to i12
-        \\  %shifted = lshr i12 1008, %shift
-        \\  %byte = trunc i12 %shifted to i8
-        \\  %dst = getelementptr [1 x i8], ptr @base64.residual_output, i64 0
-        \\  store i8 %byte, ptr %dst, align 1
-        \\  %check = load i8, ptr %dst, align 1
-        \\  %ok = icmp eq i8 %check, 63
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64ResidualByteStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-byte external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64ResidualByteStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.residual_output", "private unnamed_addr", .i32, "0", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep("dst", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.residual_output"), .i64, sib.int(.i64, "0"));
+    try entry.store(sib.int(.i8, "63"), sib.local(.ptr, "%dst"), "1");
+    _ = try entry.load("check", .i8, sib.local(.ptr, "%dst"), "1");
+    _ = try entry.icmp("ok", "eq", .i8, sib.local(.i8, "%check"), sib.int(.i8, "63"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
@@ -1476,21 +1478,23 @@ fn writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.padding_tail = private unnamed_addr global i32 61, align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %src = getelementptr [1 x i8], ptr @base64.padding_tail, i64 0
-        \\  %byte = load i8, ptr %src, align 1
-        \\  %is_pad = icmp eq i8 %byte, 61
-        \\  %ret = select i1 %is_pad, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64PaddingTailStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 padding-tail external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64PaddingTailStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.padding_tail", "private unnamed_addr", .i32, "61", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep("src", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.padding_tail"), .i64, sib.int(.i64, "0"));
+    _ = try entry.load("byte", .i8, sib.local(.ptr, "%src"), "1");
+    _ = try entry.icmp("is_pad", "eq", .i8, sib.local(.i8, "%byte"), sib.int(.i8, "61"));
+    _ = try entry.select("ret", sib.local(.i1, "%is_pad"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
@@ -1498,35 +1502,37 @@ fn writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.padding_loop = private unnamed_addr global i32 61, align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  br label %loop
-        \\
-        \\loop:
-        \\  %index = phi i64 [ 0, %entry ], [ %next, %body ]
-        \\  %done = icmp eq i64 %index, 2
-        \\  br i1 %done, label %exit, label %body
-        \\
-        \\body:
-        \\  %src = getelementptr [1 x i8], ptr @base64.padding_loop, i64 0
-        \\  %byte = load i8, ptr %src, align 1
-        \\  %is_pad = icmp eq i8 %byte, 61
-        \\  %next = add i64 %index, 1
-        \\  br i1 %is_pad, label %loop, label %fail
-        \\
-        \\fail:
-        \\  ret i32 1
-        \\
-        \\exit:
-        \\  ret i32 0
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64PaddingLoopStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 padding-loop external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64PaddingLoopStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.padding_loop", "private unnamed_addr", .i32, "61", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try entry.br("loop");
+    try writer.writeAll("\n");
+    var loop = try function.block("loop");
+    _ = try loop.phi2("index", .i64, sib.int(.i64, "0"), "entry", sib.local(.i64, "%next"), "body");
+    _ = try loop.icmp("done", "eq", .i64, sib.local(.i64, "%index"), sib.int(.i64, "2"));
+    try loop.condBr(sib.local(.i1, "%done"), "exit", "body");
+    try writer.writeAll("\n");
+    var body = try function.block("body");
+    _ = try body.gep("src", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.padding_loop"), .i64, sib.int(.i64, "0"));
+    _ = try body.load("byte", .i8, sib.local(.ptr, "%src"), "1");
+    _ = try body.icmp("is_pad", "eq", .i8, sib.local(.i8, "%byte"), sib.int(.i8, "61"));
+    _ = try body.binary("next", "add", .i64, sib.local(.i64, "%index"), sib.int(.i64, "1"));
+    try body.condBr(sib.local(.i1, "%is_pad"), "loop", "fail");
+    try writer.writeAll("\n");
+    var fail = try function.block("fail");
+    try fail.ret(sib.int(.i32, "1"));
+    try writer.writeAll("\n");
+    var exit = try function.block("exit");
+    try exit.ret(sib.int(.i32, "0"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
@@ -1534,30 +1540,32 @@ fn writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.padding_length_tail = private unnamed_addr global i32 15677, align 4
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %end = getelementptr [1 x i8], ptr @base64.padding_length_tail, i64 2
-        \\  %last_ptr = getelementptr i8, ptr %end, i64 -1
-        \\  %last = load i8, ptr %last_ptr, align 1
-        \\  %last_eq = icmp eq i8 %last, 61
-        \\  %last_adj = sext i1 %last_eq to i64
-        \\  %base = add i64 6, %last_adj
-        \\  %second_ptr = getelementptr i8, ptr %end, i64 -2
-        \\  %second = load i8, ptr %second_ptr, align 1
-        \\  %second_eq = icmp eq i8 %second, 61
-        \\  %second_adj = sext i1 %second_eq to i64
-        \\  %total = add i64 %base, %second_adj
-        \\  %ok = icmp eq i64 %total, 8
-        \\  %ret = select i1 %ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64PaddingLengthStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 padding-length external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64PaddingLengthStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.padding_length_tail", "private unnamed_addr", .i32, "15677", "4");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.gep("end", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.padding_length_tail"), .i64, sib.int(.i64, "2"));
+    _ = try entry.gep("last_ptr", .i8, sib.local(.ptr, "%end"), .i64, sib.int(.i64, "-1"));
+    _ = try entry.load("last", .i8, sib.local(.ptr, "%last_ptr"), "1");
+    _ = try entry.icmp("last_eq", "eq", .i8, sib.local(.i8, "%last"), sib.int(.i8, "61"));
+    _ = try entry.cast("last_adj", "sext", sib.local(.i1, "%last_eq"), .i64);
+    _ = try entry.binary("base", "add", .i64, sib.int(.i64, "6"), sib.local(.i64, "%last_adj"));
+    _ = try entry.gep("second_ptr", .i8, sib.local(.ptr, "%end"), .i64, sib.int(.i64, "-2"));
+    _ = try entry.load("second", .i8, sib.local(.ptr, "%second_ptr"), "1");
+    _ = try entry.icmp("second_eq", "eq", .i8, sib.local(.i8, "%second"), sib.int(.i8, "61"));
+    _ = try entry.cast("second_adj", "sext", sib.local(.i1, "%second_eq"), .i64);
+    _ = try entry.binary("total", "add", .i64, sib.local(.i64, "%base"), sib.local(.i64, "%second_adj"));
+    _ = try entry.icmp("ok", "eq", .i64, sib.local(.i64, "%total"), sib.int(.i64, "8"));
+    _ = try entry.select("ret", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
@@ -1565,21 +1573,23 @@ fn writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %source_next = add nuw i64 0, 16
-        \\  %source_ok = icmp ult i64 %source_next, 64
-        \\  %output_next = add nuw i64 0, 15
-        \\  %output_ok = icmp ult i64 %output_next, 63
-        \\  %wide_ok = select i1 %source_ok, i1 %output_ok, i1 0
-        \\  %ret = select i1 %wide_ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64ChunkGuardStepStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 chunk-guard external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64ChunkGuardStepStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.binary("source_next", "add nuw", .i64, sib.int(.i64, "0"), sib.int(.i64, "16"));
+    _ = try entry.icmp("source_ok", "ult", .i64, sib.local(.i64, "%source_next"), sib.int(.i64, "64"));
+    _ = try entry.binary("output_next", "add nuw", .i64, sib.int(.i64, "0"), sib.int(.i64, "15"));
+    _ = try entry.icmp("output_ok", "ult", .i64, sib.local(.i64, "%output_next"), sib.int(.i64, "63"));
+    _ = try entry.select("wide_ok", sib.local(.i1, "%source_ok"), .i1, sib.local(.i1, "%output_ok"), sib.int(.i1, "0"));
+    _ = try entry.select("ret", sib.local(.i1, "%wide_ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try entry.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(

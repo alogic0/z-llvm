@@ -8,6 +8,7 @@ pub const BinaryOp = core.BinaryOp;
 pub const BinaryFlags = core.BinaryFlags;
 pub const FastMathFlags = core.FastMathFlags;
 pub const CastOp = core.CastOp;
+pub const CastFlags = core.CastFlags;
 pub const IcmpPredicate = core.IcmpPredicate;
 pub const FcmpPredicate = core.FcmpPredicate;
 pub const Param = core.Param;
