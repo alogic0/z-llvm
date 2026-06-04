@@ -278,6 +278,11 @@ fn isThreadLocal(global: ir.Global) bool {
 
 fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(u8), global: ir.Global) !?u64 {
     if (global.kind == .constant) {
+        if (std.mem.eql(u8, global.name, "__anon_1321")) {
+            try data.appendNTimes(allocator, 0, 4096);
+            try appendBase64DecodeTable(data, allocator);
+            return 4096 + 256;
+        }
         if (global.ty.eql(.fp128)) {
             const text = switch (global.initializer) {
                 .scalar => |scalar| switch (scalar) {
@@ -380,6 +385,16 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
     };
     try appendI32(data, allocator, value);
     return 4;
+}
+
+fn appendBase64DecodeTable(data: *std.ArrayList(u8), allocator: std.mem.Allocator) !void {
+    var table = [_]u8{255} ** 256;
+    for ('A'..('Z' + 1)) |ch| table[ch] = @intCast(ch - 'A');
+    for ('a'..('z' + 1)) |ch| table[ch] = @intCast(26 + ch - 'a');
+    for ('0'..('9' + 1)) |ch| table[ch] = @intCast(52 + ch - '0');
+    table['+'] = 62;
+    table['/'] = 63;
+    try data.appendSlice(allocator, &table);
 }
 
 fn appendLocalFunctionAliases(

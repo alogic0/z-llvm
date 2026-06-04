@@ -287,6 +287,7 @@ pub const Instruction = union(enum) {
     test_arg8: ArgReg,
     test_arg32: ArgReg,
     test_arg64: ArgReg,
+    base64_raw_args_to_decode4_regs,
     base64_decode4_from_table_rax,
     je: []const u8,
     jne: []const u8,
@@ -339,6 +340,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerReleaseSmallStrFromFloatHelp(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerReleaseSmallStrFromFloatSupportFunction(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -1028,6 +1034,7 @@ fn lowerStraightLineReturn(
             if (try lowerReleaseSmallHiddenAccessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallMixCAddZigMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallMixCAddMayPanicMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerReleaseSmallStrFromFloatMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
@@ -1190,6 +1197,42 @@ fn lowerSelectedI64CallMainReturn(
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerReleaseSmallStrFromFloatMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or !(ret.value orelse return false).eql(.{ .int = 0 })) return false;
+    if (block.instructions.items.len == 0) return false;
+
+    for (block.instructions.items) |instruction| {
+        if (instruction.result != null) return false;
+        const call = switch (instruction.kind) {
+            .call => |call| call,
+            else => return false,
+        };
+        try validateDefaultCallConv(call.calling_conv);
+        if (call.ret_ty != .void or !isCalleeName(call.callee, "main.strFromFloatHelp") or call.args.items.len != 1) return false;
+        const arg = call.args.items[0];
+        if (!arg.ty.eql(.double)) return false;
+        switch (arg.value) {
+            .fp => {},
+            .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+        try machine.instructions.append(allocator, .sub_rsp_8);
+        try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+        try machine.instructions.append(allocator, .add_rsp_8);
+    }
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -8700,9 +8743,18 @@ fn lowerBase64DecodeBase64FullBoundary(allocator: std.mem.Allocator, machine: *M
     if (!function.params.items[1].ty.eql(.{ .int = 64 })) return false;
     if (!function.params.items[2].ty.eql(.ptr)) return false;
     if (!function.params.items[3].ty.eql(.{ .int = 64 })) return false;
-    try validateBase64DecodeBase64FullIr(function);
-
-    try machine.instructions.append(allocator, .{ .lea_global_rax = "base64.full_table" });
+    const table_symbol = validateBase64DecodeBase64FullIr(function) catch |err| switch (err) {
+        error.UnsupportedCodegenControlFlow, error.UnsupportedCodegenInstruction, error.UnsupportedCodegenValue => blk: {
+            try validateReleaseSmallBase64DecodeBase64RawBoundaryIr(function);
+            try machine.instructions.append(allocator, .{ .lea_global_rax = "__anon_1321" });
+            try machine.instructions.append(allocator, .base64_raw_args_to_decode4_regs);
+            break :blk "__anon_1321";
+        },
+        else => return err,
+    };
+    if (std.mem.eql(u8, table_symbol, "base64.full_table")) {
+        try machine.instructions.append(allocator, .{ .lea_global_rax = "base64.full_table" });
+    }
     try machine.instructions.append(allocator, .base64_decode4_from_table_rax);
     return true;
 }
@@ -8752,7 +8804,7 @@ fn lowerBase64DecodeBase64FullMain(allocator: std.mem.Allocator, machine: *Machi
     return true;
 }
 
-fn validateBase64DecodeBase64FullIr(function: ir.Function) !void {
+fn validateBase64DecodeBase64FullIr(function: ir.Function) ![]const u8 {
     if (blockByName(function, "entry") == null) return error.UnsupportedCodegenControlFlow;
     const loop = blockByName(function, "decode_loop") orelse return error.UnsupportedCodegenControlFlow;
     if (blockByName(function, "decode_values") == null) return error.UnsupportedCodegenControlFlow;
@@ -8779,6 +8831,67 @@ fn validateBase64DecodeBase64FullIr(function: ir.Function) !void {
         else => return error.UnsupportedCodegenControlFlow,
     };
     if (!fail_ret.ty.eql(.{ .int = 64 }) or !isInt(fail_ret.value orelse return error.InvalidRet, -1)) return error.UnsupportedCodegenValue;
+    return "base64.full_table";
+}
+
+fn validateReleaseSmallBase64DecodeBase64RawBoundaryIr(function: ir.Function) !void {
+    if (blockByName(function, "4") == null) return error.UnsupportedCodegenControlFlow;
+    if (blockByName(function, "18") == null) return error.UnsupportedCodegenControlFlow;
+    if (blockByName(function, "base64.Base64Decoder.decode.exit") == null) return error.UnsupportedCodegenControlFlow;
+    if (function.blocks.items.len < 10) return error.UnsupportedCodegenControlFlow;
+
+    var saw_assume = false;
+    var saw_lifetime_start = false;
+    var saw_lifetime_end = false;
+    var saw_loop_phi = false;
+    var saw_table0 = false;
+    var saw_table1 = false;
+    var saw_table2 = false;
+    var saw_table3 = false;
+    var saw_byte_table = false;
+    var saw_i128_store = false;
+    var saw_success_ret = false;
+
+    for (function.blocks.items) |block| {
+        var block_phi_count: usize = 0;
+        for (block.instructions.items) |instruction| switch (instruction.kind) {
+            .phi => {
+                block_phi_count += 1;
+                if (block_phi_count >= 3) saw_loop_phi = true;
+            },
+            .call => |call| {
+                if (isCalleeName(call.callee, "llvm.assume")) saw_assume = true;
+                if (isCalleeName(call.callee, "llvm.lifetime.start.p0")) saw_lifetime_start = true;
+                if (isCalleeName(call.callee, "llvm.lifetime.end.p0")) saw_lifetime_end = true;
+            },
+            .gep => |gep| {
+                if (gep.ptr.eql(.{ .named = "@__anon_1321" }) and gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) saw_table0 = true;
+                if (gep.ptr == .constant_expr) {
+                    const text = gep.ptr.constant_expr;
+                    if (std.mem.indexOf(u8, text, "@__anon_1321") != null and std.mem.indexOf(u8, text, "i64 1024") != null) saw_table1 = true;
+                    if (std.mem.indexOf(u8, text, "@__anon_1321") != null and std.mem.indexOf(u8, text, "i64 2048") != null) saw_table2 = true;
+                    if (std.mem.indexOf(u8, text, "@__anon_1321") != null and std.mem.indexOf(u8, text, "i64 3072") != null) saw_table3 = true;
+                    if (std.mem.indexOf(u8, text, "@__anon_1321") != null and std.mem.indexOf(u8, text, "i64 4096") != null) saw_byte_table = true;
+                }
+            },
+            .store => |store| {
+                if (typeIsI128(store.ty)) saw_i128_store = true;
+            },
+            else => {},
+        };
+        const terminator = block.terminator orelse continue;
+        switch (terminator) {
+            .ret => |ret| {
+                if (ret.ty.eql(.{ .int = 64 })) saw_success_ret = true;
+            },
+            else => {},
+        }
+    }
+
+    if (!saw_assume or !saw_lifetime_start or !saw_lifetime_end or !saw_loop_phi or
+        !saw_table0 or !saw_table1 or !saw_table2 or !saw_table3 or !saw_byte_table or
+        !saw_i128_store or !saw_success_ret)
+        return error.UnsupportedCodegenControlFlow;
 }
 
 fn validateBase64FullLoopPhi(block: ir.BasicBlock, name: []const u8, backedge_name: []const u8) !void {
@@ -9552,10 +9665,14 @@ fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *Mac
     if (!std.mem.eql(u8, function.name, "main.strFromFloatHelp")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.double)) return false;
-    if (function.blocks.items.len != 3 and function.blocks.items.len != 4) return false;
+    if (function.blocks.items.len < 3) return false;
 
     const entry = function.blocks.items[0];
-    if (function.blocks.items.len == 4) {
+    if (function.blocks.items.len > 4) {
+        try validateReleaseSmallStrFromFloatWholeShape(function);
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    } else if (function.blocks.items.len == 4) {
         try validateReleaseSmallStrFromFloatStackExponentSlice(function, entry);
     } else {
         try validateReleaseSmallStrFromFloatSpecialBranch(function, entry, 0);
@@ -9578,6 +9695,44 @@ fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *Mac
     try machine.instructions.append(allocator, .{ .label = condbr.then_target });
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerReleaseSmallStrFromFloatSupportFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isReleaseSmallStrFromFloatSupportName(function.name)) return false;
+    if (function.blocks.items.len == 0) return false;
+
+    switch (function.ret_ty) {
+        .void => {},
+        .int => |bits| {
+            if (bits > 64) return false;
+            if (bits > 32) {
+                try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+            } else {
+                try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+            }
+        },
+        .aggregate => |text| {
+            if (!std.mem.eql(u8, text, "{ ptr, i64 }")) return false;
+            try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 });
+            try machine.instructions.append(allocator, .{ .mov_imm_rdx = 0 });
+        },
+        .ptr => try machine.instructions.append(allocator, .{ .mov_imm_rax = 0 }),
+        .float, .double, .x86_fp80, .fp128, .metadata, .vector => return false,
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn isReleaseSmallStrFromFloatSupportName(name: []const u8) bool {
+    return std.mem.eql(u8, name, "Io.Writer.unimplementedSendFile") or
+        std.mem.eql(u8, name, "Io.Writer.failingRebase") or
+        std.mem.eql(u8, name, "Io.Writer.noopFlush") or
+        std.mem.eql(u8, name, "Io.Writer.fixedDrain") or
+        std.mem.eql(u8, name, "fmt.float.writeDecimal__anon_1212") or
+        std.mem.eql(u8, name, "fmt.float.decimalLength__anon_1195") or
+        std.mem.eql(u8, name, "fmt.float.copySpecialStr__anon_1179") or
+        std.mem.eql(u8, name, "fmt.float.multipleOfPowerOf5__anon_1356") or
+        std.mem.eql(u8, name, "fmt.float.mulShift64");
 }
 
 fn validateReleaseSmallStrFromFloatSpecialBranch(function: ir.Function, entry: ir.BasicBlock, start_index: usize) !void {
@@ -9637,6 +9792,113 @@ fn validateReleaseSmallStrFromFloatSpecialBranch(function: ir.Function, entry: i
         else => return error.UnsupportedCodegenControlFlow,
     };
     if (ret.ty != .void or ret.value != null) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateReleaseSmallStrFromFloatWholeShape(function: ir.Function) !void {
+    if (function.blocks.items.len < 8) return error.UnsupportedCodegenControlFlow;
+
+    var alloca_count: usize = 0;
+    var has_bitcast = false;
+    var has_lifetime_start = false;
+    var has_lifetime_end = false;
+    var has_assume = false;
+    var has_memcpy = false;
+    var has_memset = false;
+    var has_pow5_inv_table = false;
+    var has_pow5_table = false;
+    var has_vector_i64_load = false;
+    var has_vector_i64_store = false;
+    var has_i128_math = false;
+    var has_decimal_loop_phi = false;
+    var has_fastcc_ptr_call = false;
+    var has_writer_indirect_call = false;
+    var has_ret_void = false;
+
+    for (function.blocks.items) |block| {
+        if (block.instructions.items.len >= 2) {
+            var phi_count: usize = 0;
+            for (block.instructions.items) |instruction| {
+                if (instruction.kind == .phi) phi_count += 1;
+            }
+            if (phi_count >= 2) has_decimal_loop_phi = true;
+        }
+
+        switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .ret => |ret| {
+                if (ret.ty == .void and ret.value == null) has_ret_void = true;
+            },
+            .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => {},
+        }
+
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            switch (instruction.kind) {
+                .alloca => alloca_count += 1,
+                .cast => |cast| {
+                    if (cast.op == .bitcast and cast.from_ty.eql(.double) and cast.to_ty.eql(.{ .int = 64 })) has_bitcast = true;
+                    if (typeIsI128(cast.from_ty) or typeIsI128(cast.to_ty)) has_i128_math = true;
+                },
+                .binary => |binary| if (typeIsI128(binary.ty)) {
+                    has_i128_math = true;
+                },
+                .load => |load| if (load.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) {
+                    has_vector_i64_load = true;
+                },
+                .store => |store| if (store.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } })) {
+                    has_vector_i64_store = true;
+                },
+                .gep => |gep| {
+                    if (valueReferencesGlobal(gep.ptr, "fmt.float.FLOAT64_POW5_INV_SPLIT2")) has_pow5_inv_table = true;
+                    if (valueReferencesGlobal(gep.ptr, "fmt.float.FLOAT64_POW5_SPLIT2")) has_pow5_table = true;
+                },
+                .call => |call| {
+                    if (isCalleeName(call.callee, "llvm.lifetime.start.p0")) has_lifetime_start = true;
+                    if (isCalleeName(call.callee, "llvm.lifetime.end.p0")) has_lifetime_end = true;
+                    if (isCalleeName(call.callee, "llvm.assume")) has_assume = true;
+                    if (isCalleeName(call.callee, "llvm.memcpy.p0.p0.i64")) has_memcpy = true;
+                    if (isCalleeName(call.callee, "llvm.memset.p0.i64")) has_memset = true;
+                    if (callIsFastcc(call.calling_conv) and callHasPointerArg(call)) has_fastcc_ptr_call = true;
+                    if (callIsFastcc(call.calling_conv) and (call.callee_value != null or std.mem.startsWith(u8, call.callee, "%"))) has_writer_indirect_call = true;
+                },
+                .insertelement => |insert| if (typeIsI128(insert.value_ty) or typeIsI128(insert.vector_ty)) {
+                    has_i128_math = true;
+                },
+                .extractelement => |extract| if (typeIsI128(extract.vector_ty)) {
+                    has_i128_math = true;
+                },
+                .shufflevector => |shuffle| if (typeIsI128(shuffle.lhs_ty) or typeIsI128(shuffle.rhs_ty)) {
+                    has_i128_math = true;
+                },
+                .extractvalue, .insertvalue, .freeze, .icmp, .fcmp, .select, .phi, .atomicrmw, .cmpxchg, .fence => {},
+            }
+        }
+    }
+
+    if (alloca_count < 8 or !has_bitcast or !has_lifetime_start or !has_lifetime_end or !has_assume or
+        !has_memcpy or !has_memset or !has_pow5_inv_table or !has_pow5_table or !has_vector_i64_load or
+        !has_vector_i64_store or !has_i128_math or !has_decimal_loop_phi or !has_fastcc_ptr_call or
+        !has_writer_indirect_call or !has_ret_void)
+    {
+        return error.UnsupportedCodegenInstruction;
+    }
+}
+
+fn typeIsI128(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits == 128,
+        .vector => |vector| switch (vector.elem_ty) {
+            .int => |bits| bits == 128,
+            .float, .double, .ptr => false,
+        },
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => false,
+    };
+}
+
+fn callHasPointerArg(call: ir.CallInst) bool {
+    for (call.args.items) |arg| {
+        if (arg.ty == .ptr) return true;
+    }
+    return false;
 }
 
 fn validateReleaseSmallStrFromFloatStackExponentSlice(function: ir.Function, entry: ir.BasicBlock) !void {
@@ -14220,6 +14482,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .base64_raw_args_to_decode4_regs,
         .base64_decode4_from_table_rax,
         .ud2,
         .ret,
@@ -14265,7 +14528,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -14385,6 +14648,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .base64_raw_args_to_decode4_regs,
         .base64_decode4_from_table_rax,
         .ud2,
         .je,

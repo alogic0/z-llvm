@@ -210,6 +210,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .test_arg8 => |reg| try encodeTest8(&bytes, allocator, reg),
             .test_arg32 => |reg| try encodeTest32(&bytes, allocator, reg),
             .test_arg64 => |reg| try encodeTest64(&bytes, allocator, reg),
+            .base64_raw_args_to_decode4_regs => try bytes.appendSlice(allocator, base64RawArgsToDecode4RegsBytes()),
             .base64_decode4_from_table_rax => try bytes.appendSlice(allocator, base64Decode4FromTableRaxBytes()),
             .ud2 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x0b }),
             .je => |label| {
@@ -359,6 +360,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,
         .test_arg32 => |reg| if (reg.rexR()) 3 else 2,
         .test_arg64 => 3,
+        .base64_raw_args_to_decode4_regs => @intCast(base64RawArgsToDecode4RegsBytes().len),
         .base64_decode4_from_table_rax => @intCast(base64Decode4FromTableRaxBytes().len),
         .ud2 => 2,
         .je, .jne, .jo, .jp, .js => 6,
@@ -413,6 +415,14 @@ fn base64Decode4FromTableRaxBytes() []const u8 {
         0x44, 0x88, 0x0a, 0xb8, 0x01, 0x00, 0x00, 0x00,
         0xc3, 0x48, 0xb8, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0xff, 0xff, 0xc3,
+    };
+}
+
+fn base64RawArgsToDecode4RegsBytes() []const u8 {
+    return &.{
+        0x48, 0x05, 0x00, 0x10, 0x00, 0x00, 0x49, 0x89,
+        0xf8, 0x48, 0x89, 0xd7, 0x4c, 0x89, 0xc2, 0x49,
+        0x89, 0xf0, 0x48, 0x89, 0xce, 0x4c, 0x89, 0xc1,
     };
 }
 
