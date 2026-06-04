@@ -1202,7 +1202,6 @@ pub fn main(init: std.process.Init) !void {
     var structured_direct_rows: usize = 0;
     var structured_textual_rows: usize = 0;
     var textual_boundary_rows: usize = 0;
-    var textual_boundary_reason_missing_rows: usize = 0;
     var generic_codegen_rows: usize = 0;
     var case_specific_codegen_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
@@ -1319,8 +1318,6 @@ pub fn main(init: std.process.Init) !void {
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
         const construction = if (use_ir_writer) try readIrWriterConstruction(allocator, io, ir_path, case) else "-";
         defer if (use_ir_writer) allocator.free(construction);
-        const textual_boundary_reason = if (use_ir_writer) try readIrWriterTextualBoundaryReason(allocator, io, ir_path, case) else "-";
-        defer if (use_ir_writer) allocator.free(textual_boundary_reason);
         const llvm_text_parse = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_llvm_text_parse = \"", "zllvm_ir_writer_llvm_text_parse") else "-";
         defer if (use_ir_writer) allocator.free(llvm_text_parse);
         const codegen_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_codegen = \"", "zllvm_ir_writer_codegen") else "-";
@@ -1349,15 +1346,12 @@ pub fn main(init: std.process.Init) !void {
             } else if (std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset")) {
                 textual_subset_rows += 1;
                 textual_boundary_rows += 1;
-                if (textual_boundary_reason.len == 0) {
-                    textual_boundary_reason_missing_rows += 1;
-                }
             } else {
                 try common.validationError(io, "external IR writer selected row {s} reported unsupported construction ownership: {s}\n", .{ case.id, construction });
             }
         }
         const fallback = effectiveFallback(case, use_ir_writer);
-        if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface, construction, textual_boundary_reason);
+        if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface, construction);
         try linkIntegratedObject(allocator, io, target, object, exe, case);
         if (case.validation == .executable) {
             try runExecutableCase(allocator, io, exe, case, use_ir_writer);
@@ -1366,8 +1360,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} codegen_ownership={s} textual_boundary_reason={s} ownership={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, codegen_ownership, textual_boundary_reason, ownershipProof(use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} codegen_ownership={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, codegen_ownership, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1376,24 +1370,21 @@ pub fn main(init: std.process.Init) !void {
         if (minimal_wrapper_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
         }
-        if (textual_boundary_reason_missing_rows != 0) {
-            try common.validationError(io, "external IR writer textual rows must include textual_boundary_reason; textual_boundary_reason_missing_rows={}\n", .{textual_boundary_reason_missing_rows});
-        }
-        if (total >= 100 and structured_direct_rows < 100) {
-            try common.validationError(io, "external IR writer selected rows must include at least 100 structured-direct rows; structured_direct_rows={}\n", .{structured_direct_rows});
+        if (total == 136 and structured_direct_rows != 136) {
+            try common.validationError(io, "external IR writer selected rows must all be structured-direct at total=136; structured_direct_rows={}\n", .{structured_direct_rows});
         }
         if (structured_textual_rows != 0) {
             try common.validationError(io, "external IR writer structured rows must not use textual LLVM parse; structured_textual_rows={}\n", .{structured_textual_rows});
         }
-        if (total == 136 and textual_boundary_rows != 32) {
-            try common.validationError(io, "external IR writer selected rows must keep exactly 32 textual boundary rows at total=136; textual_boundary_rows={}\n", .{textual_boundary_rows});
+        if (textual_boundary_rows != 0) {
+            try common.validationError(io, "external IR writer selected rows must not keep textual boundary rows; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
-        if (structured_direct_rows >= 100 and (generic_codegen_rows != structured_direct_rows or case_specific_codegen_rows != 0)) {
+        if (total == 136 and (generic_codegen_rows != 136 or case_specific_codegen_rows != 0)) {
             try common.validationError(io, "external IR writer structured-direct rows must all use generic x86_64 codegen; structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={}\n", .{ structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows });
         }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, textual_boundary_reason_missing_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, minimal_wrapper_rows },
         );
         try stdout_writer.interface.print("ownership-summary structured-direct:{};structured-textual:{};textual-boundary:{};ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};llvm-text-parse=not-used-for-structured;{s}\n", .{ structured_direct_rows, structured_textual_rows, textual_boundary_rows, structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
         try stdout_writer.interface.print("codegen-summary generic-codegen:{};case-specific-codegen:{};textual-boundary-out-of-scope:{}\n", .{ generic_codegen_rows, case_specific_codegen_rows, textual_boundary_rows });
@@ -1625,7 +1616,7 @@ fn validationName(validation: Validation) []const u8 {
 }
 
 fn effectiveProof(use_ir_writer: bool) []const u8 {
-    if (use_ir_writer) return "integrated z_llvm IR writer direct structured rows plus explicit textual boundary rows plus local z_llvm object path plus Zig build-exe native link";
+    if (use_ir_writer) return "integrated z_llvm IR writer direct structured rows plus local z_llvm object path plus Zig build-exe native link";
     return "integrated Zig build-obj object path plus Zig build-exe native link";
 }
 
@@ -1634,19 +1625,14 @@ fn ownershipProof(use_ir_writer: bool) []const u8 {
     return "ir-construction=libLLVM;llvm-module=zig-owned;llvm-optimizer=zig-configured;llvm-targetmachine=not-used-by-z_llvm-object-hook;object-emission=z_llvm;linker=zig-native-fno-lld";
 }
 
-fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8, surface: []const u8, construction: []const u8, textual_boundary_reason: []const u8) !void {
+fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8, surface: []const u8, construction: []const u8) !void {
     if (std.mem.eql(u8, surface, "minimal-ret0")) {
         try common.validationError(io, "external IR writer selected row {s} used minimal-ret0 instead of a runtime surface\n", .{case.id});
     }
-    if (!std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder") and
-        !std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset"))
-    {
+    if (!std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder")) {
         try common.validationError(io, "external IR writer selected row {s} reported forbidden construction ownership: {s}\n", .{ case.id, construction });
     }
-    if (std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset") and textual_boundary_reason.len == 0) {
-        try common.validationError(io, "external IR writer selected textual row {s} missing textual_boundary_reason\n", .{case.id});
-    }
-    if (!std.mem.startsWith(u8, fallback, "ir-construction:z_llvm-external-textual-subset")) {
+    if (!std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder")) {
         try common.validationError(io, "external IR writer selected row {s} reported non-external IR construction fallback: {s}\n", .{ case.id, fallback });
     }
     if (std.mem.indexOf(u8, fallback, "libLLVM") != null or
@@ -1660,222 +1646,222 @@ fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8
 fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
     if (!use_ir_writer) return case.fallback;
     if (case.validation == .link_only) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:zig-panic-runtime";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_tiny_scalar_runtime_boundary")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_read")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_read")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_side_effect_free")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-void-noop-call";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-void-noop-call";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_hidden_access")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-hidden-global-access";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-hidden-global-access";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_zig")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-localexec-c-tls-input";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-localexec-c-tls-input";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_mix_c_add_may_panic")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_umul_fix_sat_i64")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-umul-fix-sat-i64";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-umul-fix-sat-i64";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_inherit_want_safety_i64")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inherit-want-safety-i64-return";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inherit-want-safety-i64-return";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_compile_asm_unreachable")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-compile-asm-unreachable-stub";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-compile-asm-unreachable-stub";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_str_from_float_help")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:str-from-float-help";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:str-from-float-help";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_base_64_full")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:base64-decode-base-64";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:base64-decode-base-64";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_store_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-store-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-store-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_byte_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-byte-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-byte-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_padding_tail_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-tail-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-tail-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_padding_loop_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-loop-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-loop-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_padding_length_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-length-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-padding-length-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_chunk_guard_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-chunk-guard-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-chunk-guard-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_source_stride_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-source-stride-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-source-stride-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_source_bundle_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-source-bundle-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-source-bundle-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_next_source_bundle_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-next-source-bundle-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-next-source-bundle-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_third_source_bundle_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-third-source-bundle-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-third-source-bundle-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_bit_buffer_store_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-bit-buffer-store-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-bit-buffer-store-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_loop_advance_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-loop-advance-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-loop-advance-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_guard_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-guard-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-guard-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_bundle_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-bundle-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-bundle-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_store_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-store-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-store-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_length_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-length-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-length-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_table_check_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-table-check-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-table-check-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_accumulator_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-accumulator-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-accumulator-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_loop_advance_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-loop-advance-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-loop-advance-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_padding_check_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-padding-check-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-padding-check-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_final_mask_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-final-mask-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-final-mask-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_residual_padding_loop_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-padding-loop-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-residual-padding-loop-step";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_exit_step")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-exit-step";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-exit-step";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_tls_bump")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_tls_bump")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls;validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:x86_64-localexec-tls;validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_pointer_load_store")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-load-store";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-load-store";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_volatile_roundtrip")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-volatile-roundtrip";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-volatile-roundtrip";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_optional_pointer")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-pointer";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-pointer";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_packed_read_flag")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-packed-read-flag";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-packed-read-flag";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_packed_replace_low")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-packed-replace-low";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-packed-replace-low";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_struct_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-struct-field-sum";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-struct-field-sum";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_array_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-array-scalar-sum";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-array-scalar-sum";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_optional_payload")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-scalar-payload";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-optional-scalar-payload";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_error_union_payload")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-error-union-payload";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-error-union-payload";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_slice_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-indexed-slice-sum";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-pointer-indexed-slice-sum";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_loop_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_fp_constants")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-fp-literal-return";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-fp-literal-return";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_comptime_const")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-comptime-const-mul";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-comptime-const-mul";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_debug_location")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-add-imm-return";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-add-imm-return";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_debug_location")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_comptime_const")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_global_update")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_pointer_load_store")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_branch_mix")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_call_chain")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_array_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_struct_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasesafe_runtime_slice_sum")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:validated-zig-panic-edge";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_atomic_add")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-monotonic-atomicrmw-add";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_inline_asm_barrier")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inline-asm-memory-barrier";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-inline-asm-memory-barrier";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_aggregate_pair")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-two-i32-aggregate-abi";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-two-i32-aggregate-abi";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_less")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-ordered-less-than";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-ordered-less-than";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_mul")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-multiply";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-multiply";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_add")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-add";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-add";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_select")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-select";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-select";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_sub")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-subtract";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-subtract";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_double_div")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-divide";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f64-divide";
     }
     if (std.mem.eql(u8, case.id, "releasefast_runtime_float_rem")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-remainder";
+        return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-f32-remainder";
     }
-    return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld";
+    return "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld";
 }
 
 fn readIrWriterSurface(
@@ -1993,29 +1979,7 @@ fn readIrWriterConstruction(
     const value = try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_construction = \"", "zllvm_ir_writer_construction");
     errdefer allocator.free(value);
     if (std.mem.eql(u8, value, "ir-construction=zllvm-structured-builder")) return value;
-    if (std.mem.eql(u8, value, "ir-construction=z_llvm-external-textual-subset")) return value;
     try common.validationError(io, "external IR writer output for {s} has unsupported construction ownership {s}\n", .{ case.id, value });
-}
-
-fn readIrWriterTextualBoundaryReason(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    ir_path: []const u8,
-    case: Case,
-) ![]const u8 {
-    const contents = std.Io.Dir.cwd().readFileAlloc(io, ir_path, allocator, .limited(1024 * 1024)) catch |err| {
-        try common.validationError(io, "missing external IR writer output for {s}: {t}\n", .{ case.id, err });
-    };
-    defer allocator.free(contents);
-    const prefix = "; zllvm_ir_writer_textual_boundary_reason = \"";
-    const start = std.mem.indexOf(u8, contents, prefix) orelse {
-        try common.validationError(io, "external IR writer output for {s} missing zllvm_ir_writer_textual_boundary_reason comment\n", .{case.id});
-    };
-    const value_start = start + prefix.len;
-    const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
-        try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_textual_boundary_reason comment\n", .{case.id});
-    };
-    return try allocator.dupe(u8, contents[value_start..value_end]);
 }
 
 fn readIrWriterHeaderValue(

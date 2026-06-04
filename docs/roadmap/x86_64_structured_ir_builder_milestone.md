@@ -1,216 +1,80 @@
 # x86_64 Structured IR Builder Milestone
 
-This milestone adds `src/structured_ir_builder.zig` and moves a measured subset
-of selected x86_64 release IR-writer rows from handwritten body strings to a
-local structured construction API. The current follow-on step builds those
-structured rows as z_llvm-owned internal IR modules directly, bypassing textual
-LLVM IR serialization/parsing for structured rows; the remaining textual rows
-are explicit boundary rows.
+This milestone adds `src/structured_ir_builder.zig` and moves the selected
+x86_64 release IR-writer rows from handwritten body strings to a local
+structured construction API. The selected rows now build z_llvm-owned internal
+IR modules directly, bypassing textual LLVM IR serialization/parsing for the
+selected replacement path.
 
 ## Measured Gate
 
 ```text
 gate=zig build distribution-zig-ir-writer
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
-structured_builder_rows=104
-structured_direct_rows=104
+structured_builder_rows=136
+structured_direct_rows=136
 structured_textual_rows=0
-textual_boundary_rows=32
-generic_codegen_rows=104
+textual_boundary_rows=0
+generic_codegen_rows=136
 case_specific_codegen_rows=0
-textual_boundary_reason_missing_rows=0
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
 ```
 
-The full selected gate fails if `structured_direct_rows < 100`, any structured
-row reports textual LLVM parsing, any textual boundary row lacks
-`textual_boundary_reason`, any structured-direct row reports case-specific
-codegen ownership, any selected row reports `minimal-ret0`, any selected row
-reports libLLVM module parse/print, or any selected row reports LLVM
-TargetMachine object emission. The generic x86_64 lowering audit is tracked in
+The full selected gate fails if any selected row is not structured-direct, any
+structured row reports textual LLVM parsing, any textual boundary row remains,
+any structured-direct row reports case-specific codegen ownership, any selected
+row reports `minimal-ret0`, any selected row reports libLLVM module
+parse/print, or any selected row reports LLVM TargetMachine object emission.
+The generic x86_64 lowering audit is tracked in
 `docs/roadmap/x86_64_codegen_genericity_audit.md`.
 
 ## Converted Rows
 
-The following selected rows now report
-`ir-construction=zllvm-structured-builder`:
+All 136 selected rows now report `ir-construction=zllvm-structured-builder`.
+This includes the original tiny scalar, integer, error-switch/select, direct
+call, global load/update, loop/phi, pointer load/store, struct/array/slice, TLS,
+atomic, inline asm, aggregate ABI, optional/error-union payload, FP
+compare/select/div/rem, ReleaseSafe checked panic-edge, ReleaseSmall mixed
+C/Zig, base64, and `strFromFloatHelp` rows.
 
-```text
-releasefast_tiny_scalar
-releasefast_source_tiny_scalar
-releasefast_integers
-releasefast_source_integers_add_wrap
-releasefast_source_integers_cmp_shift
-releasefast_error_switch
-releasefast_source_error_switch_error_switch
-releasefast_control_flow_calls
-releasefast_source_control_flow_loop_sum
-releasefast_source_control_flow_call_chain
-releasefast_globals_comptime
-releasesafe_runtime_read_global
-releasefast_runtime_cond_branch
-releasefast_source_switch_branch_mix
-releasefast_runtime_phi_merge
-releasefast_runtime_loop_sum
-releasesafe_runtime_loop_sum
-releasefast_runtime_switch
-releasefast_source_switch_dense
-releasesafe_runtime_branch_mix
-releasefast_runtime_global_update
-releasesafe_runtime_global_update
-releasesafe_source_globals_checked
-releasefast_runtime_pointer_load_store
-releasefast_source_pointers_memory
-releasesafe_runtime_pointer_load_store
-releasesafe_source_pointers_memory_checked
-releasefast_runtime_volatile_roundtrip
-releasefast_runtime_optional_pointer
-releasefast_source_optional_pointer_value
-releasefast_runtime_packed_read_flag
-releasefast_source_packed_bits_basic_read_flag
-releasefast_runtime_packed_replace_low
-releasefast_source_packed_bits_basic_replace_low
-releasefast_runtime_struct_sum
-releasefast_source_aggregates_struct_sum
-releasesafe_runtime_struct_sum
-releasesafe_source_aggregates_checked_struct
-releasefast_runtime_array_sum
-releasefast_source_aggregates_array_sum
-releasesafe_runtime_array_sum
-releasesafe_source_aggregates_checked_array
-releasefast_runtime_optional_payload
-releasefast_source_aggregates_optional_payload
-releasefast_runtime_error_union_payload
-releasefast_source_aggregates_error_union_payload
-releasefast_runtime_slice_sum
-releasefast_source_aggregates_slice_sum
-releasesafe_runtime_slice_sum
-releasesafe_source_aggregates_checked_slice
-releasefast_runtime_fp_constants
-releasefast_source_fp_constants_literals
-releasefast_runtime_comptime_const
-releasefast_source_globals_comptime_const
-releasefast_source_globals_comptime_global_counter
-releasesafe_runtime_comptime_const
-releasefast_runtime_debug_location
-releasefast_source_atomics_debug_location
-releasesafe_runtime_debug_location
-releasesafe_source_atomics_debug_location_checked
-releasefast_runtime_call_chain
-releasesafe_runtime_call_chain
-releasesafe_source_control_flow_calls_checked
-releasefast_runtime_tls_read
-releasefast_source_tls_concurrency_counter_read
-releasesafe_runtime_tls_read
-releasesafe_source_tls_concurrency_checked_read
-releasefast_runtime_tls_bump
-releasefast_source_tls_concurrency_counter_bump
-releasesafe_runtime_tls_bump
-releasesafe_source_tls_concurrency_checked_bump
-releasefast_runtime_atomic_add
-releasefast_source_atomics_atomic_add
-releasefast_runtime_aggregate_pair
-releasefast_source_aggregate_abi_pair
-releasefast_runtime_float_less
-releasefast_source_float_compare
-releasefast_runtime_float_mul
-releasefast_runtime_float_add
-releasefast_source_floats_math
-releasefast_runtime_float_select
-releasefast_runtime_float_sub
-releasefast_source_fp_extended_ops
-releasefast_runtime_double_div
-releasefast_runtime_float_rem
-releasesafe_error_switch
-releasesafe_source_error_switch_select
-releasesafe_tiny_scalar_runtime_boundary
-releasesafe_source_tiny_scalar_checked_add
-releasesafe_source_switch_branch_mix_checked
-releasesafe_runtime_side_effect_free
-releasesmall_globals_comptime
-releasesmall_runtime_hidden_access
-releasesmall_source_standalone_extern_exports_hidden_access
-releasesmall_runtime_mix_c_add_zig
-releasesmall_source_standalone_mix_c_files_add_zig
-releasesmall_runtime_umul_fix_sat_i64
-releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64
-releasesmall_runtime_inherit_want_safety_i64
-releasesmall_source_inherit_want_safety_i64_return
-releasesmall_i64_arithmetic
-releasesmall_runtime_i64_call
-releasesmall_base64_table_lookup
-releasesmall_source_base64_table_lookup
-```
+The final conversion removed the selected textual-boundary bucket by converting
+the reduced base64 slices first, then the full base64 decoder and
+`strFromFloatHelp`. The compact selected gate therefore no longer tracks
+textual-boundary reason accounting.
 
 ## Helper Families Covered
 
-`src/structured_ir_builder.zig` now models modules, functions, named blocks,
-values, types, constants, globals, TLS globals, branches, conditional branches,
-returns, phis, binary operations, casts, integer/FP compares, selects, calls,
-alloca, GEP, loads, stores, lifetime intrinsics, memcpy, memset, and checked
-signed add/mul panic-edge helpers.
+`src/structured_ir_builder.zig` models modules, functions, named blocks, values,
+types, constants, globals, TLS globals, branches, conditional branches, returns,
+phis, binary operations, casts, integer/FP compares, selects, calls, alloca,
+GEP, loads, stores, lifetime intrinsics, memcpy, memset, checked signed
+add/mul panic-edge helpers, and aggregate vector/array-style constants needed
+by the selected runtime rows.
 
-The first converted families are tiny scalar rows, integer arithmetic,
-error-switch/select rows, direct-call and call-chain rows, global load/update
-rows, loop/phi rows, pointer load/store rows, struct/array/slice rows, FP
-literal and simple FP binary rows, and ReleaseSafe checked add/global/pointer
-and branch panic-edge rows.
+The selected writer path now uses structured helpers for:
 
-## Remaining Textual Rows
-
-The 32 textual boundary rows remain valid selected evidence, and every one now
-emits a `textual_boundary_reason` so the compact gate can distinguish intended
-boundaries from accidental fallback. Current textual reasons are:
-
-```text
-releasefast_runtime_inline_asm_barrier: inline-asm-memory-barrier
-releasefast_source_atomics_inline_asm_barrier: inline-asm-memory-barrier
-releasesmall_runtime_mix_c_add_may_panic: release-small-mixed-c-zig-panic-edge
-releasesmall_source_standalone_mix_c_files_add_may_panic: release-small-mixed-c-zig-panic-edge
-releasesmall_runtime_compile_asm_unreachable: compile-asm-unreachable-boundary
-releasesmall_source_standalone_compile_asm_main_unreachable: compile-asm-unreachable-boundary
-releasesmall_runtime_str_from_float_help: full-str-from-float-formatting
-releasesmall_runtime_base64_decode_base_64_full: full-base64-decoder-cfg
-releasesmall_runtime_base64_decode_step: base64-reduced-slice
-releasesmall_runtime_base64_store_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_byte_step: base64-reduced-slice
-releasesmall_runtime_base64_padding_tail_step: base64-reduced-slice
-releasesmall_runtime_base64_padding_loop_step: base64-reduced-slice
-releasesmall_runtime_base64_padding_length_step: base64-reduced-slice
-releasesmall_runtime_base64_chunk_guard_step: base64-reduced-slice
-releasesmall_runtime_base64_source_stride_step: base64-reduced-slice
-releasesmall_runtime_base64_source_bundle_step: base64-reduced-slice
-releasesmall_runtime_base64_next_source_bundle_step: base64-reduced-slice
-releasesmall_runtime_base64_third_source_bundle_step: base64-reduced-slice
-releasesmall_runtime_base64_bit_buffer_store_step: base64-reduced-slice
-releasesmall_runtime_base64_loop_advance_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_guard_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_bundle_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_store_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_length_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_table_check_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_accumulator_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_loop_advance_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_padding_check_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_final_mask_step: base64-reduced-slice
-releasesmall_runtime_base64_residual_padding_loop_step: base64-reduced-slice
-releasesmall_runtime_base64_decode_exit_step: base64-reduced-slice
-```
-
-The remaining textual rows are concentrated in the full base64 decoder, full
-`strFromFloatHelp`, reduced base64 slices, inline/compile-asm boundaries, and
-the panic-heavy mixed C/Zig ReleaseSmall row. They are future structured-builder
-candidates only when a reusable helper removes real duplication.
+- scalar and integer arithmetic rows
+- error-switch/select rows
+- direct-call and call-chain rows
+- global load/update rows
+- loop/phi and switch rows
+- pointer load/store, volatile, slice, struct, and array rows
+- optional payload and error-union payload rows
+- TLS and simple atomic rows
+- inline/compile-asm boundary rows
+- FP literal, binary, compare, select, div, and rem rows
+- ReleaseSafe checked arithmetic and panic-edge rows
+- ReleaseSmall mixed C/Zig, hidden/global, i64 pass-through, and saturating rows
+- reduced base64 slices, full base64 decoder, and `strFromFloatHelp`
 
 ## Boundary
 
-This is not full Zig IR construction replacement. The structured builder still
-prints LLVM-compatible textual IR, covers only selected x86_64 release-mode
-IR-writer rows, and is invoked only under the explicit external writer
-environment. It does not replace Zig's normal libLLVM-backed IR construction,
-Debug/LTO/AArch64 paths, arbitrary source lowering, LLVM IR parsing for normal
-fallback builds, compiler-rt/libc replacement, or target-complete object
-coverage.
+This is not full Zig IR construction replacement. The structured builder covers
+only selected x86_64 release-mode IR-writer rows and is invoked only under the
+explicit external writer environment. It does not replace Zig's normal
+libLLVM-backed IR construction, Debug/LTO/AArch64 paths, arbitrary source
+lowering, LLVM IR parsing for normal fallback builds, compiler-rt/libc
+replacement, or target-complete object coverage.

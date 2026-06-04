@@ -8,14 +8,14 @@ Current measured gate:
 ```text
 gate=zig build distribution-zig-ir-writer
 total=136
-structured_direct_rows=104
-generic_codegen_rows=104
+structured_direct_rows=136
+generic_codegen_rows=136
 case_specific_codegen_rows=0
-textual_boundary_rows=32
+textual_boundary_rows=0
 ```
 
-The 32 textual boundary rows are out of scope for this codegen genericity
-counter. They remain explicit boundary rows with `textual_boundary_reason`.
+No selected textual boundary rows remain; every selected row is now in scope
+for the codegen genericity counter.
 
 ## Generic Structured-Direct Rows
 
@@ -57,4 +57,4 @@ points:
 There are no remaining case-specific structured-direct rows. The compact
 selected gate requires `generic_codegen_rows == structured_direct_rows` and
 `case_specific_codegen_rows == 0`; at the current 136-row size this is
-`generic_codegen_rows=104` and `case_specific_codegen_rows=0`.
+`generic_codegen_rows=136` and `case_specific_codegen_rows=0`.

@@ -23,9 +23,9 @@ Current gate:
 
 ```text
 zig build distribution-zig-ir-writer
-summary zig-integrated-object pipeline=preopt ir_writer=true total=136 executable_ok=136 link_only_ok=0 scalar_runtime_rows=136 structured_direct_rows=104 structured_textual_rows=0 textual_boundary_rows=32 generic_codegen_rows=104 case_specific_codegen_rows=0 textual_boundary_reason_missing_rows=0 minimal_wrapper_rows=0 local_fail=0
-ownership-summary structured-direct:104;structured-textual:0;textual-boundary:32;ir-construction=zllvm-structured-builder:104;ir-construction=z_llvm-external-textual-subset:32;llvm-text-parse=not-used-for-structured;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
-codegen-summary generic-codegen:104;case-specific-codegen:0;textual-boundary-out-of-scope:32
+summary zig-integrated-object pipeline=preopt ir_writer=true total=136 executable_ok=136 link_only_ok=0 scalar_runtime_rows=136 structured_direct_rows=136 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=136 case_specific_codegen_rows=0 minimal_wrapper_rows=0 local_fail=0
+ownership-summary structured-direct:136;structured-textual:0;textual-boundary:0;ir-construction=zllvm-structured-builder:136;ir-construction=z_llvm-external-textual-subset:0;llvm-text-parse=not-used-for-structured;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
+codegen-summary generic-codegen:136;case-specific-codegen:0;textual-boundary-out-of-scope:0
 ```
 
 ## Added Rows

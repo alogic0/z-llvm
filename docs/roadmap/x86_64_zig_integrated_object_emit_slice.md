@@ -589,11 +589,10 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=136 structured_direct_rows=104
-                       structured_textual_rows=0 textual_boundary_rows=32
-                       generic_codegen_rows=104
+ir-writer full set:    scalar_runtime_rows=136 structured_direct_rows=136
+                       structured_textual_rows=0 textual_boundary_rows=0
+                       generic_codegen_rows=136
                        case_specific_codegen_rows=0
-                       textual_boundary_reason_missing_rows=0
                        minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
                        error-switch-select=2 direct-call=1 global-load=3
@@ -677,7 +676,7 @@ For `ZIG_USE_ZLLVM_IR_WRITER=1` selected rows:
 
 ```text
 ir-construction=zllvm-structured-builder or
-ir-construction=z_llvm-external-textual-subset
+ir-construction=zllvm-structured-builder
 llvm-module=not-used
 llvm-optimizer=not-used
 llvm-targetmachine=not-used
@@ -688,9 +687,9 @@ linker=zig-native-fno-lld
 `zig build distribution-zig-ir-writer` now reports that ownership proof for
 each selected row and fails if a selected row falls back to libLLVM module
 parse/print, LLVM TargetMachine object emission, or a `minimal-ret0` surface.
-The full selected gate also fails if fewer than 100 rows are constructed through
-`src/structured_ir_builder.zig` or any textual row lacks a
-`textual_boundary_reason`.
+The full selected gate also fails if any row is not constructed through
+`src/structured_ir_builder.zig`, any textual row remains, or any structured row
+uses case-specific codegen.
 The normal Zig/libLLVM fallback remains available when the selected writer env
 vars are unset.
 
@@ -729,12 +728,11 @@ selected.
 
 For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the selected
-LLVM IR module for textual boundary rows or a z_llvm-owned internal IR module
-for structured rows, then `z_llvm` emits the relocatable object, and Zig's
-native linker links the executable. The external writer now emits 136/136
-selected rows as runtime surfaces with 104 rows constructed directly through
-`src/structured_ir_builder.zig` and 32 rows remaining as explicit textual
-boundaries. All 104 structured-direct rows now report generic x86_64 codegen
+LLVM IR module as a z_llvm-owned internal IR module, then `z_llvm` emits the
+relocatable object, and Zig's native linker links the executable. The external
+writer now emits 136/136 selected rows as runtime surfaces with all 136 rows
+constructed directly through `src/structured_ir_builder.zig` and no textual
+boundary rows. All 136 structured-direct rows now report generic x86_64 codegen
 ownership:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
@@ -794,15 +792,11 @@ codegen_ownership=codegen=generic-x86_64-lowering
 ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
 ```
 
-Textual-subset rows print
-`construction=ir-construction=z_llvm-external-textual-subset` with the same
-downstream ownership marker.
-
 LLVM's module optimization pipeline, LLVM TargetMachine codegen, and libLLVM
-bitcode parse/print of the selected structured rows are bypassed. The
+bitcode parse/print of the selected rows are bypassed. The
 structured-direct milestone removes handwritten body ownership and textual
-parse/print ownership for 104 selected rows. The generic-codegen milestone adds
-measured generic x86_64 lowering ownership for those structured rows but does
+parse/print ownership for all 136 selected rows. The generic-codegen milestone adds
+measured generic x86_64 lowering ownership for those rows but does
 not claim full Zig IR construction or full backend replacement.
 
 The case registry is now backed by reusable writer helpers in

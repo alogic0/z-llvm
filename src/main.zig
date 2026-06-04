@@ -199,7 +199,6 @@ fn writeIrWriterModuleFromEnv(
     const ir_writer_case = findIrWriterCase(case_id);
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
-    const textual_boundary_reason = if (ir_writer_case) |case| case.textual_boundary_reason else "minimal-ret0-fallback";
     const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
 
     var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
@@ -219,7 +218,6 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_mode = "{s}"
         \\; zllvm_ir_writer_surface = "{s}"
         \\; zllvm_ir_writer_construction = "{s}"
-        \\; zllvm_ir_writer_textual_boundary_reason = "{s}"
         \\; zllvm_ir_writer_llvm_text_parse = "{s}"
         \\; zllvm_ir_writer_direct_module = "{s}"
         \\; zllvm_ir_writer_codegen = "{s}"
@@ -230,7 +228,6 @@ fn writeIrWriterModuleFromEnv(
         mode,
         surface,
         construction,
-        textual_boundary_reason,
         if (is_structured_direct) "not-used" else "required-for-textual-boundary",
         if (is_structured_direct) "z_llvm-owned-internal-ir" else "not-used",
         codegen_ownership,
@@ -397,7 +394,6 @@ const IrWriterCase = struct {
     surface: []const u8,
     write: IrWriterBodyFn,
     construction: IrConstruction = .textual_subset,
-    textual_boundary_reason: []const u8 = "",
 };
 
 const ir_writer_cases = [_]IrWriterCase{
