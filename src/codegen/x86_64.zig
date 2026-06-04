@@ -3821,12 +3821,7 @@ fn lowerRuntimeFloatAddMainReturn(
     if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(.float)) return false;
     if (!isNamed(fcmp.lhs, fadd_name) or !isFpText(fcmp.rhs, "3.000000e+00")) return false;
 
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, fcmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    if (!isSelectI1ToI32ZeroOne(select_inst, fcmp_name)) return false;
 
     const fail = "float_add_fail";
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = 0x3f80_0000 });
@@ -5016,12 +5011,7 @@ fn lowerRuntimeStructSumMainReturn(
     if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, 42)) return false;
 
-    const select = switch (select_inst.kind) {
-        .select => |select| select,
-        else => return false,
-    };
-    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
+    if (!isSelectI1ToI32ZeroOne(select_inst, icmp_name)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
@@ -14236,6 +14226,19 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
         .named => |value_name| std.mem.eql(u8, value_name, name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn isSelectI1ToI32ZeroOne(instruction: ir.Instruction, cond_name: []const u8) bool {
+    if (instruction.removed) return false;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    return select.cond_ty.eql(.{ .int = 1 }) and
+        select.ty.eql(.{ .int = 32 }) and
+        isNamed(select.cond, cond_name) and
+        isInt(select.true_value, 0) and
+        isInt(select.false_value, 1);
 }
 
 fn valueReferencesGlobal(value: ir.Value, name: []const u8) bool {

@@ -8,6 +8,26 @@ pub fn functionEnd(writer: *std.Io.Writer) !void {
     try writer.writeAll("}\n\n");
 }
 
+pub fn alias(writer: *std.Io.Writer, public_name: []const u8, ty: []const u8, target: []const u8) !void {
+    try writer.print("@{s} = alias {s}, ptr @{s}\n", .{ public_name, ty, target });
+}
+
+pub fn global(writer: *std.Io.Writer, name: []const u8, linkage: []const u8, ty: []const u8, initializer: []const u8, align_text: []const u8) !void {
+    try writer.print("@{s} = {s} global {s} {s}, align {s}\n", .{ name, linkage, ty, initializer, align_text });
+}
+
+pub fn constant(writer: *std.Io.Writer, name: []const u8, linkage: []const u8, ty: []const u8, initializer: []const u8, align_text: []const u8) !void {
+    try writer.print("@{s} = {s} constant {s} {s}, align {s}\n", .{ name, linkage, ty, initializer, align_text });
+}
+
+pub fn tlsGlobal(writer: *std.Io.Writer, name: []const u8, linkage: []const u8, model: []const u8, ty: []const u8, initializer: []const u8, align_text: []const u8) !void {
+    if (linkage.len == 0) {
+        try writer.print("@{s} = thread_local({s}) global {s} {s}, align {s}\n", .{ name, model, ty, initializer, align_text });
+    } else {
+        try writer.print("@{s} = {s} thread_local({s}) global {s} {s}, align {s}\n", .{ name, linkage, model, ty, initializer, align_text });
+    }
+}
+
 pub fn block(writer: *std.Io.Writer, name: []const u8) !void {
     try writer.print("{s}:\n", .{name});
 }
@@ -82,6 +102,10 @@ pub fn store(writer: *std.Io.Writer, ty: []const u8, value: []const u8, ptr_name
     try writer.print("  store {s} {s}, ptr {s}, align {s}\n", .{ ty, value, ptr_name, align_text });
 }
 
+pub fn alloca(writer: *std.Io.Writer, result: []const u8, ty: []const u8, align_text: []const u8) !void {
+    try writer.print("  %{s} = alloca {s}, align {s}\n", .{ result, ty, align_text });
+}
+
 pub fn pointerIndexAdvance(writer: *std.Io.Writer, result: []const u8, base: []const u8, delta: []const u8) !void {
     try writer.print("  %{s} = add nuw i64 {s}, {s}\n", .{ result, base, delta });
 }
@@ -134,6 +158,10 @@ pub fn call(writer: *std.Io.Writer, result: ?[]const u8, attrs: []const u8, ret_
     }
 }
 
+pub fn inlineAsmBarrier(writer: *std.Io.Writer) !void {
+    try writer.writeAll("  tail call void asm sideeffect \"\", \"~{memory},~{dirflag},~{fpsr},~{flags}\"()\n");
+}
+
 pub fn lifetimeStart(writer: *std.Io.Writer, ptr_name: []const u8) !void {
     try writer.print("  call void @llvm.lifetime.start.p0(ptr {s})\n", .{ptr_name});
 }
@@ -159,6 +187,65 @@ pub fn checkedSAddI32(writer: *std.Io.Writer, result: []const u8, lhs: []const u
     , .{ result, lhs, rhs, result, result, result, result });
 }
 
+pub fn checkedSAddI32Value(writer: *std.Io.Writer, result: []const u8, lhs: []const u8, rhs: []const u8, overflow: []const u8, value: []const u8) !void {
+    try writer.print(
+        \\  %{s} = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 {s}, i32 {s})
+        \\  %{s} = extractvalue {{ i32, i1 }} %{s}, 1
+        \\  %{s} = extractvalue {{ i32, i1 }} %{s}, 0
+        \\
+    , .{ result, lhs, rhs, overflow, result, value, result });
+}
+
+pub fn checkedSMulI32Value(writer: *std.Io.Writer, result: []const u8, lhs: []const u8, rhs: []const u8, overflow: []const u8, value: []const u8) !void {
+    try writer.print(
+        \\  %{s} = tail call {{ i32, i1 }} @llvm.smul.with.overflow.i32(i32 {s}, i32 {s})
+        \\  %{s} = extractvalue {{ i32, i1 }} %{s}, 1
+        \\  %{s} = extractvalue {{ i32, i1 }} %{s}, 0
+        \\
+    , .{ result, lhs, rhs, overflow, result, value, result });
+}
+
 pub fn panicEdge(writer: *std.Io.Writer, overflow_flag: []const u8, ok_block: []const u8, panic_block: []const u8) !void {
     try condBr(writer, overflow_flag, panic_block, ok_block);
+}
+
+pub fn integerOverflowDeclarations(writer: *std.Io.Writer) !void {
+    try writer.writeAll(
+        \\declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32)
+        \\declare void @llvm.assume(i1)
+        \\
+    );
+}
+
+pub fn integerOverflowPanicFunction(writer: *std.Io.Writer) !void {
+    try writer.writeAll(
+        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    );
+}
+
+pub fn integerOverflowPanicBlock(writer: *std.Io.Writer, block_name: []const u8) !void {
+    try block(writer, block_name);
+    try writer.writeAll(
+        \\  call void @llvm.assume(i1 1) [ "cold"() ]
+        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
+        \\  unreachable
+        \\
+    );
+}
+
+pub fn compareMainI32(writer: *std.Io.Writer, value_expr: []const u8, expected: []const u8) !void {
+    try functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try block(writer, "entry");
+    try writer.print(
+        \\  %value = {s}
+        \\  %ok = icmp eq i32 %value, {s}
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\
+    , .{ value_expr, expected });
+    try ret(writer, "i32", "%ret");
+    try functionEnd(writer);
 }

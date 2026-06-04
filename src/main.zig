@@ -508,34 +508,33 @@ fn writeReleaseSmallRuntimeHiddenAccessIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@exports.hidden = private unnamed_addr global i32 0, align 4
-        \\
-        \\@getHidden = alias i32 (), ptr @exports.getHidden
-        \\@updateHidden = alias void (i32), ptr @exports.updateHidden
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  call void @exports.updateHidden(i32 7)
-        \\  %value = call i32 @exports.getHidden()
-        \\  ret i32 %value
-        \\}}
-        \\
-        \\define private i32 @exports.getHidden() unnamed_addr align 1 {{
-        \\entry:
-        \\  %value = load i32, ptr @exports.hidden, align 4
-        \\  ret i32 %value
-        \\}}
-        \\
-        \\define private void @exports.updateHidden(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  store i32 %value, ptr @exports.hidden, align 4
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSmallHiddenAccessModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime hidden-access external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSmallHiddenAccessModule(writer: *std.Io.Writer) !void {
+    try irw.global(writer, "exports.hidden", "private unnamed_addr", "i32", "0", "4");
+    try writer.writeAll("\n");
+    try irw.alias(writer, "getHidden", "i32 ()", "exports.getHidden");
+    try irw.alias(writer, "updateHidden", "void (i32)", "exports.updateHidden");
+    try writer.writeAll("\n");
+    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.call(writer, null, "", "void", "@exports.updateHidden", "i32 7");
+    try irw.call(writer, "value", "", "i32", "@exports.getHidden", "");
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
+    try irw.functionHeader(writer, "private ", "i32", "exports.getHidden", "", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "value", "i32", "@exports.hidden", "4");
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
+    try irw.functionHeader(writer, "private ", "void", "exports.updateHidden", "i32 %value", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.store(writer, "i32", "%value", "@exports.hidden", "4");
+    try irw.retVoid(writer);
+    try irw.functionEnd(writer);
 }
 
 fn writeReleaseSmallRuntimeMixCAddZigIrWriterBody(
@@ -543,31 +542,31 @@ fn writeReleaseSmallRuntimeMixCAddZigIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@C_k = thread_local(localexec) global i32 2, align 4
-        \\@main.zig_k = private unnamed_addr global i32 1, align 4
-        \\
-        \\@add_zig = alias i32 (i32), ptr @main.add_zig
-        \\@zig_k = alias i32, ptr @main.zig_k
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @main.add_zig(i32 4)
-        \\  ret i32 %value
-        \\}}
-        \\
-        \\define private i32 @main.add_zig(i32 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %zig = load i32, ptr @main.zig_k, align 4
-        \\  %with_arg = add nsw i32 %zig, %0
-        \\  %c = load i32, ptr @C_k, align 4
-        \\  %sum = add nsw i32 %with_arg, %c
-        \\  ret i32 %sum
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSmallMixCAddZigModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime mixed C/Zig add external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSmallMixCAddZigModule(writer: *std.Io.Writer) !void {
+    try irw.tlsGlobal(writer, "C_k", "", "localexec", "i32", "2", "4");
+    try irw.global(writer, "main.zig_k", "private unnamed_addr", "i32", "1", "4");
+    try writer.writeAll("\n");
+    try irw.alias(writer, "add_zig", "i32 (i32)", "main.add_zig");
+    try irw.alias(writer, "zig_k", "i32", "main.zig_k");
+    try writer.writeAll("\n");
+    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.call(writer, "value", "", "i32", "@main.add_zig", "i32 4");
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
+    try irw.functionHeader(writer, "private ", "i32", "main.add_zig", "i32 %0", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "zig", "i32", "@main.zig_k", "4");
+    try writer.writeAll("  %with_arg = add nsw i32 %zig, %0\n");
+    try irw.load(writer, "c", "i32", "@C_k", "4");
+    try writer.writeAll("  %sum = add nsw i32 %with_arg, %c\n");
+    try irw.ret(writer, "i32", "%sum");
+    try irw.functionEnd(writer);
 }
 
 fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
@@ -575,45 +574,50 @@ fn writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main.zig_k = private unnamed_addr global i32 1, align 4
-        \\@__anon_14658 = private unnamed_addr constant [13 x i8] c"negative int\00", align 1
-        \\
-        \\@add_may_panic = alias i32 (i32), ptr @main.add_may_panic
-        \\@zig_k = alias i32, ptr @main.zig_k
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %value = call i32 @main.add_may_panic(i32 4)
-        \\  ret i32 %value
-        \\}}
-        \\
-        \\define private i32 @main.add_may_panic(i32 %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %negative = icmp slt i32 %0, 0
-        \\  br i1 %negative, label %panic, label %ok
-        \\
-        \\panic:
+    writeReleaseSmallMixCAddMayPanicModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime mixed C/Zig panic add external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallMixCAddMayPanicModule(writer: *std.Io.Writer) !void {
+    try irw.global(writer, "main.zig_k", "private unnamed_addr", "i32", "1", "4");
+    try irw.constant(writer, "__anon_14658", "private unnamed_addr", "[13 x i8]", "c\"negative int\\00\"", "1");
+    try writer.writeAll("\n");
+    try irw.alias(writer, "add_may_panic", "i32 (i32)", "main.add_may_panic");
+    try irw.alias(writer, "zig_k", "i32", "main.zig_k");
+    try writer.writeAll("\n");
+    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.call(writer, "value", "", "i32", "@main.add_may_panic", "i32 4");
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
+    try irw.functionHeader(writer, "private ", "i32", "main.add_may_panic", "i32 %0", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try writer.writeAll("  %negative = icmp slt i32 %0, 0\n");
+    try irw.condBr(writer, "negative", "panic", "ok");
+    try writer.writeAll("\n");
+    try irw.block(writer, "panic");
+    try writer.writeAll(
         \\  call void @llvm.assume(i1 1) [ "cold"() ]
         \\  tail call fastcc void @debug.defaultPanic(ptr nonnull readonly align 1 @__anon_14658, i64 12)
         \\  unreachable
         \\
-        \\ok:
-        \\  %base = load i32, ptr @main.zig_k, align 4
-        \\  %sum = add nsw i32 %base, %0
-        \\  ret i32 %sum
-        \\}}
-        \\
+    );
+    try writer.writeAll("\n");
+    try irw.block(writer, "ok");
+    try irw.load(writer, "base", "i32", "@main.zig_k", "4");
+    try writer.writeAll("  %sum = add nsw i32 %base, %0\n");
+    try irw.ret(writer, "i32", "%sum");
+    try irw.functionEnd(writer);
+    try writer.writeAll(
         \\declare void @llvm.assume(i1 noundef)
         \\
-        \\define fastcc void @debug.defaultPanic(ptr nonnull readonly align 1 %msg, i64 %len) {{
+        \\define fastcc void @debug.defaultPanic(ptr nonnull readonly align 1 %msg, i64 %len) {
         \\entry:
         \\  ret void
-        \\}}
+        \\}
         \\
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime mixed C/Zig panic add external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
+    );
 }
 
 fn writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(
@@ -685,15 +689,23 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\%Io.Writer.VTable = type {{ ptr, ptr, ptr, ptr }}
-        \\%Io.Writer = type {{ ptr, {{ ptr, i64 }}, i64 }}
+    writeStrFromFloatHelpModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime strFromFloatHelp external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeStrFromFloatHelpModule(writer: *std.Io.Writer) !void {
+    try writer.writeAll(
+        \\%Io.Writer.VTable = type { ptr, ptr, ptr, ptr }
+        \\%Io.Writer = type { ptr, { ptr, i64 }, i64 }
         \\
-        \\@__anon_597 = private unnamed_addr constant %Io.Writer.VTable {{ ptr null, ptr null, ptr null, ptr null }}, align 8
-        \\@fmt.float.FLOAT64_POW5_INV_SPLIT2 = private unnamed_addr constant [2 x [2 x i64]] [[2 x i64] [i64 1, i64 2305843009213693952], [2 x i64] [i64 5955668970331000884, i64 1784059615882449851]], align 8
-        \\@fmt.float.FLOAT64_POW5_SPLIT2 = private unnamed_addr constant [2 x [2 x i64]] [[2 x i64] [i64 0, i64 1152921504606846976], [2 x i64] [i64 0, i64 1490116119384765625]], align 8
-        \\@str.float.copy = private unnamed_addr constant [6 x i8] c"12345\00", align 1
-        \\@strFromFloatHelp = alias void (double), ptr @main.strFromFloatHelp
+    );
+    try irw.constant(writer, "__anon_597", "private unnamed_addr", "%Io.Writer.VTable", "{ ptr null, ptr null, ptr null, ptr null }", "8");
+    try irw.constant(writer, "fmt.float.FLOAT64_POW5_INV_SPLIT2", "private unnamed_addr", "[2 x [2 x i64]]", "[[2 x i64] [i64 1, i64 2305843009213693952], [2 x i64] [i64 5955668970331000884, i64 1784059615882449851]]", "8");
+    try irw.constant(writer, "fmt.float.FLOAT64_POW5_SPLIT2", "private unnamed_addr", "[2 x [2 x i64]]", "[[2 x i64] [i64 0, i64 1152921504606846976], [2 x i64] [i64 0, i64 1490116119384765625]]", "8");
+    try irw.constant(writer, "str.float.copy", "private unnamed_addr", "[6 x i8]", "c\"12345\\00\"", "1");
+    try irw.alias(writer, "strFromFloatHelp", "void (double)", "main.strFromFloatHelp");
+    try writer.writeAll(
         \\
         \\declare void @llvm.lifetime.start.p0(ptr)
         \\declare void @llvm.lifetime.end.p0(ptr)
@@ -705,39 +717,50 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\declare fastcc i32 @fmt.float.decimalLength__anon_1195(i64)
         \\declare fastcc void @fmt.float.writeDecimal__anon_1212(ptr, ptr, i64)
         \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  call void @main.strFromFloatHelp(double 1.250000e+00)
-        \\  call void @main.strFromFloatHelp(double 0.000000e+00)
-        \\  ret i32 0
-        \\}}
-        \\
-        \\define private void @main.strFromFloatHelp(double %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %writer = alloca %Io.Writer, align 8
-        \\  %buffer = alloca [400 x i8], align 1
-        \\  %tag = alloca i8, align 8
-        \\  %pow_inv = alloca <2 x i64>, align 16
-        \\  %pow = alloca <2 x i64>, align 16
-        \\  %decimal = alloca i64, align 8
-        \\  %scratch = alloca [32 x i8], align 1
-        \\  %send_result = alloca {{ i64, i16, [6 x i8] }}, align 8
-        \\  call void @llvm.lifetime.start.p0(ptr %writer)
-        \\  call void @llvm.lifetime.start.p0(ptr %buffer)
-        \\  call void @llvm.lifetime.start.p0(ptr %pow_inv)
-        \\  call void @llvm.lifetime.start.p0(ptr %pow)
-        \\  call void @llvm.lifetime.start.p0(ptr %decimal)
-        \\  call void @llvm.lifetime.start.p0(ptr %scratch)
-        \\  store ptr @__anon_597, ptr %writer, align 8
-        \\  %writer_data = getelementptr i8, ptr %writer, i64 8
-        \\  store ptr %buffer, ptr %writer_data, align 8
-        \\  %writer_len = getelementptr i8, ptr %writer, i64 16
-        \\  store i64 400, ptr %writer_len, align 8
-        \\  %writer_pos = getelementptr i8, ptr %writer, i64 24
-        \\  store i64 0, ptr %writer_pos, align 8
+    );
+    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.call(writer, null, "", "void", "@main.strFromFloatHelp", "double 1.250000e+00");
+    try irw.call(writer, null, "", "void", "@main.strFromFloatHelp", "double 0.000000e+00");
+    try irw.ret(writer, "i32", "0");
+    try irw.functionEnd(writer);
+    try irw.functionHeader(writer, "private ", "void", "main.strFromFloatHelp", "double %0", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try writeStrFromFloatStackSetup(writer);
+    try writeStrFromFloatClassification(writer);
+    try writeStrFromFloatControlFlow(writer);
+    try irw.functionEnd(writer);
+}
+
+fn writeStrFromFloatStackSetup(writer: *std.Io.Writer) !void {
+    try irw.alloca(writer, "writer", "%Io.Writer", "8");
+    try irw.alloca(writer, "buffer", "[400 x i8]", "1");
+    try irw.alloca(writer, "tag", "i8", "8");
+    try irw.alloca(writer, "pow_inv", "<2 x i64>", "16");
+    try irw.alloca(writer, "pow", "<2 x i64>", "16");
+    try irw.alloca(writer, "decimal", "i64", "8");
+    try irw.alloca(writer, "scratch", "[32 x i8]", "1");
+    try irw.alloca(writer, "send_result", "{ i64, i16, [6 x i8] }", "8");
+    for ([_][]const u8{ "%writer", "%buffer", "%pow_inv", "%pow", "%decimal", "%scratch" }) |slot| {
+        try irw.lifetimeStart(writer, slot);
+    }
+    try irw.store(writer, "ptr", "@__anon_597", "%writer", "8");
+    try irw.gep(writer, "writer_data", "i8", "%writer", "8");
+    try irw.store(writer, "ptr", "%buffer", "%writer_data", "8");
+    try irw.gep(writer, "writer_len", "i8", "%writer", "16");
+    try irw.store(writer, "i64", "400", "%writer_len", "8");
+    try irw.gep(writer, "writer_pos", "i8", "%writer", "24");
+    try irw.store(writer, "i64", "0", "%writer_pos", "8");
+}
+
+fn writeStrFromFloatClassification(writer: *std.Io.Writer) !void {
+    try writer.writeAll(
         \\  %bits = bitcast double %0 to i64
-        \\  call void @llvm.lifetime.start.p0(ptr %tag)
-        \\  store i8 0, ptr %tag, align 8
+        \\
+    );
+    try irw.lifetimeStart(writer, "%tag");
+    try irw.store(writer, "i8", "0", "%tag", "8");
+    try writer.writeAll(
         \\  %mantissa = and i64 %bits, 4503599627370495
         \\  %expbits = lshr i64 %bits, 52
         \\  %exp = trunc i64 %expbits to i32
@@ -745,20 +768,33 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\  %zero_exp = icmp eq i32 %masked, 0
         \\  %zero_mantissa = icmp eq i64 %mantissa, 0
         \\  %is_zero = and i1 %zero_mantissa, %zero_exp
-        \\  br i1 %is_zero, label %done, label %check_special
         \\
-        \\check_special:
-        \\  %special = icmp eq i32 %masked, 2047
-        \\  br i1 %special, label %special_block, label %pow5_inv
-        \\
-        \\special_block:
-        \\  call void @llvm.memset.p0.i64(ptr %scratch, i8 0, i64 32, i1 0)
-        \\  br label %writer_dispatch
-        \\
-        \\pow5_inv:
-        \\  %pow_inv_ptr = getelementptr [2 x [2 x i64]], ptr @fmt.float.FLOAT64_POW5_INV_SPLIT2, i64 0
-        \\  %pow_inv_load = load <2 x i64>, ptr %pow_inv_ptr, align 8
-        \\  store <2 x i64> %pow_inv_load, ptr %pow_inv, align 16
+    );
+    try irw.condBr(writer, "is_zero", "done", "check_special");
+    try writer.writeAll("\n");
+}
+
+fn writeStrFromFloatControlFlow(writer: *std.Io.Writer) !void {
+    try irw.block(writer, "check_special");
+    try writer.writeAll("  %special = icmp eq i32 %masked, 2047\n");
+    try irw.condBr(writer, "special", "special_block", "pow5_inv");
+    try writer.writeAll("\n");
+    try irw.block(writer, "special_block");
+    try irw.memset(writer, "%scratch", "0", "32", "0");
+    try irw.br(writer, "writer_dispatch");
+    try writer.writeAll("\n");
+    try writeStrFromFloatPowBlocks(writer);
+    try writeStrFromFloatDecimalLoop(writer);
+    try writeStrFromFloatWriterDispatch(writer);
+    try writeStrFromFloatDoneBlock(writer);
+}
+
+fn writeStrFromFloatPowBlocks(writer: *std.Io.Writer) !void {
+    try irw.block(writer, "pow5_inv");
+    try irw.gep(writer, "pow_inv_ptr", "[2 x [2 x i64]]", "@fmt.float.FLOAT64_POW5_INV_SPLIT2", "0");
+    try irw.load(writer, "pow_inv_load", "<2 x i64>", "%pow_inv_ptr", "8");
+    try irw.store(writer, "<2 x i64>", "%pow_inv_load", "%pow_inv", "16");
+    try writer.writeAll(
         \\  %wide_a = zext i64 %mantissa to i128
         \\  %wide_b = zext i64 5 to i128
         \\  %wide_mul = mul i128 %wide_a, %wide_b
@@ -768,59 +804,71 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\  call void @llvm.assume(i1 %assume_ok)
         \\  %shifted = call fastcc i64 @fmt.float.mulShift64(i64 %wide_trunc, ptr %pow_inv, i32 8)
         \\  %multiple = call fastcc i1 @fmt.float.multipleOfPowerOf5__anon_1356(i64 %shifted, i32 1)
-        \\  br i1 %multiple, label %pow5, label %decimal_loop
         \\
-        \\pow5:
-        \\  %pow_ptr = getelementptr [2 x [2 x i64]], ptr @fmt.float.FLOAT64_POW5_SPLIT2, i64 0
-        \\  %pow_load = load <2 x i64>, ptr %pow_ptr, align 8
-        \\  store <2 x i64> %pow_load, ptr %pow, align 16
-        \\  %shifted_pow = call fastcc i64 @fmt.float.mulShift64(i64 %shifted, ptr %pow, i32 4)
-        \\  br label %decimal_loop
-        \\
-        \\decimal_loop:
+    );
+    try irw.condBr(writer, "multiple", "pow5", "decimal_loop");
+    try writer.writeAll("\n");
+    try irw.block(writer, "pow5");
+    try irw.gep(writer, "pow_ptr", "[2 x [2 x i64]]", "@fmt.float.FLOAT64_POW5_SPLIT2", "0");
+    try irw.load(writer, "pow_load", "<2 x i64>", "%pow_ptr", "8");
+    try irw.store(writer, "<2 x i64>", "%pow_load", "%pow", "16");
+    try irw.call(writer, "shifted_pow", "", "fastcc i64", "@fmt.float.mulShift64", "i64 %shifted, ptr %pow, i32 4");
+    try irw.br(writer, "decimal_loop");
+    try writer.writeAll("\n");
+}
+
+fn writeStrFromFloatDecimalLoop(writer: *std.Io.Writer) !void {
+    try irw.block(writer, "decimal_loop");
+    try writer.writeAll(
         \\  %index = phi i64 [ 0, %pow5_inv ], [ 0, %pow5 ], [ %next_index, %decimal_latch ]
         \\  %value = phi i64 [ %shifted, %pow5_inv ], [ %shifted_pow, %pow5 ], [ %next_value, %decimal_latch ]
         \\  %done_loop = icmp uge i64 %index, 3
-        \\  br i1 %done_loop, label %decimal_write, label %decimal_latch
         \\
-        \\decimal_latch:
+    );
+    try irw.condBr(writer, "done_loop", "decimal_write", "decimal_latch");
+    try writer.writeAll("\n");
+    try irw.block(writer, "decimal_latch");
+    try writer.writeAll(
         \\  %digit = urem i64 %value, 10
         \\  %digit8 = trunc i64 %digit to i8
         \\  %ascii = or i8 %digit8, 48
-        \\  %digit_ptr = getelementptr [32 x i8], ptr %scratch, i64 %index
-        \\  store i8 %ascii, ptr %digit_ptr, align 1
+        \\
+    );
+    try irw.gep(writer, "digit_ptr", "[32 x i8]", "%scratch", "%index");
+    try irw.store(writer, "i8", "%ascii", "%digit_ptr", "1");
+    try writer.writeAll(
         \\  %next_value = udiv i64 %value, 10
         \\  %next_index = add i64 %index, 1
-        \\  br label %decimal_loop
         \\
-        \\decimal_write:
-        \\  store i64 %value, ptr %decimal, align 8
-        \\  %digits = call fastcc i32 @fmt.float.decimalLength__anon_1195(i64 %value)
-        \\  %digits64 = zext i32 %digits to i64
-        \\  call fastcc void @fmt.float.writeDecimal__anon_1212(ptr %scratch, ptr %decimal, i64 %digits64)
-        \\  call void @llvm.memcpy.p0.p0.i64(ptr %buffer, ptr @str.float.copy, i64 5, i1 0)
-        \\  br label %writer_dispatch
-        \\
-        \\writer_dispatch:
-        \\  %vtable = load ptr, ptr %writer, align 8
-        \\  %send_slot = getelementptr i8, ptr %vtable, i64 0
-        \\  %send = load ptr, ptr %send_slot, align 8
-        \\  call fastcc void %send(ptr %send_result, ptr %writer, ptr %buffer, i64 1, i64 1)
-        \\  br label %done
-        \\
-        \\done:
-        \\  call void @llvm.lifetime.end.p0(ptr %scratch)
-        \\  call void @llvm.lifetime.end.p0(ptr %decimal)
-        \\  call void @llvm.lifetime.end.p0(ptr %pow)
-        \\  call void @llvm.lifetime.end.p0(ptr %pow_inv)
-        \\  call void @llvm.lifetime.end.p0(ptr %buffer)
-        \\  call void @llvm.lifetime.end.p0(ptr %writer)
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime strFromFloatHelp external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
+    );
+    try irw.br(writer, "decimal_loop");
+    try writer.writeAll("\n");
+    try irw.block(writer, "decimal_write");
+    try irw.store(writer, "i64", "%value", "%decimal", "8");
+    try irw.call(writer, "digits", "", "fastcc i32", "@fmt.float.decimalLength__anon_1195", "i64 %value");
+    try writer.writeAll("  %digits64 = zext i32 %digits to i64\n");
+    try irw.call(writer, null, "", "fastcc void", "@fmt.float.writeDecimal__anon_1212", "ptr %scratch, ptr %decimal, i64 %digits64");
+    try irw.memcpy(writer, "%buffer", "@str.float.copy", "5", "0");
+    try irw.br(writer, "writer_dispatch");
+    try writer.writeAll("\n");
+}
+
+fn writeStrFromFloatWriterDispatch(writer: *std.Io.Writer) !void {
+    try irw.block(writer, "writer_dispatch");
+    try irw.load(writer, "vtable", "ptr", "%writer", "8");
+    try irw.gep(writer, "send_slot", "i8", "%vtable", "0");
+    try irw.load(writer, "send", "ptr", "%send_slot", "8");
+    try irw.call(writer, null, "", "fastcc void", "%send", "ptr %send_result, ptr %writer, ptr %buffer, i64 1, i64 1");
+    try irw.br(writer, "done");
+    try writer.writeAll("\n");
+}
+
+fn writeStrFromFloatDoneBlock(writer: *std.Io.Writer) !void {
+    try irw.block(writer, "done");
+    for ([_][]const u8{ "%scratch", "%decimal", "%pow", "%pow_inv", "%buffer", "%writer" }) |slot| {
+        try irw.lifetimeEnd(writer, slot);
+    }
+    try irw.retVoid(writer);
 }
 
 fn writeBase64SourceByte(
@@ -2140,39 +2188,29 @@ fn writeReleaseSafeRuntimeGlobalUpdateIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@globals_comptime.global_counter = private global i32 3, align 4
-        \\@main = alias i32 (i32), ptr @globals_comptime.update_global
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define private i32 @globals_comptime.update_global(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  %current = load i32, ptr @globals_comptime.global_counter, align 4
-        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
-        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
-        \\  br i1 %overflow, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %updated = extractvalue {{ i32, i1 }} %checked, 0
-        \\  store i32 %updated, ptr @globals_comptime.global_counter, align 4
-        \\  ret i32 %updated
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeReleaseSafeGlobalUpdateModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime global update external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeReleaseSafeGlobalUpdateModule(writer: *std.Io.Writer) !void {
+    try irw.global(writer, "globals_comptime.global_counter", "private", "i32", "3", "4");
+    try irw.alias(writer, "main", "i32 (i32)", "globals_comptime.update_global");
+    try writer.writeAll("\n");
+    try irw.integerOverflowDeclarations(writer);
+    try irw.functionHeader(writer, "private ", "i32", "globals_comptime.update_global", "i32 %value", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "current", "i32", "@globals_comptime.global_counter", "4");
+    try irw.checkedSAddI32Value(writer, "checked", "%current", "%value", "overflow", "updated");
+    try irw.panicEdge(writer, "overflow", "ok", "panic");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "panic");
+    try writer.writeAll("\n");
+    try irw.block(writer, "ok");
+    try irw.store(writer, "i32", "%updated", "@globals_comptime.global_counter", "4");
+    try irw.ret(writer, "i32", "%updated");
+    try irw.functionEnd(writer);
+    try irw.integerOverflowPanicFunction(writer);
 }
 
 fn writeRuntimePointerLoadStoreIrWriterBody(
@@ -2233,32 +2271,22 @@ fn writeReleaseSafeRuntimePointerLoadStoreIrWriterBody(
         \\  ret i32 %ret
         \\}}
         \\
-        \\define private i32 @pointers_memory.load_store(ptr %0, ptr %1) unnamed_addr align 1 {{
-        \\entry:
-        \\  %3 = load i32, ptr %0, align 4
-        \\  %4 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %3, i32 1)
-        \\  %5 = extractvalue {{ i32, i1 }} %4, 1
-        \\  br i1 %5, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %8 = extractvalue {{ i32, i1 }} %4, 0
-        \\  store i32 %8, ptr %1, align 4
-        \\  ret i32 %8
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime pointer load/store external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+    try irw.functionHeader(writer, "private ", "i32", "pointers_memory.load_store", "ptr %0, ptr %1", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "3", "i32", "%0", "4");
+    try irw.checkedSAddI32Value(writer, "4", "%3", "1", "5", "8");
+    try irw.panicEdge(writer, "5", "ok", "panic");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "panic");
+    try writer.writeAll("\n");
+    try irw.block(writer, "ok");
+    try irw.store(writer, "i32", "%8", "%1", "4");
+    try irw.ret(writer, "i32", "%8");
+    try irw.functionEnd(writer);
+    try irw.integerOverflowPanicFunction(writer);
 }
 
 fn writeRuntimeVolatileRoundtripIrWriterBody(
@@ -2457,33 +2485,23 @@ fn writeReleaseSafeRuntimeStructSumIrWriterBody(
         \\  ret i32 %ret
         \\}}
         \\
-        \\define private i32 @aggregates.struct_sum(ptr %0) unnamed_addr align 1 {{
-        \\entry:
-        \\  %2 = load i32, ptr %0, align 4
-        \\  %3 = getelementptr i8, ptr %0, i64 4
-        \\  %4 = load i32, ptr %3, align 4
-        \\  %5 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %2, i32 %4)
-        \\  %6 = extractvalue {{ i32, i1 }} %5, 1
-        \\  br i1 %6, label %7, label %8
-        \\
-        \\7:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\8:
-        \\  %9 = extractvalue {{ i32, i1 }} %5, 0
-        \\  ret i32 %9
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime struct-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+    try irw.functionHeader(writer, "private ", "i32", "aggregates.struct_sum", "ptr %0", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "2", "i32", "%0", "4");
+    try irw.gep(writer, "3", "i8", "%0", "4");
+    try irw.load(writer, "4", "i32", "%3", "4");
+    try irw.checkedSAddI32Value(writer, "5", "%2", "%4", "6", "9");
+    try irw.panicEdge(writer, "6", "8", "7");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "7");
+    try writer.writeAll("\n");
+    try irw.block(writer, "8");
+    try irw.ret(writer, "i32", "%9");
+    try irw.functionEnd(writer);
+    try irw.integerOverflowPanicFunction(writer);
 }
 
 fn writeRuntimeArraySumIrWriterBody(
@@ -2533,41 +2551,26 @@ fn writeReleaseSafeRuntimeArraySumIrWriterBody(
         \\  ret i32 %ret
         \\}}
         \\
-        \\define private i32 @aggregates.array_sum(i32 %0, i32 %1, i32 %2) unnamed_addr align 1 {{
-        \\entry:
-        \\  %4 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %0, i32 %1)
-        \\  %5 = extractvalue {{ i32, i1 }} %4, 1
-        \\  br i1 %5, label %6, label %7
-        \\
-        \\6:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\7:
-        \\  %8 = extractvalue {{ i32, i1 }} %4, 0
-        \\  %9 = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %8, i32 %2)
-        \\  %10 = extractvalue {{ i32, i1 }} %9, 1
-        \\  br i1 %10, label %11, label %12
-        \\
-        \\11:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\12:
-        \\  %13 = extractvalue {{ i32, i1 }} %9, 0
-        \\  ret i32 %13
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime array-sum external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+    try irw.functionHeader(writer, "private ", "i32", "aggregates.array_sum", "i32 %0, i32 %1, i32 %2", " unnamed_addr align 1");
+    try irw.block(writer, "entry");
+    try irw.checkedSAddI32Value(writer, "4", "%0", "%1", "5", "8");
+    try irw.panicEdge(writer, "5", "7", "6");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "6");
+    try writer.writeAll("\n");
+    try irw.block(writer, "7");
+    try irw.checkedSAddI32Value(writer, "9", "%8", "%2", "10", "13");
+    try irw.panicEdge(writer, "10", "12", "11");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "11");
+    try writer.writeAll("\n");
+    try irw.block(writer, "12");
+    try irw.ret(writer, "i32", "%13");
+    try irw.functionEnd(writer);
+    try irw.integerOverflowPanicFunction(writer);
 }
 
 fn writeRuntimeOptionalPayloadIrWriterBody(
@@ -2970,19 +2973,20 @@ fn writeRuntimeTlsReadIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@tls_concurrency.tls_counter = internal thread_local(localexec) global i32 1, align 4
-        \\@main = alias i32 (), ptr @tls_concurrency.read_tls
-        \\
-        \\define private i32 @tls_concurrency.read_tls() local_unnamed_addr {{
-        \\entry:
-        \\  %value = load i32, ptr @tls_concurrency.tls_counter, align 4
-        \\  ret i32 %value
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeTlsReadModule(writer) catch |err| {
         try fatal(io, "failed to write runtime TLS read external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeTlsReadModule(writer: *std.Io.Writer) !void {
+    try irw.tlsGlobal(writer, "tls_concurrency.tls_counter", "internal", "localexec", "i32", "1", "4");
+    try irw.alias(writer, "main", "i32 ()", "tls_concurrency.read_tls");
+    try writer.writeAll("\n");
+    try irw.functionHeader(writer, "private ", "i32", "tls_concurrency.read_tls", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "value", "i32", "@tls_concurrency.tls_counter", "4");
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
 }
 
 fn writeRuntimeTlsBumpIrWriterBody(
@@ -2990,19 +2994,7 @@ fn writeRuntimeTlsBumpIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@tls_concurrency.tls_counter = internal thread_local(localexec) global i32 1, align 4
-        \\@main = alias i32 (i32), ptr @tls_concurrency.bump_tls
-        \\
-        \\define private i32 @tls_concurrency.bump_tls(i32 %value) local_unnamed_addr {{
-        \\entry:
-        \\  %current = load i32, ptr @tls_concurrency.tls_counter, align 4
-        \\  %updated = add i32 %current, %value
-        \\  store i32 %updated, ptr @tls_concurrency.tls_counter, align 4
-        \\  ret i32 %updated
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeTlsBumpModule(writer, false) catch |err| {
         try fatal(io, "failed to write runtime TLS bump external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
 }
@@ -3012,40 +3004,34 @@ fn writeReleaseSafeRuntimeTlsBumpIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@tls_concurrency.tls_counter = internal thread_local(localexec) global i32 1, align 4
-        \\@main = alias i32 (i32), ptr @tls_concurrency.bump_tls
-        \\@bump_tls = alias i32 (i32), ptr @tls_concurrency.bump_tls
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
-        \\declare void @llvm.assume(i1)
-        \\
-        \\define private i32 @tls_concurrency.bump_tls(i32 %value) unnamed_addr align 1 {{
-        \\entry:
-        \\  %current = load i32, ptr @tls_concurrency.tls_counter, align 4
-        \\  %checked = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 %current, i32 %value)
-        \\  %overflow = extractvalue {{ i32, i1 }} %checked, 1
-        \\  br i1 %overflow, label %panic, label %ok
-        \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\
-        \\ok:
-        \\  %updated = extractvalue {{ i32, i1 }} %checked, 0
-        \\  store i32 %updated, ptr @tls_concurrency.tls_counter, align 4
-        \\  ret i32 %updated
-        \\}}
-        \\
-        \\define fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"() {{
-        \\entry:
-        \\  ret void
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeTlsBumpModule(writer, true) catch |err| {
         try fatal(io, "failed to write ReleaseSafe runtime TLS bump external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeTlsBumpModule(writer: *std.Io.Writer, checked: bool) !void {
+    try irw.tlsGlobal(writer, "tls_concurrency.tls_counter", "internal", "localexec", "i32", "1", "4");
+    try irw.alias(writer, "main", "i32 (i32)", "tls_concurrency.bump_tls");
+    if (checked) try irw.alias(writer, "bump_tls", "i32 (i32)", "tls_concurrency.bump_tls");
+    try writer.writeAll("\n");
+    if (checked) try irw.integerOverflowDeclarations(writer);
+    try irw.functionHeader(writer, "private ", "i32", "tls_concurrency.bump_tls", "i32 %value", if (checked) " unnamed_addr align 1" else " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.load(writer, "current", "i32", "@tls_concurrency.tls_counter", "4");
+    if (checked) {
+        try irw.checkedSAddI32Value(writer, "checked", "%current", "%value", "overflow", "updated");
+        try irw.panicEdge(writer, "overflow", "ok", "panic");
+        try writer.writeAll("\n");
+        try irw.integerOverflowPanicBlock(writer, "panic");
+        try writer.writeAll("\n");
+        try irw.block(writer, "ok");
+    } else {
+        try writer.writeAll("  %updated = add i32 %current, %value\n");
+    }
+    try irw.store(writer, "i32", "%updated", "@tls_concurrency.tls_counter", "4");
+    try irw.ret(writer, "i32", "%updated");
+    try irw.functionEnd(writer);
+    if (checked) try irw.integerOverflowPanicFunction(writer);
 }
 
 fn writeRuntimeAtomicAddIrWriterBody(
@@ -3073,18 +3059,19 @@ fn writeRuntimeInlineAsmBarrierIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@main = alias i32 (i32), ptr @atomics_inline_asm_debug.inline_asm_barrier
-        \\
-        \\define private i32 @atomics_inline_asm_debug.inline_asm_barrier(i32 %value) local_unnamed_addr {{
-        \\entry:
-        \\  tail call void asm sideeffect "", "~{{memory}},~{{dirflag}},~{{fpsr}},~{{flags}}"()
-        \\  ret i32 %value
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeInlineAsmBarrierModule(writer) catch |err| {
         try fatal(io, "failed to write runtime inline asm barrier external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeInlineAsmBarrierModule(writer: *std.Io.Writer) !void {
+    try irw.alias(writer, "main", "i32 (i32)", "atomics_inline_asm_debug.inline_asm_barrier");
+    try writer.writeAll("\n");
+    try irw.functionHeader(writer, "private ", "i32", "atomics_inline_asm_debug.inline_asm_barrier", "i32 %value", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try irw.inlineAsmBarrier(writer);
+    try irw.ret(writer, "i32", "%value");
+    try irw.functionEnd(writer);
 }
 
 fn writeRuntimeAggregatePairIrWriterBody(
@@ -3458,32 +3445,38 @@ fn writeCheckedAddRuntimeBoundaryIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %pair = tail call {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32 40, i32 2)
-        \\  %overflow = extractvalue {{ i32, i1 }} %pair, 1
-        \\  br i1 %overflow, label %panic, label %ok
+    writeCheckedAddRuntimeBoundaryModule(writer) catch |err| {
+        try fatal(io, "failed to write checked-add runtime boundary external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeCheckedAddRuntimeBoundaryModule(writer: *std.Io.Writer) !void {
+    try irw.functionHeader(writer, "dso_local ", "i32", "main", "", " local_unnamed_addr");
+    try irw.block(writer, "entry");
+    try writer.writeAll(
+        \\  %pair = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 40, i32 2)
+        \\  %overflow = extractvalue { i32, i1 } %pair, 1
         \\
-        \\ok:
-        \\  %value = extractvalue {{ i32, i1 }} %pair, 0
+    );
+    try irw.panicEdge(writer, "overflow", "ok", "panic");
+    try writer.writeAll("\n");
+    try irw.block(writer, "ok");
+    try writer.writeAll(
+        \\  %value = extractvalue { i32, i1 } %pair, 0
         \\  %matches = icmp eq i32 %value, 42
         \\  %ret = select i1 %matches, i32 0, i32 1
-        \\  ret i32 %ret
         \\
-        \\panic:
-        \\  call void @llvm.assume(i1 1) [ "cold"() ]
-        \\  tail call fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
-        \\  unreachable
-        \\}}
-        \\
-        \\declare {{ i32, i1 }} @llvm.sadd.with.overflow.i32(i32, i32)
+    );
+    try irw.ret(writer, "i32", "%ret");
+    try writer.writeAll("\n");
+    try irw.integerOverflowPanicBlock(writer, "panic");
+    try irw.functionEnd(writer);
+    try writer.writeAll(
+        \\declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32)
         \\declare void @llvm.assume(i1 noundef)
         \\declare fastcc void @"debug.FullPanic((function 'defaultPanic')).integerOverflow"()
         \\
-    , .{}) catch |err| {
-        try fatal(io, "failed to write checked-add runtime boundary external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
+    );
 }
 
 fn writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(
