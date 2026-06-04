@@ -505,7 +505,7 @@ const cases = [_]Case{
         .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
-        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-str-from-float-stack-exponent",
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:str-from-float-help",
     },
     .{
         .id = "releasesmall_runtime_base64_decode_base_64_full",
@@ -872,7 +872,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "umul-fix-sat-i64" },
         .{ .name = "inherit-i64-return" },
         .{ .name = "compile-asm-unreachable" },
-        .{ .name = "str-from-float-stack-exponent" },
+        .{ .name = "str-from-float-help" },
         .{ .name = "base64-decode-base64-full" },
         .{ .name = "base64-decode-step" },
         .{ .name = "base64-store-step" },
@@ -1197,7 +1197,7 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-compile-asm-unreachable-stub";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_str_from_float_help")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-str-from-float-stack-exponent";
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:str-from-float-help";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_base_64_full")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:base64-decode-base-64";
@@ -1458,7 +1458,7 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "umul-fix-sat-i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, contents[value_start..value_end], "inherit-i64-return")) return "inherit-i64-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "compile-asm-unreachable")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, contents[value_start..value_end], "str-from-float-stack-exponent")) return "str-from-float-stack-exponent";
+    if (std.mem.eql(u8, contents[value_start..value_end], "str-from-float-help")) return "str-from-float-help";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-base64-full")) return "base64-decode-base64-full";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-step")) return "base64-decode-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-store-step")) return "base64-store-step";

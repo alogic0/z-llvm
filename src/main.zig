@@ -193,7 +193,8 @@ fn writeIrWriterModuleFromEnv(
     const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
     const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
     const ir_path = requiredEnv(io, environ, "ZLLVM_IR_PATH");
-    const surface = irWriterSurfaceForCase(case_id);
+    const ir_writer_case = findIrWriterCase(case_id);
+    const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
 
     var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
         try fatal(io, "failed to create external IR writer output {s}: {any}\n", .{ ir_path, err });
@@ -214,182 +215,8 @@ fn writeIrWriterModuleFromEnv(
     , .{ wrapper, case_id, mode, surface }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
-    if (std.mem.eql(u8, case_id, "releasefast_tiny_scalar")) {
-        try writeTinyScalarIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_integers")) {
-        try writeIntegersIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_error_switch")) {
-        try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) {
-        try writeControlFlowCallsIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) {
-        try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_read_global")) {
-        try writeReleaseSafeRuntimeReadGlobalIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) {
-        try writeRuntimeCondBranchIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) {
-        try writeRuntimePhiMergeIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) {
-        try writeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_loop_sum")) {
-        try writeReleaseSafeRuntimeLoopSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) {
-        try writeRuntimeSwitchIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_branch_mix")) {
-        try writeReleaseSafeRuntimeBranchMixIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) {
-        try writeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) {
-        try writeReleaseSafeRuntimeGlobalUpdateIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) {
-        try writeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_pointer_load_store")) {
-        try writeReleaseSafeRuntimePointerLoadStoreIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) {
-        try writeRuntimeVolatileRoundtripIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) {
-        try writeRuntimeOptionalPointerIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) {
-        try writeRuntimePackedReadFlagIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) {
-        try writeRuntimePackedReplaceLowIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) {
-        try writeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_struct_sum")) {
-        try writeReleaseSafeRuntimeStructSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) {
-        try writeRuntimeArraySumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_array_sum")) {
-        try writeReleaseSafeRuntimeArraySumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) {
-        try writeRuntimeOptionalPayloadIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) {
-        try writeRuntimeErrorUnionPayloadIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) {
-        try writeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_slice_sum")) {
-        try writeReleaseSafeRuntimeSliceSumIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) {
-        try writeRuntimeFpConstantsIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) {
-        try writeRuntimeComptimeConstIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_comptime_const")) {
-        try writeReleaseSafeRuntimeComptimeConstIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_debug_location")) {
-        try writeRuntimeDebugLocationIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_debug_location")) {
-        try writeReleaseSafeRuntimeDebugLocationIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) {
-        try writeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) {
-        try writeReleaseSafeRuntimeCallChainIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) {
-        try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_read")) {
-        try writeRuntimeTlsReadIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) {
-        try writeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) {
-        try writeReleaseSafeRuntimeTlsBumpIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) {
-        try writeRuntimeAtomicAddIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) {
-        try writeRuntimeInlineAsmBarrierIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) {
-        try writeRuntimeAggregatePairIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_less")) {
-        try writeRuntimeFloatLessIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_mul")) {
-        try writeRuntimeFloatMulIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_add")) {
-        try writeRuntimeFloatAddIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_select")) {
-        try writeRuntimeFloatSelectIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_sub")) {
-        try writeRuntimeFloatSubIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_double_div")) {
-        try writeRuntimeDoubleDivIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasefast_runtime_float_rem")) {
-        try writeRuntimeFloatRemIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) {
-        try writeErrorSwitchIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) {
-        try writeCheckedAddRuntimeBoundaryIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) {
-        try writeReleaseSafeRuntimeSideEffectFreeIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) {
-        try writeGlobalsComptimeIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) {
-        try writeReleaseSmallRuntimeHiddenAccessIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_zig")) {
-        try writeReleaseSmallRuntimeMixCAddZigIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_may_panic")) {
-        try writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) {
-        try writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) {
-        try writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) {
-        try writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) {
-        try writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_base_64_full")) {
-        try writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) {
-        try writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) {
-        try writeReleaseSmallRuntimeBase64StoreStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_byte_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_tail_step")) {
-        try writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) {
-        try writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_length_step")) {
-        try writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) {
-        try writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_stride_step")) {
-        try writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_bundle_step")) {
-        try writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_next_source_bundle_step")) {
-        try writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_third_source_bundle_step")) {
-        try writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_bit_buffer_store_step")) {
-        try writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_loop_advance_step")) {
-        try writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_guard_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_bundle_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_store_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_length_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_table_check_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_accumulator_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_loop_advance_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_check_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_final_mask_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) {
-        try writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_exit_step")) {
-        try writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) {
-        try writeI64ArithmeticIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) {
-        try writeRuntimeI64CallIrWriterBody(io, &writer.interface, ir_path);
-    } else if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) {
-        try writeBase64TableLookupIrWriterBody(io, &writer.interface, ir_path);
+    if (ir_writer_case) |case| {
+        try case.write(io, &writer.interface, ir_path);
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
     }
@@ -402,96 +229,110 @@ fn requiredEnv(io: std.Io, environ: *const std.process.Environ.Map, name: []cons
     return environ.get(name) orelse fatal(io, "missing required external IR writer env {s}\n", .{name});
 }
 
-fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
-    if (std.mem.eql(u8, case_id, "releasefast_tiny_scalar")) return "scalar-add-ret";
-    if (std.mem.eql(u8, case_id, "releasefast_integers")) return "integer-arithmetic";
-    if (std.mem.eql(u8, case_id, "releasefast_error_switch")) return "error-switch-select";
-    if (std.mem.eql(u8, case_id, "releasefast_control_flow_calls")) return "direct-call";
-    if (std.mem.eql(u8, case_id, "releasefast_globals_comptime")) return "global-load";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_read_global")) return "global-load";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_cond_branch")) return "runtime-condbr";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_phi_merge")) return "runtime-phi-merge";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_loop_sum")) return "runtime-loop-sum";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_loop_sum")) return "checked-loop-sum-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_switch")) return "runtime-switch";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_branch_mix")) return "checked-branch-mix-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_global_update")) return "global-update";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_global_update")) return "checked-global-update-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_pointer_load_store")) return "pointer-load-store";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_pointer_load_store")) return "checked-pointer-load-store-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_volatile_roundtrip")) return "volatile-roundtrip";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_pointer")) return "optional-pointer";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_read_flag")) return "packed-read-flag";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_packed_replace_low")) return "packed-replace-low";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_struct_sum")) return "struct-field-sum";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_struct_sum")) return "checked-struct-sum-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_array_sum")) return "array-scalar-sum";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_array_sum")) return "checked-array-sum-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_optional_payload")) return "optional-scalar-payload";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_error_union_payload")) return "error-union-payload";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_slice_sum")) return "slice-loop-sum";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_slice_sum")) return "checked-slice-loop-sum-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_fp_constants")) return "fp-literal-return";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_comptime_const")) return "comptime-const-mul";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_comptime_const")) return "checked-comptime-const-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_debug_location")) return "add-imm-return";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_debug_location")) return "checked-add-imm-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_call_chain")) return "abi-arg-call";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_call_chain")) return "checked-call-chain-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_read")) return "tls-read";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_read")) return "tls-read";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_tls_bump")) return "tls-bump";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_tls_bump")) return "checked-tls-bump-boundary";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_atomic_add")) return "atomic-add";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_inline_asm_barrier")) return "inline-asm-barrier";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_aggregate_pair")) return "aggregate-pair-abi";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_less")) return "float-less";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_mul")) return "float-mul";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_add")) return "float-add";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_select")) return "float-select";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_sub")) return "float-sub";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_double_div")) return "double-div";
-    if (std.mem.eql(u8, case_id, "releasefast_runtime_float_rem")) return "float-rem";
-    if (std.mem.eql(u8, case_id, "releasesafe_error_switch")) return "error-switch-select";
-    if (std.mem.eql(u8, case_id, "releasesafe_tiny_scalar_runtime_boundary")) return "checked-add-runtime-boundary";
-    if (std.mem.eql(u8, case_id, "releasesafe_runtime_side_effect_free")) return "void-noop-call";
-    if (std.mem.eql(u8, case_id, "releasesmall_globals_comptime")) return "global-load";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_hidden_access")) return "hidden-global-access";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_zig")) return "mixed-c-zig-add";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_mix_c_add_may_panic")) return "mixed-c-zig-panic-add";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) return "umul-fix-sat-i64";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-stack-exponent";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_base_64_full")) return "base64-decode-base64-full";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) return "base64-decode-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) return "base64-store-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_byte_step")) return "base64-residual-byte-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_tail_step")) return "base64-padding-tail-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_loop_step")) return "base64-padding-loop-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_padding_length_step")) return "base64-padding-length-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_chunk_guard_step")) return "base64-chunk-guard-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_stride_step")) return "base64-source-stride-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_source_bundle_step")) return "base64-source-bundle-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_next_source_bundle_step")) return "base64-next-source-bundle-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_third_source_bundle_step")) return "base64-third-source-bundle-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_bit_buffer_store_step")) return "base64-bit-buffer-store-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_loop_advance_step")) return "base64-loop-advance-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_guard_step")) return "base64-residual-guard-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_bundle_step")) return "base64-residual-bundle-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_store_step")) return "base64-residual-store-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_length_step")) return "base64-residual-length-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_table_check_step")) return "base64-residual-table-check-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_accumulator_step")) return "base64-residual-accumulator-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_loop_advance_step")) return "base64-residual-loop-advance-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_check_step")) return "base64-residual-padding-check-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_final_mask_step")) return "base64-residual-final-mask-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_residual_padding_loop_step")) return "base64-residual-padding-loop-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_exit_step")) return "base64-decode-exit-step";
-    if (std.mem.eql(u8, case_id, "releasesmall_i64_arithmetic")) return "i64-arithmetic";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_i64_call")) return "i64-call-return";
-    if (std.mem.eql(u8, case_id, "releasesmall_base64_table_lookup")) return "table-indexed-load";
-    return "minimal-ret0";
+const IrWriterBodyFn = *const fn (std.Io, *std.Io.Writer, []const u8) anyerror!void;
+
+const IrWriterCase = struct {
+    id: []const u8,
+    surface: []const u8,
+    write: IrWriterBodyFn,
+};
+
+const ir_writer_cases = [_]IrWriterCase{
+    .{ .id = "releasefast_tiny_scalar", .surface = "scalar-add-ret", .write = writeTinyScalarIrWriterBody },
+    .{ .id = "releasefast_integers", .surface = "integer-arithmetic", .write = writeIntegersIrWriterBody },
+    .{ .id = "releasefast_error_switch", .surface = "error-switch-select", .write = writeErrorSwitchIrWriterBody },
+    .{ .id = "releasefast_control_flow_calls", .surface = "direct-call", .write = writeControlFlowCallsIrWriterBody },
+    .{ .id = "releasefast_globals_comptime", .surface = "global-load", .write = writeGlobalsComptimeIrWriterBody },
+    .{ .id = "releasesafe_runtime_read_global", .surface = "global-load", .write = writeReleaseSafeRuntimeReadGlobalIrWriterBody },
+    .{ .id = "releasefast_runtime_cond_branch", .surface = "runtime-condbr", .write = writeRuntimeCondBranchIrWriterBody },
+    .{ .id = "releasefast_runtime_phi_merge", .surface = "runtime-phi-merge", .write = writeRuntimePhiMergeIrWriterBody },
+    .{ .id = "releasefast_runtime_loop_sum", .surface = "runtime-loop-sum", .write = writeRuntimeLoopSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_loop_sum", .surface = "checked-loop-sum-boundary", .write = writeReleaseSafeRuntimeLoopSumIrWriterBody },
+    .{ .id = "releasefast_runtime_switch", .surface = "runtime-switch", .write = writeRuntimeSwitchIrWriterBody },
+    .{ .id = "releasesafe_runtime_branch_mix", .surface = "checked-branch-mix-boundary", .write = writeReleaseSafeRuntimeBranchMixIrWriterBody },
+    .{ .id = "releasefast_runtime_global_update", .surface = "global-update", .write = writeRuntimeGlobalUpdateIrWriterBody },
+    .{ .id = "releasesafe_runtime_global_update", .surface = "checked-global-update-boundary", .write = writeReleaseSafeRuntimeGlobalUpdateIrWriterBody },
+    .{ .id = "releasefast_runtime_pointer_load_store", .surface = "pointer-load-store", .write = writeRuntimePointerLoadStoreIrWriterBody },
+    .{ .id = "releasesafe_runtime_pointer_load_store", .surface = "checked-pointer-load-store-boundary", .write = writeReleaseSafeRuntimePointerLoadStoreIrWriterBody },
+    .{ .id = "releasefast_runtime_volatile_roundtrip", .surface = "volatile-roundtrip", .write = writeRuntimeVolatileRoundtripIrWriterBody },
+    .{ .id = "releasefast_runtime_optional_pointer", .surface = "optional-pointer", .write = writeRuntimeOptionalPointerIrWriterBody },
+    .{ .id = "releasefast_runtime_packed_read_flag", .surface = "packed-read-flag", .write = writeRuntimePackedReadFlagIrWriterBody },
+    .{ .id = "releasefast_runtime_packed_replace_low", .surface = "packed-replace-low", .write = writeRuntimePackedReplaceLowIrWriterBody },
+    .{ .id = "releasefast_runtime_struct_sum", .surface = "struct-field-sum", .write = writeRuntimeStructSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_struct_sum", .surface = "checked-struct-sum-boundary", .write = writeReleaseSafeRuntimeStructSumIrWriterBody },
+    .{ .id = "releasefast_runtime_array_sum", .surface = "array-scalar-sum", .write = writeRuntimeArraySumIrWriterBody },
+    .{ .id = "releasesafe_runtime_array_sum", .surface = "checked-array-sum-boundary", .write = writeReleaseSafeRuntimeArraySumIrWriterBody },
+    .{ .id = "releasefast_runtime_optional_payload", .surface = "optional-scalar-payload", .write = writeRuntimeOptionalPayloadIrWriterBody },
+    .{ .id = "releasefast_runtime_error_union_payload", .surface = "error-union-payload", .write = writeRuntimeErrorUnionPayloadIrWriterBody },
+    .{ .id = "releasefast_runtime_slice_sum", .surface = "slice-loop-sum", .write = writeRuntimeSliceSumIrWriterBody },
+    .{ .id = "releasesafe_runtime_slice_sum", .surface = "checked-slice-loop-sum-boundary", .write = writeReleaseSafeRuntimeSliceSumIrWriterBody },
+    .{ .id = "releasefast_runtime_fp_constants", .surface = "fp-literal-return", .write = writeRuntimeFpConstantsIrWriterBody },
+    .{ .id = "releasefast_runtime_comptime_const", .surface = "comptime-const-mul", .write = writeRuntimeComptimeConstIrWriterBody },
+    .{ .id = "releasesafe_runtime_comptime_const", .surface = "checked-comptime-const-boundary", .write = writeReleaseSafeRuntimeComptimeConstIrWriterBody },
+    .{ .id = "releasefast_runtime_debug_location", .surface = "add-imm-return", .write = writeRuntimeDebugLocationIrWriterBody },
+    .{ .id = "releasesafe_runtime_debug_location", .surface = "checked-add-imm-boundary", .write = writeReleaseSafeRuntimeDebugLocationIrWriterBody },
+    .{ .id = "releasefast_runtime_call_chain", .surface = "abi-arg-call", .write = writeRuntimeCallChainIrWriterBody },
+    .{ .id = "releasesafe_runtime_call_chain", .surface = "checked-call-chain-boundary", .write = writeReleaseSafeRuntimeCallChainIrWriterBody },
+    .{ .id = "releasefast_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
+    .{ .id = "releasesafe_runtime_tls_read", .surface = "tls-read", .write = writeRuntimeTlsReadIrWriterBody },
+    .{ .id = "releasefast_runtime_tls_bump", .surface = "tls-bump", .write = writeRuntimeTlsBumpIrWriterBody },
+    .{ .id = "releasesafe_runtime_tls_bump", .surface = "checked-tls-bump-boundary", .write = writeReleaseSafeRuntimeTlsBumpIrWriterBody },
+    .{ .id = "releasefast_runtime_atomic_add", .surface = "atomic-add", .write = writeRuntimeAtomicAddIrWriterBody },
+    .{ .id = "releasefast_runtime_inline_asm_barrier", .surface = "inline-asm-barrier", .write = writeRuntimeInlineAsmBarrierIrWriterBody },
+    .{ .id = "releasefast_runtime_aggregate_pair", .surface = "aggregate-pair-abi", .write = writeRuntimeAggregatePairIrWriterBody },
+    .{ .id = "releasefast_runtime_float_less", .surface = "float-less", .write = writeRuntimeFloatLessIrWriterBody },
+    .{ .id = "releasefast_runtime_float_mul", .surface = "float-mul", .write = writeRuntimeFloatMulIrWriterBody },
+    .{ .id = "releasefast_runtime_float_add", .surface = "float-add", .write = writeRuntimeFloatAddIrWriterBody },
+    .{ .id = "releasefast_runtime_float_select", .surface = "float-select", .write = writeRuntimeFloatSelectIrWriterBody },
+    .{ .id = "releasefast_runtime_float_sub", .surface = "float-sub", .write = writeRuntimeFloatSubIrWriterBody },
+    .{ .id = "releasefast_runtime_double_div", .surface = "double-div", .write = writeRuntimeDoubleDivIrWriterBody },
+    .{ .id = "releasefast_runtime_float_rem", .surface = "float-rem", .write = writeRuntimeFloatRemIrWriterBody },
+    .{ .id = "releasesafe_error_switch", .surface = "error-switch-select", .write = writeErrorSwitchIrWriterBody },
+    .{ .id = "releasesafe_tiny_scalar_runtime_boundary", .surface = "checked-add-runtime-boundary", .write = writeCheckedAddRuntimeBoundaryIrWriterBody },
+    .{ .id = "releasesafe_runtime_side_effect_free", .surface = "void-noop-call", .write = writeReleaseSafeRuntimeSideEffectFreeIrWriterBody },
+    .{ .id = "releasesmall_globals_comptime", .surface = "global-load", .write = writeGlobalsComptimeIrWriterBody },
+    .{ .id = "releasesmall_runtime_hidden_access", .surface = "hidden-global-access", .write = writeReleaseSmallRuntimeHiddenAccessIrWriterBody },
+    .{ .id = "releasesmall_runtime_mix_c_add_zig", .surface = "mixed-c-zig-add", .write = writeReleaseSmallRuntimeMixCAddZigIrWriterBody },
+    .{ .id = "releasesmall_runtime_mix_c_add_may_panic", .surface = "mixed-c-zig-panic-add", .write = writeReleaseSmallRuntimeMixCAddMayPanicIrWriterBody },
+    .{ .id = "releasesmall_runtime_umul_fix_sat_i64", .surface = "umul-fix-sat-i64", .write = writeReleaseSmallRuntimeUmulFixSatI64IrWriterBody },
+    .{ .id = "releasesmall_runtime_inherit_want_safety_i64", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody },
+    .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody },
+    .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_padding_tail_step", .surface = "base64-padding-tail-step", .write = writeReleaseSmallRuntimeBase64PaddingTailStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_padding_loop_step", .surface = "base64-padding-loop-step", .write = writeReleaseSmallRuntimeBase64PaddingLoopStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_padding_length_step", .surface = "base64-padding-length-step", .write = writeReleaseSmallRuntimeBase64PaddingLengthStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_chunk_guard_step", .surface = "base64-chunk-guard-step", .write = writeReleaseSmallRuntimeBase64ChunkGuardStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_source_stride_step", .surface = "base64-source-stride-step", .write = writeReleaseSmallRuntimeBase64SourceStrideStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_source_bundle_step", .surface = "base64-source-bundle-step", .write = writeReleaseSmallRuntimeBase64SourceBundleStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_store_step", .surface = "base64-residual-store-step", .write = writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_length_step", .surface = "base64-residual-length-step", .write = writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_table_check_step", .surface = "base64-residual-table-check-step", .write = writeReleaseSmallRuntimeBase64ResidualTableCheckStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_accumulator_step", .surface = "base64-residual-accumulator-step", .write = writeReleaseSmallRuntimeBase64ResidualAccumulatorStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_loop_advance_step", .surface = "base64-residual-loop-advance-step", .write = writeReleaseSmallRuntimeBase64ResidualLoopAdvanceStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_padding_check_step", .surface = "base64-residual-padding-check-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingCheckStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_final_mask_step", .surface = "base64-residual-final-mask-step", .write = writeReleaseSmallRuntimeBase64ResidualFinalMaskStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_residual_padding_loop_step", .surface = "base64-residual-padding-loop-step", .write = writeReleaseSmallRuntimeBase64ResidualPaddingLoopStepIrWriterBody },
+    .{ .id = "releasesmall_runtime_base64_decode_exit_step", .surface = "base64-decode-exit-step", .write = writeReleaseSmallRuntimeBase64DecodeExitStepIrWriterBody },
+    .{ .id = "releasesmall_i64_arithmetic", .surface = "i64-arithmetic", .write = writeI64ArithmeticIrWriterBody },
+    .{ .id = "releasesmall_runtime_i64_call", .surface = "i64-call-return", .write = writeRuntimeI64CallIrWriterBody },
+    .{ .id = "releasesmall_base64_table_lookup", .surface = "table-indexed-load", .write = writeBase64TableLookupIrWriterBody },
+};
+
+fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
+    for (ir_writer_cases) |case| {
+        if (std.mem.eql(u8, case.id, case_id)) return case;
+    }
+    return null;
 }
 
 fn writeTinyScalarIrWriterBody(
@@ -830,12 +671,25 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\%Io.Writer = type {{ ptr, {{ ptr, i64 }}, i64 }}
         \\
         \\@__anon_597 = private unnamed_addr constant %Io.Writer.VTable {{ ptr null, ptr null, ptr null, ptr null }}, align 8
+        \\@fmt.float.FLOAT64_POW5_INV_SPLIT2 = private unnamed_addr constant [2 x [2 x i64]] [[2 x i64] [i64 1, i64 2305843009213693952], [2 x i64] [i64 5955668970331000884, i64 1784059615882449851]], align 8
+        \\@fmt.float.FLOAT64_POW5_SPLIT2 = private unnamed_addr constant [2 x [2 x i64]] [[2 x i64] [i64 0, i64 1152921504606846976], [2 x i64] [i64 0, i64 1490116119384765625]], align 8
+        \\@str.float.copy = private unnamed_addr constant [6 x i8] c"12345\00", align 1
         \\@strFromFloatHelp = alias void (double), ptr @main.strFromFloatHelp
         \\
         \\declare void @llvm.lifetime.start.p0(ptr)
+        \\declare void @llvm.lifetime.end.p0(ptr)
+        \\declare void @llvm.assume(i1)
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+        \\declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)
+        \\declare fastcc i64 @fmt.float.mulShift64(i64, ptr, i32)
+        \\declare fastcc i1 @fmt.float.multipleOfPowerOf5__anon_1356(i64, i32)
+        \\declare fastcc i32 @fmt.float.decimalLength__anon_1195(i64)
+        \\declare fastcc void @fmt.float.writeDecimal__anon_1212(ptr, ptr, i64)
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
+        \\  call void @main.strFromFloatHelp(double 1.250000e+00)
+        \\  call void @main.strFromFloatHelp(double 0.000000e+00)
         \\  ret i32 0
         \\}}
         \\
@@ -844,8 +698,17 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\  %writer = alloca %Io.Writer, align 8
         \\  %buffer = alloca [400 x i8], align 1
         \\  %tag = alloca i8, align 8
+        \\  %pow_inv = alloca <2 x i64>, align 16
+        \\  %pow = alloca <2 x i64>, align 16
+        \\  %decimal = alloca i64, align 8
+        \\  %scratch = alloca [32 x i8], align 1
+        \\  %send_result = alloca {{ i64, i16, [6 x i8] }}, align 8
         \\  call void @llvm.lifetime.start.p0(ptr %writer)
         \\  call void @llvm.lifetime.start.p0(ptr %buffer)
+        \\  call void @llvm.lifetime.start.p0(ptr %pow_inv)
+        \\  call void @llvm.lifetime.start.p0(ptr %pow)
+        \\  call void @llvm.lifetime.start.p0(ptr %decimal)
+        \\  call void @llvm.lifetime.start.p0(ptr %scratch)
         \\  store ptr @__anon_597, ptr %writer, align 8
         \\  %writer_data = getelementptr i8, ptr %writer, i64 8
         \\  store ptr %buffer, ptr %writer_data, align 8
@@ -867,12 +730,72 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\
         \\check_special:
         \\  %special = icmp eq i32 %masked, 2047
-        \\  br i1 %special, label %special_block, label %done
+        \\  br i1 %special, label %special_block, label %pow5_inv
         \\
         \\special_block:
-        \\  unreachable
+        \\  call void @llvm.memset.p0.i64(ptr %scratch, i8 0, i64 32, i1 0)
+        \\  br label %writer_dispatch
+        \\
+        \\pow5_inv:
+        \\  %pow_inv_ptr = getelementptr [2 x [2 x i64]], ptr @fmt.float.FLOAT64_POW5_INV_SPLIT2, i64 0
+        \\  %pow_inv_load = load <2 x i64>, ptr %pow_inv_ptr, align 8
+        \\  store <2 x i64> %pow_inv_load, ptr %pow_inv, align 16
+        \\  %wide_a = zext i64 %mantissa to i128
+        \\  %wide_b = zext i64 5 to i128
+        \\  %wide_mul = mul i128 %wide_a, %wide_b
+        \\  %wide_shift = lshr i128 %wide_mul, 1
+        \\  %wide_trunc = trunc i128 %wide_shift to i64
+        \\  %assume_ok = icmp uge i64 %wide_trunc, 0
+        \\  call void @llvm.assume(i1 %assume_ok)
+        \\  %shifted = call fastcc i64 @fmt.float.mulShift64(i64 %wide_trunc, ptr %pow_inv, i32 8)
+        \\  %multiple = call fastcc i1 @fmt.float.multipleOfPowerOf5__anon_1356(i64 %shifted, i32 1)
+        \\  br i1 %multiple, label %pow5, label %decimal_loop
+        \\
+        \\pow5:
+        \\  %pow_ptr = getelementptr [2 x [2 x i64]], ptr @fmt.float.FLOAT64_POW5_SPLIT2, i64 0
+        \\  %pow_load = load <2 x i64>, ptr %pow_ptr, align 8
+        \\  store <2 x i64> %pow_load, ptr %pow, align 16
+        \\  %shifted_pow = call fastcc i64 @fmt.float.mulShift64(i64 %shifted, ptr %pow, i32 4)
+        \\  br label %decimal_loop
+        \\
+        \\decimal_loop:
+        \\  %index = phi i64 [ 0, %pow5_inv ], [ 0, %pow5 ], [ %next_index, %decimal_latch ]
+        \\  %value = phi i64 [ %shifted, %pow5_inv ], [ %shifted_pow, %pow5 ], [ %next_value, %decimal_latch ]
+        \\  %done_loop = icmp uge i64 %index, 3
+        \\  br i1 %done_loop, label %decimal_write, label %decimal_latch
+        \\
+        \\decimal_latch:
+        \\  %digit = urem i64 %value, 10
+        \\  %digit8 = trunc i64 %digit to i8
+        \\  %ascii = or i8 %digit8, 48
+        \\  %digit_ptr = getelementptr [32 x i8], ptr %scratch, i64 %index
+        \\  store i8 %ascii, ptr %digit_ptr, align 1
+        \\  %next_value = udiv i64 %value, 10
+        \\  %next_index = add i64 %index, 1
+        \\  br label %decimal_loop
+        \\
+        \\decimal_write:
+        \\  store i64 %value, ptr %decimal, align 8
+        \\  %digits = call fastcc i32 @fmt.float.decimalLength__anon_1195(i64 %value)
+        \\  %digits64 = zext i32 %digits to i64
+        \\  call fastcc void @fmt.float.writeDecimal__anon_1212(ptr %scratch, ptr %decimal, i64 %digits64)
+        \\  call void @llvm.memcpy.p0.p0.i64(ptr %buffer, ptr @str.float.copy, i64 5, i1 0)
+        \\  br label %writer_dispatch
+        \\
+        \\writer_dispatch:
+        \\  %vtable = load ptr, ptr %writer, align 8
+        \\  %send_slot = getelementptr i8, ptr %vtable, i64 0
+        \\  %send = load ptr, ptr %send_slot, align 8
+        \\  call fastcc void %send(ptr %send_result, ptr %writer, ptr %buffer, i64 1, i64 1)
+        \\  br label %done
         \\
         \\done:
+        \\  call void @llvm.lifetime.end.p0(ptr %scratch)
+        \\  call void @llvm.lifetime.end.p0(ptr %decimal)
+        \\  call void @llvm.lifetime.end.p0(ptr %pow)
+        \\  call void @llvm.lifetime.end.p0(ptr %pow_inv)
+        \\  call void @llvm.lifetime.end.p0(ptr %buffer)
+        \\  call void @llvm.lifetime.end.p0(ptr %writer)
         \\  ret void
         \\}}
         \\
