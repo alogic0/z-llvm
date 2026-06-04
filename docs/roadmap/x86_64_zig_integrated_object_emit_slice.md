@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=106 executable_ok=106 link_only_ok=0 local_fail=0
+ir-writer full set:    total=136 executable_ok=136 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer base64 step: zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
@@ -587,7 +587,7 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=106 minimal_wrapper_rows=0
+ir-writer full set:    scalar_runtime_rows=136 minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
                        error-switch-select=2 direct-call=1 global-load=3
                        i64-arithmetic=1 i64-call-return=1
@@ -794,7 +794,7 @@ use that layer. The remaining case-specific code is intentionally limited to
 semantic fixture bodies whose exact shape is the evidence: base64 decoder CFG,
 `strFromFloatHelp` decimal/pow-table control flow, aggregate ABI packing,
 atomics, packed bits, and optional/error-union payload rows.
-The next milestone starts after that frozen 106-row claim: the
+The next milestone starts after that frozen 136-row claim: the
 `releasesmall_runtime_base64_decode_base_64_full` row registers a full
 `@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
 boundary closure. Its `@main` performs executable validation for
