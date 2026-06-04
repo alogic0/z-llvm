@@ -1319,6 +1319,8 @@ pub fn main(init: std.process.Init) !void {
     var source_wrapper_rows: usize = 0;
     var fallback_rows: usize = 0;
     var case_id_rows: usize = 0;
+    var manifest_structured_rows: usize = 0;
+    var semantic_lowering_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1455,6 +1457,8 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(writer_dispatch);
         const writer_case_id = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_case = \"", "zllvm_ir_writer_case") else "-";
         defer if (use_ir_writer) allocator.free(writer_case_id);
+        const lowering_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_lowering = \"", "zllvm_ir_writer_lowering") else "-";
+        defer if (use_ir_writer) allocator.free(lowering_ownership);
         if (use_ir_writer) {
             if (source_wrapper_dispatch) {
                 if (!std.mem.eql(u8, writer_dispatch, "source-wrapper")) {
@@ -1472,6 +1476,13 @@ pub fn main(init: std.process.Init) !void {
             }
             if (std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder")) {
                 structured_builder_rows += 1;
+                if (std.mem.eql(u8, lowering_ownership, "lowering=zig-semantic-records")) {
+                    semantic_lowering_rows += 1;
+                } else if (std.mem.eql(u8, lowering_ownership, "lowering=manifest-structured")) {
+                    manifest_structured_rows += 1;
+                } else {
+                    try common.validationError(io, "external IR writer selected row {s} reported unsupported structured lowering ownership: {s}\n", .{ case.id, lowering_ownership });
+                }
                 if (std.mem.eql(u8, llvm_text_parse, "not-used")) {
                     structured_direct_rows += 1;
                     if (std.mem.eql(u8, codegen_ownership, "codegen=generic-x86_64-lowering")) {
@@ -1507,8 +1518,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} codegen_ownership={s} ownership={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, codegen_ownership, ownershipProof(use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} codegen_ownership={s} lowering_ownership={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, codegen_ownership, lowering_ownership, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1554,16 +1565,20 @@ pub fn main(init: std.process.Init) !void {
             if (case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != source_wrapper_rows or generic_codegen_rows != source_wrapper_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "source-wrapper dispatch gate requires no case-id/fallback and all rows structured-direct generic; source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
             }
+            if (semantic_lowering_rows == 0 or semantic_lowering_rows + manifest_structured_rows != source_wrapper_rows) {
+                try common.validationError(io, "source-wrapper dispatch gate requires semantic/manifest lowering accounting with at least one semantic row; source_wrappers={} semantic_lowering_rows={} manifest_structured_rows={}\n", .{ source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows });
+            }
             try stdout_writer.interface.print(
-                "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, fallback_rows },
+                "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} case_specific_rows={} fallback_rows={} local_fail=0\n",
+                .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, manifest_structured_rows, semantic_lowering_rows, case_specific_codegen_rows, fallback_rows },
             );
         }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, manifest_structured_rows, semantic_lowering_rows, minimal_wrapper_rows },
         );
         try stdout_writer.interface.print("ownership-summary structured-direct:{};structured-textual:{};textual-boundary:{};ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};llvm-text-parse=not-used-for-structured;{s}\n", .{ structured_direct_rows, structured_textual_rows, textual_boundary_rows, structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
+        try stdout_writer.interface.print("lowering-summary manifest-structured:{};zig-semantic-records:{}\n", .{ manifest_structured_rows, semantic_lowering_rows });
         try stdout_writer.interface.print("codegen-summary generic-codegen:{};case-specific-codegen:{};textual-boundary-out-of-scope:{}\n", .{ generic_codegen_rows, case_specific_codegen_rows, textual_boundary_rows });
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
