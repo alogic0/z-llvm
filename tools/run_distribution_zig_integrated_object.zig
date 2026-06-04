@@ -1329,6 +1329,8 @@ pub fn main(init: std.process.Init) !void {
     var semantic_lowering_rows: usize = 0;
     var semantic_record_rows: usize = 0;
     var external_writer_delegate_rows: usize = 0;
+    var descriptor_owned_rows: usize = 0;
+    var manual_fixture_dispatch_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1479,6 +1481,10 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(writer_case_id);
         const lowering_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_lowering = \"", "zllvm_ir_writer_lowering") else "-";
         defer if (use_ir_writer) allocator.free(lowering_ownership);
+        const semantic_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_semantic_descriptor = \"", "zllvm_semantic_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(semantic_descriptor);
+        const manual_fixture_dispatch = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_manual_fixture_dispatch = \"", "zllvm_manual_fixture_dispatch") else "-";
+        defer if (use_ir_writer) allocator.free(manual_fixture_dispatch);
         if (use_ir_writer) {
             if (source_wrapper_dispatch or release_source_owned) {
                 const expected_dispatch = if (release_source_owned) "source-owned" else "source-wrapper";
@@ -1487,6 +1493,17 @@ pub fn main(init: std.process.Init) !void {
                 }
                 if (!std.mem.eql(u8, writer_case_id, source_wrapper_dispatch_case_id)) {
                     case_id_rows += 1;
+                }
+            }
+            if (release_source_owned) {
+                if (std.mem.eql(u8, semantic_descriptor, "descriptor-owned")) {
+                    descriptor_owned_rows += 1;
+                } else {
+                    try common.validationError(io, "release source-owned row {s} did not report descriptor ownership: descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, semantic_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, manual_fixture_dispatch, "not-used")) {
+                    manual_fixture_dispatch_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used manual fixture dispatch: manual_fixture_dispatch={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, manual_fixture_dispatch, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
             }
             countSurface(&surface_counters, surface);
@@ -1592,12 +1609,12 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != 90 or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (semantic_record_rows != 90 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
-                try common.validationError(io, "release source-owned gate requires all rows source-owned semantic structured-direct generic; release_source_rows={} semantic_record_rows={} external_writer_delegate_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, semantic_record_rows, external_writer_delegate_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
+            if (descriptor_owned_rows != 90 or manual_fixture_dispatch_rows != 0 or semantic_record_rows != 90 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires all rows descriptor-owned semantic structured-direct generic; release_source_rows={} descriptor_owned_rows={} manual_fixture_dispatch_rows={} semantic_record_rows={} external_writer_delegate_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, manual_fixture_dispatch_rows, semantic_record_rows, external_writer_delegate_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
-                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ release_source_rows, source_wrapper_rows, semantic_lowering_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
         }
         if (source_wrapper_dispatch) {

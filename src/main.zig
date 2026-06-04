@@ -5,6 +5,7 @@ const irw = @import("ir_writer_helpers.zig");
 const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
+const sd = @import("semantic_descriptor.zig");
 const sib = @import("structured_ir_builder.zig");
 const target = @import("target.zig");
 const zsl = @import("zig_semantic_lowering.zig");
@@ -14,8 +15,9 @@ const source_wrapper_dispatch_name = "source-wrapper";
 const source_owned_dispatch_name = "source-owned";
 
 const usage =
-    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
+    \\usage: z_llvm [--emit=ir|asm|obj|ir-writer|semantic-descriptor] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
+    \\       z_llvm --emit=semantic-descriptor
     \\
     \\Supported passes: instcombine,dce,adce,early-cse,gvn,licm,simplifycfg,mem2reg,sroa,function-attrs,inline,vector-combine,slp-vectorizer,verify plus inventory placeholders
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
@@ -30,6 +32,7 @@ const Emit = enum {
     @"asm",
     obj,
     ir_writer,
+    semantic_descriptor,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -78,6 +81,8 @@ pub fn main(init: std.process.Init) !void {
                 emit = .obj;
             } else if (std.mem.eql(u8, emit_text, "ir-writer")) {
                 emit = .ir_writer;
+            } else if (std.mem.eql(u8, emit_text, "semantic-descriptor")) {
+                emit = .semantic_descriptor;
             } else {
                 return error.UnsupportedEmitMode;
             }
@@ -104,6 +109,10 @@ pub fn main(init: std.process.Init) !void {
         try writeIrWriterModuleFromEnv(allocator, io, init.environ_map);
         return;
     }
+    if (emit == .semantic_descriptor) {
+        try writeSemanticDescriptorFromEnv(io, init.environ_map);
+        return;
+    }
 
     const path = input_path orelse {
         var stderr_buffer: [4096]u8 = undefined;
@@ -116,7 +125,30 @@ pub fn main(init: std.process.Init) !void {
     const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
     defer allocator.free(input);
 
-    if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
+    if (resolveDirectSemanticDescriptor(io, input)) |descriptor| {
+        if (emit == .ir) {
+            var stdout_buffer: [4096]u8 = undefined;
+            var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+            try stdout_writer.interface.writeAll(input);
+            try stdout_writer.interface.flush();
+            return;
+        }
+        if (emit == .obj or emit == .@"asm") {
+            var module = buildStructuredDirectModuleFromDescriptor(allocator, io, descriptor) catch |err| {
+                try fatal(io, "direct semantic descriptor module build failed for {s}: {any}\n", .{ descriptor.id, err });
+            };
+            defer module.deinit();
+            if (target_triple) |triple| {
+                _ = target.Triple.parse(triple) catch {
+                    try fatal(io, "invalid target triple: {s}\n", .{triple});
+                };
+                if (module.target_triple == null) module.target_triple = triple;
+            }
+            try runStructuredDirectAcceptedPipelineForSurface(allocator, io, &module, init.environ_map, descriptor.surface);
+            try emitCodegenModule(allocator, io, module, emit, target_triple, quiet);
+            return;
+        }
+    } else if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
         if (emit == .ir) {
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -204,16 +236,27 @@ fn writeIrWriterModuleFromEnv(
     const source_wrapper_dispatch = !source_owned_dispatch and
         (std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
             envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", source_wrapper_dispatch_name));
+    const descriptor = if (source_owned_dispatch)
+        sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
+            try fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
+        }
+    else
+        null;
+    if (descriptor) |desc| {
+        if (sd.firstUnsupportedConstruct(desc)) |construct| {
+            try fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
+        }
+    }
     const ir_writer_case = if (source_owned_dispatch)
-        resolveReleaseSourceOwnedDispatchCase(wrapper, mode, source_fixture, source_tag)
+        null
     else if (source_wrapper_dispatch)
         resolveSourceWrapperDispatchCase(wrapper, mode)
     else
         findIrWriterCase(case_id);
-    const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
-    const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
-    const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
-    const lowering_ownership = if (ir_writer_case) |case|
+    const surface = if (descriptor) |desc| desc.surface else if (ir_writer_case) |case| case.surface else "minimal-ret0";
+    const construction = if (descriptor != null) IrConstruction.structured_builder.marker() else if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
+    const codegen_ownership = if (descriptor != null) CodegenOwnership.generic.marker() else if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
+    const lowering_ownership = if (descriptor != null) StructuredLoweringOwnership.semantic_record.marker() else if (ir_writer_case) |case|
         structuredLoweringOwnershipForCase(case).marker()
     else
         StructuredLoweringOwnership.manifest_structured.marker();
@@ -225,7 +268,7 @@ fn writeIrWriterModuleFromEnv(
 
     var buffer: [4096]u8 = undefined;
     var writer = file.writer(io, &buffer);
-    const is_structured_direct = if (ir_writer_case) |case| case.construction == .structured_builder else false;
+    const is_structured_direct = if (descriptor != null) true else if (ir_writer_case) |case| case.construction == .structured_builder else false;
     writer.interface.print(
         \\; ModuleID = "zllvm-external-ir-writer"
         \\source_filename = "{s}"
@@ -244,11 +287,13 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_direct_module = "{s}"
         \\; zllvm_ir_writer_codegen = "{s}"
         \\; zllvm_ir_writer_lowering = "{s}"
+        \\; zllvm_semantic_descriptor = "{s}"
+        \\; zllvm_semantic_descriptor_id = "{s}"
         \\
     , .{
         wrapper,
         case_id,
-        if (ir_writer_case) |case| case.id else "-",
+        if (descriptor) |desc| desc.id else if (ir_writer_case) |case| case.id else "-",
         if (source_owned_dispatch) source_owned_dispatch_name else if (source_wrapper_dispatch) source_wrapper_dispatch_name else "case-id",
         wrapper,
         mode,
@@ -260,10 +305,29 @@ fn writeIrWriterModuleFromEnv(
         if (is_structured_direct) "z_llvm-owned-internal-ir" else "not-used",
         codegen_ownership,
         lowering_ownership,
+        if (descriptor != null) "descriptor-owned" else "not-used",
+        if (descriptor) |desc| desc.id else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
-    if (ir_writer_case) |case| {
+    if (descriptor) |desc| {
+        writer.interface.writeAll("; zllvm_semantic_descriptor_features = \"") catch |err| {
+            try fatal(io, "failed to start semantic descriptor features {s}: {any}\n", .{ ir_path, err });
+        };
+        sd.writeFeatureList(desc.features, &writer.interface) catch |err| {
+            try fatal(io, "failed to write semantic descriptor features {s}: {any}\n", .{ ir_path, err });
+        };
+        writer.interface.writeAll("\"\n; zllvm_manual_fixture_dispatch = \"not-used\"\n\n") catch |err| {
+            try fatal(io, "failed to write semantic descriptor header {s}: {any}\n", .{ ir_path, err });
+        };
+        var direct_module = buildStructuredDirectModuleFromDescriptor(allocator, io, desc) catch |err| {
+            try fatal(io, "failed to build semantic descriptor module for {s}: {any}\n", .{ desc.id, err });
+        };
+        defer direct_module.deinit();
+    } else if (ir_writer_case) |case| {
+        writer.interface.writeAll("; zllvm_semantic_descriptor_features = \"-\"\n; zllvm_manual_fixture_dispatch = \"not-used\"\n\n") catch |err| {
+            try fatal(io, "failed to finish external IR writer header {s}: {any}\n", .{ ir_path, err });
+        };
         if (case.construction == .structured_builder) {
             var direct_module = buildStructuredDirectModule(allocator, io, case) catch |err| {
                 try fatal(io, "failed to build direct IR writer module for {s}: {any}\n", .{ case.id, err });
@@ -273,11 +337,35 @@ fn writeIrWriterModuleFromEnv(
             try case.write(io, &writer.interface, ir_path);
         }
     } else {
+        writer.interface.writeAll("; zllvm_semantic_descriptor_features = \"-\"\n; zllvm_manual_fixture_dispatch = \"not-used\"\n\n") catch |err| {
+            try fatal(io, "failed to finish minimal external IR writer header {s}: {any}\n", .{ ir_path, err });
+        };
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
     }
     writer.interface.flush() catch |err| {
         try fatal(io, "failed to flush external IR writer output {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeSemanticDescriptorFromEnv(
+    io: std.Io,
+    environ: *const std.process.Environ.Map,
+) !void {
+    const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
+    const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
+    const source_fixture = requiredEnv(io, environ, "ZLLVM_SOURCE_FIXTURE");
+    const source_tag = environ.get("ZLLVM_SOURCE_TAG") orelse "-";
+    const descriptor = sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
+        try fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
+    };
+    if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
+        try fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
+    }
+
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    try sd.writeText(descriptor, &stdout_writer.interface);
+    try stdout_writer.interface.flush();
 }
 
 fn emitCodegenModule(
@@ -343,6 +431,27 @@ fn buildStructuredDirectModule(
     return direct.finish();
 }
 
+fn buildStructuredDirectModuleFromDescriptor(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    descriptor: sd.Descriptor,
+) !ir.Module {
+    var direct = try sib.DirectBuilder.init(allocator, "zllvm-semantic-descriptor", "x86_64-unknown-linux-gnu");
+    errdefer direct.deinit();
+    direct.activate();
+    defer direct.deactivate();
+
+    var discard_buffer: [4096]u8 = undefined;
+    var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
+    sd.emit(descriptor, &discard_writer.writer) catch |err| switch (err) {
+        error.UnsupportedDescriptorConstruct => {
+            try fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ descriptor.surface, descriptor.source.wrapper, descriptor.source.fixture, descriptor.source.mode, descriptor.source.tag });
+        },
+        else => return err,
+    };
+    return direct.finish();
+}
+
 fn runStructuredDirectAcceptedPipeline(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -350,10 +459,20 @@ fn runStructuredDirectAcceptedPipeline(
     environ: *const std.process.Environ.Map,
     case: IrWriterCase,
 ) !void {
+    try runStructuredDirectAcceptedPipelineForSurface(allocator, io, module, environ, case.surface);
+}
+
+fn runStructuredDirectAcceptedPipelineForSurface(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    module: *ir.Module,
+    environ: *const std.process.Environ.Map,
+    surface: []const u8,
+) !void {
     const pipeline_mode = environ.get("ZLLVM_PIPELINE") orelse return;
     if (!std.mem.eql(u8, pipeline_mode, "preopt")) return;
     if (environ.get("ZLLVM_ZIG_MODE") == null) return;
-    if (!structuredDirectNeedsFoldPipeline(case.surface)) return;
+    if (!structuredDirectNeedsFoldPipeline(surface)) return;
 
     var pm = pass_manager.ModulePassManager.init(allocator);
     defer pm.deinit();
@@ -393,6 +512,30 @@ fn resolveDirectIrWriterCase(contents: []const u8) ?IrWriterCase {
     }
     const case_id = readHeaderValue(contents, "; zllvm_ir_writer_case = \"") orelse return null;
     return findIrWriterCase(case_id);
+}
+
+fn resolveDirectSemanticDescriptor(io: std.Io, contents: []const u8) ?sd.Descriptor {
+    const ownership = readHeaderValue(contents, "; zllvm_semantic_descriptor = \"") orelse return null;
+    if (!std.mem.eql(u8, ownership, "descriptor-owned")) return null;
+    const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing wrapper metadata\n", .{});
+    };
+    const mode = readHeaderValue(contents, "; zllvm_ir_writer_mode = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing mode metadata\n", .{});
+    };
+    const source_fixture = readHeaderValue(contents, "; zllvm_ir_writer_source_fixture = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing fixture metadata\n", .{});
+    };
+    const source_tag = readHeaderValue(contents, "; zllvm_ir_writer_source_tag = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing source tag metadata\n", .{});
+    };
+    const descriptor = sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
+        fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
+    };
+    if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
+        fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
+    }
+    return descriptor;
 }
 
 fn readHeaderValue(contents: []const u8, prefix: []const u8) ?[]const u8 {
