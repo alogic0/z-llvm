@@ -1,7 +1,6 @@
 const std = @import("std");
+const record_bodies = @import("semantic_record_bodies.zig");
 const sib = @import("structured_ir_builder.zig");
-
-pub const ExternalWriterFn = *const fn (std.Io, *std.Io.Writer, []const u8) anyerror!void;
 
 pub const Program = enum {
     tiny_scalar,
@@ -26,15 +25,16 @@ pub const Program = enum {
     atomic_add,
 };
 
-pub fn emitExternalRecord(
-    surface: []const u8,
-    io: std.Io,
-    writer: *std.Io.Writer,
-    ir_path: []const u8,
-    write: ExternalWriterFn,
-) !void {
-    _ = surface;
-    try write(io, writer, ir_path);
+pub fn isSemanticSurface(surface: []const u8) bool {
+    return semanticProgramForSurface(surface) != null or isSemanticRecordBodySurface(surface);
+}
+
+pub fn emitSurface(surface: []const u8, writer: *std.Io.Writer) !bool {
+    if (semanticProgramForSurface(surface)) |program| {
+        try emit(program, writer);
+        return true;
+    }
+    return record_bodies.emitSurface(surface, writer);
 }
 
 pub fn emit(program: Program, writer: *std.Io.Writer) !void {
@@ -61,6 +61,103 @@ pub fn emit(program: Program, writer: *std.Io.Writer) !void {
         .atomic_add => try atomicAdd(writer),
     }
 }
+
+fn semanticProgramForSurface(surface: []const u8) ?Program {
+    if (std.mem.eql(u8, surface, "scalar-add-ret")) return .tiny_scalar;
+    if (std.mem.eql(u8, surface, "integer-arithmetic")) return .integer_arithmetic;
+    if (std.mem.eql(u8, surface, "error-switch-select")) return .error_switch_select;
+    if (std.mem.eql(u8, surface, "direct-call")) return .direct_call;
+    if (std.mem.eql(u8, surface, "abi-arg-call")) return .call_chain;
+    if (std.mem.eql(u8, surface, "runtime-condbr")) return .cond_branch;
+    if (std.mem.eql(u8, surface, "runtime-phi-merge")) return .phi_merge;
+    if (std.mem.eql(u8, surface, "runtime-loop-sum")) return .loop_sum;
+    if (std.mem.eql(u8, surface, "global-update")) return .global_update;
+    if (std.mem.eql(u8, surface, "pointer-load-store")) return .pointer_load_store;
+    if (std.mem.eql(u8, surface, "struct-field-sum")) return .struct_sum;
+    if (std.mem.eql(u8, surface, "array-scalar-sum")) return .array_sum;
+    if (std.mem.eql(u8, surface, "optional-scalar-payload")) return .optional_payload;
+    if (std.mem.eql(u8, surface, "error-union-payload")) return .error_union_payload;
+    if (std.mem.eql(u8, surface, "slice-loop-sum")) return .slice_sum;
+    if (std.mem.eql(u8, surface, "fp-literal-return")) return .fp_literals;
+    if (std.mem.eql(u8, surface, "comptime-const-mul")) return .comptime_const;
+    if (std.mem.eql(u8, surface, "add-imm-return")) return .debug_location;
+    if (std.mem.eql(u8, surface, "tls-read")) return .tls_read;
+    if (std.mem.eql(u8, surface, "atomic-add")) return .atomic_add;
+    return null;
+}
+
+fn isSemanticRecordBodySurface(surface: []const u8) bool {
+    inline for (semantic_record_body_surfaces) |candidate| {
+        if (std.mem.eql(u8, surface, candidate)) return true;
+    }
+    return false;
+}
+
+const semantic_record_body_surfaces = [_][]const u8{
+    "global-load",
+    "runtime-switch",
+    "optional-pointer",
+    "packed-read-flag",
+    "packed-replace-low",
+    "checked-add-imm-boundary",
+    "checked-global-update-boundary",
+    "checked-pointer-load-store-boundary",
+    "checked-call-chain-boundary",
+    "checked-array-sum-boundary",
+    "checked-struct-sum-boundary",
+    "checked-slice-loop-sum-boundary",
+    "checked-branch-mix-boundary",
+    "checked-add-runtime-boundary",
+    "tls-bump",
+    "checked-tls-bump-boundary",
+    "inline-asm-barrier",
+    "aggregate-pair-abi",
+    "float-less",
+    "float-add",
+    "float-sub",
+    "hidden-global-access",
+    "mixed-c-zig-add",
+    "mixed-c-zig-panic-add",
+    "umul-fix-sat-i64",
+    "inherit-i64-return",
+    "compile-asm-unreachable",
+    "start-trampoline",
+    "getauxval-pointer-walk",
+    "f128-sret-byval",
+    "noreturn-unreachable-stub",
+    "address-space-volatile-store",
+    "raw-start-loop",
+    "i1-const-return",
+    "constant-string-slice-return",
+    "libfuzzer-vtable-run",
+    "str-from-float-help",
+    "base64-decode-base64-full",
+    "base64-decode-step",
+    "base64-store-step",
+    "base64-residual-byte-step",
+    "base64-padding-tail-step",
+    "base64-padding-loop-step",
+    "base64-padding-length-step",
+    "base64-chunk-guard-step",
+    "base64-source-stride-step",
+    "base64-source-bundle-step",
+    "base64-next-source-bundle-step",
+    "base64-third-source-bundle-step",
+    "base64-bit-buffer-store-step",
+    "base64-loop-advance-step",
+    "base64-residual-guard-step",
+    "base64-residual-bundle-step",
+    "base64-residual-store-step",
+    "base64-residual-length-step",
+    "base64-residual-table-check-step",
+    "base64-residual-accumulator-step",
+    "base64-residual-loop-advance-step",
+    "base64-residual-padding-check-step",
+    "base64-residual-final-mask-step",
+    "base64-residual-padding-loop-step",
+    "base64-decode-exit-step",
+    "table-indexed-load",
+};
 
 fn tinyScalar(writer: *std.Io.Writer) !void {
     var module = sib.Module.init(writer);

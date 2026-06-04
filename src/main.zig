@@ -213,9 +213,7 @@ fn writeIrWriterModuleFromEnv(
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
     const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
-    const lowering_ownership = if (source_owned_dispatch)
-        StructuredLoweringOwnership.semantic.marker()
-    else if (ir_writer_case) |case|
+    const lowering_ownership = if (ir_writer_case) |case|
         structuredLoweringOwnershipForCase(case).marker()
     else
         StructuredLoweringOwnership.manifest_structured.marker();
@@ -272,11 +270,7 @@ fn writeIrWriterModuleFromEnv(
             };
             defer direct_module.deinit();
         } else {
-            if (source_owned_dispatch) {
-                try zsl.emitExternalRecord(case.surface, io, &writer.interface, ir_path, case.write);
-            } else {
-                try case.write(io, &writer.interface, ir_path);
-            }
+            try case.write(io, &writer.interface, ir_path);
         }
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
@@ -343,7 +337,9 @@ fn buildStructuredDirectModule(
 
     var discard_buffer: [4096]u8 = undefined;
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
-    try zsl.emitExternalRecord(case.surface, io, &discard_writer.writer, "<zllvm-structured-direct>", case.write);
+    if (!try zsl.emitSurface(case.surface, &discard_writer.writer)) {
+        try case.write(io, &discard_writer.writer, "<zllvm-structured-direct>");
+    }
     return direct.finish();
 }
 
@@ -445,12 +441,14 @@ const CodegenOwnership = enum {
 
 const StructuredLoweringOwnership = enum {
     manifest_structured,
-    semantic,
+    semantic_record,
+    external_writer_delegate,
 
     fn marker(self: StructuredLoweringOwnership) []const u8 {
         return switch (self) {
             .manifest_structured => "lowering=manifest-structured",
-            .semantic => "lowering=zig-semantic-records",
+            .semantic_record => "lowering=zig-semantic-records",
+            .external_writer_delegate => "lowering=external-writer-delegate",
         };
     }
 };
@@ -810,7 +808,8 @@ fn codegenOwnershipForCase(case: IrWriterCase) CodegenOwnership {
 }
 
 fn structuredLoweringOwnershipForCase(case: IrWriterCase) StructuredLoweringOwnership {
-    if (semanticProgramForCase(case) != null) return .semantic;
+    if (zsl.isSemanticSurface(case.surface)) return .semantic_record;
+    if (case.construction == .structured_builder) return .external_writer_delegate;
     return .manifest_structured;
 }
 

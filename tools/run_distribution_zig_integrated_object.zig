@@ -1327,6 +1327,8 @@ pub fn main(init: std.process.Init) !void {
     var case_id_rows: usize = 0;
     var manifest_structured_rows: usize = 0;
     var semantic_lowering_rows: usize = 0;
+    var semantic_record_rows: usize = 0;
+    var external_writer_delegate_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1497,8 +1499,11 @@ pub fn main(init: std.process.Init) !void {
                 structured_builder_rows += 1;
                 if (std.mem.eql(u8, lowering_ownership, "lowering=zig-semantic-records")) {
                     semantic_lowering_rows += 1;
+                    semantic_record_rows += 1;
                 } else if (std.mem.eql(u8, lowering_ownership, "lowering=manifest-structured")) {
                     manifest_structured_rows += 1;
+                } else if (std.mem.eql(u8, lowering_ownership, "lowering=external-writer-delegate")) {
+                    external_writer_delegate_rows += 1;
                 } else {
                     try common.validationError(io, "external IR writer selected row {s} reported unsupported structured lowering ownership: {s}\n", .{ case.id, lowering_ownership });
                 }
@@ -1587,12 +1592,12 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != 90 or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
-                try common.validationError(io, "release source-owned gate requires all rows source-owned semantic structured-direct generic; release_source_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
+            if (semantic_record_rows != 90 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires all rows source-owned semantic structured-direct generic; release_source_rows={} semantic_record_rows={} external_writer_delegate_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, semantic_record_rows, external_writer_delegate_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
-                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ release_source_rows, source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, semantic_lowering_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
         }
         if (source_wrapper_dispatch) {
@@ -1606,16 +1611,16 @@ pub fn main(init: std.process.Init) !void {
                 try common.validationError(io, "source-wrapper dispatch gate requires semantic/manifest lowering accounting with at least one semantic row; source_wrappers={} semantic_lowering_rows={} manifest_structured_rows={}\n", .{ source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows });
             }
             try stdout_writer.interface.print(
-                "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} case_specific_rows={} fallback_rows={} local_fail=0\n",
-                .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, manifest_structured_rows, semantic_lowering_rows, case_specific_codegen_rows, fallback_rows },
+                "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} case_specific_rows={} fallback_rows={} local_fail=0\n",
+                .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, manifest_structured_rows, semantic_lowering_rows, semantic_record_rows, external_writer_delegate_rows, case_specific_codegen_rows, fallback_rows },
             );
         }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, manifest_structured_rows, semantic_lowering_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, manifest_structured_rows, semantic_lowering_rows, semantic_record_rows, external_writer_delegate_rows, minimal_wrapper_rows },
         );
         try stdout_writer.interface.print("ownership-summary structured-direct:{};structured-textual:{};textual-boundary:{};ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};llvm-text-parse=not-used-for-structured;{s}\n", .{ structured_direct_rows, structured_textual_rows, textual_boundary_rows, structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
-        try stdout_writer.interface.print("lowering-summary manifest-structured:{};zig-semantic-records:{}\n", .{ manifest_structured_rows, semantic_lowering_rows });
+        try stdout_writer.interface.print("lowering-summary manifest-structured:{};zig-semantic-records:{};external-writer-delegate:{}\n", .{ manifest_structured_rows, semantic_record_rows, external_writer_delegate_rows });
         try stdout_writer.interface.print("codegen-summary generic-codegen:{};case-specific-codegen:{};textual-boundary-out-of-scope:{}\n", .{ generic_codegen_rows, case_specific_codegen_rows, textual_boundary_rows });
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
