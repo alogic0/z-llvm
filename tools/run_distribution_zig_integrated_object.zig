@@ -1227,6 +1227,7 @@ pub fn main(init: std.process.Init) !void {
     var use_ir_writer = false;
     var broad_source_backed = false;
     var source_wrapper_dispatch = false;
+    var release_source_owned = false;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
             pipeline = .postopt;
@@ -1242,6 +1243,10 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.eql(u8, arg, "--source-wrapper-dispatch")) {
             use_ir_writer = true;
             source_wrapper_dispatch = true;
+            pipeline = .preopt;
+        } else if (std.mem.eql(u8, arg, "--release-source-owned")) {
+            use_ir_writer = true;
+            release_source_owned = true;
             pipeline = .preopt;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             mode_filter = arg["--mode=".len..];
@@ -1294,7 +1299,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     var skipped_with_reason: usize = 0;
-    if (broad_source_backed) {
+    if (broad_source_backed or release_source_owned) {
         skipped_with_reason = try validateBroadSourceBackedInventory(allocator, io, &stdout_writer.interface);
     }
     try stdout_writer.interface.print(
@@ -1317,6 +1322,7 @@ pub fn main(init: std.process.Init) !void {
     var case_specific_codegen_rows: usize = 0;
     var source_backed_rows: usize = 0;
     var source_wrapper_rows: usize = 0;
+    var release_source_rows: usize = 0;
     var fallback_rows: usize = 0;
     var case_id_rows: usize = 0;
     var manifest_structured_rows: usize = 0;
@@ -1419,6 +1425,7 @@ pub fn main(init: std.process.Init) !void {
     };
     for (cases) |case| {
         if (broad_source_backed and !isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (release_source_owned and !isReleaseDistributionFixture(case.covered_fixture)) continue;
         if (source_wrapper_dispatch and !isSourceWrapperDispatchCase(case)) continue;
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
@@ -1429,7 +1436,12 @@ pub fn main(init: std.process.Init) !void {
         try requirePairing(case);
         total += 1;
         if (broad_source_backed) source_backed_rows += 1;
-        if (source_wrapper_dispatch) source_wrapper_rows += 1;
+        if (release_source_owned) {
+            release_source_rows += 1;
+            source_wrapper_rows += 1;
+        } else if (source_wrapper_dispatch) {
+            source_wrapper_rows += 1;
+        }
         const exe = try common.allocTempFile(allocator, temp, case.id, "_integrated");
         defer allocator.free(exe);
         const object = try common.allocTempFile(allocator, temp, case.id, ".o");
@@ -1440,12 +1452,18 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(marker);
         try env_map.put("ZLLVM_MARKER_PATH", marker);
         try env_map.put("ZLLVM_ZIG_MODE", case.mode);
-        try env_map.put("ZLLVM_CASE_ID", if (source_wrapper_dispatch) source_wrapper_dispatch_case_id else case.id);
+        const use_source_dispatch = source_wrapper_dispatch or release_source_owned;
+        try env_map.put("ZLLVM_CASE_ID", if (use_source_dispatch) source_wrapper_dispatch_case_id else case.id);
         try env_map.put("ZLLVM_WRAPPER", case.wrapper);
         if (source_wrapper_dispatch) try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-wrapper");
+        if (release_source_owned) {
+            try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
+            try env_map.put("ZLLVM_SOURCE_FIXTURE", case.covered_fixture);
+            try env_map.put("ZLLVM_SOURCE_TAG", sourceMetadataTag(case.fallback));
+        }
         if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
-        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null, if (source_wrapper_dispatch) source_wrapper_dispatch_case_id else case.id);
+        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null, if (use_source_dispatch) source_wrapper_dispatch_case_id else case.id);
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
         const construction = if (use_ir_writer) try readIrWriterConstruction(allocator, io, ir_path, case) else "-";
         defer if (use_ir_writer) allocator.free(construction);
@@ -1460,9 +1478,10 @@ pub fn main(init: std.process.Init) !void {
         const lowering_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_lowering = \"", "zllvm_ir_writer_lowering") else "-";
         defer if (use_ir_writer) allocator.free(lowering_ownership);
         if (use_ir_writer) {
-            if (source_wrapper_dispatch) {
-                if (!std.mem.eql(u8, writer_dispatch, "source-wrapper")) {
-                    try common.validationError(io, "source-wrapper dispatch row {s} did not report source-wrapper dispatch: {s}\n", .{ case.id, writer_dispatch });
+            if (source_wrapper_dispatch or release_source_owned) {
+                const expected_dispatch = if (release_source_owned) "source-owned" else "source-wrapper";
+                if (!std.mem.eql(u8, writer_dispatch, expected_dispatch)) {
+                    try common.validationError(io, "{s} dispatch row {s} did not report expected dispatch: {s}\n", .{ expected_dispatch, case.id, writer_dispatch });
                 }
                 if (!std.mem.eql(u8, writer_case_id, source_wrapper_dispatch_case_id)) {
                     case_id_rows += 1;
@@ -1506,6 +1525,9 @@ pub fn main(init: std.process.Init) !void {
         if (broad_source_backed and !std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder")) {
             fallback_rows += 1;
         }
+        if (release_source_owned and (!std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder") or !std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder"))) {
+            fallback_rows += 1;
+        }
         if (source_wrapper_dispatch and (!std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder") or !std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder"))) {
             fallback_rows += 1;
         }
@@ -1528,7 +1550,7 @@ pub fn main(init: std.process.Init) !void {
         if (minimal_wrapper_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
         }
-        if (!broad_source_backed and total == expected_selected_ir_writer_rows and structured_direct_rows != expected_selected_ir_writer_rows) {
+        if (!broad_source_backed and !release_source_owned and total == expected_selected_ir_writer_rows and structured_direct_rows != expected_selected_ir_writer_rows) {
             try common.validationError(io, "external IR writer selected rows must all be structured-direct at total={}; structured_direct_rows={}\n", .{ expected_selected_ir_writer_rows, structured_direct_rows });
         }
         if (structured_textual_rows != 0) {
@@ -1537,7 +1559,7 @@ pub fn main(init: std.process.Init) !void {
         if (textual_boundary_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not keep textual boundary rows; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
-        if (!broad_source_backed and total == expected_selected_ir_writer_rows and (generic_codegen_rows != expected_selected_ir_writer_rows or case_specific_codegen_rows != 0)) {
+        if (!broad_source_backed and !release_source_owned and total == expected_selected_ir_writer_rows and (generic_codegen_rows != expected_selected_ir_writer_rows or case_specific_codegen_rows != 0)) {
             try common.validationError(io, "external IR writer structured-direct rows must all use generic x86_64 codegen; structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={}\n", .{ structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows });
         }
         if (broad_source_backed) {
@@ -1556,6 +1578,21 @@ pub fn main(init: std.process.Init) !void {
             try stdout_writer.interface.print(
                 "summary source-backed-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_backed_rows={} structured_direct_rows={} generic_codegen_rows={} skipped_with_reason={} fallback_rows={} local_fail=0\n",
                 .{ source_backed_rows, structured_direct_rows, generic_codegen_rows, skipped_with_reason, fallback_rows },
+            );
+        }
+        if (release_source_owned) {
+            if (release_source_rows != total or source_wrapper_rows != total) {
+                try common.validationError(io, "release source-owned row accounting mismatch: release_source_rows={} source_wrapper_rows={} total={}\n", .{ release_source_rows, source_wrapper_rows, total });
+            }
+            if (release_source_rows != 90 or skipped_with_reason != 0) {
+                try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
+            }
+            if (semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires all rows source-owned semantic structured-direct generic; release_source_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
+            }
+            try stdout_writer.interface.print(
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
         }
         if (source_wrapper_dispatch) {
@@ -1984,6 +2021,13 @@ fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8
     {
         try common.validationError(io, "external IR writer selected row {s} reported forbidden libLLVM ownership fallback: {s}\n", .{ case.id, fallback });
     }
+}
+
+fn sourceMetadataTag(fallback: []const u8) []const u8 {
+    const marker = "source-backed:";
+    const value_start = (std.mem.indexOf(u8, fallback, marker) orelse return "-") + marker.len;
+    const value_end = std.mem.indexOfScalarPos(u8, fallback, value_start, ';') orelse fallback.len;
+    return fallback[value_start..value_end];
 }
 
 fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {

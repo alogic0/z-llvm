@@ -10,6 +10,8 @@ const target = @import("target.zig");
 const zsl = @import("zig_semantic_lowering.zig");
 
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
+const source_wrapper_dispatch_name = "source-wrapper";
+const source_owned_dispatch_name = "source-owned";
 
 const usage =
     \\usage: z_llvm [--emit=ir|asm|obj|ir-writer] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
@@ -196,13 +198,27 @@ fn writeIrWriterModuleFromEnv(
     const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
     const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
     const ir_path = requiredEnv(io, environ, "ZLLVM_IR_PATH");
-    const source_wrapper_dispatch = std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
-        envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", "source-wrapper");
-    const ir_writer_case = if (source_wrapper_dispatch) resolveSourceWrapperDispatchCase(wrapper, mode) else findIrWriterCase(case_id);
+    const source_fixture = environ.get("ZLLVM_SOURCE_FIXTURE") orelse "-";
+    const source_tag = environ.get("ZLLVM_SOURCE_TAG") orelse "-";
+    const source_owned_dispatch = envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", source_owned_dispatch_name);
+    const source_wrapper_dispatch = !source_owned_dispatch and
+        (std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
+            envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", source_wrapper_dispatch_name));
+    const ir_writer_case = if (source_owned_dispatch)
+        resolveReleaseSourceOwnedDispatchCase(wrapper, mode, source_fixture, source_tag)
+    else if (source_wrapper_dispatch)
+        resolveSourceWrapperDispatchCase(wrapper, mode)
+    else
+        findIrWriterCase(case_id);
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
     const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
-    const lowering_ownership = if (ir_writer_case) |case| structuredLoweringOwnershipForCase(case).marker() else StructuredLoweringOwnership.manifest_structured.marker();
+    const lowering_ownership = if (source_owned_dispatch)
+        StructuredLoweringOwnership.semantic.marker()
+    else if (ir_writer_case) |case|
+        structuredLoweringOwnershipForCase(case).marker()
+    else
+        StructuredLoweringOwnership.manifest_structured.marker();
 
     var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
         try fatal(io, "failed to create external IR writer output {s}: {any}\n", .{ ir_path, err });
@@ -222,6 +238,8 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_dispatch = "{s}"
         \\; zllvm_ir_writer_wrapper = "{s}"
         \\; zllvm_ir_writer_mode = "{s}"
+        \\; zllvm_ir_writer_source_fixture = "{s}"
+        \\; zllvm_ir_writer_source_tag = "{s}"
         \\; zllvm_ir_writer_surface = "{s}"
         \\; zllvm_ir_writer_construction = "{s}"
         \\; zllvm_ir_writer_llvm_text_parse = "{s}"
@@ -233,9 +251,11 @@ fn writeIrWriterModuleFromEnv(
         wrapper,
         case_id,
         if (ir_writer_case) |case| case.id else "-",
-        if (source_wrapper_dispatch) "source-wrapper" else "case-id",
+        if (source_owned_dispatch) source_owned_dispatch_name else if (source_wrapper_dispatch) source_wrapper_dispatch_name else "case-id",
         wrapper,
         mode,
+        source_fixture,
+        source_tag,
         surface,
         construction,
         if (is_structured_direct) "not-used" else "required-for-textual-boundary",
@@ -252,7 +272,11 @@ fn writeIrWriterModuleFromEnv(
             };
             defer direct_module.deinit();
         } else {
-            try case.write(io, &writer.interface, ir_path);
+            if (source_owned_dispatch) {
+                try zsl.emitExternalRecord(case.surface, io, &writer.interface, ir_path, case.write);
+            } else {
+                try case.write(io, &writer.interface, ir_path);
+            }
         }
     } else {
         try writeMinimalIrWriterBody(io, &writer.interface, ir_path);
@@ -319,7 +343,7 @@ fn buildStructuredDirectModule(
 
     var discard_buffer: [4096]u8 = undefined;
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
-    try case.write(io, &discard_writer.writer, "<zllvm-structured-direct>");
+    try zsl.emitExternalRecord(case.surface, io, &discard_writer.writer, "<zllvm-structured-direct>", case.write);
     return direct.finish();
 }
 
@@ -359,7 +383,14 @@ fn resolveDirectIrWriterCase(contents: []const u8) ?IrWriterCase {
     const construction = readHeaderValue(contents, "; zllvm_ir_writer_construction = \"") orelse return null;
     if (!std.mem.eql(u8, construction, IrConstruction.structured_builder.marker())) return null;
     const dispatch = readHeaderValue(contents, "; zllvm_ir_writer_dispatch = \"") orelse "case-id";
-    if (std.mem.eql(u8, dispatch, "source-wrapper")) {
+    if (std.mem.eql(u8, dispatch, source_owned_dispatch_name)) {
+        const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse return null;
+        const mode = readHeaderValue(contents, "; zllvm_ir_writer_mode = \"") orelse return null;
+        const source_fixture = readHeaderValue(contents, "; zllvm_ir_writer_source_fixture = \"") orelse return null;
+        const source_tag = readHeaderValue(contents, "; zllvm_ir_writer_source_tag = \"") orelse return null;
+        return resolveReleaseSourceOwnedDispatchCase(wrapper, mode, source_fixture, source_tag);
+    }
+    if (std.mem.eql(u8, dispatch, source_wrapper_dispatch_name)) {
         const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse return null;
         const mode = readHeaderValue(contents, "; zllvm_ir_writer_mode = \"") orelse return null;
         return resolveSourceWrapperDispatchCase(wrapper, mode);
@@ -430,6 +461,14 @@ const SourceWrapperDispatchEntry = struct {
     case_id: []const u8,
 };
 
+const ReleaseSourceOwnedDispatchEntry = struct {
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    case_id: []const u8,
+};
+
 const IrWriterCase = struct {
     id: []const u8,
     surface: []const u8,
@@ -487,6 +526,99 @@ const source_wrapper_dispatch_entries = [_]SourceWrapperDispatchEntry{
     .{ .wrapper = "test/zig/integrated/runtime_str_from_float_help_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_runtime_str_from_float_help" },
     .{ .wrapper = "test/zig/integrated/runtime_base64_decode_base_64_full_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_runtime_base64_decode_base_64_full" },
     .{ .wrapper = "test/zig/integrated/base64_table_lookup_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_base64_table_lookup" },
+};
+
+const release_source_owned_dispatch_entries = [_]ReleaseSourceOwnedDispatchEntry{
+    .{ .wrapper = "test/zig/integrated/tiny_scalar_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll", .tag = "tiny-scalar", .case_id = "releasefast_source_tiny_scalar" },
+    .{ .wrapper = "test/zig/integrated/integers_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/integers_add_wrap.ll", .tag = "integers-add-wrap", .case_id = "releasefast_source_integers_add_wrap" },
+    .{ .wrapper = "test/zig/integrated/integers_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/integers_cmp_shift.ll", .tag = "integers-cmp-shift", .case_id = "releasefast_source_integers_cmp_shift" },
+    .{ .wrapper = "test/zig/integrated/runtime_loop_sum_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/control_flow_calls_loop_sum.ll", .tag = "control-flow-loop-sum", .case_id = "releasefast_source_control_flow_loop_sum" },
+    .{ .wrapper = "test/zig/integrated/control_flow_calls_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/control_flow_calls_call_chain.ll", .tag = "control-flow-call-chain", .case_id = "releasefast_source_control_flow_call_chain" },
+    .{ .wrapper = "test/zig/integrated/error_switch_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/error_switch_error_switch.ll", .tag = "error-switch", .case_id = "releasefast_source_error_switch_error_switch" },
+    .{ .wrapper = "test/zig/integrated/runtime_cond_branch_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/switch_control_branch_mix.ll", .tag = "switch-branch-mix", .case_id = "releasefast_source_switch_branch_mix" },
+    .{ .wrapper = "test/zig/integrated/runtime_switch_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/switch_control_dense_switch.ll", .tag = "switch-dense", .case_id = "releasefast_source_switch_dense" },
+    .{ .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/pointers_memory_basic.ll", .tag = "pointers-memory", .case_id = "releasefast_source_pointers_memory" },
+    .{ .wrapper = "test/zig/integrated/runtime_optional_pointer_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/optional_pointer_value.ll", .tag = "optional-pointer-value", .case_id = "releasefast_source_optional_pointer_value" },
+    .{ .wrapper = "test/zig/integrated/runtime_packed_read_flag_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/packed_bits_basic.ll", .tag = "packed-bits-read-flag", .case_id = "releasefast_source_packed_bits_basic_read_flag" },
+    .{ .wrapper = "test/zig/integrated/runtime_packed_replace_low_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/packed_bits_basic.ll", .tag = "packed-bits-replace-low", .case_id = "releasefast_source_packed_bits_basic_replace_low" },
+    .{ .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_struct_sum.ll", .tag = "aggregates-struct-sum", .case_id = "releasefast_source_aggregates_struct_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_array_sum_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_array_sum.ll", .tag = "aggregates-array-sum", .case_id = "releasefast_source_aggregates_array_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_optional_payload_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_optional_payload.ll", .tag = "aggregates-optional-payload", .case_id = "releasefast_source_aggregates_optional_payload" },
+    .{ .wrapper = "test/zig/integrated/runtime_error_union_payload_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_error_union_payload.ll", .tag = "aggregates-error-union-payload", .case_id = "releasefast_source_aggregates_error_union_payload" },
+    .{ .wrapper = "test/zig/integrated/runtime_slice_sum_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregates_slice_sum.ll", .tag = "aggregates-slice-sum", .case_id = "releasefast_source_aggregates_slice_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_fp_constants_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/fp_constants_literals.ll", .tag = "fp-constants-literals", .case_id = "releasefast_source_fp_constants_literals" },
+    .{ .wrapper = "test/zig/integrated/runtime_comptime_const_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/globals_comptime_const.ll", .tag = "globals-comptime-const", .case_id = "releasefast_source_globals_comptime_const" },
+    .{ .wrapper = "test/zig/integrated/runtime_global_update_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/globals_comptime_global_counter.ll", .tag = "globals-comptime-global-counter", .case_id = "releasefast_source_globals_comptime_global_counter" },
+    .{ .wrapper = "test/zig/integrated/runtime_debug_location_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/atomics_debug_location.ll", .tag = "atomics-debug-location", .case_id = "releasefast_source_atomics_debug_location" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll", .tag = "tls-concurrency-read", .case_id = "releasefast_source_tls_concurrency_counter_read" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll", .tag = "tls-concurrency-bump", .case_id = "releasefast_source_tls_concurrency_counter_bump" },
+    .{ .wrapper = "test/zig/integrated/runtime_atomic_add_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/atomics_atomic_add.ll", .tag = "atomics-atomic-add", .case_id = "releasefast_source_atomics_atomic_add" },
+    .{ .wrapper = "test/zig/integrated/runtime_inline_asm_barrier_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/atomics_inline_asm_barrier.ll", .tag = "atomics-inline-asm-barrier", .case_id = "releasefast_source_atomics_inline_asm_barrier" },
+    .{ .wrapper = "test/zig/integrated/runtime_aggregate_pair_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/aggregate_abi_pair.ll", .tag = "aggregate-abi-pair", .case_id = "releasefast_source_aggregate_abi_pair" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_less_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/float_compare_basic.ll", .tag = "float-compare", .case_id = "releasefast_source_float_compare" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_add_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/floats_math_basic.ll", .tag = "floats-math", .case_id = "releasefast_source_floats_math" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_sub_main.zig", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/fp_extended_ops_basic.ll", .tag = "fp-extended-ops", .case_id = "releasefast_source_fp_extended_ops" },
+    .{ .wrapper = "test/zig/integrated/error_switch_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/error_switch_select.ll", .tag = "error-switch-select", .case_id = "releasesafe_source_error_switch_select" },
+    .{ .wrapper = "test/zig/integrated/runtime_debug_location_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/atomics_debug_location_checked.ll", .tag = "atomics-debug-location-checked", .case_id = "releasesafe_source_atomics_debug_location_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_global_update_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/globals_comptime_checked.ll", .tag = "globals-checked", .case_id = "releasesafe_source_globals_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/pointers_memory_checked.ll", .tag = "pointers-memory-checked", .case_id = "releasesafe_source_pointers_memory_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_branch_mix_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/switch_control_branch_mix_checked.ll", .tag = "switch-branch-mix-checked", .case_id = "releasesafe_source_switch_branch_mix_checked" },
+    .{ .wrapper = "test/zig/integrated/control_flow_calls_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/control_flow_calls_checked.ll", .tag = "control-flow-calls-checked", .case_id = "releasesafe_source_control_flow_calls_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll", .tag = "tls-concurrency-checked-bump", .case_id = "releasesafe_source_tls_concurrency_checked_bump" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll", .tag = "tls-concurrency-checked-read", .case_id = "releasesafe_source_tls_concurrency_checked_read" },
+    .{ .wrapper = "test/zig/integrated/runtime_array_sum_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll", .tag = "aggregates-checked-array", .case_id = "releasesafe_source_aggregates_checked_array" },
+    .{ .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll", .tag = "aggregates-checked-struct", .case_id = "releasesafe_source_aggregates_checked_struct" },
+    .{ .wrapper = "test/zig/integrated/runtime_slice_sum_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/aggregates_checked_sums.ll", .tag = "aggregates-checked-slice", .case_id = "releasesafe_source_aggregates_checked_slice" },
+    .{ .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig", .mode = "ReleaseSafe", .fixture = "test/distribution/releasesafe_x86_64/inputs/tiny_scalar_checked_add.ll", .tag = "tiny-scalar-checked-add", .case_id = "releasesafe_source_tiny_scalar_checked_add" },
+    .{ .wrapper = "test/zig/integrated/runtime_hidden_access_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_extern_exports_hidden_access.ll", .tag = "-", .case_id = "releasesmall_runtime_hidden_access" },
+    .{ .wrapper = "test/zig/integrated/runtime_hidden_access_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_extern_exports_hidden_access.ll", .tag = "hidden-access", .case_id = "releasesmall_source_standalone_extern_exports_hidden_access" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_zig_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_zig.ll", .tag = "-", .case_id = "releasesmall_runtime_mix_c_add_zig" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_zig_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_zig.ll", .tag = "mixed-c-add-zig", .case_id = "releasesmall_source_standalone_mix_c_files_add_zig" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_may_panic_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll", .tag = "-", .case_id = "releasesmall_runtime_mix_c_add_may_panic" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_may_panic_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_mix_c_files_add_may_panic.ll", .tag = "mixed-c-add-may-panic", .case_id = "releasesmall_source_standalone_mix_c_files_add_may_panic" },
+    .{ .wrapper = "test/zig/integrated/runtime_umul_fix_sat_i64_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.ll", .tag = "-", .case_id = "releasesmall_runtime_umul_fix_sat_i64" },
+    .{ .wrapper = "test/zig/integrated/runtime_umul_fix_sat_i64_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/no_compile_panic_for_unchecked_arith_umul_fix_sat_i64.ll", .tag = "umul-fix-sat-i64", .case_id = "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64" },
+    .{ .wrapper = "test/zig/integrated/runtime_inherit_want_safety_i64_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/inherit_want_safety_i64_return.ll", .tag = "-", .case_id = "releasesmall_runtime_inherit_want_safety_i64" },
+    .{ .wrapper = "test/zig/integrated/runtime_inherit_want_safety_i64_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/inherit_want_safety_i64_return.ll", .tag = "inherit-want-safety-i64-return", .case_id = "releasesmall_source_inherit_want_safety_i64_return" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_compile_asm_main_unreachable.ll", .tag = "-", .case_id = "releasesmall_runtime_compile_asm_unreachable" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_compile_asm_main_unreachable.ll", .tag = "compile-asm-main-unreachable", .case_id = "releasesmall_source_standalone_compile_asm_main_unreachable" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll", .tag = "address-space-start-trampoline", .case_id = "releasesmall_source_address_space_start_trampoline" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll", .tag = "getauxval-pointer-walk", .case_id = "releasesmall_source_array_in_anon_struct_getauxval" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll", .tag = "f128-sret-byval", .case_id = "releasesmall_source_c_abi_main_f128_sret" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll", .tag = "logical-pointer-unreachable", .case_id = "releasesmall_source_compile_errors_logical_ptr_elem_ptr" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/export_keyword_vram_store.ll", .tag = "vram-volatile-store", .case_id = "releasesmall_source_export_keyword_vram_store" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll", .tag = "unreachable-stubs", .case_id = "releasesmall_source_sizeof_typeof_unreachable_stubs" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll", .tag = "raw-start-loop", .case_id = "releasesmall_source_standalone_install_raw_hex_start_loop" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll", .tag = "libfuzzer-futex-wait", .case_id = "releasesmall_source_standalone_libfuzzer_runner_futex_wait" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll", .tag = "libfuzzer-test-name", .case_id = "releasesmall_source_standalone_libfuzzer_runner_test_name" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll", .tag = "libfuzzer-test-run", .case_id = "releasesmall_source_standalone_libfuzzer_runner_test_run" },
+    .{ .wrapper = "test/zig/integrated/runtime_str_from_float_help_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll", .tag = "-", .case_id = "releasesmall_runtime_str_from_float_help" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_decode_base_64_full_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_decode_base_64_full" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_decode_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_decode_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_store_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_store_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_byte_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_byte_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_padding_tail_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_padding_tail_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_padding_loop_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_padding_loop_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_padding_length_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_padding_length_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_chunk_guard_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_chunk_guard_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_source_stride_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_source_stride_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_source_bundle_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_source_bundle_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_next_source_bundle_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_next_source_bundle_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_third_source_bundle_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_third_source_bundle_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_bit_buffer_store_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_bit_buffer_store_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_loop_advance_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_loop_advance_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_guard_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_guard_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_bundle_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_bundle_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_store_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_store_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_length_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_length_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_table_check_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_table_check_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_accumulator_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_accumulator_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_loop_advance_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_loop_advance_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_padding_check_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_padding_check_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_final_mask_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_final_mask_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_residual_padding_loop_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_residual_padding_loop_step" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_decode_exit_step_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll", .tag = "-", .case_id = "releasesmall_runtime_base64_decode_exit_step" },
+    .{ .wrapper = "test/zig/integrated/base64_table_lookup_main.zig", .mode = "ReleaseSmall", .fixture = "test/distribution/releasesmall_x86_64/inputs/base64_table_lookup.ll", .tag = "base64-table-lookup", .case_id = "releasesmall_source_base64_table_lookup" },
 };
 
 const ir_writer_cases = [_]IrWriterCase{
@@ -648,6 +780,24 @@ fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
 fn resolveSourceWrapperDispatchCase(wrapper: []const u8, mode: []const u8) ?IrWriterCase {
     for (source_wrapper_dispatch_entries) |entry| {
         if (std.mem.eql(u8, entry.wrapper, wrapper) and std.mem.eql(u8, entry.mode, mode)) {
+            return findIrWriterCase(entry.case_id);
+        }
+    }
+    return null;
+}
+
+fn resolveReleaseSourceOwnedDispatchCase(
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+) ?IrWriterCase {
+    for (release_source_owned_dispatch_entries) |entry| {
+        if (std.mem.eql(u8, entry.wrapper, wrapper) and
+            std.mem.eql(u8, entry.mode, mode) and
+            std.mem.eql(u8, entry.fixture, fixture) and
+            std.mem.eql(u8, entry.tag, tag))
+        {
             return findIrWriterCase(entry.case_id);
         }
     }

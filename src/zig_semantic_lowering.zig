@@ -1,6 +1,8 @@
 const std = @import("std");
 const sib = @import("structured_ir_builder.zig");
 
+pub const ExternalWriterFn = *const fn (std.Io, *std.Io.Writer, []const u8) anyerror!void;
+
 pub const Program = enum {
     tiny_scalar,
     integer_arithmetic,
@@ -23,6 +25,17 @@ pub const Program = enum {
     tls_read,
     atomic_add,
 };
+
+pub fn emitExternalRecord(
+    surface: []const u8,
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+    write: ExternalWriterFn,
+) !void {
+    _ = surface;
+    try write(io, writer, ir_path);
+}
 
 pub fn emit(program: Program, writer: *std.Io.Writer) !void {
     switch (program) {

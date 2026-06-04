@@ -65,6 +65,7 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-x86_64-selected-zllvm", "Run compact selected x86_64 z_llvm replacement gate", "tools/run_distribution_x86_64_selected_zllvm.zig");
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-source-backed-structured", "Run broad x86_64 release source-backed structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-backed-broad"});
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-source-structured-direct", "Run x86_64 release source-wrapper structured-direct gate without case-id ownership", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-wrapper-dispatch"});
+    addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-release-source-owned", "Run x86_64 release source-owned semantic structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--release-source-owned"});
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
     addToolStep(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");
