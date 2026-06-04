@@ -409,25 +409,30 @@ excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
 gate=zig build distribution-x86_64-selected-zllvm
 detailed_gate=zig build distribution-zig-ir-writer
 first_gate=zig build distribution-zig-ir-writer-tiny-scalar
-stage=external z_llvm textual IR writer, selected wrapper subset
+stage=external z_llvm IR writer, selected wrapper subset
 path=Zig build-obj -> patched Zig Object.emit validates external contract
-     -> z_llvm --emit=ir-writer writes textual LLVM IR
+     -> z_llvm --emit=ir-writer writes selected LLVM IR through either the
+        structured builder or the textual subset
      -> z_llvm --passes=<accepted Zig-mode pipeline>
      -> z_llvm --emit=obj
      -> zig build-exe -fno-lld
 status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
-      selected emitted module; z_llvm owns the selected textual IR body, while
-      the normal Zig/libLLVM fallback remains available when env vars are unset
-ownership=ir-construction=z_llvm-external-textual-subset;
-          llvm-module=not-used; llvm-optimizer=not-used;
+      selected emitted module; z_llvm owns the selected IR body, while the
+      normal Zig/libLLVM fallback remains available when env vars are unset
+construction=ir-construction=zllvm-structured-builder:51;
+             ir-construction=z_llvm-external-textual-subset:85
+ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
 ownership_gate=selected IR-writer rows fail on libLLVM module parse/print,
-               LLVM TargetMachine object emission fallback, or minimal-ret0
+               LLVM TargetMachine object emission fallback, minimal-ret0, or
+               full-gate structured-builder count below 30
 compact_output=selected-zllvm status=<ok|fail> total=<rows>
-               executable_ok=<count> link_only_ok=<count> minimal-ret0=<count>
+               executable_ok=<count> link_only_ok=<count>
+               structured_builder_rows=<count> textual_subset_rows=<count>
+               minimal-ret0=<count>
                ownership=<marker> first_failure_case_id=<case-or-->
                first_failure_wrapper=<wrapper-or-->
                first_failure_mode=<mode-or-->
@@ -435,6 +440,8 @@ compact_output=selected-zllvm status=<ok|fail> total=<rows>
                first_failure_error=<error-or-->
 diagnostics=docs/x86_64_selected_zllvm_diagnostics.md
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
+structured_builder_rows=51 textual_subset_rows=85 minimal-ret0=0
+structured_inventory=docs/roadmap/x86_64_structured_ir_builder_milestone.md
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -515,7 +522,8 @@ releasesmall_base64_residual_final_mask_step_gate=zig build distribution-zig-ir-
 releasesmall_base64_residual_padding_loop_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_loop_step
 releasesmall_base64_decode_exit_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_exit_step
 next_releasesmall_probe_gate=zig build distribution-releasesmall-object
-ir_writer_rows=scalar_runtime_rows=136, minimal_wrapper_rows=0
+ir_writer_rows=scalar_runtime_rows=136, structured_builder_rows=51,
+               textual_subset_rows=85, minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=2, integer-arithmetic=3,
                error-switch-select=4, direct-call=1, global-load=3,
                i64-arithmetic=1, i64-call-return=1, table-indexed-load=2,
@@ -568,8 +576,9 @@ surface_counts=scalar-add-ret=2, integer-arithmetic=3,
                base64-decode-exit-step=1, minimal-ret0=0
 marker=pipeline, zllvm_passes, target, zig_target, object, ir, case_id,
        wrapper, mode, ir_writer=external, ir_writer_mode=external
-ownership_marker=per-row output includes ownership=ir-construction=z_llvm-external-textual-subset;
-                 llvm-module=not-used; llvm-optimizer=not-used;
+construction_marker=per-row output includes construction=ir-construction=zllvm-structured-builder
+                    or construction=ir-construction=z_llvm-external-textual-subset
+ownership_marker=per-row output includes ownership=llvm-module=not-used; llvm-optimizer=not-used;
                  llvm-targetmachine=not-used; object-emission=z_llvm;
                  linker=zig-native-fno-lld
 FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,

@@ -39,10 +39,12 @@ bounded to repeated semantic families only, such as generic compare/select main
 checks and broader checked arithmetic variants.
 
 Selected IR-writer rows now print and enforce:
-`ownership=ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
+`construction=ir-construction=zllvm-structured-builder` or
+`construction=ir-construction=z_llvm-external-textual-subset`, plus
+`ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
 The gate fails if a selected row reports libLLVM module parse/print,
-libLLVM-backed IR construction, LLVM TargetMachine object emission, or a
-minimal wrapper surface. This is a selected x86_64 release-row claim only; the
+LLVM TargetMachine object emission, a minimal wrapper surface, or a full-gate
+structured-builder count below 30. This is a selected x86_64 release-row claim only; the
 normal Zig/libLLVM fallback still exists when the external writer env vars are
 unset.
 
@@ -791,13 +793,16 @@ boundary before `z_llvm --emit=obj` and `zig build-exe -fno-lld`. The
 integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
-finishes the selected wrappers. The external z_llvm textual IR writer gate now
+finishes the selected wrappers. The external z_llvm IR writer gate now
 also passes: the first ReleaseFast tiny-scalar row and the full 136-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 106 runtime-emitted selected rows and 0 minimal-wrapper hook
-proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
+writer now has 136 runtime-surface selected rows and 0 minimal-wrapper hook
+proofs. Its construction ownership is measured per row: 51 rows are built
+through `src/structured_ir_builder.zig`, while 85 rows remain on the older
+external textual-subset writer helpers. Runtime surfaces cover tiny scalar add,
+integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
 boundary, plus ReleaseFast runtime conditional branch, phi/merge, loop, and
@@ -837,6 +842,8 @@ The Zig source integration slice is recorded in
 [x86_64_zig_source_native_link_slice.md](roadmap/x86_64_zig_source_native_link_slice.md).
 The experimental patched-Zig object-emission slice is recorded in
 [x86_64_zig_integrated_object_emit_slice.md](roadmap/x86_64_zig_integrated_object_emit_slice.md).
+The structured-builder construction milestone is recorded in
+[x86_64_structured_ir_builder_milestone.md](roadmap/x86_64_structured_ir_builder_milestone.md).
 
 ```text
 ReleaseFast  x86_64 asm/object: conservative boundary, 17/17 captured rows object-clean
@@ -863,14 +870,16 @@ preopt       patched Zig build-obj -> preopt IR -> z_llvm accepted pipeline
              -> z_llvm object -> Zig native link:
              total=10 executable_ok=9 link_only_ok=1 local_fail=0
              ReleaseFast narrow gate also passes with --mode=ReleaseFast
-ir writer    patched Zig build-obj -> external z_llvm textual IR subset
+ir writer    patched Zig build-obj -> external z_llvm IR writer subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
              full set total=136 executable_ok=136 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=136 minimal_wrapper_rows=0
-             ownership=ir-construction=z_llvm-external-textual-subset;
-                       llvm-module=not-used; llvm-optimizer=not-used;
+             scalar_runtime_rows=136 structured_builder_rows=51
+             textual_subset_rows=85 minimal_wrapper_rows=0
+             construction=ir-construction=zllvm-structured-builder:51;
+                          ir-construction=z_llvm-external-textual-subset:85
+             ownership=llvm-module=not-used; llvm-optimizer=not-used;
                        llvm-targetmachine=not-used; object-emission=z_llvm;
                        linker=zig-native-fno-lld
              surface-counts scalar-add-ret=2 integer-arithmetic=3

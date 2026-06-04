@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
-const ownership_marker = "ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
+const downstream_marker = "llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -29,8 +29,8 @@ pub fn main(init: std.process.Init) !void {
         const case_id = firstCaseId(result.stderr) orelse firstCaseId(result.stdout) orelse "-";
         const pipeline = parsePipeline(result.stdout) orelse "preopt";
         try stdout_writer.interface.print(
-            "selected-zllvm status=fail total=- executable_ok=- link_only_ok=- minimal-ret0=- ownership={s} first_failure_case_id={s} first_failure_wrapper=- first_failure_mode=- first_failure_pipeline={s} first_failure_error=\"{s}\"\n",
-            .{ ownership_marker, case_id, pipeline, first_error },
+            "selected-zllvm status=fail total=- executable_ok=- link_only_ok=- structured_builder_rows=- textual_subset_rows=- minimal-ret0=- ownership={s} first_failure_case_id={s} first_failure_wrapper=- first_failure_mode=- first_failure_pipeline={s} first_failure_error=\"{s}\"\n",
+            .{ downstream_marker, case_id, pipeline, first_error },
         );
         try stdout_writer.interface.flush();
         std.process.exit(1);
@@ -48,28 +48,42 @@ pub fn main(init: std.process.Init) !void {
     const total = valueAfter(summary, "total=") orelse "-";
     const executable_ok = valueAfter(summary, "executable_ok=") orelse "-";
     const link_only_ok = valueAfter(summary, "link_only_ok=") orelse "-";
+    const structured_builder_rows = valueAfter(summary, "structured_builder_rows=") orelse "-";
+    const textual_subset_rows = valueAfter(summary, "textual_subset_rows=") orelse "-";
     const minimal_ret0 = valueAfter(surfaces, "minimal-ret0=") orelse valueAfter(summary, "minimal_wrapper_rows=") orelse "-";
     const ownership_value = std.mem.trim(u8, ownership["ownership-summary ".len..], " \t\r\n");
-    if (!std.mem.eql(u8, ownership_value, ownership_marker)) {
+    if (std.mem.indexOf(u8, ownership_value, downstream_marker) == null or
+        std.mem.indexOf(u8, ownership_value, "libLLVM") != null or
+        std.mem.indexOf(u8, ownership_value, "TargetMachine") != null)
+    {
         try stdout_writer.interface.print(
-            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"ownership-marker-mismatch\"\n",
-            .{ total, executable_ok, link_only_ok, minimal_ret0, ownership_value },
+            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_builder_rows={s} textual_subset_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"ownership-marker-mismatch\"\n",
+            .{ total, executable_ok, link_only_ok, structured_builder_rows, textual_subset_rows, minimal_ret0, ownership_value },
+        );
+        try stdout_writer.interface.flush();
+        std.process.exit(1);
+    }
+    const structured_count = std.fmt.parseInt(usize, structured_builder_rows, 10) catch 0;
+    if (structured_count < 30) {
+        try stdout_writer.interface.print(
+            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_builder_rows={s} textual_subset_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"structured-builder-row-minimum\"\n",
+            .{ total, executable_ok, link_only_ok, structured_builder_rows, textual_subset_rows, minimal_ret0, ownership_value },
         );
         try stdout_writer.interface.flush();
         std.process.exit(1);
     }
     if (!std.mem.eql(u8, minimal_ret0, "0")) {
         try stdout_writer.interface.print(
-            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"minimal-ret0-nonzero\"\n",
-            .{ total, executable_ok, link_only_ok, minimal_ret0, ownership_value },
+            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_builder_rows={s} textual_subset_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"minimal-ret0-nonzero\"\n",
+            .{ total, executable_ok, link_only_ok, structured_builder_rows, textual_subset_rows, minimal_ret0, ownership_value },
         );
         try stdout_writer.interface.flush();
         std.process.exit(1);
     }
 
     try stdout_writer.interface.print(
-        "selected-zllvm status=ok total={s} executable_ok={s} link_only_ok={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=- first_failure_error=-\n",
-        .{ total, executable_ok, link_only_ok, minimal_ret0, ownership_value },
+        "selected-zllvm status=ok total={s} executable_ok={s} link_only_ok={s} structured_builder_rows={s} textual_subset_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=- first_failure_error=-\n",
+        .{ total, executable_ok, link_only_ok, structured_builder_rows, textual_subset_rows, minimal_ret0, ownership_value },
     );
     try stdout_writer.interface.flush();
 }

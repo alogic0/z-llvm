@@ -1197,6 +1197,8 @@ pub fn main(init: std.process.Init) !void {
     var total: usize = 0;
     var scalar_runtime_rows: usize = 0;
     var minimal_wrapper_rows: usize = 0;
+    var structured_builder_rows: usize = 0;
+    var textual_subset_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1309,6 +1311,7 @@ pub fn main(init: std.process.Init) !void {
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
         try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null);
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
+        const construction = if (use_ir_writer) try readIrWriterConstruction(allocator, io, ir_path, case) else "-";
         if (use_ir_writer) {
             countSurface(&surface_counters, surface);
             if (std.mem.eql(u8, surface, "minimal-ret0")) {
@@ -1316,9 +1319,16 @@ pub fn main(init: std.process.Init) !void {
             } else {
                 scalar_runtime_rows += 1;
             }
+            if (std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder")) {
+                structured_builder_rows += 1;
+            } else if (std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset")) {
+                textual_subset_rows += 1;
+            } else {
+                try common.validationError(io, "external IR writer selected row {s} reported unsupported construction ownership: {s}\n", .{ case.id, construction });
+            }
         }
         const fallback = effectiveFallback(case, use_ir_writer);
-        if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface);
+        if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface, construction);
         try linkIntegratedObject(allocator, io, target, object, exe, case);
         if (case.validation == .executable) {
             try runExecutableCase(allocator, io, exe, case, use_ir_writer);
@@ -1327,8 +1337,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} ownership={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, ownershipProof(use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1337,11 +1347,14 @@ pub fn main(init: std.process.Init) !void {
         if (minimal_wrapper_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
         }
+        if (total >= 30 and structured_builder_rows < 30) {
+            try common.validationError(io, "external IR writer selected rows must include at least 30 structured-builder rows; structured_builder_rows={}\n", .{structured_builder_rows});
+        }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, minimal_wrapper_rows },
         );
-        try stdout_writer.interface.print("ownership-summary {s}\n", .{ownershipProof(use_ir_writer)});
+        try stdout_writer.interface.print("ownership-summary ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};{s}\n", .{ structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
             try stdout_writer.interface.print(" {s}={}", .{ counter.name, counter.count });
@@ -1575,13 +1588,18 @@ fn effectiveProof(use_ir_writer: bool) []const u8 {
 }
 
 fn ownershipProof(use_ir_writer: bool) []const u8 {
-    if (use_ir_writer) return "ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
+    if (use_ir_writer) return "llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
     return "ir-construction=libLLVM;llvm-module=zig-owned;llvm-optimizer=zig-configured;llvm-targetmachine=not-used-by-z_llvm-object-hook;object-emission=z_llvm;linker=zig-native-fno-lld";
 }
 
-fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8, surface: []const u8) !void {
+fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8, surface: []const u8, construction: []const u8) !void {
     if (std.mem.eql(u8, surface, "minimal-ret0")) {
         try common.validationError(io, "external IR writer selected row {s} used minimal-ret0 instead of a runtime surface\n", .{case.id});
+    }
+    if (!std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder") and
+        !std.mem.eql(u8, construction, "ir-construction=z_llvm-external-textual-subset"))
+    {
+        try common.validationError(io, "external IR writer selected row {s} reported forbidden construction ownership: {s}\n", .{ case.id, construction });
     }
     if (!std.mem.startsWith(u8, fallback, "ir-construction:z_llvm-external-textual-subset")) {
         try common.validationError(io, "external IR writer selected row {s} reported non-external IR construction fallback: {s}\n", .{ case.id, fallback });
@@ -1919,6 +1937,29 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-exit-step")) return "base64-decode-exit-step";
     if (std.mem.eql(u8, contents[value_start..value_end], "minimal-ret0")) return "minimal-ret0";
     try common.validationError(io, "external IR writer output for {s} has unsupported surface {s}\n", .{ case.id, contents[value_start..value_end] });
+}
+
+fn readIrWriterConstruction(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    ir_path: []const u8,
+    case: Case,
+) ![]const u8 {
+    const contents = std.Io.Dir.cwd().readFileAlloc(io, ir_path, allocator, .limited(1024 * 1024)) catch |err| {
+        try common.validationError(io, "missing external IR writer output for {s}: {t}\n", .{ case.id, err });
+    };
+    defer allocator.free(contents);
+    const prefix = "; zllvm_ir_writer_construction = \"";
+    const start = std.mem.indexOf(u8, contents, prefix) orelse {
+        try common.validationError(io, "external IR writer output for {s} missing zllvm_ir_writer_construction comment\n", .{case.id});
+    };
+    const value_start = start + prefix.len;
+    const value_end = std.mem.indexOfScalarPos(u8, contents, value_start, '"') orelse {
+        try common.validationError(io, "external IR writer output for {s} has malformed zllvm_ir_writer_construction comment\n", .{case.id});
+    };
+    if (std.mem.eql(u8, contents[value_start..value_end], "ir-construction=zllvm-structured-builder")) return "ir-construction=zllvm-structured-builder";
+    if (std.mem.eql(u8, contents[value_start..value_end], "ir-construction=z_llvm-external-textual-subset")) return "ir-construction=z_llvm-external-textual-subset";
+    try common.validationError(io, "external IR writer output for {s} has unsupported construction ownership {s}\n", .{ case.id, contents[value_start..value_end] });
 }
 
 fn pipelineName(pipeline: Pipeline) []const u8 {
