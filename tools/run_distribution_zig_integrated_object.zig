@@ -1607,8 +1607,8 @@ pub fn main(init: std.process.Init) !void {
             if (case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != source_wrapper_rows or generic_codegen_rows != source_wrapper_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "source-wrapper dispatch gate requires no case-id/fallback and all rows structured-direct generic; source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
             }
-            if (semantic_lowering_rows == 0 or semantic_lowering_rows + manifest_structured_rows != source_wrapper_rows) {
-                try common.validationError(io, "source-wrapper dispatch gate requires semantic/manifest lowering accounting with at least one semantic row; source_wrappers={} semantic_lowering_rows={} manifest_structured_rows={}\n", .{ source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows });
+            if (semantic_lowering_rows == 0 or semantic_lowering_rows + manifest_structured_rows + external_writer_delegate_rows != source_wrapper_rows) {
+                try common.validationError(io, "source-wrapper dispatch gate requires complete lowering accounting with at least one semantic row; source_wrappers={} semantic_lowering_rows={} manifest_structured_rows={} external_writer_delegate_rows={}\n", .{ source_wrapper_rows, semantic_lowering_rows, manifest_structured_rows, external_writer_delegate_rows });
             }
             try stdout_writer.interface.print(
                 "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} manifest_structured_rows={} semantic_lowering_rows={} semantic_record_rows={} external_writer_delegate_rows={} case_specific_rows={} fallback_rows={} local_fail=0\n",
