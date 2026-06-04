@@ -418,7 +418,7 @@ status=experimental conservative boundary
 claim=selected wrapper objects bypass LLVM module optimization, LLVM
       TargetMachine object emission, and libLLVM bitcode parse/print of the
       selected emitted module; patched Zig does not own case-specific IR text
-total=88 executable_ok=88 link_only_ok=0 local_fail=0
+total=106 executable_ok=106 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
@@ -499,22 +499,22 @@ releasesmall_base64_residual_final_mask_step_gate=zig build distribution-zig-ir-
 releasesmall_base64_residual_padding_loop_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_loop_step
 releasesmall_base64_decode_exit_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_exit_step
 next_releasesmall_probe_gate=zig build distribution-releasesmall-object
-ir_writer_rows=scalar_runtime_rows=88, minimal_wrapper_rows=0
-surface_counts=scalar-add-ret=1, integer-arithmetic=1,
+ir_writer_rows=scalar_runtime_rows=106, minimal_wrapper_rows=0
+surface_counts=scalar-add-ret=1, integer-arithmetic=3,
                error-switch-select=2, direct-call=1, global-load=3,
                i64-arithmetic=1, table-indexed-load=1,
-               checked-add-runtime-boundary=1, runtime-condbr=1,
-               runtime-phi-merge=1, runtime-loop-sum=1,
+               checked-add-runtime-boundary=2, runtime-condbr=2,
+               runtime-phi-merge=1, runtime-loop-sum=2,
                checked-loop-sum-boundary=1,
-               runtime-switch=1, checked-branch-mix-boundary=1,
+               runtime-switch=2, checked-branch-mix-boundary=2,
                global-update=1,
-               pointer-load-store=1, volatile-roundtrip=1,
+               pointer-load-store=2, volatile-roundtrip=1,
                optional-pointer=1, packed-read-flag=1,
-               packed-replace-low=1, abi-arg-call=1,
+               packed-replace-low=1, abi-arg-call=2,
                i64-call-return=1, tls-read=2, tls-bump=1,
                atomic-add=1, inline-asm-barrier=1,
-               aggregate-pair-abi=1, float-less=1, float-mul=1,
-               float-add=1, float-select=1, float-sub=1,
+               aggregate-pair-abi=1, float-less=2, float-mul=1,
+               float-add=2, float-select=1, float-sub=2,
                double-div=1, float-rem=1, void-noop-call=1,
                hidden-global-access=1, mixed-c-zig-add=1,
                mixed-c-zig-panic-add=1,
@@ -546,20 +546,20 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                base64-residual-final-mask-step=1,
                base64-residual-padding-loop-step=1,
                base64-decode-exit-step=1,
-               struct-field-sum=1,
-               array-scalar-sum=1,
+               struct-field-sum=2,
+               array-scalar-sum=2,
                optional-scalar-payload=1,
                error-union-payload=1,
-               slice-loop-sum=1, fp-literal-return=1,
+               slice-loop-sum=2, fp-literal-return=1,
                comptime-const-mul=1,
                add-imm-return=1,
                checked-add-imm-boundary=1,
                checked-comptime-const-boundary=1,
-               checked-global-update-boundary=1,
-               checked-pointer-load-store-boundary=1,
+               checked-global-update-boundary=2,
+               checked-pointer-load-store-boundary=2,
                checked-call-chain-boundary=1,
                checked-tls-bump-boundary=1,
-               checked-array-sum-boundary=1,
+               checked-array-sum-boundary=2,
                checked-struct-sum-boundary=1,
                checked-slice-loop-sum-boundary=1,
                minimal-ret0=0

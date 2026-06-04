@@ -11,7 +11,7 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Replacement goal:
 Freeze the completed ReleaseSmall no-exclusion boundary. The x86_64 selected
-88-row external IR-writer gate is green under `zig build distribution-all`, and
+106-row external IR-writer gate is green under `zig build distribution-all`, and
 the two former ReleaseSmall explicit exclusions now have local object evidence:
 `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
 (`@decode_base_64 -> @base64.decode_base_64`) and
@@ -19,12 +19,38 @@ the two former ReleaseSmall explicit exclusions now have local object evidence:
 (`@strFromFloatHelp -> @main.strFromFloatHelp`). No active local failure
 remains for the captured ReleaseSmall boundary.
 
+Current target:
+External IR-writer cases are registry-driven, and the selected writer helper
+layer now lives in `src/ir_writer_helpers.zig`. Reusable helpers cover function
+headers, named blocks, unconditional and conditional branches, two-input phis,
+loop headers/latches, GEP/load/store, table loads, pointer index advancement,
+byte masks, shifts, truncation, calls, lifetime intrinsics, memcpy/memset, and
+checked arithmetic panic-edge branches. Base64 full/reduced rows, selected
+loop/phi rows, ReleaseSafe checked loop edges, and float binary/check rows use
+the shared helpers. The remaining case-specific bodies are the larger
+semantic fixtures that still need exact one-off IR text: full
+`strFromFloatHelp`, complex aggregate/pointer checked rows, TLS/inline-asm
+boundaries, and ReleaseSmall mixed C/Zig runtime shapes.
+
 Next target:
-Replace curated case bodies with reusable writer/lowering machinery. Start by
-turning the long external IR-writer `case_id` dispatch into a registry and move
-the base64, strFromFloat, and selected loop/phi rows behind shared helpers for
-function definitions, block emission, phis, branches, GEP/load/store, table
-loads, loop headers/latches, calls, and lifetime/memcpy/memset intrinsics.
+Continue broadening source-backed x86_64 release-mode external IR-writer
+coverage with reusable helper-backed rows; do not add new ad hoc bodies unless
+the row first exposes a genuinely new helper family.
+
+Source coverage discovery:
+The current release-mode captured IR inventory was checked with `find` over
+`test/distribution/releasefast_x86_64/inputs`,
+`test/distribution/releasesafe_x86_64/inputs`,
+`test/distribution/releasesmall_x86_64/inputs`, and the ReleaseSmall
+`exclusions` directory. It contains 55 x86_64 release-mode `.ll` fixtures:
+27 ReleaseFast, 9 ReleaseSafe, and 19 ReleaseSmall/former-boundary fixtures.
+The external IR-writer gate now adds 18 source-backed rows from that inventory
+without new surface names: integer add/wrap and cmp/shift, control-flow loop
+and call-chain, branch-mix and dense switch, pointer memory, aggregate
+struct/array/slice, float compare/math/extended ops, ReleaseSafe globals,
+ReleaseSafe pointer memory, ReleaseSafe branch-mix, ReleaseSafe checked
+aggregate array, and ReleaseSafe checked tiny-scalar add. The measured writer
+gate is `total=106 executable_ok=106 link_only_ok=0 local_fail=0`.
 
 Zig evidence:
 The completed `releasefast_runtime_cond_branch` and
@@ -583,7 +609,7 @@ expected source-level exit code 7, and
 source-level exit code 5. `releasesmall_runtime_inherit_want_safety_i64` now
 passes with the expected source-level exit code 4. The selected integrated
 postopt object gate is clean with
-`total=88 executable_ok=88 link_only_ok=0 local_fail=0`. The top-level
+`total=106 executable_ok=106 link_only_ok=0 local_fail=0`. The top-level
 distribution gate then exposed the next selected blocker:
 integrated preopt `releasefast_runtime_pointer_load_store` object emission
 failure with `UnsupportedCodegenControlFlow`; that row now passes. The next
@@ -731,11 +757,11 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm textual IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 88-row
+also passes: the first ReleaseFast tiny-scalar row and the full 106-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 87 runtime-emitted selected rows and 0 minimal-wrapper hook
+writer now has 106 runtime-emitted selected rows and 0 minimal-wrapper hook
 proofs. Runtime surfaces cover tiny scalar add, integer arithmetic,
 error-switch-style compare/select, direct call, global load, i64 arithmetic,
 ReleaseSmall i64 call-return, table indexed load, and the ReleaseSafe checked-add panic-runtime
@@ -806,23 +832,23 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=88 executable_ok=88 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=88 minimal_wrapper_rows=0
-             surface-counts scalar-add-ret=1 integer-arithmetic=1
+             full set total=106 executable_ok=106 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=106 minimal_wrapper_rows=0
+             surface-counts scalar-add-ret=1 integer-arithmetic=3
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1
-             checked-add-runtime-boundary=1 runtime-condbr=1
-             runtime-phi-merge=1 runtime-loop-sum=1 runtime-switch=1
+             checked-add-runtime-boundary=2 runtime-condbr=2
+             runtime-phi-merge=1 runtime-loop-sum=2 runtime-switch=2
              checked-loop-sum-boundary=1
-             global-update=1 pointer-load-store=1 volatile-roundtrip=1
-             optional-pointer=1 packed-read-flag=1 abi-arg-call=1
+             global-update=1 pointer-load-store=2 volatile-roundtrip=1
+             optional-pointer=1 packed-read-flag=1 abi-arg-call=2
              packed-replace-low=1 tls-read=2 tls-bump=1 atomic-add=1
              inline-asm-barrier=1 aggregate-pair-abi=1
-             float-less=1 float-mul=1 float-add=1 float-select=1
-             float-sub=1 double-div=1 float-rem=1 struct-field-sum=1
-             array-scalar-sum=1 optional-scalar-payload=1
+             float-less=2 float-mul=1 float-add=2 float-select=1
+             float-sub=2 double-div=1 float-rem=1 struct-field-sum=2
+             array-scalar-sum=2 optional-scalar-payload=1
              error-union-payload=1
-             slice-loop-sum=1 fp-literal-return=1
+             slice-loop-sum=2 fp-literal-return=1
              comptime-const-mul=1
              void-noop-call=1
              hidden-global-access=1
@@ -859,12 +885,12 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              add-imm-return=1
              checked-add-imm-boundary=1
              checked-comptime-const-boundary=1
-             checked-global-update-boundary=1
-             checked-pointer-load-store-boundary=1
-             checked-branch-mix-boundary=1
+             checked-global-update-boundary=2
+             checked-pointer-load-store-boundary=2
+             checked-branch-mix-boundary=2
              checked-call-chain-boundary=1
              checked-tls-bump-boundary=1
-             checked-array-sum-boundary=1
+             checked-array-sum-boundary=2
              checked-struct-sum-boundary=1
              checked-slice-loop-sum-boundary=1
              minimal-ret0=0

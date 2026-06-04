@@ -404,7 +404,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=88 executable_ok=88 link_only_ok=0 local_fail=0
+ir-writer full set:    total=106 executable_ok=106 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer base64 step: zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
@@ -587,23 +587,23 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=88 minimal_wrapper_rows=0
-ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
+ir-writer full set:    scalar_runtime_rows=106 minimal_wrapper_rows=0
+ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
                        error-switch-select=2 direct-call=1 global-load=3
                        i64-arithmetic=1 i64-call-return=1
                        table-indexed-load=1
-                       checked-add-runtime-boundary=1 runtime-condbr=1
-                       runtime-phi-merge=1 runtime-loop-sum=1
+                       checked-add-runtime-boundary=2 runtime-condbr=2
+                       runtime-phi-merge=1 runtime-loop-sum=2
                        checked-loop-sum-boundary=1
-                       runtime-switch=1 checked-branch-mix-boundary=1
+                       runtime-switch=2 checked-branch-mix-boundary=2
                        global-update=1
-                       pointer-load-store=1 volatile-roundtrip=1
+                       pointer-load-store=2 volatile-roundtrip=1
                        optional-pointer=1 packed-read-flag=1
-                       packed-replace-low=1 abi-arg-call=1 tls-read=2
+                       packed-replace-low=1 abi-arg-call=2 tls-read=2
                        tls-bump=1 atomic-add=1
                        inline-asm-barrier=1 aggregate-pair-abi=1
-                       float-less=1 float-mul=1 float-add=1
-                       float-select=1 float-sub=1 double-div=1
+                       float-less=2 float-mul=1 float-add=2
+                       float-select=1 float-sub=2 double-div=1
                        float-rem=1 void-noop-call=1
                        hidden-global-access=1 mixed-c-zig-add=1
                        mixed-c-zig-panic-add=1
@@ -635,19 +635,19 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        base64-residual-final-mask-step=1
                        base64-residual-padding-loop-step=1
                        base64-decode-exit-step=1
-                       struct-field-sum=1
-                       array-scalar-sum=1 optional-scalar-payload=1
+                       struct-field-sum=2
+                       array-scalar-sum=2 optional-scalar-payload=1
                        error-union-payload=1
-                       slice-loop-sum=1 fp-literal-return=1
+                       slice-loop-sum=2 fp-literal-return=1
                        comptime-const-mul=1
                        add-imm-return=1
                        checked-add-imm-boundary=1
                        checked-comptime-const-boundary=1
-                       checked-global-update-boundary=1
-                       checked-pointer-load-store-boundary=1
+                       checked-global-update-boundary=2
+                       checked-pointer-load-store-boundary=2
                        checked-call-chain-boundary=1
                        checked-tls-bump-boundary=1
-                       checked-array-sum-boundary=1
+                       checked-array-sum-boundary=2
                        checked-struct-sum-boundary=1
                        checked-slice-loop-sum-boundary=1
                        minimal-ret0=0
@@ -714,7 +714,7 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
 IR module, then `z_llvm` performs the accepted Zig-mode optimization pipeline
 and emits the relocatable object, and Zig's native linker links the executable.
-The external writer now emits 87/87 selected rows as runtime surfaces:
+The external writer now emits 106/106 selected rows as runtime surfaces:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
@@ -768,7 +768,18 @@ proofs. LLVM's module optimization pipeline, LLVM
 TargetMachine codegen, libLLVM bitcode parse/print of the selected object
 module, and patched-Zig ownership of case-specific IR text are bypassed for
 those rows.
-The next milestone starts after that frozen 88-row claim: the
+
+The case registry is now backed by reusable writer helpers in
+`src/ir_writer_helpers.zig`. Shared helpers cover function headers, named
+blocks, unconditional and conditional branches, two-input phis, loop
+headers/latches, GEP/load/store, table loads, pointer index advancement, byte
+masks, shifts, truncation, calls, lifetime intrinsics, memcpy/memset, and
+checked arithmetic panic-edge branches. Base64 full/reduced rows, selected
+loop/phi rows, the ReleaseSafe checked loop edge, and float binary/check rows
+use that layer. The remaining case-specific writer bodies are the exact-shape
+fixtures for full `strFromFloatHelp`, larger aggregate/pointer checked rows,
+TLS/inline-asm boundaries, and ReleaseSmall mixed C/Zig runtime shapes.
+The next milestone starts after that frozen 106-row claim: the
 `releasesmall_runtime_base64_decode_base_64_full` row registers a full
 `@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
 boundary closure. Its `@main` performs executable validation for
