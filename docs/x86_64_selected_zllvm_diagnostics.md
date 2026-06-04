@@ -62,8 +62,8 @@ binary.
 The selected runner fails if a selected IR-writer row reports libLLVM-backed IR
 construction, libLLVM module parse/print, LLVM TargetMachine object emission,
 `minimal-ret0`, any selected row reports textual LLVM parsing, any textual
-boundary row remains, `structured_direct_rows != 136`,
-`generic_codegen_rows != 136`, or any structured-direct row reports
+boundary row remains, `structured_direct_rows != 146`,
+`generic_codegen_rows != 146`, or any structured-direct row reports
 case-specific codegen ownership.
 Env var unset is normal Zig/libLLVM behavior, but the
 selected gate treats fallback as a failure.

@@ -25,7 +25,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-zig-integrated-object` | Run the patched-Zig integrated postopt object-emission gate. Patched stage4 Zig `build-obj` lets LLVM run Zig's normal module optimization pipeline, writes optimized IR at the object boundary, invokes `z_llvm --emit=obj`, records a hook marker, then `zig build-exe -fno-lld -fno-compiler-rt -lc` links paired C ABI wrapper objects. Use when validating the experimental postopt replacement hook in `../ziglang`. |
 | `zig build distribution-zig-integrated-preopt` | Run the patched-Zig integrated preopt gate. Patched stage4 Zig writes pre-optimization LLVM IR before `module_pm.run(...)`, invokes `z_llvm --passes=<accepted Zig-mode pipeline>` and then `z_llvm --emit=obj`, records mode/case/wrapper marker metadata, and links with Zig's native linker. Use `zig build distribution-zig-integrated-preopt -- --mode=ReleaseFast` for the narrow first-pass gate. |
 | `zig build distribution-zig-ir-writer-tiny-scalar` | Run the first external z_llvm textual IR writer proof for `releasefast_tiny_scalar`. Patched stage4 Zig uses `ZIG_USE_ZLLVM_IR_WRITER=1` with `ZLLVM_IR_WRITER_MODE=external`, calls `z_llvm --emit=ir-writer` to write `scalar-add-ret` IR, then runs the existing preopt `z_llvm` optimizer/object path and Zig native linker. The executable exits 42. |
-| `zig build distribution-zig-ir-writer` | Run the selected 136-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 136 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct ownership counts, generic/case-specific x86_64 codegen counts, and downstream ownership summary. It fails on unexpected `minimal-ret0`, anything other than 136 structured-direct rows, any structured textual LLVM parsing, any textual boundary row, any case-specific codegen row, libLLVM module parse/print fallback, or LLVM TargetMachine fallback. All selected rows build z_llvm-owned internal IR modules directly and use generic x86_64 lowering. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
+| `zig build distribution-zig-ir-writer` | Run the selected 146-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 146 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct ownership counts, generic/case-specific x86_64 codegen counts, and downstream ownership summary. It fails on unexpected `minimal-ret0`, anything other than 146 structured-direct rows, any structured textual LLVM parsing, any textual boundary row, any case-specific codegen row, libLLVM module parse/print fallback, or LLVM TargetMachine fallback. All selected rows build z_llvm-owned internal IR modules directly and use generic x86_64 lowering. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
 | `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, `structured_direct_rows`, `structured_textual_rows`, `textual_boundary_rows`, `generic_codegen_rows`, `case_specific_codegen_rows`, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
 | `zig build distribution-x86_64-source-backed-structured` | Run the broad x86_64 release source-backed structured-direct gate. It discovers `.ll` fixtures under the ReleaseFast, ReleaseSafe, ReleaseSmall, and former ReleaseSmall exclusion directories, requires every discovered fixture to be accepted, and fails on any skip, fallback, textual LLVM parse, non-generic codegen, or local failure. The current gate reports `discovered_fixtures=55`, `accepted_fixtures=55`, `source_backed_rows=90`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `skipped_with_reason=0`, `fallback_rows=0`, and `local_fail=0`. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
@@ -58,17 +58,17 @@ Parameters:
 | `--case=<case-id>` | Run one selected row. Use this for focused implementation slices and regressions. |
 | `--mode=ReleaseFast\|ReleaseSafe\|ReleaseSmall` | Run selected rows for one Zig optimization mode when the runner supports that mode filter. |
 
-The 136-row full gate includes the original selected runtime rows plus 48
+The 146-row full gate includes the original selected runtime rows plus 58
 `releasefast_source_*` / `releasesafe_source_*` / `releasesmall_source_*`
 rows backed by captured release-mode x86_64 fixtures. Those source rows
 intentionally reuse existing surface names and helper-backed writer bodies.
-As of the structured-direct closure milestone, all 136 selected rows are built
+As of the structured-direct closure milestone, all 146 selected rows are built
 through `src/structured_ir_builder.zig` into z_llvm-owned internal IR modules.
-The full gate enforces `structured_direct_rows=136`,
+The full gate enforces `structured_direct_rows=146`,
 `structured_textual_rows=0`, `textual_boundary_rows=0`,
-`generic_codegen_rows=136`, `case_specific_codegen_rows=0`, `minimal-ret0=0`,
+`generic_codegen_rows=146`, `case_specific_codegen_rows=0`, `minimal-ret0=0`,
 no libLLVM module parse/print fallback, and no LLVM TargetMachine
-object-emission fallback. The current measured codegen split is 136 generic
+object-emission fallback. The current measured codegen split is 146 generic
 structured-direct rows and 0 case-specific structured-direct rows; see
 `docs/roadmap/x86_64_codegen_genericity_audit.md`.
 
@@ -84,7 +84,7 @@ ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-us
 No selected row remains a textual boundary, so the selected claim no longer
 tracks textual-boundary reason accounting.
 
-The broad source-backed gate is separate from the fixed 136-row selected claim.
+The broad source-backed gate is separate from the fixed 146-row selected claim.
 It discovers 55 release fixture files and accepts all 55 fixture families as 90
 structured-direct rows, with no skip accounting remaining for the current
 inventory. Every broad row must report
@@ -93,7 +93,7 @@ inventory. Every broad row must report
 optimizer, no LLVM TargetMachine, `object-emission=z_llvm`, and
 `linker=zig-native-fno-lld`.
 
-Together, the fixed 136-row selected proof and the 90-row broad source-backed
+Together, the fixed 146-row selected proof and the 90-row broad source-backed
 proof form the current x86_64 release replacement claim. The counters stay
 separate because the first gate is a fixed selected surface proof and the second
 gate is discovery-based fixture inventory proof.

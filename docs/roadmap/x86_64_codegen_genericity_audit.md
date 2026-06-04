@@ -7,9 +7,9 @@ Current measured gate:
 
 ```text
 gate=zig build distribution-zig-ir-writer
-total=136
-structured_direct_rows=136
-generic_codegen_rows=136
+total=146
+structured_direct_rows=146
+generic_codegen_rows=146
 case_specific_codegen_rows=0
 textual_boundary_rows=0
 ```
@@ -56,5 +56,5 @@ points:
 
 There are no remaining case-specific structured-direct rows. The compact
 selected gate requires `generic_codegen_rows == structured_direct_rows` and
-`case_specific_codegen_rows == 0`; at the current 136-row size this is
-`generic_codegen_rows=136` and `case_specific_codegen_rows=0`.
+`case_specific_codegen_rows == 0`; at the current 146-row size this is
+`generic_codegen_rows=146` and `case_specific_codegen_rows=0`.

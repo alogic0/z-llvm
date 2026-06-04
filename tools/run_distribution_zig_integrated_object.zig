@@ -1,6 +1,8 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 
+const expected_selected_ir_writer_rows = 146;
+
 const Validation = enum {
     executable,
     link_only,
@@ -1489,8 +1491,8 @@ pub fn main(init: std.process.Init) !void {
         if (minimal_wrapper_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
         }
-        if (total == 136 and structured_direct_rows != 136) {
-            try common.validationError(io, "external IR writer selected rows must all be structured-direct at total=136; structured_direct_rows={}\n", .{structured_direct_rows});
+        if (!broad_source_backed and total == expected_selected_ir_writer_rows and structured_direct_rows != expected_selected_ir_writer_rows) {
+            try common.validationError(io, "external IR writer selected rows must all be structured-direct at total={}; structured_direct_rows={}\n", .{ expected_selected_ir_writer_rows, structured_direct_rows });
         }
         if (structured_textual_rows != 0) {
             try common.validationError(io, "external IR writer structured rows must not use textual LLVM parse; structured_textual_rows={}\n", .{structured_textual_rows});
@@ -1498,7 +1500,7 @@ pub fn main(init: std.process.Init) !void {
         if (textual_boundary_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not keep textual boundary rows; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
-        if (total == 136 and (generic_codegen_rows != 136 or case_specific_codegen_rows != 0)) {
+        if (!broad_source_backed and total == expected_selected_ir_writer_rows and (generic_codegen_rows != expected_selected_ir_writer_rows or case_specific_codegen_rows != 0)) {
             try common.validationError(io, "external IR writer structured-direct rows must all use generic x86_64 codegen; structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={}\n", .{ structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows });
         }
         if (broad_source_backed) {

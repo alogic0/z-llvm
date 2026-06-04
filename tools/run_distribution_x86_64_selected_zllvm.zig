@@ -2,6 +2,7 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const downstream_marker = "llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
+const expected_selected_rows = 146;
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -67,7 +68,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     }
     const structured_count = std.fmt.parseInt(usize, structured_direct_rows, 10) catch 0;
-    if (structured_count != 136) {
+    if (structured_count != expected_selected_rows) {
         try stdout_writer.interface.print(
             "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_direct_rows={s} structured_textual_rows={s} textual_boundary_rows={s} generic_codegen_rows={s} case_specific_codegen_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"structured-direct-row-exactness\"\n",
             .{ total, executable_ok, link_only_ok, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, minimal_ret0, ownership_value },
@@ -93,7 +94,7 @@ pub fn main(init: std.process.Init) !void {
     }
     const generic_codegen_count = std.fmt.parseInt(usize, generic_codegen_rows, 10) catch 0;
     const case_specific_codegen_count = std.fmt.parseInt(usize, case_specific_codegen_rows, 10) catch std.math.maxInt(usize);
-    if (generic_codegen_count != 136 or case_specific_codegen_count != 0) {
+    if (generic_codegen_count != expected_selected_rows or case_specific_codegen_count != 0) {
         try stdout_writer.interface.print(
             "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_direct_rows={s} structured_textual_rows={s} textual_boundary_rows={s} generic_codegen_rows={s} case_specific_codegen_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"generic-codegen-row-exactness\"\n",
             .{ total, executable_ok, link_only_ok, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, minimal_ret0, ownership_value },

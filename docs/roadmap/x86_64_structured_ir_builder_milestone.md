@@ -10,12 +10,12 @@ selected replacement path.
 
 ```text
 gate=zig build distribution-zig-ir-writer
-total=136 executable_ok=136 link_only_ok=0 local_fail=0
-structured_builder_rows=136
-structured_direct_rows=136
+total=146 executable_ok=146 link_only_ok=0 local_fail=0
+structured_builder_rows=146
+structured_direct_rows=146
 structured_textual_rows=0
 textual_boundary_rows=0
-generic_codegen_rows=136
+generic_codegen_rows=146
 case_specific_codegen_rows=0
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
@@ -33,7 +33,7 @@ The generic x86_64 lowering audit is tracked in
 
 ## Converted Rows
 
-All 136 selected rows now report `ir-construction=zllvm-structured-builder`.
+All 146 selected rows now report `ir-construction=zllvm-structured-builder`.
 This includes the original tiny scalar, integer, error-switch/select, direct
 call, global load/update, loop/phi, pointer load/store, struct/array/slice, TLS,
 atomic, inline asm, aggregate ABI, optional/error-union payload, FP

@@ -15,7 +15,7 @@ The current release-mode captured IR inventory is the sorted `.ll` set under:
 Measured inventory: 55 fixtures: 27 ReleaseFast, 9 ReleaseSafe, and 19
 ReleaseSmall/former-boundary fixtures.
 
-The fixed selected proof remains the 136-row external IR-writer gate. The broad
+The fixed selected proof remains the 146-row external IR-writer gate. The broad
 source-backed proof is a separate discovery gate over the release fixture tree.
 It currently accepts all 55 fixture families as 90 source-backed
 structured-direct rows and records no skips for the current inventory.
@@ -24,9 +24,9 @@ Fixed selected gate:
 
 ```text
 zig build distribution-zig-ir-writer
-summary zig-integrated-object pipeline=preopt ir_writer=true total=136 executable_ok=136 link_only_ok=0 scalar_runtime_rows=136 structured_direct_rows=136 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=136 case_specific_codegen_rows=0 minimal_wrapper_rows=0 local_fail=0
-ownership-summary structured-direct:136;structured-textual:0;textual-boundary:0;ir-construction=zllvm-structured-builder:136;ir-construction=z_llvm-external-textual-subset:0;llvm-text-parse=not-used-for-structured;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
-codegen-summary generic-codegen:136;case-specific-codegen:0;textual-boundary-out-of-scope:0
+summary zig-integrated-object pipeline=preopt ir_writer=true total=146 executable_ok=146 link_only_ok=0 scalar_runtime_rows=146 structured_direct_rows=146 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=146 case_specific_codegen_rows=0 minimal_wrapper_rows=0 local_fail=0
+ownership-summary structured-direct:146;structured-textual:0;textual-boundary:0;ir-construction=zllvm-structured-builder:146;ir-construction=z_llvm-external-textual-subset:0;llvm-text-parse=not-used-for-structured;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
+codegen-summary generic-codegen:146;case-specific-codegen:0;textual-boundary-out-of-scope:0
 ```
 
 Broad source-backed gate:
@@ -46,7 +46,7 @@ Every accepted broad row must report
 optimizer, no LLVM TargetMachine, `object-emission=z_llvm`, and
 `linker=zig-native-fno-lld`.
 
-Combined claim: the fixed selected 136-row proof and the broad 90-row
+Combined claim: the fixed selected 146-row proof and the broad 90-row
 source-backed proof are both green, but their counters remain separate. The
 selected proof is a stable surface claim; the broad proof is a discovery-based
 fixture inventory claim over the current x86_64 release corpus.

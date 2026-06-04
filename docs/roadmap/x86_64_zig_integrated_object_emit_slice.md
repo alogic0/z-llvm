@@ -406,7 +406,7 @@ postopt: total=10 executable_ok=9 link_only_ok=1 local_fail=0
 preopt:  total=10 executable_ok=9 link_only_ok=1 local_fail=0
 ir-writer tiny scalar: total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer tiny scalar: scalar_runtime_rows=1 minimal_wrapper_rows=0
-ir-writer full set:    total=136 executable_ok=136 link_only_ok=0 local_fail=0
+ir-writer full set:    total=146 executable_ok=146 link_only_ok=0 local_fail=0
 ir-writer table load:  zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 ir-writer table load:  total=1 executable_ok=1 link_only_ok=0 local_fail=0
 ir-writer base64 step: zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
@@ -589,9 +589,9 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=136 structured_direct_rows=136
+ir-writer full set:    scalar_runtime_rows=146 structured_direct_rows=146
                        structured_textual_rows=0 textual_boundary_rows=0
-                       generic_codegen_rows=136
+                       generic_codegen_rows=146
                        case_specific_codegen_rows=0
                        minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
@@ -730,9 +730,9 @@ For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the selected
 LLVM IR module as a z_llvm-owned internal IR module, then `z_llvm` emits the
 relocatable object, and Zig's native linker links the executable. The external
-writer now emits 136/136 selected rows as runtime surfaces with all 136 rows
+writer now emits 146/146 selected rows as runtime surfaces with all 146 rows
 constructed directly through `src/structured_ir_builder.zig` and no textual
-boundary rows. All 136 structured-direct rows now report generic x86_64 codegen
+boundary rows. All 146 structured-direct rows now report generic x86_64 codegen
 ownership:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
@@ -780,7 +780,11 @@ ownership:
 `checked-comptime-const-boundary`, `checked-global-update-boundary`, and
 `checked-pointer-load-store-boundary`, `checked-call-chain-boundary`, and
 `checked-tls-bump-boundary`, `checked-array-sum-boundary`, and
-`checked-struct-sum-boundary`, and `checked-slice-loop-sum-boundary`; no
+`checked-struct-sum-boundary`, and `checked-slice-loop-sum-boundary`, plus
+`start-trampoline`, `getauxval-pointer-walk`, `f128-sret-byval`,
+`noreturn-unreachable-stub`, `address-space-volatile-store`,
+`raw-start-loop`, `i1-const-return`, `constant-string-slice-return`, and
+`libfuzzer-vtable-run`; no
 selected rows remain as
 `minimal-ret0` hook-only
 proofs. The per-row markers are:
@@ -795,7 +799,7 @@ ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-us
 LLVM's module optimization pipeline, LLVM TargetMachine codegen, and libLLVM
 bitcode parse/print of the selected rows are bypassed. The
 structured-direct milestone removes handwritten body ownership and textual
-parse/print ownership for all 136 selected rows. The generic-codegen milestone adds
+parse/print ownership for all 146 selected rows. The generic-codegen milestone adds
 measured generic x86_64 lowering ownership for those rows but does
 not claim full Zig IR construction or full backend replacement.
 
@@ -813,7 +817,7 @@ use that layer. The remaining case-specific code is intentionally limited to
 semantic fixture bodies whose exact shape is the evidence: base64 decoder CFG,
 `strFromFloatHelp` decimal/pow-table control flow, aggregate ABI packing,
 atomics, packed bits, and optional/error-union payload rows.
-The next milestone starts after that frozen 136-row claim: the
+The next milestone starts after the frozen selected claim: the
 `releasesmall_runtime_base64_decode_base_64_full` row registers a full
 `@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
 boundary closure. Its `@main` performs executable validation for

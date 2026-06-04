@@ -11,7 +11,7 @@ marked complete. See [development_cycle.md](development_cycle.md) and
 
 Replacement goal:
 Freeze the completed ReleaseSmall no-exclusion boundary. The x86_64 selected
-136-row external IR-writer gate is green under `zig build distribution-all`, and
+146-row external IR-writer gate is green under `zig build distribution-all`, and
 the two former ReleaseSmall explicit exclusions now have local object evidence:
 `standalone_mix_o_files_base64.zig.ReleaseSmall.x86_64.optimized.ll`
 (`@decode_base_64 -> @base64.decode_base_64`) and
@@ -45,7 +45,7 @@ Selected IR-writer rows now print and enforce:
 `ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
 The gate fails if a selected row reports libLLVM module parse/print,
 LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
-structured-direct count other than 136, any structured row reports textual
+structured-direct count other than 146, any structured row reports textual
 LLVM parsing, any textual boundary row remains, or any structured-direct row
 reports case-specific codegen ownership. This is a selected x86_64 release-row
 claim only; the normal Zig/libLLVM fallback still exists when the external
@@ -57,8 +57,8 @@ x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
 line with row counts, structured direct/textual boundary counts,
 `generic_codegen_rows`, `case_specific_codegen_rows`,
 `minimal-ret0`, ownership, and first-failure fields. The current measured
-split is `structured_direct_rows=136`, `textual_boundary_rows=0`,
-`generic_codegen_rows=136`, and `case_specific_codegen_rows=0`.
+split is `structured_direct_rows=146`, `textual_boundary_rows=0`,
+`generic_codegen_rows=146`, and `case_specific_codegen_rows=0`.
 Failure diagnostics and reproducibility inputs live in
 `docs/x86_64_selected_zllvm_diagnostics.md`.
 
@@ -87,7 +87,7 @@ The current release-mode captured IR inventory was checked with `find` over
 `test/distribution/releasesmall_x86_64/inputs`, and the ReleaseSmall
 `exclusions` directory. It contains 55 x86_64 release-mode `.ll` fixtures:
 27 ReleaseFast, 9 ReleaseSafe, and 19 ReleaseSmall/former-boundary fixtures.
-The fixed external IR-writer gate includes 136 selected rows. The separate
+The fixed external IR-writer gate includes 146 selected rows. The separate
 broad source-backed gate now adds 90 rows that cover every currently discovered
 release fixture family: integer add/wrap and cmp/shift, control-flow loop and
 call-chain, branch-mix and dense switch, pointer memory, optional pointer,
@@ -99,8 +99,8 @@ table-load rows, start trampolines, getauxval pointer walking, f128 sret/byval
 ABI shapes, logical-pointer unreachable stubs, address-space volatile stores,
 raw `_start` loops, and libfuzzer futex/name/run boundaries. The selected
 writer gate is
-`total=136 executable_ok=136 link_only_ok=0 local_fail=0`, with
-`scalar_runtime_rows=136 minimal_wrapper_rows=0`.
+`total=146 executable_ok=146 link_only_ok=0 local_fail=0`, with
+`scalar_runtime_rows=146 minimal_wrapper_rows=0`.
 
 Coverage classification:
 The covered source-backed rows reuse existing helper families for loops/phis,
@@ -667,7 +667,7 @@ expected source-level exit code 7, and
 source-level exit code 5. `releasesmall_runtime_inherit_want_safety_i64` now
 passes with the expected source-level exit code 4. The selected integrated
 postopt object gate is clean with
-`total=136 executable_ok=136 link_only_ok=0 local_fail=0`. The top-level
+`total=146 executable_ok=146 link_only_ok=0 local_fail=0`. The top-level
 distribution gate then exposed the next selected blocker:
 integrated preopt `releasefast_runtime_pointer_load_store` object emission
 failure with `UnsupportedCodegenControlFlow`; that row now passes. The next
@@ -815,12 +815,12 @@ integrated preopt gate also passes for the same 10 rows: patched Zig writes
 pre-optimization IR before LLVM's `module_pm.run(...)`, `z_llvm` runs the
 accepted Zig-mode pipeline and emits the object, and Zig native linking
 finishes the selected wrappers. The external z_llvm IR writer gate now
-also passes: the first ReleaseFast tiny-scalar row and the full 136-row
+also passes: the first ReleaseFast tiny-scalar row and the full 146-row
 integrated set go through `ZIG_USE_ZLLVM_IR_WRITER=1` with
 `ZLLVM_IR_WRITER_MODE=external`, `z_llvm --emit=ir-writer`, the accepted
 `z_llvm` preopt pipeline, local object emission, and Zig native linking. The
-writer now has 136 runtime-surface selected rows and 0 minimal-wrapper hook
-proofs. Its construction ownership is measured per row: all 136 rows are built
+writer now has 146 runtime-surface selected rows and 0 minimal-wrapper hook
+proofs. Its construction ownership is measured per row: all 146 rows are built
 through `src/structured_ir_builder.zig` into z_llvm-owned internal IR modules.
 Runtime surfaces cover tiny scalar add,
 integer arithmetic,
@@ -895,12 +895,12 @@ ir writer    patched Zig build-obj -> external z_llvm IR writer subset
              -> z_llvm accepted pipeline -> z_llvm object -> Zig native link:
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
-             full set total=136 executable_ok=136 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=136 structured_direct_rows=136
+             full set total=146 executable_ok=146 link_only_ok=0 local_fail=0
+             scalar_runtime_rows=146 structured_direct_rows=146
              structured_textual_rows=0 textual_boundary_rows=0
-             generic_codegen_rows=136 case_specific_codegen_rows=0
+             generic_codegen_rows=146 case_specific_codegen_rows=0
              minimal_wrapper_rows=0
-             ownership=structured-direct:136; structured-textual:0;
+             ownership=structured-direct:146; structured-textual:0;
                        textual-boundary:0
              ownership=llvm-module=not-used; llvm-optimizer=not-used;
                        llvm-targetmachine=not-used; object-emission=z_llvm;
