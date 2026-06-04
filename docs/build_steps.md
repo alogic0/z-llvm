@@ -65,10 +65,11 @@ As of the structured-direct milestone, the measured construction split is 104
 rows built through `src/structured_ir_builder.zig` into z_llvm-owned internal
 IR modules and 32 explicit textual boundary rows. The full gate enforces
 `structured_direct_rows >= 100`, `structured_textual_rows=0`,
-`textual_boundary_rows=32`, `generic_codegen_rows >= 75`,
+`textual_boundary_rows=32`, `generic_codegen_rows=104`,
+`case_specific_codegen_rows=0`,
 `textual_boundary_reason_missing_rows=0`, `minimal-ret0=0`, no libLLVM module
 parse/print fallback, and no LLVM TargetMachine object-emission fallback. The
-current measured codegen split is 93 generic structured-direct rows and 11
+current measured codegen split is 104 generic structured-direct rows and 0
 case-specific structured-direct rows; see
 `docs/roadmap/x86_64_codegen_genericity_audit.md`.
 

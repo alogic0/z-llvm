@@ -9,8 +9,8 @@ Current measured gate:
 gate=zig build distribution-zig-ir-writer
 total=136
 structured_direct_rows=104
-generic_codegen_rows=93
-case_specific_codegen_rows=11
+generic_codegen_rows=104
+case_specific_codegen_rows=0
 textual_boundary_rows=32
 ```
 
@@ -30,23 +30,31 @@ path is covered by reusable x86_64 lowering families:
 - TLS/global access
 - basic FP binary/compare/select/div/rem checks
 - ReleaseSafe checked overflow and panic-edge layouts
+- aggregate pair ABI packing/accessor helpers
+- simple void-call boundaries
+- ReleaseSmall hidden/global access
+- mixed C/Zig localexec TLS input
+- i64 saturating helper shapes
+- i64 return/pass-through shapes
 
 The repeated selected FP call/fcmp/select mains now dispatch through one
 table-driven `lowerSelectedRuntimeFloatCallCompareMainReturn` path rather than
 six named wrapper lowerers.
 
+The former case-specific families now dispatch through reusable family entry
+points:
+
+- `lowerAggregatePairAbiFamilyReturn`
+- `lowerSimpleVoidCallBoundaryFamilyReturn`
+- `lowerHiddenGlobalAccessFamilyReturn`
+- `lowerMixedCZigTlsInputFamilyReturn`
+- `lowerI64SaturatingHelperFamilyReturn`
+- `lowerI64SaturatingHelperFunctionFamily`
+- `lowerI64PassThroughFunctionFamily`
+
 ## Remaining Case-Specific Structured Rows
 
-The current 11 structured-direct rows still intentionally count as
-`case_specific_codegen_rows`:
-
-- `aggregate-pair-abi=2`: selected aggregate ABI pair packing and accessors
-- `void-noop-call=1`: selected fastcc void call boundary
-- `hidden-global-access=2`: ReleaseSmall hidden extern/global access shape
-- `mixed-c-zig-add=2`: ReleaseSmall mixed C/Zig localexec TLS input shape
-- `umul-fix-sat-i64=2`: selected i64 saturating multiply helper boundary
-- `inherit-i64-return=2`: selected inherit-want-safety i64 return shape
-
-These rows are still valid selected evidence, but they are no longer hidden in
-the structured-direct count. The compact selected gate requires
-`generic_codegen_rows >= 75` for the 104 structured-direct rows.
+There are no remaining case-specific structured-direct rows. The compact
+selected gate requires `generic_codegen_rows == structured_direct_rows` and
+`case_specific_codegen_rows == 0`; at the current 136-row size this is
+`generic_codegen_rows=104` and `case_specific_codegen_rows=0`.

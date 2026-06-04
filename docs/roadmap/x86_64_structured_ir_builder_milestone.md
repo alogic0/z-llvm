@@ -16,8 +16,8 @@ structured_builder_rows=104
 structured_direct_rows=104
 structured_textual_rows=0
 textual_boundary_rows=32
-generic_codegen_rows=93
-case_specific_codegen_rows=11
+generic_codegen_rows=104
+case_specific_codegen_rows=0
 textual_boundary_reason_missing_rows=0
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
@@ -27,10 +27,10 @@ ownership=llvm-module=not-used; llvm-optimizer=not-used;
 
 The full selected gate fails if `structured_direct_rows < 100`, any structured
 row reports textual LLVM parsing, any textual boundary row lacks
-`textual_boundary_reason`, structured-direct generic-codegen rows are below
-75, any selected row reports `minimal-ret0`, any selected row reports libLLVM
-module parse/print, or any selected row reports LLVM TargetMachine object
-emission. The generic/case-specific x86_64 lowering audit is tracked in
+`textual_boundary_reason`, any structured-direct row reports case-specific
+codegen ownership, any selected row reports `minimal-ret0`, any selected row
+reports libLLVM module parse/print, or any selected row reports LLVM
+TargetMachine object emission. The generic x86_64 lowering audit is tracked in
 `docs/roadmap/x86_64_codegen_genericity_audit.md`.
 
 ## Converted Rows
