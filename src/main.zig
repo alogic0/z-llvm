@@ -521,8 +521,8 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_runtime_base64_next_source_bundle_step", .surface = "base64-next-source-bundle-step", .write = writeReleaseSmallRuntimeBase64NextSourceBundleStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_third_source_bundle_step", .surface = "base64-third-source-bundle-step", .write = writeReleaseSmallRuntimeBase64ThirdSourceBundleStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_bit_buffer_store_step", .surface = "base64-bit-buffer-store-step", .write = writeReleaseSmallRuntimeBase64BitBufferStoreStepIrWriterBody, .construction = .structured_builder },
-    .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
-    .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
+    .{ .id = "releasesmall_runtime_base64_loop_advance_step", .surface = "base64-loop-advance-step", .write = writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_runtime_base64_residual_guard_step", .surface = "base64-residual-guard-step", .write = writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_residual_bundle_step", .surface = "base64-residual-bundle-step", .write = writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_residual_store_step", .surface = "base64-residual-store-step", .write = writeReleaseSmallRuntimeBase64ResidualStoreStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
     .{ .id = "releasesmall_runtime_base64_residual_length_step", .surface = "base64-residual-length-step", .write = writeReleaseSmallRuntimeBase64ResidualLengthStepIrWriterBody, .textual_boundary_reason = "base64-reduced-slice" },
@@ -1746,33 +1746,35 @@ fn writeReleaseSmallRuntimeBase64LoopAdvanceStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.loop_advance_output = private unnamed_addr global i64 0, align 8
-        \\@base64.loop_advance_source = private unnamed_addr global i64 16, align 8
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %out.start = load i64, ptr @base64.loop_advance_output, align 8
-        \\  %src.start = load i64, ptr @base64.loop_advance_source, align 8
-        \\  br label %loop
-        \\
-        \\loop:
-        \\  %out = phi i64 [ %out.start, %entry ], [ %out.next, %loop ]
-        \\  %src = phi i64 [ %src.start, %entry ], [ %src.next, %loop ]
-        \\  %out.next = add nuw i64 %out, 12
-        \\  %src.next = add i64 %src, -16
-        \\  %done = icmp eq i64 %out.next, 12
-        \\  br i1 %done, label %exit, label %loop
-        \\
-        \\exit:
-        \\  %src.ok = icmp eq i64 %src.next, 0
-        \\  %ret = select i1 %src.ok, i32 0, i32 1
-        \\  ret i32 %ret
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64LoopAdvanceStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 loop-advance external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64LoopAdvanceStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.loop_advance_output", "private unnamed_addr", .i64, "0", "8");
+    try module.global("base64.loop_advance_source", "private unnamed_addr", .i64, "16", "8");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.load("out.start", .i64, sib.global(.ptr, "@base64.loop_advance_output"), "8");
+    _ = try entry.load("src.start", .i64, sib.global(.ptr, "@base64.loop_advance_source"), "8");
+    try entry.br("loop");
+    try writer.writeAll("\n");
+    var loop = try function.block("loop");
+    _ = try loop.phi2("out", .i64, sib.local(.i64, "%out.start"), "entry", sib.local(.i64, "%out.next"), "loop");
+    _ = try loop.phi2("src", .i64, sib.local(.i64, "%src.start"), "entry", sib.local(.i64, "%src.next"), "loop");
+    _ = try loop.binary("out.next", "add nuw", .i64, sib.local(.i64, "%out"), sib.int(.i64, "12"));
+    _ = try loop.binary("src.next", "add", .i64, sib.local(.i64, "%src"), sib.int(.i64, "-16"));
+    _ = try loop.icmp("done", "eq", .i64, sib.local(.i64, "%out.next"), sib.int(.i64, "12"));
+    try loop.condBr(sib.local(.i1, "%done"), "exit", "loop");
+    try writer.writeAll("\n");
+    var exit = try function.block("exit");
+    _ = try exit.icmp("src.ok", "eq", .i64, sib.local(.i64, "%src.next"), sib.int(.i64, "0"));
+    _ = try exit.select("ret", sib.local(.i1, "%src.ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try exit.ret(sib.local(.i32, "%ret"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(
@@ -1780,40 +1782,42 @@ fn writeReleaseSmallRuntimeBase64ResidualGuardStepIrWriterBody(
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
-    writer.print(
-        \\@base64.residual_guard_source_index = private unnamed_addr global i64 0, align 8
-        \\@base64.residual_guard_output_index = private unnamed_addr global i64 0, align 8
-        \\@base64.residual_guard_source_len = private unnamed_addr global i64 8, align 8
-        \\@base64.residual_guard_output_len = private unnamed_addr global i64 8, align 8
-        \\@base64.residual_guard_source = private unnamed_addr global [1 x i8] c"A", align 1
-        \\
-        \\define dso_local i32 @main() local_unnamed_addr {{
-        \\entry:
-        \\  %source.index = load i64, ptr @base64.residual_guard_source_index, align 8
-        \\  %output.index = load i64, ptr @base64.residual_guard_output_index, align 8
-        \\  %source.len = load i64, ptr @base64.residual_guard_source_len, align 8
-        \\  %output.len = load i64, ptr @base64.residual_guard_output_len, align 8
-        \\  %source.next = add nuw i64 %source.index, 4
-        \\  %source.ok = icmp ult i64 %source.next, %source.len
-        \\  %output.next = add nuw i64 %output.index, 3
-        \\  %output.ok = icmp ult i64 %output.next, %output.len
-        \\  %guard = select i1 %source.ok, i1 %output.ok, i1 0
-        \\  %src.ptr = getelementptr [1 x i8], ptr @base64.residual_guard_source, i64 %source.index
-        \\  br i1 %guard, label %decode, label %done
-        \\
-        \\decode:
-        \\  %byte = load i8, ptr %src.ptr, align 1
-        \\  %byte.ok = icmp eq i8 %byte, 65
-        \\  %ret.ok = select i1 %byte.ok, i32 0, i32 2
-        \\  ret i32 %ret.ok
-        \\
-        \\done:
-        \\  ret i32 1
-        \\}}
-        \\
-    , .{}) catch |err| {
+    writeBase64ResidualGuardStructuredModule(writer) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 residual-guard external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
+}
+
+fn writeBase64ResidualGuardStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("base64.residual_guard_source_index", "private unnamed_addr", .i64, "0", "8");
+    try module.global("base64.residual_guard_output_index", "private unnamed_addr", .i64, "0", "8");
+    try module.global("base64.residual_guard_source_len", "private unnamed_addr", .i64, "8", "8");
+    try module.global("base64.residual_guard_output_len", "private unnamed_addr", .i64, "8", "8");
+    try module.global("base64.residual_guard_source", "private unnamed_addr", .{ .text = "[1 x i8]" }, "c\"A\"", "1");
+    try writer.writeAll("\n");
+    var function = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    _ = try entry.load("source.index", .i64, sib.global(.ptr, "@base64.residual_guard_source_index"), "8");
+    _ = try entry.load("output.index", .i64, sib.global(.ptr, "@base64.residual_guard_output_index"), "8");
+    _ = try entry.load("source.len", .i64, sib.global(.ptr, "@base64.residual_guard_source_len"), "8");
+    _ = try entry.load("output.len", .i64, sib.global(.ptr, "@base64.residual_guard_output_len"), "8");
+    _ = try entry.binary("source.next", "add nuw", .i64, sib.local(.i64, "%source.index"), sib.int(.i64, "4"));
+    _ = try entry.icmp("source.ok", "ult", .i64, sib.local(.i64, "%source.next"), sib.local(.i64, "%source.len"));
+    _ = try entry.binary("output.next", "add nuw", .i64, sib.local(.i64, "%output.index"), sib.int(.i64, "3"));
+    _ = try entry.icmp("output.ok", "ult", .i64, sib.local(.i64, "%output.next"), sib.local(.i64, "%output.len"));
+    _ = try entry.select("guard", sib.local(.i1, "%source.ok"), .i1, sib.local(.i1, "%output.ok"), sib.int(.i1, "0"));
+    _ = try entry.gep("src.ptr", .{ .text = "[1 x i8]" }, sib.global(.ptr, "@base64.residual_guard_source"), .i64, sib.local(.i64, "%source.index"));
+    try entry.condBr(sib.local(.i1, "%guard"), "decode", "done");
+    try writer.writeAll("\n");
+    var decode = try function.block("decode");
+    _ = try decode.load("byte", .i8, sib.local(.ptr, "%src.ptr"), "1");
+    _ = try decode.icmp("byte.ok", "eq", .i8, sib.local(.i8, "%byte"), sib.int(.i8, "65"));
+    _ = try decode.select("ret.ok", sib.local(.i1, "%byte.ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "2"));
+    try decode.ret(sib.local(.i32, "%ret.ok"));
+    try writer.writeAll("\n");
+    var done = try function.block("done");
+    try done.ret(sib.int(.i32, "1"));
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeBase64ResidualBundleStepIrWriterBody(
