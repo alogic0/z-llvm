@@ -16,6 +16,7 @@ pub const Type = union(enum) {
     v2i64,
     f32,
     f64,
+    fp128,
     ptr,
     text: []const u8,
 
@@ -33,6 +34,7 @@ pub const Type = union(enum) {
             .v2i64 => "<2 x i64>",
             .f32 => "float",
             .f64 => "double",
+            .fp128 => "fp128",
             .ptr => "ptr",
             .text => |text| text,
         };
@@ -52,6 +54,7 @@ pub const Type = union(enum) {
             .v2i64 => .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 64 } } },
             .f32 => .float,
             .f64 => .double,
+            .fp128 => .fp128,
             .ptr => .ptr,
             .text => |text| .{ .aggregate = text },
         };
@@ -72,6 +75,10 @@ pub const Value = struct {
 
     pub fn constant(ty: Type, text: []const u8) Value {
         return .{ .ty = ty, .ref = text };
+    }
+
+    pub fn pointerIntConstant(address: []const u8) Value {
+        return .{ .ty = .ptr, .ref = address };
     }
 };
 
@@ -122,6 +129,10 @@ pub const Module = struct {
             try self.writer.print("@{s} = {s} constant {s} {s}, align {s}\n", .{ name, linkage, ty.llvm(), initializer, align_text });
         }
         if (active_direct) |direct| try direct.global(name, linkage, .constant, ty, initializer, align_text, null);
+    }
+
+    pub fn stringConstant(self: *Module, name: []const u8, linkage: []const u8, bytes_ty: []const u8, c_string_initializer: []const u8) !void {
+        try self.constant(name, linkage, .{ .text = bytes_ty }, c_string_initializer, "1");
     }
 
     pub fn tlsGlobal(self: *Module, name: []const u8, linkage: []const u8, model: []const u8, ty: Type, initializer: []const u8, align_text: []const u8) !void {
@@ -279,6 +290,15 @@ pub const Block = struct {
     pub fn inlineAsmBarrier(self: *Block) !void {
         try self.writer.writeAll("  tail call void asm sideeffect \"\", \"~{memory},~{dirflag},~{fpsr},~{flags}\"()\n");
         if (active_direct) |direct| try direct.inlineAsmBarrier();
+    }
+
+    pub fn startTrampolineInlineAsm(self: *Block, self_symbol: []const u8, target_symbol: []const u8) !void {
+        try self.writer.writeAll("  tail call void asm sideeffect \".cfi_undefined %rip\", \"~{dirflag},~{fpsr},~{flags}\"()\n");
+        try self.writer.print("  tail call void asm sideeffect \" xorl %ebp, %ebp\\0A movq %rsp, %rdi\\0A andq $$-16, %rsp\\0A callq ${{1:P}}\", \"X,X,~{{dirflag}},~{{fpsr}},~{{flags}}\"(ptr nonnull @{s}, ptr nonnull @{s})\n", .{ self_symbol, target_symbol });
+        if (active_direct) |direct| {
+            try direct.inlineAsmStartCfi();
+            try direct.inlineAsmStartTrampoline(self_symbol, target_symbol);
+        }
     }
 
     pub fn alloca(self: *Block, result: []const u8, ty: Type, align_text: []const u8) !Value {
@@ -664,6 +684,48 @@ pub const DirectBuilder = struct {
         try self.appendInstructionOptional(null, .{ .call = call_inst });
     }
 
+    pub fn inlineAsmStartCfi(self: *DirectBuilder) !void {
+        var call_inst: ir.CallInst = .{
+            .ret_ty = .void,
+            .callee = "asm",
+            .tail_kind = "tail",
+            .inline_asm = .{
+                .template = ".cfi_undefined %rip",
+                .constraints = "~{dirflag},~{fpsr},~{flags}",
+                .sideeffect = true,
+            },
+            .args = .empty,
+        };
+        errdefer call_inst.deinit(self.allocator);
+        try self.appendInstructionOptional(null, .{ .call = call_inst });
+    }
+
+    pub fn inlineAsmStartTrampoline(self: *DirectBuilder, self_symbol: []const u8, target_symbol: []const u8) !void {
+        var call_inst: ir.CallInst = .{
+            .ret_ty = .void,
+            .callee = "asm",
+            .tail_kind = "tail",
+            .inline_asm = .{
+                .template = " xorl %ebp, %ebp\\0A movq %rsp, %rdi\\0A andq $$-16, %rsp\\0A callq ${1:P}",
+                .constraints = "X,X,~{dirflag},~{fpsr},~{flags}",
+                .sideeffect = true,
+            },
+            .args = .empty,
+        };
+        errdefer call_inst.deinit(self.allocator);
+        try call_inst.args.append(self.allocator, .{
+            .ty = .ptr,
+            .attrs = "nonnull",
+            .value = .{ .named = try self.formatArgs("@{s}", .{self_symbol}) },
+        });
+        try call_inst.args.append(self.allocator, .{
+            .ty = .ptr,
+            .attrs = "nonnull",
+            .value = .{ .named = try self.formatArgs("@{s}", .{target_symbol}) },
+        });
+        try self.appendInstructionOptional(null, .{ .call = call_inst });
+    }
+
     pub fn alloca(self: *DirectBuilder, result: []const u8, ty: Type, align_text: []const u8) !void {
         try self.appendInstruction(result, .{ .alloca = .{
             .allocated_ty = ty.toIr(),
@@ -833,6 +895,7 @@ fn parseValueRef(text: []const u8) ir.Value {
     if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .zero_initializer;
     if (trimmed[0] == '%') return .{ .named = trimmed[1..] };
     if (trimmed[0] == '@') return .{ .named = trimmed };
+    if (std.mem.startsWith(u8, trimmed, "inttoptr (") or std.mem.startsWith(u8, trimmed, "ptrtoint (")) return .{ .constant_expr = trimmed };
     if (trimmed[0] == '[' or trimmed[0] == '<' or trimmed[0] == '{') return .{ .constant_expr = trimmed };
     if (std.mem.indexOfAny(u8, trimmed, ".xX") != null) return .{ .fp = trimmed };
     if (std.fmt.parseInt(i128, trimmed, 10)) |value| return .{ .int = value } else |_| {}
@@ -845,6 +908,7 @@ fn parseIrType(text: []const u8) ?ir.Type {
     if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
     if (std.mem.eql(u8, trimmed, "float")) return .float;
     if (std.mem.eql(u8, trimmed, "double")) return .double;
+    if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
     if (trimmed.len > 1 and trimmed[0] == 'i') {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .int = bits };

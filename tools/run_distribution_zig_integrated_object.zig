@@ -38,18 +38,7 @@ const SourceFixtureSkip = struct {
     reason: []const u8,
 };
 
-const source_fixture_skips = [_]SourceFixtureSkip{
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll", .reason = "address-space-start-trampoline" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll", .reason = "libc-getauxval-aggregate-startup-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll", .reason = "f128-sret-c-abi-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll", .reason = "logical-pointer-compile-error-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/export_keyword_vram_store.ll", .reason = "address-space-vram-store-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll", .reason = "unreachable-stub-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll", .reason = "raw-start-loop-entry-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll", .reason = "libfuzzer-futex-runtime-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll", .reason = "libfuzzer-vtable-name-boundary" },
-    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll", .reason = "libfuzzer-vtable-run-boundary" },
-};
+const source_fixture_skips = [_]SourceFixtureSkip{};
 
 const cases = [_]Case{
     .{
@@ -901,6 +890,86 @@ const cases = [_]Case{
         .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:compile-asm-main-unreachable",
     },
     .{
+        .id = "releasesmall_source_address_space_start_trampoline",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:address-space-start-trampoline",
+    },
+    .{
+        .id = "releasesmall_source_array_in_anon_struct_getauxval",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:getauxval-pointer-walk",
+    },
+    .{
+        .id = "releasesmall_source_c_abi_main_f128_sret",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:f128-sret-byval",
+    },
+    .{
+        .id = "releasesmall_source_compile_errors_logical_ptr_elem_ptr",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:logical-pointer-unreachable",
+    },
+    .{
+        .id = "releasesmall_source_export_keyword_vram_store",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/export_keyword_vram_store.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:vram-volatile-store",
+    },
+    .{
+        .id = "releasesmall_source_sizeof_typeof_unreachable_stubs",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:unreachable-stubs",
+    },
+    .{
+        .id = "releasesmall_source_standalone_install_raw_hex_start_loop",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:raw-start-loop",
+    },
+    .{
+        .id = "releasesmall_source_standalone_libfuzzer_runner_futex_wait",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:libfuzzer-futex-wait",
+    },
+    .{
+        .id = "releasesmall_source_standalone_libfuzzer_runner_test_name",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:libfuzzer-test-name",
+    },
+    .{
+        .id = "releasesmall_source_standalone_libfuzzer_runner_test_run",
+        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll",
+        .mode = "ReleaseSmall",
+        .validation = .executable,
+        .fallback = "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:libfuzzer-test-run",
+    },
+    .{
         .id = "releasesmall_runtime_str_from_float_help",
         .wrapper = "test/zig/integrated/runtime_str_from_float_help_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll",
@@ -1299,6 +1368,15 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "umul-fix-sat-i64" },
         .{ .name = "inherit-i64-return" },
         .{ .name = "compile-asm-unreachable" },
+        .{ .name = "start-trampoline" },
+        .{ .name = "getauxval-pointer-walk" },
+        .{ .name = "f128-sret-byval" },
+        .{ .name = "noreturn-unreachable-stub" },
+        .{ .name = "address-space-volatile-store" },
+        .{ .name = "raw-start-loop" },
+        .{ .name = "i1-const-return" },
+        .{ .name = "constant-string-slice-return" },
+        .{ .name = "libfuzzer-vtable-run" },
         .{ .name = "str-from-float-help" },
         .{ .name = "base64-decode-base64-full" },
         .{ .name = "base64-decode-step" },
@@ -1427,8 +1505,8 @@ pub fn main(init: std.process.Init) !void {
             if (source_backed_rows != total) {
                 try common.validationError(io, "broad source-backed gate row accounting mismatch: source_backed_rows={} total={}\n", .{ source_backed_rows, total });
             }
-            if (source_backed_rows < 80) {
-                try common.validationError(io, "broad source-backed gate must keep the current 80 accepted source-backed rows; source_backed_rows={}\n", .{source_backed_rows});
+            if (source_backed_rows != 90 or skipped_with_reason != 0) {
+                try common.validationError(io, "broad source-backed gate requires exact no-skip source fixture closure; source_backed_rows={} skipped_with_reason={}\n", .{ source_backed_rows, skipped_with_reason });
             }
             if (structured_direct_rows != source_backed_rows or generic_codegen_rows != source_backed_rows) {
                 try common.validationError(io, "broad source-backed gate requires every accepted row to be structured-direct and generic; source_backed_rows={} structured_direct_rows={} generic_codegen_rows={}\n", .{ source_backed_rows, structured_direct_rows, generic_codegen_rows });
@@ -2091,6 +2169,15 @@ fn readIrWriterSurface(
     if (std.mem.eql(u8, contents[value_start..value_end], "umul-fix-sat-i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, contents[value_start..value_end], "inherit-i64-return")) return "inherit-i64-return";
     if (std.mem.eql(u8, contents[value_start..value_end], "compile-asm-unreachable")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, contents[value_start..value_end], "start-trampoline")) return "start-trampoline";
+    if (std.mem.eql(u8, contents[value_start..value_end], "getauxval-pointer-walk")) return "getauxval-pointer-walk";
+    if (std.mem.eql(u8, contents[value_start..value_end], "f128-sret-byval")) return "f128-sret-byval";
+    if (std.mem.eql(u8, contents[value_start..value_end], "noreturn-unreachable-stub")) return "noreturn-unreachable-stub";
+    if (std.mem.eql(u8, contents[value_start..value_end], "address-space-volatile-store")) return "address-space-volatile-store";
+    if (std.mem.eql(u8, contents[value_start..value_end], "raw-start-loop")) return "raw-start-loop";
+    if (std.mem.eql(u8, contents[value_start..value_end], "i1-const-return")) return "i1-const-return";
+    if (std.mem.eql(u8, contents[value_start..value_end], "constant-string-slice-return")) return "constant-string-slice-return";
+    if (std.mem.eql(u8, contents[value_start..value_end], "libfuzzer-vtable-run")) return "libfuzzer-vtable-run";
     if (std.mem.eql(u8, contents[value_start..value_end], "str-from-float-help")) return "str-from-float-help";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-base64-full")) return "base64-decode-base64-full";
     if (std.mem.eql(u8, contents[value_start..value_end], "base64-decode-step")) return "base64-decode-step";

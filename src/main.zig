@@ -503,6 +503,16 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_source_inherit_want_safety_i64_return", .surface = "inherit-i64-return", .write = writeReleaseSmallRuntimeInheritWantSafetyI64IrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_address_space_start_trampoline", .surface = "start-trampoline", .write = writeReleaseSmallAddressSpaceStartTrampolineIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_array_in_anon_struct_getauxval", .surface = "getauxval-pointer-walk", .write = writeReleaseSmallGetauxvalIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_c_abi_main_f128_sret", .surface = "f128-sret-byval", .write = writeReleaseSmallCAbiF128SretIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_compile_errors_logical_ptr_elem_ptr", .surface = "noreturn-unreachable-stub", .write = writeReleaseSmallLogicalPtrUnreachableIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_export_keyword_vram_store", .surface = "address-space-volatile-store", .write = writeReleaseSmallVramStoreIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_sizeof_typeof_unreachable_stubs", .surface = "noreturn-unreachable-stub", .write = writeReleaseSmallSizeofTypeofUnreachableIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_install_raw_hex_start_loop", .surface = "raw-start-loop", .write = writeReleaseSmallRawStartLoopIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_libfuzzer_runner_futex_wait", .surface = "i1-const-return", .write = writeReleaseSmallLibfuzzerFutexWaitIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_libfuzzer_runner_test_name", .surface = "constant-string-slice-return", .write = writeReleaseSmallLibfuzzerTestNameIrWriterBody, .construction = .structured_builder },
+    .{ .id = "releasesmall_source_standalone_libfuzzer_runner_test_run", .surface = "libfuzzer-vtable-run", .write = writeReleaseSmallLibfuzzerTestRunIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .construction = .structured_builder },
@@ -884,6 +894,338 @@ fn writeReleaseSmallCompileAsmUnreachableStructuredModule(writer: *std.Io.Writer
     var asm_entry = try asm_fn.block("entry");
     try asm_entry.emitUnreachable();
     try asm_fn.end();
+}
+
+fn writeReleaseSmallAddressSpaceStartTrampolineIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallAddressSpaceStartTrampolineStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall address-space start-trampoline external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallAddressSpaceStartTrampolineStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("start_trampoline_entry", .{ .text = "void ()" }, "@start._start");
+    try module.declare(.void, "start.posixCallMainAndExit", "ptr");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var start_fn = try module.function("private ", .void, "start._start", "", " unnamed_addr align 1");
+    var entry = try start_fn.block("0");
+    try entry.startTrampolineInlineAsm("start._start", "start.posixCallMainAndExit");
+    try entry.emitUnreachable();
+    try start_fn.end();
+    try writeVoidStub(&module, "start.posixCallMainAndExit", "ptr %0");
+}
+
+fn writeReleaseSmallGetauxvalIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallGetauxvalStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall getauxval pointer-walk external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallGetauxvalStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.global("os.linux.elf_aux_maybe", "private unnamed_addr", .ptr, "null", "8");
+    try module.alias("getauxval", .{ .text = "i64 (i64)" }, "@os.linux.getauxvalImpl");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var function = try module.function("private ", .i64, "os.linux.getauxvalImpl", "i64 %0", " unnamed_addr align 1");
+    var entry = try function.block("1");
+    _ = try entry.load("2", .ptr, sib.global(.ptr, "@os.linux.elf_aux_maybe"), "8");
+    _ = try entry.icmp(".not", "eq", .ptr, sib.local(.ptr, "%2"), sib.Value.constant(.ptr, "null"));
+    try entry.condBr(sib.local(.i1, "%.not"), "common.ret", ".preheader");
+    try writer.writeAll("\n");
+    var common_ret = try function.block("common.ret");
+    _ = try common_ret.phi3("common.ret.op", .i64, sib.local(.i64, "%10"), "8", sib.int(.i64, "0"), "1", sib.int(.i64, "0"), ".preheader");
+    try common_ret.ret(sib.local(.i64, "%common.ret.op"));
+    try writer.writeAll("\n");
+    var preheader = try function.block(".preheader");
+    _ = try preheader.phi2(".0", .i64, sib.local(.i64, "%7"), "5", sib.int(.i64, "0"), "1");
+    _ = try preheader.gep("3", .{ .text = "[16 x i8]" }, sib.local(.ptr, "%2"), .i64, sib.local(.i64, "%.0"));
+    _ = try preheader.load("4", .i64, sib.local(.ptr, "%3"), "8");
+    _ = try preheader.icmp(".not8", "eq", .i64, sib.local(.i64, "%4"), sib.int(.i64, "0"));
+    try preheader.condBr(sib.local(.i1, "%.not8"), "common.ret", "5");
+    try writer.writeAll("\n");
+    var compare = try function.block("5");
+    _ = try compare.icmp("6", "eq", .i64, sib.local(.i64, "%4"), sib.local(.i64, "%0"));
+    _ = try compare.binary("7", "add nuw", .i64, sib.local(.i64, "%.0"), sib.int(.i64, "1"));
+    try compare.condBr(sib.local(.i1, "%6"), "8", ".preheader");
+    try writer.writeAll("\n");
+    var found = try function.block("8");
+    _ = try found.gep("9", .i8, sib.local(.ptr, "%3"), .i64, sib.int(.i64, "8"));
+    _ = try found.load("10", .i64, sib.local(.ptr, "%9"), "8");
+    try found.br("common.ret");
+    try function.end();
+}
+
+fn writeReleaseSmallCAbiF128SretIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallCAbiF128SretStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall f128 sret/byval external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallCAbiF128SretStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("__anon_762", "private unnamed_addr", .{ .text = "[13 x i8]" }, "c\"test failure\\00\"", "1");
+    try module.alias("zig_f128_f128_struct", .{ .text = "void (ptr, ptr)" }, "@main.zig_f128_f128_struct");
+    try module.declare(.i32, "__eqtf2", "fp128, fp128");
+    try module.declare(.void, "debug.defaultPanic", "ptr, i64");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var function = try module.function("private ", .void, "main.zig_f128_f128_struct", "ptr %0, ptr %1", " unnamed_addr align 1");
+    var entry = try function.block("2");
+    _ = try entry.load(".sroa.0.0.copyload", .fp128, sib.local(.ptr, "%1"), "16");
+    _ = try entry.gep(".sroa.2.0..sroa_idx", .i8, sib.local(.ptr, "%1"), .i64, sib.int(.i64, "16"));
+    _ = try entry.load(".sroa.2.0.copyload", .fp128, sib.local(.ptr, "%.sroa.2.0..sroa_idx"), "16");
+    _ = try entry.call("3", "tail ", .i32, "@__eqtf2", "fp128 %.sroa.0.0.copyload, fp128 0xL00000000000000004002A00000000000");
+    _ = try entry.icmp("4", "eq", .i32, sib.local(.i32, "%3"), sib.int(.i32, "0"));
+    try entry.condBr(sib.local(.i1, "%4"), "5", "8");
+    try writer.writeAll("\n");
+    var second = try function.block("5");
+    _ = try second.call("6", "tail ", .i32, "@__eqtf2", "fp128 %.sroa.2.0.copyload, fp128 0xL00000000000000004004C80000000000");
+    _ = try second.icmp("7", "eq", .i32, sib.local(.i32, "%6"), sib.int(.i32, "0"));
+    try second.condBr(sib.local(.i1, "%7"), "9", "11");
+    try writer.writeAll("\n");
+    var first_panic = try function.block("8");
+    _ = try first_panic.call(null, "tail fastcc ", .void, "@debug.defaultPanic", "ptr @__anon_762, i64 12");
+    try first_panic.emitUnreachable();
+    try writer.writeAll("\n");
+    var success = try function.block("9");
+    try success.store(sib.Value.constant(.fp128, "0xL00000000000000004003800000000000"), sib.local(.ptr, "%0"), "16");
+    _ = try success.gep("10", .i8, sib.local(.ptr, "%0"), .i64, sib.int(.i64, "16"));
+    try success.store(sib.Value.constant(.fp128, "0xL00000000000000004005100000000000"), sib.local(.ptr, "%10"), "16");
+    try success.retVoid();
+    try writer.writeAll("\n");
+    var second_panic = try function.block("11");
+    _ = try second_panic.call(null, "tail fastcc ", .void, "@debug.defaultPanic", "ptr @__anon_762, i64 12");
+    try second_panic.emitUnreachable();
+    try function.end();
+    try writeEqtf2Stub(&module);
+    try writeDefaultPanicStub(&module);
+}
+
+fn writeReleaseSmallLogicalPtrUnreachableIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallLogicalPtrUnreachableStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall logical-pointer unreachable external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallLogicalPtrUnreachableStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("elemVal", .{ .text = "void ()" }, "@illegal_operation_on_logical_ptr.elemVal");
+    try module.alias("elemPtr", .{ .text = "void ()" }, "@illegal_operation_on_logical_ptr.elemPtr");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var elem_val = try module.function("private ", .void, "illegal_operation_on_logical_ptr.elemVal", "", " unnamed_addr align 1");
+    var elem_val_entry = try elem_val.block("0");
+    try elem_val_entry.retVoid();
+    try elem_val.end();
+    var elem_ptr = try module.function("private ", .void, "illegal_operation_on_logical_ptr.elemPtr", "", " unnamed_addr noreturn align 1");
+    var elem_ptr_entry = try elem_ptr.block("0");
+    try elem_ptr_entry.emitUnreachable();
+    try elem_ptr.end();
+}
+
+fn writeReleaseSmallVramStoreIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallVramStoreStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall VRAM volatile-store external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallVramStoreStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("testPackedStuff", .{ .text = "void (ptr, ptr)" }, "@export_keyword.testPackedStuff");
+    try module.alias("writeToVRam", .{ .text = "void ()" }, "@export_keyword.writeToVRam");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var test_packed = try module.function("private ", .void, "export_keyword.testPackedStuff", "ptr %0, ptr %1", " unnamed_addr align 1");
+    var test_entry = try test_packed.block("2");
+    try test_entry.retVoid();
+    try test_packed.end();
+    var vram = try module.function("private ", .void, "export_keyword.writeToVRam", "", " unnamed_addr align 1");
+    var entry = try vram.block("0");
+    try entry.volatileStore(sib.int(.i8, "88"), sib.Value.pointerIntConstant("inttoptr (i64 536870912 to ptr)"), "536870912");
+    try entry.retVoid();
+    try vram.end();
+}
+
+fn writeReleaseSmallSizeofTypeofUnreachableIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallSizeofTypeofUnreachableStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall sizeof/typeof unreachable external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallSizeofTypeofUnreachableStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("c_fopen", .{ .text = "ptr (ptr, ptr)" }, "@sizeof_and_typeof.exp.c_fopen");
+    try module.alias("c_ftell", .{ .text = "i64 (ptr)" }, "@sizeof_and_typeof.exp.c_ftell");
+    try module.alias("c_fputs", .{ .text = "i32 (ptr, ptr)" }, "@sizeof_and_typeof.exp.c_fputs");
+    try module.alias("c_printf", .{ .text = "i32 (ptr)" }, "@sizeof_and_typeof.exp.c_printf");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    try writeUnreachableFunction(&module, .ptr, "sizeof_and_typeof.exp.c_fopen", "ptr %0, ptr %1");
+    try writeUnreachableFunction(&module, .i64, "sizeof_and_typeof.exp.c_ftell", "ptr %0");
+    try writeUnreachableFunction(&module, .i32, "sizeof_and_typeof.exp.c_fputs", "ptr %0, ptr %1");
+    try writeUnreachableFunction(&module, .i32, "sizeof_and_typeof.exp.c_printf", "ptr %0");
+}
+
+fn writeReleaseSmallRawStartLoopIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallRawStartLoopStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall raw _start loop external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRawStartLoopStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("raw_start_loop_entry", .{ .text = "void ()" }, "@main._start");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var start = try module.function("private ", .void, "main._start", "", " unnamed_addr noreturn align 1");
+    var entry = try start.block("0");
+    try entry.br("1");
+    try writer.writeAll("\n");
+    var loop = try start.block("1");
+    try loop.br("1");
+    try start.end();
+}
+
+fn writeReleaseSmallLibfuzzerFutexWaitIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallLibfuzzerFutexWaitStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall libfuzzer futex-wait external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallLibfuzzerFutexWaitStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.alias("runner_futex_wait", .{ .text = "i1 (ptr, i32)" }, "@main.runner_futex_wait");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var function = try module.function("private ", .i1, "main.runner_futex_wait", "ptr %0, i32 %1", " unnamed_addr align 1");
+    var entry = try function.block("2");
+    try entry.ret(sib.int(.i1, "0"));
+    try function.end();
+}
+
+fn writeReleaseSmallLibfuzzerTestNameIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallLibfuzzerTestNameStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall libfuzzer test-name external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallLibfuzzerTestNameStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.stringConstant("__anon_16879", "private unnamed_addr", "[5 x i8]", "c\"test\\00\"");
+    try module.alias("runner_test_name", .{ .text = "{ i64, i64 } (i32)" }, "@main.runner_test_name");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var function = try module.function("private ", .{ .text = "{ i64, i64 }" }, "main.runner_test_name", "i32 %0", " unnamed_addr align 1");
+    var entry = try function.block("1");
+    try entry.ret(sib.Value.constant(.{ .text = "{ i64, i64 }" }, "{ i64 ptrtoint (ptr @__anon_16879 to i64), i64 4 }"));
+    try function.end();
+}
+
+fn writeReleaseSmallLibfuzzerTestRunIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeReleaseSmallLibfuzzerTestRunStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall libfuzzer test-run external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallLibfuzzerTestRunStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.stringConstant("__anon_11775", "private unnamed_addr", "[1 x i8]", "zeroinitializer");
+    try module.stringConstant("__anon_16031", "private unnamed_addr", "[6 x i8]", "c\"hello\\00\"");
+    try module.alias("runner_test_run", .{ .text = "void (i32)" }, "@main.runner_test_run");
+    try writer.writeAll("\n");
+    try writeRet0Main(&module);
+    var runner = try module.function("private ", .void, "main.runner_test_run", "i32 %0", " unnamed_addr align 1");
+    var entry = try runner.block("1");
+    _ = try entry.call(null, "tail ", .void, "@fuzzer_set_test", "ptr @main.testOne");
+    _ = try entry.call(null, "tail ", .void, "@fuzzer_new_input", "i64 ptrtoint (ptr @__anon_11775 to i64), i64 0");
+    _ = try entry.call(null, "tail ", .void, "@fuzzer_new_input", "i64 ptrtoint (ptr @__anon_16031 to i64), i64 5");
+    _ = try entry.call(null, "tail ", .void, "@fuzzer_start_test", "");
+    try entry.retVoid();
+    try runner.end();
+    try writeVoidStub(&module, "fuzzer_set_test", "ptr %0");
+    try writeVoidStub(&module, "fuzzer_new_input", "i64 %0, i64 %1");
+    try writeVoidStub(&module, "fuzzer_start_test", "");
+    var test_one = try module.function("dso_local ", .i1, "main.testOne", "", " local_unnamed_addr");
+    var test_entry = try test_one.block("entry");
+    try test_entry.ret(sib.int(.i1, "0"));
+    try test_one.end();
+}
+
+fn writeRet0Main(module: *sib.Module) !void {
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var entry = try main_fn.block("entry");
+    try entry.ret(sib.int(.i32, "0"));
+    try main_fn.end();
+}
+
+fn writeUnreachableFunction(module: *sib.Module, ret_ty: sib.Type, name: []const u8, params: []const u8) !void {
+    var function = try module.function("private ", ret_ty, name, params, " unnamed_addr noreturn align 1");
+    var entry = try function.block("0");
+    try entry.emitUnreachable();
+    try function.end();
+}
+
+fn writeVoidStub(module: *sib.Module, name: []const u8, params: []const u8) !void {
+    var function = try module.function("dso_local ", .void, name, params, " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try entry.retVoid();
+    try function.end();
+}
+
+fn writeEqtf2Stub(module: *sib.Module) !void {
+    var function = try module.function("dso_local ", .i32, "__eqtf2", "fp128 %0, fp128 %1", " local_unnamed_addr");
+    var entry = try function.block("entry");
+    try entry.ret(sib.int(.i32, "0"));
+    try function.end();
+}
+
+fn writeDefaultPanicStub(module: *sib.Module) !void {
+    var function = try module.function("fastcc ", .void, "debug.defaultPanic", "ptr %0, i64 %1", "");
+    var entry = try function.block("entry");
+    try entry.retVoid();
+    try function.end();
 }
 
 fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(

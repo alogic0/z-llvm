@@ -373,6 +373,15 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
     }
 
     if (global.kind != .global) return null;
+    if (global.ty == .ptr) {
+        const value = switch (global.initializer) {
+            .scalar => |scalar| scalar,
+            .none, .array, .c_string, .@"opaque" => return null,
+        };
+        if (value != .null_value and value != .zero_initializer) return null;
+        try appendU64(data, allocator, 0);
+        return 8;
+    }
     if (!global.ty.eql(.{ .int = 32 })) return null;
 
     const value: i32 = switch (global.initializer) {
