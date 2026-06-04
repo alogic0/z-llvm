@@ -57,6 +57,8 @@ linker=zig-native-fno-lld
 gate=zig build distribution-x86_64-release-source-owned
 release_source_rows=90
 source_wrapper_rows=90
+descriptor_owned_rows=90
+manual_fixture_dispatch_rows=0
 semantic_record_rows=90
 external_writer_delegate_rows=0
 semantic_lowering_rows=90
@@ -70,11 +72,21 @@ local_fail=0
 
 This gate closes the wrapper/mode collision gap by passing source fixture
 metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
-`tls-concurrency-checked-read`. The emitted writer header records
-`zllvm_ir_writer_dispatch = "source-owned"`,
-`zllvm_ir_writer_source_fixture`, and `zllvm_ir_writer_source_tag`; the row
-selector remains `ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not
-the ownership selector for this gate.
+`tls-concurrency-checked-read`. Source metadata selects a z_llvm semantic
+descriptor, and that descriptor lowers through semantic records into structured
+IR without consulting `IrWriterCase` as the ownership source. The emitted writer
+header records `zllvm_ir_writer_dispatch = "source-owned"`,
+`zllvm_ir_writer_source_fixture`, `zllvm_ir_writer_source_tag`,
+`zllvm_semantic_descriptor = "descriptor-owned"`, and
+`zllvm_manual_fixture_dispatch = "not-used"`; the row selector remains
+`ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not the ownership
+selector for this gate.
+
+The same gate also reports a source-wrapper discovery bucket from
+`test/zig/integrated/*.zig`: `discovered_source_wrappers=72`,
+`descriptor_supported_wrappers=62`, and `unsupported_with_reason=10`. This is
+a discovery bucket for future expansion, not an additional accepted row set in
+the 90-row source-owned gate.
 
 ## Semantic-Lowered Families
 
@@ -103,7 +115,8 @@ families before building structured IR in the source-owned gate:
 The narrower source-wrapper compatibility gate now reports 48 semantic-record
 rows and one external writer delegate because it deliberately omits source
 fixture/tag metadata. The source-owned gate is the stronger current claim for
-release source-backed ownership, and it requires `external_writer_delegate_rows=0`.
+release source-backed ownership, and it requires `descriptor_owned_rows=90`,
+`manual_fixture_dispatch_rows=0`, and `external_writer_delegate_rows=0`.
 
 ## Boundary
 

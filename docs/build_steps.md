@@ -27,7 +27,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-zig-ir-writer-tiny-scalar` | Run the first external z_llvm textual IR writer proof for `releasefast_tiny_scalar`. Patched stage4 Zig uses `ZIG_USE_ZLLVM_IR_WRITER=1` with `ZLLVM_IR_WRITER_MODE=external`, calls `z_llvm --emit=ir-writer` to write `scalar-add-ret` IR, then runs the existing preopt `z_llvm` optimizer/object path and Zig native linker. The executable exits 42. |
 | `zig build distribution-zig-ir-writer` | Run the selected 146-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 146 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct ownership counts, generic/case-specific x86_64 codegen counts, and downstream ownership summary. It fails on unexpected `minimal-ret0`, anything other than 146 structured-direct rows, any structured textual LLVM parsing, any textual boundary row, any case-specific codegen row, libLLVM module parse/print fallback, or LLVM TargetMachine fallback. All selected rows build z_llvm-owned internal IR modules directly and use generic x86_64 lowering. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
 | `zig build distribution-zig-source-structured-direct` | Run the source-wrapper structured-direct compatibility gate. Patched Zig still passes wrapper/mode/target/output/marker metadata, but z_llvm resolves the structured module from wrapper/source metadata instead of using `ZLLVM_CASE_ID` as the primary selector. The current gate reports `source_wrappers=49`, `structured_direct_rows=49`, `case_id_rows=0`, `generic_codegen_rows=49`, `manifest_structured_rows=0`, `semantic_record_rows=48`, `external_writer_delegate_rows=1`, `case_specific_rows=0`, `fallback_rows=0`, and `local_fail=0`. |
-| `zig build distribution-x86_64-release-source-owned` | Run the strongest current x86_64 release source-owned gate. It covers the full current ReleaseFast/ReleaseSafe/ReleaseSmall source-backed inventory, starts all rows from wrapper/source metadata rather than `ZLLVM_CASE_ID`, lowers all accepted rows through real records in `src/zig_semantic_lowering.zig`, and requires `release_source_rows=90`, `source_wrapper_rows=90`, `semantic_record_rows=90`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`. |
+| `zig build distribution-x86_64-release-source-owned` | Run the strongest current x86_64 release source-owned gate. It covers the full current ReleaseFast/ReleaseSafe/ReleaseSmall source-backed inventory, starts all rows from wrapper/source metadata rather than `ZLLVM_CASE_ID`, resolves a z_llvm-owned semantic descriptor, lowers all accepted rows through real records in `src/zig_semantic_lowering.zig`, and requires `release_source_rows=90`, `source_wrapper_rows=90`, `descriptor_owned_rows=90`, `manual_fixture_dispatch_rows=0`, `semantic_record_rows=90`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`. |
 | `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, `structured_direct_rows`, `structured_textual_rows`, `textual_boundary_rows`, `generic_codegen_rows`, `case_specific_codegen_rows`, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
 | `zig build distribution-x86_64-source-backed-structured` | Run the broad x86_64 release source-backed structured-direct gate. It discovers `.ll` fixtures under the ReleaseFast, ReleaseSafe, ReleaseSmall, and former ReleaseSmall exclusion directories, requires every discovered fixture to be accepted, and fails on any skip, fallback, textual LLVM parse, non-generic codegen, or local failure. The current gate reports `discovered_fixtures=55`, `accepted_fixtures=55`, `source_backed_rows=90`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `skipped_with_reason=0`, `fallback_rows=0`, and `local_fail=0`. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
@@ -99,13 +99,17 @@ optimizer, no LLVM TargetMachine, `object-emission=z_llvm`, and
 The strongest current x86_64 release proof is
 `zig build distribution-x86_64-release-source-owned`. It keeps the same 90-row
 fixture inventory as the broad gate, but requires every row to start from Zig
-wrapper/source metadata, use `source-owned` dispatch rather than case-id
-ownership, report `lowering=zig-semantic-records`, build a structured-direct
-module, use generic x86_64 lowering, avoid fallback, and link through Zig's
-native linker handoff. This gate fails unless `semantic_record_rows=90` and
-`external_writer_delegate_rows=0`. The fixed 146-row selected proof and the
-90-row broad source-backed proof remain regression gates with separate
-counters.
+wrapper/source metadata, resolve a z_llvm semantic descriptor, use
+`source-owned` dispatch rather than case-id ownership, report
+`lowering=zig-semantic-records`, build a structured-direct module, use generic
+x86_64 lowering, avoid fallback, and link through Zig's native linker handoff.
+This gate fails unless `descriptor_owned_rows=90`,
+`manual_fixture_dispatch_rows=0`, `semantic_record_rows=90`, and
+`external_writer_delegate_rows=0`. It also prints a source-wrapper discovery
+bucket from `test/zig/integrated/*.zig`; the current bucket reports
+`discovered_source_wrappers=72`, `descriptor_supported_wrappers=62`, and
+`unsupported_with_reason=10`. The fixed 146-row selected proof and the 90-row
+broad source-backed proof remain regression gates with separate counters.
 
 The source-wrapper gate is a third, narrower proof that starts from Zig source
 wrappers without case-id ownership. It currently covers 49 unambiguous

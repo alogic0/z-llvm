@@ -236,6 +236,8 @@ target=x86_64
 modes=ReleaseFast,ReleaseSafe,ReleaseSmall
 release_source_rows=90
 source_wrapper_rows=90
+descriptor_owned_rows=90
+manual_fixture_dispatch_rows=0
 semantic_record_rows=90
 external_writer_delegate_rows=0
 semantic_lowering_rows=90
@@ -248,14 +250,18 @@ local_fail=0
 ownership=llvm-module=not-used;llvm-optimizer=not-used;
           llvm-targetmachine=not-used;object-emission=z_llvm;
           linker=zig-native-fno-lld
+source_wrapper_discovery=discovered_source_wrappers=72
+                         descriptor_supported_wrappers=62
+                         unsupported_with_reason=10
 ```
 
 This supersedes the older claim shape for the current release source-backed
-inventory: rows are selected from Zig wrapper/source metadata, including source
-fixture and source-backed tag disambiguation for wrapper/mode collisions, then
-lowered through real records in `src/zig_semantic_lowering.zig` into
-structured-direct IR. The source-owned gate fails if any row delegates back to
-the external writer body path.
+inventory: rows are selected from Zig wrapper/source metadata into z_llvm-owned
+semantic descriptors, including source fixture and source-backed tag
+disambiguation for wrapper/mode collisions, then lowered through real records
+in `src/zig_semantic_lowering.zig` into structured-direct IR. The source-owned
+gate fails if any row delegates back to the external writer body path or the
+temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
