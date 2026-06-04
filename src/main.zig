@@ -462,7 +462,7 @@ fn irWriterSurfaceForCase(case_id: []const u8) []const u8 {
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_umul_fix_sat_i64")) return "umul-fix-sat-i64";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_inherit_want_safety_i64")) return "inherit-i64-return";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_compile_asm_unreachable")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-prologue";
+    if (std.mem.eql(u8, case_id, "releasesmall_runtime_str_from_float_help")) return "str-from-float-stack-exponent";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_base_64_full")) return "base64-decode-base64-full";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_decode_step")) return "base64-decode-step";
     if (std.mem.eql(u8, case_id, "releasesmall_runtime_base64_store_step")) return "base64-store-step";
@@ -826,7 +826,13 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
     ir_path: []const u8,
 ) !void {
     writer.print(
+        \\%Io.Writer.VTable = type {{ ptr, ptr, ptr, ptr }}
+        \\%Io.Writer = type {{ ptr, {{ ptr, i64 }}, i64 }}
+        \\
+        \\@__anon_597 = private unnamed_addr constant %Io.Writer.VTable {{ ptr null, ptr null, ptr null, ptr null }}, align 8
         \\@strFromFloatHelp = alias void (double), ptr @main.strFromFloatHelp
+        \\
+        \\declare void @llvm.lifetime.start.p0(ptr)
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
@@ -835,10 +841,31 @@ fn writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody(
         \\
         \\define private void @main.strFromFloatHelp(double %0) unnamed_addr align 1 {{
         \\entry:
+        \\  %writer = alloca %Io.Writer, align 8
+        \\  %buffer = alloca [400 x i8], align 1
+        \\  %tag = alloca i8, align 8
+        \\  call void @llvm.lifetime.start.p0(ptr %writer)
+        \\  call void @llvm.lifetime.start.p0(ptr %buffer)
+        \\  store ptr @__anon_597, ptr %writer, align 8
+        \\  %writer_data = getelementptr i8, ptr %writer, i64 8
+        \\  store ptr %buffer, ptr %writer_data, align 8
+        \\  %writer_len = getelementptr i8, ptr %writer, i64 16
+        \\  store i64 400, ptr %writer_len, align 8
+        \\  %writer_pos = getelementptr i8, ptr %writer, i64 24
+        \\  store i64 0, ptr %writer_pos, align 8
         \\  %bits = bitcast double %0 to i64
+        \\  call void @llvm.lifetime.start.p0(ptr %tag)
+        \\  store i8 0, ptr %tag, align 8
+        \\  %mantissa = and i64 %bits, 4503599627370495
         \\  %expbits = lshr i64 %bits, 52
         \\  %exp = trunc i64 %expbits to i32
         \\  %masked = and i32 %exp, 2047
+        \\  %zero_exp = icmp eq i32 %masked, 0
+        \\  %zero_mantissa = icmp eq i64 %mantissa, 0
+        \\  %is_zero = and i1 %zero_mantissa, %zero_exp
+        \\  br i1 %is_zero, label %done, label %check_special
+        \\
+        \\check_special:
         \\  %special = icmp eq i32 %masked, 2047
         \\  br i1 %special, label %special_block, label %done
         \\

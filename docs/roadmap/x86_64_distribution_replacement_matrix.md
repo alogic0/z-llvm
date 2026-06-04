@@ -521,7 +521,7 @@ surface_counts=scalar-add-ret=1, integer-arithmetic=1,
                umul-fix-sat-i64=1,
                inherit-i64-return=1,
                compile-asm-unreachable=1,
-               str-from-float-prologue=1,
+               str-from-float-stack-exponent=1,
                base64-decode-step=1,
                base64-store-step=1,
                base64-residual-byte-step=1,
@@ -655,7 +655,7 @@ FuncGen_emitted_surface=releasefast_tiny_scalar scalar-add-ret,
                         releasesmall_runtime_compile_asm_unreachable
                         compile-asm-unreachable,
                         releasesmall_runtime_str_from_float_help
-                        str-from-float-prologue,
+                        str-from-float-stack-exponent,
                         releasesmall_runtime_base64_decode_step
                         base64-decode-step,
                         releasesmall_runtime_base64_store_step
@@ -872,9 +872,9 @@ closed_blocker=standalone_compile_asm_main.zig.ReleaseSmall.x86_64.optimized.ll 
 boundary_exclusion=standalone_emit_llvm_no_bin_main.zig.ReleaseSmall.x86_64.optimized.ll selected @strFromFloatHelp -> @main.strFromFloatHelp multi-block float-format helper
 boundary_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir total=1 ok=0 fail=1 category=unsupported-control-flow
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
-reduced_closed_shape=@strFromFloatHelp -> @main.strFromFloatHelp selected double bitcast/exponent branch prologue
+reduced_closed_shape=@strFromFloatHelp -> @main.strFromFloatHelp selected stack slots, lifetime markers, double bitcast, zero classification, and special-exponent branch
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
-whole_function_boundary_inventory=@main.strFromFloatHelp spans lines 37-670 in the tracked fixture before helper callees; missing helper families include stack lifetime/alloca, pow5 table loads, i128 arithmetic, decimal loop CFG, memset/memcpy, fastcc helper calls, and writer-vtable indirect calls
+whole_function_boundary_inventory=@main.strFromFloatHelp spans lines 37-670 in the tracked fixture before helper callees; missing helper families include pow5 table loads, i128 arithmetic, decimal loop CFG, memset/memcpy, fastcc helper calls, and writer-vtable indirect calls
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop

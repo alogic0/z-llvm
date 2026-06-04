@@ -81,12 +81,15 @@ running from line 37 through line 670 before the helper callees. The full
 function has the initial double bitcast/exponent branch, pow5/inv-pow5 table
 paths, `fmt.float.mulShift64` calls, multiple-of-power-of-5 calls, decimal
 length/write loops, fixed/scientific formatting branches, writer buffer
-copies, and final buffer-print writer dispatch. The next missing writer and
-lowering helper families are stack slots/alloca lifetime markers, structured
-loop-header/latch emission for the decimal loops, vector `<2 x i64>` table
-loads/stores, `i128` arithmetic/truncation, `llvm.assume`,
-`llvm.memcpy`/`llvm.memset`, fastcc helper calls with pointer arguments, and
-indirect writer-vtable calls.
+copies, and final buffer-print writer dispatch. The first real implementation
+slice now covers the writer/buffer/tag stack slots, `llvm.lifetime.start`
+markers, writer buffer pointer/length/index stores, the double-to-i64 bitcast,
+mantissa/exponent extraction, zero classification branch, and special-exponent
+branch under `releasesmall_runtime_str_from_float_help`. The next missing
+writer and lowering helper families are structured loop-header/latch emission
+for the decimal loops, vector `<2 x i64>` table loads/stores, `i128`
+arithmetic/truncation, `llvm.assume`, `llvm.memcpy`/`llvm.memset`, fastcc
+helper calls with pointer arguments, and indirect writer-vtable calls.
 The completed `releasefast_runtime_pointer_load_store` row is paired with
 `pointers_memory.load_store(p: *i32, q: *i32) i32` from
 `test/zig/inputs/pointers_memory.zig`, which exercises a pointer load, integer
@@ -832,7 +835,7 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              umul-fix-sat-i64=1
              inherit-i64-return=1
              compile-asm-unreachable=1
-             str-from-float-prologue=1
+             str-from-float-stack-exponent=1
              base64-decode-step=1
              base64-store-step=1
              base64-residual-byte-step=1

@@ -610,7 +610,7 @@ ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=1
                        umul-fix-sat-i64=1
                        inherit-i64-return=1
                        compile-asm-unreachable=1
-                       str-from-float-prologue=1
+                       str-from-float-stack-exponent=1
                        base64-decode-step=1
                        base64-store-step=1
                        base64-residual-byte-step=1
@@ -727,7 +727,7 @@ The external writer now emits 87/87 selected rows as runtime surfaces:
 `umul-fix-sat-i64`,
 `inherit-i64-return`,
 `compile-asm-unreachable`,
-`str-from-float-prologue`,
+`str-from-float-stack-exponent`,
 `base64-decode-step`,
 `base64-store-step`,
 `base64-residual-byte-step`,

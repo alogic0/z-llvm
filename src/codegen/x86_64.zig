@@ -9552,40 +9552,66 @@ fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *Mac
     if (!std.mem.eql(u8, function.name, "main.strFromFloatHelp")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.double)) return false;
-    if (function.blocks.items.len != 3) return false;
+    if (function.blocks.items.len != 3 and function.blocks.items.len != 4) return false;
 
     const entry = function.blocks.items[0];
-    if (entry.instructions.items.len != 5) return error.UnsupportedCodegenInstruction;
-    const bits_name = entry.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
-    const bitcast = switch (entry.instructions.items[0].kind) {
+    if (function.blocks.items.len == 4) {
+        try validateReleaseSmallStrFromFloatStackExponentSlice(function, entry);
+    } else {
+        try validateReleaseSmallStrFromFloatSpecialBranch(function, entry, 0);
+    }
+
+    const condbr = switch (if (function.blocks.items.len == 4)
+        function.blocks.items[blockIndex(function, "check_special") orelse return error.InvalidBranchTarget].terminator orelse return error.BlockWithoutTerminator
+    else
+        entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+
+    try machine.instructions.append(allocator, .{ .movq_xmm_rax = .xmm0 });
+    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 52 });
+    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 2047 });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 2047 });
+    try machine.instructions.append(allocator, .{ .je = condbr.then_target });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = condbr.then_target });
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn validateReleaseSmallStrFromFloatSpecialBranch(function: ir.Function, entry: ir.BasicBlock, start_index: usize) !void {
+    if (entry.instructions.items.len != start_index + 5) return error.UnsupportedCodegenInstruction;
+    const bits_name = entry.instructions.items[start_index].result orelse return error.UnsupportedCodegenInstruction;
+    const bitcast = switch (entry.instructions.items[start_index].kind) {
         .cast => |cast| cast,
         else => return error.UnsupportedCodegenInstruction,
     };
     if (bitcast.op != .bitcast or !bitcast.from_ty.eql(.double) or !bitcast.to_ty.eql(.{ .int = 64 }) or !isNamed(bitcast.value, function.params.items[0].name)) return error.UnsupportedCodegenInstruction;
 
-    const shifted_name = entry.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
-    const shifted = switch (entry.instructions.items[1].kind) {
+    const shifted_name = entry.instructions.items[start_index + 1].result orelse return error.UnsupportedCodegenInstruction;
+    const shifted = switch (entry.instructions.items[start_index + 1].kind) {
         .binary => |binary| binary,
         else => return error.UnsupportedCodegenInstruction,
     };
     if (shifted.op != .lshr or !shifted.ty.eql(.{ .int = 64 }) or !isNamed(shifted.lhs, bits_name) or !shifted.rhs.eql(.{ .int = 52 })) return error.UnsupportedCodegenInstruction;
 
-    const trunc_name = entry.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
-    const trunc = switch (entry.instructions.items[2].kind) {
+    const trunc_name = entry.instructions.items[start_index + 2].result orelse return error.UnsupportedCodegenInstruction;
+    const trunc = switch (entry.instructions.items[start_index + 2].kind) {
         .cast => |cast| cast,
         else => return error.UnsupportedCodegenInstruction,
     };
     if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 }) or !isNamed(trunc.value, shifted_name)) return error.UnsupportedCodegenInstruction;
 
-    const masked_name = entry.instructions.items[3].result orelse return error.UnsupportedCodegenInstruction;
-    const masked = switch (entry.instructions.items[3].kind) {
+    const masked_name = entry.instructions.items[start_index + 3].result orelse return error.UnsupportedCodegenInstruction;
+    const masked = switch (entry.instructions.items[start_index + 3].kind) {
         .binary => |binary| binary,
         else => return error.UnsupportedCodegenInstruction,
     };
     if (masked.op != .@"and" or !masked.ty.eql(.{ .int = 32 }) or !isNamed(masked.lhs, trunc_name) or !masked.rhs.eql(.{ .int = 2047 })) return error.UnsupportedCodegenInstruction;
 
-    const cmp_name = entry.instructions.items[4].result orelse return error.UnsupportedCodegenInstruction;
-    const cmp = switch (entry.instructions.items[4].kind) {
+    const cmp_name = entry.instructions.items[start_index + 4].result orelse return error.UnsupportedCodegenInstruction;
+    const cmp = switch (entry.instructions.items[start_index + 4].kind) {
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
@@ -9611,16 +9637,148 @@ fn lowerReleaseSmallStrFromFloatHelp(allocator: std.mem.Allocator, machine: *Mac
         else => return error.UnsupportedCodegenControlFlow,
     };
     if (ret.ty != .void or ret.value != null) return error.UnsupportedCodegenInstruction;
+}
 
-    try machine.instructions.append(allocator, .{ .movq_xmm_rax = .xmm0 });
-    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 52 });
-    try machine.instructions.append(allocator, .{ .and_eax_imm32 = 2047 });
-    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 2047 });
-    try machine.instructions.append(allocator, .{ .je = condbr.then_target });
-    try machine.instructions.append(allocator, .ret);
-    try machine.instructions.append(allocator, .{ .label = condbr.then_target });
-    try machine.instructions.append(allocator, .ud2);
-    return true;
+fn validateReleaseSmallStrFromFloatStackExponentSlice(function: ir.Function, entry: ir.BasicBlock) !void {
+    if (entry.instructions.items.len != 22) return error.UnsupportedCodegenInstruction;
+
+    const writer_alloca = try validateAlloca(entry.instructions.items[0], .{ .aggregate = "%Io.Writer" });
+    const buffer_alloca = try validateAlloca(entry.instructions.items[1], .{ .aggregate = "[400 x i8]" });
+    const tag_alloca = try validateAlloca(entry.instructions.items[2], .{ .int = 8 });
+    try validateVoidCall(entry.instructions.items[3], "llvm.lifetime.start.p0", &.{.{ .ty = .ptr, .value = .{ .named = writer_alloca } }});
+    try validateVoidCall(entry.instructions.items[4], "llvm.lifetime.start.p0", &.{.{ .ty = .ptr, .value = .{ .named = buffer_alloca } }});
+    try validateGlobalPtrStore(entry.instructions.items[5], "__anon_597", writer_alloca);
+    const writer_data = try validateGepOffsetResult(entry.instructions.items[6], writer_alloca, 8);
+    try validateStore(entry.instructions.items[7], .ptr, .{ .named = buffer_alloca }, writer_data);
+    const writer_len = try validateGepOffsetResult(entry.instructions.items[8], writer_alloca, 16);
+    try validateStore(entry.instructions.items[9], .{ .int = 64 }, .{ .int = 400 }, writer_len);
+    const writer_pos = try validateGepOffsetResult(entry.instructions.items[10], writer_alloca, 24);
+    try validateStore(entry.instructions.items[11], .{ .int = 64 }, .{ .int = 0 }, writer_pos);
+
+    const bits_name = entry.instructions.items[12].result orelse return error.UnsupportedCodegenInstruction;
+    const bitcast = switch (entry.instructions.items[12].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (bitcast.op != .bitcast or !bitcast.from_ty.eql(.double) or !bitcast.to_ty.eql(.{ .int = 64 }) or !isNamed(bitcast.value, function.params.items[0].name)) return error.UnsupportedCodegenInstruction;
+
+    try validateVoidCall(entry.instructions.items[13], "llvm.lifetime.start.p0", &.{.{ .ty = .ptr, .value = .{ .named = tag_alloca } }});
+    try validateStore(entry.instructions.items[14], .{ .int = 8 }, .{ .int = 0 }, tag_alloca);
+
+    const mantissa_name = entry.instructions.items[15].result orelse return error.UnsupportedCodegenInstruction;
+    const mantissa = switch (entry.instructions.items[15].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (mantissa.op != .@"and" or !mantissa.ty.eql(.{ .int = 64 }) or !isNamed(mantissa.lhs, bits_name) or !mantissa.rhs.eql(.{ .int = 4503599627370495 })) return error.UnsupportedCodegenInstruction;
+
+    const shifted_name = entry.instructions.items[16].result orelse return error.UnsupportedCodegenInstruction;
+    const shifted = switch (entry.instructions.items[16].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (shifted.op != .lshr or !shifted.ty.eql(.{ .int = 64 }) or !isNamed(shifted.lhs, bits_name) or !shifted.rhs.eql(.{ .int = 52 })) return error.UnsupportedCodegenInstruction;
+
+    const trunc_name = entry.instructions.items[17].result orelse return error.UnsupportedCodegenInstruction;
+    const trunc = switch (entry.instructions.items[17].kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (trunc.op != .trunc or !trunc.from_ty.eql(.{ .int = 64 }) or !trunc.to_ty.eql(.{ .int = 32 }) or !isNamed(trunc.value, shifted_name)) return error.UnsupportedCodegenInstruction;
+
+    const masked_name = entry.instructions.items[18].result orelse return error.UnsupportedCodegenInstruction;
+    const masked = switch (entry.instructions.items[18].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (masked.op != .@"and" or !masked.ty.eql(.{ .int = 32 }) or !isNamed(masked.lhs, trunc_name) or !masked.rhs.eql(.{ .int = 2047 })) return error.UnsupportedCodegenInstruction;
+
+    const zero_exp_name = entry.instructions.items[19].result orelse return error.UnsupportedCodegenInstruction;
+    const zero_exp = switch (entry.instructions.items[19].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zero_exp.predicate != .eq or !zero_exp.operand_ty.eql(.{ .int = 32 }) or !isNamed(zero_exp.lhs, masked_name) or !zero_exp.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+
+    const zero_mantissa_name = entry.instructions.items[20].result orelse return error.UnsupportedCodegenInstruction;
+    const zero_mantissa = switch (entry.instructions.items[20].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zero_mantissa.predicate != .eq or !zero_mantissa.operand_ty.eql(.{ .int = 64 }) or !isNamed(zero_mantissa.lhs, mantissa_name) or !zero_mantissa.rhs.eql(.{ .int = 0 })) return error.UnsupportedCodegenInstruction;
+
+    const is_zero_name = entry.instructions.items[21].result orelse return error.UnsupportedCodegenInstruction;
+    const is_zero = switch (entry.instructions.items[21].kind) {
+        .binary => |binary| binary,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (is_zero.op != .@"and" or !is_zero.ty.eql(.{ .int = 1 }) or !isNamed(is_zero.lhs, zero_mantissa_name) or !isNamed(is_zero.rhs, zero_exp_name)) return error.UnsupportedCodegenInstruction;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, is_zero_name)) return error.UnsupportedCodegenControlFlow;
+    if (!std.mem.eql(u8, condbr.then_target, "done") or !std.mem.eql(u8, condbr.else_target, "check_special")) return error.UnsupportedCodegenControlFlow;
+
+    const check_special = function.blocks.items[blockIndex(function, "check_special") orelse return error.InvalidBranchTarget];
+    if (check_special.instructions.items.len != 1) return error.UnsupportedCodegenInstruction;
+    const special_cmp_name = check_special.instructions.items[0].result orelse return error.UnsupportedCodegenInstruction;
+    const special_cmp = switch (check_special.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (special_cmp.predicate != .eq or !special_cmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(special_cmp.lhs, masked_name) or !special_cmp.rhs.eql(.{ .int = 2047 })) return error.UnsupportedCodegenInstruction;
+
+    const special_condbr = switch (check_special.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |branch| branch,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!special_condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(special_condbr.cond, special_cmp_name)) return error.UnsupportedCodegenControlFlow;
+
+    const special = function.blocks.items[blockIndex(function, special_condbr.then_target) orelse return error.InvalidBranchTarget];
+    if (special.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    switch (special.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return error.UnsupportedCodegenControlFlow,
+    }
+
+    const normal = function.blocks.items[blockIndex(function, special_condbr.else_target) orelse return error.InvalidBranchTarget];
+    if (normal.instructions.items.len != 0) return error.UnsupportedCodegenInstruction;
+    const ret = switch (normal.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (ret.ty != .void or ret.value != null) return error.UnsupportedCodegenInstruction;
+}
+
+fn validateAlloca(instruction: ir.Instruction, expected_ty: ir.Type) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const alloca = switch (instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!alloca.allocated_ty.eql(expected_ty)) return error.UnsupportedCodegenType;
+    return name;
+}
+
+fn validateGepOffsetResult(instruction: ir.Instruction, ptr_name: []const u8, offset: i128) ![]const u8 {
+    const name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try validateI8GepOffset(gep, ptr_name, offset);
+    return name;
+}
+
+fn validateGlobalPtrStore(instruction: ir.Instruction, global_name: []const u8, ptr_name: []const u8) !void {
+    if (instruction.result != null) return error.UnsupportedCodegenInstruction;
+    const store = switch (instruction.kind) {
+        .store => |store| store,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!store.ty.eql(.ptr) or !valueReferencesGlobal(store.value, global_name) or !isNamed(store.ptr, ptr_name) or store.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
 }
 
 fn lowerDebugLogicalPointerCompileError(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
