@@ -66,16 +66,19 @@ Broad source-backed gate:
 `zig build distribution-x86_64-source-backed-structured` is the discovery-based
 x86_64 release fixture gate. It walks the ReleaseFast, ReleaseSafe,
 ReleaseSmall, and former ReleaseSmall exclusion `.ll` fixture directories,
-runs every currently eligible source-backed structured-direct row, and prints
-explicit skip reasons for ineligible fixtures. Current measured output is
-`source_backed_rows=80`, `structured_direct_rows=80`,
-`generic_codegen_rows=80`, `skipped_with_reason=10`, `fallback_rows=0`, and
-`local_fail=0`.
+runs every discovered source-backed structured-direct row, and fails on any
+skip, fallback, textual LLVM parse, non-generic codegen, or local failure.
+Current measured output is `discovered_fixtures=55`,
+`accepted_fixtures=55`, `source_backed_rows=90`,
+`structured_direct_rows=90`, `generic_codegen_rows=90`,
+`skipped_with_reason=0`, `fallback_rows=0`, and `local_fail=0`.
 
 Next target:
-Close the remaining broad source-backed skips by adding reusable generic
-lowering/writer support for the repeated unsupported classes. Do not add new ad
-hoc bodies unless the row first exposes a genuinely new helper family.
+The current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall fixture inventory is
+fully accounted locally. Future expansion should add new fixtures or corpus
+inputs through reusable structured-builder and generic x86_64 lowering helpers;
+the broad gate should report the first unsupported fixture class exactly if a
+new row cannot be closed cleanly.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over
@@ -84,26 +87,27 @@ The current release-mode captured IR inventory was checked with `find` over
 `test/distribution/releasesmall_x86_64/inputs`, and the ReleaseSmall
 `exclusions` directory. It contains 55 x86_64 release-mode `.ll` fixtures:
 27 ReleaseFast, 9 ReleaseSafe, and 19 ReleaseSmall/former-boundary fixtures.
-The external IR-writer gate now adds 48 source-backed rows from that inventory
-without new surface names: integer add/wrap and cmp/shift, control-flow loop
-and call-chain, branch-mix and dense switch, pointer memory, optional pointer,
+The fixed external IR-writer gate includes 136 selected rows. The separate
+broad source-backed gate now adds 90 rows that cover every currently discovered
+release fixture family: integer add/wrap and cmp/shift, control-flow loop and
+call-chain, branch-mix and dense switch, pointer memory, optional pointer,
 packed bits, aggregate struct/array/optional/error/slice shapes, FP
 constants/compare/math/extended ops, globals, TLS, atomics, inline asm,
 aggregate ABI, ReleaseSafe checked globals/pointers/branches/calls/TLS and
-aggregate rows, and ReleaseSmall hidden-global, mixed C/Zig, i64,
-compile-asm, and table-load rows. The measured writer gate is
+aggregate rows, ReleaseSmall hidden-global, mixed C/Zig, i64, compile-asm,
+table-load rows, start trampolines, getauxval pointer walking, f128 sret/byval
+ABI shapes, logical-pointer unreachable stubs, address-space volatile stores,
+raw `_start` loops, and libfuzzer futex/name/run boundaries. The selected
+writer gate is
 `total=136 executable_ok=136 link_only_ok=0 local_fail=0`, with
 `scalar_runtime_rows=136 minimal_wrapper_rows=0`.
 
 Coverage classification:
 The covered source-backed rows reuse existing helper families for loops/phis,
 calls, aggregates, pointer/memory, checked arithmetic, TLS/globals, FP, and
-runtime boundaries. Remaining uncovered release-mode fixtures are future
-helper candidates only when they expose a real new family: address-space
-start/trampoline and VRAM stores, anonymous aggregate/getauxval layout,
-`f128` C ABI sret, logical pointer compile-error IR, raw-hex start loops,
-libfuzzer futex/test harness boundaries, and other ReleaseSmall runtime
-boundary shapes. The detailed inventory is recorded in
+runtime boundaries. No current release-mode fixture remains skipped. Future
+helper candidates should be created only when a newly discovered fixture exposes
+a real repeated family. The detailed inventory is recorded in
 `docs/roadmap/x86_64_selected_ir_writer_source_coverage.md`.
 
 Zig evidence:

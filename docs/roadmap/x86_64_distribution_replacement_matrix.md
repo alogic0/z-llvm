@@ -458,19 +458,22 @@ codegen_inventory=docs/roadmap/x86_64_codegen_genericity_audit.md
 source_backed_broad_gate=zig build distribution-x86_64-source-backed-structured
 source_backed_broad_claim=x86_64 release fixture discovery gate over
                           ReleaseFast/ReleaseSafe/ReleaseSmall `.ll`
-                          fixtures; accepted rows are structured-direct and
-                          generic-codegen only, skipped fixtures require an
-                          explicit reason
-source_backed_broad_inventory=discovered_fixtures=55 accepted_fixtures=45
-                              skipped_with_reason=10
-source_backed_broad_rows=source_backed_rows=80 structured_direct_rows=80
-                         generic_codegen_rows=80 fallback_rows=0
+                          fixtures; every discovered fixture is accepted,
+                          structured-direct, and generic-codegen only
+source_backed_broad_inventory=discovered_fixtures=55 accepted_fixtures=55
+                              skipped_with_reason=0
+source_backed_broad_rows=source_backed_rows=90 structured_direct_rows=90
+                         generic_codegen_rows=90 fallback_rows=0
                          local_fail=0
-source_backed_remaining_unsupported=address-space/start trampoline, VRAM
-                                    stores, getauxval aggregate startup,
-                                    f128 sret C ABI, logical pointer
-                                    compile-error IR, raw start-loop, and
-                                    libfuzzer futex/vtable runtime boundaries
+combined_current_claim=fixed_selected_rows=136 broad_source_backed_rows=90;
+                       counters remain separate; both gates require
+                       structured-direct construction, generic x86_64
+                       lowering, no textual LLVM parse fallback, no LLVM
+                       optimizer, no LLVM TargetMachine, z_llvm object
+                       emission, and Zig native linker handoff
+source_backed_remaining_unsupported=none for the current
+                                    ReleaseFast/ReleaseSafe/ReleaseSmall
+                                    x86_64 fixture inventory
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
 runtime_condbr_gate=zig build distribution-zig-ir-writer -- --case=releasefast_runtime_cond_branch
