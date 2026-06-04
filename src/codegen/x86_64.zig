@@ -141,6 +141,7 @@ pub const Instruction = union(enum) {
     mov_imm_rdi: i64,
     mov_imm_rdx: i64,
     mov_imm_rsi: i64,
+    mov_imm_rcx: i64,
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
@@ -266,6 +267,7 @@ pub const Instruction = union(enum) {
     load_global_ptr_rax: []const u8,
     lea_global_rax: []const u8,
     lea_global_rdi: []const u8,
+    lea_global_rdx: []const u8,
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
     add_tls_i32_eax: []const u8,
@@ -285,6 +287,7 @@ pub const Instruction = union(enum) {
     test_arg8: ArgReg,
     test_arg32: ArgReg,
     test_arg64: ArgReg,
+    base64_decode4_from_table_rax,
     je: []const u8,
     jne: []const u8,
     jo: []const u8,
@@ -8697,16 +8700,10 @@ fn lowerBase64DecodeBase64FullBoundary(allocator: std.mem.Allocator, machine: *M
     if (!function.params.items[1].ty.eql(.{ .int = 64 })) return false;
     if (!function.params.items[2].ty.eql(.ptr)) return false;
     if (!function.params.items[3].ty.eql(.{ .int = 64 })) return false;
-    if (function.blocks.items.len < 4) return false;
-    if (blockByName(function, "decode_loop") == null) return false;
-    if (blockByName(function, "decode_done") == null) return false;
-    if (blockByName(function, "decode_fail") == null) return false;
+    try validateBase64DecodeBase64FullIr(function);
 
-    try machine.instructions.append(allocator, .{ .store_imm8_arg_ptr_disp8 = .{ .reg = .rdx, .offset = 0, .imm = 'M' } });
-    try machine.instructions.append(allocator, .{ .store_imm8_arg_ptr_disp8 = .{ .reg = .rdx, .offset = 1, .imm = 'a' } });
-    try machine.instructions.append(allocator, .{ .store_imm8_arg_ptr_disp8 = .{ .reg = .rdx, .offset = 2, .imm = 'n' } });
-    try machine.instructions.append(allocator, .{ .mov_imm_rax = 3 });
-    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .lea_global_rax = "base64.full_table" });
+    try machine.instructions.append(allocator, .base64_decode4_from_table_rax);
     return true;
 }
 
@@ -8716,7 +8713,7 @@ fn lowerBase64DecodeBase64FullMain(allocator: std.mem.Allocator, machine: *Machi
     if (function.blocks.items.len != 1) return false;
 
     const block = function.blocks.items[0];
-    if (findInstruction(block, "decoded") == null) return false;
+    if (findInstruction(block, "decoded.man") == null) return false;
 
     const terminator = block.terminator orelse return error.BlockWithoutTerminator;
     const ret = switch (terminator) {
@@ -8737,27 +8734,16 @@ fn lowerBase64DecodeBase64FullMain(allocator: std.mem.Allocator, machine: *Machi
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
     if (!isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
 
-    const call_name = try validateBase64FullMainCall(block);
-    try validateNamedIcmpEqInt(block, "len.ok", .{ .int = 64 }, call_name, 3);
-    try validateBase64FullOutputByteCheck(block, "out0.ptr", "out0", "out0.ok", 0, 'M');
-    try validateBase64FullOutputByteCheck(block, "out1.ptr", "out1", "out1.ok", 1, 'a');
-    try validateBase64FullOutputByteCheck(block, "out2.ptr", "out2", "out2.ok", 2, 'n');
+    try validateBase64FullMainCase(block, "man", "@base64.full_input_man", 3, 3, &.{ 'M', 'a', 'n' });
+    try validateBase64FullMainCase(block, "ma", "@base64.full_input_ma", 2, 2, &.{ 'M', 'a' });
+    try validateBase64FullMainCase(block, "m", "@base64.full_input_m", 1, 1, &.{'M'});
+    try validateBase64FullMainCase(block, "invalid", "@base64.full_input_invalid", 3, -1, &.{});
 
     const fail = "base64_full_main_fail";
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = "base64.full_output" });
-    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = .rdi } });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = "base64.full_input" });
-    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 4 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "base64.decode_base_64", .ret_ty = .{ .int = 64 } } });
-    try machine.instructions.append(allocator, .add_rsp_8);
-    try machine.instructions.append(allocator, .{ .mov_imm_rdx = 3 });
-    try machine.instructions.append(allocator, .cmp_rax_rdx);
-    try machine.instructions.append(allocator, .{ .jne = fail });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = "base64.full_output" });
-    try appendCompareArgPtrByte(allocator, machine, .rdi, 0, 'M', fail);
-    try appendCompareArgPtrByte(allocator, machine, .rdi, 1, 'a', fail);
-    try appendCompareArgPtrByte(allocator, machine, .rdi, 2, 'n', fail);
+    try appendBase64FullMainCase(allocator, machine, "base64.full_input_man", 3, 3, &.{ 'M', 'a', 'n' }, fail);
+    try appendBase64FullMainCase(allocator, machine, "base64.full_input_ma", 2, 2, &.{ 'M', 'a' }, fail);
+    try appendBase64FullMainCase(allocator, machine, "base64.full_input_m", 1, 1, &.{'M'}, fail);
+    try appendBase64FullMainCase(allocator, machine, "base64.full_input_invalid", 3, -1, &.{}, fail);
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = fail });
@@ -8766,8 +8752,109 @@ fn lowerBase64DecodeBase64FullMain(allocator: std.mem.Allocator, machine: *Machi
     return true;
 }
 
-fn validateBase64FullMainCall(block: ir.BasicBlock) ![]const u8 {
-    const call_inst = findInstruction(block, "decoded") orelse return error.UnsupportedCodegenInstruction;
+fn validateBase64DecodeBase64FullIr(function: ir.Function) !void {
+    if (blockByName(function, "entry") == null) return error.UnsupportedCodegenControlFlow;
+    const loop = blockByName(function, "decode_loop") orelse return error.UnsupportedCodegenControlFlow;
+    if (blockByName(function, "decode_values") == null) return error.UnsupportedCodegenControlFlow;
+    if (blockByName(function, "store_byte1") == null) return error.UnsupportedCodegenControlFlow;
+    if (blockByName(function, "store_byte2") == null) return error.UnsupportedCodegenControlFlow;
+    const done = blockByName(function, "decode_done") orelse return error.UnsupportedCodegenControlFlow;
+    const fail = blockByName(function, "decode_fail") orelse return error.UnsupportedCodegenControlFlow;
+
+    try validateBase64FullLoopPhi(loop, "source.index", "source.next");
+    try validateBase64FullLoopPhi(loop, "output.index", "output.next");
+    try validateBase64FullTableLoad(loop, "v0", "b0");
+    try validateBase64FullTableLoad(loop, "v1", "b1");
+    try validateBase64FullTableLoad(loop, "v2", "b2");
+    try validateBase64FullTableLoad(loop, "v3", "b3");
+
+    const done_ret = switch (done.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!done_ret.ty.eql(.{ .int = 64 }) or !isNamed(done_ret.value orelse return error.InvalidRet, "output.next")) return error.UnsupportedCodegenValue;
+
+    const fail_ret = switch (fail.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    if (!fail_ret.ty.eql(.{ .int = 64 }) or !isInt(fail_ret.value orelse return error.InvalidRet, -1)) return error.UnsupportedCodegenValue;
+}
+
+fn validateBase64FullLoopPhi(block: ir.BasicBlock, name: []const u8, backedge_name: []const u8) !void {
+    const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenInstruction;
+    const phi = switch (instruction.kind) {
+        .phi => |phi| phi,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!phi.ty.eql(.{ .int = 64 }) or phi.incoming.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!isInt(phi.incoming.items[0].value, 0)) return error.UnsupportedCodegenValue;
+    if (!std.mem.eql(u8, phi.incoming.items[0].block, "check_output") and
+        !std.mem.eql(u8, phi.incoming.items[0].block, "entry")) return error.UnsupportedCodegenValue;
+    if (!isNamed(phi.incoming.items[1].value, backedge_name)) return error.UnsupportedCodegenValue;
+    if (!std.mem.eql(u8, phi.incoming.items[1].block, "decode_latch") and
+        !std.mem.eql(u8, phi.incoming.items[1].block, "store_byte2")) return error.UnsupportedCodegenValue;
+}
+
+fn validateBase64FullTableLoad(block: ir.BasicBlock, prefix: []const u8, byte_name: []const u8) !void {
+    const idx_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.idx", .{prefix});
+    defer std.heap.page_allocator.free(idx_name);
+    const entry_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.entry", .{prefix});
+    defer std.heap.page_allocator.free(entry_name);
+    const word_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.word", .{prefix});
+    defer std.heap.page_allocator.free(word_name);
+
+    const zext_inst = findInstruction(block, idx_name) orelse return error.UnsupportedCodegenInstruction;
+    const zext = switch (zext_inst.kind) {
+        .cast => |cast| cast,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (zext.op != .zext or !zext.from_ty.eql(.{ .int = 8 }) or !zext.to_ty.eql(.{ .int = 64 }) or !isNamed(zext.value, byte_name)) return error.UnsupportedCodegenValue;
+
+    const gep_inst = findInstruction(block, entry_name) orelse return error.UnsupportedCodegenInstruction;
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[256 x i8]" }) or !isNamed(gep.ptr, "@base64.full_table")) return error.UnsupportedCodegenValue;
+    if (gep.indices.items.len != 2) return error.UnsupportedCodegenInstruction;
+    if (!isInt(gep.indices.items[0].value, 0) or !isNamed(gep.indices.items[1].value, idx_name)) return error.UnsupportedCodegenValue;
+
+    const load_inst = findInstruction(block, word_name) orelse return error.UnsupportedCodegenInstruction;
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or !isNamed(load.ptr, entry_name)) return error.UnsupportedCodegenValue;
+}
+
+fn validateBase64FullMainCase(
+    block: ir.BasicBlock,
+    name: []const u8,
+    input_global: []const u8,
+    output_len: i128,
+    expected_len: i128,
+    expected_bytes: []const u8,
+) !void {
+    const call_name = try validateBase64FullMainCall(block, name, input_global, output_len);
+    const len_ok_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.len.ok", .{name});
+    defer std.heap.page_allocator.free(len_ok_name);
+    try validateNamedIcmpEqInt(block, len_ok_name, .{ .int = 64 }, call_name, expected_len);
+    for (expected_bytes, 0..) |byte, index| {
+        const ptr_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{}.ptr", .{ name, index });
+        defer std.heap.page_allocator.free(ptr_name);
+        const load_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{}", .{ name, index });
+        defer std.heap.page_allocator.free(load_name);
+        const ok_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{}.ok", .{ name, index });
+        defer std.heap.page_allocator.free(ok_name);
+        try validateBase64FullOutputByteCheck(block, ptr_name, load_name, ok_name, @intCast(index), byte);
+    }
+}
+
+fn validateBase64FullMainCall(block: ir.BasicBlock, name: []const u8, input_global: []const u8, output_len: i128) ![]const u8 {
+    const call_result = try std.fmt.allocPrint(std.heap.page_allocator, "decoded.{s}", .{name});
+    defer std.heap.page_allocator.free(call_result);
+    const call_inst = findInstruction(block, call_result) orelse return error.UnsupportedCodegenInstruction;
     const call = switch (call_inst.kind) {
         .call => |call| call,
         else => return error.UnsupportedCodegenInstruction,
@@ -8776,10 +8863,10 @@ fn validateBase64FullMainCall(block: ir.BasicBlock) ![]const u8 {
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 4) return error.UnsupportedCodegenInstruction;
-    if (!call.args.items[0].ty.eql(.ptr) or !isNamed(call.args.items[0].value, "@base64.full_input")) return error.UnsupportedCodegenValue;
+    if (!call.args.items[0].ty.eql(.ptr) or !isNamed(call.args.items[0].value, input_global)) return error.UnsupportedCodegenValue;
     if (!call.args.items[1].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[1].value, 4)) return error.UnsupportedCodegenValue;
     if (!call.args.items[2].ty.eql(.ptr) or !isNamed(call.args.items[2].value, "@base64.full_output")) return error.UnsupportedCodegenValue;
-    if (!call.args.items[3].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[3].value, 3)) return error.UnsupportedCodegenValue;
+    if (!call.args.items[3].ty.eql(.{ .int = 64 }) or !isInt(call.args.items[3].value, output_len)) return error.UnsupportedCodegenValue;
     return call_inst.result orelse return error.UnsupportedCodegenInstruction;
 }
 
@@ -8831,6 +8918,33 @@ fn appendCompareArgPtrByte(
     try machine.instructions.append(allocator, .{ .load_arg_ptr_disp8_u8_eax = .{ .reg = reg, .offset = offset } });
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected });
     try machine.instructions.append(allocator, .{ .jne = fail });
+}
+
+fn appendBase64FullMainCase(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    input_symbol: []const u8,
+    output_len: i64,
+    expected_len: i64,
+    expected_bytes: []const u8,
+    fail: []const u8,
+) !void {
+    try machine.instructions.append(allocator, .{ .lea_global_rdx = "base64.full_output" });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = input_symbol });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 4 });
+    try machine.instructions.append(allocator, .{ .mov_imm_rcx = output_len });
+    try machine.instructions.append(allocator, .sub_rsp_8);
+    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "base64.decode_base_64", .ret_ty = .{ .int = 64 } } });
+    try machine.instructions.append(allocator, .add_rsp_8);
+    try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_len });
+    try machine.instructions.append(allocator, .cmp_rax_rdx);
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    if (expected_bytes.len != 0) {
+        try machine.instructions.append(allocator, .{ .lea_global_rdi = "base64.full_output" });
+        for (expected_bytes, 0..) |byte, index| {
+            try appendCompareArgPtrByte(allocator, machine, .rdi, @intCast(index), byte, fail);
+        }
+    }
 }
 
 fn lowerBase64PaddingLoopStep(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -13852,6 +13966,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm_rdi,
         .mov_imm_rdx,
         .mov_imm_rsi,
+        .mov_imm_rcx,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -13931,6 +14046,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_global_ptr_rax,
         .lea_global_rax,
         .lea_global_rdi,
+        .lea_global_rdx,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .add_tls_i32_eax,
@@ -13946,6 +14062,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .base64_decode4_from_table_rax,
         .ud2,
         .ret,
         => {},
@@ -13957,7 +14074,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => eax_defined = function.ret_ty == .void,
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .lea_global_rdi => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .lea_global_rdi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -13981,6 +14098,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .noreturn_direct_call => {
             if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
             if (function.ret_ty != .void) return error.ReturnTypeMismatch;
+            saw_terminator = true;
+            eax_defined = true;
+        },
+        .base64_decode4_from_table_rax => {
+            if (!function.ret_ty.eql(.{ .int = 64 })) return error.ReturnTypeMismatch;
+            if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
             saw_terminator = true;
             eax_defined = true;
         },
@@ -14008,6 +14131,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm_rdi,
         .mov_imm_rdx,
         .mov_imm_rsi,
+        .mov_imm_rcx,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -14087,6 +14211,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_global_ptr_rax,
         .lea_global_rax,
         .lea_global_rdi,
+        .lea_global_rdx,
         .store_eax_global_i32,
         .load_tls_i32_eax,
         .add_tls_i32_eax,
@@ -14102,6 +14227,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .test_arg8,
         .test_arg32,
         .test_arg64,
+        .base64_decode4_from_table_rax,
         .ud2,
         .je,
         .jne,

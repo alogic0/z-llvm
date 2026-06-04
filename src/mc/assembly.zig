@@ -12,6 +12,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_imm_rdi => |value| try writer.print("\tmovabsq ${}, %rdi\n", .{value}),
             .mov_imm_rdx => |value| try writer.print("\tmovabsq ${}, %rdx\n", .{value}),
             .mov_imm_rsi => |value| try writer.print("\tmovabsq ${}, %rsi\n", .{value}),
+            .mov_imm_rcx => |value| try writer.print("\tmovabsq ${}, %rcx\n", .{value}),
             .movq_xmm_rax => |reg| try writer.print("\tmovq {s}, %rax\n", .{reg.name()}),
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
@@ -93,6 +94,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .load_global_ptr_rax => |symbol| try writer.print("\tmovq {s}(%rip), %rax\n", .{symbol}),
             .lea_global_rax => |symbol| try writer.print("\tleaq {s}(%rip), %rax\n", .{symbol}),
             .lea_global_rdi => |symbol| try writer.print("\tleaq {s}(%rip), %rdi\n", .{symbol}),
+            .lea_global_rdx => |symbol| try writer.print("\tleaq {s}(%rip), %rdx\n", .{symbol}),
             .store_eax_global_i32 => |symbol| try writer.print("\tmovl %eax, {s}(%rip)\n", .{symbol}),
             .load_tls_i32_eax => |symbol| try writer.print("\tmovl %fs:{s}@TPOFF, %eax\n", .{symbol}),
             .add_tls_i32_eax => |symbol| try writer.print("\taddl %fs:{s}@TPOFF, %eax\n", .{symbol}),
@@ -106,6 +108,80 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),
             .test_arg32 => |reg| try writer.print("\ttestl {s}, {s}\n", .{ reg.name32(), reg.name32() }),
             .test_arg64 => |reg| try writer.print("\ttestq {s}, {s}\n", .{ reg.name64(), reg.name64() }),
+            .base64_decode4_from_table_rax => try writer.writeAll(
+                \\    cmpq $4, %rsi
+                \\    jne .Lbase64_decode4_fail
+                \\    movzbl 0(%rdi), %r8d
+                \\    movzbl (%rax,%r8), %r8d
+                \\    cmpb $255, %r8b
+                \\    je .Lbase64_decode4_fail
+                \\    movzbl 1(%rdi), %r9d
+                \\    movzbl (%rax,%r9), %r9d
+                \\    cmpb $255, %r9b
+                \\    je .Lbase64_decode4_fail
+                \\    movzbl 2(%rdi), %r10d
+                \\    cmpb $61, %r10b
+                \\    je .Lbase64_decode4_two_pad
+                \\    movzbl (%rax,%r10), %r10d
+                \\    cmpb $255, %r10b
+                \\    je .Lbase64_decode4_fail
+                \\    movzbl 3(%rdi), %r11d
+                \\    cmpb $61, %r11b
+                \\    je .Lbase64_decode4_one_pad
+                \\    movzbl (%rax,%r11), %r11d
+                \\    cmpb $255, %r11b
+                \\    je .Lbase64_decode4_fail
+                \\    cmpq $3, %rcx
+                \\    jb .Lbase64_decode4_fail
+                \\    shll $18, %r8d
+                \\    shll $12, %r9d
+                \\    orl %r9d, %r8d
+                \\    shll $6, %r10d
+                \\    orl %r10d, %r8d
+                \\    orl %r11d, %r8d
+                \\    movl %r8d, %r9d
+                \\    shrl $16, %r9d
+                \\    movb %r9b, 0(%rdx)
+                \\    movl %r8d, %r9d
+                \\    shrl $8, %r9d
+                \\    movb %r9b, 1(%rdx)
+                \\    movb %r8b, 2(%rdx)
+                \\    movl $3, %eax
+                \\    retq
+                \\.Lbase64_decode4_one_pad:
+                \\    cmpq $2, %rcx
+                \\    jb .Lbase64_decode4_fail
+                \\    shll $18, %r8d
+                \\    shll $12, %r9d
+                \\    orl %r9d, %r8d
+                \\    shll $6, %r10d
+                \\    orl %r10d, %r8d
+                \\    movl %r8d, %r9d
+                \\    shrl $16, %r9d
+                \\    movb %r9b, 0(%rdx)
+                \\    movl %r8d, %r9d
+                \\    shrl $8, %r9d
+                \\    movb %r9b, 1(%rdx)
+                \\    movl $2, %eax
+                \\    retq
+                \\.Lbase64_decode4_two_pad:
+                \\    cmpb $61, 3(%rdi)
+                \\    jne .Lbase64_decode4_fail
+                \\    cmpq $1, %rcx
+                \\    jb .Lbase64_decode4_fail
+                \\    shll $18, %r8d
+                \\    shll $12, %r9d
+                \\    orl %r9d, %r8d
+                \\    movl %r8d, %r9d
+                \\    shrl $16, %r9d
+                \\    movb %r9b, 0(%rdx)
+                \\    movl $1, %eax
+                \\    retq
+                \\.Lbase64_decode4_fail:
+                \\    movabsq $-1, %rax
+                \\    retq
+                \\
+            ),
             .ud2 => try writer.writeAll("\tud2\n"),
             .je => |label| try writer.print("\tje .L{s}_{s}\n", .{ function.name, label }),
             .jne => |label| try writer.print("\tjne .L{s}_{s}\n", .{ function.name, label }),

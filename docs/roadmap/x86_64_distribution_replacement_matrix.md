@@ -894,7 +894,7 @@ tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standa
 focused_boundary_gate=zig build distribution-releasesmall-boundary
 whole_function_boundary_inventory=@decode_base_64 -> @base64.decode_base_64 full textual IR body registered as releasesmall_runtime_base64_decode_base_64_full
 whole_function_boundary_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_base_64_full
-whole_function_boundary_status=started; external IR-writer @main now validates TWFu -> Man length/bytes through the selected decoder boundary; current backend path is still selected boundary, not promoted whole-function closure
+whole_function_boundary_status=closed; external IR-writer @main validates TWFu -> Man, TWE= -> Ma, TQ== -> M, and invalid !!!! -> -1 through real x86_64 table-driven @base64.decode_base_64 lowering; proof label is whole-function:base64-decode-base-64
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected four-entry decode table load/OR/validity step
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected output pointer store step

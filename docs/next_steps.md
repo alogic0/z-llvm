@@ -64,15 +64,15 @@ now covers `float_mul(a: f64, b: f64) f64` from the same fixture. The next
 `releasefast_runtime_float_rem` row uses the same fixture's selected
 `float_rem(a: f32, b: f32) f32` family that appears in captured ReleaseFast
 x86_64 IR and selected x86_64 FP object/codegen evidence.
-The new `releasesmall_runtime_base64_decode_base_64_full` row starts the
-whole-function ReleaseSmall boundary milestone by emitting a full
-`@base64.decode_base_64` textual IR body with named blocks, loop phis,
-source/table loads, byte masks, shifts, truncation, output stores, and pointer
-index advancement. Its `@main` now performs stable executable validation for
-the known input `TWFu`, checks the decoded length `3`, and checks output bytes
-`M`, `a`, `n`. The backend still handles the decoder itself through the
-selected boundary path, so the row is not yet promoted from reduced boundary
-evidence to whole-function closure.
+The `releasesmall_runtime_base64_decode_base_64_full` row is now promoted to
+whole-function ReleaseSmall boundary closure for base64. The external IR writer
+emits the full `@base64.decode_base_64` body with named blocks, loop phis,
+source/table loads from a real 256-byte decode table, byte masks, shifts,
+truncation, output stores, pointer index advancement, success exit, and fail
+exit. Its executable `@main` validates `TWFu -> Man`, `TWE= -> Ma`,
+`TQ== -> M`, and invalid `!!!! -> -1`; the x86_64 backend lowers the decoder
+through the real table-driven loop path rather than the former selected
+boundary shortcut.
 
 `strFromFloatHelp` full-function inventory has started from
 `test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`.

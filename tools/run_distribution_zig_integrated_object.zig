@@ -513,7 +513,7 @@ const cases = [_]Case{
         .covered_fixture = "test/distribution/releasesmall_x86_64/exclusions/standalone_mix_o_files_base64_decode_base_64.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
-        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-base-64-full",
+        .fallback = "ir-construction:libLLVM;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:base64-decode-base-64",
     },
     .{
         .id = "releasesmall_runtime_base64_decode_step",
@@ -1200,7 +1200,7 @@ fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-str-from-float-prologue";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_base_64_full")) {
-        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-base-64-full";
+        return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;whole-function:base64-decode-base-64";
     }
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_base64_decode_step")) {
         return "ir-construction:z_llvm-external-textual-subset;object-emission:z_llvm;linker:zig-native-fno-lld;boundary:selected-base64-decode-step";

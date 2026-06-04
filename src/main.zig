@@ -1011,32 +1011,97 @@ fn writeIrIndexedI8TableLoad(
     , .{ prefix, byte_name, prefix, table, prefix, prefix, prefix });
 }
 
+fn base64DecodeTableValue(byte: u8) u8 {
+    if (byte >= 'A' and byte <= 'Z') return byte - 'A';
+    if (byte >= 'a' and byte <= 'z') return 26 + byte - 'a';
+    if (byte >= '0' and byte <= '9') return 52 + byte - '0';
+    if (byte == '+') return 62;
+    if (byte == '/') return 63;
+    return 0xff;
+}
+
+fn writeBase64FullTableConstant(writer: *std.Io.Writer) !void {
+    const hex = "0123456789ABCDEF";
+    try writer.writeAll("@base64.full_table = private unnamed_addr constant [256 x i8] c\"");
+    for (0..256) |index| {
+        const value = base64DecodeTableValue(@intCast(index));
+        try writer.print("\\{c}{c}", .{ hex[value >> 4], hex[value & 0xf] });
+    }
+    try writer.writeAll("\", align 1\n");
+}
+
+fn writeBase64FullMainCheck(
+    writer: *std.Io.Writer,
+    name: []const u8,
+    input_global: []const u8,
+    output_len: u8,
+    expected_len: i8,
+    expected_bytes: []const u8,
+) !void {
+    try writer.print(
+        \\  %decoded.{s} = call i64 @base64.decode_base_64(ptr @{s}, i64 4, ptr @base64.full_output, i64 {d})
+        \\  %{s}.len.ok = icmp eq i64 %decoded.{s}, {d}
+        \\
+    , .{ name, input_global, output_len, name, name, expected_len });
+    var previous = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.len.ok", .{name});
+    defer std.heap.page_allocator.free(previous);
+    for (expected_bytes, 0..) |byte, index| {
+        try writer.print(
+            \\  %{s}.out{d}.ptr = getelementptr i8, ptr @base64.full_output, i64 {d}
+            \\  %{s}.out{d} = load i8, ptr %{s}.out{d}.ptr, align 1
+            \\  %{s}.out{d}.ok = icmp eq i8 %{s}.out{d}, {d}
+            \\  %{s}.ok{d} = and i1 %{s}, %{s}.out{d}.ok
+            \\
+        , .{ name, index, index, name, index, name, index, name, index, name, index, byte, name, index, previous, name, index });
+        const next = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.ok{d}", .{ name, index });
+        std.heap.page_allocator.free(previous);
+        previous = next;
+    }
+    try writer.print("  %{s}.ok = and i1 %{s}, true\n", .{ name, previous });
+}
+
 fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
 ) !void {
     writer.print(
-        \\@base64.full_input = constant [4 x i8] c"TWFu", align 1
+        \\@base64.full_input_man = constant [4 x i8] c"TWFu", align 1
+        \\@base64.full_input_ma = constant [4 x i8] c"TWE=", align 1
+        \\@base64.full_input_m = constant [4 x i8] c"TQ==", align 1
+        \\@base64.full_input_invalid = constant [4 x i8] c"!!!!", align 1
         \\@base64.full_output = global i32 0, align 4
-        \\@base64.full_table = private unnamed_addr global [256 x i8] zeroinitializer, align 1
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FullTableConstant(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  %decoded = call i64 @base64.decode_base_64(ptr @base64.full_input, i64 4, ptr @base64.full_output, i64 3)
-        \\  %len.ok = icmp eq i64 %decoded, 3
-        \\  %out0.ptr = getelementptr i8, ptr @base64.full_output, i64 0
-        \\  %out0 = load i8, ptr %out0.ptr, align 1
-        \\  %out0.ok = icmp eq i8 %out0, 77
-        \\  %ok01 = and i1 %len.ok, %out0.ok
-        \\  %out1.ptr = getelementptr i8, ptr @base64.full_output, i64 1
-        \\  %out1 = load i8, ptr %out1.ptr, align 1
-        \\  %out1.ok = icmp eq i8 %out1, 97
-        \\  %ok012 = and i1 %ok01, %out1.ok
-        \\  %out2.ptr = getelementptr i8, ptr @base64.full_output, i64 2
-        \\  %out2 = load i8, ptr %out2.ptr, align 1
-        \\  %out2.ok = icmp eq i8 %out2, 110
-        \\  %ok = and i1 %ok012, %out2.ok
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FullMainCheck(writer, "man", "base64.full_input_man", 3, 3, "Man") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FullMainCheck(writer, "ma", "base64.full_input_ma", 2, 2, "Ma") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FullMainCheck(writer, "m", "base64.full_input_m", 1, 1, "M") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeBase64FullMainCheck(writer, "invalid", "base64.full_input_invalid", 3, -1, "") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.print(
+        \\  %ok.man.ma = and i1 %man.ok, %ma.ok
+        \\  %ok.man.ma.m = and i1 %ok.man.ma, %m.ok
+        \\  %ok = and i1 %ok.man.ma.m, %invalid.ok
         \\  %result = select i1 %ok, i32 0, i32 1
         \\  ret i32 %result
         \\}}
@@ -1061,13 +1126,7 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     writeIrBlock(writer, "check_output") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
-    writer.print(
-        \\  %output.len.ok = icmp uge i64 %output_len, 3
-        \\
-    , .{}) catch |err| {
-        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
-    };
-    writeIrCondBr(writer, "output.len.ok", "decode_loop", "decode_fail") catch |err| {
+    writeIrBr(writer, "decode_loop") catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
     };
     writeIrBlock(writer, "decode_loop") catch |err| {
@@ -1094,15 +1153,45 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     try writeIrGep(writer, "src3", "i8", "%source", "%src3.index");
     try writeIrLoad(writer, "b3", "i8", "%src3", "1");
     try writeIrIndexedI8TableLoad(writer, "v3", "base64.full_table", "b3");
+    writer.print(
+        \\  %b2.pad = icmp eq i8 %b2, 61
+        \\  %b3.pad = icmp eq i8 %b3, 61
+        \\  %v0.valid = icmp ne i8 %v0.word, -1
+        \\  %v1.valid = icmp ne i8 %v1.word, -1
+        \\  %v2.valid.raw = icmp ne i8 %v2.word, -1
+        \\  %v2.valid = select i1 %b2.pad, i1 true, i1 %v2.valid.raw
+        \\  %v3.valid.raw = icmp ne i8 %v3.word, -1
+        \\  %v3.valid = select i1 %b3.pad, i1 true, i1 %v3.valid.raw
+        \\  %pad.valid = select i1 %b2.pad, i1 %b3.pad, i1 true
+        \\  %valid01 = and i1 %v0.valid, %v1.valid
+        \\  %valid012 = and i1 %valid01, %v2.valid
+        \\  %valid0123 = and i1 %valid012, %v3.valid
+        \\  %valid = and i1 %valid0123, %pad.valid
+        \\  %output.required.23 = select i1 %b3.pad, i64 2, i64 3
+        \\  %output.required = select i1 %b2.pad, i64 1, i64 %output.required.23
+        \\  %output.len.ok = icmp uge i64 %output_len, %output.required
+        \\  %valid.output = and i1 %valid, %output.len.ok
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrCondBr(writer, "valid.output", "decode_values", "decode_fail") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "decode_values") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
     try writeIrByteMask(writer, "v0.masked", "%v0.word", "63");
     try writeIrByteMask(writer, "v1.masked", "%v1.word", "63");
     try writeIrByteMask(writer, "v2.masked", "%v2.word", "63");
     try writeIrByteMask(writer, "v3.masked", "%v3.word", "63");
     writer.print(
+        \\  %v2.value = select i1 %b2.pad, i8 0, i8 %v2.masked
+        \\  %v3.value = select i1 %b3.pad, i8 0, i8 %v3.masked
         \\  %v0.i32 = zext i8 %v0.masked to i32
         \\  %v1.i32 = zext i8 %v1.masked to i32
-        \\  %v2.i32 = zext i8 %v2.masked to i32
-        \\  %v3.i32 = zext i8 %v3.masked to i32
+        \\  %v2.i32 = zext i8 %v2.value to i32
+        \\  %v3.i32 = zext i8 %v3.value to i32
         \\
     , .{}) catch |err| {
         try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
@@ -1126,15 +1215,32 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     try writeIrShift(writer, "byte0.shift", "lshr", "i32", "%word", "16");
     try writeIrTrunc(writer, "byte0", "i32", "%byte0.shift", "i8");
     try writeBase64OutputStore(writer, "dst0", "%output", "%output.index", "i8", "%byte0");
+    writer.print(
+        \\  %output.next = add i64 %output.index, %output.required
+        \\
+    , .{}) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrCondBr(writer, "b2.pad", "decode_done", "store_byte1") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "store_byte1") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
     try writeIrPointerIndexAdvance(writer, "dst1.index", "%output.index", "1");
     try writeIrShift(writer, "byte1.shift", "lshr", "i32", "%word", "8");
     try writeIrTrunc(writer, "byte1", "i32", "%byte1.shift", "i8");
     try writeBase64OutputStore(writer, "dst1", "%output", "%dst1.index", "i8", "%byte1");
+    writeIrCondBr(writer, "b3.pad", "decode_done", "store_byte2") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+    writeIrBlock(writer, "store_byte2") catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
     try writeIrPointerIndexAdvance(writer, "dst2.index", "%output.index", "2");
     try writeIrTrunc(writer, "byte2", "i32", "%word", "i8");
     try writeBase64OutputStore(writer, "dst2", "%output", "%dst2.index", "i8", "%byte2");
     try writeIrPointerIndexAdvance(writer, "source.next", "%source.index", "4");
-    try writeIrPointerIndexAdvance(writer, "output.next", "%output.index", "3");
     writer.print(
         \\  %done = icmp eq i64 %source.next, %source_len
         \\
