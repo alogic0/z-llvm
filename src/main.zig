@@ -8,6 +8,8 @@ const pipelines = @import("pipelines.zig");
 const sib = @import("structured_ir_builder.zig");
 const target = @import("target.zig");
 
+const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
+
 const usage =
     \\usage: z_llvm [--emit=ir|asm|obj|ir-writer] [--target=triple] [--datalayout=layout] [--passes=list|pipeline] [--pipeline=name] [--trace] [--time] [--quiet] [--pass-limit=N] [--input-limit=N] <input.ll>
     \\       z_llvm --emit=ir-writer
@@ -111,7 +113,7 @@ pub fn main(init: std.process.Init) !void {
     const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
     defer allocator.free(input);
 
-    if (readDirectIrWriterCase(input)) |case_id| {
+    if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
         if (emit == .ir) {
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -120,14 +122,11 @@ pub fn main(init: std.process.Init) !void {
             return;
         }
         if (emit == .obj or emit == .@"asm") {
-            const ir_writer_case = findIrWriterCase(case_id) orelse {
-                try fatal(io, "direct IR writer artifact references unknown case: {s}\n", .{case_id});
-            };
             if (ir_writer_case.construction != .structured_builder) {
-                try fatal(io, "direct IR writer artifact references non-direct case: {s}\n", .{case_id});
+                try fatal(io, "direct IR writer artifact references non-direct case: {s}\n", .{ir_writer_case.id});
             }
             var module = buildStructuredDirectModule(allocator, io, ir_writer_case) catch |err| {
-                try fatal(io, "direct IR writer module build failed for {s}: {any}\n", .{ case_id, err });
+                try fatal(io, "direct IR writer module build failed for {s}: {any}\n", .{ ir_writer_case.id, err });
             };
             defer module.deinit();
             if (target_triple) |triple| {
@@ -196,7 +195,9 @@ fn writeIrWriterModuleFromEnv(
     const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
     const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
     const ir_path = requiredEnv(io, environ, "ZLLVM_IR_PATH");
-    const ir_writer_case = findIrWriterCase(case_id);
+    const source_wrapper_dispatch = std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
+        envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", "source-wrapper");
+    const ir_writer_case = if (source_wrapper_dispatch) resolveSourceWrapperDispatchCase(wrapper, mode) else findIrWriterCase(case_id);
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
     const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
@@ -215,6 +216,9 @@ fn writeIrWriterModuleFromEnv(
         \\target triple = "x86_64-unknown-linux-gnu"
         \\; zllvm_ir_writer_contract = "external"
         \\; zllvm_ir_writer_case = "{s}"
+        \\; zllvm_ir_writer_resolved_case = "{s}"
+        \\; zllvm_ir_writer_dispatch = "{s}"
+        \\; zllvm_ir_writer_wrapper = "{s}"
         \\; zllvm_ir_writer_mode = "{s}"
         \\; zllvm_ir_writer_surface = "{s}"
         \\; zllvm_ir_writer_construction = "{s}"
@@ -225,6 +229,9 @@ fn writeIrWriterModuleFromEnv(
     , .{
         wrapper,
         case_id,
+        if (ir_writer_case) |case| case.id else "-",
+        if (source_wrapper_dispatch) "source-wrapper" else "case-id",
+        wrapper,
         mode,
         surface,
         construction,
@@ -344,10 +351,17 @@ fn structuredDirectNeedsFoldPipeline(surface: []const u8) bool {
         std.mem.eql(u8, surface, "packed-replace-low");
 }
 
-fn readDirectIrWriterCase(contents: []const u8) ?[]const u8 {
+fn resolveDirectIrWriterCase(contents: []const u8) ?IrWriterCase {
     const construction = readHeaderValue(contents, "; zllvm_ir_writer_construction = \"") orelse return null;
     if (!std.mem.eql(u8, construction, IrConstruction.structured_builder.marker())) return null;
-    return readHeaderValue(contents, "; zllvm_ir_writer_case = \"");
+    const dispatch = readHeaderValue(contents, "; zllvm_ir_writer_dispatch = \"") orelse "case-id";
+    if (std.mem.eql(u8, dispatch, "source-wrapper")) {
+        const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse return null;
+        const mode = readHeaderValue(contents, "; zllvm_ir_writer_mode = \"") orelse return null;
+        return resolveSourceWrapperDispatchCase(wrapper, mode);
+    }
+    const case_id = readHeaderValue(contents, "; zllvm_ir_writer_case = \"") orelse return null;
+    return findIrWriterCase(case_id);
 }
 
 fn readHeaderValue(contents: []const u8, prefix: []const u8) ?[]const u8 {
@@ -359,6 +373,11 @@ fn readHeaderValue(contents: []const u8, prefix: []const u8) ?[]const u8 {
 
 fn requiredEnv(io: std.Io, environ: *const std.process.Environ.Map, name: []const u8) []const u8 {
     return environ.get(name) orelse fatal(io, "missing required external IR writer env {s}\n", .{name});
+}
+
+fn envEquals(environ: *const std.process.Environ.Map, name: []const u8, expected: []const u8) bool {
+    const value = environ.get(name) orelse return false;
+    return std.mem.eql(u8, value, expected);
 }
 
 const IrWriterBodyFn = *const fn (std.Io, *std.Io.Writer, []const u8) anyerror!void;
@@ -389,11 +408,69 @@ const CodegenOwnership = enum {
     }
 };
 
+const SourceWrapperDispatchEntry = struct {
+    wrapper: []const u8,
+    mode: []const u8,
+    case_id: []const u8,
+};
+
 const IrWriterCase = struct {
     id: []const u8,
     surface: []const u8,
     write: IrWriterBodyFn,
     construction: IrConstruction = .textual_subset,
+};
+
+const source_wrapper_dispatch_entries = [_]SourceWrapperDispatchEntry{
+    .{ .wrapper = "test/zig/integrated/tiny_scalar_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_tiny_scalar" },
+    .{ .wrapper = "test/zig/integrated/integers_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_integers_add_wrap" },
+    .{ .wrapper = "test/zig/integrated/control_flow_calls_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_control_flow_call_chain" },
+    .{ .wrapper = "test/zig/integrated/runtime_loop_sum_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_control_flow_loop_sum" },
+    .{ .wrapper = "test/zig/integrated/error_switch_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_error_switch_error_switch" },
+    .{ .wrapper = "test/zig/integrated/runtime_cond_branch_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_switch_branch_mix" },
+    .{ .wrapper = "test/zig/integrated/runtime_phi_merge_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_runtime_phi_merge" },
+    .{ .wrapper = "test/zig/integrated/runtime_switch_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_switch_dense" },
+    .{ .wrapper = "test/zig/integrated/runtime_global_update_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_globals_comptime_global_counter" },
+    .{ .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_pointers_memory" },
+    .{ .wrapper = "test/zig/integrated/runtime_volatile_roundtrip_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_runtime_volatile_roundtrip" },
+    .{ .wrapper = "test/zig/integrated/runtime_optional_pointer_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_optional_pointer_value" },
+    .{ .wrapper = "test/zig/integrated/runtime_packed_read_flag_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_packed_bits_basic_read_flag" },
+    .{ .wrapper = "test/zig/integrated/runtime_packed_replace_low_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_packed_bits_basic_replace_low" },
+    .{ .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregates_struct_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_array_sum_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregates_array_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_optional_payload_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregates_optional_payload" },
+    .{ .wrapper = "test/zig/integrated/runtime_error_union_payload_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregates_error_union_payload" },
+    .{ .wrapper = "test/zig/integrated/runtime_slice_sum_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregates_slice_sum" },
+    .{ .wrapper = "test/zig/integrated/runtime_fp_constants_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_fp_constants_literals" },
+    .{ .wrapper = "test/zig/integrated/runtime_comptime_const_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_globals_comptime_const" },
+    .{ .wrapper = "test/zig/integrated/runtime_debug_location_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_atomics_debug_location" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_tls_concurrency_counter_read" },
+    .{ .wrapper = "test/zig/integrated/runtime_atomic_add_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_atomics_atomic_add" },
+    .{ .wrapper = "test/zig/integrated/runtime_inline_asm_barrier_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_atomics_inline_asm_barrier" },
+    .{ .wrapper = "test/zig/integrated/runtime_aggregate_pair_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_aggregate_abi_pair" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_less_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_float_compare" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_add_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_floats_math" },
+    .{ .wrapper = "test/zig/integrated/runtime_float_sub_main.zig", .mode = "ReleaseFast", .case_id = "releasefast_source_fp_extended_ops" },
+    .{ .wrapper = "test/zig/integrated/error_switch_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_error_switch_select" },
+    .{ .wrapper = "test/zig/integrated/runtime_debug_location_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_atomics_debug_location_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_global_update_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_globals_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_pointer_load_store_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_pointers_memory_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_branch_mix_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_switch_branch_mix_checked" },
+    .{ .wrapper = "test/zig/integrated/control_flow_calls_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_control_flow_calls_checked" },
+    .{ .wrapper = "test/zig/integrated/runtime_tls_read_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_tls_concurrency_checked_read" },
+    .{ .wrapper = "test/zig/integrated/runtime_array_sum_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_aggregates_checked_array" },
+    .{ .wrapper = "test/zig/integrated/runtime_struct_sum_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_aggregates_checked_struct" },
+    .{ .wrapper = "test/zig/integrated/runtime_slice_sum_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_aggregates_checked_slice" },
+    .{ .wrapper = "test/zig/integrated/tiny_scalar_releasesafe_boundary_main.zig", .mode = "ReleaseSafe", .case_id = "releasesafe_source_tiny_scalar_checked_add" },
+    .{ .wrapper = "test/zig/integrated/runtime_hidden_access_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_standalone_extern_exports_hidden_access" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_zig_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_standalone_mix_c_files_add_zig" },
+    .{ .wrapper = "test/zig/integrated/runtime_mix_c_add_may_panic_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_standalone_mix_c_files_add_may_panic" },
+    .{ .wrapper = "test/zig/integrated/runtime_umul_fix_sat_i64_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64" },
+    .{ .wrapper = "test/zig/integrated/runtime_inherit_want_safety_i64_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_inherit_want_safety_i64_return" },
+    .{ .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_standalone_compile_asm_main_unreachable" },
+    .{ .wrapper = "test/zig/integrated/runtime_str_from_float_help_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_runtime_str_from_float_help" },
+    .{ .wrapper = "test/zig/integrated/runtime_base64_decode_base_64_full_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_runtime_base64_decode_base_64_full" },
+    .{ .wrapper = "test/zig/integrated/base64_table_lookup_main.zig", .mode = "ReleaseSmall", .case_id = "releasesmall_source_base64_table_lookup" },
 };
 
 const ir_writer_cases = [_]IrWriterCase{
@@ -548,6 +625,15 @@ const ir_writer_cases = [_]IrWriterCase{
 fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
     for (ir_writer_cases) |case| {
         if (std.mem.eql(u8, case.id, case_id)) return case;
+    }
+    return null;
+}
+
+fn resolveSourceWrapperDispatchCase(wrapper: []const u8, mode: []const u8) ?IrWriterCase {
+    for (source_wrapper_dispatch_entries) |entry| {
+        if (std.mem.eql(u8, entry.wrapper, wrapper) and std.mem.eql(u8, entry.mode, mode)) {
+            return findIrWriterCase(entry.case_id);
+        }
     }
     return null;
 }

@@ -2,6 +2,7 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const expected_selected_ir_writer_rows = 146;
+const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
 const Validation = enum {
     executable,
@@ -1225,6 +1226,7 @@ pub fn main(init: std.process.Init) !void {
     var case_filter: ?[]const u8 = null;
     var use_ir_writer = false;
     var broad_source_backed = false;
+    var source_wrapper_dispatch = false;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
             pipeline = .postopt;
@@ -1236,6 +1238,10 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.eql(u8, arg, "--source-backed-broad")) {
             use_ir_writer = true;
             broad_source_backed = true;
+            pipeline = .preopt;
+        } else if (std.mem.eql(u8, arg, "--source-wrapper-dispatch")) {
+            use_ir_writer = true;
+            source_wrapper_dispatch = true;
             pipeline = .preopt;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             mode_filter = arg["--mode=".len..];
@@ -1310,7 +1316,9 @@ pub fn main(init: std.process.Init) !void {
     var generic_codegen_rows: usize = 0;
     var case_specific_codegen_rows: usize = 0;
     var source_backed_rows: usize = 0;
+    var source_wrapper_rows: usize = 0;
     var fallback_rows: usize = 0;
+    var case_id_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1409,6 +1417,7 @@ pub fn main(init: std.process.Init) !void {
     };
     for (cases) |case| {
         if (broad_source_backed and !isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (source_wrapper_dispatch and !isSourceWrapperDispatchCase(case)) continue;
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
         }
@@ -1418,6 +1427,7 @@ pub fn main(init: std.process.Init) !void {
         try requirePairing(case);
         total += 1;
         if (broad_source_backed) source_backed_rows += 1;
+        if (source_wrapper_dispatch) source_wrapper_rows += 1;
         const exe = try common.allocTempFile(allocator, temp, case.id, "_integrated");
         defer allocator.free(exe);
         const object = try common.allocTempFile(allocator, temp, case.id, ".o");
@@ -1428,11 +1438,12 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(marker);
         try env_map.put("ZLLVM_MARKER_PATH", marker);
         try env_map.put("ZLLVM_ZIG_MODE", case.mode);
-        try env_map.put("ZLLVM_CASE_ID", case.id);
+        try env_map.put("ZLLVM_CASE_ID", if (source_wrapper_dispatch) source_wrapper_dispatch_case_id else case.id);
         try env_map.put("ZLLVM_WRAPPER", case.wrapper);
+        if (source_wrapper_dispatch) try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-wrapper");
         if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
-        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null);
+        try requireHookMarker(allocator, io, marker, case, pipeline, use_ir_writer, if (use_ir_writer) ir_path else null, if (source_wrapper_dispatch) source_wrapper_dispatch_case_id else case.id);
         const surface = if (use_ir_writer) try readIrWriterSurface(allocator, io, ir_path, case) else "-";
         const construction = if (use_ir_writer) try readIrWriterConstruction(allocator, io, ir_path, case) else "-";
         defer if (use_ir_writer) allocator.free(construction);
@@ -1440,7 +1451,19 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(llvm_text_parse);
         const codegen_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_codegen = \"", "zllvm_ir_writer_codegen") else "-";
         defer if (use_ir_writer) allocator.free(codegen_ownership);
+        const writer_dispatch = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_dispatch = \"", "zllvm_ir_writer_dispatch") else "-";
+        defer if (use_ir_writer) allocator.free(writer_dispatch);
+        const writer_case_id = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_case = \"", "zllvm_ir_writer_case") else "-";
+        defer if (use_ir_writer) allocator.free(writer_case_id);
         if (use_ir_writer) {
+            if (source_wrapper_dispatch) {
+                if (!std.mem.eql(u8, writer_dispatch, "source-wrapper")) {
+                    try common.validationError(io, "source-wrapper dispatch row {s} did not report source-wrapper dispatch: {s}\n", .{ case.id, writer_dispatch });
+                }
+                if (!std.mem.eql(u8, writer_case_id, source_wrapper_dispatch_case_id)) {
+                    case_id_rows += 1;
+                }
+            }
             countSurface(&surface_counters, surface);
             if (std.mem.eql(u8, surface, "minimal-ret0")) {
                 minimal_wrapper_rows += 1;
@@ -1470,6 +1493,9 @@ pub fn main(init: std.process.Init) !void {
         }
         const fallback = effectiveFallback(case, use_ir_writer);
         if (broad_source_backed and !std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder")) {
+            fallback_rows += 1;
+        }
+        if (source_wrapper_dispatch and (!std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder") or !std.mem.eql(u8, construction, "ir-construction=zllvm-structured-builder"))) {
             fallback_rows += 1;
         }
         if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface, construction);
@@ -1519,6 +1545,18 @@ pub fn main(init: std.process.Init) !void {
             try stdout_writer.interface.print(
                 "summary source-backed-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_backed_rows={} structured_direct_rows={} generic_codegen_rows={} skipped_with_reason={} fallback_rows={} local_fail=0\n",
                 .{ source_backed_rows, structured_direct_rows, generic_codegen_rows, skipped_with_reason, fallback_rows },
+            );
+        }
+        if (source_wrapper_dispatch) {
+            if (source_wrapper_rows != total) {
+                try common.validationError(io, "source-wrapper dispatch row accounting mismatch: source_wrappers={} total={}\n", .{ source_wrapper_rows, total });
+            }
+            if (case_id_rows != 0 or fallback_rows != 0 or structured_direct_rows != source_wrapper_rows or generic_codegen_rows != source_wrapper_rows or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "source-wrapper dispatch gate requires no case-id/fallback and all rows structured-direct generic; source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
+            }
+            try stdout_writer.interface.print(
+                "summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers={} structured_direct_rows={} case_id_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ source_wrapper_rows, structured_direct_rows, case_id_rows, generic_codegen_rows, fallback_rows },
             );
         }
         try stdout_writer.interface.print(
@@ -1656,6 +1694,64 @@ fn requirePairing(case: Case) !void {
     }
 }
 
+fn isSourceWrapperDispatchCase(case: Case) bool {
+    const ids = [_][]const u8{
+        "releasefast_source_tiny_scalar",
+        "releasefast_source_integers_add_wrap",
+        "releasefast_source_control_flow_call_chain",
+        "releasefast_source_control_flow_loop_sum",
+        "releasefast_source_error_switch_error_switch",
+        "releasefast_source_switch_branch_mix",
+        "releasefast_runtime_phi_merge",
+        "releasefast_source_switch_dense",
+        "releasefast_source_globals_comptime_global_counter",
+        "releasefast_source_pointers_memory",
+        "releasefast_runtime_volatile_roundtrip",
+        "releasefast_source_optional_pointer_value",
+        "releasefast_source_packed_bits_basic_read_flag",
+        "releasefast_source_packed_bits_basic_replace_low",
+        "releasefast_source_aggregates_struct_sum",
+        "releasefast_source_aggregates_array_sum",
+        "releasefast_source_aggregates_optional_payload",
+        "releasefast_source_aggregates_error_union_payload",
+        "releasefast_source_aggregates_slice_sum",
+        "releasefast_source_fp_constants_literals",
+        "releasefast_source_globals_comptime_const",
+        "releasefast_source_atomics_debug_location",
+        "releasefast_source_tls_concurrency_counter_read",
+        "releasefast_source_atomics_atomic_add",
+        "releasefast_source_atomics_inline_asm_barrier",
+        "releasefast_source_aggregate_abi_pair",
+        "releasefast_source_float_compare",
+        "releasefast_source_floats_math",
+        "releasefast_source_fp_extended_ops",
+        "releasesafe_source_error_switch_select",
+        "releasesafe_source_atomics_debug_location_checked",
+        "releasesafe_source_globals_checked",
+        "releasesafe_source_pointers_memory_checked",
+        "releasesafe_source_switch_branch_mix_checked",
+        "releasesafe_source_control_flow_calls_checked",
+        "releasesafe_source_tls_concurrency_checked_read",
+        "releasesafe_source_aggregates_checked_array",
+        "releasesafe_source_aggregates_checked_struct",
+        "releasesafe_source_aggregates_checked_slice",
+        "releasesafe_source_tiny_scalar_checked_add",
+        "releasesmall_source_standalone_extern_exports_hidden_access",
+        "releasesmall_source_standalone_mix_c_files_add_zig",
+        "releasesmall_source_standalone_mix_c_files_add_may_panic",
+        "releasesmall_source_no_compile_panic_for_unchecked_arith_umul_fix_sat_i64",
+        "releasesmall_source_inherit_want_safety_i64_return",
+        "releasesmall_source_standalone_compile_asm_main_unreachable",
+        "releasesmall_runtime_str_from_float_help",
+        "releasesmall_runtime_base64_decode_base_64_full",
+        "releasesmall_source_base64_table_lookup",
+    };
+    for (ids) |id| {
+        if (std.mem.eql(u8, case.id, id)) return true;
+    }
+    return false;
+}
+
 fn requireHookMarker(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -1664,6 +1760,7 @@ fn requireHookMarker(
     pipeline: Pipeline,
     use_ir_writer: bool,
     expected_ir_path: ?[]const u8,
+    expected_marker_case_id: []const u8,
 ) !void {
     const contents = std.Io.Dir.cwd().readFileAlloc(io, marker, allocator, .limited(1024 * 1024)) catch |err| {
         try common.validationError(io, "missing z_llvm hook marker for {s}: {t}\n", .{ case.id, err });
@@ -1673,7 +1770,7 @@ fn requireHookMarker(
     try requireMarkerField(io, contents, "target", "x86_64-unknown-linux-gnu", case);
     try requireMarkerContains(io, contents, "zig_target=x86_64", case);
     try requireMarkerContains(io, contents, "object=", case);
-    try requireMarkerField(io, contents, "case_id", case.id, case);
+    try requireMarkerField(io, contents, "case_id", expected_marker_case_id, case);
     try requireMarkerField(io, contents, "wrapper", case.wrapper, case);
     try requireMarkerField(io, contents, "mode", case.mode, case);
     if (expected_ir_path) |ir_path| try requireMarkerField(io, contents, "ir", ir_path, case);
