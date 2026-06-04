@@ -508,7 +508,7 @@ const ir_writer_cases = [_]IrWriterCase{
     .{ .id = "releasesmall_runtime_compile_asm_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_source_standalone_compile_asm_main_unreachable", .surface = "compile-asm-unreachable", .write = writeReleaseSmallRuntimeCompileAsmUnreachableIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_str_from_float_help", .surface = "str-from-float-help", .write = writeReleaseSmallRuntimeStrFromFloatHelpIrWriterBody, .textual_boundary_reason = "full-str-from-float-formatting" },
-    .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .textual_boundary_reason = "full-base64-decoder-cfg" },
+    .{ .id = "releasesmall_runtime_base64_decode_base_64_full", .surface = "base64-decode-base64-full", .write = writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_decode_step", .surface = "base64-decode-step", .write = writeReleaseSmallRuntimeBase64DecodeStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_store_step", .surface = "base64-store-step", .write = writeReleaseSmallRuntimeBase64StoreStepIrWriterBody, .construction = .structured_builder },
     .{ .id = "releasesmall_runtime_base64_residual_byte_step", .surface = "base64-residual-byte-step", .write = writeReleaseSmallRuntimeBase64ResidualByteStepIrWriterBody, .construction = .structured_builder },
@@ -1173,7 +1173,204 @@ fn writeBase64FullMainCheck(
     try writer.print("  %{s}.ok = and i1 %{s}, true\n", .{ name, previous });
 }
 
+fn base64FullTableInitializer() ![]const u8 {
+    const hex = "0123456789ABCDEF";
+    var bytes = try std.heap.page_allocator.alloc(u8, 2 + 256 * 3 + 1);
+    bytes[0] = 'c';
+    bytes[1] = '"';
+    var cursor: usize = 2;
+    for (0..256) |index| {
+        const value = base64DecodeTableValue(@intCast(index));
+        bytes[cursor] = '\\';
+        bytes[cursor + 1] = hex[value >> 4];
+        bytes[cursor + 2] = hex[value & 0xf];
+        cursor += 3;
+    }
+    bytes[cursor] = '"';
+    return bytes;
+}
+
+fn writeBase64FullStructuredModule(writer: *std.Io.Writer) !void {
+    var module = sib.Module.init(writer);
+    try module.constant("base64.full_input_man", "", .{ .text = "[4 x i8]" }, "c\"TWFu\"", "1");
+    try module.constant("base64.full_input_ma", "", .{ .text = "[4 x i8]" }, "c\"TWE=\"", "1");
+    try module.constant("base64.full_input_m", "", .{ .text = "[4 x i8]" }, "c\"TQ==\"", "1");
+    try module.constant("base64.full_input_invalid", "", .{ .text = "[4 x i8]" }, "c\"!!!!\"", "1");
+    try module.global("base64.full_output", "", .i32, "0", "4");
+    try module.constant("base64.full_table", "private unnamed_addr", .{ .text = "[256 x i8]" }, try base64FullTableInitializer(), "1");
+    try writer.writeAll("\n");
+
+    var main_fn = try module.function("dso_local ", .i32, "main", "", " local_unnamed_addr");
+    var main_entry = try main_fn.block("entry");
+    try writeBase64FullMainCheckStructured(&main_entry, "man", "base64.full_input_man", 3, 3, "Man");
+    try writeBase64FullMainCheckStructured(&main_entry, "ma", "base64.full_input_ma", 2, 2, "Ma");
+    try writeBase64FullMainCheckStructured(&main_entry, "m", "base64.full_input_m", 1, 1, "M");
+    try writeBase64FullMainCheckStructured(&main_entry, "invalid", "base64.full_input_invalid", 3, -1, "");
+    _ = try main_entry.binary("ok.man.ma", "and", .i1, sib.local(.i1, "%man.ok"), sib.local(.i1, "%ma.ok"));
+    _ = try main_entry.binary("ok.man.ma.m", "and", .i1, sib.local(.i1, "%ok.man.ma"), sib.local(.i1, "%m.ok"));
+    _ = try main_entry.binary("ok", "and", .i1, sib.local(.i1, "%ok.man.ma.m"), sib.local(.i1, "%invalid.ok"));
+    _ = try main_entry.select("result", sib.local(.i1, "%ok"), .i32, sib.int(.i32, "0"), sib.int(.i32, "1"));
+    try main_entry.ret(sib.local(.i32, "%result"));
+    try main_fn.end();
+
+    var decode_fn = try module.function("available_externally ", .i64, "base64.decode_base_64", "ptr %source, i64 %source_len, ptr %output, i64 %output_len", " unnamed_addr");
+    var entry = try decode_fn.block("entry");
+    _ = try entry.icmp("source.len.ok", "eq", .i64, sib.local(.i64, "%source_len"), sib.int(.i64, "4"));
+    try entry.condBr(sib.local(.i1, "%source.len.ok"), "check_output", "decode_fail");
+    try writer.writeAll("\n");
+    var check_output = try decode_fn.block("check_output");
+    try check_output.br("decode_loop");
+    try writer.writeAll("\n");
+    var loop = try decode_fn.block("decode_loop");
+    _ = try loop.phi2("source.index", .i64, sib.int(.i64, "0"), "check_output", sib.local(.i64, "%source.next"), "decode_latch");
+    _ = try loop.phi2("output.index", .i64, sib.int(.i64, "0"), "check_output", sib.local(.i64, "%output.next"), "decode_latch");
+    _ = try loop.gep("src0", .i8, sib.local(.ptr, "%source"), .i64, sib.local(.i64, "%source.index"));
+    _ = try loop.load("b0", .i8, sib.local(.ptr, "%src0"), "1");
+    try writeBase64FullTableLoadStructured(&loop, "v0", "%b0");
+    _ = try loop.binary("src1.index", "add nuw", .i64, sib.local(.i64, "%source.index"), sib.int(.i64, "1"));
+    _ = try loop.gep("src1", .i8, sib.local(.ptr, "%source"), .i64, sib.local(.i64, "%src1.index"));
+    _ = try loop.load("b1", .i8, sib.local(.ptr, "%src1"), "1");
+    try writeBase64FullTableLoadStructured(&loop, "v1", "%b1");
+    _ = try loop.binary("src2.index", "add nuw", .i64, sib.local(.i64, "%source.index"), sib.int(.i64, "2"));
+    _ = try loop.gep("src2", .i8, sib.local(.ptr, "%source"), .i64, sib.local(.i64, "%src2.index"));
+    _ = try loop.load("b2", .i8, sib.local(.ptr, "%src2"), "1");
+    try writeBase64FullTableLoadStructured(&loop, "v2", "%b2");
+    _ = try loop.binary("src3.index", "add nuw", .i64, sib.local(.i64, "%source.index"), sib.int(.i64, "3"));
+    _ = try loop.gep("src3", .i8, sib.local(.ptr, "%source"), .i64, sib.local(.i64, "%src3.index"));
+    _ = try loop.load("b3", .i8, sib.local(.ptr, "%src3"), "1");
+    try writeBase64FullTableLoadStructured(&loop, "v3", "%b3");
+    _ = try loop.icmp("b2.pad", "eq", .i8, sib.local(.i8, "%b2"), sib.int(.i8, "61"));
+    _ = try loop.icmp("b3.pad", "eq", .i8, sib.local(.i8, "%b3"), sib.int(.i8, "61"));
+    _ = try loop.icmp("v0.valid", "ne", .i8, sib.local(.i8, "%v0.word"), sib.int(.i8, "-1"));
+    _ = try loop.icmp("v1.valid", "ne", .i8, sib.local(.i8, "%v1.word"), sib.int(.i8, "-1"));
+    _ = try loop.icmp("v2.valid.raw", "ne", .i8, sib.local(.i8, "%v2.word"), sib.int(.i8, "-1"));
+    _ = try loop.select("v2.valid", sib.local(.i1, "%b2.pad"), .i1, sib.int(.i1, "1"), sib.local(.i1, "%v2.valid.raw"));
+    _ = try loop.icmp("v3.valid.raw", "ne", .i8, sib.local(.i8, "%v3.word"), sib.int(.i8, "-1"));
+    _ = try loop.select("v3.valid", sib.local(.i1, "%b3.pad"), .i1, sib.int(.i1, "1"), sib.local(.i1, "%v3.valid.raw"));
+    _ = try loop.select("pad.valid", sib.local(.i1, "%b2.pad"), .i1, sib.local(.i1, "%b3.pad"), sib.int(.i1, "1"));
+    _ = try loop.binary("valid01", "and", .i1, sib.local(.i1, "%v0.valid"), sib.local(.i1, "%v1.valid"));
+    _ = try loop.binary("valid012", "and", .i1, sib.local(.i1, "%valid01"), sib.local(.i1, "%v2.valid"));
+    _ = try loop.binary("valid0123", "and", .i1, sib.local(.i1, "%valid012"), sib.local(.i1, "%v3.valid"));
+    _ = try loop.binary("valid", "and", .i1, sib.local(.i1, "%valid0123"), sib.local(.i1, "%pad.valid"));
+    _ = try loop.select("output.required.23", sib.local(.i1, "%b3.pad"), .i64, sib.int(.i64, "2"), sib.int(.i64, "3"));
+    _ = try loop.select("output.required", sib.local(.i1, "%b2.pad"), .i64, sib.int(.i64, "1"), sib.local(.i64, "%output.required.23"));
+    _ = try loop.icmp("output.len.ok", "uge", .i64, sib.local(.i64, "%output_len"), sib.local(.i64, "%output.required"));
+    _ = try loop.binary("valid.output", "and", .i1, sib.local(.i1, "%valid"), sib.local(.i1, "%output.len.ok"));
+    try loop.condBr(sib.local(.i1, "%valid.output"), "decode_values", "decode_fail");
+    try writer.writeAll("\n");
+    var values = try decode_fn.block("decode_values");
+    _ = try values.binary("v0.masked", "and", .i8, sib.local(.i8, "%v0.word"), sib.int(.i8, "63"));
+    _ = try values.binary("v1.masked", "and", .i8, sib.local(.i8, "%v1.word"), sib.int(.i8, "63"));
+    _ = try values.binary("v2.masked", "and", .i8, sib.local(.i8, "%v2.word"), sib.int(.i8, "63"));
+    _ = try values.binary("v3.masked", "and", .i8, sib.local(.i8, "%v3.word"), sib.int(.i8, "63"));
+    _ = try values.select("v2.value", sib.local(.i1, "%b2.pad"), .i8, sib.int(.i8, "0"), sib.local(.i8, "%v2.masked"));
+    _ = try values.select("v3.value", sib.local(.i1, "%b3.pad"), .i8, sib.int(.i8, "0"), sib.local(.i8, "%v3.masked"));
+    _ = try values.cast("v0.i32", "zext", sib.local(.i8, "%v0.masked"), .i32);
+    _ = try values.cast("v1.i32", "zext", sib.local(.i8, "%v1.masked"), .i32);
+    _ = try values.cast("v2.i32", "zext", sib.local(.i8, "%v2.value"), .i32);
+    _ = try values.cast("v3.i32", "zext", sib.local(.i8, "%v3.value"), .i32);
+    _ = try values.binary("shift0", "shl", .i32, sib.local(.i32, "%v0.i32"), sib.int(.i32, "18"));
+    _ = try values.binary("shift1", "shl", .i32, sib.local(.i32, "%v1.i32"), sib.int(.i32, "12"));
+    _ = try values.binary("word1", "or", .i32, sib.local(.i32, "%shift0"), sib.local(.i32, "%shift1"));
+    _ = try values.binary("shift2", "shl", .i32, sib.local(.i32, "%v2.i32"), sib.int(.i32, "6"));
+    _ = try values.binary("word2", "or", .i32, sib.local(.i32, "%word1"), sib.local(.i32, "%shift2"));
+    _ = try values.binary("word", "or", .i32, sib.local(.i32, "%word2"), sib.local(.i32, "%v3.i32"));
+    _ = try values.binary("byte0.shift", "lshr", .i32, sib.local(.i32, "%word"), sib.int(.i32, "16"));
+    _ = try values.cast("byte0", "trunc", sib.local(.i32, "%byte0.shift"), .i8);
+    try writeBase64OutputStoreStructured(&values, "dst0", "%output", "%output.index", .i8, "%byte0");
+    _ = try values.binary("output.next", "add", .i64, sib.local(.i64, "%output.index"), sib.local(.i64, "%output.required"));
+    try values.condBr(sib.local(.i1, "%b2.pad"), "decode_done", "store_byte1");
+    try writer.writeAll("\n");
+    var store1 = try decode_fn.block("store_byte1");
+    _ = try store1.binary("dst1.index", "add nuw", .i64, sib.local(.i64, "%output.index"), sib.int(.i64, "1"));
+    _ = try store1.binary("byte1.shift", "lshr", .i32, sib.local(.i32, "%word"), sib.int(.i32, "8"));
+    _ = try store1.cast("byte1", "trunc", sib.local(.i32, "%byte1.shift"), .i8);
+    try writeBase64OutputStoreStructured(&store1, "dst1", "%output", "%dst1.index", .i8, "%byte1");
+    try store1.condBr(sib.local(.i1, "%b3.pad"), "decode_done", "store_byte2");
+    try writer.writeAll("\n");
+    var store2 = try decode_fn.block("store_byte2");
+    _ = try store2.binary("dst2.index", "add nuw", .i64, sib.local(.i64, "%output.index"), sib.int(.i64, "2"));
+    _ = try store2.cast("byte2", "trunc", sib.local(.i32, "%word"), .i8);
+    try writeBase64OutputStoreStructured(&store2, "dst2", "%output", "%dst2.index", .i8, "%byte2");
+    _ = try store2.binary("source.next", "add nuw", .i64, sib.local(.i64, "%source.index"), sib.int(.i64, "4"));
+    _ = try store2.icmp("done", "eq", .i64, sib.local(.i64, "%source.next"), sib.local(.i64, "%source_len"));
+    try store2.condBr(sib.local(.i1, "%done"), "decode_done", "decode_latch");
+    try writer.writeAll("\n");
+    var latch = try decode_fn.block("decode_latch");
+    try latch.br("decode_loop");
+    try writer.writeAll("\n");
+    var done = try decode_fn.block("decode_done");
+    try done.ret(sib.local(.i64, "%output.next"));
+    try writer.writeAll("\n");
+    var fail = try decode_fn.block("decode_fail");
+    try fail.ret(sib.int(.i64, "-1"));
+    try decode_fn.end();
+}
+
+fn writeBase64FullMainCheckStructured(
+    entry: *sib.Block,
+    name: []const u8,
+    input_global: []const u8,
+    output_len: u8,
+    expected_len: i8,
+    expected_bytes: []const u8,
+) !void {
+    const decoded = try std.fmt.allocPrint(std.heap.page_allocator, "decoded.{s}", .{name});
+    const len_ok = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.len.ok", .{name});
+    const input_ref = try std.fmt.allocPrint(std.heap.page_allocator, "@{s}", .{input_global});
+    const args = try std.fmt.allocPrint(std.heap.page_allocator, "ptr {s}, i64 4, ptr @base64.full_output, i64 {d}", .{ input_ref, output_len });
+    _ = try entry.call(decoded, "", .i64, "@base64.decode_base_64", args);
+    const decoded_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{decoded});
+    _ = try entry.icmp(len_ok, "eq", .i64, sib.local(.i64, decoded_ref), sib.int(.i64, try std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{expected_len})));
+    var previous = len_ok;
+    for (expected_bytes, 0..) |byte, index| {
+        const ptr_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{d}.ptr", .{ name, index });
+        const load_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{d}", .{ name, index });
+        const ok_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.out{d}.ok", .{ name, index });
+        _ = try entry.gep(ptr_name, .i8, sib.global(.ptr, "@base64.full_output"), .i64, sib.int(.i64, try std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{index})));
+        const ptr_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{ptr_name});
+        _ = try entry.load(load_name, .i8, sib.local(.ptr, ptr_ref), "1");
+        const load_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{load_name});
+        _ = try entry.icmp(ok_name, "eq", .i8, sib.local(.i8, load_ref), sib.int(.i8, try std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{byte})));
+        const next = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.ok{d}", .{ name, index });
+        const previous_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{previous});
+        const ok_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{ok_name});
+        _ = try entry.binary(next, "and", .i1, sib.local(.i1, previous_ref), sib.local(.i1, ok_ref));
+        previous = next;
+    }
+    const final_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.ok", .{name});
+    const previous_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{previous});
+    _ = try entry.binary(final_name, "and", .i1, sib.local(.i1, previous_ref), sib.int(.i1, "1"));
+}
+
+fn writeBase64FullTableLoadStructured(entry: *sib.Block, prefix: []const u8, byte_ref: []const u8) !void {
+    const idx = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.idx", .{prefix});
+    const entry_name = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.entry", .{prefix});
+    const word = try std.fmt.allocPrint(std.heap.page_allocator, "{s}.word", .{prefix});
+    _ = try entry.cast(idx, "zext", sib.local(.i8, byte_ref), .i64);
+    const idx_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{idx});
+    _ = try entry.gep2(entry_name, .{ .text = "[256 x i8]" }, sib.global(.ptr, "@base64.full_table"), sib.int(.i64, "0"), sib.local(.i64, idx_ref));
+    const entry_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{entry_name});
+    _ = try entry.load(word, .i8, sib.local(.ptr, entry_ref), "1");
+}
+
+fn writeBase64OutputStoreStructured(entry: *sib.Block, ptr_name: []const u8, output_base: []const u8, offset: []const u8, ty: sib.Type, value: []const u8) !void {
+    _ = try entry.gep(ptr_name, .i8, sib.local(.ptr, output_base), .i64, sib.local(.i64, offset));
+    const ptr_ref = try std.fmt.allocPrint(std.heap.page_allocator, "%{s}", .{ptr_name});
+    try entry.store(sib.local(ty, value), sib.local(.ptr, ptr_ref), "1");
+}
+
 fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
+    io: std.Io,
+    writer: *std.Io.Writer,
+    ir_path: []const u8,
+) !void {
+    writeBase64FullStructuredModule(writer) catch |err| {
+        try fatal(io, "failed to write ReleaseSmall runtime base64 full decoder external IR writer body {s}: {any}\n", .{ ir_path, err });
+    };
+}
+
+fn writeReleaseSmallRuntimeBase64DecodeBase64FullTextualIrWriterBody(
     io: std.Io,
     writer: *std.Io.Writer,
     ir_path: []const u8,
