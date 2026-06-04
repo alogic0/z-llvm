@@ -359,12 +359,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
-    if (try lowerDebugInheritWantSafety(allocator, &machine, function)) {
+    if (try lowerI64PassThroughFunctionFamily(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
 
-    if (try lowerDebugNoCompilePanicUncheckedArith(allocator, &machine, function)) {
+    if (try lowerI64SaturatingHelperFunctionFamily(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -975,12 +975,10 @@ fn lowerStraightLineReturn(
     switch (terminator) {
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
-            if (try lowerRuntimeAggregatePairMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeAggregatePairMakePairReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeAggregatePairPairFirstReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerAggregatePairAbiFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatLessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedRuntimeFloatCallCompareMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeSideEffectFreeMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSimpleVoidCallBoundaryFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
@@ -1032,11 +1030,10 @@ fn lowerStraightLineReturn(
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerReleaseSmallHiddenAccessMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerReleaseSmallMixCAddZigMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerHiddenGlobalAccessFamilyReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerMixedCZigTlsInputFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallMixCAddMayPanicMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallStrFromFloatMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return;
             if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
@@ -1067,7 +1064,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64TableLookupMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
-            if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return;
+            if (try lowerI64SaturatingHelperFamilyReturn(allocator, machine, function, block, ret)) return;
             if (hasLiveInstructions(block)) {
                 try lowerStraightLineInstructions(allocator, machine, function, block, ret);
                 return;
@@ -2031,6 +2028,17 @@ fn validateIntegerOverflowPanicCall(instruction: ir.Instruction) !void {
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).integerOverflow")) return error.UnsupportedCodegenInstruction;
     if (call.ret_ty != .void or call.args.items.len != 0) return error.UnsupportedCodegenInstruction;
+}
+
+fn lowerI64SaturatingHelperFamilyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerSelectedUmlFixSatI64Return(allocator, machine, function, block, ret)) return true;
+    return false;
 }
 
 fn lowerSelectedUmlFixSatI64Return(
@@ -4382,6 +4390,17 @@ fn lowerSelectedRuntimeFloatCallCompareMainReturn(
     return false;
 }
 
+fn lowerSimpleVoidCallBoundaryFamilyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerRuntimeSideEffectFreeMainReturn(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
 fn lowerRuntimeSideEffectFreeMainReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -4671,6 +4690,19 @@ fn lowerAggregateAbiReturn(
 ) !bool {
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
+fn lowerAggregatePairAbiFamilyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerRuntimeAggregatePairMainReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRuntimeAggregatePairMakePairReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerRuntimeAggregatePairPairFirstReturn(allocator, machine, function, block, ret)) return true;
     return false;
 }
 
@@ -7590,6 +7622,18 @@ fn lowerExternExportsGlobalAccess(
     return false;
 }
 
+fn lowerHiddenGlobalAccessFamilyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerReleaseSmallHiddenAccessMainReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerExternExportsGlobalAccess(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
 fn lowerReleaseSmallHiddenAccessMainReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -7673,6 +7717,18 @@ fn lowerReleaseSmallMixCAddZigMainReturn(
     try machine.instructions.append(allocator, .{ .add_tls_i32_eax = c_k_name });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerMixedCZigTlsInputFamilyReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (try lowerReleaseSmallMixCAddZigMainReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerSelectedMixCFilesAddZig(allocator, machine, function, block, ret)) return true;
+    return false;
 }
 
 fn lowerReleaseSmallMixCAddMayPanicMainReturn(
@@ -10487,6 +10543,11 @@ fn validatePhiIncoming(incoming: ir.PhiIncoming, value_name: []const u8, block_n
     if (!isNamed(incoming.value, value_name) or !std.mem.eql(u8, incoming.block, block_name)) return error.UnsupportedCodegenInstruction;
 }
 
+fn lowerI64PassThroughFunctionFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try lowerDebugInheritWantSafety(allocator, machine, function)) return true;
+    return false;
+}
+
 fn lowerDebugInheritWantSafety(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!std.mem.eql(u8, function.name, "inherit_want_safety.entry")) return false;
     if (!function.ret_ty.eql(.{ .int = 64 }) or function.params.items.len != 0) return false;
@@ -10626,6 +10687,11 @@ fn blockByName(function: ir.Function, name: []const u8) ?ir.BasicBlock {
         if (std.mem.eql(u8, block.name, name)) return block;
     }
     return null;
+}
+
+fn lowerI64SaturatingHelperFunctionFamily(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try lowerDebugNoCompilePanicUncheckedArith(allocator, machine, function)) return true;
+    return false;
 }
 
 fn lowerDebugNoCompilePanicUncheckedArith(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

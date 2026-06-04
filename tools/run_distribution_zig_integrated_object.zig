@@ -1388,8 +1388,8 @@ pub fn main(init: std.process.Init) !void {
         if (total == 136 and textual_boundary_rows != 32) {
             try common.validationError(io, "external IR writer selected rows must keep exactly 32 textual boundary rows at total=136; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
-        if (structured_direct_rows >= 100 and generic_codegen_rows < 75) {
-            try common.validationError(io, "external IR writer structured-direct rows must include at least 75 generic x86_64 codegen rows; generic_codegen_rows={}\n", .{generic_codegen_rows});
+        if (structured_direct_rows >= 100 and (generic_codegen_rows != structured_direct_rows or case_specific_codegen_rows != 0)) {
+            try common.validationError(io, "external IR writer structured-direct rows must all use generic x86_64 codegen; structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={}\n", .{ structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows });
         }
         try stdout_writer.interface.print(
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",

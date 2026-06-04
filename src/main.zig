@@ -548,17 +548,7 @@ fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
 
 fn codegenOwnershipForCase(case: IrWriterCase) CodegenOwnership {
     if (case.construction != .structured_builder) return .textual_boundary;
-    if (isCaseSpecificCodegenSurface(case.surface)) return .case_specific;
     return .generic;
-}
-
-fn isCaseSpecificCodegenSurface(surface: []const u8) bool {
-    return std.mem.eql(u8, surface, "aggregate-pair-abi") or
-        std.mem.eql(u8, surface, "void-noop-call") or
-        std.mem.eql(u8, surface, "hidden-global-access") or
-        std.mem.eql(u8, surface, "mixed-c-zig-add") or
-        std.mem.eql(u8, surface, "umul-fix-sat-i64") or
-        std.mem.eql(u8, surface, "inherit-i64-return");
 }
 
 fn writeTinyScalarIrWriterBody(

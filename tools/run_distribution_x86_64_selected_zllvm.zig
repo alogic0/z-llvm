@@ -101,9 +101,10 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     }
     const generic_codegen_count = std.fmt.parseInt(usize, generic_codegen_rows, 10) catch 0;
-    if (structured_count >= 100 and generic_codegen_count < 75) {
+    const case_specific_codegen_count = std.fmt.parseInt(usize, case_specific_codegen_rows, 10) catch std.math.maxInt(usize);
+    if (structured_count >= 100 and (generic_codegen_count != structured_count or case_specific_codegen_count != 0)) {
         try stdout_writer.interface.print(
-            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_direct_rows={s} structured_textual_rows={s} textual_boundary_rows={s} generic_codegen_rows={s} case_specific_codegen_rows={s} textual_boundary_reason_missing_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"generic-codegen-row-minimum\"\n",
+            "selected-zllvm status=fail total={s} executable_ok={s} link_only_ok={s} structured_direct_rows={s} structured_textual_rows={s} textual_boundary_rows={s} generic_codegen_rows={s} case_specific_codegen_rows={s} textual_boundary_reason_missing_rows={s} minimal-ret0={s} ownership={s} first_failure_case_id=- first_failure_wrapper=- first_failure_mode=- first_failure_pipeline=preopt first_failure_error=\"generic-codegen-row-exactness\"\n",
             .{ total, executable_ok, link_only_ok, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, textual_boundary_reason_missing_rows, minimal_ret0, ownership_value },
         );
         try stdout_writer.interface.flush();
