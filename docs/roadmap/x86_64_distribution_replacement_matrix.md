@@ -406,7 +406,8 @@ wrapper_scope=compile-time semantic checks plus minimal C ABI main; broader
               fixture gates
 excluded=AArch64, wasm, LTO, Debug expansion, broad runtime/TLS/compiler-rt
 
-gate=zig build distribution-zig-ir-writer
+gate=zig build distribution-x86_64-selected-zllvm
+detailed_gate=zig build distribution-zig-ir-writer
 first_gate=zig build distribution-zig-ir-writer-tiny-scalar
 stage=external z_llvm textual IR writer, selected wrapper subset
 path=Zig build-obj -> patched Zig Object.emit validates external contract
@@ -425,6 +426,14 @@ ownership=ir-construction=z_llvm-external-textual-subset;
           linker=zig-native-fno-lld
 ownership_gate=selected IR-writer rows fail on libLLVM module parse/print,
                LLVM TargetMachine object emission fallback, or minimal-ret0
+compact_output=selected-zllvm status=<ok|fail> total=<rows>
+               executable_ok=<count> link_only_ok=<count> minimal-ret0=<count>
+               ownership=<marker> first_failure_case_id=<case-or-->
+               first_failure_wrapper=<wrapper-or-->
+               first_failure_mode=<mode-or-->
+               first_failure_pipeline=<pipeline-or-->
+               first_failure_error=<error-or-->
+diagnostics=docs/x86_64_selected_zllvm_diagnostics.md
 total=106 executable_ok=106 link_only_ok=0 local_fail=0
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup

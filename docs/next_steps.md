@@ -46,6 +46,13 @@ minimal wrapper surface. This is a selected x86_64 release-row claim only; the
 normal Zig/libLLVM fallback still exists when the external writer env vars are
 unset.
 
+Current distribution claim gate:
+`zig build distribution-x86_64-selected-zllvm` is the stable compact selected
+x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
+line with row counts, `minimal-ret0`, ownership, and first-failure fields.
+Failure diagnostics and reproducibility inputs live in
+`docs/x86_64_selected_zllvm_diagnostics.md`.
+
 Next target:
 Continue broadening source-backed x86_64 release-mode external IR-writer
 coverage with reusable helper-backed rows; do not add new ad hoc bodies unless

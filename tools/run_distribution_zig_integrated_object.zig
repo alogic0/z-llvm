@@ -1079,7 +1079,7 @@ pub fn main(init: std.process.Init) !void {
         }
         const fallback = effectiveFallback(case, use_ir_writer);
         if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface);
-        try linkIntegratedObject(allocator, io, target, object, exe);
+        try linkIntegratedObject(allocator, io, target, object, exe, case);
         if (case.validation == .executable) {
             try runExecutableCase(allocator, io, exe, case, use_ir_writer);
             executable_ok += 1;
@@ -1209,7 +1209,9 @@ fn buildIntegratedObject(
         case.wrapper,
         emit_arg,
     });
-    const result = try common.runCaptureEnv(allocator, io, argv.items, "patched Zig integrated z_llvm build-obj emit", env_map);
+    const label = try std.fmt.allocPrint(allocator, "patched Zig integrated z_llvm build-obj emit {s}", .{case.id});
+    defer allocator.free(label);
+    const result = try common.runCaptureEnv(allocator, io, argv.items, label, env_map);
     common.freeRunResult(allocator, result);
 }
 
@@ -1219,6 +1221,7 @@ fn linkIntegratedObject(
     target: []const u8,
     object: []const u8,
     exe: []const u8,
+    case: Case,
 ) !void {
     const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{exe});
     defer allocator.free(emit_arg);
@@ -1233,7 +1236,9 @@ fn linkIntegratedObject(
         "-lc",
         emit_arg,
     };
-    const result = try common.runCapture(allocator, io, &argv, "zig build-exe -fno-lld integrated object");
+    const label = try std.fmt.allocPrint(allocator, "zig build-exe -fno-lld integrated object {s}", .{case.id});
+    defer allocator.free(label);
+    const result = try common.runCapture(allocator, io, &argv, label);
     common.freeRunResult(allocator, result);
 }
 
