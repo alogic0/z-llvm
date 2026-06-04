@@ -1017,13 +1017,28 @@ fn writeReleaseSmallRuntimeBase64DecodeBase64FullIrWriterBody(
     ir_path: []const u8,
 ) !void {
     writer.print(
-        \\@base64.full_input = private unnamed_addr global [4 x i8] c"TWFu", align 1
-        \\@base64.full_output = private unnamed_addr global [3 x i8] zeroinitializer, align 1
+        \\@base64.full_input = constant [4 x i8] c"TWFu", align 1
+        \\@base64.full_output = global i32 0, align 4
         \\@base64.full_table = private unnamed_addr global [256 x i8] zeroinitializer, align 1
         \\
         \\define dso_local i32 @main() local_unnamed_addr {{
         \\entry:
-        \\  ret i32 0
+        \\  %decoded = call i64 @base64.decode_base_64(ptr @base64.full_input, i64 4, ptr @base64.full_output, i64 3)
+        \\  %len.ok = icmp eq i64 %decoded, 3
+        \\  %out0.ptr = getelementptr i8, ptr @base64.full_output, i64 0
+        \\  %out0 = load i8, ptr %out0.ptr, align 1
+        \\  %out0.ok = icmp eq i8 %out0, 77
+        \\  %ok01 = and i1 %len.ok, %out0.ok
+        \\  %out1.ptr = getelementptr i8, ptr @base64.full_output, i64 1
+        \\  %out1 = load i8, ptr %out1.ptr, align 1
+        \\  %out1.ok = icmp eq i8 %out1, 97
+        \\  %ok012 = and i1 %ok01, %out1.ok
+        \\  %out2.ptr = getelementptr i8, ptr @base64.full_output, i64 2
+        \\  %out2 = load i8, ptr %out2.ptr, align 1
+        \\  %out2.ok = icmp eq i8 %out2, 110
+        \\  %ok = and i1 %ok012, %out2.ok
+        \\  %result = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %result
         \\}}
         \\
         \\define available_externally i64 @base64.decode_base_64(ptr %source, i64 %source_len, ptr %output, i64 %output_len) unnamed_addr {{

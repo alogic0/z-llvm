@@ -874,6 +874,7 @@ boundary_probe=tmp/zig_ir/releasesmall_exclusion_emit_llvm_no_bin_20260531/ir to
 tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll
 reduced_closed_shape=@strFromFloatHelp -> @main.strFromFloatHelp selected double bitcast/exponent branch prologue
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
+whole_function_boundary_inventory=@main.strFromFloatHelp spans lines 37-670 in the tracked fixture before helper callees; missing helper families include stack lifetime/alloca, pow5 table loads, i128 arithmetic, decimal loop CFG, memset/memcpy, fastcc helper calls, and writer-vtable indirect calls
 closed_blocker=standalone_extern_exports.zig.ReleaseSmall.x86_64.optimized.ll selected @getHidden/@updateHidden hidden i32 global access
 intermediate_adjusted_object_probe=460 ok, 4 fail, 1 excluded with --input-limit=67108864
 closed_blocker=standalone_install_raw_hex_main.zig.ReleaseSmall.x86_64.optimized.ll selected @_start -> @main._start two-block infinite loop
@@ -893,7 +894,7 @@ tracked_boundary_fixture=test/distribution/releasesmall_x86_64/exclusions/standa
 focused_boundary_gate=zig build distribution-releasesmall-boundary
 whole_function_boundary_inventory=@decode_base_64 -> @base64.decode_base_64 full textual IR body registered as releasesmall_runtime_base64_decode_base_64_full
 whole_function_boundary_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_base_64_full
-whole_function_boundary_status=started; current backend path is a selected boundary stub, not promoted whole-function closure
+whole_function_boundary_status=started; external IR-writer @main now validates TWFu -> Man length/bytes through the selected decoder boundary; current backend path is still selected boundary, not promoted whole-function closure
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected four-entry decode table load/OR/validity step
 reduced_closed_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_step
 reduced_closed_shape=@decode_base_64 -> @base64.decode_base_64 selected output pointer store step

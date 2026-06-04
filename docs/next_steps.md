@@ -68,9 +68,25 @@ The new `releasesmall_runtime_base64_decode_base_64_full` row starts the
 whole-function ReleaseSmall boundary milestone by emitting a full
 `@base64.decode_base_64` textual IR body with named blocks, loop phis,
 source/table loads, byte masks, shifts, truncation, output stores, and pointer
-index advancement. Its current backend path is deliberately recorded as a
-selected boundary stub; the row is not yet promoted from reduced boundary
+index advancement. Its `@main` now performs stable executable validation for
+the known input `TWFu`, checks the decoded length `3`, and checks output bytes
+`M`, `a`, `n`. The backend still handles the decoder itself through the
+selected boundary path, so the row is not yet promoted from reduced boundary
 evidence to whole-function closure.
+
+`strFromFloatHelp` full-function inventory has started from
+`test/distribution/releasesmall_x86_64/exclusions/standalone_emit_llvm_no_bin_str_from_float_help.ll`.
+The tracked helper is 1005 lines overall, with `@main.strFromFloatHelp`
+running from line 37 through line 670 before the helper callees. The full
+function has the initial double bitcast/exponent branch, pow5/inv-pow5 table
+paths, `fmt.float.mulShift64` calls, multiple-of-power-of-5 calls, decimal
+length/write loops, fixed/scientific formatting branches, writer buffer
+copies, and final buffer-print writer dispatch. The next missing writer and
+lowering helper families are stack slots/alloca lifetime markers, structured
+loop-header/latch emission for the decimal loops, vector `<2 x i64>` table
+loads/stores, `i128` arithmetic/truncation, `llvm.assume`,
+`llvm.memcpy`/`llvm.memset`, fastcc helper calls with pointer arguments, and
+indirect writer-vtable calls.
 The completed `releasefast_runtime_pointer_load_store` row is paired with
 `pointers_memory.load_store(p: *i32, q: *i32) i32` from
 `test/zig/inputs/pointers_memory.zig`, which exercises a pointer load, integer
