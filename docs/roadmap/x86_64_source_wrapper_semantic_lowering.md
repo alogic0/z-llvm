@@ -25,8 +25,9 @@ source_wrappers=49
 structured_direct_rows=49
 case_id_rows=0
 generic_codegen_rows=49
-manifest_structured_rows=28
-semantic_lowering_rows=21
+manifest_structured_rows=0
+semantic_record_rows=48
+external_writer_delegate_rows=1
 case_specific_rows=0
 fallback_rows=0
 local_fail=0
@@ -56,6 +57,8 @@ linker=zig-native-fno-lld
 gate=zig build distribution-x86_64-release-source-owned
 release_source_rows=90
 source_wrapper_rows=90
+semantic_record_rows=90
+external_writer_delegate_rows=0
 semantic_lowering_rows=90
 manifest_structured_rows=0
 case_id_rows=0
@@ -97,10 +100,10 @@ families before building structured IR in the source-owned gate:
 - ReleaseSmall mixed C/Zig/i64 boundary rows
 - full base64, reduced base64 slices, and `strFromFloatHelp`
 
-The narrower source-wrapper compatibility gate still reports 21 semantic rows
-and 28 manifest rows because it deliberately omits source fixture/tag metadata.
-The source-owned gate is the stronger current claim for release source-backed
-ownership.
+The narrower source-wrapper compatibility gate now reports 48 semantic-record
+rows and one external writer delegate because it deliberately omits source
+fixture/tag metadata. The source-owned gate is the stronger current claim for
+release source-backed ownership, and it requires `external_writer_delegate_rows=0`.
 
 ## Boundary
 

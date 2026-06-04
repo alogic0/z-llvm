@@ -12,6 +12,7 @@ zig build zig-corpus
 zig build handoff
 zig build generated-scalar-diff
 zig build distribution-x86_64-selected-zllvm
+zig build distribution-x86_64-release-source-owned
 zig build distribution-zig-source-structured-direct
 zig build readiness
 ```
@@ -31,7 +32,8 @@ command, and captured IR path for each Zig-emitted fixture.
 | Backend handoff | Tiny x86_64 Machine IR, asm/object smoke checks | Validation-only, not a backend replacement |
 | Selected distribution replacement gate | `distribution-x86_64-selected-zllvm` proves 146 selected x86_64 release-mode structured-direct IR-writer rows, with 146/146 rows on generic x86_64 lowering, no textual boundary rows, no libLLVM module parse/print, no LLVM optimizer, no LLVM TargetMachine object emission, and Zig native `-fno-lld` linking | Selected release rows only; normal Zig/libLLVM fallback remains when env vars are unset |
 | Broad source-backed structured gate | `distribution-x86_64-source-backed-structured` discovers 55 x86_64 release `.ll` fixtures and proves all 55 accepted fixture families as 90 structured-direct/generic-codegen rows, with `skipped_with_reason=0`, `fallback_rows=0`, no textual LLVM parse fallback, no LLVM optimizer, no LLVM TargetMachine, z_llvm object emission, and Zig native linker handoff | ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 fixture inventory only; future fixture expansion must fail closed on the first unsupported class |
-| Source-wrapper and semantic lowering gate | `distribution-zig-source-structured-direct` proves 49 selected x86_64 release Zig source wrappers without case-id dispatch ownership: `source_wrappers=49`, `case_id_rows=0`, `structured_direct_rows=49`, `generic_codegen_rows=49`, `fallback_rows=0`. Within that gate, 21 rows lower Zig-level semantic records through `src/zig_semantic_lowering.zig`; 28 remain manifest-structured rows. | Unambiguous wrapper/mode subset only; this is not full Zig Sema/AIR/Liveness replacement |
+| Source-owned semantic record gate | `distribution-x86_64-release-source-owned` proves the current 90-row x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall source-backed inventory from wrapper/source metadata without `ZLLVM_CASE_ID` ownership: `release_source_rows=90`, `source_wrapper_rows=90`, `semantic_record_rows=90`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`. | Current release source-backed inventory only; rows are semantic records feeding structured IR, not full Zig Sema/AIR/Liveness replacement |
+| Source-wrapper compatibility gate | `distribution-zig-source-structured-direct` proves 49 selected x86_64 release Zig source wrappers without case-id dispatch ownership: `source_wrappers=49`, `case_id_rows=0`, `structured_direct_rows=49`, `generic_codegen_rows=49`, `fallback_rows=0`. Within that gate, 48 rows lower semantic records through `src/zig_semantic_lowering.zig`; one compatibility row remains an external writer delegate. | Unambiguous wrapper/mode subset only; weaker than the source-owned release gate |
 | Differential testing | Generated scalar diff runner plus fail-closed negative generation | Regression infrastructure input |
 
 ## External Experiment Boundary
@@ -61,7 +63,7 @@ source-backed Zig-emitted IR corpus manifest
 fixture metadata separating opt-equivalent from local-conservative behavior
 MemorySSA/alias legality lessons for avoiding unsafe load CSE/GVN
 AIR/liveness handoff matrix separating LLVM facts from Zig-native concepts
-source-wrapper dispatch and semantic-record lowering ladder for selected rows
+source-wrapper dispatch and source-owned semantic-record lowering ladder for selected rows
 readiness check script that reproduces current claims
 ```
 

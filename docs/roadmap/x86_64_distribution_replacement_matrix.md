@@ -236,6 +236,8 @@ target=x86_64
 modes=ReleaseFast,ReleaseSafe,ReleaseSmall
 release_source_rows=90
 source_wrapper_rows=90
+semantic_record_rows=90
+external_writer_delegate_rows=0
 semantic_lowering_rows=90
 manifest_structured_rows=0
 case_id_rows=0
@@ -251,7 +253,9 @@ ownership=llvm-module=not-used;llvm-optimizer=not-used;
 This supersedes the older claim shape for the current release source-backed
 inventory: rows are selected from Zig wrapper/source metadata, including source
 fixture and source-backed tag disambiguation for wrapper/mode collisions, then
-lowered through `src/zig_semantic_lowering.zig` into structured-direct IR.
+lowered through real records in `src/zig_semantic_lowering.zig` into
+structured-direct IR. The source-owned gate fails if any row delegates back to
+the external writer body path.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
@@ -455,7 +459,8 @@ construction_split=structured_direct_rows=146 structured_textual_rows=0
                    textual_boundary_rows=0
 codegen_split=generic_codegen_rows=146 case_specific_codegen_rows=0
               textual_boundary_rows_out_of_scope=0
-lowering_split=semantic_lowering_rows=43 manifest_structured_rows=103
+lowering_split=semantic_record_rows=136 external_writer_delegate_rows=10
+               manifest_structured_rows=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
@@ -498,7 +503,8 @@ source_wrapper_claim=selected Zig source-wrapper dispatch without case-id
                      ownership for the unambiguous wrapper/mode subset
 source_wrapper_rows=source_wrappers=49 structured_direct_rows=49
                     case_id_rows=0 generic_codegen_rows=49
-                    manifest_structured_rows=28 semantic_lowering_rows=21
+                    manifest_structured_rows=0 semantic_record_rows=48
+                    external_writer_delegate_rows=1
                     case_specific_rows=0 fallback_rows=0 local_fail=0
 semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;

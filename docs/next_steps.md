@@ -58,9 +58,10 @@ current source-backed inventory. Patched Zig still passes wrapper path, optimize
 mode, target, output path, and marker path; the runner also passes source
 fixture metadata and the source-backed tag used to disambiguate wrapper/mode
 collisions. z_llvm resolves the row from that source metadata, not from
-`ZLLVM_CASE_ID`, and every accepted row reports semantic lowering through
-`src/zig_semantic_lowering.zig` into structured-direct IR. Current measured
-output is `release_source_rows=90`, `source_wrapper_rows=90`,
+`ZLLVM_CASE_ID`, and every accepted row reports semantic lowering through real
+records in `src/zig_semantic_lowering.zig` into structured-direct IR. Current
+measured output is `release_source_rows=90`, `source_wrapper_rows=90`,
+`semantic_record_rows=90`, `external_writer_delegate_rows=0`,
 `semantic_lowering_rows=90`, `manifest_structured_rows=0`,
 `case_id_rows=0`, `structured_direct_rows=90`,
 `generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`.
@@ -94,9 +95,9 @@ Patched Zig passes wrapper path, optimize mode, target, output path, and marker
 path; z_llvm resolves the structured module from wrapper/source metadata for
 the unambiguous wrapper/mode subset. Current measured output is
 `source_wrappers=49`, `structured_direct_rows=49`, `case_id_rows=0`,
-`generic_codegen_rows=49`, `manifest_structured_rows=28`,
-`semantic_lowering_rows=21`, `case_specific_rows=0`, `fallback_rows=0`, and
-`local_fail=0`.
+`generic_codegen_rows=49`, `manifest_structured_rows=0`,
+`semantic_record_rows=48`, `external_writer_delegate_rows=1`,
+`case_specific_rows=0`, `fallback_rows=0`, and `local_fail=0`.
 
 Ownership ladder:
 The current replacement evidence is split into four explicit rungs:
@@ -104,10 +105,11 @@ selected case-id registry proof, broad source-backed structured proof,
 source-wrapper compatibility proof, and source-owned semantic proof. The
 source-owned rung is now strongest: all 90 current source-backed release rows
 are selected from wrapper/fixture/tag metadata and report
-`lowering=zig-semantic-records`, with no manifest-shaped structured rows in
-that gate. The narrower source-wrapper compatibility gate remains at
-21 semantic rows and 28 manifest rows because it intentionally covers only
-unambiguous wrapper/mode inputs. The detailed milestone is recorded in
+`lowering=zig-semantic-records`, with `semantic_record_rows=90`,
+`external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
+that gate. The narrower source-wrapper compatibility gate now has 48 semantic
+record rows and one external writer delegate because it intentionally covers
+only unambiguous wrapper/mode inputs. The detailed milestone is recorded in
 `docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`.
 
 Next target:

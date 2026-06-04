@@ -44,9 +44,9 @@ Source-wrapper structured-direct gate:
 
 ```text
 zig build distribution-zig-source-structured-direct
-summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers=49 structured_direct_rows=49 case_id_rows=0 generic_codegen_rows=49 manifest_structured_rows=28 semantic_lowering_rows=21 case_specific_rows=0 fallback_rows=0 local_fail=0
-summary zig-integrated-object pipeline=preopt ir_writer=true total=49 executable_ok=49 link_only_ok=0 scalar_runtime_rows=49 structured_builder_rows=49 textual_subset_rows=0 structured_direct_rows=49 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=49 case_specific_codegen_rows=0 manifest_structured_rows=28 semantic_lowering_rows=21 minimal_wrapper_rows=0 local_fail=0
-lowering-summary manifest-structured:28;zig-semantic-records:21
+summary source-wrapper-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_wrappers=49 structured_direct_rows=49 case_id_rows=0 generic_codegen_rows=49 manifest_structured_rows=0 semantic_lowering_rows=48 semantic_record_rows=48 external_writer_delegate_rows=1 case_specific_rows=0 fallback_rows=0 local_fail=0
+summary zig-integrated-object pipeline=preopt ir_writer=true total=49 executable_ok=49 link_only_ok=0 scalar_runtime_rows=49 structured_builder_rows=49 textual_subset_rows=0 structured_direct_rows=49 structured_textual_rows=0 textual_boundary_rows=0 generic_codegen_rows=49 case_specific_codegen_rows=0 manifest_structured_rows=0 semantic_lowering_rows=48 semantic_record_rows=48 external_writer_delegate_rows=1 minimal_wrapper_rows=0 local_fail=0
+lowering-summary manifest-structured:0;zig-semantic-records:48;external-writer-delegate:1
 ```
 
 Every accepted broad row must report

@@ -49,9 +49,9 @@ ZLLVM_IR_WRITER_DISPATCH=source-wrapper
 ```
 
 That gate fails if any row reports `case_id_rows != 0`, fallback ownership,
-textual LLVM parsing, non-generic codegen, or missing semantic/manifest
-lowering accounting. It currently reports `source_wrappers=49`,
-`semantic_lowering_rows=21`, and `manifest_structured_rows=28`.
+textual LLVM parsing, non-generic codegen, or incomplete lowering accounting.
+It currently reports `source_wrappers=49`, `semantic_record_rows=48`,
+`external_writer_delegate_rows=1`, and `manifest_structured_rows=0`.
 
 The stronger source-owned release proof uses:
 
@@ -66,6 +66,7 @@ ZLLVM_SOURCE_TAG=<source-backed tag or ->
 That gate covers the full current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall
 source-backed inventory and fails unless it reports
 `release_source_rows=90`, `source_wrapper_rows=90`,
+`semantic_record_rows=90`, `external_writer_delegate_rows=0`,
 `semantic_lowering_rows=90`, `manifest_structured_rows=0`,
 `case_id_rows=0`, `structured_direct_rows=90`,
 `generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`.

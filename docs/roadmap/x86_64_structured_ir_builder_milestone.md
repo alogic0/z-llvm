@@ -17,8 +17,9 @@ structured_textual_rows=0
 textual_boundary_rows=0
 generic_codegen_rows=146
 case_specific_codegen_rows=0
-manifest_structured_rows=103
-semantic_lowering_rows=43
+manifest_structured_rows=0
+semantic_record_rows=136
+external_writer_delegate_rows=10
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
@@ -85,17 +86,18 @@ replacement, or target-complete object coverage.
 
 The next ownership rung is tracked separately in
 `docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`. The selected
-146-row gate now reports `semantic_lowering_rows=43` and
-`manifest_structured_rows=103`; the source-wrapper gate reports
-`semantic_lowering_rows=21` and `manifest_structured_rows=28`. These semantic
-rows are still emitted through `src/structured_ir_builder.zig`; the improvement
-is that z_llvm now starts from small Zig-level semantic records for those
-families instead of manifest-shaped structured templates.
+146-row gate now reports `semantic_record_rows=136`,
+`external_writer_delegate_rows=10`, and `manifest_structured_rows=0`; the
+source-wrapper compatibility gate reports `semantic_record_rows=48`,
+`external_writer_delegate_rows=1`, and `manifest_structured_rows=0`. These
+semantic rows are still emitted through `src/structured_ir_builder.zig`; the
+improvement is that z_llvm now starts from small Zig-level semantic records for
+those families instead of manifest-shaped structured templates.
 
 The strongest current release-mode source-owned gate is
 `zig build distribution-x86_64-release-source-owned`. It keeps the broad
 90-row source-backed fixture inventory, resolves each row from wrapper,
 fixture, and source-tag metadata, and requires
-`semantic_lowering_rows=90`, `manifest_structured_rows=0`,
-`case_id_rows=0`, `structured_direct_rows=90`, and
-`generic_codegen_rows=90`.
+`semantic_record_rows=90`, `external_writer_delegate_rows=0`,
+`manifest_structured_rows=0`, `case_id_rows=0`,
+`structured_direct_rows=90`, and `generic_codegen_rows=90`.
