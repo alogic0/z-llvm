@@ -200,6 +200,7 @@ fn writeIrWriterModuleFromEnv(
     const surface = if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
     const textual_boundary_reason = if (ir_writer_case) |case| case.textual_boundary_reason else "minimal-ret0-fallback";
+    const codegen_ownership = if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
 
     var file = std.Io.Dir.cwd().createFile(io, ir_path, .{}) catch |err| {
         try fatal(io, "failed to create external IR writer output {s}: {any}\n", .{ ir_path, err });
@@ -221,6 +222,7 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_textual_boundary_reason = "{s}"
         \\; zllvm_ir_writer_llvm_text_parse = "{s}"
         \\; zllvm_ir_writer_direct_module = "{s}"
+        \\; zllvm_ir_writer_codegen = "{s}"
         \\
     , .{
         wrapper,
@@ -231,6 +233,7 @@ fn writeIrWriterModuleFromEnv(
         textual_boundary_reason,
         if (is_structured_direct) "not-used" else "required-for-textual-boundary",
         if (is_structured_direct) "z_llvm-owned-internal-ir" else "not-used",
+        codegen_ownership,
     }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
@@ -371,6 +374,20 @@ const IrConstruction = enum {
         return switch (self) {
             .structured_builder => "ir-construction=zllvm-structured-builder",
             .textual_subset => "ir-construction=z_llvm-external-textual-subset",
+        };
+    }
+};
+
+const CodegenOwnership = enum {
+    generic,
+    case_specific,
+    textual_boundary,
+
+    fn marker(self: CodegenOwnership) []const u8 {
+        return switch (self) {
+            .generic => "codegen=generic-x86_64-lowering",
+            .case_specific => "codegen=case-specific-x86_64-lowering",
+            .textual_boundary => "codegen=out-of-scope-textual-boundary",
         };
     }
 };
@@ -527,6 +544,21 @@ fn findIrWriterCase(case_id: []const u8) ?IrWriterCase {
         if (std.mem.eql(u8, case.id, case_id)) return case;
     }
     return null;
+}
+
+fn codegenOwnershipForCase(case: IrWriterCase) CodegenOwnership {
+    if (case.construction != .structured_builder) return .textual_boundary;
+    if (isCaseSpecificCodegenSurface(case.surface)) return .case_specific;
+    return .generic;
+}
+
+fn isCaseSpecificCodegenSurface(surface: []const u8) bool {
+    return std.mem.eql(u8, surface, "aggregate-pair-abi") or
+        std.mem.eql(u8, surface, "void-noop-call") or
+        std.mem.eql(u8, surface, "hidden-global-access") or
+        std.mem.eql(u8, surface, "mixed-c-zig-add") or
+        std.mem.eql(u8, surface, "umul-fix-sat-i64") or
+        std.mem.eql(u8, surface, "inherit-i64-return");
 }
 
 fn writeTinyScalarIrWriterBody(

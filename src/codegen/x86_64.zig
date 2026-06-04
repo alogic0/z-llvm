@@ -979,12 +979,7 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeAggregatePairMakePairReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeAggregatePairPairFirstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeFloatLessMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatMulPreoptMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatAddPreoptMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatSelectPreoptMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatSubPreoptMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeDoubleDivPreoptMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatRemPreoptMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerSelectedRuntimeFloatCallCompareMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeSideEffectFreeMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
@@ -4263,161 +4258,128 @@ fn lowerRuntimeFloatMulMainReturn(
     return true;
 }
 
-fn lowerRuntimeFloatMulPreoptMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .double, .value = .{ .fp_text = "3.000000e+00" } },
-        .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_float_mul_main.main",
-        "runtime_float_mul_main.floatMul",
-        .double,
-        &args,
-        .oeq,
-        "6.000000e+00",
-    );
-}
+const RuntimeFloatCallArgExpectation = struct {
+    ty: ir.Type,
+    value: union(enum) {
+        fp_text: []const u8,
+        int: i128,
+    },
+};
 
-fn lowerRuntimeFloatAddPreoptMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .float, .value = .{ .fp_text = "1.000000e+00" } },
-        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_float_add_main.main",
-        "runtime_float_add_main.floatAdd",
-        .float,
-        &args,
-        .oeq,
-        "3.000000e+00",
-    );
-}
+const RuntimeFloatCallCompareCase = struct {
+    function_name: []const u8,
+    callee_name: []const u8,
+    call_ret_ty: ir.Type,
+    args: []const RuntimeFloatCallArgExpectation,
+    fcmp_predicate: ir.FcmpPredicate,
+    fcmp_rhs: []const u8,
+};
 
-fn lowerRuntimeFloatSelectPreoptMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .double, .value = .{ .fp_text = "4.000000e+00" } },
-        .{ .ty = .double, .value = .{ .fp_text = "5.000000e+00" } },
-        .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_float_select_main.main",
-        "runtime_float_select_main.floatSelect",
-        .double,
-        &args,
-        .oeq,
-        "4.000000e+00",
-    );
-}
+const runtime_float_mul_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .double, .value = .{ .fp_text = "3.000000e+00" } },
+    .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
+};
 
-fn lowerRuntimeFloatSubPreoptMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .float, .value = .{ .fp_text = "5.000000e+00" } },
-        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_float_sub_main.main",
-        "runtime_float_sub_main.floatSub",
-        .float,
-        &args,
-        .oeq,
-        "3.000000e+00",
-    );
-}
+const runtime_float_add_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .float, .value = .{ .fp_text = "1.000000e+00" } },
+    .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
+};
 
-fn lowerRuntimeDoubleDivPreoptMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .double, .value = .{ .fp_text = "6.000000e+00" } },
-        .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_double_div_main.main",
-        "runtime_double_div_main.doubleDiv",
-        .double,
-        &args,
-        .oeq,
-        "3.000000e+00",
-    );
-}
+const runtime_float_select_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .double, .value = .{ .fp_text = "4.000000e+00" } },
+    .{ .ty = .double, .value = .{ .fp_text = "5.000000e+00" } },
+    .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } },
+};
 
-fn lowerRuntimeFloatRemPreoptMainReturn(
+const runtime_float_sub_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .float, .value = .{ .fp_text = "5.000000e+00" } },
+    .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
+};
+
+const runtime_double_div_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .double, .value = .{ .fp_text = "6.000000e+00" } },
+    .{ .ty = .double, .value = .{ .fp_text = "2.000000e+00" } },
+};
+
+const runtime_float_rem_compare_args = [_]RuntimeFloatCallArgExpectation{
+    .{ .ty = .float, .value = .{ .fp_text = "5.500000e+00" } },
+    .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
+};
+
+const runtime_float_call_compare_cases = [_]RuntimeFloatCallCompareCase{
+    .{
+        .function_name = "runtime_float_mul_main.main",
+        .callee_name = "runtime_float_mul_main.floatMul",
+        .call_ret_ty = .double,
+        .args = &runtime_float_mul_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "6.000000e+00",
+    },
+    .{
+        .function_name = "runtime_float_add_main.main",
+        .callee_name = "runtime_float_add_main.floatAdd",
+        .call_ret_ty = .float,
+        .args = &runtime_float_add_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "3.000000e+00",
+    },
+    .{
+        .function_name = "runtime_float_select_main.main",
+        .callee_name = "runtime_float_select_main.floatSelect",
+        .call_ret_ty = .double,
+        .args = &runtime_float_select_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "4.000000e+00",
+    },
+    .{
+        .function_name = "runtime_float_sub_main.main",
+        .callee_name = "runtime_float_sub_main.floatSub",
+        .call_ret_ty = .float,
+        .args = &runtime_float_sub_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "3.000000e+00",
+    },
+    .{
+        .function_name = "runtime_double_div_main.main",
+        .callee_name = "runtime_double_div_main.doubleDiv",
+        .call_ret_ty = .double,
+        .args = &runtime_double_div_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "3.000000e+00",
+    },
+    .{
+        .function_name = "runtime_float_rem_main.main",
+        .callee_name = "runtime_float_rem_main.floatRem",
+        .call_ret_ty = .float,
+        .args = &runtime_float_rem_compare_args,
+        .fcmp_predicate = .oeq,
+        .fcmp_rhs = "1.500000e+00",
+    },
+};
+
+fn lowerSelectedRuntimeFloatCallCompareMainReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    const args = [_]RuntimeFloatCallArgExpectation{
-        .{ .ty = .float, .value = .{ .fp_text = "5.500000e+00" } },
-        .{ .ty = .float, .value = .{ .fp_text = "2.000000e+00" } },
-    };
-    return lowerRuntimeFloatCallCompareMainReturn(
-        allocator,
-        machine,
-        function,
-        block,
-        ret,
-        "runtime_float_rem_main.main",
-        "runtime_float_rem_main.floatRem",
-        .float,
-        &args,
-        .oeq,
-        "1.500000e+00",
-    );
+    for (runtime_float_call_compare_cases) |case| {
+        if (try lowerRuntimeFloatCallCompareMainReturn(
+            allocator,
+            machine,
+            function,
+            block,
+            ret,
+            case.function_name,
+            case.callee_name,
+            case.call_ret_ty,
+            case.args,
+            case.fcmp_predicate,
+            case.fcmp_rhs,
+        )) return true;
+    }
+    return false;
 }
 
 fn lowerRuntimeSideEffectFreeMainReturn(
@@ -4448,14 +4410,6 @@ fn lowerRuntimeSideEffectFreeMainReturn(
     try machine.instructions.append(allocator, .ret);
     return true;
 }
-
-const RuntimeFloatCallArgExpectation = struct {
-    ty: ir.Type,
-    value: union(enum) {
-        fp_text: []const u8,
-        int: i128,
-    },
-};
 
 fn lowerRuntimeFloatCallCompareMainReturn(
     allocator: std.mem.Allocator,

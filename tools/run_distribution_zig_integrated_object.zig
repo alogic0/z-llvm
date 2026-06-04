@@ -1203,6 +1203,8 @@ pub fn main(init: std.process.Init) !void {
     var structured_textual_rows: usize = 0;
     var textual_boundary_rows: usize = 0;
     var textual_boundary_reason_missing_rows: usize = 0;
+    var generic_codegen_rows: usize = 0;
+    var case_specific_codegen_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1321,6 +1323,8 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(textual_boundary_reason);
         const llvm_text_parse = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_llvm_text_parse = \"", "zllvm_ir_writer_llvm_text_parse") else "-";
         defer if (use_ir_writer) allocator.free(llvm_text_parse);
+        const codegen_ownership = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_ir_writer_codegen = \"", "zllvm_ir_writer_codegen") else "-";
+        defer if (use_ir_writer) allocator.free(codegen_ownership);
         if (use_ir_writer) {
             countSurface(&surface_counters, surface);
             if (std.mem.eql(u8, surface, "minimal-ret0")) {
@@ -1332,6 +1336,13 @@ pub fn main(init: std.process.Init) !void {
                 structured_builder_rows += 1;
                 if (std.mem.eql(u8, llvm_text_parse, "not-used")) {
                     structured_direct_rows += 1;
+                    if (std.mem.eql(u8, codegen_ownership, "codegen=generic-x86_64-lowering")) {
+                        generic_codegen_rows += 1;
+                    } else if (std.mem.eql(u8, codegen_ownership, "codegen=case-specific-x86_64-lowering")) {
+                        case_specific_codegen_rows += 1;
+                    } else {
+                        try common.validationError(io, "external IR writer structured-direct row {s} reported unsupported codegen ownership: {s}\n", .{ case.id, codegen_ownership });
+                    }
                 } else {
                     structured_textual_rows += 1;
                 }
@@ -1355,8 +1366,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} textual_boundary_reason={s} ownership={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, textual_boundary_reason, ownershipProof(use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} construction={s} llvm_text_parse={s} codegen_ownership={s} textual_boundary_reason={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, construction, llvm_text_parse, codegen_ownership, textual_boundary_reason, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1377,11 +1388,15 @@ pub fn main(init: std.process.Init) !void {
         if (total == 136 and textual_boundary_rows != 32) {
             try common.validationError(io, "external IR writer selected rows must keep exactly 32 textual boundary rows at total=136; textual_boundary_rows={}\n", .{textual_boundary_rows});
         }
+        if (structured_direct_rows >= 100 and generic_codegen_rows < 75) {
+            try common.validationError(io, "external IR writer structured-direct rows must include at least 75 generic x86_64 codegen rows; generic_codegen_rows={}\n", .{generic_codegen_rows});
+        }
         try stdout_writer.interface.print(
-            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",
-            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, textual_boundary_reason_missing_rows, minimal_wrapper_rows },
+            "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} textual_boundary_reason_missing_rows={} minimal_wrapper_rows={} local_fail=0\n",
+            .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, textual_boundary_reason_missing_rows, minimal_wrapper_rows },
         );
         try stdout_writer.interface.print("ownership-summary structured-direct:{};structured-textual:{};textual-boundary:{};ir-construction=zllvm-structured-builder:{};ir-construction=z_llvm-external-textual-subset:{};llvm-text-parse=not-used-for-structured;{s}\n", .{ structured_direct_rows, structured_textual_rows, textual_boundary_rows, structured_builder_rows, textual_subset_rows, ownershipProof(use_ir_writer) });
+        try stdout_writer.interface.print("codegen-summary generic-codegen:{};case-specific-codegen:{};textual-boundary-out-of-scope:{}\n", .{ generic_codegen_rows, case_specific_codegen_rows, textual_boundary_rows });
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
             try stdout_writer.interface.print(" {s}={}", .{ counter.name, counter.count });
