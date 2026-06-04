@@ -41,10 +41,12 @@ checks and broader checked arithmetic variants.
 Selected IR-writer rows now print and enforce:
 `construction=ir-construction=zllvm-structured-builder` or
 `construction=ir-construction=z_llvm-external-textual-subset`, plus
+`llvm_text_parse=not-used` for structured rows and
 `ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
 The gate fails if a selected row reports libLLVM module parse/print,
 LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
-structured-builder count below 100, or a textual row without
+structured-direct count below 100, any structured row reports textual LLVM
+parsing, or a textual boundary row without
 `textual_boundary_reason`. This is a selected x86_64 release-row claim only;
 the normal Zig/libLLVM fallback still exists when the external writer env vars
 are unset.
@@ -52,7 +54,7 @@ are unset.
 Current distribution claim gate:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
-line with row counts, structured/textual construction counts,
+line with row counts, structured direct/textual boundary counts,
 `textual_boundary_reason_missing_rows`, `minimal-ret0`, ownership, and
 first-failure fields.
 Failure diagnostics and reproducibility inputs live in
@@ -878,11 +880,12 @@ ir writer    patched Zig build-obj -> external z_llvm IR writer subset
              tiny-scalar total=1 executable_ok=1 local_fail=0,
              scalar_runtime_rows=1 minimal_wrapper_rows=0
              full set total=136 executable_ok=136 link_only_ok=0 local_fail=0
-             scalar_runtime_rows=136 structured_builder_rows=104
-             textual_subset_rows=32 textual_boundary_reason_missing_rows=0
+             scalar_runtime_rows=136 structured_direct_rows=104
+             structured_textual_rows=0 textual_boundary_rows=32
+             textual_boundary_reason_missing_rows=0
              minimal_wrapper_rows=0
-             construction=ir-construction=zllvm-structured-builder:104;
-                          ir-construction=z_llvm-external-textual-subset:32
+             ownership=structured-direct:104; structured-textual:0;
+                       textual-boundary:32
              ownership=llvm-module=not-used; llvm-optimizer=not-used;
                        llvm-targetmachine=not-used; object-emission=z_llvm;
                        linker=zig-native-fno-lld

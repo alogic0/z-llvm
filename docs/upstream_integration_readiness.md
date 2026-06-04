@@ -28,7 +28,7 @@ command, and captured IR path for each Zig-emitted fixture.
 | Loop optimizer | LoopInfo, simple LCSSA helper, scalar LICM, loop placeholders | AIR/liveness loop optimization study |
 | Metadata and mode handling | Debug/profile/module flags, attributes, ReleaseSmall, target features preserved opaquely | Mode and metadata preservation input |
 | Backend handoff | Tiny x86_64 Machine IR, asm/object smoke checks | Validation-only, not a backend replacement |
-| Selected distribution replacement gate | `distribution-x86_64-selected-zllvm` proves selected x86_64 release-mode external textual IR-writer rows with no libLLVM module parse/print, no LLVM optimizer, no LLVM TargetMachine object emission, and Zig native `-fno-lld` linking | Selected release rows only; normal Zig/libLLVM fallback remains when env vars are unset |
+| Selected distribution replacement gate | `distribution-x86_64-selected-zllvm` proves selected x86_64 release-mode structured-direct IR-writer rows plus explicit textual boundary rows with no libLLVM module parse/print for structured rows, no LLVM optimizer, no LLVM TargetMachine object emission, and Zig native `-fno-lld` linking | Selected release rows only; normal Zig/libLLVM fallback remains when env vars are unset |
 | Differential testing | Generated scalar diff runner plus fail-closed negative generation | Regression infrastructure input |
 
 ## External Experiment Boundary

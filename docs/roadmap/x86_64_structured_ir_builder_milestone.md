@@ -2,7 +2,10 @@
 
 This milestone adds `src/structured_ir_builder.zig` and moves a measured subset
 of selected x86_64 release IR-writer rows from handwritten body strings to a
-local structured construction API that prints LLVM-compatible textual IR.
+local structured construction API. The current follow-on step builds those
+structured rows as z_llvm-owned internal IR modules directly, bypassing textual
+LLVM IR serialization/parsing for structured rows; the remaining textual rows
+are explicit boundary rows.
 
 ## Measured Gate
 
@@ -10,7 +13,9 @@ local structured construction API that prints LLVM-compatible textual IR.
 gate=zig build distribution-zig-ir-writer
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
 structured_builder_rows=104
-textual_subset_rows=32
+structured_direct_rows=104
+structured_textual_rows=0
+textual_boundary_rows=32
 textual_boundary_reason_missing_rows=0
 minimal-ret0=0
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
@@ -18,9 +23,11 @@ ownership=llvm-module=not-used; llvm-optimizer=not-used;
           linker=zig-native-fno-lld
 ```
 
-The full selected gate fails if `structured_builder_rows < 100`, any textual
-row lacks `textual_boundary_reason`, any selected row reports `minimal-ret0`, any selected row reports libLLVM module
-parse/print, or any selected row reports LLVM TargetMachine object emission.
+The full selected gate fails if `structured_direct_rows < 100`, any structured
+row reports textual LLVM parsing, any textual boundary row lacks
+`textual_boundary_reason`, any selected row reports `minimal-ret0`, any
+selected row reports libLLVM module parse/print, or any selected row reports
+LLVM TargetMachine object emission.
 
 ## Converted Rows
 
@@ -150,7 +157,7 @@ and branch panic-edge rows.
 
 ## Remaining Textual Rows
 
-The 32 textual-subset rows remain valid selected evidence, and every one now
+The 32 textual boundary rows remain valid selected evidence, and every one now
 emits a `textual_boundary_reason` so the compact gate can distinguish intended
 boundaries from accidental fallback. Current textual reasons are:
 

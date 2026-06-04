@@ -25,8 +25,8 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-zig-integrated-object` | Run the patched-Zig integrated postopt object-emission gate. Patched stage4 Zig `build-obj` lets LLVM run Zig's normal module optimization pipeline, writes optimized IR at the object boundary, invokes `z_llvm --emit=obj`, records a hook marker, then `zig build-exe -fno-lld -fno-compiler-rt -lc` links paired C ABI wrapper objects. Use when validating the experimental postopt replacement hook in `../ziglang`. |
 | `zig build distribution-zig-integrated-preopt` | Run the patched-Zig integrated preopt gate. Patched stage4 Zig writes pre-optimization LLVM IR before `module_pm.run(...)`, invokes `z_llvm --passes=<accepted Zig-mode pipeline>` and then `z_llvm --emit=obj`, records mode/case/wrapper marker metadata, and links with Zig's native linker. Use `zig build distribution-zig-integrated-preopt -- --mode=ReleaseFast` for the narrow first-pass gate. |
 | `zig build distribution-zig-ir-writer-tiny-scalar` | Run the first external z_llvm textual IR writer proof for `releasefast_tiny_scalar`. Patched stage4 Zig uses `ZIG_USE_ZLLVM_IR_WRITER=1` with `ZLLVM_IR_WRITER_MODE=external`, calls `z_llvm --emit=ir-writer` to write `scalar-add-ret` IR, then runs the existing preopt `z_llvm` optimizer/object path and Zig native linker. The executable exits 42. |
-| `zig build distribution-zig-ir-writer` | Run the selected 136-row external z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 136 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, construction ownership counts, textual-boundary reason accounting, and downstream ownership summary, fails on unexpected `minimal-ret0`, fails if the full selected gate has fewer than 100 structured-builder rows, fails if a textual row lacks `textual_boundary_reason`, and fails selected rows that report libLLVM module parse/print or LLVM TargetMachine fallback. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
-| `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected external IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, structured/textual construction counts, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
+| `zig build distribution-zig-ir-writer` | Run the selected 136-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 136 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct/textual-boundary ownership counts, textual-boundary reason accounting, and downstream ownership summary, fails on unexpected `minimal-ret0`, fails if the full selected gate has fewer than 100 structured-direct rows, fails if any structured row uses textual LLVM parsing, fails if a textual boundary row lacks `textual_boundary_reason`, and fails selected rows that report libLLVM module parse/print or LLVM TargetMachine fallback. Structured rows build z_llvm-owned internal IR modules directly; textual boundary rows remain explicit. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
+| `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, `structured_direct_rows`, `structured_textual_rows`, `textual_boundary_rows`, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
 | `zig build probe-native-linker-broad -- --mode=ReleaseFast\|ReleaseSafe\|ReleaseSmall\|Debug` | Probe broad optimized IR/input directories for link-only acceptance through Zig's native linker. This emits local `.o` files with `z_llvm`, generates safe stubs only for unresolved function symbols, links with `zig build-exe -fno-lld`, and records link-only counts separately from executable ABI proof. |
 | `zig build distribution-native-link-boundary2` | Run the broad x86_64 native-link boundary gate for ReleaseFast, ReleaseSafe, ReleaseSmall, and Debug. This fails on any unclassified local object/link failure or generic `runtime-symbol` bucket, while accepting explicitly classified Zig runtime, TLS, compiler-rt/libc, or boundary-excluded rows. |
@@ -61,22 +61,25 @@ The 136-row full gate includes the original selected runtime rows plus 48
 `releasefast_source_*` / `releasesafe_source_*` / `releasesmall_source_*`
 rows backed by captured release-mode x86_64 fixtures. Those source rows
 intentionally reuse existing surface names and helper-backed writer bodies.
-As of the structured-builder milestone, the measured construction split is 104
-rows built through `src/structured_ir_builder.zig` and 32 rows still built
-through the older external textual-subset helpers. The full gate enforces
-`structured_builder_rows >= 100`, `textual_boundary_reason_missing_rows=0`, `minimal-ret0=0`, no libLLVM module
-parse/print fallback, and no LLVM TargetMachine object-emission fallback.
+As of the structured-direct milestone, the measured construction split is 104
+rows built through `src/structured_ir_builder.zig` into z_llvm-owned internal
+IR modules and 32 explicit textual boundary rows. The full gate enforces
+`structured_direct_rows >= 100`, `structured_textual_rows=0`,
+`textual_boundary_rows=32`, `textual_boundary_reason_missing_rows=0`,
+`minimal-ret0=0`, no libLLVM module parse/print fallback, and no LLVM
+TargetMachine object-emission fallback.
 
 Selected rows print:
 
 ```text
 construction=ir-construction=zllvm-structured-builder
+llvm_text_parse=not-used
 ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
 ```
 
-Rows that have not moved to the structured builder print
+Rows that remain textual boundaries print
 `construction=ir-construction=z_llvm-external-textual-subset` with the same
-downstream ownership marker.
+downstream ownership marker and a required `textual_boundary_reason`.
 
 CI/distribution runs should prefer the compact claim gate:
 

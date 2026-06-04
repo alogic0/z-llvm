@@ -589,8 +589,8 @@ ir-writer str from float:
                        zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_str_from_float_help
 ir-writer str from float:
                        total=1 executable_ok=1 link_only_ok=0 local_fail=0
-ir-writer full set:    scalar_runtime_rows=136 structured_builder_rows=104
-                       textual_subset_rows=32
+ir-writer full set:    scalar_runtime_rows=136 structured_direct_rows=104
+                       structured_textual_rows=0 textual_boundary_rows=32
                        textual_boundary_reason_missing_rows=0
                        minimal_wrapper_rows=0
 ir-writer surfaces:    scalar-add-ret=1 integer-arithmetic=3
@@ -727,11 +727,12 @@ selected.
 
 For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the selected
-LLVM IR module, then `z_llvm` performs the accepted Zig-mode optimization
-pipeline and emits the relocatable object, and Zig's native linker links the
-executable. The external writer now emits 136/136 selected rows as runtime
-surfaces with 104 rows constructed through `src/structured_ir_builder.zig` and
-32 rows remaining on the textual-subset helpers:
+LLVM IR module for textual boundary rows or a z_llvm-owned internal IR module
+for structured rows, then `z_llvm` emits the relocatable object, and Zig's
+native linker links the executable. The external writer now emits 136/136
+selected rows as runtime surfaces with 104 rows constructed directly through
+`src/structured_ir_builder.zig` and 32 rows remaining as explicit textual
+boundaries:
 `scalar-add-ret`, `integer-arithmetic`, `error-switch-select`, `direct-call`,
 `global-load`, `i64-arithmetic`, `i64-call-return`, `table-indexed-load`, and
 `checked-add-runtime-boundary`, plus `runtime-condbr` and
@@ -785,6 +786,7 @@ proofs. The per-row markers are:
 
 ```text
 construction=ir-construction=zllvm-structured-builder
+llvm_text_parse=not-used
 ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
 ```
 
@@ -793,9 +795,10 @@ Textual-subset rows print
 downstream ownership marker.
 
 LLVM's module optimization pipeline, LLVM TargetMachine codegen, and libLLVM
-bitcode parse/print of the selected object module are bypassed for those rows.
-The structured-builder milestone removes handwritten body ownership for 104
-selected rows but does not claim full Zig IR construction replacement.
+bitcode parse/print of the selected structured rows are bypassed. The
+structured-direct milestone removes handwritten body ownership and textual
+parse/print ownership for 104 selected rows but does not claim full Zig IR
+construction replacement.
 
 The case registry is now backed by reusable writer helpers in
 `src/ir_writer_helpers.zig`. Shared helpers cover function headers, named

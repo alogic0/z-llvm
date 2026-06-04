@@ -412,7 +412,7 @@ first_gate=zig build distribution-zig-ir-writer-tiny-scalar
 stage=external z_llvm IR writer, selected wrapper subset
 path=Zig build-obj -> patched Zig Object.emit validates external contract
      -> z_llvm --emit=ir-writer writes selected LLVM IR through either the
-        structured builder or the textual subset
+        structured direct builder or explicit textual boundary rows
      -> z_llvm --passes=<accepted Zig-mode pipeline>
      -> z_llvm --emit=obj
      -> zig build-exe -fno-lld
@@ -423,15 +423,19 @@ claim=selected wrapper objects bypass LLVM module optimization, LLVM
       normal Zig/libLLVM fallback remains available when env vars are unset
 construction=ir-construction=zllvm-structured-builder:104;
              ir-construction=z_llvm-external-textual-subset:32
+construction_split=structured_direct_rows=104 structured_textual_rows=0
+                   textual_boundary_rows=32
 ownership=llvm-module=not-used; llvm-optimizer=not-used;
           llvm-targetmachine=not-used; object-emission=z_llvm;
           linker=zig-native-fno-lld
 ownership_gate=selected IR-writer rows fail on libLLVM module parse/print,
                LLVM TargetMachine object emission fallback, minimal-ret0, or
-               full-gate structured-builder count below 100 or textual row without reason
+               full-gate structured-direct count below 100, structured textual
+               parsing, or textual boundary row without reason
 compact_output=selected-zllvm status=<ok|fail> total=<rows>
                executable_ok=<count> link_only_ok=<count>
-               structured_builder_rows=<count> textual_subset_rows=<count>
+               structured_direct_rows=<count> structured_textual_rows=<count>
+               textual_boundary_rows=<count>
                textual_boundary_reason_missing_rows=<count>
                minimal-ret0=<count>
                ownership=<marker> first_failure_case_id=<case-or-->
@@ -441,7 +445,8 @@ compact_output=selected-zllvm status=<ok|fail> total=<rows>
                first_failure_error=<error-or-->
 diagnostics=docs/x86_64_selected_zllvm_diagnostics.md
 total=136 executable_ok=136 link_only_ok=0 local_fail=0
-structured_builder_rows=104 textual_subset_rows=32 textual_boundary_reason_missing_rows=0 minimal-ret0=0
+structured_direct_rows=104 structured_textual_rows=0 textual_boundary_rows=32
+textual_boundary_reason_missing_rows=0 minimal-ret0=0
 structured_inventory=docs/roadmap/x86_64_structured_ir_builder_milestone.md
 first_gate_result=releasefast_tiny_scalar executable_ok=1 local_fail=0
 table_load_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_base64_table_lookup
@@ -523,8 +528,9 @@ releasesmall_base64_residual_final_mask_step_gate=zig build distribution-zig-ir-
 releasesmall_base64_residual_padding_loop_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_residual_padding_loop_step
 releasesmall_base64_decode_exit_step_gate=zig build distribution-zig-ir-writer -- --case=releasesmall_runtime_base64_decode_exit_step
 next_releasesmall_probe_gate=zig build distribution-releasesmall-object
-ir_writer_rows=scalar_runtime_rows=136, structured_builder_rows=104,
-               textual_subset_rows=32, textual_boundary_reason_missing_rows=0,
+ir_writer_rows=scalar_runtime_rows=136, structured_direct_rows=104,
+               structured_textual_rows=0, textual_boundary_rows=32,
+               textual_boundary_reason_missing_rows=0,
                minimal_wrapper_rows=0
 surface_counts=scalar-add-ret=2, integer-arithmetic=3,
                error-switch-select=4, direct-call=1, global-load=3,
