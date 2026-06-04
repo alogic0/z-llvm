@@ -1077,6 +1077,8 @@ pub fn main(init: std.process.Init) !void {
                 scalar_runtime_rows += 1;
             }
         }
+        const fallback = effectiveFallback(case, use_ir_writer);
+        if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface);
         try linkIntegratedObject(allocator, io, target, object, exe);
         if (case.validation == .executable) {
             try runExecutableCase(allocator, io, exe, case, use_ir_writer);
@@ -1085,8 +1087,8 @@ pub fn main(init: std.process.Init) !void {
             link_only_ok += 1;
         }
         try stdout_writer.interface.print(
-            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} ir_writer_surface={s}\n",
-            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), effectiveFallback(case, use_ir_writer), surface },
+            "ok zig-integrated-object {s} wrapper={s} covered_fixture={s} mode={s} proof=\"{s}\" validation={s} fallback={s} ownership={s} ir_writer_surface={s}\n",
+            .{ case.id, case.wrapper, case.covered_fixture, case.mode, effectiveProof(use_ir_writer), validationName(case.validation), fallback, ownershipProof(use_ir_writer), surface },
         );
         try stdout_writer.interface.flush();
     }
@@ -1099,6 +1101,7 @@ pub fn main(init: std.process.Init) !void {
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} minimal_wrapper_rows={} local_fail=0\n",
             .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, minimal_wrapper_rows },
         );
+        try stdout_writer.interface.print("ownership-summary {s}\n", .{ownershipProof(use_ir_writer)});
         try stdout_writer.interface.print("surface-counts", .{});
         for (surface_counters) |counter| {
             try stdout_writer.interface.print(" {s}={}", .{ counter.name, counter.count });
@@ -1304,8 +1307,28 @@ fn validationName(validation: Validation) []const u8 {
 }
 
 fn effectiveProof(use_ir_writer: bool) []const u8 {
-    if (use_ir_writer) return "integrated external z_llvm textual IR writer plus z_llvm optimizer/object path plus Zig build-exe native link";
+    if (use_ir_writer) return "integrated external z_llvm textual IR writer plus local z_llvm pipeline/object path plus Zig build-exe native link";
     return "integrated Zig build-obj object path plus Zig build-exe native link";
+}
+
+fn ownershipProof(use_ir_writer: bool) []const u8 {
+    if (use_ir_writer) return "ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld";
+    return "ir-construction=libLLVM;llvm-module=zig-owned;llvm-optimizer=zig-configured;llvm-targetmachine=not-used-by-z_llvm-object-hook;object-emission=z_llvm;linker=zig-native-fno-lld";
+}
+
+fn requireSelectedIrWriterOwnership(io: std.Io, case: Case, fallback: []const u8, surface: []const u8) !void {
+    if (std.mem.eql(u8, surface, "minimal-ret0")) {
+        try common.validationError(io, "external IR writer selected row {s} used minimal-ret0 instead of a runtime surface\n", .{case.id});
+    }
+    if (!std.mem.startsWith(u8, fallback, "ir-construction:z_llvm-external-textual-subset")) {
+        try common.validationError(io, "external IR writer selected row {s} reported non-external IR construction fallback: {s}\n", .{ case.id, fallback });
+    }
+    if (std.mem.indexOf(u8, fallback, "libLLVM") != null or
+        std.mem.indexOf(u8, fallback, "llvm-module") != null or
+        std.mem.indexOf(u8, fallback, "TargetMachine") != null)
+    {
+        try common.validationError(io, "external IR writer selected row {s} reported forbidden libLLVM ownership fallback: {s}\n", .{ case.id, fallback });
+    }
 }
 
 fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {

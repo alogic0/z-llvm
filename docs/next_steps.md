@@ -24,13 +24,27 @@ External IR-writer cases are registry-driven, and the selected writer helper
 layer now lives in `src/ir_writer_helpers.zig`. Reusable helpers cover function
 headers, named blocks, unconditional and conditional branches, two-input phis,
 loop headers/latches, GEP/load/store, table loads, pointer index advancement,
-byte masks, shifts, truncation, calls, lifetime intrinsics, memcpy/memset, and
-checked arithmetic panic-edge branches. Base64 full/reduced rows, selected
-loop/phi rows, ReleaseSafe checked loop edges, and float binary/check rows use
-the shared helpers. The remaining case-specific bodies are the larger
-semantic fixtures that still need exact one-off IR text: full
-`strFromFloatHelp`, complex aggregate/pointer checked rows, TLS/inline-asm
-boundaries, and ReleaseSmall mixed C/Zig runtime shapes.
+byte masks, shifts, truncation, calls, lifetime intrinsics, memcpy/memset,
+aggregate/global declarations, local-exec TLS globals/accesses, stack slots,
+inline-asm barrier calls, indirect writer calls, and checked arithmetic
+panic-edge branches. Base64 full/reduced rows, full `strFromFloatHelp`,
+selected loop/phi rows, ReleaseSafe checked loop edges, checked
+aggregate/pointer rows, TLS rows, inline-asm boundary rows, ReleaseSmall mixed
+C/Zig rows, and float binary/check rows use the shared helpers. Remaining
+intentionally case-specific bodies are exact semantic fixtures whose body shape
+is not duplicated elsewhere: base64's full decoder CFG, `strFromFloatHelp`'s
+decimal/pow-table semantics, aggregate ABI pair packing, atomics, packed bits,
+and optional/error-union scalar payload rows. Future helper candidates are
+bounded to repeated semantic families only, such as generic compare/select main
+checks and broader checked arithmetic variants.
+
+Selected IR-writer rows now print and enforce:
+`ownership=ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
+The gate fails if a selected row reports libLLVM module parse/print,
+libLLVM-backed IR construction, LLVM TargetMachine object emission, or a
+minimal wrapper surface. This is a selected x86_64 release-row claim only; the
+normal Zig/libLLVM fallback still exists when the external writer env vars are
+unset.
 
 Next target:
 Continue broadening source-backed x86_64 release-mode external IR-writer
@@ -834,6 +848,10 @@ ir writer    patched Zig build-obj -> external z_llvm textual IR subset
              scalar_runtime_rows=1 minimal_wrapper_rows=0
              full set total=106 executable_ok=106 link_only_ok=0 local_fail=0
              scalar_runtime_rows=106 minimal_wrapper_rows=0
+             ownership=ir-construction=z_llvm-external-textual-subset;
+                       llvm-module=not-used; llvm-optimizer=not-used;
+                       llvm-targetmachine=not-used; object-emission=z_llvm;
+                       linker=zig-native-fno-lld
              surface-counts scalar-add-ret=1 integer-arithmetic=3
              error-switch-select=2 direct-call=1 global-load=3
              i64-arithmetic=1 i64-call-return=1 table-indexed-load=1

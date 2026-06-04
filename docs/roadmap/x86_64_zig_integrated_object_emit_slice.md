@@ -669,14 +669,19 @@ final linker: Zig native linker/toolchain
 For `ZIG_USE_ZLLVM_IR_WRITER=1` selected rows:
 
 ```text
-still uses Zig LLVM Builder for general backend state: yes
-still serializes/parses/prints the Builder module through libLLVM for the
-selected emitted object module: no
-still uses LLVM module optimization pipeline: no
-still uses LLVM target-machine object emission: no
-still uses LLVM linker/LLD: no, final link uses Zig build-exe -fno-lld
-textual IR bodies owned by patched Zig: no, z_llvm owns --emit=ir-writer
+ir-construction=z_llvm-external-textual-subset
+llvm-module=not-used
+llvm-optimizer=not-used
+llvm-targetmachine=not-used
+object-emission=z_llvm
+linker=zig-native-fno-lld
 ```
+
+`zig build distribution-zig-ir-writer` now reports that ownership proof for
+each selected row and fails if a selected row falls back to libLLVM module
+parse/print, LLVM TargetMachine object emission, or a `minimal-ret0` surface.
+The normal Zig/libLLVM fallback remains available when the selected writer env
+vars are unset.
 
 The claim is intentionally x86_64-only and excludes AArch64, wasm, LTO, Debug
 expansion, Zig startup runtime replacement, compiler_rt sub-compilation
@@ -708,7 +713,8 @@ IR, `z_llvm` runs the selected local accepted Zig-mode pipeline and emits the
 relocatable object, and Zig's native linker links the executable. LLVM
 TargetMachine codegen and LLVM's module optimization pipeline are bypassed for
 those selected preopt rows. Zig still uses libLLVM to parse, hold, and print
-the LLVM module after Zig IR construction.
+the LLVM module after Zig IR construction when the external IR writer is not
+selected.
 
 For the selected `ZIG_USE_ZLLVM_IR_WRITER=1` rows, patched Zig validates the
 external contract and calls `z_llvm --emit=ir-writer` to write the textual LLVM
@@ -764,21 +770,30 @@ The external writer now emits 106/106 selected rows as runtime surfaces:
 `checked-struct-sum-boundary`, and `checked-slice-loop-sum-boundary`; no
 selected rows remain as
 `minimal-ret0` hook-only
-proofs. LLVM's module optimization pipeline, LLVM
-TargetMachine codegen, libLLVM bitcode parse/print of the selected object
-module, and patched-Zig ownership of case-specific IR text are bypassed for
-those rows.
+proofs. The per-row ownership marker is:
+
+```text
+ownership=ir-construction=z_llvm-external-textual-subset;llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld
+```
+
+LLVM's module optimization pipeline, LLVM TargetMachine codegen, libLLVM
+bitcode parse/print of the selected object module, and patched-Zig ownership of
+case-specific IR text are bypassed for those rows.
 
 The case registry is now backed by reusable writer helpers in
 `src/ir_writer_helpers.zig`. Shared helpers cover function headers, named
 blocks, unconditional and conditional branches, two-input phis, loop
-headers/latches, GEP/load/store, table loads, pointer index advancement, byte
-masks, shifts, truncation, calls, lifetime intrinsics, memcpy/memset, and
-checked arithmetic panic-edge branches. Base64 full/reduced rows, selected
-loop/phi rows, the ReleaseSafe checked loop edge, and float binary/check rows
-use that layer. The remaining case-specific writer bodies are the exact-shape
-fixtures for full `strFromFloatHelp`, larger aggregate/pointer checked rows,
-TLS/inline-asm boundaries, and ReleaseSmall mixed C/Zig runtime shapes.
+headers/latches, GEP/load/store, table loads, aggregate/global declarations,
+TLS globals/accesses, stack slots, inline asm calls, indirect/vtable calls,
+pointer index advancement, byte masks, shifts, truncation, calls, lifetime
+intrinsics, memcpy/memset, and checked arithmetic panic-edge branches. Base64
+full/reduced rows, selected loop/phi rows, the ReleaseSafe checked loop edge,
+checked aggregate/pointer rows, TLS rows, inline-asm boundary rows,
+ReleaseSmall mixed C/Zig rows, `strFromFloatHelp`, and float binary/check rows
+use that layer. The remaining case-specific code is intentionally limited to
+semantic fixture bodies whose exact shape is the evidence: base64 decoder CFG,
+`strFromFloatHelp` decimal/pow-table control flow, aggregate ABI packing,
+atomics, packed bits, and optional/error-union payload rows.
 The next milestone starts after that frozen 106-row claim: the
 `releasesmall_runtime_base64_decode_base_64_full` row registers a full
 `@base64.decode_base_64` textual IR body for ReleaseSmall whole-function
