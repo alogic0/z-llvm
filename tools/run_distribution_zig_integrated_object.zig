@@ -26,6 +26,31 @@ const SurfaceCounter = struct {
     count: usize = 0,
 };
 
+const release_fixture_roots = [_][]const u8{
+    "test/distribution/releasefast_x86_64/inputs",
+    "test/distribution/releasesafe_x86_64/inputs",
+    "test/distribution/releasesmall_x86_64/inputs",
+    "test/distribution/releasesmall_x86_64/exclusions",
+};
+
+const SourceFixtureSkip = struct {
+    path: []const u8,
+    reason: []const u8,
+};
+
+const source_fixture_skips = [_]SourceFixtureSkip{
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll", .reason = "address-space-start-trampoline" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll", .reason = "libc-getauxval-aggregate-startup-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll", .reason = "f128-sret-c-abi-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll", .reason = "logical-pointer-compile-error-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/export_keyword_vram_store.ll", .reason = "address-space-vram-store-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll", .reason = "unreachable-stub-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll", .reason = "raw-start-loop-entry-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll", .reason = "libfuzzer-futex-runtime-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll", .reason = "libfuzzer-vtable-name-boundary" },
+    .{ .path = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll", .reason = "libfuzzer-vtable-run-boundary" },
+};
+
 const cases = [_]Case{
     .{
         .id = "releasefast_tiny_scalar",
@@ -1128,6 +1153,7 @@ pub fn main(init: std.process.Init) !void {
     var mode_filter: ?[]const u8 = null;
     var case_filter: ?[]const u8 = null;
     var use_ir_writer = false;
+    var broad_source_backed = false;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--pipeline=postopt")) {
             pipeline = .postopt;
@@ -1135,6 +1161,10 @@ pub fn main(init: std.process.Init) !void {
             pipeline = .preopt;
         } else if (std.mem.eql(u8, arg, "--ir-writer")) {
             use_ir_writer = true;
+            pipeline = .preopt;
+        } else if (std.mem.eql(u8, arg, "--source-backed-broad")) {
+            use_ir_writer = true;
+            broad_source_backed = true;
             pipeline = .preopt;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
             mode_filter = arg["--mode=".len..];
@@ -1186,6 +1216,10 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    var skipped_with_reason: usize = 0;
+    if (broad_source_backed) {
+        skipped_with_reason = try validateBroadSourceBackedInventory(allocator, io, &stdout_writer.interface);
+    }
     try stdout_writer.interface.print(
         "zig-integrated-object target={s} pipeline={s} linker=zig build-exe -fno-lld hook={s} zllvm={s}\n",
         .{ target, pipelineName(pipeline), if (use_ir_writer) "ZIG_USE_ZLLVM_IR_WRITER" else "ZIG_USE_ZLLVM_OBJECT", zllvm_exe },
@@ -1204,6 +1238,8 @@ pub fn main(init: std.process.Init) !void {
     var textual_boundary_rows: usize = 0;
     var generic_codegen_rows: usize = 0;
     var case_specific_codegen_rows: usize = 0;
+    var source_backed_rows: usize = 0;
+    var fallback_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1292,6 +1328,7 @@ pub fn main(init: std.process.Init) !void {
         .{ .name = "minimal-ret0" },
     };
     for (cases) |case| {
+        if (broad_source_backed and !isReleaseDistributionFixture(case.covered_fixture)) continue;
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
         }
@@ -1300,6 +1337,7 @@ pub fn main(init: std.process.Init) !void {
         }
         try requirePairing(case);
         total += 1;
+        if (broad_source_backed) source_backed_rows += 1;
         const exe = try common.allocTempFile(allocator, temp, case.id, "_integrated");
         defer allocator.free(exe);
         const object = try common.allocTempFile(allocator, temp, case.id, ".o");
@@ -1351,6 +1389,9 @@ pub fn main(init: std.process.Init) !void {
             }
         }
         const fallback = effectiveFallback(case, use_ir_writer);
+        if (broad_source_backed and !std.mem.startsWith(u8, fallback, "ir-construction:zllvm-structured-builder")) {
+            fallback_rows += 1;
+        }
         if (use_ir_writer) try requireSelectedIrWriterOwnership(io, case, fallback, surface, construction);
         try linkIntegratedObject(allocator, io, target, object, exe, case);
         if (case.validation == .executable) {
@@ -1382,6 +1423,24 @@ pub fn main(init: std.process.Init) !void {
         if (total == 136 and (generic_codegen_rows != 136 or case_specific_codegen_rows != 0)) {
             try common.validationError(io, "external IR writer structured-direct rows must all use generic x86_64 codegen; structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={}\n", .{ structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows });
         }
+        if (broad_source_backed) {
+            if (source_backed_rows != total) {
+                try common.validationError(io, "broad source-backed gate row accounting mismatch: source_backed_rows={} total={}\n", .{ source_backed_rows, total });
+            }
+            if (source_backed_rows < 80) {
+                try common.validationError(io, "broad source-backed gate must keep the current 80 accepted source-backed rows; source_backed_rows={}\n", .{source_backed_rows});
+            }
+            if (structured_direct_rows != source_backed_rows or generic_codegen_rows != source_backed_rows) {
+                try common.validationError(io, "broad source-backed gate requires every accepted row to be structured-direct and generic; source_backed_rows={} structured_direct_rows={} generic_codegen_rows={}\n", .{ source_backed_rows, structured_direct_rows, generic_codegen_rows });
+            }
+            if (structured_textual_rows != 0 or textual_boundary_rows != 0 or textual_subset_rows != 0 or case_specific_codegen_rows != 0 or fallback_rows != 0) {
+                try common.validationError(io, "broad source-backed gate forbids fallback/textual/case-specific rows; structured_textual_rows={} textual_boundary_rows={} textual_subset_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ structured_textual_rows, textual_boundary_rows, textual_subset_rows, case_specific_codegen_rows, fallback_rows });
+            }
+            try stdout_writer.interface.print(
+                "summary source-backed-structured target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall source_backed_rows={} structured_direct_rows={} generic_codegen_rows={} skipped_with_reason={} fallback_rows={} local_fail=0\n",
+                .{ source_backed_rows, structured_direct_rows, generic_codegen_rows, skipped_with_reason, fallback_rows },
+            );
+        }
         try stdout_writer.interface.print(
             "summary zig-integrated-object pipeline={s} ir_writer={} total={} executable_ok={} link_only_ok={} scalar_runtime_rows={} structured_builder_rows={} textual_subset_rows={} structured_direct_rows={} structured_textual_rows={} textual_boundary_rows={} generic_codegen_rows={} case_specific_codegen_rows={} minimal_wrapper_rows={} local_fail=0\n",
             .{ pipelineName(pipeline), use_ir_writer, total, executable_ok, link_only_ok, scalar_runtime_rows, structured_builder_rows, textual_subset_rows, structured_direct_rows, structured_textual_rows, textual_boundary_rows, generic_codegen_rows, case_specific_codegen_rows, minimal_wrapper_rows },
@@ -1400,6 +1459,98 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     try stdout_writer.interface.flush();
+}
+
+fn validateBroadSourceBackedInventory(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    writer: *std.Io.Writer,
+) !usize {
+    var fixtures: std.ArrayList([]const u8) = .empty;
+    defer {
+        for (fixtures.items) |fixture| allocator.free(fixture);
+        fixtures.deinit(allocator);
+    }
+    try collectReleaseLlFixtures(allocator, io, &fixtures);
+    std.mem.sort([]const u8, fixtures.items, {}, stringLessThan);
+
+    var accepted_fixtures: usize = 0;
+    var skipped_with_reason: usize = 0;
+    for (fixtures.items) |fixture| {
+        if (hasAcceptedSourceBackedCaseForFixture(fixture)) {
+            accepted_fixtures += 1;
+            continue;
+        }
+        const reason = sourceFixtureSkipReason(fixture) orelse {
+            try common.validationError(io, "broad source-backed gate discovered unclassified release fixture: {s}\n", .{fixture});
+        };
+        skipped_with_reason += 1;
+        try writer.print("skip source-backed-fixture path={s} reason={s}\n", .{ fixture, reason });
+    }
+    for (source_fixture_skips) |skip| {
+        if (!fixtureWasDiscovered(fixtures.items, skip.path)) {
+            try common.validationError(io, "broad source-backed gate skip entry does not match a discovered release fixture: {s}\n", .{skip.path});
+        }
+    }
+    try writer.print(
+        "source-backed-inventory target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall discovered_fixtures={} accepted_fixtures={} skipped_with_reason={}\n",
+        .{ fixtures.items.len, accepted_fixtures, skipped_with_reason },
+    );
+    try writer.flush();
+    return skipped_with_reason;
+}
+
+fn collectReleaseLlFixtures(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    fixtures: *std.ArrayList([]const u8),
+) !void {
+    for (release_fixture_roots) |root| {
+        var root_dir = try std.Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
+        defer root_dir.close(io);
+
+        var walker = try root_dir.walk(allocator);
+        defer walker.deinit();
+        while (try walker.next(io)) |entry| {
+            if (entry.kind != .file) continue;
+            if (!std.mem.endsWith(u8, entry.path, ".ll")) continue;
+            try fixtures.append(allocator, try std.fmt.allocPrint(allocator, "{s}/{s}", .{ root, entry.path }));
+        }
+    }
+}
+
+fn hasAcceptedSourceBackedCaseForFixture(path: []const u8) bool {
+    for (cases) |case| {
+        if (!isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (std.mem.eql(u8, case.covered_fixture, path)) return true;
+    }
+    return false;
+}
+
+fn fixtureWasDiscovered(fixtures: []const []const u8, path: []const u8) bool {
+    for (fixtures) |fixture| {
+        if (std.mem.eql(u8, fixture, path)) return true;
+    }
+    return false;
+}
+
+fn sourceFixtureSkipReason(path: []const u8) ?[]const u8 {
+    for (source_fixture_skips) |skip| {
+        if (std.mem.eql(u8, skip.path, path)) return skip.reason;
+    }
+    return null;
+}
+
+fn isReleaseDistributionFixture(path: []const u8) bool {
+    if (!std.mem.startsWith(u8, path, "test/distribution/")) return false;
+    if (!std.mem.endsWith(u8, path, ".ll")) return false;
+    return std.mem.indexOf(u8, path, "releasefast_x86_64/") != null or
+        std.mem.indexOf(u8, path, "releasesafe_x86_64/") != null or
+        std.mem.indexOf(u8, path, "releasesmall_x86_64/") != null;
+}
+
+fn stringLessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
+    return std.mem.lessThan(u8, lhs, rhs);
 }
 
 fn countSurface(counters: []SurfaceCounter, surface: []const u8) void {
