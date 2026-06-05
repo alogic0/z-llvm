@@ -62,8 +62,9 @@ metadata, not from `ZLLVM_CASE_ID` or the temporary compatibility oracle, and
 every accepted row reports descriptor-v2 semantic lowering into
 structured-direct IR. Current measured output is `release_source_rows=90`,
 `source_wrapper_rows=90`, `descriptor_owned_rows=90`,
-`descriptor_v2_rows=90`, `manual_fixture_dispatch_rows=0`,
-`legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
+`descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
+`surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
+`manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=90`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and
@@ -119,8 +120,9 @@ source-owned rung is now strongest: all 90 current source-backed release rows
 are selected from wrapper/fixture/tag metadata into z_llvm DescriptorV2
 programs and report `lowering=semantic-descriptor-v2`, with
 `descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
-`manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`,
-`semantic_record_rows=0`, `surface_dispatch_rows=0`,
+`real_descriptor_program_rows=90`, `surface_to_body_adapter_rows=0`,
+`canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
+`legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
 that gate. The narrower source-wrapper
 compatibility gate now has 48 semantic record rows and one external writer

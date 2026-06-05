@@ -12,10 +12,11 @@ subset:
 3. Source-owned release proof: the full current 90-row source-backed release
    inventory is selected from wrapper, fixture, and source-tag metadata, not
    from case-id ownership.
-4. Semantic lowering proof: source-owned rows lower Zig-level semantic records
-   through `src/zig_semantic_lowering.zig` into
-   `src/structured_ir_builder.zig`, instead of reporting manifest-shaped
-   structured templates.
+4. DescriptorV2 semantic proof: source-owned rows lower real typed
+   DescriptorV2 programs from source metadata into
+   `src/structured_ir_builder.zig`, instead of routing through surface/body
+   adapters, canned return descriptors, or manifest-shaped structured
+   templates.
 
 ## Source-Wrapper Gate
 
@@ -59,6 +60,9 @@ release_source_rows=90
 source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
+real_descriptor_program_rows=90
+surface_to_body_adapter_rows=0
+canned_return_descriptor_rows=0
 manual_fixture_dispatch_rows=0
 legacy_semantic_record_rows=0
 semantic_record_rows=0
@@ -76,13 +80,15 @@ local_fail=0
 This gate closes the wrapper/mode collision gap by passing source fixture
 metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
 `tls-concurrency-checked-read`. Source metadata selects a z_llvm AIR-shaped
-DescriptorV2 program, and that descriptor is verified and lowered into
-structured IR without consulting `IrWriterCase` as the ownership source. The
-emitted writer
-header records `zllvm_ir_writer_dispatch = "source-owned"`,
-`zllvm_ir_writer_source_fixture`, `zllvm_ir_writer_source_tag`,
-`zllvm_semantic_descriptor = "descriptor-owned"`,
+DescriptorV2 program with real blocks/instructions, and that descriptor is
+verified and lowered into structured IR without consulting `IrWriterCase` as
+the ownership source. The emitted writer header records
+`zllvm_ir_writer_dispatch = "source-owned"`, `zllvm_ir_writer_source_fixture`,
+`zllvm_ir_writer_source_tag`, `zllvm_semantic_descriptor = "descriptor-owned"`,
 `zllvm_semantic_descriptor_version = "v2"`,
+`zllvm_descriptor_program = "real"`,
+`zllvm_surface_to_body_adapter = "not-used"`,
+`zllvm_canned_return_descriptor = "not-used"`,
 `zllvm_manual_fixture_dispatch = "not-used"`, and
 `zllvm_surface_dispatch = "not-used"`; the row selector remains
 `ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not the ownership
@@ -96,8 +102,8 @@ not an additional accepted row set in the 90-row source-owned gate.
 
 ## Semantic-Lowered Families
 
-`src/zig_semantic_lowering.zig` currently models these source-level program
-families before building structured IR in the source-owned gate:
+DescriptorV2 currently models these source-level program families before
+building structured IR in the source-owned gate:
 
 - scalar integer arithmetic and wrap/cmp/shift checks
 - error-switch/select rows
@@ -122,8 +128,10 @@ The narrower source-wrapper compatibility gate still reports 48 semantic-record
 rows and one external writer delegate because it deliberately omits source
 fixture/tag metadata. The source-owned gate is the stronger current claim for
 release source-backed ownership, and it requires `descriptor_owned_rows=90`,
-`descriptor_v2_rows=90`, `manual_fixture_dispatch_rows=0`,
-`surface_dispatch_rows=0`, and `external_writer_delegate_rows=0`.
+`descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
+`surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
+`manual_fixture_dispatch_rows=0`, `surface_dispatch_rows=0`, and
+`external_writer_delegate_rows=0`.
 
 ## Boundary
 

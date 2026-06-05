@@ -98,7 +98,8 @@ The strongest current release-mode source-owned gate is
 `zig build distribution-x86_64-release-source-owned`. It keeps the broad
 90-row source-backed fixture inventory, resolves each row from wrapper,
 fixture, and source-tag metadata into a DescriptorV2 program, and requires
-`descriptor_v2_rows=90`, `legacy_semantic_record_rows=0`,
-`semantic_record_rows=0`, `external_writer_delegate_rows=0`,
+`descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
+`surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
+`legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `external_writer_delegate_rows=0`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=90`, and `generic_codegen_rows=90`.

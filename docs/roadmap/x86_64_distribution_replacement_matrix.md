@@ -238,6 +238,9 @@ release_source_rows=90
 source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
+real_descriptor_program_rows=90
+surface_to_body_adapter_rows=0
+canned_return_descriptor_rows=0
 manual_fixture_dispatch_rows=0
 legacy_semantic_record_rows=0
 semantic_record_rows=0
@@ -520,6 +523,9 @@ source_wrapper_rows=source_wrappers=49 structured_direct_rows=49
 release_source_owned_gate=zig build distribution-x86_64-release-source-owned
 release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_owned_rows=90 descriptor_v2_rows=90
+                          real_descriptor_program_rows=90
+                          surface_to_body_adapter_rows=0
+                          canned_return_descriptor_rows=0
                           manual_fixture_dispatch_rows=0
                           legacy_semantic_record_rows=0 semantic_record_rows=0
                           external_writer_delegate_rows=0

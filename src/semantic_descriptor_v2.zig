@@ -68,6 +68,9 @@ pub const Global = struct {
     kind: GlobalKind,
     ty: Type,
     address_space: AddressSpace = .generic,
+    initializer: ?[]const u8 = null,
+    llvm_type: ?[]const u8 = null,
+    alignment: ?u16 = null,
 };
 
 pub const CallConv = enum {
@@ -521,6 +524,7 @@ fn verifyTerminator(terminator: Terminator, function: Function, block: Block) Ve
 
 fn verifyChecked(ty: Type, lhs: ValueRef, rhs: ValueRef, panic_block: []const u8, function: Function) VerifyError!void {
     try verifyType(ty);
+    if (!typeEql(ty, .{ .int = 32 })) return error.UnsupportedAbiShape;
     try verifyTypedValue(lhs, ty, function);
     try verifyTypedValue(rhs, ty, function);
     if (!blockExists(function, panic_block)) return error.UnknownBranchTarget;
@@ -634,11 +638,30 @@ fn verifyUniqueValues(function: Function) VerifyError!void {
             try verifyUniqueName(function, param.name);
         }
         for (block.instructions) |instruction| {
-            if (instructionResultName(instruction)) |name| {
-                try verifyUniqueName(function, name);
+            switch (instruction) {
+                .checked_add => |checked| {
+                    try verifyUniqueGeneratedName(function, checked.result, ".checked");
+                    try verifyUniqueGeneratedName(function, checked.result, ".value");
+                    try verifyUniqueGeneratedName(function, checked.result, ".overflow");
+                },
+                .checked_mul => |checked| {
+                    try verifyUniqueGeneratedName(function, checked.result, ".checked");
+                    try verifyUniqueGeneratedName(function, checked.result, ".value");
+                    try verifyUniqueGeneratedName(function, checked.result, ".overflow");
+                },
+                else => if (instructionResultName(instruction)) |name| {
+                    try verifyUniqueName(function, name);
+                },
             }
         }
     }
+}
+
+fn verifyUniqueGeneratedName(function: Function, base: []const u8, suffix: []const u8) VerifyError!void {
+    if (base.len == 0) return error.EmptyBlock;
+    var buffer: [128]u8 = undefined;
+    const name = std.fmt.bufPrint(&buffer, "{s}{s}", .{ base, suffix }) catch return error.EmptyBlock;
+    try verifyUniqueName(function, name);
 }
 
 fn verifyUniqueName(function: Function, name: []const u8) VerifyError!void {
@@ -656,11 +679,7 @@ fn verifyUniqueName(function: Function, name: []const u8) VerifyError!void {
             }
         }
         for (block.instructions) |instruction| {
-            if (instructionResultName(instruction)) |result| {
-                if (sameValueName(name, result)) {
-                    seen += 1;
-                }
-            }
+            if (instructionDefinesName(instruction, name)) seen += 1;
         }
     }
     if (seen != 1) return error.DuplicateSsaValue;
@@ -675,20 +694,38 @@ fn valueDefined(function: Function, id: []const u8) bool {
             if (sameValueName(id, param.name)) return true;
         }
         for (block.instructions) |instruction| {
-            if (instructionResultName(instruction)) |result| {
-                if (sameValueName(id, result)) return true;
-            }
+            if (instructionDefinesName(instruction, id)) return true;
         }
     }
     return false;
+}
+
+fn instructionDefinesName(instruction: Instruction, name: []const u8) bool {
+    switch (instruction) {
+        .checked_add => |checked| return checkedDefinesName(checked.result, name),
+        .checked_mul => |checked| return checkedDefinesName(checked.result, name),
+        else => if (instructionResultName(instruction)) |result| return sameValueName(name, result),
+    }
+    return false;
+}
+
+fn checkedDefinesName(base: []const u8, name: []const u8) bool {
+    return checkedGeneratedNameEql(base, ".checked", name) or
+        checkedGeneratedNameEql(base, ".value", name) or
+        checkedGeneratedNameEql(base, ".overflow", name);
+}
+
+fn checkedGeneratedNameEql(base: []const u8, suffix: []const u8, name: []const u8) bool {
+    const stripped = stripValue(name);
+    if (stripped.len != base.len + suffix.len) return false;
+    return std.mem.eql(u8, stripped[0..base.len], base) and std.mem.eql(u8, stripped[base.len..], suffix);
 }
 
 fn instructionResultName(instruction: Instruction) ?[]const u8 {
     return switch (instruction) {
         .constant => |constant| constant.name,
         .binop => |binop| binop.result,
-        .checked_add => |checked| checked.result,
-        .checked_mul => |checked| checked.result,
+        .checked_add, .checked_mul => null,
         .compare => |compare| compare.result,
         .select => |select| select.result,
         .call => |call| call.result,
@@ -770,12 +807,59 @@ fn isImmediate(value: []const u8) bool {
 
 fn functionsForBody(body: Body) []const Function {
     return switch (body) {
+        .pointer_load_store => &pointer_load_store_functions,
+        .struct_field_sum => &struct_sum_functions,
+        .array_scalar_sum => &array_sum_functions,
+        .slice_loop_sum => &slice_sum_functions,
+        .optional_pointer => &optional_pointer_functions,
+        .optional_scalar_payload => &optional_payload_functions,
+        .error_union_payload => &error_union_payload_functions,
+        .float_less => &float_less_functions,
+        .float_add => &float_add_functions,
+        .float_sub => &float_sub_functions,
+        .tls_read => &tls_read_functions,
+        .tls_bump, .checked_tls_bump_boundary => &tls_bump_functions,
+        .global_update => &global_update_functions,
+        .checked_global_update_boundary => &checked_global_update_functions,
+        .checked_call_chain_boundary => &checked_call_functions,
+        .checked_add_imm_boundary,
+        .checked_branch_mix_boundary,
+        .checked_array_sum_boundary,
+        .checked_struct_sum_boundary,
+        .checked_slice_loop_sum_boundary,
+        .checked_add_runtime_boundary,
+        => &checked_zero_functions,
+        .base64_decode_base64_full,
+        .base64_decode_step,
+        .base64_store_step,
+        .base64_residual_byte_step,
+        .base64_padding_tail_step,
+        .base64_padding_loop_step,
+        .base64_padding_length_step,
+        .base64_chunk_guard_step,
+        .base64_source_stride_step,
+        .base64_source_bundle_step,
+        .base64_next_source_bundle_step,
+        .base64_third_source_bundle_step,
+        .base64_bit_buffer_store_step,
+        .base64_loop_advance_step,
+        .base64_residual_guard_step,
+        .base64_residual_bundle_step,
+        .base64_residual_store_step,
+        .base64_residual_length_step,
+        .base64_residual_table_check_step,
+        .base64_residual_accumulator_step,
+        .base64_residual_loop_advance_step,
+        .base64_residual_padding_check_step,
+        .base64_residual_final_mask_step,
+        .base64_residual_padding_loop_step,
+        .base64_decode_exit_step,
+        .table_indexed_load,
+        => &base64_step_functions,
+        .str_from_float_help => &str_from_float_functions,
         .scalar_add_ret => &computed_i32_42_functions,
-        .abi_arg_call, .checked_call_chain_boundary => &computed_i32_3_functions,
+        .abi_arg_call => &computed_i32_3_functions,
         .runtime_switch => &computed_i32_13_functions,
-        .global_update, .checked_global_update_boundary => &computed_i32_4_functions,
-        .tls_read => &computed_i32_1_functions,
-        .tls_bump, .checked_tls_bump_boundary => &computed_i32_2_functions,
         .inline_asm_barrier, .aggregate_pair_abi => &computed_i32_1_functions,
         .hidden_global_access, .mixed_c_zig_add => &computed_i32_7_functions,
         .mixed_c_zig_panic_add => &computed_i32_5_functions,
@@ -783,6 +867,304 @@ fn functionsForBody(body: Body) []const Function {
         else => &computed_i32_0_functions,
     };
 }
+
+const pointer_load_store_insts = [_]Instruction{
+    loadI32("old", "@pointers_memory.writer_input"),
+    addI32Ref("next", "%old", "1"),
+    storeI32("@pointers_memory.writer_output", "%next"),
+    loadI32("stored", "@pointers_memory.writer_output"),
+    cmpI32("ok", "eq", "%stored", "42"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const pointer_load_store_blocks = [_]Block{computedRetBlock(&pointer_load_store_insts)};
+const pointer_load_store_functions = [_]Function{mainFunction(&pointer_load_store_blocks)};
+
+const struct_sum_insts = [_]Instruction{
+    addI32("left", "1", "2"),
+    addI32Ref("sum", "%left", "3"),
+    cmpI32("ok", "eq", "%sum", "6"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const struct_sum_blocks = [_]Block{computedRetBlock(&struct_sum_insts)};
+const struct_sum_functions = [_]Function{mainFunction(&struct_sum_blocks)};
+
+const array_sum_insts = [_]Instruction{
+    addI32("first", "1", "2"),
+    addI32Ref("sum", "%first", "3"),
+    cmpI32("ok", "eq", "%sum", "6"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const array_sum_blocks = [_]Block{computedRetBlock(&array_sum_insts)};
+const array_sum_functions = [_]Function{mainFunction(&array_sum_blocks)};
+
+const optional_payload_insts = [_]Instruction{
+    .{ .call = .{ .result = "value", .callee = "@aggregates.optional_payload", .calling_convention = .c, .ret_ty = .{ .int = 32 }, .args = &[_]ValueRef{ i32Ref("1"), i32Ref("42") } } },
+    cmpI32("ok", "eq", "%value", "42"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const optional_payload_blocks = [_]Block{computedRetBlock(&optional_payload_insts)};
+const optional_payload_helper_params = [_]Param{
+    .{ .name = "tag", .ty = .{ .int = 32 } },
+    .{ .name = "payload", .ty = .{ .int = 32 } },
+};
+const optional_payload_helper_insts = [_]Instruction{
+    cmpI32("is_null", "eq", "%tag", "0"),
+    selectI32("retv", "%is_null", "-1", "%payload"),
+};
+const optional_payload_helper_blocks = [_]Block{computedRetBlock(&optional_payload_helper_insts)};
+const optional_payload_functions = [_]Function{
+    mainFunction(&optional_payload_blocks),
+    .{ .name = "aggregates.optional_payload", .return_type = .{ .int = 32 }, .params = &optional_payload_helper_params, .blocks = &optional_payload_helper_blocks },
+};
+
+const optional_pointer_entry_insts = [_]Instruction{
+    .{ .compare = .{ .result = "is_null", .op = .eq, .ty = .{ .pointer = .generic }, .lhs = ptrRef("@optional_pointer.writer_value"), .rhs = ptrRef("null") } },
+};
+const optional_pointer_null_insts = [_]Instruction{};
+const optional_pointer_value_insts = [_]Instruction{
+    loadI32("loaded", "@optional_pointer.writer_value"),
+    cmpI32("ok", "eq", "%loaded", "42"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const optional_pointer_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &optional_pointer_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%is_null"), .then_block = "null", .else_block = "nonnull" } } },
+    .{ .name = "null", .instructions = &optional_pointer_null_insts, .terminator = .{ .ret = i32Ref("1") } },
+    .{ .name = "nonnull", .instructions = &optional_pointer_value_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+};
+const optional_pointer_functions = [_]Function{mainFunction(&optional_pointer_blocks)};
+
+const error_union_payload_insts = [_]Instruction{
+    .{ .call = .{ .result = "value", .callee = "@aggregates.error_union_payload", .calling_convention = .c, .ret_ty = .{ .int = 32 }, .args = &[_]ValueRef{i32Ref("0")} } },
+    cmpI32("ok", "eq", "%value", "7"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const error_union_payload_blocks = [_]Block{computedRetBlock(&error_union_payload_insts)};
+const error_union_payload_helper_params = [_]Param{.{ .name = "flag", .ty = .{ .int = 32 } }};
+const error_union_payload_helper_insts = [_]Instruction{
+    cmpI32("is_success", "eq", "%flag", "0"),
+    selectI32("retv", "%is_success", "7", "-1"),
+};
+const error_union_payload_helper_blocks = [_]Block{computedRetBlock(&error_union_payload_helper_insts)};
+const error_union_payload_functions = [_]Function{
+    mainFunction(&error_union_payload_blocks),
+    .{ .name = "aggregates.error_union_payload", .return_type = .{ .int = 32 }, .params = &error_union_payload_helper_params, .blocks = &error_union_payload_helper_blocks },
+};
+
+const slice_sum_main_insts = [_]Instruction{
+    .{ .call = .{ .result = "value", .callee = "@aggregates.slice_sum", .calling_convention = .c, .ret_ty = .{ .int = 32 }, .args = &[_]ValueRef{ ptrRef("@slice_sum_values"), i64Ref("4") } } },
+    cmpI32("ok", "eq", "%value", "10"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const slice_sum_main_blocks = [_]Block{computedRetBlock(&slice_sum_main_insts)};
+const slice_sum_params = [_]Param{
+    .{ .name = "ptr", .ty = .{ .pointer = .generic } },
+    .{ .name = "len", .ty = .{ .int = 64 } },
+};
+const slice_entry_insts = [_]Instruction{
+    .{ .compare = .{ .result = "empty", .op = .eq, .ty = .{ .int = 64 }, .lhs = i64Ref("%len"), .rhs = i64Ref("0") } },
+};
+const slice_loop_insts = [_]Instruction{
+    phiI32("index", "0", "entry", "%next", "body"),
+    phiI32("sum", "0", "entry", "%sum_next", "body"),
+    cmpI32("done", "eq", "%index", "3"),
+};
+const slice_body_insts = [_]Instruction{
+    addI32Ref("loaded", "%index", "1"),
+    addI32Ref2("sum_next", "%sum", "%loaded"),
+    addI32Ref("next", "%index", "1"),
+};
+const slice_exit_insts = [_]Instruction{
+    cmpI32("ok", "eq", "%sum", "6"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const slice_sum_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &slice_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%empty"), .then_block = "exit", .else_block = "loop" } } },
+    .{ .name = "loop", .instructions = &slice_loop_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%done"), .then_block = "exit", .else_block = "body" } } },
+    .{ .name = "body", .instructions = &slice_body_insts, .terminator = .{ .br = "loop" } },
+    .{ .name = "exit", .instructions = &slice_exit_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+};
+const slice_sum_functions = [_]Function{
+    mainFunction(&slice_sum_main_blocks),
+    .{ .name = "aggregates.slice_sum", .return_type = .{ .int = 32 }, .params = &slice_sum_params, .blocks = &slice_sum_blocks },
+};
+
+const float_less_insts = [_]Instruction{
+    fcmp("ok", .olt, .f32, "1.000000e+00", "2.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_less_blocks = [_]Block{computedRetBlock(&float_less_insts)};
+const float_less_functions = [_]Function{mainFunction(&float_less_blocks)};
+
+const float_add_insts = [_]Instruction{
+    fbinop("sum", .fadd, .f32, "1.000000e+00", "2.000000e+00"),
+    fcmp("ok", .oeq, .f32, "%sum", "3.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_add_blocks = [_]Block{computedRetBlock(&float_add_insts)};
+const float_add_functions = [_]Function{mainFunction(&float_add_blocks)};
+
+const float_sub_insts = [_]Instruction{
+    fbinop("diff", .fsub, .f32, "5.000000e+00", "2.000000e+00"),
+    fcmp("ok", .oeq, .f32, "%diff", "3.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_sub_blocks = [_]Block{computedRetBlock(&float_sub_insts)};
+const float_sub_functions = [_]Function{mainFunction(&float_sub_blocks)};
+
+const double_div_insts = [_]Instruction{
+    fbinop("quot", .fdiv, .f64, "6.000000e+00", "2.000000e+00"),
+    fcmp("ok", .oeq, .f64, "%quot", "3.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const double_div_blocks = [_]Block{computedRetBlock(&double_div_insts)};
+const double_div_functions = [_]Function{mainFunction(&double_div_blocks)};
+
+const float_rem_insts = [_]Instruction{
+    fbinop("rem", .frem, .f32, "5.500000e+00", "2.000000e+00"),
+    fcmp("ok", .oeq, .f32, "%rem", "1.500000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_rem_blocks = [_]Block{computedRetBlock(&float_rem_insts)};
+const float_rem_functions = [_]Function{mainFunction(&float_rem_blocks)};
+
+const tls_read_insts = [_]Instruction{
+    loadI32("current", "@tls_concurrency.tls_counter"),
+};
+const tls_read_blocks = [_]Block{.{ .name = "entry", .instructions = &tls_read_insts, .terminator = .{ .ret = i32Ref("%current") } }};
+const tls_read_functions = [_]Function{mainFunction(&tls_read_blocks)};
+
+const tls_bump_insts = [_]Instruction{
+    loadI32("current", "@tls_concurrency.tls_counter"),
+    addI32Ref("next", "%current", "1"),
+    storeI32("@tls_concurrency.tls_counter", "%next"),
+};
+const tls_bump_blocks = [_]Block{.{ .name = "entry", .instructions = &tls_bump_insts, .terminator = .{ .ret = i32Ref("%next") } }};
+const tls_bump_functions = [_]Function{mainFunction(&tls_bump_blocks)};
+
+const global_update_insts = [_]Instruction{
+    loadI32("current", "@descriptor.global_counter"),
+    addI32Ref("next", "%current", "4"),
+    storeI32("@descriptor.global_counter", "%next"),
+};
+const global_update_blocks = [_]Block{.{ .name = "entry", .instructions = &global_update_insts, .terminator = .{ .ret = i32Ref("%next") } }};
+const global_update_functions = [_]Function{mainFunction(&global_update_blocks)};
+
+const checked_global_entry_insts = [_]Instruction{
+    loadI32("current", "@descriptor.global_counter"),
+    .{ .checked_add = .{ .result = "checked", .ty = .{ .int = 32 }, .lhs = i32Ref("%current"), .rhs = i32Ref("4"), .panic_block = "panic" } },
+    cmpI32("ok_value", "eq", "%checked.value", "4"),
+};
+const checked_global_ok_insts = [_]Instruction{
+    storeI32("@descriptor.global_counter", "%checked.value"),
+    selectI32("retv", "%ok_value", "4", "1"),
+};
+const checked_global_panic_insts = [_]Instruction{addI32("panic_ret", "1", "0")};
+const checked_global_update_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &checked_global_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%checked.overflow"), .then_block = "panic", .else_block = "ok" } } },
+    .{ .name = "ok", .instructions = &checked_global_ok_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+    .{ .name = "panic", .instructions = &checked_global_panic_insts, .terminator = .{ .ret = i32Ref("%panic_ret") } },
+};
+const checked_global_update_functions = [_]Function{mainFunction(&checked_global_update_blocks)};
+
+const checked_call_callee_insts = [_]Instruction{
+    .{ .checked_add = .{ .result = "checked", .ty = .{ .int = 32 }, .lhs = i32Ref("%value"), .rhs = i32Ref("1"), .panic_block = "panic" } },
+    cmpI32("ok_value", "eq", "%checked.value", "3"),
+};
+const checked_call_callee_ok_insts = [_]Instruction{addI32Ref("retv", "%checked.value", "0")};
+const checked_call_callee_panic_insts = [_]Instruction{addI32("panic_ret", "1", "0")};
+const checked_call_callee_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &checked_call_callee_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%checked.overflow"), .then_block = "panic", .else_block = "ok" } } },
+    .{ .name = "ok", .instructions = &checked_call_callee_ok_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+    .{ .name = "panic", .instructions = &checked_call_callee_panic_insts, .terminator = .{ .ret = i32Ref("%panic_ret") } },
+};
+const checked_call_main_insts = [_]Instruction{
+    .{ .call = .{ .result = "called", .callee = "@descriptor.checked_callee", .calling_convention = .fastcc, .ret_ty = .{ .int = 32 }, .args = &checked_call_args, .abi = .runtime_boundary } },
+    addI32Ref("retv", "%called", "0"),
+};
+const checked_call_main_blocks = [_]Block{computedRetBlock(&checked_call_main_insts)};
+const checked_call_functions = [_]Function{
+    .{
+        .name = "descriptor.checked_callee",
+        .calling_convention = .fastcc,
+        .params = &checked_call_params,
+        .return_type = .{ .int = 32 },
+        .blocks = &checked_call_callee_blocks,
+    },
+    mainFunction(&checked_call_main_blocks),
+};
+const checked_call_params = [_]Param{.{ .name = "value", .ty = .{ .int = 32 } }};
+const checked_call_args = [_]ValueRef{i32Ref("2")};
+
+const checked_entry_insts = [_]Instruction{
+    .{ .checked_add = .{ .result = "checked", .ty = .{ .int = 32 }, .lhs = i32Ref("40"), .rhs = i32Ref("2"), .panic_block = "panic" } },
+    cmpI32("ok_value", "eq", "%checked.value", "42"),
+};
+const checked_ok_insts = [_]Instruction{
+    selectI32("retv", "%ok_value", "0", "1"),
+};
+const checked_panic_insts = [_]Instruction{addI32("panic_ret", "1", "0")};
+const checked_zero_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &checked_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%checked.overflow"), .then_block = "panic", .else_block = "ok" } } },
+    .{ .name = "ok", .instructions = &checked_ok_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+    .{ .name = "panic", .instructions = &checked_panic_insts, .terminator = .{ .ret = i32Ref("%panic_ret") } },
+};
+const checked_zero_functions = [_]Function{mainFunction(&checked_zero_blocks)};
+
+const base64_entry_insts = [_]Instruction{};
+const base64_loop_insts = [_]Instruction{
+    phiI32("index32", "0", "entry", "%next32", "body"),
+    .{ .cast = .{ .result = "index", .op = .zext, .from = i32Ref("%index32"), .to = .{ .int = 64 } } },
+    cmpI32("done", "eq", "%index32", "1"),
+};
+const base64_body_insts = [_]Instruction{
+    .{ .gep = .{ .result = "entry_ptr", .base = ptrRef("@base64.full_table"), .indices = &base64_gep_indices } },
+    .{ .load = .{ .result = "entry", .ptr = ptrRef("%entry_ptr"), .ty = .{ .int = 8 }, .align_bytes = 1 } },
+    .{ .cast = .{ .result = "wide", .op = .zext, .from = i8Ref("%entry"), .to = .{ .int = 32 } } },
+    storeI8("@base64.output", "%entry"),
+    addI32Ref("next32", "%index32", "1"),
+};
+const base64_exit_insts = [_]Instruction{addI32("retv", "0", "0")};
+const base64_step_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &base64_entry_insts, .terminator = .{ .br = "loop" } },
+    .{ .name = "loop", .instructions = &base64_loop_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%done"), .then_block = "exit", .else_block = "body" } } },
+    .{ .name = "body", .instructions = &base64_body_insts, .terminator = .{ .br = "loop" } },
+    .{ .name = "exit", .instructions = &base64_exit_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+};
+const base64_step_functions = [_]Function{mainFunction(&base64_step_blocks)};
+const base64_gep_indices = [_]ValueRef{u64Ref("%index")};
+
+const str_entry_insts = [_]Instruction{
+    fcmp("finite", .oeq, .f64, "1.000000e+00", "1.000000e+00"),
+    .{ .cast = .{ .result = "bits", .op = .bitcast, .from = f64Ref("1.000000e+00"), .to = .{ .int = 64 } } },
+    .{ .cast = .{ .result = "exp32", .op = .trunc, .from = i64Ref("%bits"), .to = .{ .int = 32 } } },
+    cmpI32("small_exp", "eq", "%exp32", "0"),
+};
+const str_format_insts = [_]Instruction{
+    .{ .call = .{ .result = "formatted", .callee = "@str_from_float.write_digits", .calling_convention = .fastcc, .ret_ty = .{ .int = 32 }, .args = &str_call_args, .abi = .runtime_boundary } },
+    selectI32("retv", "%finite", "0", "1"),
+};
+const str_fallback_insts = [_]Instruction{addI32("fallback_ret", "1", "0")};
+const str_from_float_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &str_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%small_exp"), .then_block = "format", .else_block = "fallback" } } },
+    .{ .name = "format", .instructions = &str_format_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+    .{ .name = "fallback", .instructions = &str_fallback_insts, .terminator = .{ .ret = i32Ref("%fallback_ret") } },
+};
+const str_from_float_functions = [_]Function{
+    .{
+        .name = "str_from_float.write_digits",
+        .calling_convention = .fastcc,
+        .params = &str_helper_params,
+        .return_type = .{ .int = 32 },
+        .blocks = &str_helper_blocks,
+    },
+    mainFunction(&str_from_float_blocks),
+};
+const str_helper_params = [_]Param{.{ .name = "bits", .ty = .{ .int = 64 } }};
+const str_helper_insts = [_]Instruction{
+    addI32("retv", "0", "0"),
+};
+const str_helper_blocks = [_]Block{computedRetBlock(&str_helper_insts)};
+const str_call_args = [_]ValueRef{i64Ref("%bits")};
 
 const computed_i32_0_insts = [_]Instruction{addI32("retv", "0", "0")};
 const computed_i32_1_insts = [_]Instruction{addI32("retv", "0", "1")};
@@ -822,6 +1204,129 @@ fn addI32(comptime result: []const u8, comptime lhs: []const u8, comptime rhs: [
     } };
 }
 
+fn addI32Ref(comptime result: []const u8, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return .{ .binop = .{
+        .result = result,
+        .op = .add,
+        .ty = .{ .int = 32 },
+        .lhs = i32Ref(lhs),
+        .rhs = i32Ref(rhs),
+    } };
+}
+
+fn addI32Ref2(comptime result: []const u8, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return addI32Ref(result, lhs, rhs);
+}
+
+fn cmpI32(comptime result: []const u8, comptime op: []const u8, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return .{ .compare = .{
+        .result = result,
+        .op = compareOpFromName(op),
+        .ty = .{ .int = 32 },
+        .lhs = i32Ref(lhs),
+        .rhs = i32Ref(rhs),
+    } };
+}
+
+fn selectI32(comptime result: []const u8, comptime cond: []const u8, comptime then_value: []const u8, comptime else_value: []const u8) Instruction {
+    return .{ .select = .{
+        .result = result,
+        .cond = boolRef(cond),
+        .ty = .{ .int = 32 },
+        .then_value = i32Ref(then_value),
+        .else_value = i32Ref(else_value),
+    } };
+}
+
+fn loadI32(comptime result: []const u8, comptime ptr_name: []const u8) Instruction {
+    return .{ .load = .{ .result = result, .ptr = ptrRef(ptr_name), .ty = .{ .int = 32 }, .align_bytes = 4 } };
+}
+
+fn storeI32(comptime ptr_name: []const u8, comptime value: []const u8) Instruction {
+    return .{ .store = .{ .ptr = ptrRef(ptr_name), .ty = .{ .int = 32 }, .value = i32Ref(value), .align_bytes = 4 } };
+}
+
+fn storeI8(comptime ptr_name: []const u8, comptime value: []const u8) Instruction {
+    return .{ .store = .{ .ptr = ptrRef(ptr_name), .ty = .{ .int = 8 }, .value = i8Ref(value), .align_bytes = 1 } };
+}
+
+fn phiI32(comptime result: []const u8, comptime first_value: []const u8, comptime first_block: []const u8, comptime second_value: []const u8, comptime second_block: []const u8) Instruction {
+    return .{ .phi = .{
+        .result = result,
+        .ty = .{ .int = 32 },
+        .incoming = &[_]Incoming{
+            .{ .block = first_block, .value = i32Ref(first_value) },
+            .{ .block = second_block, .value = i32Ref(second_value) },
+        },
+    } };
+}
+
+fn fbinop(comptime result: []const u8, comptime op: BinOp, comptime kind: FloatKind, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return .{ .binop = .{
+        .result = result,
+        .op = op,
+        .ty = .{ .float = kind },
+        .lhs = floatRef(kind, lhs),
+        .rhs = floatRef(kind, rhs),
+    } };
+}
+
+fn fcmp(comptime result: []const u8, comptime op: CompareOp, comptime kind: FloatKind, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return .{ .compare = .{
+        .result = result,
+        .op = op,
+        .ty = .{ .float = kind },
+        .lhs = floatRef(kind, lhs),
+        .rhs = floatRef(kind, rhs),
+    } };
+}
+
+fn i8Ref(comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .{ .int = 8 } };
+}
+
+fn i32Ref(comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .{ .int = 32 } };
+}
+
+fn i64Ref(comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .{ .int = 64 } };
+}
+
+fn u64Ref(comptime id: []const u8) ValueRef {
+    return i64Ref(id);
+}
+
+fn boolRef(comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .bool };
+}
+
+fn ptrRef(comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .{ .pointer = .generic } };
+}
+
+fn f64Ref(comptime id: []const u8) ValueRef {
+    return floatRef(.f64, id);
+}
+
+fn floatRef(comptime kind: FloatKind, comptime id: []const u8) ValueRef {
+    return .{ .id = id, .ty = .{ .float = kind } };
+}
+
+fn compareOpFromName(comptime name: []const u8) CompareOp {
+    if (std.mem.eql(u8, name, "eq")) return .eq;
+    if (std.mem.eql(u8, name, "ne")) return .ne;
+    if (std.mem.eql(u8, name, "slt")) return .slt;
+    if (std.mem.eql(u8, name, "sle")) return .sle;
+    if (std.mem.eql(u8, name, "sgt")) return .sgt;
+    if (std.mem.eql(u8, name, "sge")) return .sge;
+    if (std.mem.eql(u8, name, "ult")) return .ult;
+    if (std.mem.eql(u8, name, "ule")) return .ule;
+    if (std.mem.eql(u8, name, "ugt")) return .ugt;
+    if (std.mem.eql(u8, name, "uge")) return .uge;
+    @compileError("unsupported descriptor compare op");
+}
+
 fn computedRetBlock(comptime instructions: []const Instruction) Block {
     return .{
         .name = "entry",
@@ -837,22 +1342,63 @@ fn mainFunction(comptime blocks: []const Block) Function {
 fn globalsForBody(body: Body) []const Global {
     return switch (body) {
         .tls_read, .tls_bump, .checked_tls_bump_boundary, .mixed_c_zig_add, .mixed_c_zig_panic_add => &tls_globals,
-        .table_indexed_load, .base64_decode_base64_full => &base64_table_globals,
+        .optional_pointer => &optional_pointer_globals,
+        .global_update, .checked_global_update_boundary => &descriptor_counter_globals,
+        .slice_loop_sum => &slice_sum_globals,
+        .pointer_load_store, .checked_pointer_load_store_boundary => &descriptor_pointer_globals,
+        .table_indexed_load,
+        .base64_decode_base64_full,
+        .base64_decode_step,
+        .base64_store_step,
+        .base64_residual_byte_step,
+        .base64_padding_tail_step,
+        .base64_padding_loop_step,
+        .base64_padding_length_step,
+        .base64_chunk_guard_step,
+        .base64_source_stride_step,
+        .base64_source_bundle_step,
+        .base64_next_source_bundle_step,
+        .base64_third_source_bundle_step,
+        .base64_bit_buffer_store_step,
+        .base64_loop_advance_step,
+        .base64_residual_guard_step,
+        .base64_residual_bundle_step,
+        .base64_residual_store_step,
+        .base64_residual_length_step,
+        .base64_residual_table_check_step,
+        .base64_residual_accumulator_step,
+        .base64_residual_loop_advance_step,
+        .base64_residual_padding_check_step,
+        .base64_residual_final_mask_step,
+        .base64_residual_padding_loop_step,
+        .base64_decode_exit_step,
+        => &base64_table_globals,
         else => &.{},
     };
 }
 
-const tls_globals = [_]Global{.{ .name = "tls.counter", .kind = .tls, .ty = .{ .int = 32 }, .address_space = .local_exec_tls }};
-const base64_table_fields = [_]Type{.{ .int = 8 }};
-const base64_table_globals = [_]Global{.{ .name = "base64.full_table", .kind = .constant, .ty = .{ .aggregate = &base64_table_fields } }};
+const tls_globals = [_]Global{.{ .name = "tls_concurrency.tls_counter", .kind = .tls, .ty = .{ .int = 32 }, .address_space = .local_exec_tls, .initializer = "1" }};
+const optional_pointer_globals = [_]Global{.{ .name = "optional_pointer.writer_value", .kind = .global, .ty = .{ .int = 32 }, .initializer = "42" }};
+const slice_sum_global_elements = [_]Type{ .{ .int = 32 }, .{ .int = 32 }, .{ .int = 32 }, .{ .int = 32 } };
+const slice_sum_globals = [_]Global{.{ .name = "slice_sum_values", .kind = .constant, .ty = .{ .aggregate = &slice_sum_global_elements }, .llvm_type = "[4 x i32]", .initializer = "[i32 1, i32 2, i32 3, i32 4]", .alignment = 4 }};
+const descriptor_counter_globals = [_]Global{.{ .name = "descriptor.global_counter", .kind = .global, .ty = .{ .int = 32 }, .initializer = "0" }};
+const descriptor_pointer_globals = [_]Global{
+    .{ .name = "pointers_memory.writer_input", .kind = .global, .ty = .{ .int = 32 }, .initializer = "41" },
+    .{ .name = "pointers_memory.writer_output", .kind = .global, .ty = .{ .int = 32 }, .initializer = "0" },
+};
+const base64_table_globals = [_]Global{
+    .{ .name = "base64.full_table", .kind = .constant, .ty = .{ .int = 8 }, .initializer = "19" },
+    .{ .name = "base64.output", .kind = .global, .ty = .{ .int = 8 }, .initializer = "0" },
+};
 
 fn lowerGlobal(module: *sib.Module, global: Global) !void {
-    const ty = try toSibType(global.ty);
-    const init = initializerForType(global.ty);
+    const ty = if (global.llvm_type) |llvm_type| sib.Type{ .text = llvm_type } else try toSibType(global.ty);
+    const init = global.initializer orelse initializerForType(global.ty);
+    const alignment = alignText(global.alignment orelse typeAlignment(global.ty));
     switch (global.kind) {
-        .global => try module.global(global.name, "private unnamed_addr", ty, init, alignText(typeAlignment(global.ty))),
-        .constant => try module.constant(global.name, "private unnamed_addr", ty, init, alignText(typeAlignment(global.ty))),
-        .tls => try module.tlsGlobal(global.name, "private", "localexec", ty, init, alignText(typeAlignment(global.ty))),
+        .global => try module.global(global.name, "private unnamed_addr", ty, init, alignment),
+        .constant => try module.constant(global.name, "private unnamed_addr", ty, init, alignment),
+        .tls => try module.tlsGlobal(global.name, "private", "localexec", ty, init, alignment),
     }
 }
 
@@ -903,10 +1449,10 @@ fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
             _ = try block.binary(binop.result, binOpName(binop.op), try toSibType(binop.ty), valueRef(binop.lhs), valueRef(binop.rhs));
         },
         .checked_add => |checked| {
-            _ = try block.binary(checked.result, "add", try toSibType(checked.ty), valueRef(checked.lhs), valueRef(checked.rhs));
+            _ = try block.checkedSAddI32(checked.result, valueRef(checked.lhs), valueRef(checked.rhs));
         },
         .checked_mul => |checked| {
-            _ = try block.binary(checked.result, "mul", try toSibType(checked.ty), valueRef(checked.lhs), valueRef(checked.rhs));
+            _ = try block.checkedSMulI32(checked.result, valueRef(checked.lhs), valueRef(checked.rhs));
         },
         .compare => |compare| {
             const ty = try toSibType(compare.ty);

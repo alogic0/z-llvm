@@ -553,7 +553,7 @@ pub const DirectBuilder = struct {
             const name_text = lastToken(param_text) orelse "";
             try fn_ir.params.append(self.allocator, .{
                 .ty = parseIrType(ty_text) orelse .ptr,
-                .name = stripValuePrefix(name_text),
+                .name = try self.module.ownString(try std.fmt.allocPrint(self.allocator, "{s}", .{stripValuePrefix(name_text)})),
             });
         }
         try self.module.functions.append(self.allocator, fn_ir);
@@ -854,9 +854,19 @@ pub const DirectBuilder = struct {
             const value_text = restAfterFirstToken(arg_text) orelse continue;
             try call_inst.args.append(self.allocator, .{
                 .ty = parseIrType(ty_text) orelse .ptr,
-                .value = parseValueRef(std.mem.trim(u8, value_text, " \t")),
+                .value = try self.ownValue(parseValueRef(std.mem.trim(u8, value_text, " \t"))),
             });
         }
+    }
+
+    fn ownValue(self: *DirectBuilder, value: ir.Value) !ir.Value {
+        return switch (value) {
+            .named => |name| .{ .named = try self.module.ownString(try std.fmt.allocPrint(self.allocator, "{s}", .{name})) },
+            .fp => |fp| .{ .fp = try self.module.ownString(try std.fmt.allocPrint(self.allocator, "{s}", .{fp})) },
+            .vector => |vector| .{ .vector = try self.module.ownString(try std.fmt.allocPrint(self.allocator, "{s}", .{vector})) },
+            .constant_expr => |expr| .{ .constant_expr = try self.module.ownString(try std.fmt.allocPrint(self.allocator, "{s}", .{expr})) },
+            .int, .undef, .poison, .null_value, .zero_initializer => value,
+        };
     }
 
     fn appendInstruction(self: *DirectBuilder, result: []const u8, kind: @TypeOf(@as(ir.Instruction, undefined).kind)) !void {
