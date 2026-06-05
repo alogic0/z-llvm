@@ -243,7 +243,7 @@ full_descriptor_program_rows=90
 serialized_function_rows=90
 serialized_instruction_rows=90
 serialized_global_rows=90
-semantic_serialized_rows=41
+semantic_serialized_rows=63
 serialized_return_stub_rows=0
 descriptor_body_name_rows=0
 zllvm_body_expansion_rows=0
@@ -285,7 +285,7 @@ inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
 function/block/instruction/terminator/global-section records, and z_llvm parses
 those records directly before verifying and lowering DescriptorV2 into
 structured-direct IR. All 90 rows use serialized DescriptorV2 transport; the
-current 41 AIR-derived rows also emit semantic serialized records and the gate
+current 63 AIR-derived rows also emit semantic serialized records and the gate
 fails if any AIR-derived row falls back to the serialized return stub.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
@@ -552,15 +552,15 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           serialized_function_rows=90
                           serialized_instruction_rows=90
                           serialized_global_rows=90
-                          semantic_serialized_rows=41
+                          semantic_serialized_rows=63
                           serialized_return_stub_rows=0
                           descriptor_body_name_rows=0
                           zllvm_body_expansion_rows=0
                           descriptor_program_body_expansion_rows=0
                           functions_for_body_rows=0
                           globals_for_body_rows=0
-                          air_derived_descriptor_rows=41
-                          static_descriptor_map_rows=49
+                          air_derived_descriptor_rows=63
+                          static_descriptor_map_rows=27
                           zig_emitted_descriptor_rows=90
                           runner_generated_descriptor_rows=0
                           descriptor_file_consumed_rows=90
@@ -581,9 +581,9 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
                        rows are DescriptorV2-owned; all 90 rows use serialized
-                       transport, 41 rows are currently AIR-fact-derived
+                       transport, 63 rows are currently AIR-fact-derived
                        semantic serialized records with no return-stub fallback,
-                       and 49 rows remain explicit static descriptor map
+                       and 27 rows remain explicit static descriptor map
                        fallback; all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse
