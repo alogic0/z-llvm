@@ -43,6 +43,19 @@ pub const Descriptor = struct {
     features: []const Feature,
     v2: sdv2.Program,
     input_emitter: []const u8 = "-",
+    input_payload: InputPayload = .descriptor_body_name,
+    derivation: DescriptorDerivation = .unknown,
+};
+
+pub const InputPayload = enum {
+    descriptor_body_name,
+    full_descriptor_program,
+};
+
+pub const DescriptorDerivation = enum {
+    zig_air_facts,
+    static_descriptor_map,
+    unknown,
 };
 
 const scalar_features = [_]Feature{ .functions, .return_type, .blocks, .constants };
@@ -65,7 +78,7 @@ const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .global
 
 pub fn resolveSourceOwnedFromInput(contents: []const u8) ?Descriptor {
     const input = parseSourceDescriptorInput(contents) orelse return null;
-    return resolveSourceOwnedFromBodyWithEmitter(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface, input.emitter);
+    return resolveSourceOwnedFromBodyWithEmitter(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface, input.emitter, input.payload, input.derivation);
 }
 
 pub fn resolveSourceOwnedFromBody(
@@ -76,7 +89,20 @@ pub fn resolveSourceOwnedFromBody(
     body_name: []const u8,
     diagnostic_surface: []const u8,
 ) ?Descriptor {
-    return resolveSourceOwnedFromBodyWithEmitter(wrapper, mode, fixture, tag, body_name, diagnostic_surface, "-");
+    return resolveSourceOwnedFromBodyWithEmitter(wrapper, mode, fixture, tag, body_name, diagnostic_surface, "-", .descriptor_body_name, .unknown);
+}
+
+pub fn resolveSourceOwnedFromFullProgram(
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    body_name: []const u8,
+    diagnostic_surface: []const u8,
+    input_emitter: []const u8,
+    derivation: DescriptorDerivation,
+) ?Descriptor {
+    return resolveSourceOwnedFromBodyWithEmitter(wrapper, mode, fixture, tag, body_name, diagnostic_surface, input_emitter, .full_descriptor_program, derivation);
 }
 
 fn resolveSourceOwnedFromBodyWithEmitter(
@@ -87,6 +113,8 @@ fn resolveSourceOwnedFromBodyWithEmitter(
     body_name: []const u8,
     diagnostic_surface: []const u8,
     input_emitter: []const u8,
+    input_payload: InputPayload,
+    derivation: DescriptorDerivation,
 ) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
     if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
@@ -94,7 +122,10 @@ fn resolveSourceOwnedFromBodyWithEmitter(
     const surface = if (diagnostic_surface.len != 0) diagnostic_surface else sdv2.bodyName(body);
     const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
     const v2_source: sdv2.Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
-    const v2 = sdv2.programFromSourceDescriptor(v2_source, body, surface);
+    const v2 = switch (input_payload) {
+        .descriptor_body_name => sdv2.programFromSourceDescriptor(v2_source, body, surface),
+        .full_descriptor_program => sdv2.programFromFullDescriptor(v2_source, body, surface),
+    };
     return .{
         .id = surface,
         .surface = surface,
@@ -102,6 +133,8 @@ fn resolveSourceOwnedFromBodyWithEmitter(
         .features = featuresForSurface(surface),
         .v2 = v2,
         .input_emitter = input_emitter,
+        .input_payload = input_payload,
+        .derivation = derivation,
     };
 }
 
@@ -139,6 +172,26 @@ pub fn isZigEmittedDescriptor(descriptor: Descriptor) bool {
 
 pub fn isRunnerGeneratedDescriptor(descriptor: Descriptor) bool {
     return std.mem.eql(u8, descriptor.input_emitter, "zllvm-runner");
+}
+
+pub fn isFullDescriptorProgramInput(descriptor: Descriptor) bool {
+    return descriptor.input_payload == .full_descriptor_program;
+}
+
+pub fn usesDescriptorBodyNameInput(descriptor: Descriptor) bool {
+    return descriptor.input_payload == .descriptor_body_name;
+}
+
+pub fn usesZllvmBodyExpansion(descriptor: Descriptor) bool {
+    return descriptor.input_payload == .descriptor_body_name;
+}
+
+pub fn isAirDerivedDescriptor(descriptor: Descriptor) bool {
+    return descriptor.derivation == .zig_air_facts;
+}
+
+pub fn isStaticDescriptorMap(descriptor: Descriptor) bool {
+    return descriptor.derivation == .static_descriptor_map;
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -217,17 +270,30 @@ const SourceDescriptorInput = struct {
     body_name: []const u8,
     diagnostic_surface: []const u8,
     emitter: []const u8,
+    payload: InputPayload,
+    derivation: DescriptorDerivation,
 };
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
-    if (!std.mem.startsWith(u8, contents, "zllvm-source-derived-descriptor-v1\n")) return null;
+    const is_v1 = std.mem.startsWith(u8, contents, "zllvm-source-derived-descriptor-v1\n");
+    const is_v2 = std.mem.startsWith(u8, contents, "zllvm-source-derived-descriptor-v2\n");
+    if (!is_v1 and !is_v2) return null;
     const wrapper = descriptorLineValue(contents, "wrapper") orelse return null;
     const mode = descriptorLineValue(contents, "mode") orelse return null;
     const fixture = descriptorLineValue(contents, "fixture") orelse return null;
     const tag = descriptorLineValue(contents, "source_tag") orelse return null;
-    const body_name = descriptorLineValue(contents, "descriptor_v2_body") orelse return null;
+    const payload: InputPayload = if (is_v2) blk: {
+        const payload_name = descriptorLineValue(contents, "descriptor_payload") orelse return null;
+        if (!std.mem.eql(u8, payload_name, "full-typed-program")) return null;
+        break :blk .full_descriptor_program;
+    } else .descriptor_body_name;
+    const body_name = if (is_v2)
+        descriptorLineValue(contents, "descriptor_program_body") orelse return null
+    else
+        descriptorLineValue(contents, "descriptor_v2_body") orelse return null;
     const diagnostic_surface = descriptorLineValue(contents, "diagnostic_surface") orelse body_name;
     const emitter = descriptorLineValue(contents, "descriptor_emitter") orelse "-";
+    const derivation = descriptorDerivationFromName(descriptorLineValue(contents, "descriptor_derivation") orelse "-");
     if (descriptorLineValue(contents, "descriptor_source")) |source| {
         if (!std.mem.eql(u8, source, "zig-source-analysis")) return null;
     } else return null;
@@ -239,7 +305,15 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
         .body_name = body_name,
         .diagnostic_surface = diagnostic_surface,
         .emitter = emitter,
+        .payload = payload,
+        .derivation = derivation,
     };
+}
+
+fn descriptorDerivationFromName(name: []const u8) DescriptorDerivation {
+    if (std.mem.eql(u8, name, "zig-air-facts")) return .zig_air_facts;
+    if (std.mem.eql(u8, name, "static-descriptor-map")) return .static_descriptor_map;
+    return .unknown;
 }
 
 fn descriptorLineValue(contents: []const u8, key: []const u8) ?[]const u8 {

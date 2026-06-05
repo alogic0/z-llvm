@@ -334,6 +334,22 @@ fn writeIrWriterModuleFromEnv(
     }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
+    writer.interface.print(
+        \\; zllvm_full_descriptor_program = "{s}"
+        \\; zllvm_descriptor_body_name = "{s}"
+        \\; zllvm_body_expansion = "{s}"
+        \\; zllvm_air_derived_descriptor = "{s}"
+        \\; zllvm_static_descriptor_map = "{s}"
+        \\
+    , .{
+        if (descriptor) |desc| if (sd.isFullDescriptorProgramInput(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesDescriptorBodyNameInput(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesZllvmBodyExpansion(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isAirDerivedDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isStaticDescriptorMap(desc)) "used" else "not-used" else "-",
+    }) catch |err| {
+        try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });
+    };
     if (descriptor) |desc| {
         writer.interface.writeAll("; zllvm_semantic_descriptor_features = \"") catch |err| {
             try fatal(io, "failed to start semantic descriptor features {s}: {any}\n", .{ ir_path, err });
@@ -587,13 +603,18 @@ fn resolveDirectSemanticDescriptor(io: std.Io, contents: []const u8) ?sd.Descrip
     const diagnostic_surface = readHeaderValue(contents, "; zllvm_ir_writer_surface = \"") orelse {
         fatal(io, "semantic descriptor artifact is missing diagnostic surface metadata\n", .{});
     };
-    const descriptor = sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface) orelse {
+    const full_descriptor_program = readHeaderValue(contents, "; zllvm_full_descriptor_program = \"") orelse "not-used";
+    const descriptor = if (std.mem.eql(u8, full_descriptor_program, "used"))
+        sd.resolveSourceOwnedFromFullProgram(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface, "patched-zig-hook", .unknown)
+    else
+        sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface);
+    const resolved_descriptor = descriptor orelse {
         fatal(io, "unsupported semantic descriptor construct=source-derived-artifact wrapper={s} fixture={s} mode={s} source_tag={s} body={s}\n", .{ wrapper, source_fixture, mode, source_tag, body_name });
     };
-    if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
+    if (sd.firstUnsupportedConstruct(resolved_descriptor)) |construct| {
         fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
     }
-    return descriptor;
+    return resolved_descriptor;
 }
 
 fn readHeaderValue(contents: []const u8, prefix: []const u8) ?[]const u8 {

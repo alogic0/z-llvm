@@ -270,15 +270,16 @@ source_wrapper_discovery=discovered_source_wrappers=72
 
 This supersedes the older claim shape for the current release source-backed
 inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
-stable source-derived descriptor file, and z_llvm consumes that descriptor
-directly before verifying and lowering DescriptorV2 into structured-direct IR.
+full typed `zllvm-source-derived-descriptor-v2` payload, and z_llvm consumes
+that descriptor directly before verifying and lowering DescriptorV2 into
+structured-direct IR.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
 ownership path. The source-owned gate fails if any row delegates back to the
 external writer body path, uses the old semantic-record ownership marker, uses
 surface dispatch as the ownership selector, uses a tag-table descriptor lookup,
-uses body-enum descriptor dispatch, or uses the temporary manual fixture
-dispatch oracle.
+uses body-enum descriptor dispatch, expands a descriptor body name inside
+z_llvm, or uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
@@ -533,6 +534,9 @@ release_source_owned_gate=zig build distribution-x86_64-release-source-owned
 release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_owned_rows=90 descriptor_v2_rows=90
                           real_descriptor_program_rows=90
+                          full_descriptor_program_rows=90
+                          descriptor_body_name_rows=0
+                          zllvm_body_expansion_rows=0
                           zig_emitted_descriptor_rows=90
                           runner_generated_descriptor_rows=0
                           descriptor_file_consumed_rows=90

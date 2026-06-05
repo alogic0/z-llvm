@@ -417,6 +417,10 @@ pub fn programFromSourceDescriptor(source: Source, body: Body, diagnostic_surfac
     return programFromBody(source, body, diagnostic_surface, .source_derived_descriptor);
 }
 
+pub fn programFromFullDescriptor(source: Source, body: Body, diagnostic_surface: []const u8) Program {
+    return programFromBody(source, body, diagnostic_surface, .source_derived_descriptor);
+}
+
 fn programFromBody(source: Source, body: Body, diagnostic_surface: []const u8, origin: ProgramOrigin) Program {
     return .{
         .id = bodyName(body),

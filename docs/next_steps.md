@@ -57,13 +57,16 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
 current source-backed inventory. Patched Zig still passes wrapper path, optimize
 mode, target, output path, and marker path; the runner also passes source
 fixture metadata and the source-backed tag used only to disambiguate
-wrapper/mode collisions. Patched Zig emits a stable source-derived descriptor
-file from those source facts, and z_llvm consumes that descriptor directly
-rather than resolving a wrapper/fixture/tag table. Every accepted row reports
+wrapper/mode collisions. Patched Zig emits a full typed
+`zllvm-source-derived-descriptor-v2` payload from those source facts, and
+z_llvm consumes that descriptor directly rather than resolving a
+wrapper/fixture/tag table or expanding a body name. Every accepted row reports
 descriptor-v2 semantic lowering into
 structured-direct IR. Current measured output is `release_source_rows=90`,
 `source_wrapper_rows=90`, `descriptor_owned_rows=90`,
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
+`full_descriptor_program_rows=90`, `descriptor_body_name_rows=0`,
+`zllvm_body_expansion_rows=0`,
 `zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
 `descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
@@ -121,10 +124,12 @@ The current replacement evidence is split into four explicit rungs:
 selected case-id registry proof, broad source-backed structured proof,
 source-wrapper compatibility proof, and source-owned DescriptorV2 proof. The
 source-owned rung is now strongest: all 90 current source-backed release rows
-start from a stable source-derived descriptor file emitted by patched Zig and
+start from a full typed DescriptorV2 program file emitted by patched Zig and
 consumed directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
-`real_descriptor_program_rows=90`, `zig_emitted_descriptor_rows=90`,
+`real_descriptor_program_rows=90`, `full_descriptor_program_rows=90`,
+`descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`,
+`zig_emitted_descriptor_rows=90`,
 `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
 `source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
 `body_enum_dispatch_rows=0`,
