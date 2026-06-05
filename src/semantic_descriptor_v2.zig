@@ -302,11 +302,18 @@ pub const Program = struct {
     source: Source,
     body: Body,
     diagnostic_surface: []const u8,
+    origin: ProgramOrigin,
     functions: []const Function,
     globals: []const Global = &.{},
     constants: []const Constant = &.{},
     atomics: bool = false,
     inline_asm_boundary: bool = false,
+};
+
+pub const ProgramOrigin = enum {
+    source_derived_descriptor,
+    surface_adapter,
+    body_enum_dispatch,
 };
 
 pub const VerifyError = error{
@@ -399,15 +406,24 @@ pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
 
 pub fn programFromSurface(source: Source, surface: []const u8) ?Program {
     const body = bodyForSurface(surface) orelse return null;
-    return programFromSemanticBody(source, body, surface);
+    return programFromBody(source, body, surface, .surface_adapter);
 }
 
 pub fn programFromSemanticBody(source: Source, body: Body, diagnostic_surface: []const u8) Program {
+    return programFromBody(source, body, diagnostic_surface, .body_enum_dispatch);
+}
+
+pub fn programFromSourceDescriptor(source: Source, body: Body, diagnostic_surface: []const u8) Program {
+    return programFromBody(source, body, diagnostic_surface, .source_derived_descriptor);
+}
+
+fn programFromBody(source: Source, body: Body, diagnostic_surface: []const u8, origin: ProgramOrigin) Program {
     return .{
         .id = bodyName(body),
         .source = source,
         .body = body,
         .diagnostic_surface = diagnostic_surface,
+        .origin = origin,
         .functions = functionsForBody(body),
         .globals = globalsForBody(body),
         .atomics = body == .atomic_add,
@@ -419,13 +435,16 @@ pub fn bodyForDiagnosticSurface(surface: []const u8) ?Body {
     return bodyForSurface(surface);
 }
 
+pub fn bodyForName(name: []const u8) ?Body {
+    return bodyForSurface(name);
+}
+
 pub fn isRealDescriptorProgram(program: Program) bool {
     return !isCannedReturnDescriptor(program);
 }
 
 pub fn isSurfaceToBodyAdapter(program: Program) bool {
-    _ = program;
-    return false;
+    return program.origin == .surface_adapter;
 }
 
 pub fn isCannedReturnDescriptor(program: Program) bool {
@@ -440,6 +459,14 @@ pub fn isCannedReturnDescriptor(program: Program) bool {
         .ret => |maybe_value| if (maybe_value) |value| isImmediate(value.id) else false,
         else => false,
     };
+}
+
+pub fn isSourceDerivedDescriptor(program: Program) bool {
+    return program.origin == .source_derived_descriptor;
+}
+
+pub fn isBodyEnumDispatch(program: Program) bool {
+    return program.origin == .body_enum_dispatch;
 }
 
 pub fn firstUnsupportedConstruct(program: Program) ?[]const u8 {
@@ -1775,7 +1802,7 @@ fn testProgramWithInstruction(instruction: Instruction) Program {
         .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
     }};
     const functions = [_]Function{.{ .name = "main", .return_type = .{ .int = 32 }, .blocks = &blocks }};
-    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .functions = &functions };
+    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = &functions };
 }
 
 test "descriptor v2 rejects unsupported vector type" {

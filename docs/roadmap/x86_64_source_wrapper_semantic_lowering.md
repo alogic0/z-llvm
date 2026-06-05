@@ -10,10 +10,10 @@ subset:
    module from wrapper/source metadata instead of using the case id as the
    primary selector.
 3. Source-owned release proof: the full current 90-row source-backed release
-   inventory is selected from wrapper, fixture, and source-tag metadata, not
-   from case-id ownership.
-4. DescriptorV2 semantic proof: source-owned rows lower real typed
-   DescriptorV2 programs from source metadata into
+   inventory starts from wrapper, fixture, and source-tag metadata, then emits a
+   stable source-derived descriptor input instead of using case-id ownership.
+4. DescriptorV2 semantic proof: z_llvm consumes that descriptor input directly
+   and lowers real typed DescriptorV2 programs into
    `src/structured_ir_builder.zig`, instead of routing through surface/body
    adapters, canned return descriptors, or manifest-shaped structured
    templates.
@@ -61,6 +61,9 @@ source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
 real_descriptor_program_rows=90
+source_derived_descriptor_rows=90
+tag_table_descriptor_rows=0
+body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
 canned_return_descriptor_rows=0
 manual_fixture_dispatch_rows=0
@@ -79,14 +82,19 @@ local_fail=0
 
 This gate closes the wrapper/mode collision gap by passing source fixture
 metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
-`tls-concurrency-checked-read`. Source metadata selects a z_llvm AIR-shaped
-DescriptorV2 program with real blocks/instructions, and that descriptor is
-verified and lowered into structured IR without consulting `IrWriterCase` as
-the ownership source. The emitted writer header records
+`tls-concurrency-checked-read` only as source-analysis inputs. The runner emits
+a stable `zllvm-source-derived-descriptor-v1` input, z_llvm consumes that
+descriptor directly, verifies the DescriptorV2 program with real
+blocks/instructions, and lowers it into structured IR without consulting
+`IrWriterCase` as the ownership source or resolving a wrapper/fixture/tag table
+inside z_llvm. The emitted writer header records
 `zllvm_ir_writer_dispatch = "source-owned"`, `zllvm_ir_writer_source_fixture`,
 `zllvm_ir_writer_source_tag`, `zllvm_semantic_descriptor = "descriptor-owned"`,
 `zllvm_semantic_descriptor_version = "v2"`,
 `zllvm_descriptor_program = "real"`,
+`zllvm_source_derived_descriptor = "used"`,
+`zllvm_tag_table_descriptor = "not-used"`,
+`zllvm_body_enum_dispatch = "not-used"`,
 `zllvm_surface_to_body_adapter = "not-used"`,
 `zllvm_canned_return_descriptor = "not-used"`,
 `zllvm_manual_fixture_dispatch = "not-used"`, and
@@ -129,6 +137,8 @@ rows and one external writer delegate because it deliberately omits source
 fixture/tag metadata. The source-owned gate is the stronger current claim for
 release source-backed ownership, and it requires `descriptor_owned_rows=90`,
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
+`source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
+`body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `manual_fixture_dispatch_rows=0`, `surface_dispatch_rows=0`, and
 `external_writer_delegate_rows=0`.

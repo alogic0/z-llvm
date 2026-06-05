@@ -62,14 +62,26 @@ const base64_features = [_]Feature{ .functions, .params, .return_type, .blocks, 
 const str_from_float_features = [_]Feature{ .functions, .params, .return_type, .blocks, .branches, .loops, .phi, .calls, .globals, .memory, .fp, .casts, .runtime_boundary_calls };
 const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .globals, .aggregates, .indirect_calls, .calls };
 
-pub fn resolveSourceOwned(wrapper: []const u8, mode: []const u8, fixture: []const u8, tag: []const u8) ?Descriptor {
+pub fn resolveSourceOwnedFromInput(contents: []const u8) ?Descriptor {
+    const input = parseSourceDescriptorInput(contents) orelse return null;
+    return resolveSourceOwnedFromBody(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface);
+}
+
+pub fn resolveSourceOwnedFromBody(
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    body_name: []const u8,
+    diagnostic_surface: []const u8,
+) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
     if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
-    const body = bodyForSourceMetadata(wrapper, tag) orelse return null;
-    const surface = sdv2.bodyName(body);
+    const body = sdv2.bodyForName(body_name) orelse return null;
+    const surface = if (diagnostic_surface.len != 0) diagnostic_surface else sdv2.bodyName(body);
     const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
     const v2_source: sdv2.Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
-    const v2 = sdv2.programFromSemanticBody(v2_source, body, surface);
+    const v2 = sdv2.programFromSourceDescriptor(v2_source, body, surface);
     return .{
         .id = surface,
         .surface = surface,
@@ -97,6 +109,14 @@ pub fn isSurfaceToBodyAdapter(descriptor: Descriptor) bool {
 
 pub fn isCannedReturnDescriptor(descriptor: Descriptor) bool {
     return sdv2.isCannedReturnDescriptor(descriptor.v2);
+}
+
+pub fn isSourceDerivedDescriptor(descriptor: Descriptor) bool {
+    return sdv2.isSourceDerivedDescriptor(descriptor.v2);
+}
+
+pub fn isBodyEnumDispatchDescriptor(descriptor: Descriptor) bool {
+    return sdv2.isBodyEnumDispatch(descriptor.v2);
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -167,111 +187,42 @@ fn isReleaseMode(mode: []const u8) bool {
         std.mem.eql(u8, mode, "ReleaseSmall");
 }
 
-fn surfaceForSourceMetadata(wrapper: []const u8, tag: []const u8) ?[]const u8 {
-    if (!std.mem.eql(u8, tag, "-")) return surfaceForTag(tag);
-    return surfaceForUntaggedWrapper(wrapper);
+const SourceDescriptorInput = struct {
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    body_name: []const u8,
+    diagnostic_surface: []const u8,
+};
+
+fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
+    if (!std.mem.startsWith(u8, contents, "zllvm-source-derived-descriptor-v1\n")) return null;
+    const wrapper = descriptorLineValue(contents, "wrapper") orelse return null;
+    const mode = descriptorLineValue(contents, "mode") orelse return null;
+    const fixture = descriptorLineValue(contents, "fixture") orelse return null;
+    const tag = descriptorLineValue(contents, "source_tag") orelse return null;
+    const body_name = descriptorLineValue(contents, "descriptor_v2_body") orelse return null;
+    const diagnostic_surface = descriptorLineValue(contents, "diagnostic_surface") orelse body_name;
+    if (descriptorLineValue(contents, "descriptor_source")) |source| {
+        if (!std.mem.eql(u8, source, "zig-source-analysis")) return null;
+    } else return null;
+    return .{
+        .wrapper = wrapper,
+        .mode = mode,
+        .fixture = fixture,
+        .tag = tag,
+        .body_name = body_name,
+        .diagnostic_surface = diagnostic_surface,
+    };
 }
 
-fn bodyForSourceMetadata(wrapper: []const u8, tag: []const u8) ?sdv2.Body {
-    const surface = surfaceForSourceMetadata(wrapper, tag) orelse return null;
-    return sdv2.bodyForDiagnosticSurface(surface);
-}
-
-fn surfaceForTag(tag: []const u8) ?[]const u8 {
-    if (std.mem.eql(u8, tag, "tiny-scalar")) return "scalar-add-ret";
-    if (std.mem.eql(u8, tag, "integers-add-wrap")) return "integer-arithmetic";
-    if (std.mem.eql(u8, tag, "integers-cmp-shift")) return "integer-arithmetic";
-    if (std.mem.eql(u8, tag, "control-flow-loop-sum")) return "runtime-loop-sum";
-    if (std.mem.eql(u8, tag, "control-flow-call-chain")) return "abi-arg-call";
-    if (std.mem.eql(u8, tag, "error-switch")) return "error-switch-select";
-    if (std.mem.eql(u8, tag, "switch-branch-mix")) return "runtime-condbr";
-    if (std.mem.eql(u8, tag, "switch-dense")) return "runtime-switch";
-    if (std.mem.eql(u8, tag, "pointers-memory")) return "pointer-load-store";
-    if (std.mem.eql(u8, tag, "optional-pointer-value")) return "optional-pointer";
-    if (std.mem.eql(u8, tag, "packed-bits-read-flag")) return "packed-read-flag";
-    if (std.mem.eql(u8, tag, "packed-bits-replace-low")) return "packed-replace-low";
-    if (std.mem.eql(u8, tag, "aggregates-struct-sum")) return "struct-field-sum";
-    if (std.mem.eql(u8, tag, "aggregates-array-sum")) return "array-scalar-sum";
-    if (std.mem.eql(u8, tag, "aggregates-optional-payload")) return "optional-scalar-payload";
-    if (std.mem.eql(u8, tag, "aggregates-error-union-payload")) return "error-union-payload";
-    if (std.mem.eql(u8, tag, "aggregates-slice-sum")) return "slice-loop-sum";
-    if (std.mem.eql(u8, tag, "fp-constants-literals")) return "fp-literal-return";
-    if (std.mem.eql(u8, tag, "globals-comptime-const")) return "comptime-const-mul";
-    if (std.mem.eql(u8, tag, "globals-comptime-global-counter")) return "global-update";
-    if (std.mem.eql(u8, tag, "atomics-debug-location")) return "add-imm-return";
-    if (std.mem.eql(u8, tag, "tls-concurrency-read")) return "tls-read";
-    if (std.mem.eql(u8, tag, "tls-concurrency-bump")) return "tls-bump";
-    if (std.mem.eql(u8, tag, "atomics-atomic-add")) return "atomic-add";
-    if (std.mem.eql(u8, tag, "atomics-inline-asm-barrier")) return "inline-asm-barrier";
-    if (std.mem.eql(u8, tag, "aggregate-abi-pair")) return "aggregate-pair-abi";
-    if (std.mem.eql(u8, tag, "float-compare")) return "float-less";
-    if (std.mem.eql(u8, tag, "floats-math")) return "float-add";
-    if (std.mem.eql(u8, tag, "fp-extended-ops")) return "float-sub";
-    if (std.mem.eql(u8, tag, "error-switch-select")) return "error-switch-select";
-    if (std.mem.eql(u8, tag, "atomics-debug-location-checked")) return "checked-add-imm-boundary";
-    if (std.mem.eql(u8, tag, "globals-checked")) return "checked-global-update-boundary";
-    if (std.mem.eql(u8, tag, "pointers-memory-checked")) return "checked-pointer-load-store-boundary";
-    if (std.mem.eql(u8, tag, "switch-branch-mix-checked")) return "checked-branch-mix-boundary";
-    if (std.mem.eql(u8, tag, "control-flow-calls-checked")) return "checked-call-chain-boundary";
-    if (std.mem.eql(u8, tag, "tls-concurrency-checked-bump")) return "checked-tls-bump-boundary";
-    if (std.mem.eql(u8, tag, "tls-concurrency-checked-read")) return "tls-read";
-    if (std.mem.eql(u8, tag, "aggregates-checked-array")) return "checked-array-sum-boundary";
-    if (std.mem.eql(u8, tag, "aggregates-checked-struct")) return "checked-struct-sum-boundary";
-    if (std.mem.eql(u8, tag, "aggregates-checked-slice")) return "checked-slice-loop-sum-boundary";
-    if (std.mem.eql(u8, tag, "tiny-scalar-checked-add")) return "checked-add-runtime-boundary";
-    if (std.mem.eql(u8, tag, "hidden-access")) return "hidden-global-access";
-    if (std.mem.eql(u8, tag, "mixed-c-add-zig")) return "mixed-c-zig-add";
-    if (std.mem.eql(u8, tag, "mixed-c-add-may-panic")) return "mixed-c-zig-panic-add";
-    if (std.mem.eql(u8, tag, "umul-fix-sat-i64")) return "umul-fix-sat-i64";
-    if (std.mem.eql(u8, tag, "inherit-want-safety-i64-return")) return "inherit-i64-return";
-    if (std.mem.eql(u8, tag, "compile-asm-main-unreachable")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, tag, "address-space-start-trampoline")) return "start-trampoline";
-    if (std.mem.eql(u8, tag, "getauxval-pointer-walk")) return "getauxval-pointer-walk";
-    if (std.mem.eql(u8, tag, "f128-sret-byval")) return "f128-sret-byval";
-    if (std.mem.eql(u8, tag, "logical-pointer-unreachable")) return "noreturn-unreachable-stub";
-    if (std.mem.eql(u8, tag, "vram-volatile-store")) return "address-space-volatile-store";
-    if (std.mem.eql(u8, tag, "unreachable-stubs")) return "noreturn-unreachable-stub";
-    if (std.mem.eql(u8, tag, "raw-start-loop")) return "raw-start-loop";
-    if (std.mem.eql(u8, tag, "libfuzzer-futex-wait")) return "i1-const-return";
-    if (std.mem.eql(u8, tag, "libfuzzer-test-name")) return "constant-string-slice-return";
-    if (std.mem.eql(u8, tag, "libfuzzer-test-run")) return "libfuzzer-vtable-run";
-    if (std.mem.eql(u8, tag, "base64-table-lookup")) return "table-indexed-load";
-    return null;
-}
-
-fn surfaceForUntaggedWrapper(wrapper: []const u8) ?[]const u8 {
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_hidden_access_main.zig")) return "hidden-global-access";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_mix_c_add_zig_main.zig")) return "mixed-c-zig-add";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_mix_c_add_may_panic_main.zig")) return "mixed-c-zig-panic-add";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_umul_fix_sat_i64_main.zig")) return "umul-fix-sat-i64";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_inherit_want_safety_i64_main.zig")) return "inherit-i64-return";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_compile_asm_unreachable_main.zig")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_str_from_float_help_main.zig")) return "str-from-float-help";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_decode_base_64_full_main.zig")) return "base64-decode-base64-full";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_decode_step_main.zig")) return "base64-decode-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_store_step_main.zig")) return "base64-store-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_byte_step_main.zig")) return "base64-residual-byte-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_padding_tail_step_main.zig")) return "base64-padding-tail-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_padding_loop_step_main.zig")) return "base64-padding-loop-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_padding_length_step_main.zig")) return "base64-padding-length-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_chunk_guard_step_main.zig")) return "base64-chunk-guard-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_source_stride_step_main.zig")) return "base64-source-stride-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_source_bundle_step_main.zig")) return "base64-source-bundle-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_next_source_bundle_step_main.zig")) return "base64-next-source-bundle-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_third_source_bundle_step_main.zig")) return "base64-third-source-bundle-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_bit_buffer_store_step_main.zig")) return "base64-bit-buffer-store-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_loop_advance_step_main.zig")) return "base64-loop-advance-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_guard_step_main.zig")) return "base64-residual-guard-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_bundle_step_main.zig")) return "base64-residual-bundle-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_store_step_main.zig")) return "base64-residual-store-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_length_step_main.zig")) return "base64-residual-length-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_table_check_step_main.zig")) return "base64-residual-table-check-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_accumulator_step_main.zig")) return "base64-residual-accumulator-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_loop_advance_step_main.zig")) return "base64-residual-loop-advance-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_padding_check_step_main.zig")) return "base64-residual-padding-check-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_final_mask_step_main.zig")) return "base64-residual-final-mask-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_residual_padding_loop_step_main.zig")) return "base64-residual-padding-loop-step";
-    if (std.mem.eql(u8, wrapper, "test/zig/integrated/runtime_base64_decode_exit_step_main.zig")) return "base64-decode-exit-step";
+fn descriptorLineValue(contents: []const u8, key: []const u8) ?[]const u8 {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        const separator = std.mem.indexOfScalar(u8, line, '=') orelse continue;
+        if (std.mem.eql(u8, line[0..separator], key)) return line[separator + 1 ..];
+    }
     return null;
 }
 

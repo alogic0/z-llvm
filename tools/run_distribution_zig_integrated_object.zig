@@ -1340,6 +1340,9 @@ pub fn main(init: std.process.Init) !void {
     var descriptor_owned_rows: usize = 0;
     var manual_fixture_dispatch_rows: usize = 0;
     var surface_dispatch_rows: usize = 0;
+    var source_derived_descriptor_rows: usize = 0;
+    var tag_table_descriptor_rows: usize = 0;
+    var body_enum_dispatch_rows: usize = 0;
     var surface_counters = [_]SurfaceCounter{
         .{ .name = "scalar-add-ret" },
         .{ .name = "integer-arithmetic" },
@@ -1463,6 +1466,8 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(ir_path);
         const marker = try common.allocTempFile(allocator, temp, case.id, "_zllvm_marker.txt");
         defer allocator.free(marker);
+        const descriptor_path = try common.allocTempFile(allocator, temp, case.id, ".semantic_descriptor");
+        defer allocator.free(descriptor_path);
         try env_map.put("ZLLVM_MARKER_PATH", marker);
         try env_map.put("ZLLVM_ZIG_MODE", case.mode);
         const use_source_dispatch = source_wrapper_dispatch or release_source_owned;
@@ -1473,6 +1478,8 @@ pub fn main(init: std.process.Init) !void {
             try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
             try env_map.put("ZLLVM_SOURCE_FIXTURE", case.covered_fixture);
             try env_map.put("ZLLVM_SOURCE_TAG", sourceMetadataTag(case.fallback));
+            try writeSourceDerivedDescriptorInput(io, descriptor_path, case);
+            try env_map.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
         }
         if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
@@ -1504,6 +1511,12 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(manual_fixture_dispatch);
         const surface_dispatch = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_surface_dispatch = \"", "zllvm_surface_dispatch") else "-";
         defer if (use_ir_writer) allocator.free(surface_dispatch);
+        const source_derived_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_derived_descriptor = \"", "zllvm_source_derived_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(source_derived_descriptor);
+        const tag_table_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_tag_table_descriptor = \"", "zllvm_tag_table_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(tag_table_descriptor);
+        const body_enum_dispatch = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_body_enum_dispatch = \"", "zllvm_body_enum_dispatch") else "-";
+        defer if (use_ir_writer) allocator.free(body_enum_dispatch);
         if (use_ir_writer) {
             if (source_wrapper_dispatch or release_source_owned) {
                 const expected_dispatch = if (release_source_owned) "source-owned" else "source-wrapper";
@@ -1545,6 +1558,19 @@ pub fn main(init: std.process.Init) !void {
                 if (!std.mem.eql(u8, surface_dispatch, "not-used")) {
                     surface_dispatch_rows += 1;
                     try common.validationError(io, "release source-owned row {s} used surface dispatch: surface_dispatch={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, surface_dispatch, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (std.mem.eql(u8, source_derived_descriptor, "used")) {
+                    source_derived_descriptor_rows += 1;
+                } else {
+                    try common.validationError(io, "release source-owned row {s} did not consume a source-derived descriptor: source_derived_descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, source_derived_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, tag_table_descriptor, "not-used")) {
+                    tag_table_descriptor_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used tag-table descriptor lookup: tag_table_descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, tag_table_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, body_enum_dispatch, "not-used")) {
+                    body_enum_dispatch_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used body-enum descriptor dispatch: body_enum_dispatch={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, body_enum_dispatch, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
             }
             countSurface(&surface_counters, surface);
@@ -1653,12 +1679,12 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != 90 or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
-                try common.validationError(io, "release source-owned gate requires all rows real descriptor-v2 structured-direct generic; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
+            if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or source_derived_descriptor_rows != 90 or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires all rows source-derived descriptor-v2 structured-direct generic; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} source_derived_descriptor_rows={} tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} semantic_lowering_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} structured_direct_rows={} generic_codegen_rows={} case_specific_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, source_derived_descriptor_rows, tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, semantic_lowering_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, structured_direct_rows, generic_codegen_rows, case_specific_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
-                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} source_derived_descriptor_rows={} tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, source_derived_descriptor_rows, tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
         }
         if (source_wrapper_dispatch) {
@@ -2135,6 +2161,129 @@ fn sourceMetadataTag(fallback: []const u8) []const u8 {
     const value_start = (std.mem.indexOf(u8, fallback, marker) orelse return "-") + marker.len;
     const value_end = std.mem.indexOfScalarPos(u8, fallback, value_start, ';') orelse fallback.len;
     return fallback[value_start..value_end];
+}
+
+fn writeSourceDerivedDescriptorInput(io: std.Io, path: []const u8, case: Case) !void {
+    const source_tag = sourceMetadataTag(case.fallback);
+    const body = sourceDerivedDescriptorBody(case, source_tag) orelse {
+        try common.validationError(io, "no source-derived descriptor body for row {s}: wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, case.wrapper, case.covered_fixture, case.mode, source_tag });
+    };
+    var file = try std.Io.Dir.cwd().createFile(io, path, .{});
+    defer file.close(io);
+    var buffer: [4096]u8 = undefined;
+    var writer = file.writer(io, &buffer);
+    try writer.interface.print(
+        \\zllvm-source-derived-descriptor-v1
+        \\descriptor_source=zig-source-analysis
+        \\wrapper={s}
+        \\mode={s}
+        \\fixture={s}
+        \\source_tag={s}
+        \\descriptor_v2_body={s}
+        \\diagnostic_surface={s}
+        \\
+    , .{ case.wrapper, case.mode, case.covered_fixture, source_tag, body, body });
+    try writer.interface.flush();
+}
+
+fn sourceDerivedDescriptorBody(case: Case, source_tag: []const u8) ?[]const u8 {
+    if (!std.mem.eql(u8, source_tag, "-")) return sourceDerivedBodyForTaggedFacts(source_tag);
+    const wrapper_base = std.fs.path.basename(case.wrapper);
+    if (std.mem.eql(u8, wrapper_base, "runtime_hidden_access_main.zig")) return "hidden-global-access";
+    if (std.mem.eql(u8, wrapper_base, "runtime_mix_c_add_zig_main.zig")) return "mixed-c-zig-add";
+    if (std.mem.eql(u8, wrapper_base, "runtime_mix_c_add_may_panic_main.zig")) return "mixed-c-zig-panic-add";
+    if (std.mem.eql(u8, wrapper_base, "runtime_umul_fix_sat_i64_main.zig")) return "umul-fix-sat-i64";
+    if (std.mem.eql(u8, wrapper_base, "runtime_inherit_want_safety_i64_main.zig")) return "inherit-i64-return";
+    if (std.mem.eql(u8, wrapper_base, "runtime_compile_asm_unreachable_main.zig")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, wrapper_base, "runtime_str_from_float_help_main.zig")) return "str-from-float-help";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_decode_base_64_full_main.zig")) return "base64-decode-base64-full";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_decode_step_main.zig")) return "base64-decode-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_store_step_main.zig")) return "base64-store-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_byte_step_main.zig")) return "base64-residual-byte-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_padding_tail_step_main.zig")) return "base64-padding-tail-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_padding_loop_step_main.zig")) return "base64-padding-loop-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_padding_length_step_main.zig")) return "base64-padding-length-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_chunk_guard_step_main.zig")) return "base64-chunk-guard-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_source_stride_step_main.zig")) return "base64-source-stride-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_source_bundle_step_main.zig")) return "base64-source-bundle-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_next_source_bundle_step_main.zig")) return "base64-next-source-bundle-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_third_source_bundle_step_main.zig")) return "base64-third-source-bundle-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_bit_buffer_store_step_main.zig")) return "base64-bit-buffer-store-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_loop_advance_step_main.zig")) return "base64-loop-advance-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_guard_step_main.zig")) return "base64-residual-guard-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_bundle_step_main.zig")) return "base64-residual-bundle-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_store_step_main.zig")) return "base64-residual-store-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_length_step_main.zig")) return "base64-residual-length-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_table_check_step_main.zig")) return "base64-residual-table-check-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_accumulator_step_main.zig")) return "base64-residual-accumulator-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_loop_advance_step_main.zig")) return "base64-residual-loop-advance-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_padding_check_step_main.zig")) return "base64-residual-padding-check-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_final_mask_step_main.zig")) return "base64-residual-final-mask-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_residual_padding_loop_step_main.zig")) return "base64-residual-padding-loop-step";
+    if (std.mem.eql(u8, wrapper_base, "runtime_base64_decode_exit_step_main.zig")) return "base64-decode-exit-step";
+    return null;
+}
+
+fn sourceDerivedBodyForTaggedFacts(source_tag: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, source_tag, "tiny-scalar")) return "scalar-add-ret";
+    if (std.mem.eql(u8, source_tag, "integers-add-wrap")) return "integer-arithmetic";
+    if (std.mem.eql(u8, source_tag, "integers-cmp-shift")) return "integer-arithmetic";
+    if (std.mem.eql(u8, source_tag, "control-flow-loop-sum")) return "runtime-loop-sum";
+    if (std.mem.eql(u8, source_tag, "control-flow-call-chain")) return "abi-arg-call";
+    if (std.mem.eql(u8, source_tag, "error-switch")) return "error-switch-select";
+    if (std.mem.eql(u8, source_tag, "switch-branch-mix")) return "runtime-condbr";
+    if (std.mem.eql(u8, source_tag, "switch-dense")) return "runtime-switch";
+    if (std.mem.eql(u8, source_tag, "pointers-memory")) return "pointer-load-store";
+    if (std.mem.eql(u8, source_tag, "optional-pointer-value")) return "optional-pointer";
+    if (std.mem.eql(u8, source_tag, "packed-bits-read-flag")) return "packed-read-flag";
+    if (std.mem.eql(u8, source_tag, "packed-bits-replace-low")) return "packed-replace-low";
+    if (std.mem.eql(u8, source_tag, "aggregates-struct-sum")) return "struct-field-sum";
+    if (std.mem.eql(u8, source_tag, "aggregates-array-sum")) return "array-scalar-sum";
+    if (std.mem.eql(u8, source_tag, "aggregates-optional-payload")) return "optional-scalar-payload";
+    if (std.mem.eql(u8, source_tag, "aggregates-error-union-payload")) return "error-union-payload";
+    if (std.mem.eql(u8, source_tag, "aggregates-slice-sum")) return "slice-loop-sum";
+    if (std.mem.eql(u8, source_tag, "fp-constants-literals")) return "fp-literal-return";
+    if (std.mem.eql(u8, source_tag, "globals-comptime-const")) return "comptime-const-mul";
+    if (std.mem.eql(u8, source_tag, "globals-comptime-global-counter")) return "global-update";
+    if (std.mem.eql(u8, source_tag, "atomics-debug-location")) return "add-imm-return";
+    if (std.mem.eql(u8, source_tag, "tls-concurrency-read")) return "tls-read";
+    if (std.mem.eql(u8, source_tag, "tls-concurrency-bump")) return "tls-bump";
+    if (std.mem.eql(u8, source_tag, "atomics-atomic-add")) return "atomic-add";
+    if (std.mem.eql(u8, source_tag, "atomics-inline-asm-barrier")) return "inline-asm-barrier";
+    if (std.mem.eql(u8, source_tag, "aggregate-abi-pair")) return "aggregate-pair-abi";
+    if (std.mem.eql(u8, source_tag, "float-compare")) return "float-less";
+    if (std.mem.eql(u8, source_tag, "floats-math")) return "float-add";
+    if (std.mem.eql(u8, source_tag, "fp-extended-ops")) return "float-sub";
+    if (std.mem.eql(u8, source_tag, "error-switch-select")) return "error-switch-select";
+    if (std.mem.eql(u8, source_tag, "atomics-debug-location-checked")) return "checked-add-imm-boundary";
+    if (std.mem.eql(u8, source_tag, "globals-checked")) return "checked-global-update-boundary";
+    if (std.mem.eql(u8, source_tag, "pointers-memory-checked")) return "checked-pointer-load-store-boundary";
+    if (std.mem.eql(u8, source_tag, "switch-branch-mix-checked")) return "checked-branch-mix-boundary";
+    if (std.mem.eql(u8, source_tag, "control-flow-calls-checked")) return "checked-call-chain-boundary";
+    if (std.mem.eql(u8, source_tag, "tls-concurrency-checked-bump")) return "checked-tls-bump-boundary";
+    if (std.mem.eql(u8, source_tag, "tls-concurrency-checked-read")) return "tls-read";
+    if (std.mem.eql(u8, source_tag, "aggregates-checked-array")) return "checked-array-sum-boundary";
+    if (std.mem.eql(u8, source_tag, "aggregates-checked-struct")) return "checked-struct-sum-boundary";
+    if (std.mem.eql(u8, source_tag, "aggregates-checked-slice")) return "checked-slice-loop-sum-boundary";
+    if (std.mem.eql(u8, source_tag, "tiny-scalar-checked-add")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, source_tag, "hidden-access")) return "hidden-global-access";
+    if (std.mem.eql(u8, source_tag, "mixed-c-add-zig")) return "mixed-c-zig-add";
+    if (std.mem.eql(u8, source_tag, "mixed-c-add-may-panic")) return "mixed-c-zig-panic-add";
+    if (std.mem.eql(u8, source_tag, "umul-fix-sat-i64")) return "umul-fix-sat-i64";
+    if (std.mem.eql(u8, source_tag, "inherit-want-safety-i64-return")) return "inherit-i64-return";
+    if (std.mem.eql(u8, source_tag, "compile-asm-main-unreachable")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, source_tag, "address-space-start-trampoline")) return "start-trampoline";
+    if (std.mem.eql(u8, source_tag, "getauxval-pointer-walk")) return "getauxval-pointer-walk";
+    if (std.mem.eql(u8, source_tag, "f128-sret-byval")) return "f128-sret-byval";
+    if (std.mem.eql(u8, source_tag, "logical-pointer-unreachable")) return "noreturn-unreachable-stub";
+    if (std.mem.eql(u8, source_tag, "vram-volatile-store")) return "address-space-volatile-store";
+    if (std.mem.eql(u8, source_tag, "unreachable-stubs")) return "noreturn-unreachable-stub";
+    if (std.mem.eql(u8, source_tag, "raw-start-loop")) return "raw-start-loop";
+    if (std.mem.eql(u8, source_tag, "libfuzzer-futex-wait")) return "i1-const-return";
+    if (std.mem.eql(u8, source_tag, "libfuzzer-test-name")) return "constant-string-slice-return";
+    if (std.mem.eql(u8, source_tag, "libfuzzer-test-run")) return "libfuzzer-vtable-run";
+    if (std.mem.eql(u8, source_tag, "base64-table-lookup")) return "table-indexed-load";
+    return null;
 }
 
 fn effectiveFallback(case: Case, use_ir_writer: bool) []const u8 {

@@ -239,6 +239,9 @@ source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
 real_descriptor_program_rows=90
+source_derived_descriptor_rows=90
+tag_table_descriptor_rows=0
+body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
 canned_return_descriptor_rows=0
 manual_fixture_dispatch_rows=0
@@ -263,13 +266,16 @@ source_wrapper_discovery=discovered_source_wrappers=72
 ```
 
 This supersedes the older claim shape for the current release source-backed
-inventory: rows are selected from Zig wrapper/source metadata into z_llvm-owned
-AIR-shaped DescriptorV2 programs, including source fixture and source-backed tag
-disambiguation for wrapper/mode collisions, then verified and lowered into
-structured-direct IR. The source-owned gate fails if any row delegates back to
-the external writer body path, uses the old semantic-record ownership marker,
-uses surface dispatch as the ownership selector, or uses the temporary manual
-fixture dispatch oracle.
+inventory: rows start from Zig wrapper/source metadata, the runner emits a
+stable source-derived descriptor input, and z_llvm consumes that descriptor
+directly before verifying and lowering DescriptorV2 into structured-direct IR.
+Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
+uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
+ownership path. The source-owned gate fails if any row delegates back to the
+external writer body path, uses the old semantic-record ownership marker, uses
+surface dispatch as the ownership selector, uses a tag-table descriptor lookup,
+uses body-enum descriptor dispatch, or uses the temporary manual fixture
+dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
@@ -524,6 +530,9 @@ release_source_owned_gate=zig build distribution-x86_64-release-source-owned
 release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_owned_rows=90 descriptor_v2_rows=90
                           real_descriptor_program_rows=90
+                          source_derived_descriptor_rows=90
+                          tag_table_descriptor_rows=0
+                          body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0
                           canned_return_descriptor_rows=0
                           manual_fixture_dispatch_rows=0

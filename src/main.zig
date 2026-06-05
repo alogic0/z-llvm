@@ -110,7 +110,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     if (emit == .semantic_descriptor) {
-        try writeSemanticDescriptorFromEnv(io, init.environ_map);
+        try writeSemanticDescriptorFromEnv(allocator, io, init.environ_map);
         return;
     }
 
@@ -237,9 +237,7 @@ fn writeIrWriterModuleFromEnv(
         (std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
             envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", source_wrapper_dispatch_name));
     const descriptor = if (source_owned_dispatch)
-        sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
-            try fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
-        }
+        try readSourceOwnedDescriptorFromEnv(allocator, io, environ, wrapper, mode, source_fixture, source_tag)
     else
         null;
     if (descriptor) |desc| {
@@ -290,7 +288,12 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_semantic_descriptor = "{s}"
         \\; zllvm_semantic_descriptor_id = "{s}"
         \\; zllvm_semantic_descriptor_version = "{s}"
+        \\; zllvm_semantic_descriptor_body = "{s}"
         \\; zllvm_descriptor_program = "{s}"
+        \\; zllvm_descriptor_input = "{s}"
+        \\; zllvm_source_derived_descriptor = "{s}"
+        \\; zllvm_tag_table_descriptor = "{s}"
+        \\; zllvm_body_enum_dispatch = "{s}"
         \\; zllvm_surface_to_body_adapter = "{s}"
         \\; zllvm_canned_return_descriptor = "{s}"
         \\; zllvm_surface_dispatch = "{s}"
@@ -313,7 +316,12 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor != null) "descriptor-owned" else "not-used",
         if (descriptor) |desc| desc.id else "-",
         if (descriptor != null) "v2" else "-",
+        if (descriptor) |desc| sdv2BodyName(desc) else "-",
         if (descriptor) |desc| if (sd.isRealDescriptorProgram(desc)) "real" else "not-real" else "-",
+        if (descriptor != null) "source-derived" else "not-used",
+        if (descriptor) |desc| if (sd.isSourceDerivedDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor != null) "not-used" else "-",
+        if (descriptor) |desc| if (sd.isBodyEnumDispatchDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isSurfaceToBodyAdapter(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isCannedReturnDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor != null) "not-used" else if (ir_writer_case != null) "case-surface" else "not-used",
@@ -358,6 +366,7 @@ fn writeIrWriterModuleFromEnv(
 }
 
 fn writeSemanticDescriptorFromEnv(
+    allocator: std.mem.Allocator,
     io: std.Io,
     environ: *const std.process.Environ.Map,
 ) !void {
@@ -365,9 +374,7 @@ fn writeSemanticDescriptorFromEnv(
     const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
     const source_fixture = requiredEnv(io, environ, "ZLLVM_SOURCE_FIXTURE");
     const source_tag = environ.get("ZLLVM_SOURCE_TAG") orelse "-";
-    const descriptor = sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
-        try fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
-    };
+    const descriptor = try readSourceOwnedDescriptorFromEnv(allocator, io, environ, wrapper, mode, source_fixture, source_tag);
     if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
         try fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
     }
@@ -376,6 +383,39 @@ fn writeSemanticDescriptorFromEnv(
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try sd.writeText(descriptor, &stdout_writer.interface);
     try stdout_writer.interface.flush();
+}
+
+fn readSourceOwnedDescriptorFromEnv(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    environ: *const std.process.Environ.Map,
+    wrapper: []const u8,
+    mode: []const u8,
+    source_fixture: []const u8,
+    source_tag: []const u8,
+) !sd.Descriptor {
+    const descriptor_path = requiredEnv(io, environ, "ZLLVM_SEMANTIC_DESCRIPTOR_PATH");
+    const contents = std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, allocator, .limited(1024 * 1024)) catch |err| {
+        try fatal(io, "failed to read source-derived semantic descriptor {s}: {any}\n", .{ descriptor_path, err });
+    };
+    // The returned descriptor borrows slices from this process-local input.
+    // z_llvm exits immediately after consuming one descriptor, so keeping the
+    // stable input alive is simpler than cloning each field independently.
+    const descriptor = sd.resolveSourceOwnedFromInput(contents) orelse {
+        try fatal(io, "unsupported semantic descriptor construct=source-derived-input wrapper={s} fixture={s} mode={s} source_tag={s} descriptor={s}\n", .{ wrapper, source_fixture, mode, source_tag, descriptor_path });
+    };
+    if (!std.mem.eql(u8, descriptor.source.wrapper, wrapper) or
+        !std.mem.eql(u8, descriptor.source.mode, mode) or
+        !std.mem.eql(u8, descriptor.source.fixture, source_fixture) or
+        !std.mem.eql(u8, descriptor.source.tag, source_tag))
+    {
+        try fatal(io, "source-derived descriptor metadata mismatch descriptor={s} expected_wrapper={s} actual_wrapper={s} expected_fixture={s} actual_fixture={s} expected_mode={s} actual_mode={s} expected_source_tag={s} actual_source_tag={s}\n", .{ descriptor_path, wrapper, descriptor.source.wrapper, source_fixture, descriptor.source.fixture, mode, descriptor.source.mode, source_tag, descriptor.source.tag });
+    }
+    return descriptor;
+}
+
+fn sdv2BodyName(descriptor: sd.Descriptor) []const u8 {
+    return @import("semantic_descriptor_v2.zig").bodyName(descriptor.v2.body);
 }
 
 fn emitCodegenModule(
@@ -509,11 +549,7 @@ fn resolveDirectIrWriterCase(contents: []const u8) ?IrWriterCase {
     if (!std.mem.eql(u8, construction, IrConstruction.structured_builder.marker())) return null;
     const dispatch = readHeaderValue(contents, "; zllvm_ir_writer_dispatch = \"") orelse "case-id";
     if (std.mem.eql(u8, dispatch, source_owned_dispatch_name)) {
-        const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse return null;
-        const mode = readHeaderValue(contents, "; zllvm_ir_writer_mode = \"") orelse return null;
-        const source_fixture = readHeaderValue(contents, "; zllvm_ir_writer_source_fixture = \"") orelse return null;
-        const source_tag = readHeaderValue(contents, "; zllvm_ir_writer_source_tag = \"") orelse return null;
-        return resolveReleaseSourceOwnedDispatchCase(wrapper, mode, source_fixture, source_tag);
+        return null;
     }
     if (std.mem.eql(u8, dispatch, source_wrapper_dispatch_name)) {
         const wrapper = readHeaderValue(contents, "; zllvm_ir_writer_wrapper = \"") orelse return null;
@@ -539,8 +575,14 @@ fn resolveDirectSemanticDescriptor(io: std.Io, contents: []const u8) ?sd.Descrip
     const source_tag = readHeaderValue(contents, "; zllvm_ir_writer_source_tag = \"") orelse {
         fatal(io, "semantic descriptor artifact is missing source tag metadata\n", .{});
     };
-    const descriptor = sd.resolveSourceOwned(wrapper, mode, source_fixture, source_tag) orelse {
-        fatal(io, "unsupported semantic descriptor construct=source-metadata wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ wrapper, source_fixture, mode, source_tag });
+    const body_name = readHeaderValue(contents, "; zllvm_semantic_descriptor_body = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing descriptor body metadata\n", .{});
+    };
+    const diagnostic_surface = readHeaderValue(contents, "; zllvm_ir_writer_surface = \"") orelse {
+        fatal(io, "semantic descriptor artifact is missing diagnostic surface metadata\n", .{});
+    };
+    const descriptor = sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface) orelse {
+        fatal(io, "unsupported semantic descriptor construct=source-derived-artifact wrapper={s} fixture={s} mode={s} source_tag={s} body={s}\n", .{ wrapper, source_fixture, mode, source_tag, body_name });
     };
     if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
         fatal(io, "unsupported semantic descriptor construct={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ construct, wrapper, source_fixture, mode, source_tag });
