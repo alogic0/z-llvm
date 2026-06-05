@@ -152,16 +152,12 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 that gate. Serialized AIR-shaped transport is proven for all 90 rows because
 those rows emit semantic DescriptorV2 records and the gate rejects any
 serialized return stub. Current provenance counters show
-`air_extracted_descriptor_rows=24`, `template_descriptor_rows=66`,
-`wrapper_body_map_rows=32`, and `source_tag_body_map_rows=34`, so the records
-are only partially separated from template ownership. The extracted-record
-slice covers simple scalar/integer arithmetic, branch/loop/call,
-global/TLS, pointer load/store, and selected checked-edge rows, and those rows
-now report no body-map selector. The remaining template-owned rows include
-packed bits, optional/error-union payloads,
-aggregate/slice rows, FP rows, atomics, inline-asm, ReleaseSmall mixed C/Zig
-and i64 helpers, start/noreturn/address-space/raw-start/libfuzzer rows,
-base64 full/reduced/table, and `strFromFloatHelp`. The narrower source-wrapper compatibility
+`air_extracted_descriptor_rows=64`, `template_descriptor_rows=26`,
+`wrapper_body_map_rows=26`, and `source_tag_body_map_rows=0`, so the records
+are mostly separated from template ownership. Every
+non-base64/non-`strFromFloatHelp` family now uses the extracted-record path
+with no body-map selector. The remaining template-owned rows are the base64
+full/reduced decoder rows and `strFromFloatHelp`. The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally
 covers only unambiguous wrapper/mode inputs.

@@ -6,16 +6,16 @@ Measured state after the first extracted-record slice:
 
 ```text
 release_source_rows=90
-air_extracted_descriptor_rows=24
-template_descriptor_rows=66
-wrapper_body_map_rows=32
-source_tag_body_map_rows=34
+air_extracted_descriptor_rows=64
+template_descriptor_rows=26
+wrapper_body_map_rows=26
+source_tag_body_map_rows=0
 ```
 
-All rows still serialize DescriptorV2 records. The first 24 rows now use a
-separate extracted-record writer path for simple compiler-owned facts and no
-longer report a wrapper/source-tag body-map selector, while the remaining 66
-rows are still emitted from
+All rows still serialize DescriptorV2 records. The current 64 extracted rows
+use a separate extracted-record writer path and no longer report a
+wrapper/source-tag body-map selector, while the remaining 26 hard rows are
+still emitted from
 `zllvmWriteAirDescriptorRecords(...)` body templates selected by
 `zllvmSourceOwnedDescriptorBody(...)` or
 `zllvmSourceOwnedTaggedDescriptorBody(...)`. This is distinct from full Zig
@@ -108,8 +108,8 @@ Sema/AIR extraction, which remains the target.
 
 ## Extracted-Record Rows
 
-The first extracted-record milestone covers these simple families and no
-longer routes them through the broad body-template dispatcher:
+The extracted-record milestone now covers these families and no longer routes
+them through the broad body-template dispatcher:
 
 - `scalar-add-ret`
 - `integer-arithmetic`
@@ -132,19 +132,43 @@ longer routes them through the broad body-template dispatcher:
 - `checked-branch-mix-boundary`
 - `checked-call-chain-boundary`
 - `checked-tls-bump-boundary`
+- `packed-read-flag`
+- `packed-replace-low`
+- `struct-field-sum`
+- `array-scalar-sum`
+- `optional-scalar-payload`
+- `error-union-payload`
+- `slice-loop-sum`
+- `fp-literal-return`
+- `atomic-add`
+- `inline-asm-barrier`
+- `aggregate-pair-abi`
+- `float-less`
+- `float-add`
+- `float-sub`
+- `hidden-global-access`
+- `mixed-c-zig-add`
+- `mixed-c-zig-panic-add`
+- `umul-fix-sat-i64`
+- `inherit-i64-return`
+- `compile-asm-unreachable`
+- `start-trampoline`
+- `getauxval-pointer-walk`
+- `f128-sret-byval`
+- `noreturn-unreachable-stub`
+- `address-space-volatile-store`
+- `raw-start-loop`
+- `i1-const-return`
+- `constant-string-slice-return`
+- `libfuzzer-vtable-run`
+- `table-indexed-load`
 
 ## Next Extraction Target
 
 Next slices should keep moving repeated families to
 `air_extracted_descriptor_rows` without broadening the 90-row inventory:
 
-- packed bits
-- optional and error-union payloads
-- aggregate and slice rows
-- FP compare/binary rows
-- atomics and inline-asm boundary rows
-- ReleaseSmall mixed C/Zig and i64 helper rows
-- base64 full/reduced/table rows
+- base64 full/reduced decoder rows
 - `strFromFloatHelp`
 
 The end-state target remains:
