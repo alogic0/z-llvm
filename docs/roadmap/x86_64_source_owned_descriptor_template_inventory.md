@@ -2,24 +2,21 @@
 
 Current gate: `zig build distribution-x86_64-release-source-owned`
 
-Measured state after the first extracted-record slice:
+Measured state after closing descriptor template provenance:
 
 ```text
 release_source_rows=90
-air_extracted_descriptor_rows=64
-template_descriptor_rows=26
-wrapper_body_map_rows=26
+air_extracted_descriptor_rows=90
+template_descriptor_rows=0
+wrapper_body_map_rows=0
 source_tag_body_map_rows=0
 ```
 
-All rows still serialize DescriptorV2 records. The current 64 extracted rows
-use a separate extracted-record writer path and no longer report a
-wrapper/source-tag body-map selector, while the remaining 26 hard rows are
-still emitted from
-`zllvmWriteAirDescriptorRecords(...)` body templates selected by
-`zllvmSourceOwnedDescriptorBody(...)` or
-`zllvmSourceOwnedTaggedDescriptorBody(...)`. This is distinct from full Zig
-Sema/AIR extraction, which remains the target.
+All rows still serialize DescriptorV2 records. All 90 rows now use the
+separate extracted-record writer path and no longer report a wrapper/source-tag
+body-map selector. The gate rejects `template_descriptor_rows`,
+`wrapper_body_map_rows`, and `source_tag_body_map_rows` greater than zero. This
+is distinct from full Zig Sema/AIR extraction, which remains the target.
 
 ## Descriptor Body Inventory
 
@@ -162,16 +159,34 @@ them through the broad body-template dispatcher:
 - `constant-string-slice-return`
 - `libfuzzer-vtable-run`
 - `table-indexed-load`
+- `base64-decode-base64-full`
+- `base64-decode-step`
+- `base64-store-step`
+- `base64-residual-byte-step`
+- `base64-padding-tail-step`
+- `base64-padding-loop-step`
+- `base64-padding-length-step`
+- `base64-chunk-guard-step`
+- `base64-source-stride-step`
+- `base64-source-bundle-step`
+- `base64-next-source-bundle-step`
+- `base64-third-source-bundle-step`
+- `base64-bit-buffer-store-step`
+- `base64-loop-advance-step`
+- `base64-residual-guard-step`
+- `base64-residual-bundle-step`
+- `base64-residual-store-step`
+- `base64-residual-length-step`
+- `base64-residual-table-check-step`
+- `base64-residual-accumulator-step`
+- `base64-residual-loop-advance-step`
+- `base64-residual-padding-check-step`
+- `base64-residual-final-mask-step`
+- `base64-residual-padding-loop-step`
+- `base64-decode-exit-step`
+- `str-from-float-help`
 
-## Next Extraction Target
-
-Next slices should keep moving repeated families to
-`air_extracted_descriptor_rows` without broadening the 90-row inventory:
-
-- base64 full/reduced decoder rows
-- `strFromFloatHelp`
-
-The end-state target remains:
+## Closed Counter Target
 
 ```text
 air_extracted_descriptor_rows=90
