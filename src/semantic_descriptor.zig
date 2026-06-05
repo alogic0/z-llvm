@@ -70,6 +70,7 @@ pub const DescriptorRecordSource = enum {
 pub const DescriptorBodySelector = enum {
     wrapper_body_map,
     source_tag_body_map,
+    source_analysis,
     unknown,
 };
 
@@ -868,6 +869,7 @@ fn descriptorRecordSourceFromName(name: []const u8) DescriptorRecordSource {
 fn descriptorBodySelectorFromName(name: []const u8) DescriptorBodySelector {
     if (std.mem.eql(u8, name, "wrapper-body-map")) return .wrapper_body_map;
     if (std.mem.eql(u8, name, "source-tag-body-map")) return .source_tag_body_map;
+    if (std.mem.eql(u8, name, "source-analysis")) return .source_analysis;
     return .unknown;
 }
 

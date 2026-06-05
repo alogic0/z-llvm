@@ -9,12 +9,13 @@ release_source_rows=90
 air_extracted_descriptor_rows=24
 template_descriptor_rows=66
 wrapper_body_map_rows=32
-source_tag_body_map_rows=58
+source_tag_body_map_rows=34
 ```
 
 All rows still serialize DescriptorV2 records. The first 24 rows now use a
-separate extracted-record writer path for simple compiler-owned facts, while
-the remaining 66 rows are still emitted from
+separate extracted-record writer path for simple compiler-owned facts and no
+longer report a wrapper/source-tag body-map selector, while the remaining 66
+rows are still emitted from
 `zllvmWriteAirDescriptorRecords(...)` body templates selected by
 `zllvmSourceOwnedDescriptorBody(...)` or
 `zllvmSourceOwnedTaggedDescriptorBody(...)`. This is distinct from full Zig

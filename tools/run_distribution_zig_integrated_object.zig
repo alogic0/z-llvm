@@ -1680,8 +1680,13 @@ pub fn main(init: std.process.Init) !void {
                 if (std.mem.eql(u8, source_tag_body_map, "used")) {
                     source_tag_body_map_rows += 1;
                 }
-                if ((std.mem.eql(u8, air_extracted_descriptor, "used") == std.mem.eql(u8, template_descriptor, "used")) or
-                    (std.mem.eql(u8, wrapper_body_map, "used") == std.mem.eql(u8, source_tag_body_map, "used")))
+                const row_air_extracted = std.mem.eql(u8, air_extracted_descriptor, "used");
+                const row_template = std.mem.eql(u8, template_descriptor, "used");
+                const row_wrapper_body_map = std.mem.eql(u8, wrapper_body_map, "used");
+                const row_source_tag_body_map = std.mem.eql(u8, source_tag_body_map, "used");
+                if ((row_air_extracted == row_template) or
+                    (row_template and (row_wrapper_body_map == row_source_tag_body_map)) or
+                    (row_air_extracted and (row_wrapper_body_map or row_source_tag_body_map)))
                 {
                     try common.validationError(io, "release source-owned row {s} has ambiguous descriptor provenance: air_extracted={s} template={s} wrapper_body_map={s} source_tag_body_map={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, air_extracted_descriptor, template_descriptor, wrapper_body_map, source_tag_body_map, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
@@ -1829,7 +1834,7 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != 90 or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (air_extracted_descriptor_rows + template_descriptor_rows != 90 or wrapper_body_map_rows + source_tag_body_map_rows != 90) {
+            if (air_extracted_descriptor_rows + template_descriptor_rows != 90 or wrapper_body_map_rows + source_tag_body_map_rows != template_descriptor_rows) {
                 try common.validationError(io, "release source-owned descriptor provenance accounting mismatch: air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
             if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or full_descriptor_program_rows != 90 or serialized_function_rows != 90 or serialized_instruction_rows != 90 or serialized_global_rows != 90 or semantic_serialized_rows != 90 or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != 90 or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != 90 or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != 90 or source_derived_descriptor_rows != 90 or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {

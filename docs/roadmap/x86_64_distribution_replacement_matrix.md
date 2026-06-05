@@ -287,7 +287,8 @@ those records directly before verifying and lowering DescriptorV2 into
 structured-direct IR. All 90 rows use serialized DescriptorV2 transport and
 semantic serialized records, and the gate fails if any row falls back to the
 serialized return stub. The current provenance split is 24 rows on the
-separate extracted-record path and 66 rows still template-owned.
+separate extracted-record path with no body-map selector and 66 rows still
+template-owned.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
 ownership path. The source-owned gate fails if any row delegates back to the
@@ -587,7 +588,7 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        provenance is only partially extracted
                        (air_extracted_descriptor_rows=24,
                        template_descriptor_rows=66, wrapper_body_map_rows=32,
-                       source_tag_body_map_rows=58);
+                       source_tag_body_map_rows=34);
                        all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse
