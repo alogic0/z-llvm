@@ -42,6 +42,7 @@ pub const Descriptor = struct {
     source: Source,
     features: []const Feature,
     v2: sdv2.Program,
+    input_emitter: []const u8 = "-",
 };
 
 const scalar_features = [_]Feature{ .functions, .return_type, .blocks, .constants };
@@ -64,7 +65,7 @@ const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .global
 
 pub fn resolveSourceOwnedFromInput(contents: []const u8) ?Descriptor {
     const input = parseSourceDescriptorInput(contents) orelse return null;
-    return resolveSourceOwnedFromBody(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface);
+    return resolveSourceOwnedFromBodyWithEmitter(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface, input.emitter);
 }
 
 pub fn resolveSourceOwnedFromBody(
@@ -74,6 +75,18 @@ pub fn resolveSourceOwnedFromBody(
     tag: []const u8,
     body_name: []const u8,
     diagnostic_surface: []const u8,
+) ?Descriptor {
+    return resolveSourceOwnedFromBodyWithEmitter(wrapper, mode, fixture, tag, body_name, diagnostic_surface, "-");
+}
+
+fn resolveSourceOwnedFromBodyWithEmitter(
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    body_name: []const u8,
+    diagnostic_surface: []const u8,
+    input_emitter: []const u8,
 ) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
     if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
@@ -88,6 +101,7 @@ pub fn resolveSourceOwnedFromBody(
         .source = source,
         .features = featuresForSurface(surface),
         .v2 = v2,
+        .input_emitter = input_emitter,
     };
 }
 
@@ -117,6 +131,14 @@ pub fn isSourceDerivedDescriptor(descriptor: Descriptor) bool {
 
 pub fn isBodyEnumDispatchDescriptor(descriptor: Descriptor) bool {
     return sdv2.isBodyEnumDispatch(descriptor.v2);
+}
+
+pub fn isZigEmittedDescriptor(descriptor: Descriptor) bool {
+    return std.mem.eql(u8, descriptor.input_emitter, "patched-zig-hook");
+}
+
+pub fn isRunnerGeneratedDescriptor(descriptor: Descriptor) bool {
+    return std.mem.eql(u8, descriptor.input_emitter, "zllvm-runner");
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -194,6 +216,7 @@ const SourceDescriptorInput = struct {
     tag: []const u8,
     body_name: []const u8,
     diagnostic_surface: []const u8,
+    emitter: []const u8,
 };
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
@@ -204,6 +227,7 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
     const tag = descriptorLineValue(contents, "source_tag") orelse return null;
     const body_name = descriptorLineValue(contents, "descriptor_v2_body") orelse return null;
     const diagnostic_surface = descriptorLineValue(contents, "diagnostic_surface") orelse body_name;
+    const emitter = descriptorLineValue(contents, "descriptor_emitter") orelse "-";
     if (descriptorLineValue(contents, "descriptor_source")) |source| {
         if (!std.mem.eql(u8, source, "zig-source-analysis")) return null;
     } else return null;
@@ -214,6 +238,7 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
         .tag = tag,
         .body_name = body_name,
         .diagnostic_surface = diagnostic_surface,
+        .emitter = emitter,
     };
 }
 

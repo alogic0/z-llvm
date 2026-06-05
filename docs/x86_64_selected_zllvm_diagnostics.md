@@ -67,7 +67,9 @@ That gate covers the full current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall
 source-backed inventory and fails unless it reports
 `release_source_rows=90`, `source_wrapper_rows=90`,
 `descriptor_owned_rows=90`, `manual_fixture_dispatch_rows=0`,
-`descriptor_v2_rows=90`, `legacy_semantic_record_rows=0`,
+`descriptor_v2_rows=90`, `zig_emitted_descriptor_rows=90`,
+`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
+`legacy_semantic_record_rows=0`,
 `semantic_record_rows=0`, `external_writer_delegate_rows=0`,
 `semantic_lowering_rows=90`, `manifest_structured_rows=0`, `case_id_rows=0`,
 `surface_dispatch_rows=0`, `structured_direct_rows=90`,
@@ -92,6 +94,9 @@ For the source-owned gate, also confirm the emitted IR header reports
 `zllvm_ir_writer_source_fixture` and `zllvm_ir_writer_source_tag` fields,
 `zllvm_semantic_descriptor = "descriptor-owned"`, and
 `zllvm_semantic_descriptor_version = "v2"`,
+`zllvm_zig_emitted_descriptor = "used"`,
+`zllvm_runner_generated_descriptor = "not-used"`,
+`zllvm_descriptor_file_consumed = "used"`,
 `zllvm_manual_fixture_dispatch = "not-used"`, and
 `zllvm_surface_dispatch = "not-used"`. Unsupported descriptor failures print
 the first unsupported construct with wrapper, fixture, mode, and source tag.

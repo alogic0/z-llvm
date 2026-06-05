@@ -57,15 +57,16 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
 current source-backed inventory. Patched Zig still passes wrapper path, optimize
 mode, target, output path, and marker path; the runner also passes source
 fixture metadata and the source-backed tag used only to disambiguate
-wrapper/mode collisions. The runner emits a stable source-derived descriptor
-input from those source facts, and z_llvm consumes that descriptor directly
+wrapper/mode collisions. Patched Zig emits a stable source-derived descriptor
+file from those source facts, and z_llvm consumes that descriptor directly
 rather than resolving a wrapper/fixture/tag table. Every accepted row reports
 descriptor-v2 semantic lowering into
 structured-direct IR. Current measured output is `release_source_rows=90`,
 `source_wrapper_rows=90`, `descriptor_owned_rows=90`,
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
-`source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
-`body_enum_dispatch_rows=0`,
+`zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
+`descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
+`tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=90`,
@@ -120,11 +121,13 @@ The current replacement evidence is split into four explicit rungs:
 selected case-id registry proof, broad source-backed structured proof,
 source-wrapper compatibility proof, and source-owned DescriptorV2 proof. The
 source-owned rung is now strongest: all 90 current source-backed release rows
-start from a stable source-derived descriptor input consumed directly by
-z_llvm and report `lowering=semantic-descriptor-v2`, with
+start from a stable source-derived descriptor file emitted by patched Zig and
+consumed directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
-`real_descriptor_program_rows=90`, `source_derived_descriptor_rows=90`,
-`tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
+`real_descriptor_program_rows=90`, `zig_emitted_descriptor_rows=90`,
+`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
+`source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
+`body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`,
 `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,

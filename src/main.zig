@@ -291,6 +291,9 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_semantic_descriptor_body = "{s}"
         \\; zllvm_descriptor_program = "{s}"
         \\; zllvm_descriptor_input = "{s}"
+        \\; zllvm_descriptor_file_consumed = "{s}"
+        \\; zllvm_zig_emitted_descriptor = "{s}"
+        \\; zllvm_runner_generated_descriptor = "{s}"
         \\; zllvm_source_derived_descriptor = "{s}"
         \\; zllvm_tag_table_descriptor = "{s}"
         \\; zllvm_body_enum_dispatch = "{s}"
@@ -319,6 +322,9 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| sdv2BodyName(desc) else "-",
         if (descriptor) |desc| if (sd.isRealDescriptorProgram(desc)) "real" else "not-real" else "-",
         if (descriptor != null) "source-derived" else "not-used",
+        if (descriptor != null) "used" else "-",
+        if (descriptor) |desc| if (sd.isZigEmittedDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isRunnerGeneratedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isSourceDerivedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor != null) "not-used" else "-",
         if (descriptor) |desc| if (sd.isBodyEnumDispatchDescriptor(desc)) "used" else "not-used" else "-",

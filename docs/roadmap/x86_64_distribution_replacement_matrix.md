@@ -239,6 +239,9 @@ source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
 real_descriptor_program_rows=90
+zig_emitted_descriptor_rows=90
+runner_generated_descriptor_rows=0
+descriptor_file_consumed_rows=90
 source_derived_descriptor_rows=90
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
@@ -266,8 +269,8 @@ source_wrapper_discovery=discovered_source_wrappers=72
 ```
 
 This supersedes the older claim shape for the current release source-backed
-inventory: rows start from Zig wrapper/source metadata, the runner emits a
-stable source-derived descriptor input, and z_llvm consumes that descriptor
+inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
+stable source-derived descriptor file, and z_llvm consumes that descriptor
 directly before verifying and lowering DescriptorV2 into structured-direct IR.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
@@ -530,6 +533,9 @@ release_source_owned_gate=zig build distribution-x86_64-release-source-owned
 release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_owned_rows=90 descriptor_v2_rows=90
                           real_descriptor_program_rows=90
+                          zig_emitted_descriptor_rows=90
+                          runner_generated_descriptor_rows=0
+                          descriptor_file_consumed_rows=90
                           source_derived_descriptor_rows=90
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0

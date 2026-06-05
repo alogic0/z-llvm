@@ -37,7 +37,8 @@ ir-writer:
 source-owned ir-writer:
   Zig build-obj
     -> patched Zig passes wrapper/mode/target/output/marker metadata
-    -> the runner supplies source fixture/tag metadata and descriptor input
+    -> the runner supplies source fixture/tag metadata and descriptor path
+    -> patched Zig writes the source-derived descriptor file
     -> z_llvm consumes the source-derived descriptor, not ZLLVM_CASE_ID
     -> z_llvm lowers DescriptorV2 into structured IR
     -> z_llvm emits x86_64 relocatable .o through generic lowering
@@ -164,12 +165,16 @@ Zig.
 The source-owned release gate keeps the patched Zig hook stable by passing the
 sentinel `ZLLVM_CASE_ID=source-wrapper-dispatch` plus
 `ZLLVM_IR_WRITER_DISPATCH=source-owned`, `ZLLVM_SOURCE_FIXTURE`, and
-`ZLLVM_SOURCE_TAG`; the runner additionally writes
-`ZLLVM_SEMANTIC_DESCRIPTOR_PATH` as a stable source-derived descriptor input.
-z_llvm consumes that descriptor directly and then builds the structured module.
+`ZLLVM_SOURCE_TAG`; the runner additionally passes
+`ZLLVM_SEMANTIC_DESCRIPTOR_PATH`, and patched Zig writes that stable
+source-derived descriptor file before invoking z_llvm. z_llvm consumes that
+descriptor directly and then builds the structured module.
 The gate requires all 90 current x86_64 release source-backed rows to report
 `lowering=semantic-descriptor-v2`, `zllvm_semantic_descriptor_version = "v2"`,
 `zllvm_descriptor_program = "real"`,
+`zllvm_zig_emitted_descriptor = "used"`,
+`zllvm_runner_generated_descriptor = "not-used"`,
+`zllvm_descriptor_file_consumed = "used"`,
 `zllvm_source_derived_descriptor = "used"`,
 `zllvm_tag_table_descriptor = "not-used"`,
 `zllvm_body_enum_dispatch = "not-used"`,
