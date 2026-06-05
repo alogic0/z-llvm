@@ -237,12 +237,15 @@ modes=ReleaseFast,ReleaseSafe,ReleaseSmall
 release_source_rows=90
 source_wrapper_rows=90
 descriptor_owned_rows=90
+descriptor_v2_rows=90
 manual_fixture_dispatch_rows=0
-semantic_record_rows=90
+legacy_semantic_record_rows=0
+semantic_record_rows=0
 external_writer_delegate_rows=0
 semantic_lowering_rows=90
 manifest_structured_rows=0
 case_id_rows=0
+surface_dispatch_rows=0
 structured_direct_rows=90
 generic_codegen_rows=90
 fallback_rows=0
@@ -252,16 +255,18 @@ ownership=llvm-module=not-used;llvm-optimizer=not-used;
           linker=zig-native-fno-lld
 source_wrapper_discovery=discovered_source_wrappers=72
                          descriptor_supported_wrappers=62
-                         unsupported_with_reason=10
+                         out_of_scope_wrappers=10
+                         unsupported_with_reason=0
 ```
 
 This supersedes the older claim shape for the current release source-backed
 inventory: rows are selected from Zig wrapper/source metadata into z_llvm-owned
-semantic descriptors, including source fixture and source-backed tag
-disambiguation for wrapper/mode collisions, then lowered through real records
-in `src/zig_semantic_lowering.zig` into structured-direct IR. The source-owned
-gate fails if any row delegates back to the external writer body path or the
-temporary manual fixture dispatch oracle.
+AIR-shaped DescriptorV2 programs, including source fixture and source-backed tag
+disambiguation for wrapper/mode collisions, then verified and lowered into
+structured-direct IR. The source-owned gate fails if any row delegates back to
+the external writer body path, uses the old semantic-record ownership marker,
+uses surface dispatch as the ownership selector, or uses the temporary manual
+fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
@@ -512,10 +517,22 @@ source_wrapper_rows=source_wrappers=49 structured_direct_rows=49
                     manifest_structured_rows=0 semantic_record_rows=48
                     external_writer_delegate_rows=1
                     case_specific_rows=0 fallback_rows=0 local_fail=0
+release_source_owned_gate=zig build distribution-x86_64-release-source-owned
+release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
+                          descriptor_owned_rows=90 descriptor_v2_rows=90
+                          manual_fixture_dispatch_rows=0
+                          legacy_semantic_record_rows=0 semantic_record_rows=0
+                          external_writer_delegate_rows=0
+                          manifest_structured_rows=0 case_id_rows=0
+                          surface_dispatch_rows=0 structured_direct_rows=90
+                          generic_codegen_rows=90 fallback_rows=0 local_fail=0
 semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
-                       source_wrapper_rows=49; counters remain separate; all
-                       three gates require structured-direct construction,
+                       release_source_owned_rows=90;
+                       source_wrapper_rows=49; counters remain separate; the
+                       source-owned rung is strongest and all release source
+                       rows are DescriptorV2-owned; all gates require
+                       structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse
                        fallback, no LLVM optimizer, no LLVM TargetMachine,
                        z_llvm object emission, and Zig native linker handoff

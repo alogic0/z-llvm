@@ -165,10 +165,11 @@ The source-owned release gate keeps the patched Zig hook stable by passing the
 sentinel `ZLLVM_CASE_ID=source-wrapper-dispatch` plus
 `ZLLVM_IR_WRITER_DISPATCH=source-owned`, `ZLLVM_SOURCE_FIXTURE`, and
 `ZLLVM_SOURCE_TAG`. z_llvm uses the wrapper/mode/fixture/tag tuple to resolve
-the structured module. The gate requires all 90 current x86_64 release
-source-backed rows to report `lowering=zig-semantic-records`,
-`llvm_text_parse=not-used`, `codegen=generic-x86_64-lowering`, no fallback,
-and no case-id ownership.
+an AIR-shaped DescriptorV2 program and then the structured module. The gate
+requires all 90 current x86_64 release source-backed rows to report
+`lowering=semantic-descriptor-v2`, `zllvm_semantic_descriptor_version = "v2"`,
+`zllvm_surface_dispatch = "not-used"`, `llvm_text_parse=not-used`,
+`codegen=generic-x86_64-lowering`, no fallback, and no case-id ownership.
 
 Marker fields:
 

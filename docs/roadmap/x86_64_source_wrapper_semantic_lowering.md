@@ -58,12 +58,15 @@ gate=zig build distribution-x86_64-release-source-owned
 release_source_rows=90
 source_wrapper_rows=90
 descriptor_owned_rows=90
+descriptor_v2_rows=90
 manual_fixture_dispatch_rows=0
-semantic_record_rows=90
+legacy_semantic_record_rows=0
+semantic_record_rows=0
 external_writer_delegate_rows=0
 semantic_lowering_rows=90
 manifest_structured_rows=0
 case_id_rows=0
+surface_dispatch_rows=0
 structured_direct_rows=90
 generic_codegen_rows=90
 fallback_rows=0
@@ -72,21 +75,24 @@ local_fail=0
 
 This gate closes the wrapper/mode collision gap by passing source fixture
 metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
-`tls-concurrency-checked-read`. Source metadata selects a z_llvm semantic
-descriptor, and that descriptor lowers through semantic records into structured
-IR without consulting `IrWriterCase` as the ownership source. The emitted writer
+`tls-concurrency-checked-read`. Source metadata selects a z_llvm AIR-shaped
+DescriptorV2 program, and that descriptor is verified and lowered into
+structured IR without consulting `IrWriterCase` as the ownership source. The
+emitted writer
 header records `zllvm_ir_writer_dispatch = "source-owned"`,
 `zllvm_ir_writer_source_fixture`, `zllvm_ir_writer_source_tag`,
-`zllvm_semantic_descriptor = "descriptor-owned"`, and
-`zllvm_manual_fixture_dispatch = "not-used"`; the row selector remains
+`zllvm_semantic_descriptor = "descriptor-owned"`,
+`zllvm_semantic_descriptor_version = "v2"`,
+`zllvm_manual_fixture_dispatch = "not-used"`, and
+`zllvm_surface_dispatch = "not-used"`; the row selector remains
 `ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not the ownership
 selector for this gate.
 
 The same gate also reports a source-wrapper discovery bucket from
 `test/zig/integrated/*.zig`: `discovered_source_wrappers=72`,
-`descriptor_supported_wrappers=62`, and `unsupported_with_reason=10`. This is
-a discovery bucket for future expansion, not an additional accepted row set in
-the 90-row source-owned gate.
+`descriptor_supported_wrappers=62`, `out_of_scope_wrappers=10`, and
+`unsupported_with_reason=0`. This is a discovery bucket for future expansion,
+not an additional accepted row set in the 90-row source-owned gate.
 
 ## Semantic-Lowered Families
 
@@ -112,16 +118,17 @@ families before building structured IR in the source-owned gate:
 - ReleaseSmall mixed C/Zig/i64 boundary rows
 - full base64, reduced base64 slices, and `strFromFloatHelp`
 
-The narrower source-wrapper compatibility gate now reports 48 semantic-record
+The narrower source-wrapper compatibility gate still reports 48 semantic-record
 rows and one external writer delegate because it deliberately omits source
 fixture/tag metadata. The source-owned gate is the stronger current claim for
 release source-backed ownership, and it requires `descriptor_owned_rows=90`,
-`manual_fixture_dispatch_rows=0`, and `external_writer_delegate_rows=0`.
+`descriptor_v2_rows=90`, `manual_fixture_dispatch_rows=0`,
+`surface_dispatch_rows=0`, and `external_writer_delegate_rows=0`.
 
 ## Boundary
 
-This is not full Zig Sema, AIR, or Liveness replacement. The semantic records
-are small local descriptions for selected x86_64 release wrappers, and they
-feed the structured IR builder. Normal Zig/libLLVM fallback remains available
-when the external writer environment is unset, and no Debug, LTO, AArch64, or
-target-complete backend claim is made.
+This is not full Zig Sema, AIR, or Liveness replacement. DescriptorV2 is a
+small local AIR-shaped descriptor language for selected x86_64 release
+wrappers, and it feeds the structured IR builder. Normal Zig/libLLVM fallback
+remains available when the external writer environment is unset, and no Debug,
+LTO, AArch64, or target-complete backend claim is made.

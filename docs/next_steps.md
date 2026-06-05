@@ -57,14 +57,15 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
 current source-backed inventory. Patched Zig still passes wrapper path, optimize
 mode, target, output path, and marker path; the runner also passes source
 fixture metadata and the source-backed tag used to disambiguate wrapper/mode
-collisions. z_llvm resolves a semantic descriptor from that source metadata,
-not from `ZLLVM_CASE_ID` or the temporary compatibility oracle, and every
-accepted row reports semantic lowering through real records in
-`src/zig_semantic_lowering.zig` into structured-direct IR. Current measured
-output is `release_source_rows=90`, `source_wrapper_rows=90`,
-`descriptor_owned_rows=90`, `manual_fixture_dispatch_rows=0`,
-`semantic_record_rows=90`, `external_writer_delegate_rows=0`,
-`semantic_lowering_rows=90`, `manifest_structured_rows=0`, `case_id_rows=0`,
+collisions. z_llvm resolves an AIR-shaped DescriptorV2 program from that source
+metadata, not from `ZLLVM_CASE_ID` or the temporary compatibility oracle, and
+every accepted row reports descriptor-v2 semantic lowering into
+structured-direct IR. Current measured output is `release_source_rows=90`,
+`source_wrapper_rows=90`, `descriptor_owned_rows=90`,
+`descriptor_v2_rows=90`, `manual_fixture_dispatch_rows=0`,
+`legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
+`external_writer_delegate_rows=0`, `semantic_lowering_rows=90`,
+`manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and
 `local_fail=0`.
 
@@ -105,21 +106,23 @@ Source-wrapper discovery bucket:
 The source-owned gate now scans `test/zig/integrated/*.zig` directly as a
 separate discovery bucket, not as additional case-id selected rows. Current
 measured output is `discovered_source_wrappers=72`,
-`descriptor_supported_wrappers=62`, and `unsupported_with_reason=10`; the
-unsupported wrappers are outside the current x86_64 release source-owned
-inventory and should become the next expansion source only when paired with
-source metadata and descriptor records.
+`descriptor_supported_wrappers=62`, `out_of_scope_wrappers=10`, and
+`unsupported_with_reason=0`; the out-of-scope wrappers are outside the current
+x86_64 release source-owned inventory and should become the next expansion
+source only when paired with source metadata and descriptor records.
 
 Ownership ladder:
 The current replacement evidence is split into four explicit rungs:
 selected case-id registry proof, broad source-backed structured proof,
-source-wrapper compatibility proof, and source-owned semantic proof. The
+source-wrapper compatibility proof, and source-owned DescriptorV2 proof. The
 source-owned rung is now strongest: all 90 current source-backed release rows
-are selected from wrapper/fixture/tag metadata into z_llvm semantic
-descriptors and report `lowering=zig-semantic-records`, with
-`descriptor_owned_rows=90`, `manual_fixture_dispatch_rows=0`,
-`semantic_record_rows=90`, `external_writer_delegate_rows=0`, and no
-manifest-shaped structured rows in that gate. The narrower source-wrapper
+are selected from wrapper/fixture/tag metadata into z_llvm DescriptorV2
+programs and report `lowering=semantic-descriptor-v2`, with
+`descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
+`manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`,
+`semantic_record_rows=0`, `surface_dispatch_rows=0`,
+`external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
+that gate. The narrower source-wrapper
 compatibility gate now has 48 semantic record rows and one external writer
 delegate because it intentionally covers only unambiguous wrapper/mode inputs.
 The detailed milestone is recorded in
