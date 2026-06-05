@@ -2,23 +2,25 @@
 
 Current gate: `zig build distribution-x86_64-release-source-owned`
 
-Measured baseline after adding descriptor provenance counters:
+Measured state after the first extracted-record slice:
 
 ```text
 release_source_rows=90
-air_extracted_descriptor_rows=0
-template_descriptor_rows=90
+air_extracted_descriptor_rows=24
+template_descriptor_rows=66
 wrapper_body_map_rows=32
 source_tag_body_map_rows=58
 ```
 
-All rows still serialize DescriptorV2 records, but those records are emitted
-from `zllvmWriteAirDescriptorRecords(...)` body templates selected by
+All rows still serialize DescriptorV2 records. The first 24 rows now use a
+separate extracted-record writer path for simple compiler-owned facts, while
+the remaining 66 rows are still emitted from
+`zllvmWriteAirDescriptorRecords(...)` body templates selected by
 `zllvmSourceOwnedDescriptorBody(...)` or
-`zllvmSourceOwnedTaggedDescriptorBody(...)`. This is distinct from records
-actually extracted from Zig Sema/AIR facts.
+`zllvmSourceOwnedTaggedDescriptorBody(...)`. This is distinct from full Zig
+Sema/AIR extraction, which remains the target.
 
-## Template Body Inventory
+## Descriptor Body Inventory
 
 | Descriptor body | Rows | Current selector |
 | --- | ---: | --- |
@@ -103,16 +105,46 @@ actually extracted from Zig Sema/AIR facts.
 | `base64-residual-padding-loop-step` | 1 | wrapper basename |
 | `base64-decode-exit-step` | 1 | wrapper basename |
 
+## Extracted-Record Rows
+
+The first extracted-record milestone covers these simple families and no
+longer routes them through the broad body-template dispatcher:
+
+- `scalar-add-ret`
+- `integer-arithmetic`
+- `runtime-loop-sum`
+- `abi-arg-call`
+- `error-switch-select`
+- `runtime-condbr`
+- `runtime-switch`
+- `pointer-load-store`
+- `optional-pointer`
+- `comptime-const-mul`
+- `global-update`
+- `add-imm-return`
+- `tls-read`
+- `tls-bump`
+- `checked-add-imm-boundary`
+- `checked-add-runtime-boundary`
+- `checked-global-update-boundary`
+- `checked-pointer-load-store-boundary`
+- `checked-branch-mix-boundary`
+- `checked-call-chain-boundary`
+- `checked-tls-bump-boundary`
+
 ## Next Extraction Target
 
-First non-template milestone should move simple families to
+Next slices should keep moving repeated families to
 `air_extracted_descriptor_rows` without broadening the 90-row inventory:
 
-- scalar and integer arithmetic
-- branch, phi, and loop rows
-- direct call rows
-- global and TLS read/update rows
-- pointer load/store rows
+- packed bits
+- optional and error-union payloads
+- aggregate and slice rows
+- FP compare/binary rows
+- atomics and inline-asm boundary rows
+- ReleaseSmall mixed C/Zig and i64 helper rows
+- base64 full/reduced/table rows
+- `strFromFloatHelp`
 
 The end-state target remains:
 

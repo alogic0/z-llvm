@@ -284,9 +284,10 @@ inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
 `zllvm-source-derived-descriptor-v2` file with serialized
 function/block/instruction/terminator/global-section records, and z_llvm parses
 those records directly before verifying and lowering DescriptorV2 into
-structured-direct IR. All 90 rows use serialized DescriptorV2 transport; the
-current 63 AIR-derived rows also emit semantic serialized records and the gate
-fails if any AIR-derived row falls back to the serialized return stub.
+structured-direct IR. All 90 rows use serialized DescriptorV2 transport and
+semantic serialized records, and the gate fails if any row falls back to the
+serialized return stub. The current provenance split is 24 rows on the
+separate extracted-record path and 66 rows still template-owned.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
 ownership path. The source-owned gate fails if any row delegates back to the
@@ -583,9 +584,9 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        rows are DescriptorV2-owned; all 90 rows use serialized
                        AIR-shaped semantic records with no return-stub fallback
                        or static descriptor map fallback, but current
-                       provenance is still template-owned
-                       (air_extracted_descriptor_rows=0,
-                       template_descriptor_rows=90, wrapper_body_map_rows=32,
+                       provenance is only partially extracted
+                       (air_extracted_descriptor_rows=24,
+                       template_descriptor_rows=66, wrapper_body_map_rows=32,
                        source_tag_body_map_rows=58);
                        all gates require
                        structured-direct construction,
