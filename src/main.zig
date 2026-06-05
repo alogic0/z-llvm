@@ -338,6 +338,13 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_full_descriptor_program = "{s}"
         \\; zllvm_descriptor_body_name = "{s}"
         \\; zllvm_body_expansion = "{s}"
+        \\; zllvm_serialized_functions = "{s}"
+        \\; zllvm_serialized_instructions = "{s}"
+        \\; zllvm_serialized_globals = "{s}"
+        \\; zllvm_descriptor_program_body_expansion = "{s}"
+        \\; zllvm_functions_for_body = "{s}"
+        \\; zllvm_globals_for_body = "{s}"
+        \\; zllvm_serialized_return_i32 = "{}"
         \\; zllvm_air_derived_descriptor = "{s}"
         \\; zllvm_static_descriptor_map = "{s}"
         \\
@@ -345,6 +352,13 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.isFullDescriptorProgramInput(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesDescriptorBodyNameInput(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesZllvmBodyExpansion(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.hasSerializedFunctions(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.hasSerializedInstructions(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.hasSerializedGlobals(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesDescriptorProgramBodyExpansion(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesFunctionsForBody(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesGlobalsForBody(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| sd.serializedReturnI32(desc) orelse -1 else -1,
         if (descriptor) |desc| if (sd.isAirDerivedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isStaticDescriptorMap(desc)) "used" else "not-used" else "-",
     }) catch |err| {
@@ -604,10 +618,15 @@ fn resolveDirectSemanticDescriptor(io: std.Io, contents: []const u8) ?sd.Descrip
         fatal(io, "semantic descriptor artifact is missing diagnostic surface metadata\n", .{});
     };
     const full_descriptor_program = readHeaderValue(contents, "; zllvm_full_descriptor_program = \"") orelse "not-used";
-    const descriptor = if (std.mem.eql(u8, full_descriptor_program, "used"))
-        sd.resolveSourceOwnedFromFullProgram(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface, "patched-zig-hook", .unknown)
-    else
-        sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface);
+    const descriptor = if (std.mem.eql(u8, full_descriptor_program, "used")) blk: {
+        const serialized_ret = readHeaderValue(contents, "; zllvm_serialized_return_i32 = \"") orelse {
+            fatal(io, "semantic descriptor artifact is missing serialized return metadata\n", .{});
+        };
+        const ret_i32 = std.fmt.parseInt(i32, serialized_ret, 10) catch {
+            fatal(io, "semantic descriptor artifact has invalid serialized return metadata: {s}\n", .{serialized_ret});
+        };
+        break :blk sd.resolveSourceOwnedFromSerializedReturn(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface, "patched-zig-hook", .unknown, ret_i32);
+    } else sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface);
     const resolved_descriptor = descriptor orelse {
         fatal(io, "unsupported semantic descriptor construct=source-derived-artifact wrapper={s} fixture={s} mode={s} source_tag={s} body={s}\n", .{ wrapper, source_fixture, mode, source_tag, body_name });
     };

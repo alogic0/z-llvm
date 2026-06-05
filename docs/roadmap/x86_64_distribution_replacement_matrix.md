@@ -239,6 +239,15 @@ source_wrapper_rows=90
 descriptor_owned_rows=90
 descriptor_v2_rows=90
 real_descriptor_program_rows=90
+full_descriptor_program_rows=90
+serialized_function_rows=90
+serialized_instruction_rows=90
+serialized_global_rows=90
+descriptor_body_name_rows=0
+zllvm_body_expansion_rows=0
+descriptor_program_body_expansion_rows=0
+functions_for_body_rows=0
+globals_for_body_rows=0
 zig_emitted_descriptor_rows=90
 runner_generated_descriptor_rows=0
 descriptor_file_consumed_rows=90
@@ -270,8 +279,9 @@ source_wrapper_discovery=discovered_source_wrappers=72
 
 This supersedes the older claim shape for the current release source-backed
 inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
-full typed `zllvm-source-derived-descriptor-v2` payload, and z_llvm consumes
-that descriptor directly before verifying and lowering DescriptorV2 into
+`zllvm-source-derived-descriptor-v2` file with serialized
+function/block/instruction/terminator/global-section records, and z_llvm parses
+those records directly before verifying and lowering DescriptorV2 into
 structured-direct IR.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
@@ -535,8 +545,14 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_owned_rows=90 descriptor_v2_rows=90
                           real_descriptor_program_rows=90
                           full_descriptor_program_rows=90
+                          serialized_function_rows=90
+                          serialized_instruction_rows=90
+                          serialized_global_rows=90
                           descriptor_body_name_rows=0
                           zllvm_body_expansion_rows=0
+                          descriptor_program_body_expansion_rows=0
+                          functions_for_body_rows=0
+                          globals_for_body_rows=0
                           air_derived_descriptor_rows=9
                           static_descriptor_map_rows=81
                           zig_emitted_descriptor_rows=90

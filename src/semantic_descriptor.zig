@@ -45,6 +45,7 @@ pub const Descriptor = struct {
     input_emitter: []const u8 = "-",
     input_payload: InputPayload = .descriptor_body_name,
     derivation: DescriptorDerivation = .unknown,
+    serialized_return_i32: ?i32 = null,
 };
 
 pub const InputPayload = enum {
@@ -78,6 +79,9 @@ const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .global
 
 pub fn resolveSourceOwnedFromInput(contents: []const u8) ?Descriptor {
     const input = parseSourceDescriptorInput(contents) orelse return null;
+    if (input.payload == .full_descriptor_program) {
+        return resolveSourceOwnedFromSerializedInput(contents, input);
+    }
     return resolveSourceOwnedFromBodyWithEmitter(input.wrapper, input.mode, input.fixture, input.tag, input.body_name, input.diagnostic_surface, input.emitter, input.payload, input.derivation);
 }
 
@@ -103,6 +107,36 @@ pub fn resolveSourceOwnedFromFullProgram(
     derivation: DescriptorDerivation,
 ) ?Descriptor {
     return resolveSourceOwnedFromBodyWithEmitter(wrapper, mode, fixture, tag, body_name, diagnostic_surface, input_emitter, .full_descriptor_program, derivation);
+}
+
+pub fn resolveSourceOwnedFromSerializedReturn(
+    wrapper: []const u8,
+    mode: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    body_name: []const u8,
+    diagnostic_surface: []const u8,
+    input_emitter: []const u8,
+    derivation: DescriptorDerivation,
+    ret_i32: i32,
+) ?Descriptor {
+    if (!isReleaseMode(mode)) return null;
+    if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
+    const body = sdv2.bodyForName(body_name) orelse return null;
+    const surface = if (diagnostic_surface.len != 0) diagnostic_surface else sdv2.bodyName(body);
+    const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
+    const v2_source: sdv2.Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
+    return .{
+        .id = surface,
+        .surface = surface,
+        .source = source,
+        .features = featuresForSurface(surface),
+        .v2 = sdv2.programFromSerializedReturn(v2_source, body, surface, ret_i32, true),
+        .input_emitter = input_emitter,
+        .input_payload = .full_descriptor_program,
+        .derivation = derivation,
+        .serialized_return_i32 = ret_i32,
+    };
 }
 
 fn resolveSourceOwnedFromBodyWithEmitter(
@@ -183,7 +217,7 @@ pub fn usesDescriptorBodyNameInput(descriptor: Descriptor) bool {
 }
 
 pub fn usesZllvmBodyExpansion(descriptor: Descriptor) bool {
-    return descriptor.input_payload == .descriptor_body_name;
+    return descriptor.v2.descriptor_program_body_expansion;
 }
 
 pub fn isAirDerivedDescriptor(descriptor: Descriptor) bool {
@@ -192,6 +226,34 @@ pub fn isAirDerivedDescriptor(descriptor: Descriptor) bool {
 
 pub fn isStaticDescriptorMap(descriptor: Descriptor) bool {
     return descriptor.derivation == .static_descriptor_map;
+}
+
+pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
+    return descriptor.v2.serialized_functions;
+}
+
+pub fn hasSerializedInstructions(descriptor: Descriptor) bool {
+    return descriptor.v2.serialized_instructions;
+}
+
+pub fn hasSerializedGlobals(descriptor: Descriptor) bool {
+    return descriptor.v2.serialized_globals;
+}
+
+pub fn usesDescriptorProgramBodyExpansion(descriptor: Descriptor) bool {
+    return descriptor.v2.descriptor_program_body_expansion;
+}
+
+pub fn usesFunctionsForBody(descriptor: Descriptor) bool {
+    return descriptor.v2.functions_for_body;
+}
+
+pub fn usesGlobalsForBody(descriptor: Descriptor) bool {
+    return descriptor.v2.globals_for_body;
+}
+
+pub fn serializedReturnI32(descriptor: Descriptor) ?i32 {
+    return descriptor.serialized_return_i32 orelse descriptor.v2.serialized_return_i32;
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -310,6 +372,68 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
     };
 }
 
+fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDescriptorInput) ?Descriptor {
+    if (!isReleaseMode(input.mode)) return null;
+    if (!std.mem.startsWith(u8, input.fixture, "test/distribution/")) return null;
+    const body = sdv2.bodyForName(input.body_name) orelse return null;
+    const surface = if (input.diagnostic_surface.len != 0) input.diagnostic_surface else sdv2.bodyName(body);
+    const ret_i32 = parseSerializedReturnProgram(contents) orelse return null;
+    const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    const v2_source: sdv2.Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    return .{
+        .id = surface,
+        .surface = surface,
+        .source = source,
+        .features = featuresForSurface(surface),
+        .v2 = sdv2.programFromSerializedReturn(v2_source, body, surface, ret_i32, true),
+        .input_emitter = input.emitter,
+        .input_payload = .full_descriptor_program,
+        .derivation = input.derivation,
+        .serialized_return_i32 = ret_i32,
+    };
+}
+
+fn parseSerializedReturnProgram(contents: []const u8) ?i32 {
+    if (!descriptorLineValueEql(contents, "program_functions", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_blocks", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_instructions", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_terminators", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_globals", "records")) return null;
+    var saw_function = false;
+    var saw_block = false;
+    var saw_term = false;
+    var saw_globals = false;
+    var ret_i32: ?i32 = null;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        const payload = if (std.mem.startsWith(u8, line, "record=")) line["record=".len..] else continue;
+        if (std.mem.eql(u8, payload, "function|main|zig|i32|0")) {
+            saw_function = true;
+            continue;
+        }
+        if (std.mem.eql(u8, payload, "block|main|entry|1")) {
+            saw_block = true;
+            continue;
+        }
+        if (std.mem.eql(u8, payload, "term|main|entry|ret|i32|%retv")) {
+            saw_term = true;
+            continue;
+        }
+        if (std.mem.eql(u8, payload, "globals|0")) {
+            saw_globals = true;
+            continue;
+        }
+        if (std.mem.startsWith(u8, payload, "inst|main|entry|binop|retv|add|i32|")) {
+            const rest = payload["inst|main|entry|binop|retv|add|i32|".len..];
+            const separator = std.mem.indexOfScalar(u8, rest, '|') orelse return null;
+            if (!std.mem.eql(u8, rest[separator + 1 ..], "0")) return null;
+            ret_i32 = std.fmt.parseInt(i32, rest[0..separator], 10) catch return null;
+        }
+    }
+    if (!saw_function or !saw_block or !saw_term or !saw_globals) return null;
+    return ret_i32;
+}
+
 fn descriptorDerivationFromName(name: []const u8) DescriptorDerivation {
     if (std.mem.eql(u8, name, "zig-air-facts")) return .zig_air_facts;
     if (std.mem.eql(u8, name, "static-descriptor-map")) return .static_descriptor_map;
@@ -323,6 +447,11 @@ fn descriptorLineValue(contents: []const u8, key: []const u8) ?[]const u8 {
         if (std.mem.eql(u8, line[0..separator], key)) return line[separator + 1 ..];
     }
     return null;
+}
+
+fn descriptorLineValueEql(contents: []const u8, key: []const u8, expected: []const u8) bool {
+    const value = descriptorLineValue(contents, key) orelse return false;
+    return std.mem.eql(u8, value, expected);
 }
 
 fn featuresForSurface(surface: []const u8) []const Feature {

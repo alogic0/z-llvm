@@ -308,6 +308,13 @@ pub const Program = struct {
     constants: []const Constant = &.{},
     atomics: bool = false,
     inline_asm_boundary: bool = false,
+    serialized_functions: bool = false,
+    serialized_instructions: bool = false,
+    serialized_globals: bool = false,
+    descriptor_program_body_expansion: bool = false,
+    functions_for_body: bool = false,
+    globals_for_body: bool = false,
+    serialized_return_i32: ?i32 = null,
 };
 
 pub const ProgramOrigin = enum {
@@ -418,7 +425,40 @@ pub fn programFromSourceDescriptor(source: Source, body: Body, diagnostic_surfac
 }
 
 pub fn programFromFullDescriptor(source: Source, body: Body, diagnostic_surface: []const u8) Program {
-    return programFromBody(source, body, diagnostic_surface, .source_derived_descriptor);
+    return programFromSerializedReturn(source, body, diagnostic_surface, 0, true);
+}
+
+pub fn programFromSerializedReturn(source: Source, body: Body, diagnostic_surface: []const u8, ret_i32: i32, serialized_globals: bool) Program {
+    const allocator = std.heap.page_allocator;
+    const lhs = std.fmt.allocPrint(allocator, "{d}", .{ret_i32}) catch @panic("failed to allocate serialized descriptor constant");
+    const instructions = allocator.alloc(Instruction, 1) catch @panic("failed to allocate serialized descriptor instructions");
+    instructions[0] = .{ .binop = .{
+        .result = "retv",
+        .op = .add,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .id = lhs, .ty = .{ .int = 32 } },
+        .rhs = .{ .id = "0", .ty = .{ .int = 32 } },
+    } };
+    const blocks = allocator.alloc(Block, 1) catch @panic("failed to allocate serialized descriptor blocks");
+    blocks[0] = .{
+        .name = "entry",
+        .instructions = instructions,
+        .terminator = .{ .ret = .{ .id = "%retv", .ty = .{ .int = 32 } } },
+    };
+    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate serialized descriptor functions");
+    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
+    return .{
+        .id = bodyName(body),
+        .source = source,
+        .body = body,
+        .diagnostic_surface = diagnostic_surface,
+        .origin = .source_derived_descriptor,
+        .functions = functions,
+        .serialized_functions = true,
+        .serialized_instructions = true,
+        .serialized_globals = serialized_globals,
+        .serialized_return_i32 = ret_i32,
+    };
 }
 
 fn programFromBody(source: Source, body: Body, diagnostic_surface: []const u8, origin: ProgramOrigin) Program {
@@ -432,6 +472,9 @@ fn programFromBody(source: Source, body: Body, diagnostic_surface: []const u8, o
         .globals = globalsForBody(body),
         .atomics = body == .atomic_add,
         .inline_asm_boundary = body == .inline_asm_barrier or body == .compile_asm_unreachable,
+        .descriptor_program_body_expansion = origin == .source_derived_descriptor,
+        .functions_for_body = true,
+        .globals_for_body = true,
     };
 }
 
