@@ -67,6 +67,7 @@ structured-direct IR. Current measured output is `release_source_rows=90`,
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
 `full_descriptor_program_rows=90`, `descriptor_body_name_rows=0`,
 `zllvm_body_expansion_rows=0`,
+`air_derived_descriptor_rows=9`, `static_descriptor_map_rows=81`,
 `zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
 `descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
@@ -129,6 +130,7 @@ consumed directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
 `real_descriptor_program_rows=90`, `full_descriptor_program_rows=90`,
 `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`,
+`air_derived_descriptor_rows=9`, `static_descriptor_map_rows=81`,
 `zig_emitted_descriptor_rows=90`,
 `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
 `source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
@@ -137,7 +139,11 @@ consumed directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
-that gate. The narrower source-wrapper
+that gate. The narrower source-wrapper compatibility proof remains a separate
+regression rung. Next ownership work
+should move the remaining memory/global/TLS/aggregate/FP/runtime-boundary
+families out of `static_descriptor_map_rows=81` and into real AIR-fact
+derivation before requiring `air_derived_descriptor_rows=90`.
 compatibility gate now has 48 semantic record rows and one external writer
 delegate because it intentionally covers only unambiguous wrapper/mode inputs.
 The detailed milestone is recorded in
