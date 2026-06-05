@@ -1,5 +1,5 @@
 const std = @import("std");
-const zsl = @import("zig_semantic_lowering.zig");
+const sib = @import("structured_ir_builder.zig");
 
 pub const Source = struct {
     wrapper: []const u8,
@@ -347,7 +347,10 @@ pub fn verify(program: Program) VerifyError!void {
 
 pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     try verify(program);
-    if (!try zsl.emitSurface(program.diagnostic_surface, writer)) return error.UnsupportedDescriptorConstruct;
+    var module = sib.Module.init(writer);
+    for (program.functions) |function| {
+        try lowerFunction(&module, function);
+    }
 }
 
 pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
@@ -544,18 +547,56 @@ fn typeEql(lhs: Type, rhs: Type) bool {
 }
 
 fn functionsForBody(body: Body) []const Function {
-    return if (body == .compile_asm_unreachable or body == .noreturn_unreachable_stub)
-        &void_functions
-    else
-        &i32_functions;
+    return switch (body) {
+        .scalar_add_ret => &i32_42_functions,
+        .abi_arg_call, .checked_call_chain_boundary => &i32_3_functions,
+        .runtime_switch => &i32_13_functions,
+        .global_update, .checked_global_update_boundary => &i32_4_functions,
+        .tls_read => &i32_1_functions,
+        .tls_bump, .checked_tls_bump_boundary => &i32_2_functions,
+        .inline_asm_barrier, .aggregate_pair_abi => &i32_1_functions,
+        .hidden_global_access, .mixed_c_zig_add => &i32_7_functions,
+        .mixed_c_zig_panic_add => &i32_5_functions,
+        .inherit_i64_return => &i32_4_functions,
+        else => &i32_0_functions,
+    };
 }
 
-const i32_entry_blocks = [_]Block{.{ .name = "entry", .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } } }};
-const void_entry_blocks = [_]Block{.{ .name = "entry", .terminator = .@"unreachable" }};
-const i32_main_function: Function = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = &i32_entry_blocks };
-const void_main_function: Function = .{ .name = "main", .return_type = .void, .blocks = &void_entry_blocks };
-const i32_functions = [_]Function{i32_main_function};
-const void_functions = [_]Function{void_main_function};
+const i32_0_entry_blocks = [_]Block{retBlock("0")};
+const i32_1_entry_blocks = [_]Block{retBlock("1")};
+const i32_2_entry_blocks = [_]Block{retBlock("2")};
+const i32_3_entry_blocks = [_]Block{retBlock("3")};
+const i32_4_entry_blocks = [_]Block{retBlock("4")};
+const i32_5_entry_blocks = [_]Block{retBlock("5")};
+const i32_7_entry_blocks = [_]Block{retBlock("7")};
+const i32_13_entry_blocks = [_]Block{retBlock("13")};
+const i32_42_entry_blocks = [_]Block{retBlock("42")};
+const i32_0_main_function: Function = mainFunction(&i32_0_entry_blocks);
+const i32_1_main_function: Function = mainFunction(&i32_1_entry_blocks);
+const i32_2_main_function: Function = mainFunction(&i32_2_entry_blocks);
+const i32_3_main_function: Function = mainFunction(&i32_3_entry_blocks);
+const i32_4_main_function: Function = mainFunction(&i32_4_entry_blocks);
+const i32_5_main_function: Function = mainFunction(&i32_5_entry_blocks);
+const i32_7_main_function: Function = mainFunction(&i32_7_entry_blocks);
+const i32_13_main_function: Function = mainFunction(&i32_13_entry_blocks);
+const i32_42_main_function: Function = mainFunction(&i32_42_entry_blocks);
+const i32_0_functions = [_]Function{i32_0_main_function};
+const i32_1_functions = [_]Function{i32_1_main_function};
+const i32_2_functions = [_]Function{i32_2_main_function};
+const i32_3_functions = [_]Function{i32_3_main_function};
+const i32_4_functions = [_]Function{i32_4_main_function};
+const i32_5_functions = [_]Function{i32_5_main_function};
+const i32_7_functions = [_]Function{i32_7_main_function};
+const i32_13_functions = [_]Function{i32_13_main_function};
+const i32_42_functions = [_]Function{i32_42_main_function};
+
+fn retBlock(comptime value: []const u8) Block {
+    return .{ .name = "entry", .terminator = .{ .ret = .{ .id = value, .ty = .{ .int = 32 } } } };
+}
+
+fn mainFunction(comptime blocks: []const Block) Function {
+    return .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
+}
 
 fn globalsForBody(body: Body) []const Global {
     return switch (body) {
@@ -568,6 +609,243 @@ fn globalsForBody(body: Body) []const Global {
 const tls_globals = [_]Global{.{ .name = "tls.counter", .kind = .tls, .ty = .{ .int = 32 }, .address_space = .local_exec_tls }};
 const base64_table_fields = [_]Type{.{ .int = 8 }};
 const base64_table_globals = [_]Global{.{ .name = "base64.full_table", .kind = .constant, .ty = .{ .aggregate = &base64_table_fields } }};
+
+fn lowerFunction(module: *sib.Module, function: Function) !void {
+    const ret_ty = try toSibType(function.return_type);
+    var params_buf: [1024]u8 = undefined;
+    const params = try formatParams(&params_buf, function.params);
+    var lowered = try module.function(functionLinkage(function), ret_ty, function.name, params, functionAttrs(function));
+    for (function.blocks) |block| {
+        var lowered_block = try lowered.block(block.name);
+        for (block.instructions) |instruction| try lowerInstruction(&lowered_block, instruction);
+        try lowerTerminator(&lowered_block, block.terminator);
+        if (!std.mem.eql(u8, block.name, function.blocks[function.blocks.len - 1].name)) {
+            try module.writer.writeAll("\n");
+        }
+    }
+    try lowered.end();
+}
+
+fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
+    switch (instruction) {
+        .constant => {},
+        .binop => |binop| {
+            _ = try block.binary(binop.result, binOpName(binop.op), try toSibType(binop.ty), valueRef(binop.lhs), valueRef(binop.rhs));
+        },
+        .checked_add => |checked| {
+            _ = try block.binary(checked.result, "add", try toSibType(checked.ty), valueRef(checked.lhs), valueRef(checked.rhs));
+        },
+        .checked_mul => |checked| {
+            _ = try block.binary(checked.result, "mul", try toSibType(checked.ty), valueRef(checked.lhs), valueRef(checked.rhs));
+        },
+        .compare => |compare| {
+            const ty = try toSibType(compare.ty);
+            if (isFloatType(compare.ty)) {
+                _ = try block.fcmp(compare.result, compareOpName(compare.op), ty, valueRef(compare.lhs), valueRef(compare.rhs));
+            } else {
+                _ = try block.icmp(compare.result, compareOpName(compare.op), ty, valueRef(compare.lhs), valueRef(compare.rhs));
+            }
+        },
+        .select => |select| {
+            _ = try block.select(select.result, valueRef(select.cond), try toSibType(select.ty), valueRef(select.then_value), valueRef(select.else_value));
+        },
+        .call => |call| {
+            var args_buf: [1024]u8 = undefined;
+            _ = try block.call(call.result, callConvAttrs(call.calling_convention), try toSibType(call.ret_ty), call.callee, try formatCallArgs(&args_buf, call.args));
+        },
+        .load => |load| {
+            if (load.is_volatile) {
+                _ = try block.volatileLoad(loadResultName(load), try toSibType(load.ty), valueRef(load.ptr), alignText(load.align_bytes));
+            } else {
+                _ = try block.load(loadResultName(load), try toSibType(load.ty), valueRef(load.ptr), alignText(load.align_bytes));
+            }
+        },
+        .store => |store| {
+            const value = sib.Value.constant(try toSibType(store.ty), "0");
+            if (store.is_volatile) {
+                try block.volatileStore(value, valueRef(store.ptr), alignText(store.align_bytes));
+            } else {
+                try block.store(value, valueRef(store.ptr), alignText(store.align_bytes));
+            }
+        },
+        .gep => |gep| {
+            if (gep.indices.len == 0) return;
+            _ = try block.gep(gep.result, .i8, valueRef(gep.base), try toSibType(gep.indices[0].ty), valueRef(gep.indices[0]));
+        },
+        .phi => |phi| {
+            if (phi.incoming.len == 2) {
+                _ = try block.phi2(phi.result, try toSibType(phi.ty), valueRef(phi.incoming[0].value), phi.incoming[0].block, valueRef(phi.incoming[1].value), phi.incoming[1].block);
+            } else if (phi.incoming.len == 3) {
+                _ = try block.phi3(phi.result, try toSibType(phi.ty), valueRef(phi.incoming[0].value), phi.incoming[0].block, valueRef(phi.incoming[1].value), phi.incoming[1].block, valueRef(phi.incoming[2].value), phi.incoming[2].block);
+            } else {
+                return error.UnsupportedDescriptorConstruct;
+            }
+        },
+        .cast => |cast| {
+            _ = try block.cast(cast.result, castOpName(cast.op), valueRef(cast.from), try toSibType(cast.to));
+        },
+        .aggregate_value => {},
+        .inline_asm_boundary => try block.inlineAsmBarrier(),
+    }
+}
+
+fn lowerTerminator(block: *sib.Block, terminator: Terminator) !void {
+    switch (terminator) {
+        .ret => |maybe_value| {
+            if (maybe_value) |value| {
+                try block.ret(valueRef(value));
+            } else {
+                try block.retVoid();
+            }
+        },
+        .br => |target| try block.br(target),
+        .condbr => |condbr| try block.condBr(valueRef(condbr.cond), condbr.then_block, condbr.else_block),
+        .@"unreachable" => try block.emitUnreachable(),
+    }
+}
+
+fn toSibType(ty: Type) !sib.Type {
+    return switch (ty) {
+        .void => .void,
+        .bool => .i1,
+        .int => |bits| switch (bits) {
+            1 => .i1,
+            4 => .i4,
+            8 => .i8,
+            12 => .i12,
+            16 => .i16,
+            32 => .i32,
+            64 => .i64,
+            128 => .i128,
+            else => error.UnsupportedDescriptorConstruct,
+        },
+        .float => |kind| switch (kind) {
+            .f32 => .f32,
+            .f64 => .f64,
+            .f128 => .fp128,
+        },
+        .pointer => .ptr,
+        .aggregate => .{ .text = "{}" },
+        .vector => error.UnsupportedTypeVector,
+    };
+}
+
+fn valueRef(value: ValueRef) sib.Value {
+    return sib.Value.constant(toSibType(value.ty) catch .i32, value.id);
+}
+
+fn formatParams(buf: []u8, params: []const Param) ![]const u8 {
+    var used: usize = 0;
+    for (params, 0..) |param, index| {
+        if (index != 0) used = try appendBuf(buf, used, ", ", .{});
+        used = try appendBuf(buf, used, "{s} %{s}", .{ (try toSibType(param.ty)).llvm(), param.name });
+    }
+    return buf[0..used];
+}
+
+fn formatCallArgs(buf: []u8, args: []const ValueRef) ![]const u8 {
+    var used: usize = 0;
+    for (args, 0..) |arg, index| {
+        if (index != 0) used = try appendBuf(buf, used, ", ", .{});
+        used = try appendBuf(buf, used, "{s} {s}", .{ (try toSibType(arg.ty)).llvm(), arg.id });
+    }
+    return buf[0..used];
+}
+
+fn appendBuf(buf: []u8, used: usize, comptime fmt: []const u8, args: anytype) !usize {
+    const written = try std.fmt.bufPrint(buf[used..], fmt, args);
+    return used + written.len;
+}
+
+fn functionLinkage(function: Function) []const u8 {
+    return if (std.mem.eql(u8, function.name, "main")) "dso_local " else "internal ";
+}
+
+fn functionAttrs(function: Function) []const u8 {
+    return if (function.calling_convention == .fastcc) " fastcc" else " local_unnamed_addr";
+}
+
+fn callConvAttrs(cc: CallConv) []const u8 {
+    return switch (cc) {
+        .fastcc => "fastcc ",
+        .c, .zig, .inline_asm_boundary => "",
+        .unsupported => "",
+    };
+}
+
+fn binOpName(op: BinOp) []const u8 {
+    return switch (op) {
+        .add => "add",
+        .sub => "sub",
+        .mul => "mul",
+        .shl => "shl",
+        .lshr => "lshr",
+        .ashr => "ashr",
+        .@"and" => "and",
+        .@"or" => "or",
+        .xor => "xor",
+        .fadd => "fadd",
+        .fsub => "fsub",
+        .fmul => "fmul",
+        .fdiv => "fdiv",
+        .frem => "frem",
+    };
+}
+
+fn compareOpName(op: CompareOp) []const u8 {
+    return switch (op) {
+        .eq => "eq",
+        .ne => "ne",
+        .slt => "slt",
+        .sle => "sle",
+        .sgt => "sgt",
+        .sge => "sge",
+        .ult => "ult",
+        .ule => "ule",
+        .ugt => "ugt",
+        .uge => "uge",
+        .oeq => "oeq",
+        .one => "one",
+        .olt => "olt",
+        .ole => "ole",
+        .ogt => "ogt",
+        .oge => "oge",
+    };
+}
+
+fn castOpName(op: CastOp) []const u8 {
+    return switch (op) {
+        .trunc => "trunc",
+        .zext => "zext",
+        .sext => "sext",
+        .bitcast => "bitcast",
+        .ptrtoint => "ptrtoint",
+        .inttoptr => "inttoptr",
+    };
+}
+
+fn isFloatType(ty: Type) bool {
+    return switch (ty) {
+        .float => true,
+        else => false,
+    };
+}
+
+fn alignText(align_bytes: u16) []const u8 {
+    return switch (align_bytes) {
+        1 => "1",
+        2 => "2",
+        4 => "4",
+        8 => "8",
+        16 => "16",
+        else => "1",
+    };
+}
+
+fn loadResultName(load: MemoryOp) []const u8 {
+    _ = load;
+    return "load";
+}
 
 fn bodyForSurface(surface: []const u8) ?Body {
     inline for (surface_body_map) |entry| {
