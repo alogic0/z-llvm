@@ -232,6 +232,7 @@ fn writeIrWriterModuleFromEnv(
     const ir_path = requiredEnv(io, environ, "ZLLVM_IR_PATH");
     const source_fixture = environ.get("ZLLVM_SOURCE_FIXTURE") orelse "-";
     const source_tag = environ.get("ZLLVM_SOURCE_TAG") orelse "-";
+    const semantic_descriptor_path = environ.get("ZLLVM_SEMANTIC_DESCRIPTOR_PATH") orelse "-";
     const source_owned_dispatch = envEquals(environ, "ZLLVM_IR_WRITER_DISPATCH", source_owned_dispatch_name);
     const source_wrapper_dispatch = !source_owned_dispatch and
         (std.mem.eql(u8, case_id, source_wrapper_dispatch_case_id) or
@@ -286,6 +287,7 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_codegen = "{s}"
         \\; zllvm_ir_writer_lowering = "{s}"
         \\; zllvm_semantic_descriptor = "{s}"
+        \\; zllvm_semantic_descriptor_path = "{s}"
         \\; zllvm_semantic_descriptor_id = "{s}"
         \\; zllvm_semantic_descriptor_version = "{s}"
         \\; zllvm_semantic_descriptor_body = "{s}"
@@ -317,6 +319,7 @@ fn writeIrWriterModuleFromEnv(
         codegen_ownership,
         lowering_ownership,
         if (descriptor != null) "descriptor-owned" else "not-used",
+        if (descriptor != null) semantic_descriptor_path else "-",
         if (descriptor) |desc| desc.id else "-",
         if (descriptor != null) "v2" else "-",
         if (descriptor) |desc| sdv2BodyName(desc) else "-",
@@ -622,10 +625,19 @@ fn resolveDirectSemanticDescriptor(io: std.Io, contents: []const u8) ?sd.Descrip
         const serialized_ret = readHeaderValue(contents, "; zllvm_serialized_return_i32 = \"") orelse {
             fatal(io, "semantic descriptor artifact is missing serialized return metadata\n", .{});
         };
-        const ret_i32 = std.fmt.parseInt(i32, serialized_ret, 10) catch {
-            fatal(io, "semantic descriptor artifact has invalid serialized return metadata: {s}\n", .{serialized_ret});
+        if (!std.mem.eql(u8, serialized_ret, "-1")) {
+            const ret_i32 = std.fmt.parseInt(i32, serialized_ret, 10) catch {
+                fatal(io, "semantic descriptor artifact has invalid serialized return metadata: {s}\n", .{serialized_ret});
+            };
+            break :blk sd.resolveSourceOwnedFromSerializedReturn(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface, "patched-zig-hook", .unknown, ret_i32);
+        }
+        const descriptor_path = readHeaderValue(contents, "; zllvm_semantic_descriptor_path = \"") orelse {
+            fatal(io, "semantic descriptor artifact is missing descriptor path metadata\n", .{});
         };
-        break :blk sd.resolveSourceOwnedFromSerializedReturn(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface, "patched-zig-hook", .unknown, ret_i32);
+        const descriptor_contents = std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, std.heap.page_allocator, .limited(1024 * 1024)) catch {
+            fatal(io, "semantic descriptor artifact cannot read descriptor path metadata: {s}\n", .{descriptor_path});
+        };
+        break :blk sd.resolveSourceOwnedFromInput(descriptor_contents);
     } else sd.resolveSourceOwnedFromBody(wrapper, mode, source_fixture, source_tag, body_name, diagnostic_surface);
     const resolved_descriptor = descriptor orelse {
         fatal(io, "unsupported semantic descriptor construct=source-derived-artifact wrapper={s} fixture={s} mode={s} source_tag={s} body={s}\n", .{ wrapper, source_fixture, mode, source_tag, body_name });

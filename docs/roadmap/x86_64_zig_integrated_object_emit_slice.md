@@ -180,6 +180,7 @@ The gate requires all 90 current x86_64 release source-backed rows to report
 `zllvm_body_enum_dispatch = "not-used"`,
 `zllvm_surface_to_body_adapter = "not-used"`,
 `zllvm_canned_return_descriptor = "not-used"`,
+`semantic_serialized_rows=41`, `serialized_return_stub_rows=0`,
 `zllvm_surface_dispatch = "not-used"`, `llvm_text_parse=not-used`,
 `codegen=generic-x86_64-lowering`, no fallback, and no case-id ownership.
 

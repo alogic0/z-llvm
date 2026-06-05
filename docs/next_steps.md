@@ -68,6 +68,7 @@ structured-direct IR. Current measured output is `release_source_rows=90`,
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
 `full_descriptor_program_rows=90`, `serialized_function_rows=90`,
 `serialized_instruction_rows=90`, `serialized_global_rows=90`,
+`semantic_serialized_rows=41`, `serialized_return_stub_rows=0`,
 `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`,
 `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`,
 `globals_for_body_rows=0`,
@@ -138,6 +139,7 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `serialized_global_rows=90`, `descriptor_body_name_rows=0`,
 `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`,
 `functions_for_body_rows=0`, `globals_for_body_rows=0`,
+`semantic_serialized_rows=41`, `serialized_return_stub_rows=0`,
 `air_derived_descriptor_rows=41`, `static_descriptor_map_rows=49`,
 `zig_emitted_descriptor_rows=90`,
 `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
@@ -147,7 +149,10 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
-that gate. The narrower source-wrapper compatibility proof remains a separate
+that gate. Serialized transport is proven for all 90 rows; AIR-derived
+provenance is currently stronger for 41 rows because those rows emit semantic
+DescriptorV2 records and the gate rejects any AIR-derived serialized return
+stub. The narrower source-wrapper compatibility proof remains a separate
 regression rung. Next ownership work
 should move the remaining ReleaseSmall mixed C/Zig, i64, compile-asm,
 libfuzzer, base64, and `strFromFloatHelp` families out of

@@ -243,6 +243,8 @@ full_descriptor_program_rows=90
 serialized_function_rows=90
 serialized_instruction_rows=90
 serialized_global_rows=90
+semantic_serialized_rows=41
+serialized_return_stub_rows=0
 descriptor_body_name_rows=0
 zllvm_body_expansion_rows=0
 descriptor_program_body_expansion_rows=0
@@ -282,7 +284,9 @@ inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
 `zllvm-source-derived-descriptor-v2` file with serialized
 function/block/instruction/terminator/global-section records, and z_llvm parses
 those records directly before verifying and lowering DescriptorV2 into
-structured-direct IR.
+structured-direct IR. All 90 rows use serialized DescriptorV2 transport; the
+current 41 AIR-derived rows also emit semantic serialized records and the gate
+fails if any AIR-derived row falls back to the serialized return stub.
 Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
 uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
 ownership path. The source-owned gate fails if any row delegates back to the
@@ -548,6 +552,8 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           serialized_function_rows=90
                           serialized_instruction_rows=90
                           serialized_global_rows=90
+                          semantic_serialized_rows=41
+                          serialized_return_stub_rows=0
                           descriptor_body_name_rows=0
                           zllvm_body_expansion_rows=0
                           descriptor_program_body_expansion_rows=0
@@ -574,9 +580,11 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        release_source_owned_rows=90;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
-                       rows are DescriptorV2-owned; 41 rows are currently
-                       marked AIR-fact-derived and 49 rows remain explicit
-                       static descriptor map fallback; all gates require
+                       rows are DescriptorV2-owned; all 90 rows use serialized
+                       transport, 41 rows are currently AIR-fact-derived
+                       semantic serialized records with no return-stub fallback,
+                       and 49 rows remain explicit static descriptor map
+                       fallback; all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse
                        fallback, no LLVM optimizer, no LLVM TargetMachine,
