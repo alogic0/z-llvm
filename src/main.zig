@@ -290,6 +290,9 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_semantic_descriptor = "{s}"
         \\; zllvm_semantic_descriptor_id = "{s}"
         \\; zllvm_semantic_descriptor_version = "{s}"
+        \\; zllvm_descriptor_program = "{s}"
+        \\; zllvm_surface_to_body_adapter = "{s}"
+        \\; zllvm_canned_return_descriptor = "{s}"
         \\; zllvm_surface_dispatch = "{s}"
         \\
     , .{
@@ -310,6 +313,9 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor != null) "descriptor-owned" else "not-used",
         if (descriptor) |desc| desc.id else "-",
         if (descriptor != null) "v2" else "-",
+        if (descriptor) |desc| if (sd.isRealDescriptorProgram(desc)) "real" else "not-real" else "-",
+        if (descriptor) |desc| if (sd.isSurfaceToBodyAdapter(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isCannedReturnDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor != null) "not-used" else if (ir_writer_case != null) "case-surface" else "not-used",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });

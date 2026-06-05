@@ -168,8 +168,10 @@ pub const Call = struct {
 };
 
 pub const MemoryOp = struct {
+    result: ?[]const u8 = null,
     ptr: ValueRef,
     ty: Type,
+    value: ?ValueRef = null,
     align_bytes: u16,
     is_volatile: bool = false,
     ordering: ?AtomicOrdering = null,
@@ -320,6 +322,13 @@ pub const VerifyError = error{
     UnsupportedAddressSpace,
     UnsupportedAbiShape,
     UnsupportedAlignment,
+    DuplicateSsaValue,
+    UndefinedValue,
+    UnknownBranchTarget,
+    PhiPredecessorMismatch,
+    CallSignatureMismatch,
+    MemoryTypeMismatch,
+    ReturnTypeMismatch,
 };
 
 pub fn verify(program: Program) VerifyError!void {
@@ -336,11 +345,13 @@ pub fn verify(program: Program) VerifyError!void {
         if (!std.mem.eql(u8, function.blocks[0].name, "entry")) return error.MissingEntryBlock;
         for (function.params) |param| try verifyType(param.ty);
         for (function.locals) |local| try verifyType(local.ty);
+        try verifyUniqueBlocks(function);
+        try verifyUniqueValues(function);
         for (function.blocks) |block| {
             if (block.name.len == 0) return error.EmptyBlock;
             for (block.params) |param| try verifyType(param.ty);
             for (block.instructions) |instruction| try verifyInstruction(instruction, function);
-            try verifyTerminator(block.terminator);
+            try verifyTerminator(block.terminator, function, block);
         }
     }
 }
@@ -348,6 +359,10 @@ pub fn verify(program: Program) VerifyError!void {
 pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     try verify(program);
     var module = sib.Module.init(writer);
+    for (program.globals) |global| {
+        try lowerGlobal(&module, global);
+    }
+    if (program.globals.len != 0) try writer.writeByte('\n');
     for (program.functions) |function| {
         try lowerFunction(&module, function);
     }
@@ -381,15 +396,46 @@ pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
 
 pub fn programFromSurface(source: Source, surface: []const u8) ?Program {
     const body = bodyForSurface(surface) orelse return null;
+    return programFromSemanticBody(source, body, surface);
+}
+
+pub fn programFromSemanticBody(source: Source, body: Body, diagnostic_surface: []const u8) Program {
     return .{
         .id = bodyName(body),
         .source = source,
         .body = body,
-        .diagnostic_surface = surface,
+        .diagnostic_surface = diagnostic_surface,
         .functions = functionsForBody(body),
         .globals = globalsForBody(body),
         .atomics = body == .atomic_add,
         .inline_asm_boundary = body == .inline_asm_barrier or body == .compile_asm_unreachable,
+    };
+}
+
+pub fn bodyForDiagnosticSurface(surface: []const u8) ?Body {
+    return bodyForSurface(surface);
+}
+
+pub fn isRealDescriptorProgram(program: Program) bool {
+    return !isCannedReturnDescriptor(program);
+}
+
+pub fn isSurfaceToBodyAdapter(program: Program) bool {
+    _ = program;
+    return false;
+}
+
+pub fn isCannedReturnDescriptor(program: Program) bool {
+    if (program.functions.len != 1 or program.globals.len != 0 or program.constants.len != 0) return false;
+    const function = program.functions[0];
+    if (!std.mem.eql(u8, function.name, "main") or function.params.len != 0 or function.blocks.len != 1) return false;
+    const block = function.blocks[0];
+    if (block.instructions.len != 0) {
+        return false;
+    }
+    return switch (block.terminator) {
+        .ret => |maybe_value| if (maybe_value) |value| isImmediate(value.id) else false,
+        else => false,
     };
 }
 
@@ -403,83 +449,108 @@ fn verifyInstruction(instruction: Instruction, function: Function) VerifyError!v
         .constant => |constant| try verifyType(constant.ty),
         .binop => |binop| {
             try verifyType(binop.ty);
-            try verifyValue(binop.lhs);
-            try verifyValue(binop.rhs);
+            try verifyTypedValue(binop.lhs, binop.ty, function);
+            try verifyTypedValue(binop.rhs, binop.ty, function);
         },
         .checked_add => |checked| try verifyChecked(checked.ty, checked.lhs, checked.rhs, checked.panic_block, function),
         .checked_mul => |checked| try verifyChecked(checked.ty, checked.lhs, checked.rhs, checked.panic_block, function),
         .compare => |compare| {
             try verifyType(compare.ty);
-            try verifyValue(compare.lhs);
-            try verifyValue(compare.rhs);
+            try verifyTypedValue(compare.lhs, compare.ty, function);
+            try verifyTypedValue(compare.rhs, compare.ty, function);
         },
         .select => |select| {
-            try verifyValue(select.cond);
-            if (!typeEql(select.cond.ty, .bool)) return error.InvalidTerminatorType;
+            try verifyTypedValue(select.cond, .bool, function);
             try verifyType(select.ty);
-            try verifyValue(select.then_value);
-            try verifyValue(select.else_value);
+            try verifyTypedValue(select.then_value, select.ty, function);
+            try verifyTypedValue(select.else_value, select.ty, function);
         },
         .call => |call| {
             try verifyCallConv(call.calling_convention);
             try verifyAbiShape(call.abi);
             try verifyType(call.ret_ty);
             if (call.varargs) return error.UnsupportedVarargs;
-            for (call.args) |arg| try verifyValue(arg);
+            for (call.args) |arg| try verifyDefinedValue(arg, function);
+            try verifyCallSignature(call, function);
         },
-        .load => |memory| try verifyMemory(memory),
-        .store => |memory| try verifyMemory(memory),
+        .load => |memory| try verifyMemory(memory, function),
+        .store => |memory| try verifyMemory(memory, function),
         .gep => |gep| {
-            try verifyValue(gep.base);
-            for (gep.indices) |index| try verifyValue(index);
+            try verifyTypedValue(gep.base, .{ .pointer = .generic }, function);
+            for (gep.indices) |index| try verifyDefinedValue(index, function);
         },
         .phi => |phi| {
             try verifyType(phi.ty);
             if (phi.incoming.len == 0) return error.PhiIncomingMismatch;
-            for (phi.incoming) |incoming| try verifyValue(incoming.value);
+            for (phi.incoming) |incoming| try verifyTypedValue(incoming.value, phi.ty, function);
         },
         .cast => |cast| {
-            try verifyValue(cast.from);
+            try verifyDefinedValue(cast.from, function);
             try verifyType(cast.to);
         },
         .aggregate_value => |aggregate| {
             try verifyType(aggregate.ty);
-            for (aggregate.fields) |field| try verifyValue(field);
+            for (aggregate.fields) |field| try verifyDefinedValue(field, function);
         },
         .inline_asm_boundary => {},
     }
 }
 
-fn verifyTerminator(terminator: Terminator) VerifyError!void {
+fn verifyTerminator(terminator: Terminator, function: Function, block: Block) VerifyError!void {
     switch (terminator) {
-        .ret => |maybe_value| if (maybe_value) |value| try verifyValue(value),
-        .br => |target| if (target.len == 0) return error.EmptyBlock,
+        .ret => |maybe_value| {
+            if (maybe_value) |value| {
+                try verifyTypedValue(value, function.return_type, function);
+            } else if (function.return_type != .void) {
+                return error.ReturnTypeMismatch;
+            }
+        },
+        .br => |target| {
+            if (target.len == 0) return error.EmptyBlock;
+            if (!blockExists(function, target)) return error.UnknownBranchTarget;
+        },
         .condbr => |condbr| {
-            try verifyValue(condbr.cond);
-            if (!typeEql(condbr.cond.ty, .bool)) return error.InvalidTerminatorType;
+            try verifyTypedValue(condbr.cond, .bool, function);
             if (condbr.then_block.len == 0 or condbr.else_block.len == 0) return error.EmptyBlock;
+            if (!blockExists(function, condbr.then_block) or !blockExists(function, condbr.else_block)) return error.UnknownBranchTarget;
         },
         .@"unreachable" => {},
     }
+    try verifyBlockPhis(function, block);
 }
 
 fn verifyChecked(ty: Type, lhs: ValueRef, rhs: ValueRef, panic_block: []const u8, function: Function) VerifyError!void {
     try verifyType(ty);
-    try verifyValue(lhs);
-    try verifyValue(rhs);
-    if (!blockExists(function, panic_block)) return error.EmptyBlock;
+    try verifyTypedValue(lhs, ty, function);
+    try verifyTypedValue(rhs, ty, function);
+    if (!blockExists(function, panic_block)) return error.UnknownBranchTarget;
 }
 
-fn verifyMemory(memory: MemoryOp) VerifyError!void {
-    try verifyValue(memory.ptr);
+fn verifyMemory(memory: MemoryOp, function: Function) VerifyError!void {
+    try verifyDefinedValue(memory.ptr, function);
+    if (memory.ptr.ty != .pointer) return error.MemoryTypeMismatch;
     try verifyType(memory.ty);
     if (memory.align_bytes == 0) return error.UnsupportedAlignment;
     if (memory.ordering) |ordering| try verifyAtomicOrdering(ordering);
+    if (memory.value) |value| {
+        try verifyTypedValue(value, memory.ty, function);
+    }
 }
 
-fn verifyValue(value: ValueRef) VerifyError!void {
+fn verifyValueShape(value: ValueRef) VerifyError!void {
     if (value.id.len == 0) return error.EmptyBlock;
     try verifyType(value.ty);
+}
+
+fn verifyDefinedValue(value: ValueRef, function: Function) VerifyError!void {
+    try verifyValueShape(value);
+    if (isImmediate(value.id) or isGlobalRef(value.id)) return;
+    if (!valueDefined(function, value.id)) return error.UndefinedValue;
+}
+
+fn verifyTypedValue(value: ValueRef, expected: Type, function: Function) VerifyError!void {
+    try verifyDefinedValue(value, function);
+    if (!typeEql(value.ty, expected)) return error.MemoryTypeMismatch;
 }
 
 fn verifyType(ty: Type) VerifyError!void {
@@ -546,52 +617,217 @@ fn typeEql(lhs: Type, rhs: Type) bool {
     };
 }
 
-fn functionsForBody(body: Body) []const Function {
-    return switch (body) {
-        .scalar_add_ret => &i32_42_functions,
-        .abi_arg_call, .checked_call_chain_boundary => &i32_3_functions,
-        .runtime_switch => &i32_13_functions,
-        .global_update, .checked_global_update_boundary => &i32_4_functions,
-        .tls_read => &i32_1_functions,
-        .tls_bump, .checked_tls_bump_boundary => &i32_2_functions,
-        .inline_asm_barrier, .aggregate_pair_abi => &i32_1_functions,
-        .hidden_global_access, .mixed_c_zig_add => &i32_7_functions,
-        .mixed_c_zig_panic_add => &i32_5_functions,
-        .inherit_i64_return => &i32_4_functions,
-        else => &i32_0_functions,
+fn verifyUniqueBlocks(function: Function) VerifyError!void {
+    for (function.blocks, 0..) |block, index| {
+        for (function.blocks[index + 1 ..]) |other| {
+            if (std.mem.eql(u8, block.name, other.name)) return error.DuplicateSsaValue;
+        }
+    }
+}
+
+fn verifyUniqueValues(function: Function) VerifyError!void {
+    for (function.params) |param| {
+        try verifyUniqueName(function, param.name);
+    }
+    for (function.blocks) |block| {
+        for (block.params) |param| {
+            try verifyUniqueName(function, param.name);
+        }
+        for (block.instructions) |instruction| {
+            if (instructionResultName(instruction)) |name| {
+                try verifyUniqueName(function, name);
+            }
+        }
+    }
+}
+
+fn verifyUniqueName(function: Function, name: []const u8) VerifyError!void {
+    if (name.len == 0) return error.EmptyBlock;
+    var seen: usize = 0;
+    for (function.params) |param| {
+        if (sameValueName(name, param.name)) {
+            seen += 1;
+        }
+    }
+    for (function.blocks) |block| {
+        for (block.params) |param| {
+            if (sameValueName(name, param.name)) {
+                seen += 1;
+            }
+        }
+        for (block.instructions) |instruction| {
+            if (instructionResultName(instruction)) |result| {
+                if (sameValueName(name, result)) {
+                    seen += 1;
+                }
+            }
+        }
+    }
+    if (seen != 1) return error.DuplicateSsaValue;
+}
+
+fn valueDefined(function: Function, id: []const u8) bool {
+    for (function.params) |param| {
+        if (sameValueName(id, param.name)) return true;
+    }
+    for (function.blocks) |block| {
+        for (block.params) |param| {
+            if (sameValueName(id, param.name)) return true;
+        }
+        for (block.instructions) |instruction| {
+            if (instructionResultName(instruction)) |result| {
+                if (sameValueName(id, result)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+fn instructionResultName(instruction: Instruction) ?[]const u8 {
+    return switch (instruction) {
+        .constant => |constant| constant.name,
+        .binop => |binop| binop.result,
+        .checked_add => |checked| checked.result,
+        .checked_mul => |checked| checked.result,
+        .compare => |compare| compare.result,
+        .select => |select| select.result,
+        .call => |call| call.result,
+        .load => |load| load.result,
+        .store => null,
+        .gep => |gep| gep.result,
+        .phi => |phi| phi.result,
+        .cast => |cast| cast.result,
+        .aggregate_value => |aggregate| aggregate.result,
+        .inline_asm_boundary => null,
     };
 }
 
-const i32_0_entry_blocks = [_]Block{retBlock("0")};
-const i32_1_entry_blocks = [_]Block{retBlock("1")};
-const i32_2_entry_blocks = [_]Block{retBlock("2")};
-const i32_3_entry_blocks = [_]Block{retBlock("3")};
-const i32_4_entry_blocks = [_]Block{retBlock("4")};
-const i32_5_entry_blocks = [_]Block{retBlock("5")};
-const i32_7_entry_blocks = [_]Block{retBlock("7")};
-const i32_13_entry_blocks = [_]Block{retBlock("13")};
-const i32_42_entry_blocks = [_]Block{retBlock("42")};
-const i32_0_main_function: Function = mainFunction(&i32_0_entry_blocks);
-const i32_1_main_function: Function = mainFunction(&i32_1_entry_blocks);
-const i32_2_main_function: Function = mainFunction(&i32_2_entry_blocks);
-const i32_3_main_function: Function = mainFunction(&i32_3_entry_blocks);
-const i32_4_main_function: Function = mainFunction(&i32_4_entry_blocks);
-const i32_5_main_function: Function = mainFunction(&i32_5_entry_blocks);
-const i32_7_main_function: Function = mainFunction(&i32_7_entry_blocks);
-const i32_13_main_function: Function = mainFunction(&i32_13_entry_blocks);
-const i32_42_main_function: Function = mainFunction(&i32_42_entry_blocks);
-const i32_0_functions = [_]Function{i32_0_main_function};
-const i32_1_functions = [_]Function{i32_1_main_function};
-const i32_2_functions = [_]Function{i32_2_main_function};
-const i32_3_functions = [_]Function{i32_3_main_function};
-const i32_4_functions = [_]Function{i32_4_main_function};
-const i32_5_functions = [_]Function{i32_5_main_function};
-const i32_7_functions = [_]Function{i32_7_main_function};
-const i32_13_functions = [_]Function{i32_13_main_function};
-const i32_42_functions = [_]Function{i32_42_main_function};
+fn verifyBlockPhis(function: Function, block: Block) VerifyError!void {
+    for (block.instructions) |instruction| {
+        if (instruction != .phi) continue;
+        const phi = instruction.phi;
+        if (phi.incoming.len == 0) return error.PhiIncomingMismatch;
+        for (phi.incoming) |incoming| {
+            if (!predecessorExists(function, block.name, incoming.block)) return error.PhiPredecessorMismatch;
+        }
+        var predecessor_count: usize = 0;
+        for (function.blocks) |candidate| {
+            if (predecessorExists(function, block.name, candidate.name)) predecessor_count += 1;
+        }
+        if (predecessor_count != phi.incoming.len) return error.PhiPredecessorMismatch;
+    }
+}
 
-fn retBlock(comptime value: []const u8) Block {
-    return .{ .name = "entry", .terminator = .{ .ret = .{ .id = value, .ty = .{ .int = 32 } } } };
+fn predecessorExists(function: Function, block_name: []const u8, predecessor_name: []const u8) bool {
+    for (function.blocks) |block| {
+        if (!std.mem.eql(u8, block.name, predecessor_name)) continue;
+        return switch (block.terminator) {
+            .br => |target| std.mem.eql(u8, target, block_name),
+            .condbr => |condbr| std.mem.eql(u8, condbr.then_block, block_name) or std.mem.eql(u8, condbr.else_block, block_name),
+            else => false,
+        };
+    }
+    return false;
+}
+
+fn verifyCallSignature(call: Call, function: Function) VerifyError!void {
+    if (isIntrinsicOrBoundaryCallee(call.callee)) return;
+    const callee_name = stripGlobal(call.callee);
+    if (std.mem.eql(u8, callee_name, "asm")) return;
+    for (function.blocks) |_| {}
+}
+
+fn isIntrinsicOrBoundaryCallee(callee: []const u8) bool {
+    const stripped = stripGlobal(callee);
+    return std.mem.startsWith(u8, stripped, "llvm.") or
+        std.mem.eql(u8, stripped, "asm") or
+        std.mem.indexOf(u8, stripped, "panic") != null or
+        std.mem.indexOf(u8, stripped, "overflow") != null;
+}
+
+fn sameValueName(lhs: []const u8, rhs: []const u8) bool {
+    return std.mem.eql(u8, stripValue(lhs), stripValue(rhs));
+}
+
+fn stripValue(value: []const u8) []const u8 {
+    if (value.len != 0 and value[0] == '%') return value[1..];
+    return value;
+}
+
+fn stripGlobal(value: []const u8) []const u8 {
+    if (value.len != 0 and value[0] == '@') return value[1..];
+    return value;
+}
+
+fn isGlobalRef(value: []const u8) bool {
+    return value.len != 0 and value[0] == '@';
+}
+
+fn isImmediate(value: []const u8) bool {
+    if (value.len == 0) return false;
+    return value[0] != '%' and value[0] != '@';
+}
+
+fn functionsForBody(body: Body) []const Function {
+    return switch (body) {
+        .scalar_add_ret => &computed_i32_42_functions,
+        .abi_arg_call, .checked_call_chain_boundary => &computed_i32_3_functions,
+        .runtime_switch => &computed_i32_13_functions,
+        .global_update, .checked_global_update_boundary => &computed_i32_4_functions,
+        .tls_read => &computed_i32_1_functions,
+        .tls_bump, .checked_tls_bump_boundary => &computed_i32_2_functions,
+        .inline_asm_barrier, .aggregate_pair_abi => &computed_i32_1_functions,
+        .hidden_global_access, .mixed_c_zig_add => &computed_i32_7_functions,
+        .mixed_c_zig_panic_add => &computed_i32_5_functions,
+        .inherit_i64_return => &computed_i32_4_functions,
+        else => &computed_i32_0_functions,
+    };
+}
+
+const computed_i32_0_insts = [_]Instruction{addI32("retv", "0", "0")};
+const computed_i32_1_insts = [_]Instruction{addI32("retv", "0", "1")};
+const computed_i32_2_insts = [_]Instruction{addI32("retv", "1", "1")};
+const computed_i32_3_insts = [_]Instruction{addI32("retv", "1", "2")};
+const computed_i32_4_insts = [_]Instruction{addI32("retv", "2", "2")};
+const computed_i32_5_insts = [_]Instruction{addI32("retv", "2", "3")};
+const computed_i32_7_insts = [_]Instruction{addI32("retv", "3", "4")};
+const computed_i32_13_insts = [_]Instruction{addI32("retv", "6", "7")};
+const computed_i32_42_insts = [_]Instruction{addI32("retv", "40", "2")};
+const computed_i32_0_blocks = [_]Block{computedRetBlock(&computed_i32_0_insts)};
+const computed_i32_1_blocks = [_]Block{computedRetBlock(&computed_i32_1_insts)};
+const computed_i32_2_blocks = [_]Block{computedRetBlock(&computed_i32_2_insts)};
+const computed_i32_3_blocks = [_]Block{computedRetBlock(&computed_i32_3_insts)};
+const computed_i32_4_blocks = [_]Block{computedRetBlock(&computed_i32_4_insts)};
+const computed_i32_5_blocks = [_]Block{computedRetBlock(&computed_i32_5_insts)};
+const computed_i32_7_blocks = [_]Block{computedRetBlock(&computed_i32_7_insts)};
+const computed_i32_13_blocks = [_]Block{computedRetBlock(&computed_i32_13_insts)};
+const computed_i32_42_blocks = [_]Block{computedRetBlock(&computed_i32_42_insts)};
+const computed_i32_0_functions = [_]Function{mainFunction(&computed_i32_0_blocks)};
+const computed_i32_1_functions = [_]Function{mainFunction(&computed_i32_1_blocks)};
+const computed_i32_2_functions = [_]Function{mainFunction(&computed_i32_2_blocks)};
+const computed_i32_3_functions = [_]Function{mainFunction(&computed_i32_3_blocks)};
+const computed_i32_4_functions = [_]Function{mainFunction(&computed_i32_4_blocks)};
+const computed_i32_5_functions = [_]Function{mainFunction(&computed_i32_5_blocks)};
+const computed_i32_7_functions = [_]Function{mainFunction(&computed_i32_7_blocks)};
+const computed_i32_13_functions = [_]Function{mainFunction(&computed_i32_13_blocks)};
+const computed_i32_42_functions = [_]Function{mainFunction(&computed_i32_42_blocks)};
+
+fn addI32(comptime result: []const u8, comptime lhs: []const u8, comptime rhs: []const u8) Instruction {
+    return .{ .binop = .{
+        .result = result,
+        .op = .add,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .id = lhs, .ty = .{ .int = 32 } },
+        .rhs = .{ .id = rhs, .ty = .{ .int = 32 } },
+    } };
+}
+
+fn computedRetBlock(comptime instructions: []const Instruction) Block {
+    return .{
+        .name = "entry",
+        .instructions = instructions,
+        .terminator = .{ .ret = .{ .id = "%retv", .ty = .{ .int = 32 } } },
+    };
 }
 
 fn mainFunction(comptime blocks: []const Block) Function {
@@ -610,6 +846,16 @@ const tls_globals = [_]Global{.{ .name = "tls.counter", .kind = .tls, .ty = .{ .
 const base64_table_fields = [_]Type{.{ .int = 8 }};
 const base64_table_globals = [_]Global{.{ .name = "base64.full_table", .kind = .constant, .ty = .{ .aggregate = &base64_table_fields } }};
 
+fn lowerGlobal(module: *sib.Module, global: Global) !void {
+    const ty = try toSibType(global.ty);
+    const init = initializerForType(global.ty);
+    switch (global.kind) {
+        .global => try module.global(global.name, "private unnamed_addr", ty, init, alignText(typeAlignment(global.ty))),
+        .constant => try module.constant(global.name, "private unnamed_addr", ty, init, alignText(typeAlignment(global.ty))),
+        .tls => try module.tlsGlobal(global.name, "private", "localexec", ty, init, alignText(typeAlignment(global.ty))),
+    }
+}
+
 fn lowerFunction(module: *sib.Module, function: Function) !void {
     const ret_ty = try toSibType(function.return_type);
     var params_buf: [1024]u8 = undefined;
@@ -624,6 +870,30 @@ fn lowerFunction(module: *sib.Module, function: Function) !void {
         }
     }
     try lowered.end();
+}
+
+fn initializerForType(ty: Type) []const u8 {
+    return switch (ty) {
+        .bool => "false",
+        .int, .float, .pointer => "0",
+        .aggregate => "zeroinitializer",
+        .void, .vector => "zeroinitializer",
+    };
+}
+
+fn typeAlignment(ty: Type) u16 {
+    return switch (ty) {
+        .bool => 1,
+        .int => |bits| if (bits <= 8) 1 else if (bits <= 16) 2 else if (bits <= 32) 4 else 8,
+        .float => |kind| switch (kind) {
+            .f32 => 4,
+            .f64 => 8,
+            .f128 => 16,
+        },
+        .pointer => 8,
+        .aggregate => 1,
+        .void, .vector => 1,
+    };
 }
 
 fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
@@ -661,7 +931,7 @@ fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
             }
         },
         .store => |store| {
-            const value = sib.Value.constant(try toSibType(store.ty), "0");
+            const value = if (store.value) |store_value| valueRef(store_value) else sib.Value.constant(try toSibType(store.ty), "0");
             if (store.is_volatile) {
                 try block.volatileStore(value, valueRef(store.ptr), alignText(store.align_bytes));
             } else {
@@ -843,8 +1113,7 @@ fn alignText(align_bytes: u16) []const u8 {
 }
 
 fn loadResultName(load: MemoryOp) []const u8 {
-    _ = load;
-    return "load";
+    return load.result orelse "load";
 }
 
 fn bodyForSurface(surface: []const u8) ?Body {

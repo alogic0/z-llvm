@@ -65,10 +65,11 @@ const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .global
 pub fn resolveSourceOwned(wrapper: []const u8, mode: []const u8, fixture: []const u8, tag: []const u8) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
     if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
-    const surface = surfaceForSourceMetadata(wrapper, tag) orelse return null;
+    const body = bodyForSourceMetadata(wrapper, tag) orelse return null;
+    const surface = sdv2.bodyName(body);
     const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
     const v2_source: sdv2.Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
-    const v2 = sdv2.programFromSurface(v2_source, surface) orelse return null;
+    const v2 = sdv2.programFromSemanticBody(v2_source, body, surface);
     return .{
         .id = surface,
         .surface = surface,
@@ -84,6 +85,18 @@ pub fn emit(descriptor: Descriptor, writer: *std.Io.Writer) !void {
 
 pub fn firstUnsupportedConstruct(descriptor: Descriptor) ?[]const u8 {
     return sdv2.firstUnsupportedConstruct(descriptor.v2);
+}
+
+pub fn isRealDescriptorProgram(descriptor: Descriptor) bool {
+    return sdv2.isRealDescriptorProgram(descriptor.v2);
+}
+
+pub fn isSurfaceToBodyAdapter(descriptor: Descriptor) bool {
+    return sdv2.isSurfaceToBodyAdapter(descriptor.v2);
+}
+
+pub fn isCannedReturnDescriptor(descriptor: Descriptor) bool {
+    return sdv2.isCannedReturnDescriptor(descriptor.v2);
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -157,6 +170,11 @@ fn isReleaseMode(mode: []const u8) bool {
 fn surfaceForSourceMetadata(wrapper: []const u8, tag: []const u8) ?[]const u8 {
     if (!std.mem.eql(u8, tag, "-")) return surfaceForTag(tag);
     return surfaceForUntaggedWrapper(wrapper);
+}
+
+fn bodyForSourceMetadata(wrapper: []const u8, tag: []const u8) ?sdv2.Body {
+    const surface = surfaceForSourceMetadata(wrapper, tag) orelse return null;
+    return sdv2.bodyForDiagnosticSurface(surface);
 }
 
 fn surfaceForTag(tag: []const u8) ?[]const u8 {
