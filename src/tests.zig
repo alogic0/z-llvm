@@ -17,6 +17,7 @@ const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const postdominator = @import("analysis/postdominator.zig");
+const semantic_descriptor_v2 = @import("semantic_descriptor_v2.zig");
 const target = @import("target.zig");
 const target_library_info = @import("analysis/target_library_info.zig");
 const target_transform_info = @import("analysis/target_transform_info.zig");
