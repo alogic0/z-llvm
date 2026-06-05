@@ -350,6 +350,10 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_serialized_return_i32 = "{}"
         \\; zllvm_air_derived_descriptor = "{s}"
         \\; zllvm_static_descriptor_map = "{s}"
+        \\; zllvm_air_extracted_descriptor = "{s}"
+        \\; zllvm_template_descriptor = "{s}"
+        \\; zllvm_wrapper_body_map = "{s}"
+        \\; zllvm_source_tag_body_map = "{s}"
         \\
     , .{
         if (descriptor) |desc| if (sd.isFullDescriptorProgramInput(desc)) "used" else "not-used" else "-",
@@ -364,6 +368,10 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| sd.serializedReturnI32(desc) orelse -1 else -1,
         if (descriptor) |desc| if (sd.isAirDerivedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isStaticDescriptorMap(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isAirExtractedDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.isTemplateDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesWrapperBodyMap(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesSourceTagBodyMap(desc)) "used" else "not-used" else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });
     };

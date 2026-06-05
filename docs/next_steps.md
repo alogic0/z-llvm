@@ -149,17 +149,22 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
-that gate. Serialized transport and AIR-derived provenance are proven for all
-90 rows because those rows emit semantic DescriptorV2 records and the gate
-rejects any AIR-derived serialized return stub. This includes the repeated
+that gate. Serialized AIR-shaped transport is proven for all 90 rows because
+those rows emit semantic DescriptorV2 records and the gate rejects any
+serialized return stub. Current provenance counters show
+`air_extracted_descriptor_rows=0`, `template_descriptor_rows=90`,
+`wrapper_body_map_rows=32`, and `source_tag_body_map_rows=58`, so the records
+are not yet extracted from Zig AIR/Sema facts. This includes the repeated
 simple ReleaseSmall hidden/global, mixed C/Zig, i64, start/noreturn,
 address-space, raw-start, libfuzzer, base64 full/reduced/table, and
 `strFromFloatHelp` boundary rows. The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally
 covers only unambiguous wrapper/mode inputs.
-The detailed milestone is recorded in
-`docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`.
+The detailed source-wrapper milestone is recorded in
+`docs/roadmap/x86_64_source_wrapper_semantic_lowering.md`; the source-owned
+template inventory is recorded in
+`docs/roadmap/x86_64_source_owned_descriptor_template_inventory.md`.
 
 Next target:
 The current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall fixture inventory is

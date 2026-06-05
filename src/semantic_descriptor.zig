@@ -45,6 +45,8 @@ pub const Descriptor = struct {
     input_emitter: []const u8 = "-",
     input_payload: InputPayload = .descriptor_body_name,
     derivation: DescriptorDerivation = .unknown,
+    record_source: DescriptorRecordSource = .unknown,
+    body_selector: DescriptorBodySelector = .unknown,
     serialized_return_i32: ?i32 = null,
 };
 
@@ -56,6 +58,18 @@ pub const InputPayload = enum {
 pub const DescriptorDerivation = enum {
     zig_air_facts,
     static_descriptor_map,
+    unknown,
+};
+
+pub const DescriptorRecordSource = enum {
+    air_extracted,
+    template,
+    unknown,
+};
+
+pub const DescriptorBodySelector = enum {
+    wrapper_body_map,
+    source_tag_body_map,
     unknown,
 };
 
@@ -228,6 +242,22 @@ pub fn isStaticDescriptorMap(descriptor: Descriptor) bool {
     return descriptor.derivation == .static_descriptor_map;
 }
 
+pub fn isAirExtractedDescriptor(descriptor: Descriptor) bool {
+    return descriptor.record_source == .air_extracted;
+}
+
+pub fn isTemplateDescriptor(descriptor: Descriptor) bool {
+    return descriptor.record_source == .template;
+}
+
+pub fn usesWrapperBodyMap(descriptor: Descriptor) bool {
+    return descriptor.body_selector == .wrapper_body_map;
+}
+
+pub fn usesSourceTagBodyMap(descriptor: Descriptor) bool {
+    return descriptor.body_selector == .source_tag_body_map;
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }
@@ -334,6 +364,8 @@ const SourceDescriptorInput = struct {
     emitter: []const u8,
     payload: InputPayload,
     derivation: DescriptorDerivation,
+    record_source: DescriptorRecordSource,
+    body_selector: DescriptorBodySelector,
 };
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
@@ -356,6 +388,8 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
     const diagnostic_surface = descriptorLineValue(contents, "diagnostic_surface") orelse body_name;
     const emitter = descriptorLineValue(contents, "descriptor_emitter") orelse "-";
     const derivation = descriptorDerivationFromName(descriptorLineValue(contents, "descriptor_derivation") orelse "-");
+    const record_source = descriptorRecordSourceFromName(descriptorLineValue(contents, "descriptor_record_source") orelse "-");
+    const body_selector = descriptorBodySelectorFromName(descriptorLineValue(contents, "descriptor_body_selector") orelse "-");
     if (descriptorLineValue(contents, "descriptor_source")) |source| {
         if (!std.mem.eql(u8, source, "zig-source-analysis")) return null;
     } else return null;
@@ -369,6 +403,8 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
         .emitter = emitter,
         .payload = payload,
         .derivation = derivation,
+        .record_source = record_source,
+        .body_selector = body_selector,
     };
 }
 
@@ -389,6 +425,8 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
             .input_emitter = input.emitter,
             .input_payload = .full_descriptor_program,
             .derivation = input.derivation,
+            .record_source = input.record_source,
+            .body_selector = input.body_selector,
             .serialized_return_i32 = program.serialized_return_i32,
         };
     }
@@ -402,6 +440,8 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
         .input_emitter = input.emitter,
         .input_payload = .full_descriptor_program,
         .derivation = input.derivation,
+        .record_source = input.record_source,
+        .body_selector = input.body_selector,
         .serialized_return_i32 = ret_i32,
     };
 }
@@ -816,6 +856,18 @@ fn parseSerializedReturnProgram(contents: []const u8) ?i32 {
 fn descriptorDerivationFromName(name: []const u8) DescriptorDerivation {
     if (std.mem.eql(u8, name, "zig-air-facts")) return .zig_air_facts;
     if (std.mem.eql(u8, name, "static-descriptor-map")) return .static_descriptor_map;
+    return .unknown;
+}
+
+fn descriptorRecordSourceFromName(name: []const u8) DescriptorRecordSource {
+    if (std.mem.eql(u8, name, "air-extracted")) return .air_extracted;
+    if (std.mem.eql(u8, name, "template")) return .template;
+    return .unknown;
+}
+
+fn descriptorBodySelectorFromName(name: []const u8) DescriptorBodySelector {
+    if (std.mem.eql(u8, name, "wrapper-body-map")) return .wrapper_body_map;
+    if (std.mem.eql(u8, name, "source-tag-body-map")) return .source_tag_body_map;
     return .unknown;
 }
 

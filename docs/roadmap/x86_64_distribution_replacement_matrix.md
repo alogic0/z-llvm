@@ -581,8 +581,12 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
                        rows are DescriptorV2-owned; all 90 rows use serialized
-                       transport and AIR-fact-derived semantic records with no
-                       return-stub fallback or static descriptor map fallback;
+                       AIR-shaped semantic records with no return-stub fallback
+                       or static descriptor map fallback, but current
+                       provenance is still template-owned
+                       (air_extracted_descriptor_rows=0,
+                       template_descriptor_rows=90, wrapper_body_map_rows=32,
+                       source_tag_body_map_rows=58);
                        all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse

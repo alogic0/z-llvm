@@ -1338,6 +1338,10 @@ pub fn main(init: std.process.Init) !void {
     var zllvm_body_expansion_rows: usize = 0;
     var air_derived_descriptor_rows: usize = 0;
     var static_descriptor_map_rows: usize = 0;
+    var air_extracted_descriptor_rows: usize = 0;
+    var template_descriptor_rows: usize = 0;
+    var wrapper_body_map_rows: usize = 0;
+    var source_tag_body_map_rows: usize = 0;
     var surface_to_body_adapter_rows: usize = 0;
     var canned_return_descriptor_rows: usize = 0;
     var legacy_semantic_record_rows: usize = 0;
@@ -1554,6 +1558,14 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(air_derived_descriptor);
         const static_descriptor_map = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_static_descriptor_map = \"", "zllvm_static_descriptor_map") else "-";
         defer if (use_ir_writer) allocator.free(static_descriptor_map);
+        const air_extracted_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_air_extracted_descriptor = \"", "zllvm_air_extracted_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(air_extracted_descriptor);
+        const template_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_template_descriptor = \"", "zllvm_template_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(template_descriptor);
+        const wrapper_body_map = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_wrapper_body_map = \"", "zllvm_wrapper_body_map") else "-";
+        defer if (use_ir_writer) allocator.free(wrapper_body_map);
+        const source_tag_body_map = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_tag_body_map = \"", "zllvm_source_tag_body_map") else "-";
+        defer if (use_ir_writer) allocator.free(source_tag_body_map);
         const surface_to_body_adapter = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_surface_to_body_adapter = \"", "zllvm_surface_to_body_adapter") else "-";
         defer if (use_ir_writer) allocator.free(surface_to_body_adapter);
         const canned_return_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_canned_return_descriptor = \"", "zllvm_canned_return_descriptor") else "-";
@@ -1655,6 +1667,23 @@ pub fn main(init: std.process.Init) !void {
                 }
                 if (std.mem.eql(u8, static_descriptor_map, "used")) {
                     static_descriptor_map_rows += 1;
+                }
+                if (std.mem.eql(u8, air_extracted_descriptor, "used")) {
+                    air_extracted_descriptor_rows += 1;
+                }
+                if (std.mem.eql(u8, template_descriptor, "used")) {
+                    template_descriptor_rows += 1;
+                }
+                if (std.mem.eql(u8, wrapper_body_map, "used")) {
+                    wrapper_body_map_rows += 1;
+                }
+                if (std.mem.eql(u8, source_tag_body_map, "used")) {
+                    source_tag_body_map_rows += 1;
+                }
+                if ((std.mem.eql(u8, air_extracted_descriptor, "used") == std.mem.eql(u8, template_descriptor, "used")) or
+                    (std.mem.eql(u8, wrapper_body_map, "used") == std.mem.eql(u8, source_tag_body_map, "used")))
+                {
+                    try common.validationError(io, "release source-owned row {s} has ambiguous descriptor provenance: air_extracted={s} template={s} wrapper_body_map={s} source_tag_body_map={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, air_extracted_descriptor, template_descriptor, wrapper_body_map, source_tag_body_map, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
                 if (!std.mem.eql(u8, surface_to_body_adapter, "not-used")) {
                     surface_to_body_adapter_rows += 1;
@@ -1800,12 +1829,15 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != 90 or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
+            if (air_extracted_descriptor_rows + template_descriptor_rows != 90 or wrapper_body_map_rows + source_tag_body_map_rows != 90) {
+                try common.validationError(io, "release source-owned descriptor provenance accounting mismatch: air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
+            }
             if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or full_descriptor_program_rows != 90 or serialized_function_rows != 90 or serialized_instruction_rows != 90 or serialized_global_rows != 90 or semantic_serialized_rows != 90 or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != 90 or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != 90 or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != 90 or source_derived_descriptor_rows != 90 or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
-                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
             try stdout_writer.interface.print(
                 "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} local_fail=0\n",
