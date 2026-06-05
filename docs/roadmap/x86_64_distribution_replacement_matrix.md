@@ -553,8 +553,8 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           descriptor_program_body_expansion_rows=0
                           functions_for_body_rows=0
                           globals_for_body_rows=0
-                          air_derived_descriptor_rows=9
-                          static_descriptor_map_rows=81
+                          air_derived_descriptor_rows=41
+                          static_descriptor_map_rows=49
                           zig_emitted_descriptor_rows=90
                           runner_generated_descriptor_rows=0
                           descriptor_file_consumed_rows=90
@@ -574,8 +574,8 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        release_source_owned_rows=90;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
-                       rows are DescriptorV2-owned; 9 rows are currently
-                       marked AIR-fact-derived and 81 rows remain explicit
+                       rows are DescriptorV2-owned; 41 rows are currently
+                       marked AIR-fact-derived and 49 rows remain explicit
                        static descriptor map fallback; all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse

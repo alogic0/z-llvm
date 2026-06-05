@@ -71,7 +71,7 @@ structured-direct IR. Current measured output is `release_source_rows=90`,
 `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`,
 `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`,
 `globals_for_body_rows=0`,
-`air_derived_descriptor_rows=9`, `static_descriptor_map_rows=81`,
+`air_derived_descriptor_rows=41`, `static_descriptor_map_rows=49`,
 `zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
 `descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
@@ -138,7 +138,7 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `serialized_global_rows=90`, `descriptor_body_name_rows=0`,
 `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`,
 `functions_for_body_rows=0`, `globals_for_body_rows=0`,
-`air_derived_descriptor_rows=9`, `static_descriptor_map_rows=81`,
+`air_derived_descriptor_rows=41`, `static_descriptor_map_rows=49`,
 `zig_emitted_descriptor_rows=90`,
 `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
 `source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
@@ -149,9 +149,10 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
 that gate. The narrower source-wrapper compatibility proof remains a separate
 regression rung. Next ownership work
-should move the remaining memory/global/TLS/aggregate/FP/runtime-boundary
-families out of `static_descriptor_map_rows=81` and into real AIR-fact
-derivation before requiring `air_derived_descriptor_rows=90`.
+should move the remaining ReleaseSmall mixed C/Zig, i64, compile-asm,
+libfuzzer, base64, and `strFromFloatHelp` families out of
+`static_descriptor_map_rows=49` and into real AIR-fact derivation before
+requiring `air_derived_descriptor_rows=90`.
 compatibility gate now has 48 semantic record rows and one external writer
 delegate because it intentionally covers only unambiguous wrapper/mode inputs.
 The detailed milestone is recorded in
