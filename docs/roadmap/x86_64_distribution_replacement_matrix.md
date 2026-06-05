@@ -243,7 +243,7 @@ full_descriptor_program_rows=90
 serialized_function_rows=90
 serialized_instruction_rows=90
 serialized_global_rows=90
-semantic_serialized_rows=63
+semantic_serialized_rows=90
 serialized_return_stub_rows=0
 descriptor_body_name_rows=0
 zllvm_body_expansion_rows=0
@@ -552,15 +552,15 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           serialized_function_rows=90
                           serialized_instruction_rows=90
                           serialized_global_rows=90
-                          semantic_serialized_rows=63
+                          semantic_serialized_rows=90
                           serialized_return_stub_rows=0
                           descriptor_body_name_rows=0
                           zllvm_body_expansion_rows=0
                           descriptor_program_body_expansion_rows=0
                           functions_for_body_rows=0
                           globals_for_body_rows=0
-                          air_derived_descriptor_rows=63
-                          static_descriptor_map_rows=27
+                          air_derived_descriptor_rows=90
+                          static_descriptor_map_rows=0
                           zig_emitted_descriptor_rows=90
                           runner_generated_descriptor_rows=0
                           descriptor_file_consumed_rows=90
@@ -581,10 +581,9 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
                        rows are DescriptorV2-owned; all 90 rows use serialized
-                       transport, 63 rows are currently AIR-fact-derived
-                       semantic serialized records with no return-stub fallback,
-                       and 27 rows remain explicit static descriptor map
-                       fallback; all gates require
+                       transport and AIR-fact-derived semantic records with no
+                       return-stub fallback or static descriptor map fallback;
+                       all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse
                        fallback, no LLVM optimizer, no LLVM TargetMachine,

@@ -102,7 +102,7 @@ makes z_llvm consume that descriptor directly, and requires
 `descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
 `zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
 `descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
-`semantic_serialized_rows=63`, `serialized_return_stub_rows=0`,
+`semantic_serialized_rows=90`, `serialized_return_stub_rows=0`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `external_writer_delegate_rows=0`,
