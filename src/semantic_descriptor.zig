@@ -377,9 +377,22 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
     if (!std.mem.startsWith(u8, input.fixture, "test/distribution/")) return null;
     const body = sdv2.bodyForName(input.body_name) orelse return null;
     const surface = if (input.diagnostic_surface.len != 0) input.diagnostic_surface else sdv2.bodyName(body);
-    const ret_i32 = parseSerializedReturnProgram(contents) orelse return null;
     const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
     const v2_source: sdv2.Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    if (parseSerializedProgram(contents, v2_source, body, surface)) |program| {
+        return .{
+            .id = surface,
+            .surface = surface,
+            .source = source,
+            .features = featuresForSurface(surface),
+            .v2 = program,
+            .input_emitter = input.emitter,
+            .input_payload = .full_descriptor_program,
+            .derivation = input.derivation,
+            .serialized_return_i32 = program.serialized_return_i32,
+        };
+    }
+    const ret_i32 = parseSerializedReturnProgram(contents) orelse return null;
     return .{
         .id = surface,
         .surface = surface,
@@ -391,6 +404,372 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
         .derivation = input.derivation,
         .serialized_return_i32 = ret_i32,
     };
+}
+
+fn parseSerializedProgram(contents: []const u8, source: sdv2.Source, body: sdv2.Body, surface: []const u8) ?sdv2.Program {
+    if (!descriptorLineValueEql(contents, "program_functions", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_blocks", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_instructions", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_terminators", "records")) return null;
+    if (!descriptorLineValueEql(contents, "program_globals", "records")) return null;
+
+    const allocator = std.heap.page_allocator;
+    var parser = SerializedProgramParser.init(allocator, source, body, surface);
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        const payload = if (std.mem.startsWith(u8, line, "record=")) line["record=".len..] else continue;
+        parser.record(payload) catch return null;
+    }
+    return parser.finish() catch null;
+}
+
+const SerializedProgramParser = struct {
+    allocator: std.mem.Allocator,
+    source: sdv2.Source,
+    body: sdv2.Body,
+    surface: []const u8,
+    functions: std.ArrayList(sdv2.Function) = .empty,
+    globals: std.ArrayList(sdv2.Global) = .empty,
+    function_name: ?[]const u8 = null,
+    function_cc: sdv2.CallConv = .zig,
+    function_return_type: sdv2.Type = .void,
+    params: std.ArrayList(sdv2.Param) = .empty,
+    blocks: std.ArrayList(sdv2.Block) = .empty,
+    block_name: ?[]const u8 = null,
+    instructions: std.ArrayList(sdv2.Instruction) = .empty,
+    terminator: ?sdv2.Terminator = null,
+    semantic_records: bool = false,
+    saw_globals_record: bool = false,
+
+    fn init(allocator: std.mem.Allocator, source: sdv2.Source, body: sdv2.Body, surface: []const u8) SerializedProgramParser {
+        return .{ .allocator = allocator, .source = source, .body = body, .surface = surface };
+    }
+
+    fn record(self: *SerializedProgramParser, payload: []const u8) !void {
+        var fields = std.mem.splitScalar(u8, payload, '|');
+        const kind = fields.next() orelse return error.InvalidDescriptor;
+        if (std.mem.eql(u8, kind, "function")) {
+            try self.startFunction(fields.next() orelse return error.InvalidDescriptor, fields.next() orelse return error.InvalidDescriptor, fields.next() orelse return error.InvalidDescriptor);
+        } else if (std.mem.eql(u8, kind, "param")) {
+            try self.params.append(self.allocator, .{ .name = fields.next() orelse return error.InvalidDescriptor, .ty = try parseType(fields.next() orelse return error.InvalidDescriptor) });
+            self.semantic_records = true;
+        } else if (std.mem.eql(u8, kind, "block")) {
+            _ = fields.next() orelse return error.InvalidDescriptor;
+            try self.startBlock(fields.next() orelse return error.InvalidDescriptor);
+        } else if (std.mem.eql(u8, kind, "inst")) {
+            _ = fields.next() orelse return error.InvalidDescriptor;
+            _ = fields.next() orelse return error.InvalidDescriptor;
+            try self.instructions.append(self.allocator, try parseInstruction(&fields));
+            self.semantic_records = true;
+        } else if (std.mem.eql(u8, kind, "term")) {
+            _ = fields.next() orelse return error.InvalidDescriptor;
+            _ = fields.next() orelse return error.InvalidDescriptor;
+            self.terminator = try parseTerminator(&fields);
+        } else if (std.mem.eql(u8, kind, "global")) {
+            try self.globals.append(self.allocator, try parseGlobal(&fields));
+            self.semantic_records = true;
+        } else if (std.mem.eql(u8, kind, "globals")) {
+            self.saw_globals_record = true;
+        } else {
+            return error.InvalidDescriptor;
+        }
+    }
+
+    fn startFunction(self: *SerializedProgramParser, name: []const u8, cc_text: []const u8, ret_text: []const u8) !void {
+        try self.finishFunction();
+        self.function_name = name;
+        self.function_cc = try parseCallConv(cc_text);
+        self.function_return_type = try parseType(ret_text);
+    }
+
+    fn startBlock(self: *SerializedProgramParser, name: []const u8) !void {
+        try self.finishBlock();
+        self.block_name = name;
+    }
+
+    fn finishBlock(self: *SerializedProgramParser) !void {
+        const name = self.block_name orelse return;
+        const terminator = self.terminator orelse return error.InvalidDescriptor;
+        try self.blocks.append(self.allocator, .{
+            .name = name,
+            .instructions = try self.instructions.toOwnedSlice(self.allocator),
+            .terminator = terminator,
+        });
+        self.instructions = .empty;
+        self.terminator = null;
+        self.block_name = null;
+    }
+
+    fn finishFunction(self: *SerializedProgramParser) !void {
+        const name = self.function_name orelse return;
+        try self.finishBlock();
+        try self.functions.append(self.allocator, .{
+            .name = name,
+            .calling_convention = self.function_cc,
+            .params = try self.params.toOwnedSlice(self.allocator),
+            .return_type = self.function_return_type,
+            .blocks = try self.blocks.toOwnedSlice(self.allocator),
+        });
+        self.params = .empty;
+        self.blocks = .empty;
+        self.function_name = null;
+        self.function_cc = .zig;
+        self.function_return_type = .void;
+    }
+
+    fn finish(self: *SerializedProgramParser) !sdv2.Program {
+        try self.finishFunction();
+        if (self.functions.items.len == 0 or !self.saw_globals_record) return error.InvalidDescriptor;
+        const serialized_return_i32 = if (self.semantic_records) null else inferSerializedReturnStub(self.functions.items);
+        return .{
+            .id = sdv2.bodyName(self.body),
+            .source = self.source,
+            .body = self.body,
+            .diagnostic_surface = self.surface,
+            .origin = .source_derived_descriptor,
+            .functions = try self.functions.toOwnedSlice(self.allocator),
+            .globals = try self.globals.toOwnedSlice(self.allocator),
+            .serialized_functions = true,
+            .serialized_instructions = true,
+            .serialized_globals = true,
+            .serialized_return_i32 = serialized_return_i32,
+        };
+    }
+};
+
+fn parseInstruction(fields: *std.mem.SplitIterator(u8, .scalar)) !sdv2.Instruction {
+    const tag = fields.next() orelse return error.InvalidDescriptor;
+    if (std.mem.eql(u8, tag, "binop")) {
+        const result = fields.next() orelse return error.InvalidDescriptor;
+        return .{ .binop = .{
+            .result = result,
+            .op = try parseBinOp(fields.next() orelse return error.InvalidDescriptor),
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .lhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .rhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "checked_add")) {
+        return .{ .checked_add = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .lhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .rhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .panic_block = fields.next() orelse return error.InvalidDescriptor,
+        } };
+    }
+    if (std.mem.eql(u8, tag, "cmp")) {
+        return .{ .compare = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .op = try parseCompareOp(fields.next() orelse return error.InvalidDescriptor),
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .lhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .rhs = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "select")) {
+        return .{ .select = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .cond = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .then_value = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .else_value = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "call")) {
+        const result_text = fields.next() orelse return error.InvalidDescriptor;
+        return .{ .call = .{
+            .result = if (std.mem.eql(u8, result_text, "-")) null else result_text,
+            .callee = fields.next() orelse return error.InvalidDescriptor,
+            .calling_convention = try parseCallConv(fields.next() orelse return error.InvalidDescriptor),
+            .ret_ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .args = try parseValueList(fields.next() orelse return error.InvalidDescriptor),
+            .abi = try parseAbiShape(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "load")) {
+        return .{ .load = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .ptr = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .align_bytes = try parseU16(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "store")) {
+        return .{ .store = .{
+            .ptr = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+            .value = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .align_bytes = try parseU16(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "gep")) {
+        return .{ .gep = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .base = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .indices = try parseValueList(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "phi2")) {
+        const incoming = try std.heap.page_allocator.alloc(sdv2.Incoming, 2);
+        const result = fields.next() orelse return error.InvalidDescriptor;
+        const ty = try parseType(fields.next() orelse return error.InvalidDescriptor);
+        incoming[0] = .{ .value = try parseValue(fields.next() orelse return error.InvalidDescriptor), .block = fields.next() orelse return error.InvalidDescriptor };
+        incoming[1] = .{ .value = try parseValue(fields.next() orelse return error.InvalidDescriptor), .block = fields.next() orelse return error.InvalidDescriptor };
+        return .{ .phi = .{ .result = result, .ty = ty, .incoming = incoming } };
+    }
+    if (std.mem.eql(u8, tag, "cast")) {
+        return .{ .cast = .{
+            .result = fields.next() orelse return error.InvalidDescriptor,
+            .op = try parseCastOp(fields.next() orelse return error.InvalidDescriptor),
+            .from = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .to = try parseType(fields.next() orelse return error.InvalidDescriptor),
+        } };
+    }
+    if (std.mem.eql(u8, tag, "inline_asm_boundary")) {
+        return .{ .inline_asm_boundary = .{ .text = fields.next() orelse "" } };
+    }
+    return error.InvalidDescriptor;
+}
+
+fn parseTerminator(fields: *std.mem.SplitIterator(u8, .scalar)) !sdv2.Terminator {
+    const tag = fields.next() orelse return error.InvalidDescriptor;
+    if (std.mem.eql(u8, tag, "ret")) {
+        return .{ .ret = try parseValue(fields.next() orelse return error.InvalidDescriptor) };
+    }
+    if (std.mem.eql(u8, tag, "ret_void")) return .{ .ret = null };
+    if (std.mem.eql(u8, tag, "br")) return .{ .br = fields.next() orelse return error.InvalidDescriptor };
+    if (std.mem.eql(u8, tag, "condbr")) {
+        return .{ .condbr = .{
+            .cond = try parseValue(fields.next() orelse return error.InvalidDescriptor),
+            .then_block = fields.next() orelse return error.InvalidDescriptor,
+            .else_block = fields.next() orelse return error.InvalidDescriptor,
+        } };
+    }
+    if (std.mem.eql(u8, tag, "unreachable")) return .@"unreachable";
+    return error.InvalidDescriptor;
+}
+
+fn parseGlobal(fields: *std.mem.SplitIterator(u8, .scalar)) !sdv2.Global {
+    const llvm_type = fields.next() orelse return error.InvalidDescriptor;
+    return .{
+        .name = fields.next() orelse return error.InvalidDescriptor,
+        .kind = try parseGlobalKind(fields.next() orelse return error.InvalidDescriptor),
+        .ty = try parseType(fields.next() orelse return error.InvalidDescriptor),
+        .address_space = try parseAddressSpace(fields.next() orelse return error.InvalidDescriptor),
+        .initializer = fields.next() orelse return error.InvalidDescriptor,
+        .llvm_type = if (std.mem.eql(u8, llvm_type, "-")) null else llvm_type,
+        .alignment = try parseU16(fields.next() orelse return error.InvalidDescriptor),
+    };
+}
+
+fn parseValueList(text: []const u8) ![]const sdv2.ValueRef {
+    if (std.mem.eql(u8, text, "-")) return &.{};
+    var count: usize = 1;
+    for (text) |byte| {
+        if (byte == ',') count += 1;
+    }
+    const values = try std.heap.page_allocator.alloc(sdv2.ValueRef, count);
+    var index: usize = 0;
+    var parts = std.mem.splitScalar(u8, text, ',');
+    while (parts.next()) |part| {
+        values[index] = try parseValue(part);
+        index += 1;
+    }
+    return values;
+}
+
+fn parseValue(text: []const u8) !sdv2.ValueRef {
+    const colon = std.mem.indexOfScalar(u8, text, ':') orelse return error.InvalidDescriptor;
+    return .{ .id = text[colon + 1 ..], .ty = try parseType(text[0..colon]) };
+}
+
+fn parseType(text: []const u8) !sdv2.Type {
+    if (std.mem.eql(u8, text, "void")) return .void;
+    if (std.mem.eql(u8, text, "i1")) return .bool;
+    if (std.mem.eql(u8, text, "i8")) return .{ .int = 8 };
+    if (std.mem.eql(u8, text, "i16")) return .{ .int = 16 };
+    if (std.mem.eql(u8, text, "i32")) return .{ .int = 32 };
+    if (std.mem.eql(u8, text, "i64")) return .{ .int = 64 };
+    if (std.mem.eql(u8, text, "i128")) return .{ .int = 128 };
+    if (std.mem.eql(u8, text, "f32")) return .{ .float = .f32 };
+    if (std.mem.eql(u8, text, "f64")) return .{ .float = .f64 };
+    if (std.mem.eql(u8, text, "f128")) return .{ .float = .f128 };
+    if (std.mem.eql(u8, text, "ptr")) return .{ .pointer = .generic };
+    if (std.mem.eql(u8, text, "tls_ptr")) return .{ .pointer = .local_exec_tls };
+    return error.InvalidDescriptor;
+}
+
+fn parseBinOp(text: []const u8) !sdv2.BinOp {
+    inline for (@typeInfo(sdv2.BinOp).@"enum".fields) |field| {
+        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
+    }
+    return error.InvalidDescriptor;
+}
+
+fn parseCompareOp(text: []const u8) !sdv2.CompareOp {
+    inline for (@typeInfo(sdv2.CompareOp).@"enum".fields) |field| {
+        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
+    }
+    return error.InvalidDescriptor;
+}
+
+fn parseCastOp(text: []const u8) !sdv2.CastOp {
+    inline for (@typeInfo(sdv2.CastOp).@"enum".fields) |field| {
+        if (std.mem.eql(u8, text, field.name)) return @enumFromInt(field.value);
+    }
+    return error.InvalidDescriptor;
+}
+
+fn parseCallConv(text: []const u8) !sdv2.CallConv {
+    if (std.mem.eql(u8, text, "zig")) return .zig;
+    if (std.mem.eql(u8, text, "c")) return .c;
+    if (std.mem.eql(u8, text, "fastcc")) return .fastcc;
+    if (std.mem.eql(u8, text, "inline_asm_boundary")) return .inline_asm_boundary;
+    return error.InvalidDescriptor;
+}
+
+fn parseAbiShape(text: []const u8) !sdv2.AbiShape {
+    if (std.mem.eql(u8, text, "direct")) return .direct;
+    if (std.mem.eql(u8, text, "runtime_boundary")) return .runtime_boundary;
+    if (std.mem.eql(u8, text, "inline_asm_boundary")) return .inline_asm_boundary;
+    if (std.mem.eql(u8, text, "sret")) return .sret;
+    if (std.mem.eql(u8, text, "byval")) return .byval;
+    return error.InvalidDescriptor;
+}
+
+fn parseGlobalKind(text: []const u8) !sdv2.GlobalKind {
+    if (std.mem.eql(u8, text, "global")) return .global;
+    if (std.mem.eql(u8, text, "constant")) return .constant;
+    if (std.mem.eql(u8, text, "tls")) return .tls;
+    return error.InvalidDescriptor;
+}
+
+fn parseAddressSpace(text: []const u8) !sdv2.AddressSpace {
+    if (std.mem.eql(u8, text, "generic")) return .generic;
+    if (std.mem.eql(u8, text, "local_exec_tls")) return .local_exec_tls;
+    if (std.mem.eql(u8, text, "vram")) return .vram;
+    return error.InvalidDescriptor;
+}
+
+fn parseU16(text: []const u8) !u16 {
+    return std.fmt.parseInt(u16, text, 10) catch error.InvalidDescriptor;
+}
+
+fn inferSerializedReturnStub(functions: []const sdv2.Function) ?i32 {
+    if (functions.len != 1) return null;
+    const function = functions[0];
+    if (!std.mem.eql(u8, function.name, "main") or function.blocks.len != 1) return null;
+    const block = function.blocks[0];
+    if (block.instructions.len != 1) return null;
+    const binop = switch (block.instructions[0]) {
+        .binop => |binop| binop,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, binop.result, "retv") or binop.op != .add) return null;
+    const rhs = std.fmt.parseInt(i32, binop.rhs.id, 10) catch return null;
+    if (rhs != 0) return null;
+    return std.fmt.parseInt(i32, binop.lhs.id, 10) catch null;
 }
 
 fn parseSerializedReturnProgram(contents: []const u8) ?i32 {
