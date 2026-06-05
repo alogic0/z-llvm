@@ -1,5 +1,5 @@
 const std = @import("std");
-const zsl = @import("zig_semantic_lowering.zig");
+const sdv2 = @import("semantic_descriptor_v2.zig");
 
 pub const Feature = enum {
     functions,
@@ -41,6 +41,7 @@ pub const Descriptor = struct {
     surface: []const u8,
     source: Source,
     features: []const Feature,
+    v2: sdv2.Program,
 };
 
 const scalar_features = [_]Feature{ .functions, .return_type, .blocks, .constants };
@@ -65,21 +66,24 @@ pub fn resolveSourceOwned(wrapper: []const u8, mode: []const u8, fixture: []cons
     if (!isReleaseMode(mode)) return null;
     if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
     const surface = surfaceForSourceMetadata(wrapper, tag) orelse return null;
+    const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
+    const v2_source: sdv2.Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
+    const v2 = sdv2.programFromSurface(v2_source, surface) orelse return null;
     return .{
         .id = surface,
         .surface = surface,
-        .source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag },
+        .source = source,
         .features = featuresForSurface(surface),
+        .v2 = v2,
     };
 }
 
 pub fn emit(descriptor: Descriptor, writer: *std.Io.Writer) !void {
-    if (!try zsl.emitSurface(descriptor.surface, writer)) return error.UnsupportedDescriptorConstruct;
+    try sdv2.lowerToStructuredIr(descriptor.v2, writer);
 }
 
 pub fn firstUnsupportedConstruct(descriptor: Descriptor) ?[]const u8 {
-    if (!zsl.isSemanticSurface(descriptor.surface)) return descriptor.surface;
-    return null;
+    return sdv2.firstUnsupportedConstruct(descriptor.v2);
 }
 
 pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
@@ -91,6 +95,7 @@ pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
         \\fixture={s}
         \\source_tag={s}
         \\surface={s}
+        \\descriptor_v2_body={s}
         \\features=
     , .{
         descriptor.id,
@@ -99,9 +104,11 @@ pub fn writeText(descriptor: Descriptor, writer: *std.Io.Writer) !void {
         descriptor.source.fixture,
         descriptor.source.tag,
         descriptor.surface,
+        sdv2.bodyName(descriptor.v2.body),
     });
     try writeFeatureList(descriptor.features, writer);
     try writer.writeByte('\n');
+    try sdv2.writeText(descriptor.v2, writer);
 }
 
 pub fn writeFeatureList(features: []const Feature, writer: *std.Io.Writer) !void {

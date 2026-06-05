@@ -378,13 +378,12 @@ pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
 
 pub fn programFromSurface(source: Source, surface: []const u8) ?Program {
     const body = bodyForSurface(surface) orelse return null;
-    const feature_fn = [_]Function{mainFunctionForBody(body)};
     return .{
         .id = bodyName(body),
         .source = source,
         .body = body,
         .diagnostic_surface = surface,
-        .functions = &feature_fn,
+        .functions = functionsForBody(body),
         .globals = globalsForBody(body),
         .atomics = body == .atomic_add,
         .inline_asm_boundary = body == .inline_asm_barrier or body == .compile_asm_unreachable,
@@ -544,17 +543,19 @@ fn typeEql(lhs: Type, rhs: Type) bool {
     };
 }
 
-fn mainFunctionForBody(body: Body) Function {
+fn functionsForBody(body: Body) []const Function {
     return if (body == .compile_asm_unreachable or body == .noreturn_unreachable_stub)
-        void_main_function
+        &void_functions
     else
-        i32_main_function;
+        &i32_functions;
 }
 
 const i32_entry_blocks = [_]Block{.{ .name = "entry", .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } } }};
 const void_entry_blocks = [_]Block{.{ .name = "entry", .terminator = .@"unreachable" }};
 const i32_main_function: Function = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = &i32_entry_blocks };
 const void_main_function: Function = .{ .name = "main", .return_type = .void, .blocks = &void_entry_blocks };
+const i32_functions = [_]Function{i32_main_function};
+const void_functions = [_]Function{void_main_function};
 
 fn globalsForBody(body: Body) []const Global {
     return switch (body) {

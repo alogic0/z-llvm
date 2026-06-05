@@ -256,7 +256,7 @@ fn writeIrWriterModuleFromEnv(
     const surface = if (descriptor) |desc| desc.surface else if (ir_writer_case) |case| case.surface else "minimal-ret0";
     const construction = if (descriptor != null) IrConstruction.structured_builder.marker() else if (ir_writer_case) |case| case.construction.marker() else IrConstruction.textual_subset.marker();
     const codegen_ownership = if (descriptor != null) CodegenOwnership.generic.marker() else if (ir_writer_case) |case| codegenOwnershipForCase(case).marker() else CodegenOwnership.case_specific.marker();
-    const lowering_ownership = if (descriptor != null) StructuredLoweringOwnership.semantic_record.marker() else if (ir_writer_case) |case|
+    const lowering_ownership = if (descriptor != null) StructuredLoweringOwnership.descriptor_v2.marker() else if (ir_writer_case) |case|
         structuredLoweringOwnershipForCase(case).marker()
     else
         StructuredLoweringOwnership.manifest_structured.marker();
@@ -289,6 +289,8 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_ir_writer_lowering = "{s}"
         \\; zllvm_semantic_descriptor = "{s}"
         \\; zllvm_semantic_descriptor_id = "{s}"
+        \\; zllvm_semantic_descriptor_version = "{s}"
+        \\; zllvm_surface_dispatch = "{s}"
         \\
     , .{
         wrapper,
@@ -307,6 +309,8 @@ fn writeIrWriterModuleFromEnv(
         lowering_ownership,
         if (descriptor != null) "descriptor-owned" else "not-used",
         if (descriptor) |desc| desc.id else "-",
+        if (descriptor != null) "v2" else "-",
+        if (descriptor != null) "not-used" else if (ir_writer_case != null) "case-surface" else "not-used",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer header {s}: {any}\n", .{ ir_path, err });
     };
@@ -585,12 +589,14 @@ const CodegenOwnership = enum {
 const StructuredLoweringOwnership = enum {
     manifest_structured,
     semantic_record,
+    descriptor_v2,
     external_writer_delegate,
 
     fn marker(self: StructuredLoweringOwnership) []const u8 {
         return switch (self) {
             .manifest_structured => "lowering=manifest-structured",
             .semantic_record => "lowering=zig-semantic-records",
+            .descriptor_v2 => "lowering=semantic-descriptor-v2",
             .external_writer_delegate => "lowering=external-writer-delegate",
         };
     }
