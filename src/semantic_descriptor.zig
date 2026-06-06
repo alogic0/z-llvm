@@ -50,6 +50,8 @@ pub const Descriptor = struct {
     context_selector: DescriptorContextSelector = .unknown,
     source_tag_env_present: bool = false,
     serialized_return_i32: ?i32 = null,
+    concrete_source_facts: bool = false,
+    fact_derived_classification: bool = false,
 };
 
 pub const InputPayload = enum {
@@ -301,6 +303,18 @@ pub fn hasSourceTagEnv(descriptor: Descriptor) bool {
     return descriptor.source_tag_env_present;
 }
 
+pub fn hasConcreteSourceFacts(descriptor: Descriptor) bool {
+    return descriptor.concrete_source_facts;
+}
+
+pub fn usesFactDerivedClassification(descriptor: Descriptor) bool {
+    return descriptor.fact_derived_classification;
+}
+
+pub fn usesRootSourceClassificationFallback(descriptor: Descriptor) bool {
+    return descriptor.input_payload == .source_facts and !descriptor.fact_derived_classification;
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }
@@ -422,6 +436,35 @@ const SourceFactInput = struct {
     tag: []const u8,
     emitter: []const u8,
     source_tag_env_present: bool,
+    function_count: usize,
+    block_count: usize,
+    main_return_type: []const u8,
+    main_param_count: usize,
+    return_count: usize,
+    branch_count: usize,
+    loop_count: usize,
+    call_count: usize,
+    global_count: usize,
+    tls_count: usize,
+    atomic_count: usize,
+    inline_asm_count: usize,
+    fp_count: usize,
+    int_count: usize,
+    base64_count: usize,
+    token_add: usize,
+    token_float_add: usize,
+    token_float_sub: usize,
+    token_float_mul: usize,
+    token_float_rem: usize,
+    token_double_div: usize,
+    token_float_less: usize,
+    token_read_tls: usize,
+    token_bump_tls: usize,
+    token_atomic_add: usize,
+    token_base64_table_lookup: usize,
+    token_error_switch: usize,
+    token_classify: usize,
+    token_comptime_const: usize,
 };
 
 fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
@@ -429,7 +472,18 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
     if (!isReleaseMode(input.mode)) return null;
     if (!isSourceOwnedFixture(input.fixture)) return null;
     if (!std.mem.startsWith(u8, input.target, "x86_64-")) return null;
-    const body = bodyForSourceFacts(input.root_source, input.mode) orelse return null;
+    if (!hasConcreteFacts(input)) return null;
+    const classification = if (bodyForConcreteSourceFacts(input)) |fact_classification| blk: {
+        if (bodyForSourceFacts(input.root_source, input.mode)) |fallback| {
+            if (fallback != fact_classification.body) return null;
+        }
+        break :blk fact_classification;
+    } else blk: {
+        const fallback = bodyForSourceFacts(input.root_source, input.mode) orelse return null;
+        if (!sourceFactsMatchRootFallback(input, fallback)) return null;
+        break :blk SourceFactClassification{ .body = fallback, .fact_derived = false };
+    };
+    const body = classification.body;
     const surface = sdv2.bodyName(body);
     const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
     const v2_source: sdv2.Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
@@ -446,6 +500,8 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
         .body_selector = .source_analysis,
         .context_selector = .compile_context,
         .source_tag_env_present = input.source_tag_env_present,
+        .concrete_source_facts = true,
+        .fact_derived_classification = classification.fact_derived,
     };
 }
 
@@ -470,7 +526,91 @@ fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
         .tag = tag,
         .emitter = emitter,
         .source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present"),
+        .function_count = factValueUsize(contents, "function_count") orelse return null,
+        .block_count = factValueUsize(contents, "block_count") orelse return null,
+        .main_return_type = factValue3(contents, "function", "main", "return") orelse return null,
+        .main_param_count = factMainParamCount(contents) orelse factValueUsize(contents, "main_param_count") orelse return null,
+        .return_count = factCategoryCount(contents, "return"),
+        .branch_count = factCategoryCount(contents, "branch"),
+        .loop_count = factCategoryCount(contents, "loop"),
+        .call_count = factCategoryCount(contents, "call"),
+        .global_count = factCategoryCount(contents, "global"),
+        .tls_count = factCategoryCount(contents, "tls"),
+        .atomic_count = factCategoryCount(contents, "atomic"),
+        .inline_asm_count = factCategoryCount(contents, "inline_asm"),
+        .fp_count = factCategoryCount(contents, "fp"),
+        .int_count = factCategoryCount(contents, "int"),
+        .base64_count = factCategoryCount(contents, "base64"),
+        .token_add = factSourceTokenCount(contents, "add"),
+        .token_float_add = factSourceTokenCount(contents, "floatAdd"),
+        .token_float_sub = factSourceTokenCount(contents, "floatSub"),
+        .token_float_mul = factSourceTokenCount(contents, "floatMul"),
+        .token_float_rem = factSourceTokenCount(contents, "floatRem"),
+        .token_double_div = factSourceTokenCount(contents, "doubleDiv"),
+        .token_float_less = factSourceTokenCount(contents, "floatLess"),
+        .token_read_tls = factSourceTokenCount(contents, "readTls"),
+        .token_bump_tls = factSourceTokenCount(contents, "bumpTls"),
+        .token_atomic_add = factSourceTokenCount(contents, "atomicAdd"),
+        .token_base64_table_lookup = factSourceTokenCount(contents, "base64TableLookup"),
+        .token_error_switch = factSourceTokenCount(contents, "errorSwitch"),
+        .token_classify = factSourceTokenCount(contents, "classify"),
+        .token_comptime_const = factSourceTokenCount(contents, "comptimeConst"),
     };
+}
+
+const SourceFactClassification = struct {
+    body: sdv2.Body,
+    fact_derived: bool,
+};
+
+fn hasConcreteFacts(input: SourceFactInput) bool {
+    return input.function_count > 0 and
+        input.block_count > 0 and
+        input.main_param_count == 0 and
+        (std.mem.eql(u8, input.main_return_type, "c_int") or
+            std.mem.eql(u8, input.main_return_type, "c_long") or
+            std.mem.eql(u8, input.main_return_type, "i32")) and
+        input.return_count > 0;
+}
+
+fn bodyForConcreteSourceFacts(input: SourceFactInput) ?SourceFactClassification {
+    const name: ?[]const u8 = if (input.token_float_add != 0)
+        "float-add"
+    else if (input.token_float_sub != 0)
+        "float-sub"
+    else if (input.token_float_mul != 0)
+        "float-mul"
+    else if (input.token_float_rem != 0)
+        "float-rem"
+    else if (input.token_double_div != 0)
+        "double-div"
+    else if (input.token_float_less != 0)
+        "float-less"
+    else if (input.token_bump_tls != 0)
+        if (std.mem.eql(u8, input.mode, "ReleaseSafe")) "checked-tls-bump-boundary" else "tls-bump"
+    else if (input.token_read_tls != 0)
+        "tls-read"
+    else if (input.token_atomic_add != 0)
+        "atomic-add"
+    else if (input.token_base64_table_lookup != 0)
+        "table-indexed-load"
+    else if (input.token_error_switch != 0 and input.token_classify != 0)
+        "error-switch-select"
+    else
+        null;
+    const body = sdv2.bodyForName(name orelse return null) orelse return null;
+    return .{ .body = body, .fact_derived = true };
+}
+
+fn sourceFactsMatchRootFallback(input: SourceFactInput, body: sdv2.Body) bool {
+    const name = sdv2.bodyName(body);
+    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div") or std.mem.eql(u8, name, "fp-literal-return")) return input.fp_count != 0;
+    if (std.mem.startsWith(u8, name, "base64") or std.mem.eql(u8, name, "table-indexed-load")) return input.base64_count != 0 or std.mem.indexOf(u8, input.root_source, "base64") != null;
+    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return input.tls_count != 0 or input.token_read_tls != 0 or input.token_bump_tls != 0;
+    if (std.mem.eql(u8, name, "atomic-add")) return input.atomic_count != 0 or input.token_atomic_add != 0;
+    if (std.mem.eql(u8, name, "error-switch-select")) return input.branch_count != 0 or input.token_error_switch != 0;
+    if (std.mem.eql(u8, name, "global-load") or std.mem.eql(u8, name, "global-update") or std.mem.eql(u8, name, "checked-global-update-boundary")) return input.global_count != 0;
+    return true;
 }
 
 fn bodyForSourceFacts(root_source: []const u8, mode: []const u8) ?sdv2.Body {
@@ -1104,6 +1244,77 @@ fn descriptorLineValue(contents: []const u8, key: []const u8) ?[]const u8 {
 fn descriptorLineValueEql(contents: []const u8, key: []const u8, expected: []const u8) bool {
     const value = descriptorLineValue(contents, key) orelse return false;
     return std.mem.eql(u8, value, expected);
+}
+
+fn factValueUsize(contents: []const u8, name: []const u8) ?usize {
+    const text = factValue1(contents, name) orelse return null;
+    return std.fmt.parseInt(usize, text, 10) catch null;
+}
+
+fn factCategoryCount(contents: []const u8, category: []const u8) usize {
+    const text = factValue2(contents, "inst_category", category) orelse return 0;
+    return std.fmt.parseInt(usize, text, 10) catch 0;
+}
+
+fn factSourceTokenCount(contents: []const u8, token: []const u8) usize {
+    const text = factValue2(contents, "source_token", token) orelse return 0;
+    return std.fmt.parseInt(usize, text, 10) catch 0;
+}
+
+fn factMainParamCount(contents: []const u8) ?usize {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=function|main|")) continue;
+        var fields = std.mem.splitScalar(u8, line["fact=".len..], '|');
+        while (fields.next()) |field| {
+            if (std.mem.eql(u8, field, "params")) {
+                const text = fields.next() orelse return null;
+                return std.fmt.parseInt(usize, text, 10) catch null;
+            }
+        }
+    }
+    return null;
+}
+
+fn factValue1(contents: []const u8, name: []const u8) ?[]const u8 {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=")) continue;
+        var fields = std.mem.splitScalar(u8, line["fact=".len..], '|');
+        const first = fields.next() orelse continue;
+        if (!std.mem.eql(u8, first, name)) continue;
+        return fields.next();
+    }
+    return null;
+}
+
+fn factValue2(contents: []const u8, first_name: []const u8, second_name: []const u8) ?[]const u8 {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=")) continue;
+        var fields = std.mem.splitScalar(u8, line["fact=".len..], '|');
+        const first = fields.next() orelse continue;
+        const second = fields.next() orelse continue;
+        if (!std.mem.eql(u8, first, first_name) or !std.mem.eql(u8, second, second_name)) continue;
+        return fields.next();
+    }
+    return null;
+}
+
+fn factValue3(contents: []const u8, first_name: []const u8, second_name: []const u8, third_name: []const u8) ?[]const u8 {
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=")) continue;
+        var fields = std.mem.splitScalar(u8, line["fact=".len..], '|');
+        const first = fields.next() orelse continue;
+        const second = fields.next() orelse continue;
+        const third = fields.next() orelse continue;
+        if (!std.mem.eql(u8, first, first_name) or
+            !std.mem.eql(u8, second, second_name) or
+            !std.mem.eql(u8, third, third_name)) continue;
+        return fields.next();
+    }
+    return null;
 }
 
 fn featuresForSurface(surface: []const u8) []const Feature {

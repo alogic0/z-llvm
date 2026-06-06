@@ -57,10 +57,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
 current source-backed inventory. Patched Zig still receives wrapper path,
 optimize mode, target, output path, marker path, and diagnostic source fixture
 metadata; the release source-owned runner no longer passes `ZLLVM_SOURCE_TAG`.
-Patched Zig emits
-`zllvm-source-derived-descriptor-v2` with serialized function/block/instruction/
-terminator/global-section records from those source facts, and z_llvm parses
-those records directly rather than resolving a wrapper/fixture/tag table or
+Patched Zig emits `zllvm-source-facts-v1` with generic compile-context facts:
+root source path, mode, target, wrapper, diagnostic fixture, concrete function
+count, main return type, parameter count, block count, instruction-category
+counts, globals, TLS, calls, atomics, inline-asm markers, and source tokens.
+z_llvm classifies those facts into DescriptorV2, then verifies and lowers the
+records directly rather than resolving a Zig-side wrapper/fixture/tag table or
 expanding a body name. Every accepted row reports
 descriptor-v2 semantic lowering into
 structured-direct IR. Current measured output is `release_source_rows=100`,
@@ -74,14 +76,19 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `globals_for_body_rows=0`,
 `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`,
 `zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`,
-`descriptor_file_consumed_rows=100`, `source_derived_descriptor_rows=100`,
+`descriptor_file_consumed_rows=100`, `source_fact_stream_rows=100`,
+`concrete_source_fact_rows=100`, `source_derived_descriptor_rows=100`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
-`local_fail=0`.
+`local_fail=0`. The gate reports `fact_derived_classification_rows` and
+`root_source_classification_fallback_rows`; all accepted rows must have concrete
+facts, and those two classification counters must account for every row. The
+remaining root-source fallback is temporary z_llvm-side classification support,
+guarded by a wrong-facts negative probe.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
@@ -129,9 +136,10 @@ The current replacement evidence is split into four explicit rungs:
 selected case-id registry proof, broad source-backed structured proof,
 source-wrapper compatibility proof, and source-owned DescriptorV2 proof. The
 source-owned rung is now strongest: all 100 current source-owned release rows
-start from a DescriptorV2 file emitted by patched Zig with serialized
-function/block/instruction/terminator/global-section records that are parsed
-directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
+start from a Zig-emitted `zllvm-source-facts-v1` fact stream, not a Zig-emitted
+DescriptorV2 body. z_llvm classifies those facts into DescriptorV2 and parses
+the resulting serialized semantic records directly. They report
+`lowering=semantic-descriptor-v2`, with
 `descriptor_owned_rows=100`, `descriptor_v2_rows=100`,
 `real_descriptor_program_rows=100`, `full_descriptor_program_rows=100`,
 `serialized_function_rows=100`, `serialized_instruction_rows=100`,
@@ -142,6 +150,7 @@ directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
 `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`,
 `zig_emitted_descriptor_rows=100`,
 `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`,
+`source_fact_stream_rows=100`, `concrete_source_fact_rows=100`,
 `source_derived_descriptor_rows=100`, `tag_table_descriptor_rows=0`,
 `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`,
@@ -159,7 +168,9 @@ serialized return stub. Current provenance counters show
 source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
-compile-context descriptor provenance and no body-map selector.
+compile-context fact provenance and no body-map selector. The next ownership
+step is to drive `root_source_classification_fallback_rows` down by deriving
+more DescriptorV2 bodies from concrete facts inside z_llvm.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally

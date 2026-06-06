@@ -93,11 +93,11 @@ local_fail=0
 This gate closes the old wrapper/mode collision gap with distinct compiled
 source wrappers and compile-context descriptor extraction. The accepted path no
 longer receives `ZLLVM_SOURCE_TAG`; source fixture text is diagnostic only.
-Patched Zig emits a stable `zllvm-source-derived-descriptor-v2` file, z_llvm
-consumes that descriptor directly, verifies the DescriptorV2 program with real
-blocks/instructions, and lowers it into structured IR without consulting
-`IrWriterCase` as the ownership source or resolving a wrapper/fixture/tag table
-inside z_llvm. The emitted writer header records
+Patched Zig emits a stable `zllvm-source-facts-v1` fact stream, z_llvm
+classifies that fact stream into DescriptorV2, verifies the DescriptorV2 program
+with real blocks/instructions, and lowers it into structured IR without
+consulting `IrWriterCase` as the ownership source or resolving a Zig-side
+wrapper/fixture/tag table. The emitted writer header records
 `zllvm_ir_writer_dispatch = "source-owned"`, `zllvm_ir_writer_source_fixture`,
 `zllvm_ir_writer_source_tag`, `zllvm_semantic_descriptor = "descriptor-owned"`,
 `zllvm_semantic_descriptor_version = "v2"`,

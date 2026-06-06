@@ -135,20 +135,22 @@ Use this ladder:
 2. zig build test
 3. zig build distribution-x86_64-release-source-owned
 4. zig build distribution-x86_64-selected-zllvm
-5. zig build check-zig-stage4-emitter
-6. zig build distribution-all
+5. zig build check-zig-stage4-emitter  # only when ../ziglang changed
+6. zig build distribution-all          # milestone confirmation only
 ```
 
-Run step 6 only before handoff, before committing a broad evidence/matrix
-claim, or when a change affects several distribution gates at once.
+Run step 5 only when the Zig hook contract or patched Zig source changed. Run
+step 6 only before handoff, before committing a broad evidence/matrix claim, or
+when a change affects several distribution gates at once.
 
 Do not rebuild stage4 for every row. Patch `../ziglang` only when the hook
 contract changes. The stable accepted hook emits generic `zllvm-source-facts-v1`
-compile-context facts: root source path, mode, target, function/parameter/return
-type availability, block/AIR category availability, globals, TLS, calls,
-atomics, and inline-asm markers. z_llvm owns fact-stream classification into
-DescriptorV2 rows, so new source-owned rows should usually require z_llvm
-runner/descriptor/lowering changes only.
+compile-context facts: root source path, mode, target, function count, main
+return type, parameter count, block count, instruction-category counts,
+globals, TLS, calls, atomics, inline-asm markers, and source tokens. z_llvm
+owns fact-stream classification into DescriptorV2 rows, and the focused runner
+includes wrong-tag and wrong-facts probes. New source-owned rows should usually
+require z_llvm runner/descriptor/lowering changes only.
 
 ## Distribution Replacement Matrix
 

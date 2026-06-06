@@ -263,7 +263,11 @@ source_tag_env_present_rows=0
 zig_emitted_descriptor_rows=100
 runner_generated_descriptor_rows=0
 descriptor_file_consumed_rows=100
+source_fact_stream_rows=100
+concrete_source_fact_rows=100
 source_derived_descriptor_rows=100
+fact_derived_classification_rows>0
+fact_derived_classification_rows+root_source_classification_fallback_rows=100
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -290,17 +294,19 @@ source_wrapper_discovery=discovered_source_wrappers=82
 ```
 
 This supersedes the older claim shape for the current release source-backed
-inventory: rows start from patched Zig compile-context descriptor provenance
-rather than case IDs, source tags, wrapper basename maps, fixture metadata,
-body enums, or template expansion. Patched Zig emits a
-`zllvm-source-derived-descriptor-v2` file with serialized
-function/block/instruction/terminator/global-section records, and z_llvm parses
-those records directly before verifying and lowering DescriptorV2 into
-structured-direct IR. All 100 rows use serialized DescriptorV2 transport and
-semantic serialized records, and the gate fails if any row falls back to the
-serialized return stub. The current provenance split is 100 rows on the
-separate extracted-record path with compile-context descriptor provenance, no
-body-map selector, no source-tag selector, and 0 template-owned rows.
+inventory: rows start from patched Zig compile-context fact provenance rather
+than case IDs, source tags, wrapper basename maps, fixture metadata, body
+enums, or template expansion. Patched Zig emits `zllvm-source-facts-v1` with
+generic source facts, and z_llvm classifies those facts into DescriptorV2
+before verifying and lowering the records into structured-direct IR. All 100
+rows use serialized DescriptorV2 transport and semantic serialized records, and
+the gate fails if any row falls back to the serialized return stub. The current
+provenance split is 100 rows on the separate extracted-record path with
+compile-context fact provenance, no body-map selector, no source-tag selector,
+and 0 template-owned rows. The gate also reports fact-derived classification
+versus temporary root-source classification fallback; all rows must have
+concrete facts, the two classification counters must account for all rows, and
+the wrong-facts probe rejects mismatched root/fact streams.
 `ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
 source-owned gate fails if any row delegates back to the external
 writer body path, uses the old semantic-record ownership marker, uses surface
@@ -577,7 +583,12 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           zig_emitted_descriptor_rows=100
                           runner_generated_descriptor_rows=0
                           descriptor_file_consumed_rows=100
+                          source_fact_stream_rows=100
+                          concrete_source_fact_rows=100
                           source_derived_descriptor_rows=100
+                          fact_derived_classification_rows>0
+                          fact_derived_classification_rows+
+                          root_source_classification_fallback_rows=100
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0
@@ -593,10 +604,11 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        release_source_owned_rows=100;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
-                       rows are DescriptorV2-owned; all 100 rows use serialized
-                       AIR-shaped semantic records with no return-stub fallback
-                       or static descriptor map fallback; current provenance is
-                       compile-context extracted
+                       rows are DescriptorV2-owned from Zig-emitted generic
+                       fact streams; all 100 rows use serialized AIR-shaped
+                       semantic records with no return-stub fallback or static
+                       descriptor map fallback; current provenance is
+                       compile-context fact extracted
                        (air_extracted_descriptor_rows=100,
                        template_descriptor_rows=0, wrapper_body_map_rows=0,
                        source_tag_body_map_rows=0,
