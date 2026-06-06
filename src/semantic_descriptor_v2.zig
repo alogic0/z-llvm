@@ -437,6 +437,23 @@ pub fn programFromFullDescriptor(source: Source, body: Body, diagnostic_surface:
     return programFromSerializedReturn(source, body, diagnostic_surface, 0, true);
 }
 
+pub fn programFromSourceFacts(source: Source, body: Body, diagnostic_surface: []const u8) Program {
+    return .{
+        .id = bodyName(body),
+        .source = source,
+        .body = body,
+        .diagnostic_surface = diagnostic_surface,
+        .origin = .source_derived_descriptor,
+        .functions = functionsForBody(body),
+        .globals = globalsForBody(body),
+        .atomics = body == .atomic_add,
+        .inline_asm_boundary = body == .inline_asm_barrier or body == .compile_asm_unreachable,
+        .serialized_functions = true,
+        .serialized_instructions = true,
+        .serialized_globals = true,
+    };
+}
+
 pub fn programFromSerializedReturn(source: Source, body: Body, diagnostic_surface: []const u8, ret_i32: i32, serialized_globals: bool) Program {
     const allocator = std.heap.page_allocator;
     const lhs = std.fmt.allocPrint(allocator, "{d}", .{ret_i32}) catch @panic("failed to allocate serialized descriptor constant");

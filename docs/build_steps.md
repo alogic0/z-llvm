@@ -17,7 +17,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | --- | --- |
 | `zig build readiness` | Run the full readiness gate: unit tests, optimizer comparison, manifest linting, Zig corpus validation, handoff validation, and generated scalar differential checks. Use for parser, verifier, pass-manager, manifest, or broad evidence changes. |
 | `zig build handoff` | Run optimizer-to-codegen handoff validation and selected x86_64 asm/object smoke checks. Use when optimizer output, codegen handoff, assembly emission, object emission, or selected Debug/O0 handoff behavior changes. |
-| `zig build distribution-all` | Run the selected no-LLVM-codegen distribution subset, source-owned release proof, native-link proof/probe, Zig source native-link integration gate, and conservative boundary gates. Use for release-milestone evidence or matrix status changes. |
+| `zig build distribution-all` | Run the selected no-LLVM-codegen distribution subset, source-owned release proof, native-link proof/probe, Zig source native-link integration gate, and conservative boundary gates. This is a milestone confirmation gate, not the development loop. Use it before handoff, before committing a broad claim change, or when evidence from several gates must be refreshed together. |
 | `zig build distribution-no-llvm` | Run the selected no-LLVM-codegen x86_64 subset: ReleaseFast, ReleaseSafe, ReleaseSmall, Debug focused object/executable gates, plus handoff validation. Use when validating the positive selected distribution subset without the extra boundary checks. |
 | `zig build distribution-boundary` | Run conservative boundary gates: linker/CRT ownership, ReleaseSmall exclusions, Debug unwind/DWARF boundary, and AArch64 object target boundary. Use when boundary docs or boundary behavior changes. |
 | `zig build distribution-native-link` | Run selected native Zig linker handoff proof. This emits local objects with `z_llvm`, compiles C harnesses with `zig cc -c`, links with `zig build-exe -fno-lld`, and runs the executables. Use when proving native-linker compatibility for selected local objects. |
@@ -27,7 +27,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-zig-ir-writer-tiny-scalar` | Run the first external z_llvm textual IR writer proof for `releasefast_tiny_scalar`. Patched stage4 Zig uses `ZIG_USE_ZLLVM_IR_WRITER=1` with `ZLLVM_IR_WRITER_MODE=external`, calls `z_llvm --emit=ir-writer` to write `scalar-add-ret` IR, then runs the existing preopt `z_llvm` optimizer/object path and Zig native linker. The executable exits 42. |
 | `zig build distribution-zig-ir-writer` | Run the selected 146-row z_llvm IR writer gate. This keeps wrapper/source fixture pairing, proves 146 runtime-surface rows and 0 minimal-wrapper rows, reports per-surface counts, structured-direct ownership counts, generic/case-specific x86_64 codegen counts, and downstream ownership summary. It fails on unexpected `minimal-ret0`, anything other than 146 structured-direct rows, any structured textual LLVM parsing, any textual boundary row, any case-specific codegen row, libLLVM module parse/print fallback, or LLVM TargetMachine fallback. All selected rows build z_llvm-owned internal IR modules directly and use generic x86_64 lowering. The selected rows bypass libLLVM bitcode parsing/printing, LLVM module optimization, LLVM TargetMachine object emission, and LLD; the normal libLLVM fallback remains untouched when the env var is unset. Use `--case=<case-id>` for focused rows; case IDs are defined in `tools/run_distribution_zig_integrated_object.zig`. |
 | `zig build distribution-zig-source-structured-direct` | Run the source-wrapper structured-direct compatibility gate. Patched Zig still passes wrapper/mode/target/output/marker metadata, but z_llvm resolves the structured module from wrapper/source metadata instead of using `ZLLVM_CASE_ID` as the primary selector. The current gate reports `source_wrappers=49`, `structured_direct_rows=49`, `case_id_rows=0`, `generic_codegen_rows=49`, `manifest_structured_rows=0`, `semantic_record_rows=48`, `external_writer_delegate_rows=1`, `case_specific_rows=0`, `fallback_rows=0`, and `local_fail=0`. |
-| `zig build distribution-x86_64-release-source-owned` | Run the strongest current x86_64 release source-owned gate. It covers the current ReleaseFast/ReleaseSafe/ReleaseSmall source-owned wrapper inventory, starts rows from patched Zig's compile-context descriptor extractor rather than `ZLLVM_CASE_ID`, `ZLLVM_SOURCE_TAG`, wrapper basename maps, fixture metadata, body enum dispatch, or template expansion, has patched Zig emit `zllvm-source-derived-descriptor-v2` with serialized function/block/instruction/terminator/global-section records, makes z_llvm parse those records directly, verifies DescriptorV2, lowers it to structured-direct IR, and requires `release_source_rows=100`, `source_wrapper_rows=100`, `descriptor_owned_rows=100`, `descriptor_v2_rows=100`, `real_descriptor_program_rows=100`, `full_descriptor_program_rows=100`, `serialized_function_rows=100`, `serialized_instruction_rows=100`, `serialized_global_rows=100`, `semantic_serialized_rows=100`, `serialized_return_stub_rows=0`, `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`, `globals_for_body_rows=0`, `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`, `zig_compile_context_descriptor_rows=100`, `env_source_tag_selector_rows=0`, `wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, `fixture_metadata_selector_rows=0`, `source_tag_env_present_rows=0`, `zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`, `source_derived_descriptor_rows=100`, `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`, `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`, `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, `air_extracted_descriptor_rows=100`, `template_descriptor_rows=0`, `wrapper_body_map_rows=0`, `source_tag_body_map_rows=0`, and `local_fail=0`. |
+| `zig build distribution-x86_64-release-source-owned` | Run the strongest current x86_64 release source-owned gate. It covers the current ReleaseFast/ReleaseSafe/ReleaseSmall source-owned wrapper inventory. Patched Zig emits one stable `zllvm-source-facts-v1` compile-context fact stream per row, including root source path, mode, target, wrapper, diagnostic fixture, and generic function/parameter/return/block/AIR-category/global/TLS/call/atomic/inline-asm capability markers. z_llvm consumes that fact stream, classifies it into DescriptorV2 rows, verifies DescriptorV2, lowers it to structured-direct IR, and requires no `ZLLVM_CASE_ID`, `ZLLVM_SOURCE_TAG`, wrapper basename map, source-tag map, fixture selector, body enum dispatch, or template expansion ownership. The full gate requires `release_source_rows=100`, `source_wrapper_rows=100`, `descriptor_owned_rows=100`, `descriptor_v2_rows=100`, `real_descriptor_program_rows=100`, `full_descriptor_program_rows=100`, `serialized_function_rows=100`, `serialized_instruction_rows=100`, `serialized_global_rows=100`, `semantic_serialized_rows=100`, `serialized_return_stub_rows=0`, `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`, `globals_for_body_rows=0`, `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`, `zig_compile_context_descriptor_rows=100`, `env_source_tag_selector_rows=0`, `wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, `fixture_metadata_selector_rows=0`, `source_tag_env_present_rows=0`, `zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`, `source_fact_stream_rows=100`, `source_derived_descriptor_rows=100`, `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`, `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`, `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, `air_extracted_descriptor_rows=100`, `template_descriptor_rows=0`, `wrapper_body_map_rows=0`, `source_tag_body_map_rows=0`, and `local_fail=0`. Use `zig run tools/run_distribution_zig_integrated_object.zig -- --release-source-owned --case=<case-id>` for the focused source-owned row loop. |
 | `zig build distribution-x86_64-selected-zllvm` | Run the stable compact gate for the current selected x86_64 release replacement claim. This wraps the selected IR-writer gate and prints one machine-readable `selected-zllvm` line with total rows, executable/link-only counts, `structured_direct_rows`, `structured_textual_rows`, `textual_boundary_rows`, `generic_codegen_rows`, `case_specific_codegen_rows`, `minimal-ret0`, ownership marker, and first-failure fields. Diagnostics and reproducibility inputs are documented in `docs/x86_64_selected_zllvm_diagnostics.md`. |
 | `zig build distribution-x86_64-source-backed-structured` | Run the broad x86_64 release source-backed structured-direct gate. It discovers `.ll` fixtures under the ReleaseFast, ReleaseSafe, ReleaseSmall, and former ReleaseSmall exclusion directories, requires every discovered fixture to be accepted, and fails on any skip, fallback, textual LLVM parse, non-generic codegen, or local failure. The current gate reports `discovered_fixtures=55`, `accepted_fixtures=55`, `source_backed_rows=90`, `structured_direct_rows=90`, `generic_codegen_rows=90`, `skipped_with_reason=0`, `fallback_rows=0`, and `local_fail=0`. |
 | `zig build probe-native-linker` | Probe selected local objects against Zig native linker acceptance with `zig build-exe -fno-lld`, classifying the first failure by symbol, relocation, section, TLS model, COMDAT, alignment, ABI, or unknown linker compatibility. Use before promoting a native-linker object compatibility slice. |
@@ -46,7 +46,8 @@ is for. Use `zig build --help` to see the authoritative current list.
 
 ## External IR Writer Parameters
 
-Focused runs use the same build step with arguments forwarded after `--`:
+Focused selected-row runs use the same build step with arguments forwarded after
+`--`:
 
 ```bash
 zig build distribution-zig-ir-writer -- --case=<case-id>
@@ -59,6 +60,32 @@ Parameters:
 | no parameter | Run the full selected external IR-writer gate. |
 | `--case=<case-id>` | Run one selected row. Use this for focused implementation slices and regressions. |
 | `--mode=ReleaseFast\|ReleaseSafe\|ReleaseSmall` | Run selected rows for one Zig optimization mode when the runner supports that mode filter. |
+
+Focused source-owned rows should use the runner directly:
+
+```bash
+zig run tools/run_distribution_zig_integrated_object.zig -- --release-source-owned --case=<case-id>
+```
+
+Use this as the inner loop for source-owned row work. It runs the wrong-tag
+probe, the selected row, and the same per-row provenance checks as the full
+source-owned gate, while scaling aggregate counters to the selected row set.
+
+Recommended validation ladder for source-owned work:
+
+```text
+1. zig run tools/run_distribution_zig_integrated_object.zig -- --release-source-owned --case=<case-id>
+2. zig build test
+3. zig build distribution-x86_64-release-source-owned
+4. zig build distribution-x86_64-selected-zllvm
+5. zig build check-zig-stage4-emitter
+6. zig build distribution-all
+```
+
+`distribution-all` is step 6 because it is a milestone confirmation gate, not
+the development loop. Do not rebuild stage4 for every row. Patch Zig only when
+the hook contract changes; otherwise stabilize the hook and iterate in z_llvm
+with focused gates.
 
 The 146-row full gate includes the original selected runtime rows plus 58
 `releasefast_source_*` / `releasesafe_source_*` / `releasesmall_source_*`
@@ -99,12 +126,15 @@ optimizer, no LLVM TargetMachine, `object-emission=z_llvm`, and
 The strongest current x86_64 release proof is
 `zig build distribution-x86_64-release-source-owned`. It extends beyond the
 90-row broad fixture gate to a 100-row source-owned wrapper inventory, and
-requires every row to start from Zig
-compile-context descriptor provenance, have patched Zig emit serialized
-`zllvm-source-derived-descriptor-v2` function/block/instruction/terminator/global
-records, make z_llvm parse those records directly without body-name expansion,
-use
-`source-owned` dispatch rather than case-id ownership, report
+requires every row to start from a Zig-emitted compile-context fact stream.
+Patched Zig emits `zllvm-source-facts-v1`, not row-specific DescriptorV2 bodies.
+The fact stream includes root source path, mode, target, wrapper, diagnostic
+fixture, source-tag presence, and generic capability markers for functions,
+params, return types, blocks, AIR/instruction categories, globals, TLS, calls,
+atomics, and inline asm. z_llvm classifies that fact stream into DescriptorV2,
+builds the structured records internally, and verifies/lower those records
+without body-name payloads or deprecated selector ownership. The gate uses
+`source-owned` dispatch rather than case-id ownership, reports
 `lowering=semantic-descriptor-v2`, build a structured-direct module, use
 generic x86_64 lowering, avoid fallback, and link through Zig's native linker
 handoff. This gate fails unless `descriptor_owned_rows=100`,
@@ -117,7 +147,8 @@ handoff. This gate fails unless `descriptor_owned_rows=100`,
 `globals_for_body_rows=0`,
 `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`,
 `zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`,
-`descriptor_file_consumed_rows=100`, `source_derived_descriptor_rows=100`,
+`descriptor_file_consumed_rows=100`, `source_fact_stream_rows=100`,
+`source_derived_descriptor_rows=100`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`,

@@ -294,6 +294,7 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_descriptor_program = "{s}"
         \\; zllvm_descriptor_input = "{s}"
         \\; zllvm_descriptor_file_consumed = "{s}"
+        \\; zllvm_source_fact_stream = "{s}"
         \\; zllvm_zig_emitted_descriptor = "{s}"
         \\; zllvm_runner_generated_descriptor = "{s}"
         \\; zllvm_source_derived_descriptor = "{s}"
@@ -326,6 +327,7 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.isRealDescriptorProgram(desc)) "real" else "not-real" else "-",
         if (descriptor != null) "source-derived" else "not-used",
         if (descriptor != null) "used" else "-",
+        if (descriptor) |desc| if (sd.usesSourceFactStream(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isZigEmittedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isRunnerGeneratedDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.isSourceDerivedDescriptor(desc)) "used" else "not-used" else "-",

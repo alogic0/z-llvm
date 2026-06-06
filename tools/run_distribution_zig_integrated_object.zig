@@ -1365,6 +1365,7 @@ pub fn main(init: std.process.Init) !void {
     var zig_emitted_descriptor_rows: usize = 0;
     var runner_generated_descriptor_rows: usize = 0;
     var descriptor_file_consumed_rows: usize = 0;
+    var source_fact_stream_rows: usize = 0;
     var serialized_function_rows: usize = 0;
     var serialized_instruction_rows: usize = 0;
     var serialized_global_rows: usize = 0;
@@ -1512,7 +1513,7 @@ pub fn main(init: std.process.Init) !void {
         if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
         try buildIntegratedObject(allocator, io, zig_emitter, target, object, case, &env_map);
         if (release_source_owned) {
-            const descriptor_emitter = try readDescriptorInputValue(allocator, io, descriptor_path, case, "descriptor_emitter");
+            const descriptor_emitter = try readSourceOwnedInputEmitter(allocator, io, descriptor_path, case);
             defer allocator.free(descriptor_emitter);
             if (std.mem.eql(u8, descriptor_emitter, "patched-zig-hook")) {
                 zig_emitted_descriptor_rows += 1;
@@ -1607,6 +1608,8 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(runner_generated_descriptor);
         const descriptor_file_consumed = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_descriptor_file_consumed = \"", "zllvm_descriptor_file_consumed") else "-";
         defer if (use_ir_writer) allocator.free(descriptor_file_consumed);
+        const source_fact_stream = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_fact_stream = \"", "zllvm_source_fact_stream") else "-";
+        defer if (use_ir_writer) allocator.free(source_fact_stream);
         if (use_ir_writer) {
             if (source_wrapper_dispatch or release_source_owned) {
                 const expected_dispatch = if (release_source_owned) "source-owned" else "source-wrapper";
@@ -1766,6 +1769,11 @@ pub fn main(init: std.process.Init) !void {
                 } else {
                     try common.validationError(io, "release source-owned row {s} did not report descriptor file consumption: descriptor_file_consumed={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, descriptor_file_consumed, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
+                if (std.mem.eql(u8, source_fact_stream, "used")) {
+                    source_fact_stream_rows += 1;
+                } else {
+                    try common.validationError(io, "release source-owned row {s} did not report Zig source fact stream consumption: source_fact_stream={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, source_fact_stream, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
                 if (!std.mem.eql(u8, zig_emitted_descriptor, "used")) {
                     try common.validationError(io, "release source-owned row {s} did not report Zig-emitted descriptor input: zig_emitted_descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, zig_emitted_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
@@ -1839,6 +1847,10 @@ pub fn main(init: std.process.Init) !void {
         try stdout_writer.interface.flush();
     }
 
+    if (case_filter != null and total == 0) {
+        try common.validationError(io, "no zig-integrated-object rows matched --case filter\n", .{});
+    }
+
     if (use_ir_writer) {
         if (minimal_wrapper_rows != 0) {
             try common.validationError(io, "external IR writer selected rows must not use minimal-ret0; minimal_wrapper_rows={}\n", .{minimal_wrapper_rows});
@@ -1874,27 +1886,28 @@ pub fn main(init: std.process.Init) !void {
             );
         }
         if (release_source_owned) {
+            const expected_rows = if (case_filter == null) expected_release_source_owned_rows else total;
             if (release_source_rows != total or source_wrapper_rows != total) {
                 try common.validationError(io, "release source-owned row accounting mismatch: release_source_rows={} source_wrapper_rows={} total={}\n", .{ release_source_rows, source_wrapper_rows, total });
             }
-            if (release_source_rows != expected_release_source_owned_rows or skipped_with_reason != 0) {
+            if (release_source_rows != expected_rows or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (air_extracted_descriptor_rows + template_descriptor_rows != expected_release_source_owned_rows or wrapper_body_map_rows + source_tag_body_map_rows != template_descriptor_rows) {
+            if (air_extracted_descriptor_rows + template_descriptor_rows != expected_rows or wrapper_body_map_rows + source_tag_body_map_rows != template_descriptor_rows) {
                 try common.validationError(io, "release source-owned descriptor provenance accounting mismatch: air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
-            if (air_extracted_descriptor_rows != expected_release_source_owned_rows or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
+            if (air_extracted_descriptor_rows != expected_rows or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires extracted descriptor provenance; air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
-            if (zig_compile_context_descriptor_rows != expected_release_source_owned_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0 or source_tag_env_present_rows != 0) {
+            if (zig_compile_context_descriptor_rows != expected_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0 or source_tag_env_present_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows, source_tag_env_present_rows });
             }
-            if (descriptor_owned_rows != expected_release_source_owned_rows or descriptor_v2_rows != expected_release_source_owned_rows or real_descriptor_program_rows != expected_release_source_owned_rows or full_descriptor_program_rows != expected_release_source_owned_rows or serialized_function_rows != expected_release_source_owned_rows or serialized_instruction_rows != expected_release_source_owned_rows or serialized_global_rows != expected_release_source_owned_rows or semantic_serialized_rows != expected_release_source_owned_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_release_source_owned_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_release_source_owned_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_release_source_owned_rows or source_derived_descriptor_rows != expected_release_source_owned_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_release_source_owned_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_release_source_owned_rows or generic_codegen_rows != expected_release_source_owned_rows or case_specific_codegen_rows != 0) {
-                try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
+            if (descriptor_owned_rows != expected_rows or descriptor_v2_rows != expected_rows or real_descriptor_program_rows != expected_rows or full_descriptor_program_rows != expected_rows or serialized_function_rows != expected_rows or serialized_instruction_rows != expected_rows or serialized_global_rows != expected_rows or semantic_serialized_rows != expected_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_rows or source_fact_stream_rows != expected_rows or source_derived_descriptor_rows != expected_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_rows or generic_codegen_rows != expected_rows or case_specific_codegen_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records from Zig source facts; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_fact_stream_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
-                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
-                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
+                "summary release-source-owned target=x86_64 release_modes=ReleaseFast,ReleaseSafe,ReleaseSmall release_source_rows={} source_wrapper_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_fact_stream_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={} local_fail=0\n",
+                .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
             try stdout_writer.interface.print(
                 "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={} local_fail=0\n",
@@ -2238,32 +2251,33 @@ fn runSourceOwnedWrongSourceTagProbe(
     try buildIntegratedObject(allocator, io, zig_emitter, target, object, probe_case, &probe_env);
     try requireHookMarker(allocator, io, marker, probe_case, pipeline, true, ir_path, source_wrapper_dispatch_case_id);
 
-    const descriptor_source_tag = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag");
-    defer allocator.free(descriptor_source_tag);
-    const descriptor_source_tag_env_present = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag_env_present");
-    defer allocator.free(descriptor_source_tag_env_present);
-    const descriptor_context_selector = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "descriptor_context_selector");
-    defer allocator.free(descriptor_context_selector);
-    const descriptor_body_selector = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "descriptor_body_selector");
-    defer allocator.free(descriptor_body_selector);
-    const diagnostic_surface = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "diagnostic_surface");
-    defer allocator.free(diagnostic_surface);
+    const facts_source = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "facts_source");
+    defer allocator.free(facts_source);
+    const root_source = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "root_source");
+    defer allocator.free(root_source);
+    const fact_source_tag = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag");
+    defer allocator.free(fact_source_tag);
+    const fact_source_tag_env_present = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag_env_present");
+    defer allocator.free(fact_source_tag_env_present);
 
-    if (!std.mem.eql(u8, descriptor_source_tag, "-") or
-        !std.mem.eql(u8, descriptor_source_tag_env_present, "present") or
-        !std.mem.eql(u8, descriptor_context_selector, "compile-context") or
-        !std.mem.eql(u8, descriptor_body_selector, "source-analysis") or
-        !std.mem.eql(u8, diagnostic_surface, "scalar-add-ret"))
+    if (!std.mem.eql(u8, facts_source, "zig-compile-context") or
+        !std.mem.eql(u8, root_source, "tiny_scalar_main.zig") or
+        !std.mem.eql(u8, fact_source_tag, "-") or
+        !std.mem.eql(u8, fact_source_tag_env_present, "present"))
     {
         try common.validationError(
             io,
-            "source-owned wrong-source-tag probe did not resolve from compile context: source_tag={s} source_tag_env_present={s} context_selector={s} body_selector={s} surface={s}\n",
-            .{ descriptor_source_tag, descriptor_source_tag_env_present, descriptor_context_selector, descriptor_body_selector, diagnostic_surface },
+            "source-owned wrong-source-tag probe did not emit stable compile-context facts: facts_source={s} root_source={s} source_tag={s} source_tag_env_present={s}\n",
+            .{ facts_source, root_source, fact_source_tag, fact_source_tag_env_present },
         );
     }
 
+    const diagnostic_surface = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_ir_writer_surface = \"", "zllvm_ir_writer_surface");
+    defer allocator.free(diagnostic_surface);
     const source_tag_env_present = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_source_tag_env_present = \"", "zllvm_source_tag_env_present");
     defer allocator.free(source_tag_env_present);
+    const source_fact_stream = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_source_fact_stream = \"", "zllvm_source_fact_stream");
+    defer allocator.free(source_fact_stream);
     const zig_compile_context_descriptor = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_zig_compile_context_descriptor = \"", "zllvm_zig_compile_context_descriptor");
     defer allocator.free(zig_compile_context_descriptor);
     const env_source_tag_selector = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_env_source_tag_selector = \"", "zllvm_env_source_tag_selector");
@@ -2271,14 +2285,15 @@ fn runSourceOwnedWrongSourceTagProbe(
     const source_tag_body_selector = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_source_tag_body_selector = \"", "zllvm_source_tag_body_selector");
     defer allocator.free(source_tag_body_selector);
     if (!std.mem.eql(u8, source_tag_env_present, "present") or
+        !std.mem.eql(u8, source_fact_stream, "used") or
         !std.mem.eql(u8, zig_compile_context_descriptor, "used") or
         !std.mem.eql(u8, env_source_tag_selector, "not-used") or
         !std.mem.eql(u8, source_tag_body_selector, "not-used"))
     {
         try common.validationError(
             io,
-            "source-owned wrong-source-tag probe used deprecated selector path: source_tag_env_present={s} compile_context={s} env_source_tag_selector={s} source_tag_body_selector={s}\n",
-            .{ source_tag_env_present, zig_compile_context_descriptor, env_source_tag_selector, source_tag_body_selector },
+            "source-owned wrong-source-tag probe used deprecated selector path: source_tag_env_present={s} source_fact_stream={s} compile_context={s} env_source_tag_selector={s} source_tag_body_selector={s}\n",
+            .{ source_tag_env_present, source_fact_stream, zig_compile_context_descriptor, env_source_tag_selector, source_tag_body_selector },
         );
     }
 
@@ -2855,6 +2870,16 @@ fn readIrWriterHeaderValue(
         try common.validationError(io, "external IR writer output for {s} has malformed {s} comment\n", .{ case.id, field_name });
     };
     return try allocator.dupe(u8, contents[value_start..value_end]);
+}
+
+fn readSourceOwnedInputEmitter(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    descriptor_path: []const u8,
+    case: Case,
+) ![]const u8 {
+    return readDescriptorInputValue(allocator, io, descriptor_path, case, "facts_emitter") catch
+        readDescriptorInputValue(allocator, io, descriptor_path, case, "descriptor_emitter");
 }
 
 fn readDescriptorInputValue(

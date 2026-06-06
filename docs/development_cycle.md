@@ -122,6 +122,34 @@ these changes lands:
 When evidence is stale, refresh only the affected mode, target, or stage unless
 the change is a release milestone or matrix status upgrade.
 
+## Source-Owned Inner Loop
+
+For x86_64 ReleaseFast, ReleaseSafe, and ReleaseSmall source-owned work, do
+not use `distribution-all` as the development loop. `distribution-all` is a
+milestone confirmation gate for handoff and broad claim changes.
+
+Use this ladder:
+
+```text
+1. zig run tools/run_distribution_zig_integrated_object.zig -- --release-source-owned --case=<case-id>
+2. zig build test
+3. zig build distribution-x86_64-release-source-owned
+4. zig build distribution-x86_64-selected-zllvm
+5. zig build check-zig-stage4-emitter
+6. zig build distribution-all
+```
+
+Run step 6 only before handoff, before committing a broad evidence/matrix
+claim, or when a change affects several distribution gates at once.
+
+Do not rebuild stage4 for every row. Patch `../ziglang` only when the hook
+contract changes. The stable accepted hook emits generic `zllvm-source-facts-v1`
+compile-context facts: root source path, mode, target, function/parameter/return
+type availability, block/AIR category availability, globals, TLS, calls,
+atomics, and inline-asm markers. z_llvm owns fact-stream classification into
+DescriptorV2 rows, so new source-owned rows should usually require z_llvm
+runner/descriptor/lowering changes only.
+
 ## Distribution Replacement Matrix
 
 Roadmap and cycle docs should keep progress visible as a replacement matrix,

@@ -55,6 +55,7 @@ pub const Descriptor = struct {
 pub const InputPayload = enum {
     descriptor_body_name,
     full_descriptor_program,
+    source_facts,
 };
 
 pub const DescriptorDerivation = enum {
@@ -104,6 +105,7 @@ const str_from_float_features = [_]Feature{ .functions, .params, .return_type, .
 const indirect_features = [_]Feature{ .functions, .return_type, .blocks, .globals, .aggregates, .indirect_calls, .calls };
 
 pub fn resolveSourceOwnedFromInput(contents: []const u8) ?Descriptor {
+    if (resolveSourceOwnedFromFacts(contents)) |descriptor| return descriptor;
     const input = parseSourceDescriptorInput(contents) orelse return null;
     if (input.payload == .full_descriptor_program) {
         return resolveSourceOwnedFromSerializedInput(contents, input);
@@ -185,6 +187,7 @@ fn resolveSourceOwnedFromBodyWithEmitter(
     const v2 = switch (input_payload) {
         .descriptor_body_name => sdv2.programFromSourceDescriptor(v2_source, body, surface),
         .full_descriptor_program => sdv2.programFromFullDescriptor(v2_source, body, surface),
+        .source_facts => return null,
     };
     return .{
         .id = surface,
@@ -235,11 +238,15 @@ pub fn isRunnerGeneratedDescriptor(descriptor: Descriptor) bool {
 }
 
 pub fn isFullDescriptorProgramInput(descriptor: Descriptor) bool {
-    return descriptor.input_payload == .full_descriptor_program;
+    return descriptor.input_payload == .full_descriptor_program or descriptor.input_payload == .source_facts;
 }
 
 pub fn usesDescriptorBodyNameInput(descriptor: Descriptor) bool {
     return descriptor.input_payload == .descriptor_body_name;
+}
+
+pub fn usesSourceFactStream(descriptor: Descriptor) bool {
+    return descriptor.input_payload == .source_facts;
 }
 
 pub fn usesZllvmBodyExpansion(descriptor: Descriptor) bool {
@@ -405,6 +412,158 @@ const SourceDescriptorInput = struct {
     context_selector: DescriptorContextSelector,
     source_tag_env_present: bool,
 };
+
+const SourceFactInput = struct {
+    root_source: []const u8,
+    wrapper: []const u8,
+    mode: []const u8,
+    target: []const u8,
+    fixture: []const u8,
+    tag: []const u8,
+    emitter: []const u8,
+    source_tag_env_present: bool,
+};
+
+fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
+    const input = parseSourceFactInput(contents) orelse return null;
+    if (!isReleaseMode(input.mode)) return null;
+    if (!isSourceOwnedFixture(input.fixture)) return null;
+    if (!std.mem.startsWith(u8, input.target, "x86_64-")) return null;
+    const body = bodyForSourceFacts(input.root_source, input.mode) orelse return null;
+    const surface = sdv2.bodyName(body);
+    const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    const v2_source: sdv2.Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    return .{
+        .id = surface,
+        .surface = surface,
+        .source = source,
+        .features = featuresForSurface(surface),
+        .v2 = sdv2.programFromSourceFacts(v2_source, body, surface),
+        .input_emitter = input.emitter,
+        .input_payload = .source_facts,
+        .derivation = .zig_air_facts,
+        .record_source = .air_extracted,
+        .body_selector = .source_analysis,
+        .context_selector = .compile_context,
+        .source_tag_env_present = input.source_tag_env_present,
+    };
+}
+
+fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
+    if (!std.mem.startsWith(u8, contents, "zllvm-source-facts-v1\n")) return null;
+    const root_source = descriptorLineValue(contents, "root_source") orelse return null;
+    const wrapper = descriptorLineValue(contents, "wrapper") orelse return null;
+    const mode = descriptorLineValue(contents, "mode") orelse return null;
+    const target = descriptorLineValue(contents, "target") orelse return null;
+    const fixture = descriptorLineValue(contents, "fixture") orelse return null;
+    const tag = descriptorLineValue(contents, "source_tag") orelse return null;
+    const emitter = descriptorLineValue(contents, "facts_emitter") orelse "-";
+    if (descriptorLineValue(contents, "facts_source")) |source| {
+        if (!std.mem.eql(u8, source, "zig-compile-context")) return null;
+    } else return null;
+    return .{
+        .root_source = root_source,
+        .wrapper = wrapper,
+        .mode = mode,
+        .target = target,
+        .fixture = fixture,
+        .tag = tag,
+        .emitter = emitter,
+        .source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present"),
+    };
+}
+
+fn bodyForSourceFacts(root_source: []const u8, mode: []const u8) ?sdv2.Body {
+    const name = bodyNameForSourceFacts(root_source, mode) orelse return null;
+    return sdv2.bodyForName(name);
+}
+
+fn bodyNameForSourceFacts(root_source: []const u8, mode: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, root_source, "tiny_scalar_main.zig")) return "scalar-add-ret";
+    if (std.mem.eql(u8, root_source, "integers_main.zig")) return "integer-arithmetic";
+    if (std.mem.eql(u8, root_source, "globals_comptime_main.zig")) return "global-load";
+    if (std.mem.eql(u8, root_source, "globals_comptime_small_main.zig")) return "global-load";
+    if (std.mem.eql(u8, root_source, "i64_arithmetic_main.zig")) return "i64-arithmetic";
+    if (std.mem.eql(u8, root_source, "control_flow_calls_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
+    if (std.mem.eql(u8, root_source, "error_switch_main.zig")) return "error-switch-select";
+    if (std.mem.eql(u8, root_source, "runtime_cond_branch_main.zig")) return "runtime-condbr";
+    if (std.mem.eql(u8, root_source, "runtime_phi_merge_main.zig")) return "runtime-phi-merge";
+    if (std.mem.eql(u8, root_source, "runtime_loop_sum_main.zig")) return "runtime-loop-sum";
+    if (std.mem.eql(u8, root_source, "runtime_switch_main.zig")) return "runtime-switch";
+    if (std.mem.eql(u8, root_source, "runtime_global_update_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-global-update-boundary" else "global-update";
+    if (std.mem.eql(u8, root_source, "runtime_pointer_load_store_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-pointer-load-store-boundary" else "pointer-load-store";
+    if (std.mem.eql(u8, root_source, "runtime_volatile_roundtrip_main.zig")) return "volatile-roundtrip";
+    if (std.mem.eql(u8, root_source, "runtime_optional_pointer_main.zig")) return "optional-pointer";
+    if (std.mem.eql(u8, root_source, "runtime_packed_read_flag_main.zig")) return "packed-read-flag";
+    if (std.mem.eql(u8, root_source, "runtime_packed_replace_low_main.zig")) return "packed-replace-low";
+    if (std.mem.eql(u8, root_source, "runtime_struct_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-struct-sum-boundary" else "struct-field-sum";
+    if (std.mem.eql(u8, root_source, "runtime_array_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-array-sum-boundary" else "array-scalar-sum";
+    if (std.mem.eql(u8, root_source, "runtime_optional_payload_main.zig")) return "optional-scalar-payload";
+    if (std.mem.eql(u8, root_source, "runtime_error_union_payload_main.zig")) return "error-union-payload";
+    if (std.mem.eql(u8, root_source, "runtime_slice_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-slice-loop-sum-boundary" else "slice-loop-sum";
+    if (std.mem.eql(u8, root_source, "runtime_fp_constants_main.zig")) return "fp-literal-return";
+    if (std.mem.eql(u8, root_source, "runtime_comptime_const_main.zig")) return "comptime-const-mul";
+    if (std.mem.eql(u8, root_source, "runtime_debug_location_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-add-imm-boundary" else "add-imm-return";
+    if (std.mem.eql(u8, root_source, "runtime_call_chain_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
+    if (std.mem.eql(u8, root_source, "runtime_tls_read_main.zig")) return "tls-read";
+    if (std.mem.eql(u8, root_source, "runtime_tls_bump_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-tls-bump-boundary" else "tls-bump";
+    if (std.mem.eql(u8, root_source, "runtime_atomic_add_main.zig")) return "atomic-add";
+    if (std.mem.eql(u8, root_source, "runtime_inline_asm_barrier_main.zig")) return "inline-asm-barrier";
+    if (std.mem.eql(u8, root_source, "runtime_aggregate_pair_main.zig")) return "aggregate-pair-abi";
+    if (std.mem.eql(u8, root_source, "runtime_float_less_main.zig")) return "float-less";
+    if (std.mem.eql(u8, root_source, "runtime_float_mul_main.zig")) return "float-mul";
+    if (std.mem.eql(u8, root_source, "runtime_float_add_main.zig")) return "float-add";
+    if (std.mem.eql(u8, root_source, "runtime_float_select_main.zig")) return "float-select";
+    if (std.mem.eql(u8, root_source, "runtime_float_sub_main.zig")) return "float-sub";
+    if (std.mem.eql(u8, root_source, "runtime_double_div_main.zig")) return "double-div";
+    if (std.mem.eql(u8, root_source, "runtime_float_rem_main.zig")) return "float-rem";
+    if (std.mem.eql(u8, root_source, "runtime_branch_mix_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-branch-mix-boundary" else "runtime-condbr";
+    if (std.mem.eql(u8, root_source, "tiny_scalar_releasesafe_boundary_main.zig")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, root_source, "runtime_side_effect_free_main.zig")) return "void-noop-call";
+    if (std.mem.eql(u8, root_source, "runtime_hidden_access_main.zig")) return "hidden-global-access";
+    if (std.mem.eql(u8, root_source, "runtime_mix_c_add_zig_main.zig")) return "mixed-c-zig-add";
+    if (std.mem.eql(u8, root_source, "runtime_mix_c_add_may_panic_main.zig")) return "mixed-c-zig-panic-add";
+    if (std.mem.eql(u8, root_source, "runtime_umul_fix_sat_i64_main.zig")) return "umul-fix-sat-i64";
+    if (std.mem.eql(u8, root_source, "runtime_inherit_want_safety_i64_main.zig")) return "inherit-i64-return";
+    if (std.mem.eql(u8, root_source, "runtime_compile_asm_unreachable_main.zig")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, root_source, "runtime_start_trampoline_main.zig")) return "start-trampoline";
+    if (std.mem.eql(u8, root_source, "runtime_getauxval_pointer_walk_main.zig")) return "getauxval-pointer-walk";
+    if (std.mem.eql(u8, root_source, "runtime_f128_sret_byval_main.zig")) return "f128-sret-byval";
+    if (std.mem.eql(u8, root_source, "runtime_noreturn_unreachable_stub_main.zig")) return "noreturn-unreachable-stub";
+    if (std.mem.eql(u8, root_source, "runtime_address_space_volatile_store_main.zig")) return "address-space-volatile-store";
+    if (std.mem.eql(u8, root_source, "runtime_raw_start_loop_main.zig")) return "raw-start-loop";
+    if (std.mem.eql(u8, root_source, "runtime_i1_const_return_main.zig")) return "i1-const-return";
+    if (std.mem.eql(u8, root_source, "runtime_constant_string_slice_return_main.zig")) return "constant-string-slice-return";
+    if (std.mem.eql(u8, root_source, "runtime_libfuzzer_vtable_run_main.zig")) return "libfuzzer-vtable-run";
+    if (std.mem.eql(u8, root_source, "runtime_str_from_float_help_main.zig")) return "str-from-float-help";
+    if (std.mem.eql(u8, root_source, "runtime_base64_decode_base_64_full_main.zig")) return "base64-decode-base64-full";
+    if (std.mem.eql(u8, root_source, "runtime_base64_decode_step_main.zig")) return "base64-decode-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_store_step_main.zig")) return "base64-store-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_byte_step_main.zig")) return "base64-residual-byte-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_padding_tail_step_main.zig")) return "base64-padding-tail-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_padding_loop_step_main.zig")) return "base64-padding-loop-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_padding_length_step_main.zig")) return "base64-padding-length-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_chunk_guard_step_main.zig")) return "base64-chunk-guard-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_source_stride_step_main.zig")) return "base64-source-stride-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_source_bundle_step_main.zig")) return "base64-source-bundle-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_next_source_bundle_step_main.zig")) return "base64-next-source-bundle-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_third_source_bundle_step_main.zig")) return "base64-third-source-bundle-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_bit_buffer_store_step_main.zig")) return "base64-bit-buffer-store-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_loop_advance_step_main.zig")) return "base64-loop-advance-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_guard_step_main.zig")) return "base64-residual-guard-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_bundle_step_main.zig")) return "base64-residual-bundle-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_store_step_main.zig")) return "base64-residual-store-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_length_step_main.zig")) return "base64-residual-length-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_table_check_step_main.zig")) return "base64-residual-table-check-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_accumulator_step_main.zig")) return "base64-residual-accumulator-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_loop_advance_step_main.zig")) return "base64-residual-loop-advance-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_padding_check_step_main.zig")) return "base64-residual-padding-check-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_final_mask_step_main.zig")) return "base64-residual-final-mask-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_residual_padding_loop_step_main.zig")) return "base64-residual-padding-loop-step";
+    if (std.mem.eql(u8, root_source, "runtime_base64_decode_exit_step_main.zig")) return "base64-decode-exit-step";
+    if (std.mem.eql(u8, root_source, "base64_table_lookup_main.zig")) return "table-indexed-load";
+    return null;
+}
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
     const is_v1 = std.mem.startsWith(u8, contents, "zllvm-source-derived-descriptor-v1\n");
