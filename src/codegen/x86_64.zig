@@ -1043,6 +1043,7 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeSliceSumMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeComptimeConstMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeDebugLocationMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerTlsBumpCallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDirectI32CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerControlFlowCallsWriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
@@ -1177,7 +1178,7 @@ fn lowerDirectI32CallMainReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!isMainOrWrapperMain(function.name)) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1 and block.instructions.items.len != 2) return false;
 
@@ -1230,6 +1231,37 @@ fn lowerDirectI32CallMainReturn(
     try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
     try machine.instructions.append(allocator, .add_rsp_8);
     if (add_immediate != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_immediate });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerTlsBumpCallMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (block.instructions.items.len != 1) return false;
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    const call_name = call_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_name)) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!std.mem.endsWith(u8, call.callee, ".bumpTls")) return false;
+    if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
+    if (!callIsFastcc(call.calling_conv)) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return error.UnsupportedCodegenInstruction;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[0].value, 1)) return false;
+
+    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = "runtime_tls_bump_main.tls_counter" });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = "runtime_tls_bump_main.tls_counter" });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -8592,11 +8624,16 @@ fn lowerTlsBumpReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "tls_concurrency.bump_tls")) return false;
-    const arg_reg = (try matchGlobalUpdate(function, block, ret, "tls_concurrency.tls_counter")) orelse return false;
-    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = "tls_concurrency.tls_counter" });
+    const global_name: []const u8 = if (std.mem.eql(u8, function.name, "tls_concurrency.bump_tls"))
+        "tls_concurrency.tls_counter"
+    else if (std.mem.endsWith(u8, function.name, ".bumpTls"))
+        "runtime_tls_bump_main.tls_counter"
+    else
+        return false;
+    const arg_reg = (try matchGlobalUpdate(function, block, ret, global_name)) orelse return false;
+    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
-    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = "tls_concurrency.tls_counter" });
+    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = global_name });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
