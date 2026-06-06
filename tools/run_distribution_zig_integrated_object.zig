@@ -439,7 +439,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasefast_runtime_tls_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
         .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
         .mode = "ReleaseFast",
         .validation = .executable,
@@ -687,7 +687,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesafe_runtime_tls_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
         .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
         .mode = "ReleaseSafe",
         .validation = .executable,
