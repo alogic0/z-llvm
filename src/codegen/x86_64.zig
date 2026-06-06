@@ -8508,7 +8508,7 @@ fn lowerTlsMainReadReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!isMainOrWrapperMain(function.name)) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1) return false;
     const load_inst = block.instructions.items[0];
@@ -8536,7 +8536,7 @@ fn lowerTlsMainUpdateReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "main")) return false;
+    if (!isMainOrWrapperMain(function.name)) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 3) return false;
     const load_inst = block.instructions.items[0];
@@ -8579,6 +8579,10 @@ fn lowerTlsMainUpdateReturn(
     try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = global_name });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn isMainOrWrapperMain(name: []const u8) bool {
+    return std.mem.eql(u8, name, "main") or std.mem.endsWith(u8, name, ".main");
 }
 
 fn lowerTlsBumpReturn(
@@ -10543,6 +10547,7 @@ fn lowerDescriptorTableLoopMain(allocator: std.mem.Allocator, machine: *MachineF
 }
 
 fn lowerCheckedTlsBump(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try lowerCheckedTlsMainUpdate(allocator, machine, function)) return true;
     if (!std.mem.eql(u8, function.name, "tls_concurrency.bump_tls")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
@@ -10557,6 +10562,92 @@ fn lowerCheckedTlsBump(allocator: std.mem.Allocator, machine: *MachineFunction, 
     try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = "tls_concurrency.tls_counter" });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
+    return true;
+}
+
+fn lowerCheckedTlsMainUpdate(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 3) return false;
+    const load_name = entry.instructions.items[0].result orelse return false;
+    const pair_name = entry.instructions.items[1].result orelse return false;
+    const overflow_name = entry.instructions.items[2].result orelse return false;
+
+    const load = switch (entry.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const global_name = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const call = switch (entry.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!isCalleeName(call.callee, "llvm.sadd.with.overflow.i32")) return false;
+    if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isNamed(call.args.items[0].value, load_name)) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(call.args.items[1].value, 1)) return false;
+
+    const overflow_extract = switch (entry.instructions.items[2].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!overflow_extract.result_ty.eql(.{ .int = 1 }) or !isNamed(overflow_extract.aggregate, pair_name)) return false;
+
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, overflow_name)) return false;
+
+    const overflow_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ok_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
+    const overflow_block = function.blocks.items[overflow_index];
+    const ok_block = function.blocks.items[ok_index];
+    if (overflow_block.instructions.items.len != 2) return false;
+    try validateAssumeColdCall(overflow_block.instructions.items[0]);
+    try validateIntegerOverflowPanicCall(overflow_block.instructions.items[1]);
+    switch (overflow_block.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return false,
+    }
+
+    if (ok_block.instructions.items.len != 2) return false;
+    const updated_name = ok_block.instructions.items[0].result orelse return false;
+    const updated_extract = switch (ok_block.instructions.items[0].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!updated_extract.result_ty.eql(.{ .int = 32 }) or !isNamed(updated_extract.aggregate, pair_name)) return false;
+    const store = switch (ok_block.instructions.items[1].kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier() or !isNamed(store.value, updated_name)) return false;
+    if (!store.ptr.eql(load.ptr)) return false;
+    const ret = switch (ok_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, updated_name)) return false;
+
+    const overflow_label = "tls_bump_overflow";
+    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = global_name });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
+    try machine.instructions.append(allocator, .{ .jo = overflow_label });
+    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = global_name });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = overflow_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
     return true;
 }
 

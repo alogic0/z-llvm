@@ -2400,6 +2400,8 @@ fn integratedExpectedExitCode(case: Case) u8 {
     if (std.mem.eql(u8, case.id, "releasesmall_source_standalone_mix_c_files_add_may_panic")) return 5;
     if (std.mem.eql(u8, case.id, "releasesmall_runtime_inherit_want_safety_i64")) return 4;
     if (std.mem.eql(u8, case.id, "releasesmall_source_inherit_want_safety_i64_return")) return 4;
+    if (std.mem.eql(u8, case.id, "releasefast_source_tls_concurrency_counter_bump")) return 2;
+    if (std.mem.eql(u8, case.id, "releasesafe_source_tls_concurrency_checked_bump")) return 2;
     return 0;
 }
 
