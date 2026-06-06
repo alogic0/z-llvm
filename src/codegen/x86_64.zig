@@ -1044,15 +1044,15 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeComptimeConstMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimeDebugLocationMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsBumpCallMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerHiddenGlobalAccessFamilyReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerMixedCZigTlsInputFamilyReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerReleaseSmallMixCAddMayPanicMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDirectI32CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerControlFlowCallsWriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateCheckMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerHiddenGlobalAccessFamilyReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerMixedCZigTlsInputFamilyReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerReleaseSmallMixCAddMayPanicMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerReleaseSmallStrFromFloatMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsMainReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsMainUpdateReturn(allocator, machine, function, block, ret)) return;
