@@ -54,10 +54,10 @@ writer env vars are unset.
 Current strongest distribution claim gate:
 `zig build distribution-x86_64-release-source-owned` is the source-owned
 x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
-current source-backed inventory. Patched Zig still passes wrapper path, optimize
-mode, target, output path, and marker path; the runner also passes source
-fixture metadata and the source-backed tag used only to disambiguate
-wrapper/mode collisions. Patched Zig emits
+current source-backed inventory. Patched Zig still receives wrapper path,
+optimize mode, target, output path, marker path, and diagnostic source fixture
+metadata; the release source-owned runner no longer passes `ZLLVM_SOURCE_TAG`.
+Patched Zig emits
 `zllvm-source-derived-descriptor-v2` with serialized function/block/instruction/
 terminator/global-section records from those source facts, and z_llvm parses
 those records directly rather than resolving a wrapper/fixture/tag table or
@@ -119,8 +119,8 @@ the unambiguous wrapper/mode subset. Current measured output is
 Source-wrapper discovery bucket:
 The source-owned gate now scans `test/zig/integrated/*.zig` directly as a
 separate discovery bucket, not as additional case-id selected rows. Current
-measured output is `discovered_source_wrappers=72`,
-`descriptor_supported_wrappers=72`, `out_of_scope_wrappers=0`, and
+measured output is `discovered_source_wrappers=82`,
+`descriptor_supported_wrappers=82`, `out_of_scope_wrappers=0`, and
 `unsupported_with_reason=0`; the formerly out-of-scope release wrappers are now
 part of the source-owned inventory.
 
@@ -155,7 +155,8 @@ serialized return stub. Current provenance counters show
 `wrapper_body_map_rows=0`, `source_tag_body_map_rows=0`,
 `zig_compile_context_descriptor_rows=100`, `env_source_tag_selector_rows=0`,
 `wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, and
-`fixture_metadata_selector_rows=0`, so source tag, wrapper basename, fixture
+`fixture_metadata_selector_rows=0`, and `source_tag_env_present_rows=0`, so
+source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
 compile-context descriptor provenance and no body-map selector.

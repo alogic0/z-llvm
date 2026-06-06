@@ -259,6 +259,7 @@ env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0
 fixture_metadata_selector_rows=0
+source_tag_env_present_rows=0
 zig_emitted_descriptor_rows=100
 runner_generated_descriptor_rows=0
 descriptor_file_consumed_rows=100
@@ -282,8 +283,8 @@ local_fail=0
 ownership=llvm-module=not-used;llvm-optimizer=not-used;
           llvm-targetmachine=not-used;object-emission=z_llvm;
           linker=zig-native-fno-lld
-source_wrapper_discovery=discovered_source_wrappers=72
-                         descriptor_supported_wrappers=72
+source_wrapper_discovery=discovered_source_wrappers=82
+                         descriptor_supported_wrappers=82
                          out_of_scope_wrappers=0
                          unsupported_with_reason=0
 ```
@@ -299,9 +300,9 @@ structured-direct IR. All 100 rows use serialized DescriptorV2 transport and
 semantic serialized records, and the gate fails if any row falls back to the
 serialized return stub. The current provenance split is 100 rows on the
 separate extracted-record path with compile-context descriptor provenance, no
-body-map selector, no source-tag selector, and 0 template-owned rows. Source
-tags remain diagnostic text in artifacts but are not an accepted semantic
-selector. The source-owned gate fails if any row delegates back to the external
+body-map selector, no source-tag selector, and 0 template-owned rows.
+`ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
+source-owned gate fails if any row delegates back to the external
 writer body path, uses the old semantic-record ownership marker, uses surface
 dispatch as the ownership selector, uses a tag-table descriptor lookup, uses
 body-enum descriptor dispatch, expands a descriptor body name inside z_llvm, or
@@ -603,7 +604,8 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        env_source_tag_selector_rows=0,
                        wrapper_body_selector_rows=0,
                        source_tag_body_selector_rows=0,
-                       fixture_metadata_selector_rows=0);
+                       fixture_metadata_selector_rows=0,
+                       source_tag_env_present_rows=0);
                        all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse

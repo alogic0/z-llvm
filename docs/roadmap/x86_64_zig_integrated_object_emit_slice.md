@@ -164,12 +164,12 @@ Zig.
 
 The source-owned release gate keeps the patched Zig hook stable by passing the
 sentinel `ZLLVM_CASE_ID=source-wrapper-dispatch` plus
-`ZLLVM_IR_WRITER_DISPATCH=source-owned`, `ZLLVM_SOURCE_FIXTURE`, and
-`ZLLVM_SOURCE_TAG`; the runner additionally passes
+`ZLLVM_IR_WRITER_DISPATCH=source-owned` and diagnostic
+`ZLLVM_SOURCE_FIXTURE`; the runner additionally passes
 `ZLLVM_SEMANTIC_DESCRIPTOR_PATH`, and patched Zig writes that stable
 source-derived descriptor file before invoking z_llvm. z_llvm consumes that
 descriptor directly and then builds the structured module.
-The gate requires all 90 current x86_64 release source-backed rows to report
+The gate requires all 100 current x86_64 release source-owned rows to report
 `lowering=semantic-descriptor-v2`, `zllvm_semantic_descriptor_version = "v2"`,
 `zllvm_descriptor_program = "real"`,
 `zllvm_zig_emitted_descriptor = "used"`,

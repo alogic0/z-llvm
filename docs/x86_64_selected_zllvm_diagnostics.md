@@ -59,21 +59,24 @@ The stronger source-owned release proof uses:
 gate: zig build distribution-x86_64-release-source-owned
 ZLLVM_CASE_ID=source-wrapper-dispatch
 ZLLVM_IR_WRITER_DISPATCH=source-owned
-ZLLVM_SOURCE_FIXTURE=<covered release fixture path>
-ZLLVM_SOURCE_TAG=<source-backed tag or ->
+ZLLVM_SOURCE_FIXTURE=<covered release fixture path, diagnostic only>
+ZLLVM_SEMANTIC_DESCRIPTOR_PATH=<descriptor output path>
 ```
 
 That gate covers the full current x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall
 source-backed inventory and fails unless it reports
-`release_source_rows=90`, `source_wrapper_rows=90`,
-`descriptor_owned_rows=90`, `manual_fixture_dispatch_rows=0`,
-`descriptor_v2_rows=90`, `zig_emitted_descriptor_rows=90`,
-`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
+`release_source_rows=100`, `source_wrapper_rows=100`,
+`descriptor_owned_rows=100`, `manual_fixture_dispatch_rows=0`,
+`descriptor_v2_rows=100`, `zig_emitted_descriptor_rows=100`,
+`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`,
 `legacy_semantic_record_rows=0`,
 `semantic_record_rows=0`, `external_writer_delegate_rows=0`,
-`semantic_lowering_rows=90`, `manifest_structured_rows=0`, `case_id_rows=0`,
-`surface_dispatch_rows=0`, `structured_direct_rows=90`,
-`generic_codegen_rows=90`, `fallback_rows=0`, and `local_fail=0`.
+`semantic_lowering_rows=100`, `manifest_structured_rows=0`, `case_id_rows=0`,
+`surface_dispatch_rows=0`, `structured_direct_rows=100`,
+`generic_codegen_rows=100`, `zig_compile_context_descriptor_rows=100`,
+`env_source_tag_selector_rows=0`, `wrapper_body_selector_rows=0`,
+`source_tag_body_selector_rows=0`, `fixture_metadata_selector_rows=0`,
+`source_tag_env_present_rows=0`, `fallback_rows=0`, and `local_fail=0`.
 
 `ZIG_EMITTER`, `ZIG_SOURCE_DIR`, `ZLLVM_EXE`, and `TARGET` may be overridden by
 the caller, but the selected claim is only for the target above and the
@@ -90,16 +93,17 @@ For the source-wrapper gate, also confirm the marker reports
 `case_id=source-wrapper-dispatch` and the emitted IR header reports
 `zllvm_ir_writer_dispatch = "source-wrapper"`.
 For the source-owned gate, also confirm the emitted IR header reports
-`zllvm_ir_writer_dispatch = "source-owned"` plus the expected
-`zllvm_ir_writer_source_fixture` and `zllvm_ir_writer_source_tag` fields,
+`zllvm_ir_writer_dispatch = "source-owned"`,
 `zllvm_semantic_descriptor = "descriptor-owned"`, and
 `zllvm_semantic_descriptor_version = "v2"`,
 `zllvm_zig_emitted_descriptor = "used"`,
 `zllvm_runner_generated_descriptor = "not-used"`,
 `zllvm_descriptor_file_consumed = "used"`,
+`zllvm_source_tag_env_present = "not-present"`,
 `zllvm_manual_fixture_dispatch = "not-used"`, and
 `zllvm_surface_dispatch = "not-used"`. Unsupported descriptor failures print
-the first unsupported construct with wrapper, fixture, mode, and source tag.
+the first unsupported construct with wrapper, diagnostic fixture, mode, and
+diagnostic source tag.
 
 `wrong z_llvm`:
 The marker points at an unexpected tool, the binary is missing, or the emitted

@@ -57,15 +57,15 @@ linker=zig-native-fno-lld
 
 ```text
 gate=zig build distribution-x86_64-release-source-owned
-release_source_rows=90
-source_wrapper_rows=90
-descriptor_owned_rows=90
-descriptor_v2_rows=90
-real_descriptor_program_rows=90
-zig_emitted_descriptor_rows=90
+release_source_rows=100
+source_wrapper_rows=100
+descriptor_owned_rows=100
+descriptor_v2_rows=100
+real_descriptor_program_rows=100
+zig_emitted_descriptor_rows=100
 runner_generated_descriptor_rows=0
-descriptor_file_consumed_rows=90
-source_derived_descriptor_rows=90
+descriptor_file_consumed_rows=100
+source_derived_descriptor_rows=100
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -74,21 +74,27 @@ manual_fixture_dispatch_rows=0
 legacy_semantic_record_rows=0
 semantic_record_rows=0
 external_writer_delegate_rows=0
-semantic_lowering_rows=90
+semantic_lowering_rows=100
 manifest_structured_rows=0
 case_id_rows=0
 surface_dispatch_rows=0
-structured_direct_rows=90
-generic_codegen_rows=90
+structured_direct_rows=100
+generic_codegen_rows=100
+zig_compile_context_descriptor_rows=100
+env_source_tag_selector_rows=0
+wrapper_body_selector_rows=0
+source_tag_body_selector_rows=0
+fixture_metadata_selector_rows=0
+source_tag_env_present_rows=0
 fallback_rows=0
 local_fail=0
 ```
 
-This gate closes the wrapper/mode collision gap by passing source fixture
-metadata and a source-backed tag such as `tls-concurrency-checked-bump` or
-`tls-concurrency-checked-read` only as source-analysis inputs. Patched Zig emits
-a stable `zllvm-source-derived-descriptor-v1` file, z_llvm consumes that
-descriptor directly, verifies the DescriptorV2 program with real
+This gate closes the old wrapper/mode collision gap with distinct compiled
+source wrappers and compile-context descriptor extraction. The accepted path no
+longer receives `ZLLVM_SOURCE_TAG`; source fixture text is diagnostic only.
+Patched Zig emits a stable `zllvm-source-derived-descriptor-v2` file, z_llvm
+consumes that descriptor directly, verifies the DescriptorV2 program with real
 blocks/instructions, and lowers it into structured IR without consulting
 `IrWriterCase` as the ownership source or resolving a wrapper/fixture/tag table
 inside z_llvm. The emitted writer header records
@@ -106,11 +112,12 @@ inside z_llvm. The emitted writer header records
 `ZLLVM_CASE_ID=source-wrapper-dispatch`, so case ids are not the ownership
 selector for this gate.
 
-The same gate also reports a source-wrapper discovery bucket from
-`test/zig/integrated/*.zig`: `discovered_source_wrappers=72`,
-`descriptor_supported_wrappers=62`, `out_of_scope_wrappers=10`, and
-`unsupported_with_reason=0`. This is a discovery bucket for future expansion,
-not an additional accepted row set in the 90-row source-owned gate.
+The source-owned release gate also reports a source-wrapper discovery bucket
+from `test/zig/integrated/*.zig`: `discovered_source_wrappers=82`,
+`descriptor_supported_wrappers=82`, `out_of_scope_wrappers=0`, and
+`unsupported_with_reason=0`. This is a discovery bucket for the 100-row
+source-owned gate, not an additional accepted row set in the narrower
+source-wrapper compatibility gate.
 
 ## Semantic-Lowered Families
 

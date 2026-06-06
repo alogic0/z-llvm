@@ -15,7 +15,8 @@ env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0
 fixture_metadata_selector_rows=0
-descriptor_supported_wrappers=72
+source_tag_env_present_rows=0
+descriptor_supported_wrappers=82
 out_of_scope_wrappers=0
 ```
 
@@ -24,8 +25,9 @@ separate extracted-record writer path with compile-context descriptor
 provenance. The gate rejects `template_descriptor_rows`,
 `wrapper_body_map_rows`, `source_tag_body_map_rows`,
 `env_source_tag_selector_rows`, `wrapper_body_selector_rows`,
-`source_tag_body_selector_rows`, and `fixture_metadata_selector_rows` greater
-than zero. This is distinct from full Zig Sema/AIR extraction, which remains
+`source_tag_body_selector_rows`, `fixture_metadata_selector_rows`, and
+`source_tag_env_present_rows` greater than zero. This is distinct from full
+Zig Sema/AIR extraction, which remains
 the target.
 
 ## Descriptor Body Inventory
@@ -224,4 +226,5 @@ env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0
 fixture_metadata_selector_rows=0
+source_tag_env_present_rows=0
 ```
