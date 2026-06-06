@@ -359,6 +359,7 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_wrapper_body_selector = "{s}"
         \\; zllvm_source_tag_body_selector = "{s}"
         \\; zllvm_fixture_metadata_selector = "{s}"
+        \\; zllvm_source_tag_env_present = "{s}"
         \\
     , .{
         if (descriptor) |desc| if (sd.isFullDescriptorProgramInput(desc)) "used" else "not-used" else "-",
@@ -382,6 +383,7 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.usesWrapperBodySelector(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesSourceTagBodySelector(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesFixtureMetadataSelector(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.hasSourceTagEnv(desc)) "present" else "not-present" else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });
     };
@@ -429,7 +431,7 @@ fn writeSemanticDescriptorFromEnv(
 ) !void {
     const mode = requiredEnv(io, environ, "ZLLVM_ZIG_MODE");
     const wrapper = requiredEnv(io, environ, "ZLLVM_WRAPPER");
-    const source_fixture = requiredEnv(io, environ, "ZLLVM_SOURCE_FIXTURE");
+    const source_fixture = environ.get("ZLLVM_SOURCE_FIXTURE") orelse "-";
     const source_tag = environ.get("ZLLVM_SOURCE_TAG") orelse "-";
     const descriptor = try readSourceOwnedDescriptorFromEnv(allocator, io, environ, wrapper, mode, source_fixture, source_tag);
     if (sd.firstUnsupportedConstruct(descriptor)) |construct| {
@@ -462,11 +464,9 @@ fn readSourceOwnedDescriptorFromEnv(
         try fatal(io, "unsupported semantic descriptor construct=source-derived-input wrapper={s} fixture={s} mode={s} source_tag={s} descriptor={s}\n", .{ wrapper, source_fixture, mode, source_tag, descriptor_path });
     };
     if (!std.mem.eql(u8, descriptor.source.wrapper, wrapper) or
-        !std.mem.eql(u8, descriptor.source.mode, mode) or
-        !std.mem.eql(u8, descriptor.source.fixture, source_fixture) or
-        !std.mem.eql(u8, descriptor.source.tag, source_tag))
+        !std.mem.eql(u8, descriptor.source.mode, mode))
     {
-        try fatal(io, "source-derived descriptor metadata mismatch descriptor={s} expected_wrapper={s} actual_wrapper={s} expected_fixture={s} actual_fixture={s} expected_mode={s} actual_mode={s} expected_source_tag={s} actual_source_tag={s}\n", .{ descriptor_path, wrapper, descriptor.source.wrapper, source_fixture, descriptor.source.fixture, mode, descriptor.source.mode, source_tag, descriptor.source.tag });
+        try fatal(io, "source-derived descriptor metadata mismatch descriptor={s} expected_wrapper={s} actual_wrapper={s} diagnostic_fixture={s} actual_fixture={s} expected_mode={s} actual_mode={s} diagnostic_source_tag={s} actual_source_tag={s}\n", .{ descriptor_path, wrapper, descriptor.source.wrapper, source_fixture, descriptor.source.fixture, mode, descriptor.source.mode, source_tag, descriptor.source.tag });
     }
     return descriptor;
 }

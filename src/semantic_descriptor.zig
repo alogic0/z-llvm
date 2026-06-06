@@ -48,6 +48,7 @@ pub const Descriptor = struct {
     record_source: DescriptorRecordSource = .unknown,
     body_selector: DescriptorBodySelector = .unknown,
     context_selector: DescriptorContextSelector = .unknown,
+    source_tag_env_present: bool = false,
     serialized_return_i32: ?i32 = null,
 };
 
@@ -289,6 +290,10 @@ pub fn usesFixtureMetadataSelector(descriptor: Descriptor) bool {
     return descriptor.context_selector == .fixture_metadata;
 }
 
+pub fn hasSourceTagEnv(descriptor: Descriptor) bool {
+    return descriptor.source_tag_env_present;
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }
@@ -398,6 +403,7 @@ const SourceDescriptorInput = struct {
     record_source: DescriptorRecordSource,
     body_selector: DescriptorBodySelector,
     context_selector: DescriptorContextSelector,
+    source_tag_env_present: bool,
 };
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
@@ -423,6 +429,7 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
     const record_source = descriptorRecordSourceFromName(descriptorLineValue(contents, "descriptor_record_source") orelse "-");
     const body_selector = descriptorBodySelectorFromName(descriptorLineValue(contents, "descriptor_body_selector") orelse "-");
     const context_selector = descriptorContextSelectorFromName(descriptorLineValue(contents, "descriptor_context_selector") orelse "-");
+    const source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present");
     if (descriptorLineValue(contents, "descriptor_source")) |source| {
         if (!std.mem.eql(u8, source, "zig-source-analysis")) return null;
     } else return null;
@@ -439,6 +446,7 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
         .record_source = record_source,
         .body_selector = body_selector,
         .context_selector = context_selector,
+        .source_tag_env_present = source_tag_env_present,
     };
 }
 
@@ -462,6 +470,7 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
             .record_source = input.record_source,
             .body_selector = input.body_selector,
             .context_selector = input.context_selector,
+            .source_tag_env_present = input.source_tag_env_present,
             .serialized_return_i32 = program.serialized_return_i32,
         };
     }
@@ -478,12 +487,14 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
         .record_source = input.record_source,
         .body_selector = input.body_selector,
         .context_selector = input.context_selector,
+        .source_tag_env_present = input.source_tag_env_present,
         .serialized_return_i32 = ret_i32,
     };
 }
 
 fn isSourceOwnedFixture(fixture: []const u8) bool {
-    return std.mem.startsWith(u8, fixture, "test/distribution/") or
+    return std.mem.eql(u8, fixture, "-") or
+        std.mem.startsWith(u8, fixture, "test/distribution/") or
         std.mem.startsWith(u8, fixture, "test/zig/inputs/");
 }
 

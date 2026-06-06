@@ -439,7 +439,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasefast_runtime_tls_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
         .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
         .mode = "ReleaseFast",
         .validation = .executable,
@@ -447,7 +447,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasefast_source_tls_concurrency_counter_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
         .covered_fixture = "test/distribution/releasefast_x86_64/inputs/tls_concurrency_counter.ll",
         .mode = "ReleaseFast",
         .validation = .executable,
@@ -687,7 +687,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesafe_runtime_tls_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
         .covered_fixture = "test/zig/inputs/tls_concurrency.zig",
         .mode = "ReleaseSafe",
         .validation = .executable,
@@ -695,7 +695,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesafe_source_tls_concurrency_checked_bump",
-        .wrapper = "test/zig/integrated/runtime_tls_read_main.zig",
+        .wrapper = "test/zig/integrated/runtime_tls_bump_main.zig",
         .covered_fixture = "test/distribution/releasesafe_x86_64/inputs/tls_concurrency_checked.ll",
         .mode = "ReleaseSafe",
         .validation = .executable,
@@ -895,7 +895,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_address_space_start_trampoline",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_start_trampoline_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/address_space_start_trampoline.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -903,7 +903,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_array_in_anon_struct_getauxval",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_getauxval_pointer_walk_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/array_in_anon_struct_getauxval.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -911,7 +911,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_c_abi_main_f128_sret",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_f128_sret_byval_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/c_abi_main_f128_sret.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -919,7 +919,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_compile_errors_logical_ptr_elem_ptr",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_noreturn_unreachable_stub_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/compile_errors_illegal_operation_on_logical_ptr_elem_ptr.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -927,7 +927,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_export_keyword_vram_store",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_address_space_volatile_store_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/export_keyword_vram_store.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -935,7 +935,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_sizeof_typeof_unreachable_stubs",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_noreturn_unreachable_stub_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/sizeof_typeof_unreachable_stubs.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -943,7 +943,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_standalone_install_raw_hex_start_loop",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_raw_start_loop_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_install_raw_hex_start_loop.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -951,7 +951,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_standalone_libfuzzer_runner_futex_wait",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_i1_const_return_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_futex_wait.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -959,7 +959,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_standalone_libfuzzer_runner_test_name",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_constant_string_slice_return_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_name.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -967,7 +967,7 @@ const cases = [_]Case{
     },
     .{
         .id = "releasesmall_source_standalone_libfuzzer_runner_test_run",
-        .wrapper = "test/zig/integrated/runtime_compile_asm_unreachable_main.zig",
+        .wrapper = "test/zig/integrated/runtime_libfuzzer_vtable_run_main.zig",
         .covered_fixture = "test/distribution/releasesmall_x86_64/inputs/standalone_libfuzzer_runner_test_run.ll",
         .mode = "ReleaseSmall",
         .validation = .executable,
@@ -1348,6 +1348,7 @@ pub fn main(init: std.process.Init) !void {
     var wrapper_body_selector_rows: usize = 0;
     var source_tag_body_selector_rows: usize = 0;
     var fixture_metadata_selector_rows: usize = 0;
+    var source_tag_env_present_rows: usize = 0;
     var surface_to_body_adapter_rows: usize = 0;
     var canned_return_descriptor_rows: usize = 0;
     var legacy_semantic_record_rows: usize = 0;
@@ -1503,7 +1504,6 @@ pub fn main(init: std.process.Init) !void {
         if (release_source_owned) {
             try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
             try env_map.put("ZLLVM_SOURCE_FIXTURE", case.covered_fixture);
-            try env_map.put("ZLLVM_SOURCE_TAG", sourceMetadataTag(case.fallback));
             try env_map.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
         }
         if (use_ir_writer) try env_map.put("ZLLVM_IR_PATH", ir_path);
@@ -1582,6 +1582,8 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(source_tag_body_selector);
         const fixture_metadata_selector = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_fixture_metadata_selector = \"", "zllvm_fixture_metadata_selector") else "-";
         defer if (use_ir_writer) allocator.free(fixture_metadata_selector);
+        const source_tag_env_present = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_tag_env_present = \"", "zllvm_source_tag_env_present") else "-";
+        defer if (use_ir_writer) allocator.free(source_tag_env_present);
         const surface_to_body_adapter = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_surface_to_body_adapter = \"", "zllvm_surface_to_body_adapter") else "-";
         defer if (use_ir_writer) allocator.free(surface_to_body_adapter);
         const canned_return_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_canned_return_descriptor = \"", "zllvm_canned_return_descriptor") else "-";
@@ -1716,6 +1718,10 @@ pub fn main(init: std.process.Init) !void {
                 if (!std.mem.eql(u8, fixture_metadata_selector, "not-used")) {
                     fixture_metadata_selector_rows += 1;
                     try common.validationError(io, "release source-owned row {s} used fixture metadata descriptor selection: fixture_metadata_selector={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, fixture_metadata_selector, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, source_tag_env_present, "not-present")) {
+                    source_tag_env_present_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} received deprecated ZLLVM_SOURCE_TAG env: source_tag_env_present={s} wrapper={s} fixture={s} mode={s}\n", .{ case.id, source_tag_env_present, case.wrapper, case.covered_fixture, case.mode });
                 }
                 const row_air_extracted = std.mem.eql(u8, air_extracted_descriptor, "used");
                 const row_template = std.mem.eql(u8, template_descriptor, "used");
@@ -1877,8 +1883,8 @@ pub fn main(init: std.process.Init) !void {
             if (air_extracted_descriptor_rows != expected_release_source_owned_rows or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires extracted descriptor provenance; air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
-            if (zig_compile_context_descriptor_rows != expected_release_source_owned_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0) {
-                try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows });
+            if (zig_compile_context_descriptor_rows != expected_release_source_owned_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0 or source_tag_env_present_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows, source_tag_env_present_rows });
             }
             if (descriptor_owned_rows != expected_release_source_owned_rows or descriptor_v2_rows != expected_release_source_owned_rows or real_descriptor_program_rows != expected_release_source_owned_rows or full_descriptor_program_rows != expected_release_source_owned_rows or serialized_function_rows != expected_release_source_owned_rows or serialized_instruction_rows != expected_release_source_owned_rows or serialized_global_rows != expected_release_source_owned_rows or semantic_serialized_rows != expected_release_source_owned_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_release_source_owned_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_release_source_owned_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_release_source_owned_rows or source_derived_descriptor_rows != expected_release_source_owned_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_release_source_owned_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_release_source_owned_rows or generic_codegen_rows != expected_release_source_owned_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
@@ -1888,8 +1894,8 @@ pub fn main(init: std.process.Init) !void {
                 .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
             try stdout_writer.interface.print(
-                "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} local_fail=0\n",
-                .{ tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, case_specific_codegen_rows, zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows },
+                "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={} local_fail=0\n",
+                .{ tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, case_specific_codegen_rows, zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows, source_tag_env_present_rows },
             );
         }
         if (source_wrapper_dispatch) {
