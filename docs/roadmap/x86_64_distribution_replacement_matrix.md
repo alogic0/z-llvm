@@ -250,6 +250,15 @@ zllvm_body_expansion_rows=0
 descriptor_program_body_expansion_rows=0
 functions_for_body_rows=0
 globals_for_body_rows=0
+air_extracted_descriptor_rows=90
+template_descriptor_rows=0
+wrapper_body_map_rows=0
+source_tag_body_map_rows=0
+zig_compile_context_descriptor_rows=90
+env_source_tag_selector_rows=0
+wrapper_body_selector_rows=0
+source_tag_body_selector_rows=0
+fixture_metadata_selector_rows=0
 zig_emitted_descriptor_rows=90
 runner_generated_descriptor_rows=0
 descriptor_file_consumed_rows=90
@@ -280,22 +289,23 @@ source_wrapper_discovery=discovered_source_wrappers=72
 ```
 
 This supersedes the older claim shape for the current release source-backed
-inventory: rows start from Zig wrapper/source metadata, patched Zig emits a
+inventory: rows start from patched Zig compile-context descriptor provenance
+rather than case IDs, source tags, wrapper basename maps, fixture metadata,
+body enums, or template expansion. Patched Zig emits a
 `zllvm-source-derived-descriptor-v2` file with serialized
 function/block/instruction/terminator/global-section records, and z_llvm parses
 those records directly before verifying and lowering DescriptorV2 into
 structured-direct IR. All 90 rows use serialized DescriptorV2 transport and
 semantic serialized records, and the gate fails if any row falls back to the
 serialized return stub. The current provenance split is 90 rows on the
-separate extracted-record path with no body-map selector and 0 template-owned
-rows.
-Source-backed tags remain diagnostic/disambiguation inputs; z_llvm no longer
-uses a wrapper/fixture/tag table or body-enum dispatch as the source-owned
-ownership path. The source-owned gate fails if any row delegates back to the
-external writer body path, uses the old semantic-record ownership marker, uses
-surface dispatch as the ownership selector, uses a tag-table descriptor lookup,
-uses body-enum descriptor dispatch, expands a descriptor body name inside
-z_llvm, or uses the temporary manual fixture dispatch oracle.
+separate extracted-record path with compile-context descriptor provenance, no
+body-map selector, no source-tag selector, and 0 template-owned rows. Source
+tags remain diagnostic text in artifacts but are not an accepted semantic
+selector. The source-owned gate fails if any row delegates back to the external
+writer body path, uses the old semantic-record ownership marker, uses surface
+dispatch as the ownership selector, uses a tag-table descriptor lookup, uses
+body-enum descriptor dispatch, expands a descriptor body name inside z_llvm, or
+uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
@@ -584,11 +594,16 @@ combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        source-owned rung is strongest and all release source
                        rows are DescriptorV2-owned; all 90 rows use serialized
                        AIR-shaped semantic records with no return-stub fallback
-                       or static descriptor map fallback, but current
-                       provenance is only partially extracted
+                       or static descriptor map fallback; current provenance is
+                       compile-context extracted
                        (air_extracted_descriptor_rows=90,
                        template_descriptor_rows=0, wrapper_body_map_rows=0,
-                       source_tag_body_map_rows=0);
+                       source_tag_body_map_rows=0,
+                       zig_compile_context_descriptor_rows=90,
+                       env_source_tag_selector_rows=0,
+                       wrapper_body_selector_rows=0,
+                       source_tag_body_selector_rows=0,
+                       fixture_metadata_selector_rows=0);
                        all gates require
                        structured-direct construction,
                        generic x86_64 lowering, no textual LLVM parse

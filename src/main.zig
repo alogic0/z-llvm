@@ -354,6 +354,11 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_template_descriptor = "{s}"
         \\; zllvm_wrapper_body_map = "{s}"
         \\; zllvm_source_tag_body_map = "{s}"
+        \\; zllvm_zig_compile_context_descriptor = "{s}"
+        \\; zllvm_env_source_tag_selector = "{s}"
+        \\; zllvm_wrapper_body_selector = "{s}"
+        \\; zllvm_source_tag_body_selector = "{s}"
+        \\; zllvm_fixture_metadata_selector = "{s}"
         \\
     , .{
         if (descriptor) |desc| if (sd.isFullDescriptorProgramInput(desc)) "used" else "not-used" else "-",
@@ -372,6 +377,11 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.isTemplateDescriptor(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesWrapperBodyMap(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesSourceTagBodyMap(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesCompileContextDescriptor(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesEnvSourceTagSelector(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesWrapperBodySelector(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesSourceTagBodySelector(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesFixtureMetadataSelector(desc)) "used" else "not-used" else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });
     };

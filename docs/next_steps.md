@@ -153,9 +153,13 @@ that gate. Serialized AIR-shaped transport is proven for all 90 rows because
 those rows emit semantic DescriptorV2 records and the gate rejects any
 serialized return stub. Current provenance counters show
 `air_extracted_descriptor_rows=90`, `template_descriptor_rows=0`,
-`wrapper_body_map_rows=0`, and `source_tag_body_map_rows=0`, so wrapper/source
-tag/body-template ownership is no longer accepted by that gate. Every
-source-owned row now uses the extracted-record path with no body-map selector.
+`wrapper_body_map_rows=0`, `source_tag_body_map_rows=0`,
+`zig_compile_context_descriptor_rows=90`, `env_source_tag_selector_rows=0`,
+`wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, and
+`fixture_metadata_selector_rows=0`, so source tag, wrapper basename, fixture
+metadata, body-template, and body-enum ownership are no longer accepted by that
+gate. Every source-owned row now uses the extracted-record path with
+compile-context descriptor provenance and no body-map selector.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally

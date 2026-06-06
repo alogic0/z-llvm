@@ -1342,6 +1342,11 @@ pub fn main(init: std.process.Init) !void {
     var template_descriptor_rows: usize = 0;
     var wrapper_body_map_rows: usize = 0;
     var source_tag_body_map_rows: usize = 0;
+    var zig_compile_context_descriptor_rows: usize = 0;
+    var env_source_tag_selector_rows: usize = 0;
+    var wrapper_body_selector_rows: usize = 0;
+    var source_tag_body_selector_rows: usize = 0;
+    var fixture_metadata_selector_rows: usize = 0;
     var surface_to_body_adapter_rows: usize = 0;
     var canned_return_descriptor_rows: usize = 0;
     var legacy_semantic_record_rows: usize = 0;
@@ -1566,6 +1571,16 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(wrapper_body_map);
         const source_tag_body_map = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_tag_body_map = \"", "zllvm_source_tag_body_map") else "-";
         defer if (use_ir_writer) allocator.free(source_tag_body_map);
+        const zig_compile_context_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_zig_compile_context_descriptor = \"", "zllvm_zig_compile_context_descriptor") else "-";
+        defer if (use_ir_writer) allocator.free(zig_compile_context_descriptor);
+        const env_source_tag_selector = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_env_source_tag_selector = \"", "zllvm_env_source_tag_selector") else "-";
+        defer if (use_ir_writer) allocator.free(env_source_tag_selector);
+        const wrapper_body_selector = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_wrapper_body_selector = \"", "zllvm_wrapper_body_selector") else "-";
+        defer if (use_ir_writer) allocator.free(wrapper_body_selector);
+        const source_tag_body_selector = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_tag_body_selector = \"", "zllvm_source_tag_body_selector") else "-";
+        defer if (use_ir_writer) allocator.free(source_tag_body_selector);
+        const fixture_metadata_selector = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_fixture_metadata_selector = \"", "zllvm_fixture_metadata_selector") else "-";
+        defer if (use_ir_writer) allocator.free(fixture_metadata_selector);
         const surface_to_body_adapter = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_surface_to_body_adapter = \"", "zllvm_surface_to_body_adapter") else "-";
         defer if (use_ir_writer) allocator.free(surface_to_body_adapter);
         const canned_return_descriptor = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_canned_return_descriptor = \"", "zllvm_canned_return_descriptor") else "-";
@@ -1679,6 +1694,27 @@ pub fn main(init: std.process.Init) !void {
                 }
                 if (std.mem.eql(u8, source_tag_body_map, "used")) {
                     source_tag_body_map_rows += 1;
+                }
+                if (std.mem.eql(u8, zig_compile_context_descriptor, "used")) {
+                    zig_compile_context_descriptor_rows += 1;
+                } else {
+                    try common.validationError(io, "release source-owned row {s} did not report Zig compile-context descriptor extraction: zig_compile_context_descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, zig_compile_context_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, env_source_tag_selector, "not-used")) {
+                    env_source_tag_selector_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used env source-tag descriptor selection: env_source_tag_selector={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, env_source_tag_selector, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, wrapper_body_selector, "not-used")) {
+                    wrapper_body_selector_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used wrapper body descriptor selection: wrapper_body_selector={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, wrapper_body_selector, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, source_tag_body_selector, "not-used")) {
+                    source_tag_body_selector_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used source-tag body descriptor selection: source_tag_body_selector={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, source_tag_body_selector, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                }
+                if (!std.mem.eql(u8, fixture_metadata_selector, "not-used")) {
+                    fixture_metadata_selector_rows += 1;
+                    try common.validationError(io, "release source-owned row {s} used fixture metadata descriptor selection: fixture_metadata_selector={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, fixture_metadata_selector, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
                 const row_air_extracted = std.mem.eql(u8, air_extracted_descriptor, "used");
                 const row_template = std.mem.eql(u8, template_descriptor, "used");
@@ -1840,6 +1876,9 @@ pub fn main(init: std.process.Init) !void {
             if (air_extracted_descriptor_rows != 90 or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires extracted descriptor provenance; air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
+            if (zig_compile_context_descriptor_rows != 90 or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows });
+            }
             if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or full_descriptor_program_rows != 90 or serialized_function_rows != 90 or serialized_instruction_rows != 90 or serialized_global_rows != 90 or semantic_serialized_rows != 90 or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != 90 or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != 90 or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != 90 or source_derived_descriptor_rows != 90 or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
@@ -1848,8 +1887,8 @@ pub fn main(init: std.process.Init) !void {
                 .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
             try stdout_writer.interface.print(
-                "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} local_fail=0\n",
-                .{ tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, case_specific_codegen_rows },
+                "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} local_fail=0\n",
+                .{ tag_table_descriptor_rows, body_enum_dispatch_rows, surface_to_body_adapter_rows, canned_return_descriptor_rows, manual_fixture_dispatch_rows, semantic_lowering_rows, legacy_semantic_record_rows, semantic_record_rows, external_writer_delegate_rows, manifest_structured_rows, case_id_rows, surface_dispatch_rows, case_specific_codegen_rows, zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows },
             );
         }
         if (source_wrapper_dispatch) {
