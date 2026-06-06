@@ -1311,6 +1311,9 @@ pub fn main(init: std.process.Init) !void {
         .{ target, pipelineName(pipeline), if (use_ir_writer) "ZIG_USE_ZLLVM_IR_WRITER" else "ZIG_USE_ZLLVM_OBJECT", zllvm_exe },
     );
     try stdout_writer.interface.flush();
+    if (release_source_owned) {
+        try runSourceOwnedWrongSourceTagProbe(allocator, io, temp, zig_emitter, target, pipeline, &env_map, &stdout_writer.interface);
+    }
 
     var executable_ok: usize = 0;
     var link_only_ok: usize = 0;
@@ -2190,6 +2193,100 @@ fn requireHookMarker(
     }
     if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer", "external", case);
     if (use_ir_writer) try requireMarkerField(io, contents, "ir_writer_mode", "external", case);
+}
+
+fn runSourceOwnedWrongSourceTagProbe(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    temp: common.TempDir,
+    zig_emitter: []const u8,
+    target: []const u8,
+    pipeline: Pipeline,
+    base_env: *const std.process.Environ.Map,
+    output: *std.Io.Writer,
+) !void {
+    const probe_case: Case = .{
+        .id = "release_source_owned_wrong_source_tag_probe",
+        .wrapper = "test/zig/integrated/tiny_scalar_main.zig",
+        .covered_fixture = "test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll",
+        .mode = "ReleaseFast",
+        .validation = .executable,
+        .fallback = "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:wrong-source-tag-probe",
+    };
+    const object = try common.allocTempFile(allocator, temp, probe_case.id, ".o");
+    defer allocator.free(object);
+    const ir_path = try common.allocTempFile(allocator, temp, probe_case.id, ".external.ll");
+    defer allocator.free(ir_path);
+    const marker = try common.allocTempFile(allocator, temp, probe_case.id, "_zllvm_marker.txt");
+    defer allocator.free(marker);
+    const descriptor_path = try common.allocTempFile(allocator, temp, probe_case.id, ".semantic_descriptor");
+    defer allocator.free(descriptor_path);
+
+    var probe_env = std.process.Environ.Map.init(allocator);
+    defer probe_env.deinit();
+    try copyEnvironment(&probe_env, base_env);
+    try probe_env.put("ZLLVM_MARKER_PATH", marker);
+    try probe_env.put("ZLLVM_ZIG_MODE", probe_case.mode);
+    try probe_env.put("ZLLVM_CASE_ID", source_wrapper_dispatch_case_id);
+    try probe_env.put("ZLLVM_WRAPPER", probe_case.wrapper);
+    try probe_env.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
+    try probe_env.put("ZLLVM_SOURCE_FIXTURE", probe_case.covered_fixture);
+    try probe_env.put("ZLLVM_SOURCE_TAG", "deliberately-wrong-source-tag");
+    try probe_env.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
+    try probe_env.put("ZLLVM_IR_PATH", ir_path);
+
+    try buildIntegratedObject(allocator, io, zig_emitter, target, object, probe_case, &probe_env);
+    try requireHookMarker(allocator, io, marker, probe_case, pipeline, true, ir_path, source_wrapper_dispatch_case_id);
+
+    const descriptor_source_tag = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag");
+    defer allocator.free(descriptor_source_tag);
+    const descriptor_source_tag_env_present = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "source_tag_env_present");
+    defer allocator.free(descriptor_source_tag_env_present);
+    const descriptor_context_selector = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "descriptor_context_selector");
+    defer allocator.free(descriptor_context_selector);
+    const descriptor_body_selector = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "descriptor_body_selector");
+    defer allocator.free(descriptor_body_selector);
+    const diagnostic_surface = try readDescriptorInputValue(allocator, io, descriptor_path, probe_case, "diagnostic_surface");
+    defer allocator.free(diagnostic_surface);
+
+    if (!std.mem.eql(u8, descriptor_source_tag, "-") or
+        !std.mem.eql(u8, descriptor_source_tag_env_present, "present") or
+        !std.mem.eql(u8, descriptor_context_selector, "compile-context") or
+        !std.mem.eql(u8, descriptor_body_selector, "source-analysis") or
+        !std.mem.eql(u8, diagnostic_surface, "scalar-add-ret"))
+    {
+        try common.validationError(
+            io,
+            "source-owned wrong-source-tag probe did not resolve from compile context: source_tag={s} source_tag_env_present={s} context_selector={s} body_selector={s} surface={s}\n",
+            .{ descriptor_source_tag, descriptor_source_tag_env_present, descriptor_context_selector, descriptor_body_selector, diagnostic_surface },
+        );
+    }
+
+    const source_tag_env_present = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_source_tag_env_present = \"", "zllvm_source_tag_env_present");
+    defer allocator.free(source_tag_env_present);
+    const zig_compile_context_descriptor = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_zig_compile_context_descriptor = \"", "zllvm_zig_compile_context_descriptor");
+    defer allocator.free(zig_compile_context_descriptor);
+    const env_source_tag_selector = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_env_source_tag_selector = \"", "zllvm_env_source_tag_selector");
+    defer allocator.free(env_source_tag_selector);
+    const source_tag_body_selector = try readIrWriterHeaderValue(allocator, io, ir_path, probe_case, "; zllvm_source_tag_body_selector = \"", "zllvm_source_tag_body_selector");
+    defer allocator.free(source_tag_body_selector);
+    if (!std.mem.eql(u8, source_tag_env_present, "present") or
+        !std.mem.eql(u8, zig_compile_context_descriptor, "used") or
+        !std.mem.eql(u8, env_source_tag_selector, "not-used") or
+        !std.mem.eql(u8, source_tag_body_selector, "not-used"))
+    {
+        try common.validationError(
+            io,
+            "source-owned wrong-source-tag probe used deprecated selector path: source_tag_env_present={s} compile_context={s} env_source_tag_selector={s} source_tag_body_selector={s}\n",
+            .{ source_tag_env_present, zig_compile_context_descriptor, env_source_tag_selector, source_tag_body_selector },
+        );
+    }
+
+    try output.print(
+        "ok release-source-owned wrong-source-tag-probe wrapper={s} mode={s} source_tag_env_present=present context_selector=compile-context env_source_tag_selector=not-used source_tag_body_selector=not-used surface={s}\n",
+        .{ probe_case.wrapper, probe_case.mode, diagnostic_surface },
+    );
+    try output.flush();
 }
 
 fn requireMarkerField(io: std.Io, contents: []const u8, field: []const u8, value: []const u8, case: Case) !void {
