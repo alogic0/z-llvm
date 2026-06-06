@@ -38,7 +38,7 @@ source-owned ir-writer:
   Zig build-obj
     -> patched Zig passes wrapper/mode/target/output/marker metadata
     -> the runner supplies diagnostic source fixture metadata and descriptor path
-    -> patched Zig writes zllvm-source-facts-v1 generic source facts
+    -> patched Zig writes zllvm-source-facts-v1 generic compiler facts
     -> z_llvm classifies the fact stream into DescriptorV2, not ZLLVM_CASE_ID
     -> z_llvm lowers DescriptorV2 into structured IR
     -> z_llvm emits x86_64 relocatable .o through generic lowering
@@ -166,8 +166,10 @@ The source-owned release gate keeps the patched Zig hook stable by passing the
 sentinel `ZLLVM_CASE_ID=source-wrapper-dispatch` plus
 `ZLLVM_IR_WRITER_DISPATCH=source-owned` and diagnostic
 `ZLLVM_SOURCE_FIXTURE`; the runner additionally passes
-`ZLLVM_SEMANTIC_DESCRIPTOR_PATH`, and patched Zig writes stable
-`zllvm-source-facts-v1` generic source facts before invoking z_llvm. z_llvm
+`ZLLVM_SEMANTIC_DESCRIPTOR_PATH`, and patched Zig writes frozen
+`zllvm-source-facts-v1` generic compiler facts before invoking z_llvm. The
+fact stream is derived from compile context and LLVM-builder summaries, not
+wrapper source text or row selectors. z_llvm
 classifies that fact stream into DescriptorV2 and then builds the structured
 module.
 The gate requires all 100 current x86_64 release source-owned rows to report

@@ -57,11 +57,14 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall replacement gate for the full
 current source-backed inventory. Patched Zig still receives wrapper path,
 optimize mode, target, output path, marker path, and diagnostic source fixture
 metadata; the release source-owned runner no longer passes `ZLLVM_SOURCE_TAG`.
-Patched Zig emits `zllvm-source-facts-v1` with generic compile-context facts:
-root source path, mode, target, wrapper, diagnostic fixture, concrete function
-count, main return type, parameter count, block count, instruction-category
-counts, globals, TLS, calls, atomics, inline-asm markers, and source tokens.
-z_llvm classifies those facts into DescriptorV2, then verifies and lowers the
+Patched Zig emits `zllvm-source-facts-v1` with frozen generic compiler facts:
+root source path, mode, target, wrapper, diagnostic fixture, function inventory,
+exported/main function signature, parameter and return types,
+block/instruction counts, instruction-category summaries, globals, TLS, calls,
+atomics, and inline-asm capability facts. The stream has
+`facts_contract_version=1` and `facts_payload=generic-compiler-facts`; the hook
+does not read or token-count wrapper source. z_llvm classifies those facts into
+DescriptorV2, then verifies and lowers the
 records directly rather than resolving a Zig-side wrapper/fixture/tag table or
 expanding a body name. Every accepted row reports
 descriptor-v2 semantic lowering into
@@ -84,11 +87,15 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
-`local_fail=0`. The gate reports `fact_derived_classification_rows` and
-`root_source_classification_fallback_rows`; all accepted rows must have concrete
-facts, and those two classification counters must account for every row. The
+`local_fail=0`. The current measured split is
+`fact_derived_classification_rows=5` and
+`root_source_classification_fallback_rows=95`; all accepted rows must have
+concrete facts, and those two classification counters must account for every row. The
 remaining root-source fallback is temporary z_llvm-side classification support,
 guarded by a wrong-facts negative probe.
+
+The Zig hook is frozen for this milestone: patch Zig only for fact-contract
+version changes, not for row expansion or surface classification.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
@@ -169,7 +176,7 @@ source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
 compile-context fact provenance and no body-map selector. The next ownership
-step is to drive `root_source_classification_fallback_rows` down by deriving
+step is to drive `root_source_classification_fallback_rows` down from 95 by deriving
 more DescriptorV2 bodies from concrete facts inside z_llvm.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48

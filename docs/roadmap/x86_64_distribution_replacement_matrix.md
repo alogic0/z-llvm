@@ -266,8 +266,8 @@ descriptor_file_consumed_rows=100
 source_fact_stream_rows=100
 concrete_source_fact_rows=100
 source_derived_descriptor_rows=100
-fact_derived_classification_rows>0
-fact_derived_classification_rows+root_source_classification_fallback_rows=100
+fact_derived_classification_rows=5
+root_source_classification_fallback_rows=95
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -296,16 +296,23 @@ source_wrapper_discovery=discovered_source_wrappers=82
 This supersedes the older claim shape for the current release source-backed
 inventory: rows start from patched Zig compile-context fact provenance rather
 than case IDs, source tags, wrapper basename maps, fixture metadata, body
-enums, or template expansion. Patched Zig emits `zllvm-source-facts-v1` with
-generic source facts, and z_llvm classifies those facts into DescriptorV2
+enums, or template expansion. Patched Zig emits frozen
+`zllvm-source-facts-v1` `generic-compiler-facts` from compiler context and
+LLVM-builder module summaries: root source, mode, target, function inventory,
+exported/main signature, parameter and return types, block/instruction counts,
+instruction-category summaries, globals, TLS, calls, atomics, and inline-asm
+capability facts. It does not read or token-count wrapper source and does not
+emit z_llvm surface names. z_llvm classifies those facts into DescriptorV2
 before verifying and lowering the records into structured-direct IR. All 100
 rows use serialized DescriptorV2 transport and semantic serialized records, and
 the gate fails if any row falls back to the serialized return stub. The current
 provenance split is 100 rows on the separate extracted-record path with
 compile-context fact provenance, no body-map selector, no source-tag selector,
 and 0 template-owned rows. The gate also reports fact-derived classification
-versus temporary root-source classification fallback; all rows must have
-concrete facts, the two classification counters must account for all rows, and
+versus temporary root-source classification fallback; the current measured split
+is `fact_derived_classification_rows=5` and
+`root_source_classification_fallback_rows=95`. All rows must have concrete
+facts, the two classification counters must account for all rows, and
 the wrong-facts probe rejects mismatched root/fact streams.
 `ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
 source-owned gate fails if any row delegates back to the external
@@ -586,9 +593,8 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           source_fact_stream_rows=100
                           concrete_source_fact_rows=100
                           source_derived_descriptor_rows=100
-                          fact_derived_classification_rows>0
-                          fact_derived_classification_rows+
-                          root_source_classification_fallback_rows=100
+                          fact_derived_classification_rows=5
+                          root_source_classification_fallback_rows=95
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0

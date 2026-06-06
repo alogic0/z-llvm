@@ -145,12 +145,17 @@ when a change affects several distribution gates at once.
 
 Do not rebuild stage4 for every row. Patch `../ziglang` only when the hook
 contract changes. The stable accepted hook emits generic `zllvm-source-facts-v1`
-compile-context facts: root source path, mode, target, function count, main
-return type, parameter count, block count, instruction-category counts,
-globals, TLS, calls, atomics, inline-asm markers, and source tokens. z_llvm
+`generic-compiler-facts`: root source path, mode, target, function inventory,
+exported/main signature, parameter and return types, block/instruction counts,
+instruction-category summaries, globals, TLS, calls, atomics, and inline-asm
+capability facts. The hook does not read or token-count wrapper source. z_llvm
 owns fact-stream classification into DescriptorV2 rows, and the focused runner
 includes wrong-tag and wrong-facts probes. New source-owned rows should usually
 require z_llvm runner/descriptor/lowering changes only.
+
+For this milestone the Zig hook is frozen. Patch Zig only for deliberate
+`zllvm-source-facts-v1` contract-version changes, not for row expansion or
+surface classification.
 
 ## Distribution Replacement Matrix
 

@@ -2359,9 +2359,10 @@ fn runSourceOwnedWrongSourceFactsProbe(
 
     const bad_descriptor =
         \\zllvm-source-facts-v1
+        \\facts_contract_version=1
         \\facts_source=zig-compile-context
         \\facts_emitter=patched-zig-hook
-        \\facts_payload=generic-source-facts
+        \\facts_payload=generic-compiler-facts
         \\root_source=runtime_float_add_main.zig
         \\wrapper=test/zig/integrated/runtime_float_add_main.zig
         \\mode=ReleaseFast
@@ -2374,14 +2375,19 @@ fn runSourceOwnedWrongSourceFactsProbe(
         \\fact=module|target|x86_64-linux-gnu
         \\fact=function_count|2
         \\fact=block_count|2
-        \\fact=main_return_type|c_int
+        \\fact=instruction_count|8
+        \\fact=global_count|0
+        \\fact=tls_global_count|0
+        \\fact=main_function_name|main
+        \\fact=main_return_type|i32
         \\fact=main_param_count|0
-        \\fact=function|main|return|c_int|params|0
-        \\fact=source_token|helper_functions|1
+        \\fact=function_inventory_count|2
+        \\fact=function_inventory|main|return|i32|params|0|blocks|1|instructions|4
         \\fact=inst_category|return|2
         \\fact=inst_category|branch|0
-        \\fact=inst_category|loop|0
         \\fact=inst_category|call|1
+        \\fact=inst_category|load|0
+        \\fact=inst_category|store|0
         \\fact=inst_category|global|0
         \\fact=inst_category|tls|0
         \\fact=inst_category|atomic|0
@@ -2389,7 +2395,13 @@ fn runSourceOwnedWrongSourceFactsProbe(
         \\fact=inst_category|fp|0
         \\fact=inst_category|int|4
         \\fact=inst_category|base64|0
-        \\fact=source_token|add|2
+        \\fact=inst_detail|fadd|0
+        \\fact=inst_detail|fsub|0
+        \\fact=inst_detail|fmul|0
+        \\fact=inst_detail|fdiv|0
+        \\fact=inst_detail|frem|0
+        \\fact=inst_detail|fcmp|0
+        \\fact=inst_detail|select|0
         \\
     ;
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = descriptor_path, .data = bad_descriptor });

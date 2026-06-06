@@ -438,12 +438,18 @@ const SourceFactInput = struct {
     source_tag_env_present: bool,
     function_count: usize,
     block_count: usize,
+    instruction_count: usize,
+    module_global_count: usize,
+    tls_global_count: usize,
+    main_function_name: []const u8,
     main_return_type: []const u8,
     main_param_count: usize,
     return_count: usize,
     branch_count: usize,
     loop_count: usize,
     call_count: usize,
+    load_count: usize,
+    store_count: usize,
     global_count: usize,
     tls_count: usize,
     atomic_count: usize,
@@ -451,20 +457,13 @@ const SourceFactInput = struct {
     fp_count: usize,
     int_count: usize,
     base64_count: usize,
-    token_add: usize,
-    token_float_add: usize,
-    token_float_sub: usize,
-    token_float_mul: usize,
-    token_float_rem: usize,
-    token_double_div: usize,
-    token_float_less: usize,
-    token_read_tls: usize,
-    token_bump_tls: usize,
-    token_atomic_add: usize,
-    token_base64_table_lookup: usize,
-    token_error_switch: usize,
-    token_classify: usize,
-    token_comptime_const: usize,
+    fadd_count: usize,
+    fsub_count: usize,
+    fmul_count: usize,
+    fdiv_count: usize,
+    frem_count: usize,
+    fcmp_count: usize,
+    select_count: usize,
 };
 
 fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
@@ -507,6 +506,9 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
 
 fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
     if (!std.mem.startsWith(u8, contents, "zllvm-source-facts-v1\n")) return null;
+    if (!descriptorLineValueEql(contents, "facts_contract_version", "1")) return null;
+    if (!descriptorLineValueEql(contents, "facts_payload", "generic-compiler-facts")) return null;
+    if (std.mem.indexOf(u8, contents, "\nfact=source_token|") != null) return null;
     const root_source = descriptorLineValue(contents, "root_source") orelse return null;
     const wrapper = descriptorLineValue(contents, "wrapper") orelse return null;
     const mode = descriptorLineValue(contents, "mode") orelse return null;
@@ -528,12 +530,18 @@ fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
         .source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present"),
         .function_count = factValueUsize(contents, "function_count") orelse return null,
         .block_count = factValueUsize(contents, "block_count") orelse return null,
-        .main_return_type = factValue3(contents, "function", "main", "return") orelse return null,
-        .main_param_count = factMainParamCount(contents) orelse factValueUsize(contents, "main_param_count") orelse return null,
+        .instruction_count = factValueUsize(contents, "instruction_count") orelse return null,
+        .module_global_count = factValueUsize(contents, "global_count") orelse return null,
+        .tls_global_count = factValueUsize(contents, "tls_global_count") orelse return null,
+        .main_function_name = factValue1(contents, "main_function_name") orelse return null,
+        .main_return_type = factValue1(contents, "main_return_type") orelse return null,
+        .main_param_count = factValueUsize(contents, "main_param_count") orelse return null,
         .return_count = factCategoryCount(contents, "return"),
         .branch_count = factCategoryCount(contents, "branch"),
         .loop_count = factCategoryCount(contents, "loop"),
         .call_count = factCategoryCount(contents, "call"),
+        .load_count = factCategoryCount(contents, "load"),
+        .store_count = factCategoryCount(contents, "store"),
         .global_count = factCategoryCount(contents, "global"),
         .tls_count = factCategoryCount(contents, "tls"),
         .atomic_count = factCategoryCount(contents, "atomic"),
@@ -541,20 +549,13 @@ fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
         .fp_count = factCategoryCount(contents, "fp"),
         .int_count = factCategoryCount(contents, "int"),
         .base64_count = factCategoryCount(contents, "base64"),
-        .token_add = factSourceTokenCount(contents, "add"),
-        .token_float_add = factSourceTokenCount(contents, "floatAdd"),
-        .token_float_sub = factSourceTokenCount(contents, "floatSub"),
-        .token_float_mul = factSourceTokenCount(contents, "floatMul"),
-        .token_float_rem = factSourceTokenCount(contents, "floatRem"),
-        .token_double_div = factSourceTokenCount(contents, "doubleDiv"),
-        .token_float_less = factSourceTokenCount(contents, "floatLess"),
-        .token_read_tls = factSourceTokenCount(contents, "readTls"),
-        .token_bump_tls = factSourceTokenCount(contents, "bumpTls"),
-        .token_atomic_add = factSourceTokenCount(contents, "atomicAdd"),
-        .token_base64_table_lookup = factSourceTokenCount(contents, "base64TableLookup"),
-        .token_error_switch = factSourceTokenCount(contents, "errorSwitch"),
-        .token_classify = factSourceTokenCount(contents, "classify"),
-        .token_comptime_const = factSourceTokenCount(contents, "comptimeConst"),
+        .fadd_count = factDetailCount(contents, "fadd"),
+        .fsub_count = factDetailCount(contents, "fsub"),
+        .fmul_count = factDetailCount(contents, "fmul"),
+        .fdiv_count = factDetailCount(contents, "fdiv"),
+        .frem_count = factDetailCount(contents, "frem"),
+        .fcmp_count = factDetailCount(contents, "fcmp"),
+        .select_count = factDetailCount(contents, "select"),
     };
 }
 
@@ -566,36 +567,26 @@ const SourceFactClassification = struct {
 fn hasConcreteFacts(input: SourceFactInput) bool {
     return input.function_count > 0 and
         input.block_count > 0 and
+        input.instruction_count > 0 and
         input.main_param_count == 0 and
-        (std.mem.eql(u8, input.main_return_type, "c_int") or
-            std.mem.eql(u8, input.main_return_type, "c_long") or
-            std.mem.eql(u8, input.main_return_type, "i32")) and
+        input.main_function_name.len > 0 and
+        !std.mem.eql(u8, input.main_function_name, "-") and
+        (std.mem.eql(u8, input.main_return_type, "i32") or
+            std.mem.eql(u8, input.main_return_type, "i64")) and
         input.return_count > 0;
 }
 
 fn bodyForConcreteSourceFacts(input: SourceFactInput) ?SourceFactClassification {
-    const name: ?[]const u8 = if (input.token_float_add != 0)
+    const name: ?[]const u8 = if (input.fadd_count != 0)
         "float-add"
-    else if (input.token_float_sub != 0)
+    else if (input.fsub_count != 0)
         "float-sub"
-    else if (input.token_float_mul != 0)
+    else if (input.fmul_count != 0)
         "float-mul"
-    else if (input.token_float_rem != 0)
+    else if (input.frem_count != 0)
         "float-rem"
-    else if (input.token_double_div != 0)
+    else if (input.fdiv_count != 0)
         "double-div"
-    else if (input.token_float_less != 0)
-        "float-less"
-    else if (input.token_bump_tls != 0)
-        if (std.mem.eql(u8, input.mode, "ReleaseSafe")) "checked-tls-bump-boundary" else "tls-bump"
-    else if (input.token_read_tls != 0)
-        "tls-read"
-    else if (input.token_atomic_add != 0)
-        "atomic-add"
-    else if (input.token_base64_table_lookup != 0)
-        "table-indexed-load"
-    else if (input.token_error_switch != 0 and input.token_classify != 0)
-        "error-switch-select"
     else
         null;
     const body = sdv2.bodyForName(name orelse return null) orelse return null;
@@ -604,11 +595,12 @@ fn bodyForConcreteSourceFacts(input: SourceFactInput) ?SourceFactClassification 
 
 fn sourceFactsMatchRootFallback(input: SourceFactInput, body: sdv2.Body) bool {
     const name = sdv2.bodyName(body);
-    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div") or std.mem.eql(u8, name, "fp-literal-return")) return input.fp_count != 0;
+    if (std.mem.eql(u8, name, "fp-literal-return")) return input.return_count != 0;
+    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div")) return input.fp_count != 0;
     if (std.mem.startsWith(u8, name, "base64") or std.mem.eql(u8, name, "table-indexed-load")) return input.base64_count != 0 or std.mem.indexOf(u8, input.root_source, "base64") != null;
-    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return input.tls_count != 0 or input.token_read_tls != 0 or input.token_bump_tls != 0;
-    if (std.mem.eql(u8, name, "atomic-add")) return input.atomic_count != 0 or input.token_atomic_add != 0;
-    if (std.mem.eql(u8, name, "error-switch-select")) return input.branch_count != 0 or input.token_error_switch != 0;
+    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return input.tls_count != 0 or input.global_count != 0;
+    if (std.mem.eql(u8, name, "atomic-add")) return input.atomic_count != 0 or input.global_count != 0;
+    if (std.mem.eql(u8, name, "error-switch-select")) return input.branch_count != 0 or input.select_count != 0 or input.int_count != 0 or input.global_count != 0;
     if (std.mem.eql(u8, name, "global-load") or std.mem.eql(u8, name, "global-update") or std.mem.eql(u8, name, "checked-global-update-boundary")) return input.global_count != 0;
     return true;
 }
@@ -1256,8 +1248,8 @@ fn factCategoryCount(contents: []const u8, category: []const u8) usize {
     return std.fmt.parseInt(usize, text, 10) catch 0;
 }
 
-fn factSourceTokenCount(contents: []const u8, token: []const u8) usize {
-    const text = factValue2(contents, "source_token", token) orelse return 0;
+fn factDetailCount(contents: []const u8, detail: []const u8) usize {
+    const text = factValue2(contents, "inst_detail", detail) orelse return 0;
     return std.fmt.parseInt(usize, text, 10) catch 0;
 }
 
