@@ -2,6 +2,7 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const expected_selected_ir_writer_rows = 146;
+const expected_release_source_owned_rows = 100;
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
 const Validation = enum {
@@ -1466,7 +1467,7 @@ pub fn main(init: std.process.Init) !void {
     };
     for (cases) |case| {
         if (broad_source_backed and !isReleaseDistributionFixture(case.covered_fixture)) continue;
-        if (release_source_owned and !isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (release_source_owned and !isReleaseSourceOwnedCase(case)) continue;
         if (source_wrapper_dispatch and !isSourceWrapperDispatchCase(case)) continue;
         if (mode_filter) |filter| {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
@@ -1867,19 +1868,19 @@ pub fn main(init: std.process.Init) !void {
             if (release_source_rows != total or source_wrapper_rows != total) {
                 try common.validationError(io, "release source-owned row accounting mismatch: release_source_rows={} source_wrapper_rows={} total={}\n", .{ release_source_rows, source_wrapper_rows, total });
             }
-            if (release_source_rows != 90 or skipped_with_reason != 0) {
+            if (release_source_rows != expected_release_source_owned_rows or skipped_with_reason != 0) {
                 try common.validationError(io, "release source-owned gate requires exact current fixture inventory closure; release_source_rows={} skipped_with_reason={}\n", .{ release_source_rows, skipped_with_reason });
             }
-            if (air_extracted_descriptor_rows + template_descriptor_rows != 90 or wrapper_body_map_rows + source_tag_body_map_rows != template_descriptor_rows) {
+            if (air_extracted_descriptor_rows + template_descriptor_rows != expected_release_source_owned_rows or wrapper_body_map_rows + source_tag_body_map_rows != template_descriptor_rows) {
                 try common.validationError(io, "release source-owned descriptor provenance accounting mismatch: air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
-            if (air_extracted_descriptor_rows != 90 or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
+            if (air_extracted_descriptor_rows != expected_release_source_owned_rows or template_descriptor_rows != 0 or wrapper_body_map_rows != 0 or source_tag_body_map_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires extracted descriptor provenance; air_extracted_descriptor_rows={} template_descriptor_rows={} wrapper_body_map_rows={} source_tag_body_map_rows={}\n", .{ air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows });
             }
-            if (zig_compile_context_descriptor_rows != 90 or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0) {
+            if (zig_compile_context_descriptor_rows != expected_release_source_owned_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows });
             }
-            if (descriptor_owned_rows != 90 or descriptor_v2_rows != 90 or real_descriptor_program_rows != 90 or full_descriptor_program_rows != 90 or serialized_function_rows != 90 or serialized_instruction_rows != 90 or serialized_global_rows != 90 or semantic_serialized_rows != 90 or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != 90 or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != 90 or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != 90 or source_derived_descriptor_rows != 90 or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != 90 or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != 90 or generic_codegen_rows != 90 or case_specific_codegen_rows != 0) {
+            if (descriptor_owned_rows != expected_release_source_owned_rows or descriptor_v2_rows != expected_release_source_owned_rows or real_descriptor_program_rows != expected_release_source_owned_rows or full_descriptor_program_rows != expected_release_source_owned_rows or serialized_function_rows != expected_release_source_owned_rows or serialized_instruction_rows != expected_release_source_owned_rows or serialized_global_rows != expected_release_source_owned_rows or semantic_serialized_rows != expected_release_source_owned_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_release_source_owned_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_release_source_owned_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_release_source_owned_rows or source_derived_descriptor_rows != expected_release_source_owned_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_release_source_owned_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_release_source_owned_rows or generic_codegen_rows != expected_release_source_owned_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
             try stdout_writer.interface.print(
@@ -2001,7 +2002,7 @@ fn reportSourceWrapperDiscoveryBucket(
 
 fn sourceWrapperHasReleaseFixtureMetadata(wrapper: []const u8) bool {
     for (cases) |case| {
-        if (!isReleaseDistributionFixture(case.covered_fixture)) continue;
+        if (!isReleaseSourceOwnedCase(case)) continue;
         if (std.mem.eql(u8, case.wrapper, wrapper)) return true;
     }
     return false;
@@ -2054,6 +2055,20 @@ fn isReleaseDistributionFixture(path: []const u8) bool {
     return std.mem.indexOf(u8, path, "releasefast_x86_64/") != null or
         std.mem.indexOf(u8, path, "releasesafe_x86_64/") != null or
         std.mem.indexOf(u8, path, "releasesmall_x86_64/") != null;
+}
+
+fn isReleaseSourceOwnedCase(case: Case) bool {
+    if (isReleaseDistributionFixture(case.covered_fixture)) return true;
+    return std.mem.eql(u8, case.id, "releasefast_globals_comptime") or
+        std.mem.eql(u8, case.id, "releasesmall_globals_comptime") or
+        std.mem.eql(u8, case.id, "releasesmall_i64_arithmetic") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_double_div") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_float_mul") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_float_rem") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_float_select") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_phi_merge") or
+        std.mem.eql(u8, case.id, "releasesafe_runtime_side_effect_free") or
+        std.mem.eql(u8, case.id, "releasefast_runtime_volatile_roundtrip");
 }
 
 fn stringLessThan(_: void, lhs: []const u8, rhs: []const u8) bool {

@@ -63,24 +63,24 @@ terminator/global-section records from those source facts, and z_llvm parses
 those records directly rather than resolving a wrapper/fixture/tag table or
 expanding a body name. Every accepted row reports
 descriptor-v2 semantic lowering into
-structured-direct IR. Current measured output is `release_source_rows=90`,
-`source_wrapper_rows=90`, `descriptor_owned_rows=90`,
-`descriptor_v2_rows=90`, `real_descriptor_program_rows=90`,
-`full_descriptor_program_rows=90`, `serialized_function_rows=90`,
-`serialized_instruction_rows=90`, `serialized_global_rows=90`,
-`semantic_serialized_rows=90`, `serialized_return_stub_rows=0`,
+structured-direct IR. Current measured output is `release_source_rows=100`,
+`source_wrapper_rows=100`, `descriptor_owned_rows=100`,
+`descriptor_v2_rows=100`, `real_descriptor_program_rows=100`,
+`full_descriptor_program_rows=100`, `serialized_function_rows=100`,
+`serialized_instruction_rows=100`, `serialized_global_rows=100`,
+`semantic_serialized_rows=100`, `serialized_return_stub_rows=0`,
 `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`,
 `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`,
 `globals_for_body_rows=0`,
-`air_derived_descriptor_rows=90`, `static_descriptor_map_rows=0`,
-`zig_emitted_descriptor_rows=90`, `runner_generated_descriptor_rows=0`,
-`descriptor_file_consumed_rows=90`, `source_derived_descriptor_rows=90`,
+`air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`,
+`zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`,
+`descriptor_file_consumed_rows=100`, `source_derived_descriptor_rows=100`,
 `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`,
 `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`,
-`external_writer_delegate_rows=0`, `semantic_lowering_rows=90`,
+`external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
-`structured_direct_rows=90`, `generic_codegen_rows=90`, `fallback_rows=0`, and
+`structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
 `local_fail=0`.
 
 Regression distribution claim gates:
@@ -120,41 +120,40 @@ Source-wrapper discovery bucket:
 The source-owned gate now scans `test/zig/integrated/*.zig` directly as a
 separate discovery bucket, not as additional case-id selected rows. Current
 measured output is `discovered_source_wrappers=72`,
-`descriptor_supported_wrappers=62`, `out_of_scope_wrappers=10`, and
-`unsupported_with_reason=0`; the out-of-scope wrappers are outside the current
-x86_64 release source-owned inventory and should become the next expansion
-source only when paired with source metadata and descriptor records.
+`descriptor_supported_wrappers=72`, `out_of_scope_wrappers=0`, and
+`unsupported_with_reason=0`; the formerly out-of-scope release wrappers are now
+part of the source-owned inventory.
 
 Ownership ladder:
 The current replacement evidence is split into four explicit rungs:
 selected case-id registry proof, broad source-backed structured proof,
 source-wrapper compatibility proof, and source-owned DescriptorV2 proof. The
-source-owned rung is now strongest: all 90 current source-backed release rows
+source-owned rung is now strongest: all 100 current source-owned release rows
 start from a DescriptorV2 file emitted by patched Zig with serialized
 function/block/instruction/terminator/global-section records that are parsed
 directly by z_llvm. They report `lowering=semantic-descriptor-v2`, with
-`descriptor_owned_rows=90`, `descriptor_v2_rows=90`,
-`real_descriptor_program_rows=90`, `full_descriptor_program_rows=90`,
-`serialized_function_rows=90`, `serialized_instruction_rows=90`,
-`serialized_global_rows=90`, `descriptor_body_name_rows=0`,
+`descriptor_owned_rows=100`, `descriptor_v2_rows=100`,
+`real_descriptor_program_rows=100`, `full_descriptor_program_rows=100`,
+`serialized_function_rows=100`, `serialized_instruction_rows=100`,
+`serialized_global_rows=100`, `descriptor_body_name_rows=0`,
 `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`,
 `functions_for_body_rows=0`, `globals_for_body_rows=0`,
-`semantic_serialized_rows=90`, `serialized_return_stub_rows=0`,
-`air_derived_descriptor_rows=90`, `static_descriptor_map_rows=0`,
-`zig_emitted_descriptor_rows=90`,
-`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=90`,
-`source_derived_descriptor_rows=90`, `tag_table_descriptor_rows=0`,
+`semantic_serialized_rows=100`, `serialized_return_stub_rows=0`,
+`air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`,
+`zig_emitted_descriptor_rows=100`,
+`runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`,
+`source_derived_descriptor_rows=100`, `tag_table_descriptor_rows=0`,
 `body_enum_dispatch_rows=0`,
 `surface_to_body_adapter_rows=0`,
 `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`,
 `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `surface_dispatch_rows=0`,
 `external_writer_delegate_rows=0`, and no manifest-shaped structured rows in
-that gate. Serialized AIR-shaped transport is proven for all 90 rows because
+that gate. Serialized AIR-shaped transport is proven for all 100 rows because
 those rows emit semantic DescriptorV2 records and the gate rejects any
 serialized return stub. Current provenance counters show
-`air_extracted_descriptor_rows=90`, `template_descriptor_rows=0`,
+`air_extracted_descriptor_rows=100`, `template_descriptor_rows=0`,
 `wrapper_body_map_rows=0`, `source_tag_body_map_rows=0`,
-`zig_compile_context_descriptor_rows=90`, `env_source_tag_selector_rows=0`,
+`zig_compile_context_descriptor_rows=100`, `env_source_tag_selector_rows=0`,
 `wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, and
 `fixture_metadata_selector_rows=0`, so source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that

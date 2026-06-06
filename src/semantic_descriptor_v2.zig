@@ -218,6 +218,8 @@ pub const Body = enum {
     scalar_add_ret,
     integer_arithmetic,
     error_switch_select,
+    global_load,
+    runtime_phi_merge,
     runtime_loop_sum,
     abi_arg_call,
     runtime_condbr,
@@ -241,8 +243,15 @@ pub const Body = enum {
     inline_asm_barrier,
     aggregate_pair_abi,
     float_less,
+    float_mul,
     float_add,
+    float_select,
     float_sub,
+    double_div,
+    float_rem,
+    void_noop_call,
+    volatile_roundtrip,
+    i64_arithmetic,
     checked_add_imm_boundary,
     checked_global_update_boundary,
     checked_pointer_load_store_boundary,
@@ -888,9 +897,14 @@ fn functionsForBody(body: Body) []const Function {
         .optional_pointer => &optional_pointer_functions,
         .optional_scalar_payload => &optional_payload_functions,
         .error_union_payload => &error_union_payload_functions,
+        .runtime_phi_merge => &runtime_phi_merge_functions,
         .float_less => &float_less_functions,
+        .float_mul => &float_mul_functions,
         .float_add => &float_add_functions,
+        .float_select => &float_select_functions,
         .float_sub => &float_sub_functions,
+        .double_div => &double_div_functions,
+        .float_rem => &float_rem_functions,
         .tls_read => &tls_read_functions,
         .tls_bump, .checked_tls_bump_boundary => &tls_bump_functions,
         .global_update => &global_update_functions,
@@ -932,12 +946,17 @@ fn functionsForBody(body: Body) []const Function {
         => &base64_step_functions,
         .str_from_float_help => &str_from_float_functions,
         .scalar_add_ret => &computed_i32_42_functions,
+        .global_load => &computed_i32_5_functions,
         .abi_arg_call => &computed_i32_3_functions,
         .runtime_switch => &computed_i32_13_functions,
         .inline_asm_barrier, .aggregate_pair_abi => &computed_i32_1_functions,
         .hidden_global_access, .mixed_c_zig_add => &computed_i32_7_functions,
         .mixed_c_zig_panic_add => &computed_i32_5_functions,
         .inherit_i64_return => &computed_i32_4_functions,
+        .void_noop_call,
+        .volatile_roundtrip,
+        .i64_arithmetic,
+        => &computed_i32_0_functions,
         else => &computed_i32_0_functions,
     };
 }
@@ -1024,6 +1043,28 @@ const error_union_payload_functions = [_]Function{
     .{ .name = "aggregates.error_union_payload", .return_type = .{ .int = 32 }, .params = &error_union_payload_helper_params, .blocks = &error_union_payload_helper_blocks },
 };
 
+const runtime_phi_entry_insts = [_]Instruction{
+    cmpI32("take_then", "eq", "1", "1"),
+};
+const runtime_phi_then_insts = [_]Instruction{
+    addI32("then_value", "1", "1"),
+};
+const runtime_phi_else_insts = [_]Instruction{
+    addI32("else_value", "3", "1"),
+};
+const runtime_phi_join_insts = [_]Instruction{
+    phiI32("merged", "%then_value", "then", "%else_value", "else"),
+    cmpI32("ok", "eq", "%merged", "2"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const runtime_phi_merge_blocks = [_]Block{
+    .{ .name = "entry", .instructions = &runtime_phi_entry_insts, .terminator = .{ .condbr = .{ .cond = boolRef("%take_then"), .then_block = "then", .else_block = "else" } } },
+    .{ .name = "then", .instructions = &runtime_phi_then_insts, .terminator = .{ .br = "join" } },
+    .{ .name = "else", .instructions = &runtime_phi_else_insts, .terminator = .{ .br = "join" } },
+    .{ .name = "join", .instructions = &runtime_phi_join_insts, .terminator = .{ .ret = i32Ref("%retv") } },
+};
+const runtime_phi_merge_functions = [_]Function{mainFunction(&runtime_phi_merge_blocks)};
+
 const slice_sum_main_insts = [_]Instruction{
     .{ .call = .{ .result = "value", .callee = "@aggregates.slice_sum", .calling_convention = .c, .ret_ty = .{ .int = 32 }, .args = &[_]ValueRef{ ptrRef("@slice_sum_values"), i64Ref("4") } } },
     cmpI32("ok", "eq", "%value", "10"),
@@ -1069,6 +1110,14 @@ const float_less_insts = [_]Instruction{
 const float_less_blocks = [_]Block{computedRetBlock(&float_less_insts)};
 const float_less_functions = [_]Function{mainFunction(&float_less_blocks)};
 
+const float_mul_insts = [_]Instruction{
+    fbinop("product", .fmul, .f64, "2.000000e+00", "3.000000e+00"),
+    fcmp("ok", .oeq, .f64, "%product", "6.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_mul_blocks = [_]Block{computedRetBlock(&float_mul_insts)};
+const float_mul_functions = [_]Function{mainFunction(&float_mul_blocks)};
+
 const float_add_insts = [_]Instruction{
     fbinop("sum", .fadd, .f32, "1.000000e+00", "2.000000e+00"),
     fcmp("ok", .oeq, .f32, "%sum", "3.000000e+00"),
@@ -1076,6 +1125,21 @@ const float_add_insts = [_]Instruction{
 };
 const float_add_blocks = [_]Block{computedRetBlock(&float_add_insts)};
 const float_add_functions = [_]Function{mainFunction(&float_add_blocks)};
+
+const float_select_insts = [_]Instruction{
+    fcmp("choose_left", .olt, .f64, "1.000000e+00", "2.000000e+00"),
+    .{ .select = .{
+        .result = "selected",
+        .cond = boolRef("%choose_left"),
+        .ty = .{ .float = .f64 },
+        .then_value = floatRef(.f64, "3.000000e+00"),
+        .else_value = floatRef(.f64, "4.000000e+00"),
+    } },
+    fcmp("ok", .oeq, .f64, "%selected", "3.000000e+00"),
+    selectI32("retv", "%ok", "0", "1"),
+};
+const float_select_blocks = [_]Block{computedRetBlock(&float_select_insts)};
+const float_select_functions = [_]Function{mainFunction(&float_select_blocks)};
 
 const float_sub_insts = [_]Instruction{
     fbinop("diff", .fsub, .f32, "5.000000e+00", "2.000000e+00"),
@@ -1760,6 +1824,8 @@ const surface_body_map = [_]SurfaceBody{
     .{ .surface = "scalar-add-ret", .name = "scalar-add-ret", .body = .scalar_add_ret },
     .{ .surface = "integer-arithmetic", .name = "integer-arithmetic", .body = .integer_arithmetic },
     .{ .surface = "error-switch-select", .name = "error-switch-select", .body = .error_switch_select },
+    .{ .surface = "global-load", .name = "global-load", .body = .global_load },
+    .{ .surface = "runtime-phi-merge", .name = "runtime-phi-merge", .body = .runtime_phi_merge },
     .{ .surface = "runtime-loop-sum", .name = "runtime-loop-sum", .body = .runtime_loop_sum },
     .{ .surface = "abi-arg-call", .name = "abi-arg-call", .body = .abi_arg_call },
     .{ .surface = "runtime-condbr", .name = "runtime-condbr", .body = .runtime_condbr },
@@ -1783,8 +1849,15 @@ const surface_body_map = [_]SurfaceBody{
     .{ .surface = "inline-asm-barrier", .name = "inline-asm-barrier", .body = .inline_asm_barrier },
     .{ .surface = "aggregate-pair-abi", .name = "aggregate-pair-abi", .body = .aggregate_pair_abi },
     .{ .surface = "float-less", .name = "float-less", .body = .float_less },
+    .{ .surface = "float-mul", .name = "float-mul", .body = .float_mul },
     .{ .surface = "float-add", .name = "float-add", .body = .float_add },
+    .{ .surface = "float-select", .name = "float-select", .body = .float_select },
     .{ .surface = "float-sub", .name = "float-sub", .body = .float_sub },
+    .{ .surface = "double-div", .name = "double-div", .body = .double_div },
+    .{ .surface = "float-rem", .name = "float-rem", .body = .float_rem },
+    .{ .surface = "void-noop-call", .name = "void-noop-call", .body = .void_noop_call },
+    .{ .surface = "volatile-roundtrip", .name = "volatile-roundtrip", .body = .volatile_roundtrip },
+    .{ .surface = "i64-arithmetic", .name = "i64-arithmetic", .body = .i64_arithmetic },
     .{ .surface = "checked-add-imm-boundary", .name = "checked-add-imm-boundary", .body = .checked_add_imm_boundary },
     .{ .surface = "checked-global-update-boundary", .name = "checked-global-update-boundary", .body = .checked_global_update_boundary },
     .{ .surface = "checked-pointer-load-store-boundary", .name = "checked-pointer-load-store-boundary", .body = .checked_pointer_load_store_boundary },

@@ -2,22 +2,24 @@
 
 Current gate: `zig build distribution-x86_64-release-source-owned`
 
-Measured state after closing selector-assisted descriptor provenance:
+Measured state after promoting the release wrapper discovery bucket:
 
 ```text
-release_source_rows=90
-air_extracted_descriptor_rows=90
+release_source_rows=100
+air_extracted_descriptor_rows=100
 template_descriptor_rows=0
 wrapper_body_map_rows=0
 source_tag_body_map_rows=0
-zig_compile_context_descriptor_rows=90
+zig_compile_context_descriptor_rows=100
 env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0
 fixture_metadata_selector_rows=0
+descriptor_supported_wrappers=72
+out_of_scope_wrappers=0
 ```
 
-All rows still serialize DescriptorV2 records. All 90 rows now use the
+All rows still serialize DescriptorV2 records. All 100 rows now use the
 separate extracted-record writer path with compile-context descriptor
 provenance. The gate rejects `template_descriptor_rows`,
 `wrapper_body_map_rows`, `source_tag_body_map_rows`,
@@ -36,6 +38,7 @@ the target.
 | `table-indexed-load` | 1 | compile context |
 | `checked-add-runtime-boundary` | 1 | compile context |
 | `runtime-condbr` | 1 | compile context |
+| `runtime-phi-merge` | 1 | compile context |
 | `runtime-loop-sum` | 1 | compile context |
 | `runtime-switch` | 1 | compile context |
 | `checked-branch-mix-boundary` | 1 | compile context |
@@ -67,8 +70,15 @@ the target.
 | `inline-asm-barrier` | 1 | compile context |
 | `aggregate-pair-abi` | 1 | compile context |
 | `float-less` | 1 | compile context |
+| `float-mul` | 1 | compile context |
 | `float-add` | 1 | compile context |
+| `float-select` | 1 | compile context |
 | `float-sub` | 1 | compile context |
+| `double-div` | 1 | compile context |
+| `float-rem` | 1 | compile context |
+| `void-noop-call` | 1 | compile context |
+| `volatile-roundtrip` | 1 | compile context |
+| `i64-arithmetic` | 1 | compile context |
 | `hidden-global-access` | 2 | compile context |
 | `mixed-c-zig-add` | 2 | compile context |
 | `mixed-c-zig-panic-add` | 2 | compile context |
@@ -119,6 +129,7 @@ them through the broad body-template dispatcher:
 - `scalar-add-ret`
 - `integer-arithmetic`
 - `runtime-loop-sum`
+- `runtime-phi-merge`
 - `abi-arg-call`
 - `error-switch-select`
 - `runtime-condbr`
@@ -149,8 +160,15 @@ them through the broad body-template dispatcher:
 - `inline-asm-barrier`
 - `aggregate-pair-abi`
 - `float-less`
+- `float-mul`
 - `float-add`
+- `float-select`
 - `float-sub`
+- `double-div`
+- `float-rem`
+- `void-noop-call`
+- `volatile-roundtrip`
+- `i64-arithmetic`
 - `hidden-global-access`
 - `mixed-c-zig-add`
 - `mixed-c-zig-panic-add`
@@ -197,11 +215,11 @@ them through the broad body-template dispatcher:
 ## Closed Counter Target
 
 ```text
-air_extracted_descriptor_rows=90
+air_extracted_descriptor_rows=100
 template_descriptor_rows=0
 wrapper_body_map_rows=0
 source_tag_body_map_rows=0
-zig_compile_context_descriptor_rows=90
+zig_compile_context_descriptor_rows=100
 env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0

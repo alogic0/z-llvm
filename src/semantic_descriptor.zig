@@ -146,7 +146,7 @@ pub fn resolveSourceOwnedFromSerializedReturn(
     ret_i32: i32,
 ) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
-    if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
+    if (!isSourceOwnedFixture(fixture)) return null;
     const body = sdv2.bodyForName(body_name) orelse return null;
     const surface = if (diagnostic_surface.len != 0) diagnostic_surface else sdv2.bodyName(body);
     const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
@@ -176,7 +176,7 @@ fn resolveSourceOwnedFromBodyWithEmitter(
     derivation: DescriptorDerivation,
 ) ?Descriptor {
     if (!isReleaseMode(mode)) return null;
-    if (!std.mem.startsWith(u8, fixture, "test/distribution/")) return null;
+    if (!isSourceOwnedFixture(fixture)) return null;
     const body = sdv2.bodyForName(body_name) orelse return null;
     const surface = if (diagnostic_surface.len != 0) diagnostic_surface else sdv2.bodyName(body);
     const source: Source = .{ .wrapper = wrapper, .mode = mode, .fixture = fixture, .tag = tag };
@@ -444,7 +444,7 @@ fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {
 
 fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDescriptorInput) ?Descriptor {
     if (!isReleaseMode(input.mode)) return null;
-    if (!std.mem.startsWith(u8, input.fixture, "test/distribution/")) return null;
+    if (!isSourceOwnedFixture(input.fixture)) return null;
     const body = sdv2.bodyForName(input.body_name) orelse return null;
     const surface = if (input.diagnostic_surface.len != 0) input.diagnostic_surface else sdv2.bodyName(body);
     const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
@@ -480,6 +480,11 @@ fn resolveSourceOwnedFromSerializedInput(contents: []const u8, input: SourceDesc
         .context_selector = input.context_selector,
         .serialized_return_i32 = ret_i32,
     };
+}
+
+fn isSourceOwnedFixture(fixture: []const u8) bool {
+    return std.mem.startsWith(u8, fixture, "test/distribution/") or
+        std.mem.startsWith(u8, fixture, "test/zig/inputs/");
 }
 
 fn parseSerializedProgram(contents: []const u8, source: sdv2.Source, body: sdv2.Body, surface: []const u8) ?sdv2.Program {
@@ -942,17 +947,18 @@ fn featuresForSurface(surface: []const u8) []const Feature {
     {
         return &scalar_features;
     }
-    if (std.mem.eql(u8, surface, "integer-arithmetic") or std.mem.eql(u8, surface, "umul-fix-sat-i64") or std.mem.eql(u8, surface, "inherit-i64-return")) return &integer_features;
-    if (std.mem.eql(u8, surface, "runtime-condbr") or std.mem.eql(u8, surface, "runtime-switch") or std.mem.eql(u8, surface, "error-switch-select")) return &branch_features;
+    if (std.mem.eql(u8, surface, "integer-arithmetic") or std.mem.eql(u8, surface, "i64-arithmetic") or std.mem.eql(u8, surface, "umul-fix-sat-i64") or std.mem.eql(u8, surface, "inherit-i64-return")) return &integer_features;
+    if (std.mem.eql(u8, surface, "runtime-condbr") or std.mem.eql(u8, surface, "runtime-switch") or std.mem.eql(u8, surface, "runtime-phi-merge") or std.mem.eql(u8, surface, "error-switch-select")) return &branch_features;
     if (std.mem.eql(u8, surface, "runtime-loop-sum") or std.mem.eql(u8, surface, "slice-loop-sum") or std.mem.eql(u8, surface, "checked-slice-loop-sum-boundary") or std.mem.eql(u8, surface, "raw-start-loop")) return &loop_features;
     if (std.mem.eql(u8, surface, "abi-arg-call") or std.mem.eql(u8, surface, "checked-call-chain-boundary") or std.mem.eql(u8, surface, "compile-asm-unreachable")) return &call_features;
     if (std.mem.eql(u8, surface, "global-update") or std.mem.eql(u8, surface, "global-load") or std.mem.eql(u8, surface, "hidden-global-access")) return &global_features;
     if (std.mem.eql(u8, surface, "tls-read") or std.mem.eql(u8, surface, "tls-bump") or std.mem.eql(u8, surface, "checked-tls-bump-boundary") or std.mem.eql(u8, surface, "mixed-c-zig-add") or std.mem.eql(u8, surface, "mixed-c-zig-panic-add")) return &tls_features;
-    if (std.mem.eql(u8, surface, "pointer-load-store") or std.mem.eql(u8, surface, "optional-pointer") or std.mem.eql(u8, surface, "packed-read-flag") or std.mem.eql(u8, surface, "packed-replace-low") or std.mem.eql(u8, surface, "address-space-volatile-store") or std.mem.eql(u8, surface, "getauxval-pointer-walk")) return &memory_features;
+    if (std.mem.eql(u8, surface, "pointer-load-store") or std.mem.eql(u8, surface, "optional-pointer") or std.mem.eql(u8, surface, "packed-read-flag") or std.mem.eql(u8, surface, "packed-replace-low") or std.mem.eql(u8, surface, "volatile-roundtrip") or std.mem.eql(u8, surface, "address-space-volatile-store") or std.mem.eql(u8, surface, "getauxval-pointer-walk")) return &memory_features;
     if (std.mem.indexOf(u8, surface, "struct") != null or std.mem.indexOf(u8, surface, "array") != null or std.mem.indexOf(u8, surface, "aggregate") != null or std.mem.indexOf(u8, surface, "payload") != null or std.mem.eql(u8, surface, "f128-sret-byval") or std.mem.eql(u8, surface, "start-trampoline")) return &aggregate_features;
     if (std.mem.startsWith(u8, surface, "float") or std.mem.eql(u8, surface, "double-div")) return &fp_features;
     if (std.mem.eql(u8, surface, "atomic-add")) return &atomic_features;
     if (std.mem.eql(u8, surface, "inline-asm-barrier")) return &inline_asm_features;
+    if (std.mem.eql(u8, surface, "void-noop-call")) return &call_features;
     if (std.mem.startsWith(u8, surface, "checked-")) return &runtime_boundary_features;
     if (std.mem.eql(u8, surface, "table-indexed-load")) return &table_features;
     if (std.mem.startsWith(u8, surface, "base64-")) return &base64_features;

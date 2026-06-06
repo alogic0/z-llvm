@@ -234,35 +234,35 @@ The strongest current release-mode source-owned replacement gate is:
 gate=zig build distribution-x86_64-release-source-owned
 target=x86_64
 modes=ReleaseFast,ReleaseSafe,ReleaseSmall
-release_source_rows=90
-source_wrapper_rows=90
-descriptor_owned_rows=90
-descriptor_v2_rows=90
-real_descriptor_program_rows=90
-full_descriptor_program_rows=90
-serialized_function_rows=90
-serialized_instruction_rows=90
-serialized_global_rows=90
-semantic_serialized_rows=90
+release_source_rows=100
+source_wrapper_rows=100
+descriptor_owned_rows=100
+descriptor_v2_rows=100
+real_descriptor_program_rows=100
+full_descriptor_program_rows=100
+serialized_function_rows=100
+serialized_instruction_rows=100
+serialized_global_rows=100
+semantic_serialized_rows=100
 serialized_return_stub_rows=0
 descriptor_body_name_rows=0
 zllvm_body_expansion_rows=0
 descriptor_program_body_expansion_rows=0
 functions_for_body_rows=0
 globals_for_body_rows=0
-air_extracted_descriptor_rows=90
+air_extracted_descriptor_rows=100
 template_descriptor_rows=0
 wrapper_body_map_rows=0
 source_tag_body_map_rows=0
-zig_compile_context_descriptor_rows=90
+zig_compile_context_descriptor_rows=100
 env_source_tag_selector_rows=0
 wrapper_body_selector_rows=0
 source_tag_body_selector_rows=0
 fixture_metadata_selector_rows=0
-zig_emitted_descriptor_rows=90
+zig_emitted_descriptor_rows=100
 runner_generated_descriptor_rows=0
-descriptor_file_consumed_rows=90
-source_derived_descriptor_rows=90
+descriptor_file_consumed_rows=100
+source_derived_descriptor_rows=100
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -271,20 +271,20 @@ manual_fixture_dispatch_rows=0
 legacy_semantic_record_rows=0
 semantic_record_rows=0
 external_writer_delegate_rows=0
-semantic_lowering_rows=90
+semantic_lowering_rows=100
 manifest_structured_rows=0
 case_id_rows=0
 surface_dispatch_rows=0
-structured_direct_rows=90
-generic_codegen_rows=90
+structured_direct_rows=100
+generic_codegen_rows=100
 fallback_rows=0
 local_fail=0
 ownership=llvm-module=not-used;llvm-optimizer=not-used;
           llvm-targetmachine=not-used;object-emission=z_llvm;
           linker=zig-native-fno-lld
 source_wrapper_discovery=discovered_source_wrappers=72
-                         descriptor_supported_wrappers=62
-                         out_of_scope_wrappers=10
+                         descriptor_supported_wrappers=72
+                         out_of_scope_wrappers=0
                          unsupported_with_reason=0
 ```
 
@@ -295,9 +295,9 @@ body enums, or template expansion. Patched Zig emits a
 `zllvm-source-derived-descriptor-v2` file with serialized
 function/block/instruction/terminator/global-section records, and z_llvm parses
 those records directly before verifying and lowering DescriptorV2 into
-structured-direct IR. All 90 rows use serialized DescriptorV2 transport and
+structured-direct IR. All 100 rows use serialized DescriptorV2 transport and
 semantic serialized records, and the gate fails if any row falls back to the
-serialized return stub. The current provenance split is 90 rows on the
+serialized return stub. The current provenance split is 100 rows on the
 separate extracted-record path with compile-context descriptor provenance, no
 body-map selector, no source-tag selector, and 0 template-owned rows. Source
 tags remain diagnostic text in artifacts but are not an accepted semantic
@@ -557,26 +557,26 @@ source_wrapper_rows=source_wrappers=49 structured_direct_rows=49
                     external_writer_delegate_rows=1
                     case_specific_rows=0 fallback_rows=0 local_fail=0
 release_source_owned_gate=zig build distribution-x86_64-release-source-owned
-release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
-                          descriptor_owned_rows=90 descriptor_v2_rows=90
-                          real_descriptor_program_rows=90
-                          full_descriptor_program_rows=90
-                          serialized_function_rows=90
-                          serialized_instruction_rows=90
-                          serialized_global_rows=90
-                          semantic_serialized_rows=90
+release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
+                          descriptor_owned_rows=100 descriptor_v2_rows=100
+                          real_descriptor_program_rows=100
+                          full_descriptor_program_rows=100
+                          serialized_function_rows=100
+                          serialized_instruction_rows=100
+                          serialized_global_rows=100
+                          semantic_serialized_rows=100
                           serialized_return_stub_rows=0
                           descriptor_body_name_rows=0
                           zllvm_body_expansion_rows=0
                           descriptor_program_body_expansion_rows=0
                           functions_for_body_rows=0
                           globals_for_body_rows=0
-                          air_derived_descriptor_rows=90
+                          air_derived_descriptor_rows=100
                           static_descriptor_map_rows=0
-                          zig_emitted_descriptor_rows=90
+                          zig_emitted_descriptor_rows=100
                           runner_generated_descriptor_rows=0
-                          descriptor_file_consumed_rows=90
-                          source_derived_descriptor_rows=90
+                          descriptor_file_consumed_rows=100
+                          source_derived_descriptor_rows=100
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0
@@ -585,21 +585,21 @@ release_source_owned_rows=release_source_rows=90 source_wrapper_rows=90
                           legacy_semantic_record_rows=0 semantic_record_rows=0
                           external_writer_delegate_rows=0
                           manifest_structured_rows=0 case_id_rows=0
-                          surface_dispatch_rows=0 structured_direct_rows=90
-                          generic_codegen_rows=90 fallback_rows=0 local_fail=0
+                          surface_dispatch_rows=0 structured_direct_rows=100
+                          generic_codegen_rows=100 fallback_rows=0 local_fail=0
 semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
-                       release_source_owned_rows=90;
+                       release_source_owned_rows=100;
                        source_wrapper_rows=49; counters remain separate; the
                        source-owned rung is strongest and all release source
-                       rows are DescriptorV2-owned; all 90 rows use serialized
+                       rows are DescriptorV2-owned; all 100 rows use serialized
                        AIR-shaped semantic records with no return-stub fallback
                        or static descriptor map fallback; current provenance is
                        compile-context extracted
-                       (air_extracted_descriptor_rows=90,
+                       (air_extracted_descriptor_rows=100,
                        template_descriptor_rows=0, wrapper_body_map_rows=0,
                        source_tag_body_map_rows=0,
-                       zig_compile_context_descriptor_rows=90,
+                       zig_compile_context_descriptor_rows=100,
                        env_source_tag_selector_rows=0,
                        wrapper_body_selector_rows=0,
                        source_tag_body_selector_rows=0,
