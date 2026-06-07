@@ -52,6 +52,8 @@ pub const Descriptor = struct {
     serialized_return_i32: ?i32 = null,
     concrete_source_facts: bool = false,
     fact_derived_classification: bool = false,
+    source_fact_program: bool = false,
+    body_enum_fallback: bool = false,
 };
 
 pub const InputPayload = enum {
@@ -315,6 +317,14 @@ pub fn usesRootSourceClassificationFallback(descriptor: Descriptor) bool {
     return descriptor.input_payload == .source_facts and !descriptor.fact_derived_classification;
 }
 
+pub fn usesSourceFactProgram(descriptor: Descriptor) bool {
+    return descriptor.source_fact_program;
+}
+
+pub fn usesBodyEnumFallback(descriptor: Descriptor) bool {
+    return descriptor.body_enum_fallback;
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }
@@ -563,12 +573,16 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
     const surface = sdv2.bodyName(body);
     const source: Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
     const v2_source: sdv2.Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
+    const fact_program = sourceFactProgramFromFacts(facts, classification, surface);
     return .{
         .id = surface,
         .surface = surface,
         .source = source,
         .features = featuresForSurface(surface),
-        .v2 = sdv2.programFromSourceFacts(v2_source, body, surface),
+        .v2 = if (fact_program) |program|
+            sdv2.programFromSourceFactProgram(v2_source, program.body, program.surface)
+        else
+            sdv2.programFromSourceFacts(v2_source, body, surface),
         .input_emitter = facts.module.emitter,
         .input_payload = .source_facts,
         .derivation = .zig_air_facts,
@@ -578,7 +592,20 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
         .source_tag_env_present = facts.module.source_tag_env_present,
         .concrete_source_facts = true,
         .fact_derived_classification = classification.fact_derived,
+        .source_fact_program = fact_program != null,
+        .body_enum_fallback = fact_program == null,
     };
+}
+
+const SourceFactProgram = struct {
+    body: sdv2.Body,
+    surface: []const u8,
+};
+
+fn sourceFactProgramFromFacts(facts: SourceFactModel, classification: SourceFactClassification, surface: []const u8) ?SourceFactProgram {
+    if (!classification.fact_derived) return null;
+    _ = facts;
+    return .{ .body = classification.body, .surface = surface };
 }
 
 fn parseSourceFactModel(contents: []const u8) ?SourceFactModel {

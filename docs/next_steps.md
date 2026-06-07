@@ -89,10 +89,13 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
 `local_fail=0`. The gate requires at least `fact_derived_classification_rows=30`. The current measured split is
 `fact_derived_classification_rows=32` and
-`root_source_classification_fallback_rows=68`; all accepted rows must have
-concrete facts, and those two classification counters must account for every row. The
-remaining root-source fallback is temporary z_llvm-side classification support,
-guarded by a 7-family wrong-facts negative probe.
+`root_source_classification_fallback_rows=68`. Those counters are mirrored by
+the first SourceFactProgram ownership split:
+`source_fact_program_rows=32` and `body_enum_fallback_rows=68`. All accepted
+rows must have concrete facts, and the fact-program plus body-enum fallback
+counters must account for every row. The remaining root-source/body-enum
+fallback is temporary z_llvm-side classification support, guarded by a
+7-family wrong-facts negative probe.
 
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
@@ -176,8 +179,9 @@ source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
 compile-context fact provenance and no body-map selector. The next ownership
-step is to drive `root_source_classification_fallback_rows` down from 68 by deriving
-more DescriptorV2 bodies from concrete facts inside z_llvm.
+step is to drive `root_source_classification_fallback_rows` and
+`body_enum_fallback_rows` down from 68 by deriving more SourceFactProgram
+records from concrete facts inside z_llvm.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally

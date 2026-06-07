@@ -438,6 +438,10 @@ pub fn programFromFullDescriptor(source: Source, body: Body, diagnostic_surface:
 }
 
 pub fn programFromSourceFacts(source: Source, body: Body, diagnostic_surface: []const u8) Program {
+    return programFromSourceFactProgram(source, body, diagnostic_surface);
+}
+
+pub fn programFromSourceFactProgram(source: Source, body: Body, diagnostic_surface: []const u8) Program {
     return .{
         .id = bodyName(body),
         .source = source,
