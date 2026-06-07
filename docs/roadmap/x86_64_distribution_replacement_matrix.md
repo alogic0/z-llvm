@@ -389,6 +389,18 @@ The selected native Zig linker handoff subset is intentionally smaller and
 stricter than the `zig cc` executable gates:
 
 ```text
+object_contract=docs/native_elf_linker_handoff.md
+pre_link_gate=zig build distribution-native-link-object-inspection
+pre_link_checks=ELF64 REL, section flags/alignment, symbols, relocations,
+                TLS local-exec shape, undefined imports, no COMDAT, no
+                .eh_frame
+failure_categories=missing-relocation-support, bad-symbol-binding-type,
+                   section-flag-alignment, tls-model, comdat,
+                   unwind-boundary, runtime/compiler-rt/libc-boundary,
+                   zig-linker-bug-or-unsupported-feature
+```
+
+```text
 gate=zig build distribution-native-link
 target=x86_64-unknown-linux-gnu
 linker_selection=zig build-exe -fno-lld
@@ -414,8 +426,10 @@ accepted=45
 failed=0
 per_mode=ReleaseFast 27/27 accepted, ReleaseSafe 9/9 accepted,
          ReleaseSmall 8/8 accepted, Debug 1/1 accepted
-failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
-                   ABI, unknown linker compatibility
+failure_categories=bad-symbol-binding-type, missing-relocation-support,
+                   section-flag-alignment, tls-model, comdat, abi,
+                   runtime/compiler-rt/libc-boundary,
+                   zig-linker-bug-or-unsupported-feature
 next_blocker=none measured; first future failure becomes a local object
              compatibility slice unless evidence proves Zig linker behavior
 ```

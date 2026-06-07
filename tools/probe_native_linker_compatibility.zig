@@ -176,15 +176,16 @@ fn classifyFailure(stderr: []const u8) []const u8 {
     if (std.mem.indexOf(u8, stderr, "undefined symbol") != null or
         std.mem.indexOf(u8, stderr, "undefined reference") != null)
     {
-        return "symbol";
+        if (std.mem.indexOf(u8, stderr, "compiler_rt") != null or std.mem.indexOf(u8, stderr, "libc") != null) return "runtime/compiler-rt/libc-boundary";
+        return "bad-symbol-binding-type";
     }
-    if (std.mem.indexOf(u8, stderr, "relocation") != null) return "relocation";
-    if (std.mem.indexOf(u8, stderr, "section") != null) return "section";
+    if (std.mem.indexOf(u8, stderr, "relocation") != null) return "missing-relocation-support";
+    if (std.mem.indexOf(u8, stderr, "section") != null) return "section-flag-alignment";
     if (std.mem.indexOf(u8, stderr, "TLS") != null or std.mem.indexOf(u8, stderr, "thread-local") != null) return "tls-model";
     if (std.mem.indexOf(u8, stderr, "COMDAT") != null or std.mem.indexOf(u8, stderr, "comdat") != null) return "comdat";
-    if (std.mem.indexOf(u8, stderr, "align") != null) return "alignment";
+    if (std.mem.indexOf(u8, stderr, "align") != null) return "section-flag-alignment";
     if (std.mem.indexOf(u8, stderr, "ABI") != null or std.mem.indexOf(u8, stderr, "calling convention") != null) return "abi";
-    return "unknown-linker-compatibility";
+    return "zig-linker-bug-or-unsupported-feature";
 }
 
 fn defaultCcTarget(target: []const u8) []const u8 {

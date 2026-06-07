@@ -133,7 +133,7 @@ const Category = enum {
             .unsupported_abi => "unsupported-abi",
             .unsupported_target => "unsupported-target",
             .input_too_large => "input-too-large",
-            .unknown_linker_compatibility => "unknown-linker-compatibility",
+            .unknown_linker_compatibility => "zig-linker-bug-or-unsupported-feature",
         };
     }
 

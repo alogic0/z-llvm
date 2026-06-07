@@ -922,6 +922,7 @@ Latest local validation:
 zig build test
 zig build readiness
 zig build distribution-all
+zig build distribution-native-link-object-inspection
 zig build distribution-native-link
 zig build probe-native-linker
 zig build distribution-zig-source-native-link
@@ -943,8 +944,9 @@ zig build distribution-native-link-boundary2
 ```
 
 The focused gates passed after the script runner cleanup, shared tool helper
-refactor, selected native-linker proof expansion, native-linker compatibility
-probe addition, exact broad-probe category split, ReleaseSmall base64 table
+refactor, selected native-linker proof expansion, native-linker object
+inspection, native-linker compatibility probe addition, exact broad-probe
+category split, ReleaseSmall base64 table
 lookup reduction, and the experimental patched-Zig object-emission hook. The
 Zig source integration gate passes: 10 source rows go from stage4 Zig-emitted
 LLVM IR through local `z_llvm` object emission and Zig native linking, with 9

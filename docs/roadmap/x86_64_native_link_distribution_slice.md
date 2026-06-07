@@ -124,8 +124,10 @@ ReleaseFast accepted=27 failed=0
 ReleaseSafe accepted=9 failed=0
 ReleaseSmall accepted=8 failed=0
 Debug accepted=1 failed=0
-failure_categories=symbol, relocation, section, TLS model, COMDAT, alignment,
-                   ABI, unknown linker compatibility
+failure_categories=bad-symbol-binding-type, missing-relocation-support,
+                   section-flag-alignment, tls-model, comdat, abi,
+                   runtime/compiler-rt/libc-boundary,
+                   zig-linker-bug-or-unsupported-feature
 ```
 
 Latest broad link-only probe result:

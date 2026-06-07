@@ -8,6 +8,7 @@ const Tool = struct {
 
 const tools = [_]Tool{
     .{ .path = "tools/run_distribution_no_llvm_codegen_subset.zig" },
+    .{ .path = "tools/run_native_link_object_inspection.zig" },
     .{ .path = "tools/run_distribution_native_link_m5.zig" },
     .{ .path = "tools/probe_native_linker_compatibility.zig" },
     .{ .path = "tools/run_distribution_zig_source_native_link.zig" },
