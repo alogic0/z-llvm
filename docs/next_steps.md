@@ -109,19 +109,17 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
-`local_fail=0`. The gate requires at least
-`fact_derived_classification_rows=45`, at least
-`source_fact_program_direct_rows=10`, and no more than
-`body_enum_fallback_rows=55`. The current measured split is
-`fact_derived_classification_rows=50`,
-`source_fact_program_rows=50`,
-`source_fact_program_direct_rows=50`,
+`local_fail=0`. The gate requires
+`fact_derived_classification_rows=100`,
+`source_fact_program_rows=100`,
+`source_fact_program_direct_rows=100`,
 `source_fact_body_wrapper_rows=0`,
-`root_source_classification_fallback_rows=50`, and
-`body_enum_fallback_rows=50`. All accepted rows must have concrete facts, and
-the fact-program plus body-enum fallback counters must account for every row.
-The remaining root-source/body-enum fallback is temporary z_llvm-side
-classification support, guarded by a 7-family wrong-facts negative probe.
+`root_source_classification_fallback_rows=0`, and
+`body_enum_fallback_rows=0`. All accepted rows must have concrete facts, and
+the 100-row source-owned inventory is now classified from those facts into
+direct SourceFactProgram DescriptorV2 records without root-source/body-enum
+fallback. A 7-family wrong-facts negative probe still rejects mismatched
+wrapper/fact streams without using root source as the body selector.
 
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
@@ -204,10 +202,9 @@ serialized return stub. Current provenance counters show
 source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
-compile-context fact provenance and no body-map selector. The next ownership
-step is to drive `root_source_classification_fallback_rows` and
-`body_enum_fallback_rows` down from 50 by deriving more SourceFactProgram
-records from concrete facts inside z_llvm.
+compile-context fact provenance, direct SourceFactProgram DescriptorV2
+construction, and no body-map selector, root-source classification fallback, or
+body-enum fallback.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
 semantic record rows and one external writer delegate because it intentionally

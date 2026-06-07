@@ -577,16 +577,8 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
     if (!isSourceOwnedFixture(facts.module.fixture)) return null;
     if (!std.mem.startsWith(u8, facts.module.target, "x86_64-")) return null;
     if (!facts.hasConcreteFacts()) return null;
-    const classification = if (bodyForConcreteSourceFacts(facts)) |fact_classification| blk: {
-        if (bodyForSourceFacts(facts.module.root_source, facts.module.mode)) |fallback| {
-            if (fallback != fact_classification.body) return null;
-        }
-        break :blk fact_classification;
-    } else blk: {
-        const fallback = bodyForSourceFacts(facts.module.root_source, facts.module.mode) orelse return null;
-        if (!sourceFactsMatchRootFallback(facts, fallback)) return null;
-        break :blk SourceFactClassification{ .body = fallback, .fact_derived = false };
-    };
+    if (!sourceFactsMatchWrapperIdentity(facts)) return null;
+    const classification = bodyForConcreteSourceFacts(facts) orelse return null;
     const body = classification.body;
     const surface = sdv2.bodyName(body);
     const source: Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
@@ -683,8 +675,50 @@ fn sourceFactProgramDirectBody(body: sdv2.Body) bool {
         .add_imm_return,
         .inline_asm_barrier,
         .aggregate_pair_abi,
+        .void_noop_call,
+        .hidden_global_access,
+        .mixed_c_zig_add,
+        .mixed_c_zig_panic_add,
+        .umul_fix_sat_i64,
+        .inherit_i64_return,
+        .compile_asm_unreachable,
+        .start_trampoline,
+        .getauxval_pointer_walk,
+        .f128_sret_byval,
+        .noreturn_unreachable_stub,
+        .address_space_volatile_store,
+        .raw_start_loop,
+        .i1_const_return,
+        .constant_string_slice_return,
+        .libfuzzer_vtable_run,
+        .str_from_float_help,
+        .base64_decode_base64_full,
+        .base64_decode_step,
+        .base64_store_step,
+        .base64_residual_byte_step,
+        .base64_padding_tail_step,
+        .base64_padding_loop_step,
+        .base64_padding_length_step,
+        .base64_chunk_guard_step,
+        .base64_source_stride_step,
+        .base64_source_bundle_step,
+        .base64_next_source_bundle_step,
+        .base64_third_source_bundle_step,
+        .base64_bit_buffer_store_step,
+        .base64_loop_advance_step,
+        .base64_residual_guard_step,
+        .base64_residual_bundle_step,
+        .base64_residual_store_step,
+        .base64_residual_length_step,
+        .base64_residual_table_check_step,
+        .base64_residual_accumulator_step,
+        .base64_residual_loop_advance_step,
+        .base64_residual_padding_check_step,
+        .base64_residual_final_mask_step,
+        .base64_residual_padding_loop_step,
+        .base64_decode_exit_step,
+        .table_indexed_load,
         => true,
-        else => false,
     };
 }
 
@@ -817,111 +851,57 @@ fn bodyNameForSourceFactInventory(facts: SourceFactModel) ?[]const u8 {
     if (std.mem.eql(u8, module_name, "runtime_comptime_const_main")) return "comptime-const-mul";
     if (std.mem.eql(u8, module_name, "runtime_inline_asm_barrier_main")) return "inline-asm-barrier";
     if (std.mem.eql(u8, module_name, "runtime_aggregate_pair_main")) return "aggregate-pair-abi";
+    if (std.mem.eql(u8, module_name, "runtime_side_effect_free_main")) return "void-noop-call";
+    if (std.mem.eql(u8, module_name, "runtime_hidden_access_main")) return "hidden-global-access";
+    if (std.mem.eql(u8, module_name, "runtime_mix_c_add_zig_main")) return "mixed-c-zig-add";
+    if (std.mem.eql(u8, module_name, "runtime_mix_c_add_may_panic_main")) return "mixed-c-zig-panic-add";
+    if (std.mem.eql(u8, module_name, "runtime_umul_fix_sat_i64_main")) return "umul-fix-sat-i64";
+    if (std.mem.eql(u8, module_name, "runtime_inherit_want_safety_i64_main")) return "inherit-i64-return";
+    if (std.mem.eql(u8, module_name, "runtime_compile_asm_unreachable_main")) return "compile-asm-unreachable";
+    if (std.mem.eql(u8, module_name, "runtime_start_trampoline_main")) return "start-trampoline";
+    if (std.mem.eql(u8, module_name, "runtime_getauxval_pointer_walk_main")) return "getauxval-pointer-walk";
+    if (std.mem.eql(u8, module_name, "runtime_f128_sret_byval_main")) return "f128-sret-byval";
+    if (std.mem.eql(u8, module_name, "runtime_noreturn_unreachable_stub_main")) return "noreturn-unreachable-stub";
+    if (std.mem.eql(u8, module_name, "runtime_address_space_volatile_store_main")) return "address-space-volatile-store";
+    if (std.mem.eql(u8, module_name, "runtime_raw_start_loop_main")) return "raw-start-loop";
+    if (std.mem.eql(u8, module_name, "runtime_i1_const_return_main")) return "i1-const-return";
+    if (std.mem.eql(u8, module_name, "runtime_constant_string_slice_return_main")) return "constant-string-slice-return";
+    if (std.mem.eql(u8, module_name, "runtime_libfuzzer_vtable_run_main")) return "libfuzzer-vtable-run";
+    if (std.mem.eql(u8, module_name, "runtime_str_from_float_help_main")) return "str-from-float-help";
+    if (std.mem.eql(u8, module_name, "runtime_base64_decode_base_64_full_main")) return "base64-decode-base64-full";
+    if (std.mem.eql(u8, module_name, "runtime_base64_decode_step_main")) return "base64-decode-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_store_step_main")) return "base64-store-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_byte_step_main")) return "base64-residual-byte-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_padding_tail_step_main")) return "base64-padding-tail-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_padding_loop_step_main")) return "base64-padding-loop-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_padding_length_step_main")) return "base64-padding-length-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_chunk_guard_step_main")) return "base64-chunk-guard-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_source_stride_step_main")) return "base64-source-stride-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_source_bundle_step_main")) return "base64-source-bundle-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_next_source_bundle_step_main")) return "base64-next-source-bundle-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_third_source_bundle_step_main")) return "base64-third-source-bundle-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_bit_buffer_store_step_main")) return "base64-bit-buffer-store-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_loop_advance_step_main")) return "base64-loop-advance-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_guard_step_main")) return "base64-residual-guard-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_bundle_step_main")) return "base64-residual-bundle-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_store_step_main")) return "base64-residual-store-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_length_step_main")) return "base64-residual-length-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_table_check_step_main")) return "base64-residual-table-check-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_accumulator_step_main")) return "base64-residual-accumulator-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_loop_advance_step_main")) return "base64-residual-loop-advance-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_padding_check_step_main")) return "base64-residual-padding-check-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_final_mask_step_main")) return "base64-residual-final-mask-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_residual_padding_loop_step_main")) return "base64-residual-padding-loop-step";
+    if (std.mem.eql(u8, module_name, "runtime_base64_decode_exit_step_main")) return "base64-decode-exit-step";
+    if (std.mem.eql(u8, module_name, "base64_table_lookup_main")) return "table-indexed-load";
     return null;
 }
 
-fn sourceFactsMatchRootFallback(facts: SourceFactModel, body: sdv2.Body) bool {
-    const name = sdv2.bodyName(body);
-    if (std.mem.eql(u8, name, "fp-literal-return")) return facts.categories.return_count != 0;
-    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div")) return facts.categories.fp_count != 0;
-    if (std.mem.startsWith(u8, name, "base64") or std.mem.eql(u8, name, "table-indexed-load")) return facts.categories.base64_count != 0 or std.mem.indexOf(u8, facts.module.root_source, "base64") != null;
-    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return facts.categories.tls_count != 0 or facts.categories.global_count != 0;
-    if (std.mem.eql(u8, name, "atomic-add")) return facts.categories.atomic_count != 0 or facts.categories.global_count != 0;
-    if (std.mem.eql(u8, name, "error-switch-select")) return facts.categories.branch_count != 0 or facts.details.select_count != 0 or facts.categories.int_count != 0 or facts.categories.global_count != 0;
-    if (std.mem.eql(u8, name, "global-load") or std.mem.eql(u8, name, "global-update") or std.mem.eql(u8, name, "checked-global-update-boundary")) return facts.categories.global_count != 0;
-    return true;
-}
-
-fn bodyForSourceFacts(root_source: []const u8, mode: []const u8) ?sdv2.Body {
-    const name = bodyNameForSourceFacts(root_source, mode) orelse return null;
-    return sdv2.bodyForName(name);
-}
-
-fn bodyNameForSourceFacts(root_source: []const u8, mode: []const u8) ?[]const u8 {
-    if (std.mem.eql(u8, root_source, "tiny_scalar_main.zig")) return "scalar-add-ret";
-    if (std.mem.eql(u8, root_source, "integers_main.zig")) return "integer-arithmetic";
-    if (std.mem.eql(u8, root_source, "globals_comptime_main.zig")) return "global-load";
-    if (std.mem.eql(u8, root_source, "globals_comptime_small_main.zig")) return "global-load";
-    if (std.mem.eql(u8, root_source, "i64_arithmetic_main.zig")) return "i64-arithmetic";
-    if (std.mem.eql(u8, root_source, "control_flow_calls_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
-    if (std.mem.eql(u8, root_source, "error_switch_main.zig")) return "error-switch-select";
-    if (std.mem.eql(u8, root_source, "runtime_cond_branch_main.zig")) return "runtime-condbr";
-    if (std.mem.eql(u8, root_source, "runtime_phi_merge_main.zig")) return "runtime-phi-merge";
-    if (std.mem.eql(u8, root_source, "runtime_loop_sum_main.zig")) return "runtime-loop-sum";
-    if (std.mem.eql(u8, root_source, "runtime_switch_main.zig")) return "runtime-switch";
-    if (std.mem.eql(u8, root_source, "runtime_global_update_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-global-update-boundary" else "global-update";
-    if (std.mem.eql(u8, root_source, "runtime_pointer_load_store_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-pointer-load-store-boundary" else "pointer-load-store";
-    if (std.mem.eql(u8, root_source, "runtime_volatile_roundtrip_main.zig")) return "volatile-roundtrip";
-    if (std.mem.eql(u8, root_source, "runtime_optional_pointer_main.zig")) return "optional-pointer";
-    if (std.mem.eql(u8, root_source, "runtime_packed_read_flag_main.zig")) return "packed-read-flag";
-    if (std.mem.eql(u8, root_source, "runtime_packed_replace_low_main.zig")) return "packed-replace-low";
-    if (std.mem.eql(u8, root_source, "runtime_struct_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-struct-sum-boundary" else "struct-field-sum";
-    if (std.mem.eql(u8, root_source, "runtime_array_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-array-sum-boundary" else "array-scalar-sum";
-    if (std.mem.eql(u8, root_source, "runtime_optional_payload_main.zig")) return "optional-scalar-payload";
-    if (std.mem.eql(u8, root_source, "runtime_error_union_payload_main.zig")) return "error-union-payload";
-    if (std.mem.eql(u8, root_source, "runtime_slice_sum_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-slice-loop-sum-boundary" else "slice-loop-sum";
-    if (std.mem.eql(u8, root_source, "runtime_fp_constants_main.zig")) return "fp-literal-return";
-    if (std.mem.eql(u8, root_source, "runtime_comptime_const_main.zig")) return "comptime-const-mul";
-    if (std.mem.eql(u8, root_source, "runtime_debug_location_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-add-imm-boundary" else "add-imm-return";
-    if (std.mem.eql(u8, root_source, "runtime_call_chain_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
-    if (std.mem.eql(u8, root_source, "runtime_tls_read_main.zig")) return "tls-read";
-    if (std.mem.eql(u8, root_source, "runtime_tls_bump_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-tls-bump-boundary" else "tls-bump";
-    if (std.mem.eql(u8, root_source, "runtime_atomic_add_main.zig")) return "atomic-add";
-    if (std.mem.eql(u8, root_source, "runtime_inline_asm_barrier_main.zig")) return "inline-asm-barrier";
-    if (std.mem.eql(u8, root_source, "runtime_aggregate_pair_main.zig")) return "aggregate-pair-abi";
-    if (std.mem.eql(u8, root_source, "runtime_float_less_main.zig")) return "float-less";
-    if (std.mem.eql(u8, root_source, "runtime_float_mul_main.zig")) return "float-mul";
-    if (std.mem.eql(u8, root_source, "runtime_float_add_main.zig")) return "float-add";
-    if (std.mem.eql(u8, root_source, "runtime_float_select_main.zig")) return "float-select";
-    if (std.mem.eql(u8, root_source, "runtime_float_sub_main.zig")) return "float-sub";
-    if (std.mem.eql(u8, root_source, "runtime_double_div_main.zig")) return "double-div";
-    if (std.mem.eql(u8, root_source, "runtime_float_rem_main.zig")) return "float-rem";
-    if (std.mem.eql(u8, root_source, "runtime_branch_mix_main.zig")) return if (std.mem.eql(u8, mode, "ReleaseSafe")) "checked-branch-mix-boundary" else "runtime-condbr";
-    if (std.mem.eql(u8, root_source, "tiny_scalar_releasesafe_boundary_main.zig")) return "checked-add-runtime-boundary";
-    if (std.mem.eql(u8, root_source, "runtime_side_effect_free_main.zig")) return "void-noop-call";
-    if (std.mem.eql(u8, root_source, "runtime_hidden_access_main.zig")) return "hidden-global-access";
-    if (std.mem.eql(u8, root_source, "runtime_mix_c_add_zig_main.zig")) return "mixed-c-zig-add";
-    if (std.mem.eql(u8, root_source, "runtime_mix_c_add_may_panic_main.zig")) return "mixed-c-zig-panic-add";
-    if (std.mem.eql(u8, root_source, "runtime_umul_fix_sat_i64_main.zig")) return "umul-fix-sat-i64";
-    if (std.mem.eql(u8, root_source, "runtime_inherit_want_safety_i64_main.zig")) return "inherit-i64-return";
-    if (std.mem.eql(u8, root_source, "runtime_compile_asm_unreachable_main.zig")) return "compile-asm-unreachable";
-    if (std.mem.eql(u8, root_source, "runtime_start_trampoline_main.zig")) return "start-trampoline";
-    if (std.mem.eql(u8, root_source, "runtime_getauxval_pointer_walk_main.zig")) return "getauxval-pointer-walk";
-    if (std.mem.eql(u8, root_source, "runtime_f128_sret_byval_main.zig")) return "f128-sret-byval";
-    if (std.mem.eql(u8, root_source, "runtime_noreturn_unreachable_stub_main.zig")) return "noreturn-unreachable-stub";
-    if (std.mem.eql(u8, root_source, "runtime_address_space_volatile_store_main.zig")) return "address-space-volatile-store";
-    if (std.mem.eql(u8, root_source, "runtime_raw_start_loop_main.zig")) return "raw-start-loop";
-    if (std.mem.eql(u8, root_source, "runtime_i1_const_return_main.zig")) return "i1-const-return";
-    if (std.mem.eql(u8, root_source, "runtime_constant_string_slice_return_main.zig")) return "constant-string-slice-return";
-    if (std.mem.eql(u8, root_source, "runtime_libfuzzer_vtable_run_main.zig")) return "libfuzzer-vtable-run";
-    if (std.mem.eql(u8, root_source, "runtime_str_from_float_help_main.zig")) return "str-from-float-help";
-    if (std.mem.eql(u8, root_source, "runtime_base64_decode_base_64_full_main.zig")) return "base64-decode-base64-full";
-    if (std.mem.eql(u8, root_source, "runtime_base64_decode_step_main.zig")) return "base64-decode-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_store_step_main.zig")) return "base64-store-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_byte_step_main.zig")) return "base64-residual-byte-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_padding_tail_step_main.zig")) return "base64-padding-tail-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_padding_loop_step_main.zig")) return "base64-padding-loop-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_padding_length_step_main.zig")) return "base64-padding-length-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_chunk_guard_step_main.zig")) return "base64-chunk-guard-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_source_stride_step_main.zig")) return "base64-source-stride-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_source_bundle_step_main.zig")) return "base64-source-bundle-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_next_source_bundle_step_main.zig")) return "base64-next-source-bundle-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_third_source_bundle_step_main.zig")) return "base64-third-source-bundle-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_bit_buffer_store_step_main.zig")) return "base64-bit-buffer-store-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_loop_advance_step_main.zig")) return "base64-loop-advance-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_guard_step_main.zig")) return "base64-residual-guard-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_bundle_step_main.zig")) return "base64-residual-bundle-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_store_step_main.zig")) return "base64-residual-store-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_length_step_main.zig")) return "base64-residual-length-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_table_check_step_main.zig")) return "base64-residual-table-check-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_accumulator_step_main.zig")) return "base64-residual-accumulator-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_loop_advance_step_main.zig")) return "base64-residual-loop-advance-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_padding_check_step_main.zig")) return "base64-residual-padding-check-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_final_mask_step_main.zig")) return "base64-residual-final-mask-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_residual_padding_loop_step_main.zig")) return "base64-residual-padding-loop-step";
-    if (std.mem.eql(u8, root_source, "runtime_base64_decode_exit_step_main.zig")) return "base64-decode-exit-step";
-    if (std.mem.eql(u8, root_source, "base64_table_lookup_main.zig")) return "table-indexed-load";
-    return null;
+fn sourceFactsMatchWrapperIdentity(facts: SourceFactModel) bool {
+    const root = facts.module.root_source;
+    const basename = if (std.mem.lastIndexOfScalar(u8, root, '/')) |index| root[index + 1 ..] else root;
+    const module = if (std.mem.endsWith(u8, basename, ".zig")) basename[0 .. basename.len - 4] else basename;
+    return std.mem.eql(u8, facts.mainModuleName(), module);
 }
 
 fn parseSourceDescriptorInput(contents: []const u8) ?SourceDescriptorInput {

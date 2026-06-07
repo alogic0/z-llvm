@@ -266,12 +266,12 @@ descriptor_file_consumed_rows=100
 source_fact_stream_rows=100
 concrete_source_fact_rows=100
 source_derived_descriptor_rows=100
-fact_derived_classification_rows=50
-root_source_classification_fallback_rows=50
-source_fact_program_rows=50
-source_fact_program_direct_rows=50
+fact_derived_classification_rows=100
+root_source_classification_fallback_rows=0
+source_fact_program_rows=100
+source_fact_program_direct_rows=100
 source_fact_body_wrapper_rows=0
-body_enum_fallback_rows=50
+body_enum_fallback_rows=0
 release_canonicalizer_rows=100
 observed_int_fold_rows=57
 observed_fp_fold_rows=5
@@ -323,19 +323,17 @@ rows use serialized DescriptorV2 transport and semantic serialized records, and
 the gate fails if any row falls back to the serialized return stub. The current
 provenance split is 100 rows on the separate extracted-record path with
 compile-context fact provenance, no body-map selector, no source-tag selector,
-and 0 template-owned rows. The gate also reports fact-derived classification
-versus temporary root-source classification fallback; the current measured split
-is `fact_derived_classification_rows=50` and
-`root_source_classification_fallback_rows=50`. Those classification counters
-are mirrored by `source_fact_program_rows=50` and
-`body_enum_fallback_rows=50`, and the SourceFactProgram rows now report
-`source_fact_program_direct_rows=50` and
-`source_fact_body_wrapper_rows=0`. The gate proves the fact-derived rows enter
-direct SourceFactProgram DescriptorV2 construction while remaining root-source
-fallback rows are still counted as body-enum fallback. All rows must have
-concrete facts, the fact-program plus body-enum fallback counters must account
-for all rows, and
-the 7-family wrong-facts probe rejects mismatched root/fact streams.
+and 0 template-owned rows. The gate now requires all 100 rows to be classified
+from concrete facts into direct SourceFactProgram DescriptorV2 records:
+`fact_derived_classification_rows=100`,
+`root_source_classification_fallback_rows=0`,
+`source_fact_program_rows=100`,
+`source_fact_program_direct_rows=100`,
+`source_fact_body_wrapper_rows=0`, and
+`body_enum_fallback_rows=0`. All rows must have concrete facts, the
+fact-program counters must account for all rows, and the 7-family wrong-facts
+probe rejects mismatched wrapper/fact streams without using root source as a
+body selector.
 The same source-owned path now runs a z_llvm release canonicalizer before
 structured lowering and applies selected transformations to eligible
 DescriptorV2 programs rather than reporting observation-only counters. The
@@ -625,12 +623,12 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           source_fact_stream_rows=100
                           concrete_source_fact_rows=100
                           source_derived_descriptor_rows=100
-                          fact_derived_classification_rows=50
-                          root_source_classification_fallback_rows=50
-                          source_fact_program_rows=50
-                          source_fact_program_direct_rows=50
+                          fact_derived_classification_rows=100
+                          root_source_classification_fallback_rows=0
+                          source_fact_program_rows=100
+                          source_fact_program_direct_rows=100
                           source_fact_body_wrapper_rows=0
-                          body_enum_fallback_rows=50
+                          body_enum_fallback_rows=0
                           release_canonicalizer_rows=100
                           observed_int_fold_rows=57
                           observed_fp_fold_rows=5

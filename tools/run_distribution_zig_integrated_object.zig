@@ -3,9 +3,9 @@ const common = @import("tool_common.zig");
 
 const expected_selected_ir_writer_rows = 146;
 const expected_release_source_owned_rows = 100;
-const min_release_source_owned_fact_derived_rows = 45;
-const min_release_source_owned_fact_program_direct_rows = 10;
-const max_release_source_owned_body_enum_fallback_rows = 55;
+const required_release_source_owned_fact_derived_rows = 100;
+const required_release_source_owned_fact_program_direct_rows = 100;
+const required_release_source_owned_body_enum_fallback_rows = 0;
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
 const Validation = enum {
@@ -2041,17 +2041,17 @@ pub fn main(init: std.process.Init) !void {
             if (zig_compile_context_descriptor_rows != expected_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0 or source_tag_env_present_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows, source_tag_env_present_rows });
             }
-            const min_fact_derived_rows: usize = if (case_filter == null) min_release_source_owned_fact_derived_rows else 0;
-            if (concrete_source_fact_rows != expected_rows or fact_derived_classification_rows < min_fact_derived_rows or fact_derived_classification_rows + root_source_classification_fallback_rows != expected_rows) {
-                try common.validationError(io, "release source-owned gate requires concrete source facts with complete classification accounting; concrete_source_fact_rows={} fact_derived_classification_rows={} min_fact_derived_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ concrete_source_fact_rows, fact_derived_classification_rows, min_fact_derived_rows, root_source_classification_fallback_rows, expected_rows });
+            const required_fact_derived_rows: usize = if (case_filter == null) required_release_source_owned_fact_derived_rows else expected_rows;
+            if (concrete_source_fact_rows != expected_rows or fact_derived_classification_rows != required_fact_derived_rows or root_source_classification_fallback_rows != 0) {
+                try common.validationError(io, "release source-owned gate requires every accepted row to be fact-derived with no root-source classification fallback; concrete_source_fact_rows={} fact_derived_classification_rows={} required_fact_derived_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ concrete_source_fact_rows, fact_derived_classification_rows, required_fact_derived_rows, root_source_classification_fallback_rows, expected_rows });
             }
             if (source_fact_program_rows != fact_derived_classification_rows or body_enum_fallback_rows != root_source_classification_fallback_rows or source_fact_program_rows + body_enum_fallback_rows != expected_rows) {
                 try common.validationError(io, "release source-owned gate requires source fact program accounting to match classification; source_fact_program_rows={} fact_derived_classification_rows={} body_enum_fallback_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ source_fact_program_rows, fact_derived_classification_rows, body_enum_fallback_rows, root_source_classification_fallback_rows, expected_rows });
             }
-            const min_direct_rows: usize = if (case_filter == null) min_release_source_owned_fact_program_direct_rows else 0;
-            const max_body_enum_fallback_rows: usize = if (case_filter == null) max_release_source_owned_body_enum_fallback_rows else expected_rows;
-            if (source_fact_program_direct_rows + source_fact_body_wrapper_rows != source_fact_program_rows or source_fact_program_direct_rows < min_direct_rows or body_enum_fallback_rows > max_body_enum_fallback_rows) {
-                try common.validationError(io, "release source-owned gate requires direct source fact program lowering for converted families; source_fact_program_rows={} source_fact_program_direct_rows={} min_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} max_body_enum_fallback_rows={}\n", .{ source_fact_program_rows, source_fact_program_direct_rows, min_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows, max_body_enum_fallback_rows });
+            const required_direct_rows: usize = if (case_filter == null) required_release_source_owned_fact_program_direct_rows else expected_rows;
+            const required_body_enum_fallback_rows: usize = if (case_filter == null) required_release_source_owned_body_enum_fallback_rows else 0;
+            if (source_fact_program_direct_rows + source_fact_body_wrapper_rows != source_fact_program_rows or source_fact_program_direct_rows != required_direct_rows or source_fact_body_wrapper_rows != 0 or body_enum_fallback_rows != required_body_enum_fallback_rows) {
+                try common.validationError(io, "release source-owned gate requires direct source fact program lowering for every accepted row; source_fact_program_rows={} source_fact_program_direct_rows={} required_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} required_body_enum_fallback_rows={}\n", .{ source_fact_program_rows, source_fact_program_direct_rows, required_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows, required_body_enum_fallback_rows });
             }
             const min_checked_preserved_rows: usize = if (case_filter == null) 3 else 0;
             if (release_canonicalizer_rows != expected_rows or release_canonicalizer_checked_rows < min_checked_preserved_rows or release_canonicalizer_checks_preserved_rows != release_canonicalizer_checked_rows) {
