@@ -20,7 +20,7 @@ is for. Use `zig build --help` to see the authoritative current list.
 | `zig build distribution-all` | Run the selected no-LLVM-codegen distribution subset, source-owned release proof, native-link object inspection/proof/probe, Zig source native-link integration gate, and conservative boundary gates. This is a milestone confirmation gate, not the development loop. Use it before handoff, before committing a broad claim change, or when evidence from several gates must be refreshed together. |
 | `zig build distribution-no-llvm` | Run the selected no-LLVM-codegen x86_64 subset: ReleaseFast, ReleaseSafe, ReleaseSmall, Debug focused object/executable gates, plus handoff validation. Use when validating the positive selected distribution subset without the extra boundary checks. |
 | `zig build distribution-boundary` | Run conservative boundary gates: linker/CRT ownership, ReleaseSmall exclusions, Debug unwind/DWARF boundary, and AArch64 object target boundary. Use when boundary docs or boundary behavior changes. |
-| `zig build distribution-native-link-object-inspection` | Inspect selected `z_llvm` ELF64 relocatable objects before Zig native linker handoff. It runs `readelf -W -h -S -s -r` and `objdump -dr`, validates section flags/alignment, symbols, relocations, TLS shape, undefined imports, and rejects COMDAT or `.eh_frame` until those are modeled. Use `--release-source-owned` to inspect the full 100-row x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall source-owned replacement boundary through the same patched-Zig z_llvm object path; the current source-owned object-format proof reports `inspected=100`, `elf64_rel=100`, `relocation_rows=12`, `tls_rows=8`, `undefined_import_rows=0`, `comdat_rows=0`, `eh_frame_rows=0`, `unsupported_relocation_rows=0`, and `local_fail=0`. Use before native-link executable gates when object layout, relocation, symbol, or TLS emission changes. |
+| `zig build distribution-native-link-object-inspection` | Inspect selected `z_llvm` ELF64 relocatable objects before Zig native linker handoff. It runs `readelf -W -h -S -s -r` and `objdump -dr`, validates section flags/alignment, symbols, relocations, TLS shape, undefined imports, and rejects COMDAT or `.eh_frame` until those are modeled. Use `--release-source-owned` to inspect the full 100-row x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall source-owned replacement boundary through the same patched-Zig z_llvm object path; that mode checks the patched stage4 hook and runs `zig build` during setup, so treat it as a milestone/object-boundary confirmation gate rather than a tiny inner-loop check. The current source-owned object-format proof reports `inspected=100`, `elf64_rel=100`, `relocation_rows=12`, `tls_rows=8`, `undefined_import_rows=0`, `comdat_rows=0`, `eh_frame_rows=0`, `unsupported_relocation_rows=0`, and `local_fail=0`. Use before native-link executable gates when object layout, relocation, symbol, or TLS emission changes. |
 | `zig build distribution-native-link` | Run selected native Zig linker handoff proof. This emits local objects with `z_llvm`, compiles C harnesses with `zig cc -c`, links with `zig build-exe -fno-lld`, and runs the executables. Use when proving native-linker compatibility for selected local objects. |
 | `zig build distribution-zig-source-native-link` | Run the selected Zig source integration gate: stage4 Zig emits LLVM IR, `z_llvm` emits local objects, and Zig's native linker links with `zig build-exe -fno-lld`. Executable rows run; runtime-heavy rows are link-only boundary accounting. |
 | `zig build distribution-zig-integrated-object` | Run the patched-Zig integrated postopt object-emission gate. Patched stage4 Zig `build-obj` lets LLVM run Zig's normal module optimization pipeline, writes optimized IR at the object boundary, invokes `z_llvm --emit=obj`, records a hook marker, then `zig build-exe -fno-lld -fno-compiler-rt -lc` links paired C ABI wrapper objects. Use when validating the experimental postopt replacement hook in `../ziglang`. |
@@ -80,13 +80,16 @@ Recommended validation ladder for source-owned work:
 3. zig build distribution-x86_64-release-source-owned
 4. zig build distribution-x86_64-selected-zllvm
 5. zig build check-zig-stage4-emitter
-6. zig build distribution-all
+6. zig build distribution-native-link-object-inspection -- --release-source-owned
+7. zig build distribution-all
 ```
 
-`distribution-all` is step 6 because it is a milestone confirmation gate, not
-the development loop. Do not rebuild stage4 for every row. Patch Zig only when
-the hook contract changes; otherwise stabilize the hook and iterate in z_llvm
-with focused gates.
+`distribution-native-link-object-inspection -- --release-source-owned` and
+`distribution-all` are milestone confirmation gates, not the development loop.
+The source-owned inspection mode validates the patched stage4 hook and rebuilds
+z_llvm before inspecting the 100-row object boundary. Do not rebuild stage4 for
+every row. Patch Zig only when the hook contract changes; otherwise stabilize
+the hook and iterate in z_llvm with focused gates.
 
 The 146-row full gate includes the original selected runtime rows plus 58
 `releasefast_source_*` / `releasesafe_source_*` / `releasesmall_source_*`

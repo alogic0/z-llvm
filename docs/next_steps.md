@@ -129,6 +129,9 @@ counters are `inspected=100`, `elf64_rel=100`, `relocation_rows=12`,
 `tls_rows=8`, `undefined_import_rows=0`, `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. Final linking remains
 Zig-owned; this is object-format proof, not a z_llvm linker implementation.
+This gate mode validates the patched stage4 hook and runs `zig build` during
+setup, so use it as milestone object-boundary confirmation rather than the
+regular source-owned row inner loop.
 
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.

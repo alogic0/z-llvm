@@ -81,6 +81,11 @@ ReleaseFast/ReleaseSafe/ReleaseSmall inventory as
 `distribution-x86_64-release-source-owned` and emits each object through the
 patched-Zig source-owned z_llvm hook before inspecting it.
 
+The source-owned inspection mode is a milestone object-boundary confirmation,
+not a tiny inner-loop check. Its setup validates the patched stage4 hook with
+`tools/check_zig_stage4_emitter.zig` and runs `zig build` before inspecting the
+100-row object boundary.
+
 It reports:
 
 ```text
