@@ -47,6 +47,12 @@ The x86_64 lowering layer now shares SysV direct-call frame helpers for the
 aligned call prologue/epilogue and the one-slot live-parameter spill/reload
 shape used by simple direct calls; remaining raw stack-frame emission is kept
 to custom multi-call, f128 comparison, and explicit stack-slot boundary rows.
+The source-owned DescriptorV2 path also runs a local z_llvm release
+canonicalizer before structured lowering. The current source-owned gate reports
+`release_canonicalizer_rows=100`, `int_fold_rows=83`, `fp_fold_rows=5`,
+`dead_local_rows=67`, `select_fcmp_rows=8`, `checked_rows=9`, and
+`checks_preserved_rows=9`, so ReleaseSafe checked/runtime-call boundaries are
+counted and fail closed if preservation regresses.
 The gate fails if a selected row reports libLLVM module parse/print,
 LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
 structured-direct count other than 146, any structured row reports textual

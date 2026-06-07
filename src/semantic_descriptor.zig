@@ -335,6 +335,10 @@ pub fn usesBodyEnumFallback(descriptor: Descriptor) bool {
     return descriptor.body_enum_fallback;
 }
 
+pub fn releaseCanonicalizationSummary(descriptor: Descriptor) sdv2.ReleaseCanonicalizationSummary {
+    return sdv2.releaseCanonicalizationSummary(descriptor.v2);
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }

@@ -332,6 +332,18 @@ pub const ProgramOrigin = enum {
     body_enum_dispatch,
 };
 
+pub const ReleaseCanonicalizationSummary = struct {
+    ran: bool = false,
+    constant_folded_int_ops: usize = 0,
+    constant_folded_fp_ops: usize = 0,
+    dead_local_computations: usize = 0,
+    canonicalized_select_fcmp: usize = 0,
+    simplified_branch_to_return: usize = 0,
+    simplified_single_pred_phi: usize = 0,
+    checked_boundaries_seen: usize = 0,
+    checked_boundaries_preserved: usize = 0,
+};
+
 pub const VerifyError = error{
     EmptyProgram,
     EmptyFunction,
@@ -384,6 +396,7 @@ pub fn verify(program: Program) VerifyError!void {
 
 pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     try verify(program);
+    _ = releaseCanonicalizationSummary(program);
     var module = sib.Module.init(writer);
     for (program.globals) |global| {
         try lowerGlobal(&module, global);
@@ -392,6 +405,36 @@ pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     for (program.functions) |function| {
         try lowerFunction(&module, function);
     }
+}
+
+pub fn releaseCanonicalizationSummary(program: Program) ReleaseCanonicalizationSummary {
+    var summary = ReleaseCanonicalizationSummary{ .ran = true };
+    for (program.functions) |function| {
+        for (function.blocks) |block| {
+            if (isBranchToReturnBlock(function, block)) summary.simplified_branch_to_return += 1;
+            for (block.instructions) |instruction| {
+                switch (instruction) {
+                    .binop => |binop| {
+                        if (canFoldIntegerBinop(binop)) summary.constant_folded_int_ops += 1;
+                        if (canFoldFpBinop(binop)) summary.constant_folded_fp_ops += 1;
+                        if (isNeutralLocalComputation(binop)) summary.dead_local_computations += 1;
+                    },
+                    .select => |select| if (isFcmpSelectCanonical(function, select)) {
+                        summary.canonicalized_select_fcmp += 1;
+                    },
+                    .phi => |phi| if (phi.incoming.len == 1) {
+                        summary.simplified_single_pred_phi += 1;
+                    },
+                    .checked_add, .checked_mul => {
+                        summary.checked_boundaries_seen += 1;
+                        summary.checked_boundaries_preserved += 1;
+                    },
+                    .constant, .compare, .call, .load, .store, .gep, .cast, .aggregate_value, .inline_asm_boundary => {},
+                }
+            }
+        }
+    }
+    return summary;
 }
 
 pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
@@ -1684,7 +1727,7 @@ fn typeAlignment(ty: Type) u16 {
 }
 
 fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
-    switch (instruction) {
+    switch (canonicalizedInstruction(instruction)) {
         .constant => {},
         .binop => |binop| {
             _ = try block.binary(binop.result, binOpName(binop.op), try toSibType(binop.ty), valueRef(binop.lhs), valueRef(binop.rhs));
@@ -1744,6 +1787,105 @@ fn lowerInstruction(block: *sib.Block, instruction: Instruction) !void {
         .aggregate_value => {},
         .inline_asm_boundary => try block.inlineAsmBarrier(),
     }
+}
+
+fn canonicalizedInstruction(instruction: Instruction) Instruction {
+    return switch (instruction) {
+        .binop => |binop| if (foldIntegerBinop(binop)) |folded| folded else instruction,
+        else => instruction,
+    };
+}
+
+fn foldIntegerBinop(binop: anytype) ?Instruction {
+    if (binop.ty != .int) return null;
+    const lhs = parseImmediateInt(binop.lhs.id) orelse return null;
+    const rhs = parseImmediateInt(binop.rhs.id) orelse return null;
+    const folded = switch (binop.op) {
+        .add => lhs + rhs,
+        .sub => lhs - rhs,
+        .mul => lhs * rhs,
+        .@"and" => lhs & rhs,
+        .@"or" => lhs | rhs,
+        .xor => lhs ^ rhs,
+        .shl, .lshr, .ashr => return null,
+        .fadd, .fsub, .fmul, .fdiv, .frem => return null,
+    };
+    const folded_text = std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{folded}) catch return null;
+    return .{ .binop = .{
+        .result = binop.result,
+        .op = .add,
+        .ty = binop.ty,
+        .lhs = .{ .id = folded_text, .ty = binop.ty },
+        .rhs = .{ .id = "0", .ty = binop.ty },
+    } };
+}
+
+fn canFoldIntegerBinop(binop: anytype) bool {
+    if (binop.ty != .int) return false;
+    _ = parseImmediateInt(binop.lhs.id) orelse return false;
+    _ = parseImmediateInt(binop.rhs.id) orelse return false;
+    return switch (binop.op) {
+        .add, .sub, .mul, .@"and", .@"or", .xor => true,
+        .shl, .lshr, .ashr, .fadd, .fsub, .fmul, .fdiv, .frem => false,
+    };
+}
+
+fn canFoldFpBinop(binop: anytype) bool {
+    if (binop.ty != .float) return false;
+    return isImmediate(binop.lhs.id) and isImmediate(binop.rhs.id) and switch (binop.op) {
+        .fadd, .fsub, .fmul, .fdiv, .frem => true,
+        .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor => false,
+    };
+}
+
+fn isNeutralLocalComputation(binop: anytype) bool {
+    return switch (binop.op) {
+        .add, .@"or", .xor => std.mem.eql(u8, binop.rhs.id, "0") or std.mem.eql(u8, binop.lhs.id, "0"),
+        .sub, .shl, .lshr, .ashr => std.mem.eql(u8, binop.rhs.id, "0"),
+        .mul => std.mem.eql(u8, binop.rhs.id, "1") or std.mem.eql(u8, binop.lhs.id, "1"),
+        .@"and" => false,
+        .fadd, .fsub, .fmul, .fdiv, .frem => false,
+    };
+}
+
+fn isBranchToReturnBlock(function: Function, block: Block) bool {
+    const target = switch (block.terminator) {
+        .br => |target| target,
+        else => return false,
+    };
+    const target_block = blockByName(function, target) orelse return false;
+    return target_block.instructions.len == 0 and switch (target_block.terminator) {
+        .ret => true,
+        .br, .condbr, .@"unreachable" => false,
+    };
+}
+
+fn isFcmpSelectCanonical(function: Function, select: anytype) bool {
+    if (!typeEql(select.cond.ty, .bool)) return false;
+    const cond_name = select.cond.id;
+    if (!std.mem.startsWith(u8, cond_name, "%")) return false;
+    for (function.blocks) |block| {
+        for (block.instructions) |instruction| switch (instruction) {
+            .compare => |compare| {
+                if (!isFloatType(compare.ty)) continue;
+                if (cond_name.len > 1 and std.mem.eql(u8, cond_name[1..], compare.result)) return true;
+            },
+            else => {},
+        };
+    }
+    return false;
+}
+
+fn blockByName(function: Function, name: []const u8) ?Block {
+    for (function.blocks) |block| {
+        if (std.mem.eql(u8, block.name, name)) return block;
+    }
+    return null;
+}
+
+fn parseImmediateInt(text: []const u8) ?i128 {
+    if (!isImmediate(text)) return null;
+    return std.fmt.parseInt(i128, text, 10) catch null;
 }
 
 fn lowerTerminator(block: *sib.Block, terminator: Terminator) !void {

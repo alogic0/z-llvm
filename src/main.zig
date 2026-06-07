@@ -6,6 +6,7 @@ const mc = @import("mc.zig");
 const pass_manager = @import("pass_manager.zig");
 const pipelines = @import("pipelines.zig");
 const sd = @import("semantic_descriptor.zig");
+const sdv2 = @import("semantic_descriptor_v2.zig");
 const sib = @import("structured_ir_builder.zig");
 const target = @import("target.zig");
 const zsl = @import("zig_semantic_lowering.zig");
@@ -268,6 +269,7 @@ fn writeIrWriterModuleFromEnv(
     var buffer: [4096]u8 = undefined;
     var writer = file.writer(io, &buffer);
     const is_structured_direct = if (descriptor != null) true else if (ir_writer_case) |case| case.construction == .structured_builder else false;
+    const release_canonicalization: sdv2.ReleaseCanonicalizationSummary = if (descriptor) |desc| sd.releaseCanonicalizationSummary(desc) else .{};
     writer.interface.print(
         \\; ModuleID = "zllvm-external-ir-writer"
         \\source_filename = "{s}"
@@ -402,6 +404,30 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.usesBodyEnumFallback(desc)) "used" else "not-used" else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });
+    };
+    writer.interface.print(
+        \\; zllvm_release_canonicalizer = "{s}"
+        \\; zllvm_release_canonicalizer_int_folds = "{}"
+        \\; zllvm_release_canonicalizer_fp_folds = "{}"
+        \\; zllvm_release_canonicalizer_dead_locals = "{}"
+        \\; zllvm_release_canonicalizer_select_fcmp = "{}"
+        \\; zllvm_release_canonicalizer_branch_to_return = "{}"
+        \\; zllvm_release_canonicalizer_single_pred_phi = "{}"
+        \\; zllvm_release_canonicalizer_checked_seen = "{}"
+        \\; zllvm_release_canonicalizer_checks_preserved = "{}"
+        \\
+    , .{
+        if (release_canonicalization.ran) "used" else "not-used",
+        release_canonicalization.constant_folded_int_ops,
+        release_canonicalization.constant_folded_fp_ops,
+        release_canonicalization.dead_local_computations,
+        release_canonicalization.canonicalized_select_fcmp,
+        release_canonicalization.simplified_branch_to_return,
+        release_canonicalization.simplified_single_pred_phi,
+        release_canonicalization.checked_boundaries_seen,
+        release_canonicalization.checked_boundaries_preserved,
+    }) catch |err| {
+        try fatal(io, "failed to write external IR writer optimizer header {s}: {any}\n", .{ ir_path, err });
     };
     if (descriptor) |desc| {
         writer.interface.writeAll("; zllvm_semantic_descriptor_features = \"") catch |err| {

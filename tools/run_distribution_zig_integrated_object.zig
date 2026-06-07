@@ -1377,6 +1377,15 @@ pub fn main(init: std.process.Init) !void {
     var source_fact_program_direct_rows: usize = 0;
     var source_fact_body_wrapper_rows: usize = 0;
     var body_enum_fallback_rows: usize = 0;
+    var release_canonicalizer_rows: usize = 0;
+    var release_canonicalizer_int_fold_rows: usize = 0;
+    var release_canonicalizer_fp_fold_rows: usize = 0;
+    var release_canonicalizer_dead_local_rows: usize = 0;
+    var release_canonicalizer_select_fcmp_rows: usize = 0;
+    var release_canonicalizer_branch_to_return_rows: usize = 0;
+    var release_canonicalizer_single_pred_phi_rows: usize = 0;
+    var release_canonicalizer_checked_rows: usize = 0;
+    var release_canonicalizer_checks_preserved_rows: usize = 0;
     var serialized_function_rows: usize = 0;
     var serialized_instruction_rows: usize = 0;
     var serialized_global_rows: usize = 0;
@@ -1635,6 +1644,24 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(source_fact_body_wrapper);
         const body_enum_fallback = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_body_enum_fallback = \"", "zllvm_body_enum_fallback") else "-";
         defer if (use_ir_writer) allocator.free(body_enum_fallback);
+        const release_canonicalizer = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer = \"", "zllvm_release_canonicalizer") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer);
+        const release_canonicalizer_int_folds = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_int_folds = \"", "zllvm_release_canonicalizer_int_folds") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_int_folds);
+        const release_canonicalizer_fp_folds = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_fp_folds = \"", "zllvm_release_canonicalizer_fp_folds") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_fp_folds);
+        const release_canonicalizer_dead_locals = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_dead_locals = \"", "zllvm_release_canonicalizer_dead_locals") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_dead_locals);
+        const release_canonicalizer_select_fcmp = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_select_fcmp = \"", "zllvm_release_canonicalizer_select_fcmp") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_select_fcmp);
+        const release_canonicalizer_branch_to_return = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_branch_to_return = \"", "zllvm_release_canonicalizer_branch_to_return") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_branch_to_return);
+        const release_canonicalizer_single_pred_phi = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_single_pred_phi = \"", "zllvm_release_canonicalizer_single_pred_phi") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_single_pred_phi);
+        const release_canonicalizer_checked_seen = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_checked_seen = \"", "zllvm_release_canonicalizer_checked_seen") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_checked_seen);
+        const release_canonicalizer_checks_preserved = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_release_canonicalizer_checks_preserved = \"", "zllvm_release_canonicalizer_checks_preserved") else "-";
+        defer if (use_ir_writer) allocator.free(release_canonicalizer_checks_preserved);
         if (use_ir_writer) {
             if (source_wrapper_dispatch or release_source_owned) {
                 const expected_dispatch = if (release_source_owned) "source-owned" else "source-wrapper";
@@ -1825,6 +1852,25 @@ pub fn main(init: std.process.Init) !void {
                 } else {
                     try common.validationError(io, "release source-owned row {s} did not report source fact program ownership: source_fact_program={s} body_enum_fallback={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, source_fact_program, body_enum_fallback, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
+                if (std.mem.eql(u8, release_canonicalizer, "used")) {
+                    release_canonicalizer_rows += 1;
+                } else {
+                    try common.validationError(io, "release source-owned row {s} did not run the z_llvm release canonicalizer: release_canonicalizer={s} wrapper={s} fixture={s} mode={s}\n", .{ case.id, release_canonicalizer, case.wrapper, case.covered_fixture, case.mode });
+                }
+                if (!std.mem.eql(u8, release_canonicalizer_int_folds, "0")) release_canonicalizer_int_fold_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_fp_folds, "0")) release_canonicalizer_fp_fold_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_dead_locals, "0")) release_canonicalizer_dead_local_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_select_fcmp, "0")) release_canonicalizer_select_fcmp_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_branch_to_return, "0")) release_canonicalizer_branch_to_return_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_single_pred_phi, "0")) release_canonicalizer_single_pred_phi_rows += 1;
+                if (!std.mem.eql(u8, release_canonicalizer_checked_seen, "0")) {
+                    release_canonicalizer_checked_rows += 1;
+                    if (std.mem.eql(u8, release_canonicalizer_checks_preserved, release_canonicalizer_checked_seen)) {
+                        release_canonicalizer_checks_preserved_rows += 1;
+                    } else {
+                        try common.validationError(io, "release source-owned row {s} changed ReleaseSafe/runtime checked boundaries: checked_seen={s} checks_preserved={s} wrapper={s} fixture={s} mode={s}\n", .{ case.id, release_canonicalizer_checked_seen, release_canonicalizer_checks_preserved, case.wrapper, case.covered_fixture, case.mode });
+                    }
+                }
                 if (!std.mem.eql(u8, zig_emitted_descriptor, "used")) {
                     try common.validationError(io, "release source-owned row {s} did not report Zig-emitted descriptor input: zig_emitted_descriptor={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, zig_emitted_descriptor, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
                 }
@@ -1965,6 +2011,10 @@ pub fn main(init: std.process.Init) !void {
             if (source_fact_program_direct_rows + source_fact_body_wrapper_rows != source_fact_program_rows or source_fact_program_direct_rows < min_direct_rows or body_enum_fallback_rows > max_body_enum_fallback_rows) {
                 try common.validationError(io, "release source-owned gate requires direct source fact program lowering for converted families; source_fact_program_rows={} source_fact_program_direct_rows={} min_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} max_body_enum_fallback_rows={}\n", .{ source_fact_program_rows, source_fact_program_direct_rows, min_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows, max_body_enum_fallback_rows });
             }
+            const min_checked_preserved_rows: usize = if (case_filter == null) 3 else 0;
+            if (release_canonicalizer_rows != expected_rows or release_canonicalizer_checked_rows < min_checked_preserved_rows or release_canonicalizer_checks_preserved_rows != release_canonicalizer_checked_rows) {
+                try common.validationError(io, "release source-owned gate requires z_llvm release canonicalization with checked-boundary preservation; release_canonicalizer_rows={} expected_rows={} checked_rows={} checks_preserved_rows={} min_checked_preserved_rows={}\n", .{ release_canonicalizer_rows, expected_rows, release_canonicalizer_checked_rows, release_canonicalizer_checks_preserved_rows, min_checked_preserved_rows });
+            }
             if (descriptor_owned_rows != expected_rows or descriptor_v2_rows != expected_rows or real_descriptor_program_rows != expected_rows or full_descriptor_program_rows != expected_rows or serialized_function_rows != expected_rows or serialized_instruction_rows != expected_rows or serialized_global_rows != expected_rows or semantic_serialized_rows != expected_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_rows or source_fact_stream_rows != expected_rows or concrete_source_fact_rows != expected_rows or source_derived_descriptor_rows != expected_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_rows or generic_codegen_rows != expected_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records from Zig source facts; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_fact_stream_rows={} concrete_source_fact_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, concrete_source_fact_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
@@ -1975,6 +2025,10 @@ pub fn main(init: std.process.Init) !void {
             try stdout_writer.interface.print(
                 "summary release-source-owned-classification concrete_source_fact_rows={} fact_derived_classification_rows={} root_source_classification_fallback_rows={} source_fact_program_rows={} source_fact_program_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} local_fail=0\n",
                 .{ concrete_source_fact_rows, fact_derived_classification_rows, root_source_classification_fallback_rows, source_fact_program_rows, source_fact_program_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows },
+            );
+            try stdout_writer.interface.print(
+                "summary release-source-owned-optimizer release_canonicalizer_rows={} int_fold_rows={} fp_fold_rows={} dead_local_rows={} select_fcmp_rows={} branch_to_return_rows={} single_pred_phi_rows={} checked_rows={} checks_preserved_rows={} local_fail=0\n",
+                .{ release_canonicalizer_rows, release_canonicalizer_int_fold_rows, release_canonicalizer_fp_fold_rows, release_canonicalizer_dead_local_rows, release_canonicalizer_select_fcmp_rows, release_canonicalizer_branch_to_return_rows, release_canonicalizer_single_pred_phi_rows, release_canonicalizer_checked_rows, release_canonicalizer_checks_preserved_rows },
             );
             try stdout_writer.interface.print(
                 "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={} local_fail=0\n",

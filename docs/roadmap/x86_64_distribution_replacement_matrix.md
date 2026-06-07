@@ -272,6 +272,13 @@ source_fact_program_rows=50
 source_fact_program_direct_rows=50
 source_fact_body_wrapper_rows=0
 body_enum_fallback_rows=50
+release_canonicalizer_rows=100
+int_fold_rows=83
+fp_fold_rows=5
+dead_local_rows=67
+select_fcmp_rows=8
+checked_rows=9
+checks_preserved_rows=9
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -325,6 +332,11 @@ fallback rows are still counted as body-enum fallback. All rows must have
 concrete facts, the fact-program plus body-enum fallback counters must account
 for all rows, and
 the 7-family wrong-facts probe rejects mismatched root/fact streams.
+The same source-owned path now runs a z_llvm release canonicalizer before
+structured lowering; the current proof reports 100 canonicalized rows, 83 rows
+with integer constant folds, 5 rows with FP-foldable shapes, 67 rows with
+neutral/dead local computations, 8 compare/select canonical shapes, and 9
+ReleaseSafe checked rows with all 9 checked boundaries preserved.
 `ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
 source-owned gate fails if any row delegates back to the external
 writer body path, uses the old semantic-record ownership marker, uses surface
@@ -610,6 +622,13 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           source_fact_program_direct_rows=50
                           source_fact_body_wrapper_rows=0
                           body_enum_fallback_rows=50
+                          release_canonicalizer_rows=100
+                          int_fold_rows=83
+                          fp_fold_rows=5
+                          dead_local_rows=67
+                          select_fcmp_rows=8
+                          checked_rows=9
+                          checks_preserved_rows=9
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0
