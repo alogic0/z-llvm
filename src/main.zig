@@ -269,7 +269,7 @@ fn writeIrWriterModuleFromEnv(
     var buffer: [4096]u8 = undefined;
     var writer = file.writer(io, &buffer);
     const is_structured_direct = if (descriptor != null) true else if (ir_writer_case) |case| case.construction == .structured_builder else false;
-    const release_canonicalization: sdv2.ReleaseCanonicalizationSummary = if (descriptor) |desc| sd.releaseCanonicalizationSummary(desc) else .{};
+    const release_canonicalization: sdv2.ReleaseCanonicalizationReport = if (descriptor) |desc| sd.releaseCanonicalizationReport(desc) else .{};
     writer.interface.print(
         \\; ModuleID = "zllvm-external-ir-writer"
         \\source_filename = "{s}"
@@ -415,17 +415,55 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_release_canonicalizer_single_pred_phi = "{}"
         \\; zllvm_release_canonicalizer_checked_seen = "{}"
         \\; zllvm_release_canonicalizer_checks_preserved = "{}"
+        \\; zllvm_release_canonicalizer_observed_int_folds = "{}"
+        \\; zllvm_release_canonicalizer_observed_fp_folds = "{}"
+        \\; zllvm_release_canonicalizer_observed_dead_locals = "{}"
+        \\; zllvm_release_canonicalizer_observed_select_fcmp = "{}"
+        \\; zllvm_release_canonicalizer_observed_branch_to_return = "{}"
+        \\; zllvm_release_canonicalizer_observed_single_pred_phi = "{}"
+        \\; zllvm_release_canonicalizer_applied_int_folds = "{}"
+        \\; zllvm_release_canonicalizer_applied_fp_folds = "{}"
+        \\; zllvm_release_canonicalizer_applied_dead_locals = "{}"
+        \\; zllvm_release_canonicalizer_applied_select_fcmp = "{}"
+        \\; zllvm_release_canonicalizer_applied_branch_to_return = "{}"
+        \\; zllvm_release_canonicalizer_applied_single_pred_phi = "{}"
+        \\; zllvm_release_canonicalizer_after_int_folds = "{}"
+        \\; zllvm_release_canonicalizer_after_fp_folds = "{}"
+        \\; zllvm_release_canonicalizer_after_dead_locals = "{}"
+        \\; zllvm_release_canonicalizer_after_select_fcmp = "{}"
+        \\; zllvm_release_canonicalizer_after_branch_to_return = "{}"
+        \\; zllvm_release_canonicalizer_after_single_pred_phi = "{}"
+        \\; zllvm_release_canonicalizer_check_mode = "{s}"
         \\
     , .{
-        if (release_canonicalization.ran) "used" else "not-used",
-        release_canonicalization.constant_folded_int_ops,
-        release_canonicalization.constant_folded_fp_ops,
-        release_canonicalization.dead_local_computations,
-        release_canonicalization.canonicalized_select_fcmp,
-        release_canonicalization.simplified_branch_to_return,
-        release_canonicalization.simplified_single_pred_phi,
-        release_canonicalization.checked_boundaries_seen,
-        release_canonicalization.checked_boundaries_preserved,
+        if (release_canonicalization.observed.ran) "used" else "not-used",
+        release_canonicalization.observed.constant_folded_int_ops,
+        release_canonicalization.observed.constant_folded_fp_ops,
+        release_canonicalization.observed.dead_local_computations,
+        release_canonicalization.observed.canonicalized_select_fcmp,
+        release_canonicalization.observed.simplified_branch_to_return,
+        release_canonicalization.observed.simplified_single_pred_phi,
+        release_canonicalization.observed.checked_boundaries_seen,
+        release_canonicalization.after.checked_boundaries_seen,
+        release_canonicalization.observed.constant_folded_int_ops,
+        release_canonicalization.observed.constant_folded_fp_ops,
+        release_canonicalization.observed.dead_local_computations,
+        release_canonicalization.observed.canonicalized_select_fcmp,
+        release_canonicalization.observed.simplified_branch_to_return,
+        release_canonicalization.observed.simplified_single_pred_phi,
+        release_canonicalization.applied.constant_folded_int_ops,
+        release_canonicalization.applied.constant_folded_fp_ops,
+        release_canonicalization.applied.dead_local_computations,
+        release_canonicalization.applied.canonicalized_select_fcmp,
+        release_canonicalization.applied.simplified_branch_to_return,
+        release_canonicalization.applied.simplified_single_pred_phi,
+        release_canonicalization.after.constant_folded_int_ops,
+        release_canonicalization.after.constant_folded_fp_ops,
+        release_canonicalization.after.dead_local_computations,
+        release_canonicalization.after.canonicalized_select_fcmp,
+        release_canonicalization.after.simplified_branch_to_return,
+        release_canonicalization.after.simplified_single_pred_phi,
+        mode,
     }) catch |err| {
         try fatal(io, "failed to write external IR writer optimizer header {s}: {any}\n", .{ ir_path, err });
     };

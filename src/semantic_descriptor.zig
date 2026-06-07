@@ -339,6 +339,10 @@ pub fn releaseCanonicalizationSummary(descriptor: Descriptor) sdv2.ReleaseCanoni
     return sdv2.releaseCanonicalizationSummary(descriptor.v2);
 }
 
+pub fn releaseCanonicalizationReport(descriptor: Descriptor) sdv2.ReleaseCanonicalizationReport {
+    return sdv2.releaseCanonicalizationReport(descriptor.v2);
+}
+
 pub fn hasSerializedFunctions(descriptor: Descriptor) bool {
     return descriptor.v2.serialized_functions;
 }

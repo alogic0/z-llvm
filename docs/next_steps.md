@@ -47,12 +47,20 @@ The x86_64 lowering layer now shares SysV direct-call frame helpers for the
 aligned call prologue/epilogue and the one-slot live-parameter spill/reload
 shape used by simple direct calls; remaining raw stack-frame emission is kept
 to custom multi-call, f128 comparison, and explicit stack-slot boundary rows.
-The source-owned DescriptorV2 path also runs a local z_llvm release
-canonicalizer before structured lowering. The current source-owned gate reports
-`release_canonicalizer_rows=100`, `int_fold_rows=83`, `fp_fold_rows=5`,
-`dead_local_rows=67`, `select_fcmp_rows=8`, `checked_rows=9`, and
-`checks_preserved_rows=9`, so ReleaseSafe checked/runtime-call boundaries are
-counted and fail closed if preservation regresses.
+The source-owned DescriptorV2 path now runs a local z_llvm release
+canonicalizer that rewrites eligible DescriptorV2 programs before structured
+lowering. The current source-owned gate reports
+`release_canonicalizer_rows=100`, `observed_int_fold_rows=57`,
+`observed_fp_fold_rows=5`, `observed_dead_local_rows=41`,
+`observed_select_fcmp_rows=7`, `applied_int_fold_rows=57`,
+`applied_fp_fold_rows=5`, `applied_dead_local_rows=41`,
+`applied_select_fcmp_rows=7`, `checked_rows=9`, and
+`checks_preserved_rows=9`. The runner fails if eligible selected rows only
+observe integer/FP/select/CFG opportunities without applying them, and
+ReleaseSafe checked/runtime-call boundaries fail closed if preservation
+regresses. Large semantic boundary rows such as full base64 and
+`strFromFloatHelp` keep their current shape until their generic lowering is
+ready for canonicalized CFG.
 DescriptorV2 verifier negatives now cover unsupported vector and varargs
 boundaries, malformed SysV aggregate/sret/byval ABI shapes, unsupported atomic
 ordering, TLS/local-exec relocation mismatches, and ReleaseSafe checked-boundary

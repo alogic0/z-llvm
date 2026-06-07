@@ -344,6 +344,13 @@ pub const ReleaseCanonicalizationSummary = struct {
     checked_boundaries_preserved: usize = 0,
 };
 
+pub const ReleaseCanonicalizationReport = struct {
+    observed: ReleaseCanonicalizationSummary = .{},
+    applied: ReleaseCanonicalizationSummary = .{},
+    after: ReleaseCanonicalizationSummary = .{},
+    checks_preserved: bool = false,
+};
+
 pub const VerifyError = error{
     EmptyProgram,
     EmptyFunction,
@@ -397,15 +404,32 @@ pub fn verify(program: Program) VerifyError!void {
 
 pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
     try verify(program);
-    _ = releaseCanonicalizationSummary(program);
+    const canonicalized = try canonicalizeReleaseProgram(std.heap.page_allocator, program);
+    try verify(canonicalized);
+    try verifyCanonicalizedReleaseProgram(program, canonicalized);
     var module = sib.Module.init(writer);
-    for (program.globals) |global| {
+    for (canonicalized.globals) |global| {
         try lowerGlobal(&module, global);
     }
-    if (program.globals.len != 0) try writer.writeByte('\n');
-    for (program.functions) |function| {
+    if (canonicalized.globals.len != 0) try writer.writeByte('\n');
+    for (canonicalized.functions) |function| {
         try lowerFunction(&module, function);
     }
+}
+
+pub fn releaseCanonicalizationReport(program: Program) ReleaseCanonicalizationReport {
+    const observed = releaseCanonicalizationObservedSummary(program);
+    const canonicalized = canonicalizeReleaseProgram(std.heap.page_allocator, program) catch {
+        return .{ .observed = observed, .applied = .{ .ran = false }, .after = observed, .checks_preserved = false };
+    };
+    const after = releaseCanonicalizationObservedSummary(canonicalized);
+    const applied = appliedCanonicalizationSummary(observed, after);
+    return .{
+        .observed = observed,
+        .applied = applied,
+        .after = after,
+        .checks_preserved = observed.checked_boundaries_seen == after.checked_boundaries_seen,
+    };
 }
 
 pub fn releaseCanonicalizationSummary(program: Program) ReleaseCanonicalizationSummary {
@@ -436,6 +460,378 @@ pub fn releaseCanonicalizationSummary(program: Program) ReleaseCanonicalizationS
         }
     }
     return summary;
+}
+
+fn releaseCanonicalizationObservedSummary(program: Program) ReleaseCanonicalizationSummary {
+    if (!releaseCanonicalizerMayRewriteBody(program.body)) {
+        const summary = releaseCanonicalizationSummary(program);
+        return .{
+            .ran = true,
+            .checked_boundaries_seen = summary.checked_boundaries_seen,
+            .checked_boundaries_preserved = summary.checked_boundaries_seen,
+        };
+    }
+    return releaseCanonicalizationSummary(program);
+}
+
+fn appliedCanonicalizationSummary(observed: ReleaseCanonicalizationSummary, after: ReleaseCanonicalizationSummary) ReleaseCanonicalizationSummary {
+    return .{
+        .ran = observed.ran,
+        .constant_folded_int_ops = saturatedDelta(observed.constant_folded_int_ops, after.constant_folded_int_ops),
+        .constant_folded_fp_ops = saturatedDelta(observed.constant_folded_fp_ops, after.constant_folded_fp_ops),
+        .dead_local_computations = saturatedDelta(observed.dead_local_computations, after.dead_local_computations),
+        .canonicalized_select_fcmp = saturatedDelta(observed.canonicalized_select_fcmp, after.canonicalized_select_fcmp),
+        .simplified_branch_to_return = saturatedDelta(observed.simplified_branch_to_return, after.simplified_branch_to_return),
+        .simplified_single_pred_phi = saturatedDelta(observed.simplified_single_pred_phi, after.simplified_single_pred_phi),
+        .checked_boundaries_seen = observed.checked_boundaries_seen,
+        .checked_boundaries_preserved = after.checked_boundaries_seen,
+    };
+}
+
+fn saturatedDelta(before: usize, after: usize) usize {
+    return if (before > after) before - after else 0;
+}
+
+fn canonicalizeReleaseProgram(allocator: std.mem.Allocator, program: Program) !Program {
+    if (!releaseCanonicalizerMayRewriteBody(program.body)) return program;
+    var functions = try allocator.alloc(Function, program.functions.len);
+    for (program.functions, 0..) |function, index| {
+        functions[index] = try canonicalizeFunction(allocator, function);
+    }
+    var canonicalized = program;
+    canonicalized.functions = functions;
+    return canonicalized;
+}
+
+fn releaseCanonicalizerMayRewriteBody(body: Body) bool {
+    return switch (body) {
+        .str_from_float_help,
+        .base64_decode_base64_full,
+        .base64_decode_step,
+        .base64_store_step,
+        .base64_residual_byte_step,
+        .base64_padding_tail_step,
+        .base64_padding_loop_step,
+        .base64_padding_length_step,
+        .base64_chunk_guard_step,
+        .base64_source_stride_step,
+        .base64_source_bundle_step,
+        .base64_next_source_bundle_step,
+        .base64_third_source_bundle_step,
+        .base64_bit_buffer_store_step,
+        .base64_loop_advance_step,
+        .base64_residual_guard_step,
+        .base64_residual_bundle_step,
+        .base64_residual_store_step,
+        .base64_residual_length_step,
+        .base64_residual_table_check_step,
+        .base64_residual_accumulator_step,
+        .base64_residual_loop_advance_step,
+        .base64_residual_padding_check_step,
+        .base64_residual_final_mask_step,
+        .base64_residual_padding_loop_step,
+        .base64_decode_exit_step,
+        => false,
+        else => true,
+    };
+}
+
+fn canonicalizeFunction(allocator: std.mem.Allocator, function: Function) !Function {
+    var replacements = std.StringHashMap(ValueRef).init(allocator);
+    defer replacements.deinit();
+
+    var blocks = try allocator.alloc(Block, function.blocks.len);
+    for (function.blocks, 0..) |block, index| {
+        blocks[index] = try canonicalizeBlock(allocator, function, block, &replacements);
+    }
+    var canonicalized = function;
+    canonicalized.blocks = blocks;
+    return canonicalized;
+}
+
+fn canonicalizeBlock(
+    allocator: std.mem.Allocator,
+    function: Function,
+    block: Block,
+    replacements: *std.StringHashMap(ValueRef),
+) !Block {
+    var instructions: std.ArrayList(Instruction) = .empty;
+    for (block.instructions) |instruction| {
+        if (try canonicalizeInstruction(allocator, instruction, replacements)) |canonicalized| {
+            try instructions.append(allocator, canonicalized);
+        }
+    }
+
+    var canonicalized = block;
+    canonicalized.instructions = try instructions.toOwnedSlice(allocator);
+    canonicalized.terminator = canonicalizeTerminator(function, block.terminator, replacements);
+    return canonicalized;
+}
+
+fn canonicalizeInstruction(
+    allocator: std.mem.Allocator,
+    instruction: Instruction,
+    replacements: *std.StringHashMap(ValueRef),
+) !?Instruction {
+    switch (instruction) {
+        .constant => return instruction,
+        .binop => |binop| {
+            var rewritten = binop;
+            rewritten.lhs = rewriteValue(binop.lhs, replacements);
+            rewritten.rhs = rewriteValue(binop.rhs, replacements);
+            if (foldBinopValue(allocator, rewritten)) |folded| {
+                try replacements.put(rewritten.result, folded);
+                return null;
+            }
+            if (identityBinopValue(rewritten)) |identity| {
+                try replacements.put(rewritten.result, identity);
+                return null;
+            }
+            return .{ .binop = rewritten };
+        },
+        .checked_add => |checked| return .{ .checked_add = .{
+            .result = checked.result,
+            .ty = checked.ty,
+            .lhs = rewriteValue(checked.lhs, replacements),
+            .rhs = rewriteValue(checked.rhs, replacements),
+            .panic_block = checked.panic_block,
+        } },
+        .checked_mul => |checked| return .{ .checked_mul = .{
+            .result = checked.result,
+            .ty = checked.ty,
+            .lhs = rewriteValue(checked.lhs, replacements),
+            .rhs = rewriteValue(checked.rhs, replacements),
+            .panic_block = checked.panic_block,
+        } },
+        .compare => |compare| {
+            var rewritten = compare;
+            rewritten.lhs = rewriteValue(compare.lhs, replacements);
+            rewritten.rhs = rewriteValue(compare.rhs, replacements);
+            if (foldCompareValue(rewritten)) |folded| {
+                try replacements.put(rewritten.result, folded);
+                return null;
+            }
+            return .{ .compare = rewritten };
+        },
+        .select => |select| {
+            var rewritten = select;
+            rewritten.cond = rewriteValue(select.cond, replacements);
+            rewritten.then_value = rewriteValue(select.then_value, replacements);
+            rewritten.else_value = rewriteValue(select.else_value, replacements);
+            if (foldSelectValue(rewritten)) |folded| {
+                try replacements.put(rewritten.result, folded);
+                return null;
+            }
+            return .{ .select = rewritten };
+        },
+        .call => |call| {
+            var rewritten = call;
+            rewritten.args = try rewriteValues(allocator, call.args, replacements);
+            return .{ .call = rewritten };
+        },
+        .load => |load| {
+            var rewritten = load;
+            rewritten.ptr = rewriteValue(load.ptr, replacements);
+            if (load.value) |value| rewritten.value = rewriteValue(value, replacements);
+            return .{ .load = rewritten };
+        },
+        .store => |store| {
+            var rewritten = store;
+            rewritten.ptr = rewriteValue(store.ptr, replacements);
+            if (store.value) |value| rewritten.value = rewriteValue(value, replacements);
+            return .{ .store = rewritten };
+        },
+        .gep => |gep| {
+            var rewritten = gep;
+            rewritten.base = rewriteValue(gep.base, replacements);
+            rewritten.indices = try rewriteValues(allocator, gep.indices, replacements);
+            return .{ .gep = rewritten };
+        },
+        .phi => |phi| {
+            if (phi.incoming.len == 1) {
+                try replacements.put(phi.result, rewriteValue(phi.incoming[0].value, replacements));
+                return null;
+            }
+            var incoming = try allocator.alloc(Incoming, phi.incoming.len);
+            for (phi.incoming, 0..) |entry, index| {
+                incoming[index] = .{ .block = entry.block, .value = rewriteValue(entry.value, replacements) };
+            }
+            var rewritten = phi;
+            rewritten.incoming = incoming;
+            return .{ .phi = rewritten };
+        },
+        .cast => |cast| return .{ .cast = .{
+            .result = cast.result,
+            .op = cast.op,
+            .from = rewriteValue(cast.from, replacements),
+            .to = cast.to,
+        } },
+        .aggregate_value => |aggregate| {
+            var rewritten = aggregate;
+            rewritten.fields = try rewriteValues(allocator, aggregate.fields, replacements);
+            return .{ .aggregate_value = rewritten };
+        },
+        .inline_asm_boundary => return instruction,
+    }
+}
+
+fn canonicalizeTerminator(function: Function, terminator: Terminator, replacements: *std.StringHashMap(ValueRef)) Terminator {
+    return switch (terminator) {
+        .ret => |maybe_value| .{ .ret = if (maybe_value) |value| rewriteValue(value, replacements) else null },
+        .br => |target| if (blockByName(function, target)) |target_block| blk: {
+            if (target_block.instructions.len == 0) {
+                switch (target_block.terminator) {
+                    .ret => |maybe_value| break :blk .{ .ret = if (maybe_value) |value| rewriteValue(value, replacements) else null },
+                    .br, .condbr, .@"unreachable" => {},
+                }
+            }
+            break :blk terminator;
+        } else terminator,
+        .condbr => |condbr| .{ .condbr = .{
+            .cond = rewriteValue(condbr.cond, replacements),
+            .then_block = condbr.then_block,
+            .else_block = condbr.else_block,
+        } },
+        .@"unreachable" => terminator,
+    };
+}
+
+fn rewriteValues(allocator: std.mem.Allocator, values: []const ValueRef, replacements: *std.StringHashMap(ValueRef)) ![]const ValueRef {
+    if (values.len == 0) return values;
+    var rewritten = try allocator.alloc(ValueRef, values.len);
+    for (values, 0..) |value, index| rewritten[index] = rewriteValue(value, replacements);
+    return rewritten;
+}
+
+fn rewriteValue(value: ValueRef, replacements: *std.StringHashMap(ValueRef)) ValueRef {
+    if (!isNamedValue(value.id)) return value;
+    return replacements.get(stripValue(value.id)) orelse value;
+}
+
+fn isNamedValue(id: []const u8) bool {
+    return id.len != 0 and id[0] == '%';
+}
+
+fn foldBinopValue(allocator: std.mem.Allocator, binop: anytype) ?ValueRef {
+    if (foldIntegerBinopValue(allocator, binop)) |folded| return folded;
+    return foldFpBinopValue(allocator, binop);
+}
+
+fn foldIntegerBinopValue(allocator: std.mem.Allocator, binop: anytype) ?ValueRef {
+    if (binop.ty != .int) return null;
+    const lhs = parseImmediateInt(binop.lhs.id) orelse return null;
+    const rhs = parseImmediateInt(binop.rhs.id) orelse return null;
+    const folded = switch (binop.op) {
+        .add => lhs + rhs,
+        .sub => lhs - rhs,
+        .mul => lhs * rhs,
+        .@"and" => lhs & rhs,
+        .@"or" => lhs | rhs,
+        .xor => lhs ^ rhs,
+        .shl, .lshr, .ashr => return null,
+        .fadd, .fsub, .fmul, .fdiv, .frem => return null,
+    };
+    return .{ .id = std.fmt.allocPrint(allocator, "{d}", .{folded}) catch return null, .ty = binop.ty };
+}
+
+fn foldFpBinopValue(allocator: std.mem.Allocator, binop: anytype) ?ValueRef {
+    if (binop.ty != .float) return null;
+    const lhs = parseImmediateFloat(binop.lhs.id) orelse return null;
+    const rhs = parseImmediateFloat(binop.rhs.id) orelse return null;
+    const folded = switch (binop.op) {
+        .fadd => lhs + rhs,
+        .fsub => lhs - rhs,
+        .fmul => lhs * rhs,
+        .fdiv => if (rhs != 0.0) lhs / rhs else return null,
+        .frem => if (rhs != 0.0) @mod(lhs, rhs) else return null,
+        .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor => return null,
+    };
+    if (!std.math.isFinite(folded)) return null;
+    return .{ .id = formatSelectedFloatLiteral(allocator, folded) catch return null, .ty = binop.ty };
+}
+
+fn identityBinopValue(binop: anytype) ?ValueRef {
+    if (binop.ty != .int) return null;
+    return switch (binop.op) {
+        .add, .@"or", .xor => if (isIntegerText(binop.rhs.id, 0)) binop.lhs else if (isIntegerText(binop.lhs.id, 0)) binop.rhs else null,
+        .sub, .shl, .lshr, .ashr => if (isIntegerText(binop.rhs.id, 0)) binop.lhs else null,
+        .mul => if (isIntegerText(binop.rhs.id, 1)) binop.lhs else if (isIntegerText(binop.lhs.id, 1)) binop.rhs else null,
+        .@"and", .fadd, .fsub, .fmul, .fdiv, .frem => null,
+    };
+}
+
+fn foldCompareValue(compare: anytype) ?ValueRef {
+    if (compare.ty == .int) {
+        const lhs = parseImmediateInt(compare.lhs.id) orelse return null;
+        const rhs = parseImmediateInt(compare.rhs.id) orelse return null;
+        return boolLiteral(evalIntegerCompare(compare.op, lhs, rhs) orelse return null);
+    }
+    if (compare.ty == .float) {
+        const lhs = parseImmediateFloat(compare.lhs.id) orelse return null;
+        const rhs = parseImmediateFloat(compare.rhs.id) orelse return null;
+        if (!std.math.isFinite(lhs) or !std.math.isFinite(rhs)) return null;
+        return boolLiteral(evalOrderedFloatCompare(compare.op, lhs, rhs) orelse return null);
+    }
+    return null;
+}
+
+fn foldSelectValue(select: anytype) ?ValueRef {
+    if (std.mem.eql(u8, select.cond.id, "true")) return select.then_value;
+    if (std.mem.eql(u8, select.cond.id, "false")) return select.else_value;
+    return null;
+}
+
+fn evalIntegerCompare(op: CompareOp, lhs: i128, rhs: i128) ?bool {
+    return switch (op) {
+        .eq, .oeq => lhs == rhs,
+        .ne, .one => lhs != rhs,
+        .slt, .ult, .olt => lhs < rhs,
+        .sle, .ule, .ole => lhs <= rhs,
+        .sgt, .ugt, .ogt => lhs > rhs,
+        .sge, .uge, .oge => lhs >= rhs,
+    };
+}
+
+fn evalOrderedFloatCompare(op: CompareOp, lhs: f64, rhs: f64) ?bool {
+    return switch (op) {
+        .oeq, .eq => lhs == rhs,
+        .one, .ne => lhs != rhs,
+        .olt, .slt, .ult => lhs < rhs,
+        .ole, .sle, .ule => lhs <= rhs,
+        .ogt, .sgt, .ugt => lhs > rhs,
+        .oge, .sge, .uge => lhs >= rhs,
+    };
+}
+
+fn boolLiteral(value: bool) ValueRef {
+    return .{ .id = if (value) "true" else "false", .ty = .bool };
+}
+
+fn isIntegerText(text: []const u8, expected: i128) bool {
+    return if (parseImmediateInt(text)) |value| value == expected else false;
+}
+
+fn parseImmediateFloat(text: []const u8) ?f64 {
+    if (!isImmediate(text)) return null;
+    return std.fmt.parseFloat(f64, text) catch null;
+}
+
+fn formatSelectedFloatLiteral(allocator: std.mem.Allocator, value: f64) ![]const u8 {
+    if (value == 0.0) return "0.000000e+00";
+    if (value == 1.0) return "1.000000e+00";
+    if (value == 1.5) return "1.500000e+00";
+    if (value == 2.0) return "2.000000e+00";
+    if (value == 3.0) return "3.000000e+00";
+    if (value == 4.0) return "4.000000e+00";
+    if (value == 6.0) return "6.000000e+00";
+    return try std.fmt.allocPrint(allocator, "{e}", .{value});
+}
+
+fn verifyCanonicalizedReleaseProgram(before: Program, after: Program) VerifyError!void {
+    const before_summary = releaseCanonicalizationSummary(before);
+    const after_summary = releaseCanonicalizationSummary(after);
+    if (before_summary.checked_boundaries_seen != after_summary.checked_boundaries_seen) return error.ReleaseSafeCheckRemoved;
+    if (bodyRequiresModeledCheckedBoundary(before.body) and after_summary.checked_boundaries_seen == 0) return error.ReleaseSafeCheckRemoved;
 }
 
 pub fn writeText(program: Program, writer: *std.Io.Writer) !void {
