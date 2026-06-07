@@ -53,6 +53,10 @@ canonicalizer before structured lowering. The current source-owned gate reports
 `dead_local_rows=67`, `select_fcmp_rows=8`, `checked_rows=9`, and
 `checks_preserved_rows=9`, so ReleaseSafe checked/runtime-call boundaries are
 counted and fail closed if preservation regresses.
+DescriptorV2 verifier negatives now cover unsupported vector and varargs
+boundaries, malformed SysV aggregate/sret/byval ABI shapes, unsupported atomic
+ordering, TLS/local-exec relocation mismatches, and ReleaseSafe checked-boundary
+removal.
 The gate fails if a selected row reports libLLVM module parse/print,
 LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
 structured-direct count other than 146, any structured row reports textual

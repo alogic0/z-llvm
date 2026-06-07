@@ -360,6 +360,7 @@ pub const VerifyError = error{
     UnsupportedAddressSpace,
     UnsupportedAbiShape,
     UnsupportedAlignment,
+    ReleaseSafeCheckRemoved,
     DuplicateSsaValue,
     UndefinedValue,
     UnknownBranchTarget,
@@ -372,8 +373,7 @@ pub const VerifyError = error{
 pub fn verify(program: Program) VerifyError!void {
     if (program.functions.len == 0) return error.EmptyProgram;
     for (program.globals) |global| {
-        try verifyType(global.ty);
-        try verifyAddressSpace(global.address_space);
+        try verifyGlobal(global);
     }
     for (program.constants) |constant| try verifyType(constant.ty);
     for (program.functions) |function| {
@@ -392,6 +392,7 @@ pub fn verify(program: Program) VerifyError!void {
             try verifyTerminator(block.terminator, function, block);
         }
     }
+    try verifyReleaseSafeChecksPreserved(program);
 }
 
 pub fn lowerToStructuredIr(program: Program, writer: *std.Io.Writer) !void {
@@ -640,6 +641,7 @@ fn verifyInstruction(instruction: Instruction, function: Function) VerifyError!v
             if (call.varargs) return error.UnsupportedVarargs;
             for (call.args) |arg| try verifyDefinedValue(arg, function);
             try verifyCallSignature(call, function);
+            try verifyCallAbi(call);
         },
         .load => |memory| try verifyMemory(memory, function),
         .store => |memory| try verifyMemory(memory, function),
@@ -685,6 +687,36 @@ fn verifyTerminator(terminator: Terminator, function: Function, block: Block) Ve
         .@"unreachable" => {},
     }
     try verifyBlockPhis(function, block);
+}
+
+fn verifyGlobal(global: Global) VerifyError!void {
+    try verifyType(global.ty);
+    try verifyAddressSpace(global.address_space);
+    switch (global.kind) {
+        .tls => if (global.address_space != .local_exec_tls) return error.UnsupportedAddressSpace,
+        .global, .constant => if (global.address_space == .local_exec_tls) return error.UnsupportedAddressSpace,
+    }
+}
+
+fn verifyReleaseSafeChecksPreserved(program: Program) VerifyError!void {
+    if (!bodyRequiresModeledCheckedBoundary(program.body)) return;
+    if (releaseCanonicalizationSummary(program).checked_boundaries_seen == 0) return error.ReleaseSafeCheckRemoved;
+}
+
+fn bodyRequiresModeledCheckedBoundary(body: Body) bool {
+    return switch (body) {
+        .checked_add_imm_boundary,
+        .checked_global_update_boundary,
+        .checked_pointer_load_store_boundary,
+        .checked_branch_mix_boundary,
+        .checked_call_chain_boundary,
+        .checked_array_sum_boundary,
+        .checked_struct_sum_boundary,
+        .checked_slice_loop_sum_boundary,
+        .checked_add_runtime_boundary,
+        => true,
+        else => false,
+    };
 }
 
 fn verifyChecked(ty: Type, lhs: ValueRef, rhs: ValueRef, panic_block: []const u8, function: Function) VerifyError!void {
@@ -755,6 +787,29 @@ fn verifyAtomicOrdering(ordering: AtomicOrdering) VerifyError!void {
 fn verifyAbiShape(abi: AbiShape) VerifyError!void {
     switch (abi) {
         .direct, .sret, .byval, .runtime_boundary, .inline_asm_boundary => {},
+    }
+}
+
+fn verifyCallAbi(call: Call) VerifyError!void {
+    switch (call.abi) {
+        .direct => {
+            if (call.ret_ty == .aggregate) return error.UnsupportedAbiShape;
+            for (call.args) |arg| {
+                if (arg.ty == .aggregate) return error.UnsupportedAbiShape;
+            }
+        },
+        .sret => {
+            if (call.ret_ty != .void or call.args.len == 0 or call.args[0].ty != .pointer) return error.UnsupportedAbiShape;
+        },
+        .byval => {
+            if (call.args.len == 0) return error.UnsupportedAbiShape;
+            var saw_pointer = false;
+            for (call.args) |arg| {
+                if (arg.ty == .pointer) saw_pointer = true;
+            }
+            if (!saw_pointer) return error.UnsupportedAbiShape;
+        },
+        .runtime_boundary, .inline_asm_boundary => {},
     }
 }
 
@@ -2160,14 +2215,39 @@ const surface_body_map = [_]SurfaceBody{
 const empty_source: Source = .{ .wrapper = "test", .mode = "ReleaseFast", .fixture = "test/distribution/releasefast_x86_64/inputs/tiny_scalar.ll", .tag = "tiny-scalar" };
 
 fn testProgramWithInstruction(instruction: Instruction) Program {
-    const instructions = [_]Instruction{instruction};
-    const blocks = [_]Block{.{
+    const allocator = std.heap.page_allocator;
+    const instructions = allocator.alloc(Instruction, 1) catch @panic("failed to allocate test instructions");
+    instructions[0] = instruction;
+    const blocks = allocator.alloc(Block, 1) catch @panic("failed to allocate test blocks");
+    blocks[0] = .{
         .name = "entry",
-        .instructions = &instructions,
+        .instructions = instructions,
         .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
-    }};
-    const functions = [_]Function{.{ .name = "main", .return_type = .{ .int = 32 }, .blocks = &blocks }};
-    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = &functions };
+    };
+    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
+    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
+    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = functions };
+}
+
+fn testProgramWithBody(body: Body, blocks: []const Block) Program {
+    const allocator = std.heap.page_allocator;
+    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
+    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
+    return .{ .id = "test", .source = empty_source, .body = body, .diagnostic_surface = bodyName(body), .origin = .source_derived_descriptor, .functions = functions };
+}
+
+fn testProgramWithGlobal(global: Global) Program {
+    const allocator = std.heap.page_allocator;
+    const blocks = allocator.alloc(Block, 1) catch @panic("failed to allocate test blocks");
+    blocks[0] = .{
+        .name = "entry",
+        .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
+    };
+    const functions = allocator.alloc(Function, 1) catch @panic("failed to allocate test functions");
+    functions[0] = .{ .name = "main", .return_type = .{ .int = 32 }, .blocks = blocks };
+    const globals = allocator.alloc(Global, 1) catch @panic("failed to allocate test globals");
+    globals[0] = global;
+    return .{ .id = "test", .source = empty_source, .body = .scalar_add_ret, .diagnostic_surface = "scalar-add-ret", .origin = .source_derived_descriptor, .functions = functions, .globals = globals };
 }
 
 test "descriptor v2 rejects unsupported vector type" {
@@ -2188,7 +2268,7 @@ test "descriptor v2 rejects unsupported callconv" {
 
 test "descriptor v2 rejects unsupported atomic ordering" {
     const program = testProgramWithInstruction(.{ .load = .{
-        .ptr = .{ .id = "%p", .ty = .{ .pointer = .generic } },
+        .ptr = .{ .id = "@p", .ty = .{ .pointer = .generic } },
         .ty = .{ .int = 32 },
         .align_bytes = 4,
         .ordering = .unsupported,
@@ -2203,6 +2283,56 @@ test "descriptor v2 rejects unsupported address space" {
         .align_bytes = 4,
     } });
     try std.testing.expectError(error.UnsupportedAddressSpace, verify(program));
+}
+
+test "descriptor v2 rejects wrong SysV aggregate classification" {
+    const aggregate_fields = [_]Type{ .{ .int = 64 }, .{ .int = 64 } };
+    const program = testProgramWithInstruction(.{ .call = .{
+        .result = "pair",
+        .callee = "make_pair",
+        .calling_convention = .c,
+        .ret_ty = .{ .aggregate = &aggregate_fields },
+        .args = &.{},
+        .abi = .direct,
+    } });
+    try std.testing.expectError(error.UnsupportedAbiShape, verify(program));
+}
+
+test "descriptor v2 rejects malformed sret and byval ABI shapes" {
+    const bad_sret = testProgramWithInstruction(.{ .call = .{
+        .callee = "make_pair",
+        .calling_convention = .c,
+        .ret_ty = .{ .int = 32 },
+        .args = &.{i32Ref("0")},
+        .abi = .sret,
+    } });
+    try std.testing.expectError(error.UnsupportedAbiShape, verify(bad_sret));
+
+    const bad_byval = testProgramWithInstruction(.{ .call = .{
+        .callee = "consume_pair",
+        .calling_convention = .c,
+        .ret_ty = .void,
+        .args = &.{i32Ref("0")},
+        .abi = .byval,
+    } });
+    try std.testing.expectError(error.UnsupportedAbiShape, verify(bad_byval));
+}
+
+test "descriptor v2 rejects TLS relocation shape mismatch" {
+    const tls_global = testProgramWithGlobal(.{ .name = "bad_tls", .kind = .tls, .ty = .{ .int = 32 }, .address_space = .generic, .initializer = "0" });
+    try std.testing.expectError(error.UnsupportedAddressSpace, verify(tls_global));
+
+    const local_exec_global = testProgramWithGlobal(.{ .name = "bad_global", .kind = .global, .ty = .{ .int = 32 }, .address_space = .local_exec_tls, .initializer = "0" });
+    try std.testing.expectError(error.UnsupportedAddressSpace, verify(local_exec_global));
+}
+
+test "descriptor v2 rejects ReleaseSafe check removal" {
+    const blocks = [_]Block{.{
+        .name = "entry",
+        .terminator = .{ .ret = .{ .id = "0", .ty = .{ .int = 32 } } },
+    }};
+    const program = testProgramWithBody(.checked_add_imm_boundary, &blocks);
+    try std.testing.expectError(error.ReleaseSafeCheckRemoved, verify(program));
 }
 
 test "descriptor v2 unsupported debug metadata and EH are explicit" {
