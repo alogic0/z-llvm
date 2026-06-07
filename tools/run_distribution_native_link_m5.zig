@@ -1,19 +1,23 @@
 const std = @import("std");
 const common = @import("tool_common.zig");
 const native_cases = @import("native_link_cases.zig");
+const source_owned = @import("run_distribution_zig_integrated_object.zig");
+const source_handoff = @import("source_owned_handoff.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
-    const mode_filter = try parseModeFilter(allocator, io, init);
-    defer if (mode_filter.owned) allocator.free(mode_filter.mode.?);
+    const filters = try parseFilters(allocator, io, init);
+    defer filters.deinit(allocator);
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
     const cc_target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "CC_TARGET");
     defer if (cc_target_env) |value| allocator.free(value);
-    const target = target_env orelse "x86_64-unknown-linux-gnu";
+    const target = if (filters.release_source_owned) source_handoff.normalizeZigTarget(target_env orelse "x86_64-linux-gnu") else target_env orelse "x86_64-unknown-linux-gnu";
     const cc_target = cc_target_env orelse defaultCcTarget(target);
+    const source_context = if (filters.release_source_owned) try source_handoff.Context.init(allocator, io, init, target) else null;
+    defer if (source_context) |context| context.deinit(allocator);
 
     const temp = try common.TempDir.init(allocator, io, "distribution_native_link_m5");
     defer temp.deinit(allocator, io);
@@ -21,47 +25,110 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [512]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     var selected: usize = 0;
-    for (native_cases.cases) |case| {
-        if (!modeMatches(mode_filter.mode, case.mode)) continue;
-        selected += 1;
-        try runCase(allocator, io, temp, target, cc_target, case);
-        try stdout_writer.interface.print("ok distribution native-link {s} [{s}]\n", .{ case.id, case.mode });
+
+    if (filters.release_source_owned) {
+        const context = source_context.?;
+        var executable_abi_proof_rows: usize = 0;
+        var link_only_rows: usize = 0;
+        var runtime_boundary_rows: usize = 0;
+        var unsupported_zig_linker_feature_rows: usize = 0;
+        for (source_owned.cases) |case| {
+            if (!source_owned.isReleaseSourceOwnedCase(case) or !filters.matchesSourceOwned(case)) continue;
+            selected += 1;
+            const result = try runSourceOwnedCase(allocator, io, temp, context, target, case);
+            switch (result) {
+                .executable => executable_abi_proof_rows += 1,
+                .link_only => link_only_rows += 1,
+                .runtime_boundary => runtime_boundary_rows += 1,
+                .unsupported_zig_linker_feature => unsupported_zig_linker_feature_rows += 1,
+            }
+            try stdout_writer.interface.print("ok distribution native-link source-owned {s} [{s} {s}]\n", .{ case.id, case.mode, sourceLinkResultName(result) });
+            try stdout_writer.interface.flush();
+        }
+        if (selected == 0) {
+            try common.validationError(io, "no source-owned native-link cases selected for filters\n", .{});
+        }
+        if (filters.mode == null and filters.case_id == null and selected != source_handoff.expected_release_source_owned_rows) {
+            try common.validationError(io, "release source-owned native-link requires selected={} rows; selected={}\n", .{ source_handoff.expected_release_source_owned_rows, selected });
+        }
+        const mode_label = filters.mode orelse "all";
+        const case_label = filters.case_id orelse "all";
+        try stdout_writer.interface.print(
+            "summary distribution-native-link inventory=release-source-owned target={s} mode={s} case={s} total={} executable_abi_proof_rows={} link_only_rows={} runtime_compiler_rt_libc_boundary_rows={} unsupported_zig_linker_feature_rows={} local_object_codegen_failures=0 local_fail=0\n",
+            .{ target, mode_label, case_label, selected, executable_abi_proof_rows, link_only_rows, runtime_boundary_rows, unsupported_zig_linker_feature_rows },
+        );
         try stdout_writer.interface.flush();
-    }
-    if (selected == 0) {
-        try common.validationError(io, "no native-link cases selected for mode filter\n", .{});
+    } else {
+        for (native_cases.cases) |case| {
+            if (!filters.matchesNative(case)) continue;
+            selected += 1;
+            try runCase(allocator, io, temp, target, cc_target, case);
+            try stdout_writer.interface.print("ok distribution native-link {s} [{s}]\n", .{ case.id, case.mode });
+            try stdout_writer.interface.flush();
+        }
+        if (selected == 0) {
+            try common.validationError(io, "no native-link cases selected for filters\n", .{});
+        }
     }
 }
 
-const ModeFilter = struct {
-    mode: ?[]const u8,
-    owned: bool = false,
+const Filters = struct {
+    mode: ?[]const u8 = null,
+    case_id: ?[]const u8 = null,
+    release_source_owned: bool = false,
+
+    fn deinit(filters: Filters, allocator: std.mem.Allocator) void {
+        if (filters.mode) |mode| allocator.free(mode);
+        if (filters.case_id) |case_id| allocator.free(case_id);
+    }
+
+    fn matchesNative(filters: Filters, case: native_cases.Case) bool {
+        if (!modeMatches(filters.mode, case.mode)) return false;
+        if (filters.case_id) |case_id| {
+            if (!std.mem.eql(u8, case_id, case.id)) return false;
+        }
+        return true;
+    }
+
+    fn matchesSourceOwned(filters: Filters, case: source_owned.Case) bool {
+        if (!modeMatches(filters.mode, case.mode)) return false;
+        if (filters.case_id) |case_id| {
+            if (!std.mem.eql(u8, case_id, case.id)) return false;
+        }
+        return true;
+    }
 };
 
-fn parseModeFilter(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !ModeFilter {
+fn parseFilters(allocator: std.mem.Allocator, io: std.Io, init: std.process.Init) !Filters {
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
     _ = args.next();
 
-    var mode: ?[]const u8 = null;
+    var filters: Filters = .{};
+    errdefer filters.deinit(allocator);
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
             var stdout_buffer: [512]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-            try stdout_writer.interface.writeAll("usage: zig build distribution-native-link -- [--mode=ReleaseFast|ReleaseSafe|ReleaseSmall|Debug]\n");
+            try stdout_writer.interface.writeAll("usage: zig build distribution-native-link -- [--release-source-owned] [--mode=ReleaseFast|ReleaseSafe|ReleaseSmall|Debug] [--case=<case-id>]\n");
             try stdout_writer.interface.flush();
             std.process.exit(0);
+        } else if (std.mem.eql(u8, arg, "--release-source-owned")) {
+            filters.release_source_owned = true;
         } else if (std.mem.startsWith(u8, arg, "--mode=")) {
-            if (mode != null) try common.validationError(io, "duplicate --mode argument\n", .{});
+            if (filters.mode != null) try common.validationError(io, "duplicate --mode argument\n", .{});
             const value = arg["--mode=".len..];
             if (!isKnownMode(value)) try common.validationError(io, "unknown native-link mode: {s}\n", .{value});
-            mode = try allocator.dupe(u8, value);
+            filters.mode = try allocator.dupe(u8, value);
+        } else if (std.mem.startsWith(u8, arg, "--case=")) {
+            if (filters.case_id != null) try common.validationError(io, "duplicate --case argument\n", .{});
+            filters.case_id = try allocator.dupe(u8, arg["--case=".len..]);
         } else {
             try common.validationError(io, "unexpected native-link argument: {s}\n", .{arg});
         }
     }
 
-    return .{ .mode = mode, .owned = mode != null };
+    return filters;
 }
 
 fn modeMatches(filter: ?[]const u8, mode: []const u8) bool {
@@ -129,6 +196,69 @@ fn runCase(
     const run_argv = [_][]const u8{exe};
     const run_result = try common.runCapture(allocator, io, &run_argv, exe);
     common.freeRunResult(allocator, run_result);
+}
+
+const SourceLinkResult = enum {
+    executable,
+    link_only,
+    runtime_boundary,
+    unsupported_zig_linker_feature,
+};
+
+fn runSourceOwnedCase(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    temp: common.TempDir,
+    context: source_handoff.Context,
+    target: []const u8,
+    case: source_owned.Case,
+) !SourceLinkResult {
+    const object = try common.allocTempFile(allocator, temp, case.id, ".o");
+    defer allocator.free(object);
+    const marker = try common.allocTempFile(allocator, temp, case.id, "_zllvm_marker.txt");
+    defer allocator.free(marker);
+    const ir_path = try common.allocTempFile(allocator, temp, case.id, ".external.ll");
+    defer allocator.free(ir_path);
+    const descriptor_path = try common.allocTempFile(allocator, temp, case.id, ".semantic_descriptor");
+    defer allocator.free(descriptor_path);
+    const exe = try common.allocTempFile(allocator, temp, case.id, "_source_owned_native_link");
+    defer allocator.free(exe);
+
+    try source_handoff.emitObject(allocator, io, context, case, object, marker, ir_path, descriptor_path);
+    const link_result = try source_handoff.probeLinkObject(allocator, io, target, object, exe);
+    switch (link_result) {
+        .accepted => {},
+        .failed => |failure| {
+            defer allocator.free(failure.stderr);
+            if (source_handoff.isGenericFailureCategory(failure.category)) {
+                try common.validationError(io, "source-owned native-link row {s} used forbidden generic failure bucket: {s}\n", .{ case.id, failure.category });
+            }
+            if (std.mem.eql(u8, failure.category, "runtime/compiler-rt/libc-boundary")) {
+                return .runtime_boundary;
+            }
+            if (std.mem.eql(u8, failure.category, "zig-linker-bug-or-unsupported-feature")) {
+                try common.validationError(io, "source-owned native-link row {s} hit unsupported Zig linker feature\n{s}\n", .{ case.id, failure.stderr });
+            }
+            try common.validationError(io, "source-owned native-link row {s} failed with category={s}\n{s}\n", .{ case.id, failure.category, failure.stderr });
+        },
+    }
+
+    switch (case.validation) {
+        .executable => {
+            try source_handoff.runExecutable(allocator, io, exe, case);
+            return .executable;
+        },
+        .link_only => return .link_only,
+    }
+}
+
+fn sourceLinkResultName(result: SourceLinkResult) []const u8 {
+    return switch (result) {
+        .executable => "executable-abi",
+        .link_only => "link-only",
+        .runtime_boundary => "runtime/compiler-rt/libc-boundary",
+        .unsupported_zig_linker_feature => "unsupported-zig-linker-feature",
+    };
 }
 
 fn defaultCcTarget(target: []const u8) []const u8 {

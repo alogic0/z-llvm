@@ -133,6 +133,19 @@ This gate mode validates the patched stage4 hook and runs `zig build` during
 setup, so use it as milestone object-boundary confirmation rather than the
 regular source-owned row inner loop.
 
+The source-owned boundary now also has Zig native-link handoff accounting:
+`zig build distribution-native-link -- --release-source-owned` emits through
+the same patched-Zig source-owned object path, links with `zig build-exe
+-fno-lld`, and runs every accepted executable row. Current counters are
+`total=100`, `executable_abi_proof_rows=100`, `link_only_rows=0`,
+`runtime_compiler_rt_libc_boundary_rows=0`,
+`unsupported_zig_linker_feature_rows=0`,
+`local_object_codegen_failures=0`, and `local_fail=0`. The companion probe,
+`zig build probe-native-linker -- --release-source-owned`, reports
+`accepted=100`, `runtime_compiler_rt_libc_boundary_rows=0`,
+`unsupported_zig_linker_feature_rows=0`,
+`local_object_codegen_failures=0`, and `failed=0`.
+
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
 
@@ -937,7 +950,9 @@ zig build distribution-all
 zig build distribution-native-link-object-inspection
 zig build distribution-native-link-object-inspection -- --release-source-owned
 zig build distribution-native-link
+zig build distribution-native-link -- --release-source-owned
 zig build probe-native-linker
+zig build probe-native-linker -- --release-source-owned
 zig build distribution-zig-source-native-link
 zig build distribution-zig-integrated-object
 zig build distribution-zig-integrated-preopt

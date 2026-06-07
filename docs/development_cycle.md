@@ -137,14 +137,16 @@ Use this ladder:
 4. zig build distribution-x86_64-selected-zllvm
 5. zig build check-zig-stage4-emitter  # only when ../ziglang changed
 6. zig build distribution-native-link-object-inspection -- --release-source-owned  # milestone object-boundary proof
-7. zig build distribution-all          # milestone confirmation only
+7. zig build distribution-native-link -- --release-source-owned  # milestone native-link executable proof
+8. zig build probe-native-linker -- --release-source-owned  # milestone native-link acceptance probe
+9. zig build distribution-all          # milestone confirmation only
 ```
 
 Run step 5 only when the Zig hook contract or patched Zig source changed. Run
-step 6 when confirming the full 100-row source-owned object boundary, not for
-ordinary row iteration; it checks the patched stage4 hook and runs `zig build`
-before object inspection. Run
-step 7 only before handoff, before committing a broad evidence/matrix claim, or
+steps 6-8 when confirming the full 100-row source-owned object/link boundary,
+not for ordinary row iteration; they check the patched stage4 hook and run
+`zig build` before object inspection or native-link handoff. Run
+step 9 only before handoff, before committing a broad evidence/matrix claim, or
 when a change affects several distribution gates at once.
 
 Do not rebuild stage4 for every row. Patch `../ziglang` only when the hook

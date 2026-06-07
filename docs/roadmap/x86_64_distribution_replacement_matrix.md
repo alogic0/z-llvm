@@ -378,6 +378,30 @@ linker_boundary=final linking remains Zig-owned through native ELF linker;
                 z_llvm does not implement a linker
 ```
 
+The same boundary now has Zig native-link handoff accounting through the
+patched-Zig source-owned object path:
+
+```text
+gate=zig build distribution-native-link -- --release-source-owned
+target=x86_64-linux-gnu
+linker_selection=zig build-exe -fno-lld
+inventory=release-source-owned
+total=100
+executable_abi_proof_rows=100
+link_only_rows=0
+runtime_compiler_rt_libc_boundary_rows=0
+unsupported_zig_linker_feature_rows=0
+local_object_codegen_failures=0
+local_fail=0
+
+probe=zig build probe-native-linker -- --release-source-owned
+accepted=100
+runtime_compiler_rt_libc_boundary_rows=0
+unsupported_zig_linker_feature_rows=0
+local_object_codegen_failures=0
+failed=0
+```
+
 The selected x86_64 musl object subset is a target-boundary proof. It also
 inherits the selected ReleaseSafe executable harnesses embedded in the M2 gate,
 but does not claim broad executable replacement or local linker ownership for

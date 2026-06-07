@@ -129,6 +129,38 @@ summary native-link-object-inspection inventory=release-source-owned
   local_fail=0
 ```
 
+## Source-Owned Native Link
+
+`zig build distribution-native-link -- --release-source-owned` is the matching
+100-row native-link executable proof. It emits each row through the same
+patched-Zig source-owned z_llvm object path, links with `zig build-exe
+-fno-lld`, and keeps final linker ownership in Zig.
+
+It separates object/link outcomes from runnable ABI evidence:
+
+```text
+summary distribution-native-link inventory=release-source-owned
+  total=100
+  executable_abi_proof_rows=100
+  link_only_rows=0
+  runtime_compiler_rt_libc_boundary_rows=0
+  unsupported_zig_linker_feature_rows=0
+  local_object_codegen_failures=0
+  local_fail=0
+```
+
+`zig build probe-native-linker -- --release-source-owned` is the companion
+link-acceptance probe over the same inventory and object path:
+
+```text
+summary native-link-probe inventory=release-source-owned
+  accepted=100
+  runtime_compiler_rt_libc_boundary_rows=0
+  unsupported_zig_linker_feature_rows=0
+  local_object_codegen_failures=0
+  failed=0
+```
+
 ## Failure Classes
 
 Do not use a generic `link failed` bucket. Classify failures as:

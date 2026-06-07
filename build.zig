@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) void {
     addToolStep(b, "distribution-all", "Run selected distribution gates, native-link proof/probe, and boundary gates", "tools/run_distribution_all_gates.zig");
     addToolStep(b, "distribution-no-llvm", "Run the selected no-LLVM-codegen distribution subset", "tools/run_distribution_no_llvm_codegen_subset.zig");
     addToolStep(b, "distribution-boundary", "Run conservative distribution boundary gates", "tools/run_distribution_boundary_gates.zig");
-    addToolStep(b, "distribution-native-link", "Run selected native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig");
+    addToolStepWithArgs(b, "distribution-native-link", "Run selected native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig");
     addToolStepWithArgs(b, "distribution-native-link-object-inspection", "Inspect z_llvm ELF objects before Zig native linker handoff", "tools/run_native_link_object_inspection.zig");
     addToolStep(b, "distribution-zig-source-native-link", "Run selected Zig source to z_llvm object to native-link executable gate", "tools/run_distribution_zig_source_native_link.zig");
     addToolStep(b, "distribution-zig-integrated-object", "Run patched Zig integrated z_llvm object-emission gate", "tools/run_distribution_zig_integrated_object.zig");
@@ -68,7 +68,7 @@ pub fn build(b: *std.Build) void {
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-source-structured-direct", "Run x86_64 release source-wrapper structured-direct gate without case-id ownership", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-wrapper-dispatch"});
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-release-source-owned", "Run x86_64 release source-owned semantic structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--release-source-owned"});
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
-    addToolStep(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
+    addToolStepWithArgs(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");
     addToolStepWithFixedArgs(b, "distribution-native-link-releasefast", "Run selected ReleaseFast native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=ReleaseFast"});
     addToolStepWithFixedArgs(b, "distribution-native-link-releasesafe", "Run selected ReleaseSafe native Zig linker handoff gates", "tools/run_distribution_native_link_m5.zig", &.{"--mode=ReleaseSafe"});

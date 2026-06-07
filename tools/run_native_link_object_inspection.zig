@@ -2,9 +2,7 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 const native_cases = @import("native_link_cases.zig");
 const source_owned = @import("run_distribution_zig_integrated_object.zig");
-
-const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
-const expected_release_source_owned_rows = 100;
+const source_handoff = @import("source_owned_handoff.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -14,11 +12,11 @@ pub fn main(init: std.process.Init) !void {
 
     const target_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "TARGET");
     defer if (target_env) |value| allocator.free(value);
-    const target = if (filters.release_source_owned) normalizeZigTarget(target_env orelse "x86_64-linux-gnu") else target_env orelse "x86_64-unknown-linux-gnu";
+    const target = if (filters.release_source_owned) source_handoff.normalizeZigTarget(target_env orelse "x86_64-linux-gnu") else target_env orelse "x86_64-unknown-linux-gnu";
     if (!std.mem.startsWith(u8, target, "x86_64-")) {
         try common.validationError(io, "native-link object inspection supports x86_64 ELF only; target={s}\n", .{target});
     }
-    const source_context = if (filters.release_source_owned) try SourceOwnedContext.init(allocator, io, init, target) else null;
+    const source_context = if (filters.release_source_owned) try source_handoff.Context.init(allocator, io, init, target) else null;
     defer if (source_context) |context| context.deinit(allocator);
 
     const temp = try common.TempDir.init(allocator, io, "native_link_object_inspection");
@@ -70,8 +68,8 @@ pub fn main(init: std.process.Init) !void {
     if (inspected == 0) {
         try common.validationError(io, "no native-link object inspection cases selected\n", .{});
     }
-    if (filters.release_source_owned and filters.mode == null and filters.case_id == null and inspected != expected_release_source_owned_rows) {
-        try common.validationError(io, "release source-owned object inspection requires inspected={} rows; inspected={}\n", .{ expected_release_source_owned_rows, inspected });
+    if (filters.release_source_owned and filters.mode == null and filters.case_id == null and inspected != source_handoff.expected_release_source_owned_rows) {
+        try common.validationError(io, "release source-owned object inspection requires inspected={} rows; inspected={}\n", .{ source_handoff.expected_release_source_owned_rows, inspected });
     }
 
     const mode_label = filters.mode orelse "all";
@@ -155,59 +153,6 @@ fn isKnownMode(mode: []const u8) bool {
         std.mem.eql(u8, mode, "Debug");
 }
 
-const SourceOwnedContext = struct {
-    target: []const u8,
-    zig_emitter: []const u8,
-    zllvm_exe: []const u8,
-    env_map: std.process.Environ.Map,
-
-    fn init(allocator: std.mem.Allocator, io: std.Io, init_process: std.process.Init, target: []const u8) !SourceOwnedContext {
-        const zig_source_env = try common.getEnvOwnedOrNull(allocator, init_process.minimal.environ, "ZIG_SOURCE_DIR");
-        defer if (zig_source_env) |value| allocator.free(value);
-        const zig_emitter_env = try common.getEnvOwnedOrNull(allocator, init_process.minimal.environ, "ZIG_EMITTER");
-        errdefer if (zig_emitter_env) |value| allocator.free(value);
-        const zllvm_env = try common.getEnvOwnedOrNull(allocator, init_process.minimal.environ, "ZLLVM_EXE");
-        errdefer if (zllvm_env) |value| allocator.free(value);
-
-        const zig_source_dir = zig_source_env orelse "../ziglang";
-        const zig_emitter = zig_emitter_env orelse try std.fs.path.join(allocator, &.{ zig_source_dir, "build/stage4/bin/zig" });
-        errdefer if (zig_emitter_env == null) allocator.free(zig_emitter);
-
-        const zllvm_exe = zllvm_env orelse try allocator.dupe(u8, "zig-out/bin/z_llvm");
-        errdefer if (zllvm_env == null) allocator.free(zllvm_exe);
-
-        const check_argv = [_][]const u8{ "zig", "run", "tools/check_zig_stage4_emitter.zig" };
-        const check_result = try common.runCapture(allocator, io, &check_argv, "tools/check_zig_stage4_emitter.zig");
-        common.freeRunResult(allocator, check_result);
-
-        const build_argv = [_][]const u8{ "zig", "build" };
-        const build_result = try common.runCapture(allocator, io, &build_argv, "zig build");
-        common.freeRunResult(allocator, build_result);
-
-        var env_map = std.process.Environ.Map.init(allocator);
-        errdefer env_map.deinit();
-        try copyEnvironment(&env_map, init_process.environ_map);
-        try env_map.put("ZIG_USE_ZLLVM_IR_WRITER", "1");
-        try env_map.put("ZLLVM_IR_WRITER_MODE", "external");
-        try env_map.put("ZLLVM_PIPELINE", "preopt");
-        try env_map.put("ZLLVM_EXE", zllvm_exe);
-
-        return .{
-            .target = target,
-            .zig_emitter = zig_emitter,
-            .zllvm_exe = zllvm_exe,
-            .env_map = env_map,
-        };
-    }
-
-    fn deinit(context: SourceOwnedContext, allocator: std.mem.Allocator) void {
-        var env_map = context.env_map;
-        env_map.deinit();
-        allocator.free(context.zig_emitter);
-        allocator.free(context.zllvm_exe);
-    }
-};
-
 const Inspection = struct {
     has_relocations: bool,
     has_tls: bool,
@@ -236,7 +181,7 @@ fn inspectSourceOwnedCase(
     allocator: std.mem.Allocator,
     io: std.Io,
     temp: common.TempDir,
-    context: SourceOwnedContext,
+    context: source_handoff.Context,
     case: source_owned.Case,
 ) !Inspection {
     const object = try common.allocTempFile(allocator, temp, case.id, ".o");
@@ -248,19 +193,7 @@ fn inspectSourceOwnedCase(
     const descriptor_path = try common.allocTempFile(allocator, temp, case.id, ".semantic_descriptor");
     defer allocator.free(descriptor_path);
 
-    var env_map = try cloneEnvironment(allocator, &context.env_map);
-    defer env_map.deinit();
-    try env_map.put("ZLLVM_MARKER_PATH", marker);
-    try env_map.put("ZLLVM_ZIG_MODE", case.mode);
-    try env_map.put("ZLLVM_CASE_ID", source_wrapper_dispatch_case_id);
-    try env_map.put("ZLLVM_WRAPPER", case.wrapper);
-    try env_map.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
-    try env_map.put("ZLLVM_SOURCE_FIXTURE", case.covered_fixture);
-    try env_map.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
-    try env_map.put("ZLLVM_IR_PATH", ir_path);
-
-    try emitSourceOwnedObject(allocator, io, context, case, object, &env_map);
-    try requireSourceOwnedHookArtifacts(allocator, io, .{ .id = case.id, .mode = case.mode }, marker, descriptor_path);
+    try source_handoff.emitObject(allocator, io, context, case, object, marker, ir_path, descriptor_path);
     return inspectObject(allocator, io, temp, .{ .id = case.id, .mode = case.mode }, object);
 }
 
@@ -275,72 +208,6 @@ fn emitNativeObject(
     defer allocator.free(target_arg);
     const emit_argv = [_][]const u8{ "zig", "build", "run", "--", "--emit=obj", target_arg, "--input-limit=67108864", case.fixture };
     try common.runToFile(allocator, io, &emit_argv, "zig build run --emit=obj", object);
-}
-
-fn emitSourceOwnedObject(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    context: SourceOwnedContext,
-    case: source_owned.Case,
-    object: []const u8,
-    env_map: *const std.process.Environ.Map,
-) !void {
-    const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{object});
-    defer allocator.free(emit_arg);
-
-    var argv: std.ArrayList([]const u8) = .empty;
-    defer argv.deinit(allocator);
-    try argv.appendSlice(allocator, &.{
-        context.zig_emitter,
-        "build-obj",
-        "-fllvm",
-        "-flibllvm",
-        "-fno-compiler-rt",
-    });
-    if (shouldStrip(case.mode)) try argv.append(allocator, "-fstrip");
-    try argv.appendSlice(allocator, &.{
-        "-O",
-        case.mode,
-        "-target",
-        context.target,
-        case.wrapper,
-        emit_arg,
-    });
-    const label = try std.fmt.allocPrint(allocator, "patched Zig source-owned object inspection build-obj {s}", .{case.id});
-    defer allocator.free(label);
-    const result = try common.runCaptureEnv(allocator, io, argv.items, label, env_map);
-    common.freeRunResult(allocator, result);
-}
-
-fn requireSourceOwnedHookArtifacts(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    row: RowInfo,
-    marker: []const u8,
-    descriptor_path: []const u8,
-) !void {
-    const marker_contents = std.Io.Dir.cwd().readFileAlloc(io, marker, allocator, .limited(1024 * 1024)) catch |err| {
-        try common.validationError(io, "source-owned object inspection missing z_llvm marker for {s}: {t}\n", .{ row.id, err });
-    };
-    defer allocator.free(marker_contents);
-    if (std.mem.indexOf(u8, marker_contents, "case_id=source-wrapper-dispatch") == null) {
-        try common.validationError(io, "source-owned object inspection row {s} did not use source-wrapper dispatch marker\n", .{row.id});
-    }
-    if (std.mem.indexOf(u8, marker_contents, "pipeline=preopt") == null) {
-        try common.validationError(io, "source-owned object inspection row {s} did not use preopt pipeline marker\n", .{row.id});
-    }
-    if (std.mem.indexOf(u8, marker_contents, "ir_writer=external") == null) {
-        try common.validationError(io, "source-owned object inspection row {s} did not use external IR writer marker\n", .{row.id});
-    }
-
-    const emitter = readDescriptorInputValue(allocator, io, descriptor_path, row, "facts_emitter") catch |err| switch (err) {
-        error.MissingDescriptorInputValue => try readDescriptorInputValue(allocator, io, descriptor_path, row, "descriptor_emitter"),
-        else => return err,
-    };
-    defer allocator.free(emitter);
-    if (!std.mem.eql(u8, emitter, "patched-zig-hook")) {
-        try common.validationError(io, "source-owned object inspection row {s} descriptor emitter is {s}, expected patched-zig-hook\n", .{ row.id, emitter });
-    }
 }
 
 fn inspectObject(
@@ -507,50 +374,4 @@ fn failObject(io: std.Io, case: RowInfo, category: []const u8, message: []const 
 
 fn yesNo(value: bool) []const u8 {
     return if (value) "yes" else "no";
-}
-
-fn cloneEnvironment(allocator: std.mem.Allocator, src: *const std.process.Environ.Map) !std.process.Environ.Map {
-    var dst = std.process.Environ.Map.init(allocator);
-    errdefer dst.deinit();
-    try copyEnvironment(&dst, src);
-    return dst;
-}
-
-fn copyEnvironment(dst: *std.process.Environ.Map, src: *const std.process.Environ.Map) !void {
-    const keys = src.keys();
-    const values = src.values();
-    for (keys, values) |key, value| {
-        try dst.put(key, value);
-    }
-}
-
-fn readDescriptorInputValue(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    descriptor_path: []const u8,
-    row: RowInfo,
-    key: []const u8,
-) ![]const u8 {
-    const contents = std.Io.Dir.cwd().readFileAlloc(io, descriptor_path, allocator, .limited(1024 * 1024)) catch |err| {
-        try common.validationError(io, "missing Zig-emitted semantic descriptor for {s}: {t}\n", .{ row.id, err });
-    };
-    defer allocator.free(contents);
-    var lines = std.mem.splitScalar(u8, contents, '\n');
-    while (lines.next()) |line| {
-        const separator = std.mem.indexOfScalar(u8, line, '=') orelse continue;
-        if (std.mem.eql(u8, line[0..separator], key)) {
-            return try allocator.dupe(u8, line[separator + 1 ..]);
-        }
-    }
-    return error.MissingDescriptorInputValue;
-}
-
-fn shouldStrip(mode: []const u8) bool {
-    return std.mem.eql(u8, mode, "ReleaseFast") or std.mem.eql(u8, mode, "ReleaseSmall");
-}
-
-fn normalizeZigTarget(target: []const u8) []const u8 {
-    if (std.mem.eql(u8, target, "x86_64-unknown-linux-gnu")) return "x86_64-linux-gnu";
-    if (std.mem.eql(u8, target, "x86_64-unknown-linux-musl")) return "x86_64-linux-musl";
-    return target;
 }
