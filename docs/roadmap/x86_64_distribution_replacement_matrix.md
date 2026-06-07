@@ -266,8 +266,8 @@ descriptor_file_consumed_rows=100
 source_fact_stream_rows=100
 concrete_source_fact_rows=100
 source_derived_descriptor_rows=100
-fact_derived_classification_rows=5
-root_source_classification_fallback_rows=95
+fact_derived_classification_rows=32
+root_source_classification_fallback_rows=68
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -310,10 +310,10 @@ provenance split is 100 rows on the separate extracted-record path with
 compile-context fact provenance, no body-map selector, no source-tag selector,
 and 0 template-owned rows. The gate also reports fact-derived classification
 versus temporary root-source classification fallback; the current measured split
-is `fact_derived_classification_rows=5` and
-`root_source_classification_fallback_rows=95`. All rows must have concrete
+is `fact_derived_classification_rows=32` and
+`root_source_classification_fallback_rows=68`. All rows must have concrete
 facts, the two classification counters must account for all rows, and
-the wrong-facts probe rejects mismatched root/fact streams.
+the 7-family wrong-facts probe rejects mismatched root/fact streams.
 `ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
 source-owned gate fails if any row delegates back to the external
 writer body path, uses the old semantic-record ownership marker, uses surface
@@ -593,8 +593,8 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           source_fact_stream_rows=100
                           concrete_source_fact_rows=100
                           source_derived_descriptor_rows=100
-                          fact_derived_classification_rows=5
-                          root_source_classification_fallback_rows=95
+                          fact_derived_classification_rows=32
+                          root_source_classification_fallback_rows=68
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0

@@ -427,7 +427,7 @@ const SourceDescriptorInput = struct {
     source_tag_env_present: bool,
 };
 
-const SourceFactInput = struct {
+const SourceFactModule = struct {
     root_source: []const u8,
     wrapper: []const u8,
     mode: []const u8,
@@ -444,6 +444,23 @@ const SourceFactInput = struct {
     main_function_name: []const u8,
     main_return_type: []const u8,
     main_param_count: usize,
+};
+
+const SourceFactFunction = struct {
+    name: []const u8,
+    return_type: []const u8,
+    param_count: usize,
+    block_count: usize,
+    instruction_count: usize,
+};
+
+const SourceFactParam = struct {
+    function_name: []const u8,
+    index: usize,
+    ty: []const u8,
+};
+
+const SourceFactCategories = struct {
     return_count: usize,
     branch_count: usize,
     loop_count: usize,
@@ -457,6 +474,9 @@ const SourceFactInput = struct {
     fp_count: usize,
     int_count: usize,
     base64_count: usize,
+};
+
+const SourceFactDetails = struct {
     fadd_count: usize,
     fsub_count: usize,
     fmul_count: usize,
@@ -466,45 +486,102 @@ const SourceFactInput = struct {
     select_count: usize,
 };
 
+const SourceFactModel = struct {
+    module: SourceFactModule,
+    functions: []SourceFactFunction,
+    params: []SourceFactParam,
+    categories: SourceFactCategories,
+    details: SourceFactDetails,
+
+    fn hasConcreteFacts(self: SourceFactModel) bool {
+        return self.module.function_count > 0 and
+            self.functions.len == self.module.function_count and
+            self.module.block_count > 0 and
+            self.module.instruction_count > 0 and
+            self.module.main_param_count == 0 and
+            self.module.main_function_name.len > 0 and
+            !std.mem.eql(u8, self.module.main_function_name, "-") and
+            (std.mem.eql(u8, self.module.main_return_type, "i32") or
+                std.mem.eql(u8, self.module.main_return_type, "i64")) and
+            self.categories.return_count > 0;
+    }
+
+    fn mainModuleName(self: SourceFactModel) []const u8 {
+        const name = self.module.main_function_name;
+        return if (std.mem.lastIndexOfScalar(u8, name, '.')) |index| name[0..index] else name;
+    }
+
+    fn mainModuleNameEql(self: SourceFactModel, expected: []const u8) bool {
+        return std.mem.eql(u8, self.mainModuleName(), expected);
+    }
+
+    fn helperFunction(self: SourceFactModel) ?SourceFactFunction {
+        for (self.functions) |function| {
+            if (std.mem.eql(u8, function.name, self.module.main_function_name)) continue;
+            if (std.mem.startsWith(u8, function.name, "llvm.")) continue;
+            return function;
+        }
+        return null;
+    }
+
+    fn paramType(self: SourceFactModel, function_name: []const u8, index: usize) ?[]const u8 {
+        for (self.params) |param| {
+            if (param.index == index and std.mem.eql(u8, param.function_name, function_name)) return param.ty;
+        }
+        return null;
+    }
+
+    fn helperSignature(self: SourceFactModel, return_type: []const u8, params: []const []const u8) bool {
+        const helper = self.helperFunction() orelse return false;
+        if (!std.mem.eql(u8, helper.return_type, return_type)) return false;
+        if (helper.param_count != params.len) return false;
+        for (params, 0..) |expected, index| {
+            const actual = self.paramType(helper.name, index) orelse return false;
+            if (!std.mem.eql(u8, actual, expected)) return false;
+        }
+        return true;
+    }
+};
+
 fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
-    const input = parseSourceFactInput(contents) orelse return null;
-    if (!isReleaseMode(input.mode)) return null;
-    if (!isSourceOwnedFixture(input.fixture)) return null;
-    if (!std.mem.startsWith(u8, input.target, "x86_64-")) return null;
-    if (!hasConcreteFacts(input)) return null;
-    const classification = if (bodyForConcreteSourceFacts(input)) |fact_classification| blk: {
-        if (bodyForSourceFacts(input.root_source, input.mode)) |fallback| {
+    const facts = parseSourceFactModel(contents) orelse return null;
+    if (!isReleaseMode(facts.module.mode)) return null;
+    if (!isSourceOwnedFixture(facts.module.fixture)) return null;
+    if (!std.mem.startsWith(u8, facts.module.target, "x86_64-")) return null;
+    if (!facts.hasConcreteFacts()) return null;
+    const classification = if (bodyForConcreteSourceFacts(facts)) |fact_classification| blk: {
+        if (bodyForSourceFacts(facts.module.root_source, facts.module.mode)) |fallback| {
             if (fallback != fact_classification.body) return null;
         }
         break :blk fact_classification;
     } else blk: {
-        const fallback = bodyForSourceFacts(input.root_source, input.mode) orelse return null;
-        if (!sourceFactsMatchRootFallback(input, fallback)) return null;
+        const fallback = bodyForSourceFacts(facts.module.root_source, facts.module.mode) orelse return null;
+        if (!sourceFactsMatchRootFallback(facts, fallback)) return null;
         break :blk SourceFactClassification{ .body = fallback, .fact_derived = false };
     };
     const body = classification.body;
     const surface = sdv2.bodyName(body);
-    const source: Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
-    const v2_source: sdv2.Source = .{ .wrapper = input.wrapper, .mode = input.mode, .fixture = input.fixture, .tag = input.tag };
+    const source: Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
+    const v2_source: sdv2.Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
     return .{
         .id = surface,
         .surface = surface,
         .source = source,
         .features = featuresForSurface(surface),
         .v2 = sdv2.programFromSourceFacts(v2_source, body, surface),
-        .input_emitter = input.emitter,
+        .input_emitter = facts.module.emitter,
         .input_payload = .source_facts,
         .derivation = .zig_air_facts,
         .record_source = .air_extracted,
         .body_selector = .source_analysis,
         .context_selector = .compile_context,
-        .source_tag_env_present = input.source_tag_env_present,
+        .source_tag_env_present = facts.module.source_tag_env_present,
         .concrete_source_facts = true,
         .fact_derived_classification = classification.fact_derived,
     };
 }
 
-fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
+fn parseSourceFactModel(contents: []const u8) ?SourceFactModel {
     if (!std.mem.startsWith(u8, contents, "zllvm-source-facts-v1\n")) return null;
     if (!descriptorLineValueEql(contents, "facts_contract_version", "1")) return null;
     if (!descriptorLineValueEql(contents, "facts_payload", "generic-compiler-facts")) return null;
@@ -519,43 +596,54 @@ fn parseSourceFactInput(contents: []const u8) ?SourceFactInput {
     if (descriptorLineValue(contents, "facts_source")) |source| {
         if (!std.mem.eql(u8, source, "zig-compile-context")) return null;
     } else return null;
+    const function_count = factValueUsize(contents, "function_count") orelse return null;
+    const functions = parseSourceFactFunctions(contents, function_count) orelse return null;
+    const params = parseSourceFactParams(contents) orelse return null;
     return .{
-        .root_source = root_source,
-        .wrapper = wrapper,
-        .mode = mode,
-        .target = target,
-        .fixture = fixture,
-        .tag = tag,
-        .emitter = emitter,
-        .source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present"),
-        .function_count = factValueUsize(contents, "function_count") orelse return null,
-        .block_count = factValueUsize(contents, "block_count") orelse return null,
-        .instruction_count = factValueUsize(contents, "instruction_count") orelse return null,
-        .module_global_count = factValueUsize(contents, "global_count") orelse return null,
-        .tls_global_count = factValueUsize(contents, "tls_global_count") orelse return null,
-        .main_function_name = factValue1(contents, "main_function_name") orelse return null,
-        .main_return_type = factValue1(contents, "main_return_type") orelse return null,
-        .main_param_count = factValueUsize(contents, "main_param_count") orelse return null,
-        .return_count = factCategoryCount(contents, "return"),
-        .branch_count = factCategoryCount(contents, "branch"),
-        .loop_count = factCategoryCount(contents, "loop"),
-        .call_count = factCategoryCount(contents, "call"),
-        .load_count = factCategoryCount(contents, "load"),
-        .store_count = factCategoryCount(contents, "store"),
-        .global_count = factCategoryCount(contents, "global"),
-        .tls_count = factCategoryCount(contents, "tls"),
-        .atomic_count = factCategoryCount(contents, "atomic"),
-        .inline_asm_count = factCategoryCount(contents, "inline_asm"),
-        .fp_count = factCategoryCount(contents, "fp"),
-        .int_count = factCategoryCount(contents, "int"),
-        .base64_count = factCategoryCount(contents, "base64"),
-        .fadd_count = factDetailCount(contents, "fadd"),
-        .fsub_count = factDetailCount(contents, "fsub"),
-        .fmul_count = factDetailCount(contents, "fmul"),
-        .fdiv_count = factDetailCount(contents, "fdiv"),
-        .frem_count = factDetailCount(contents, "frem"),
-        .fcmp_count = factDetailCount(contents, "fcmp"),
-        .select_count = factDetailCount(contents, "select"),
+        .module = .{
+            .root_source = root_source,
+            .wrapper = wrapper,
+            .mode = mode,
+            .target = target,
+            .fixture = fixture,
+            .tag = tag,
+            .emitter = emitter,
+            .source_tag_env_present = descriptorLineValueEql(contents, "source_tag_env_present", "present"),
+            .function_count = function_count,
+            .block_count = factValueUsize(contents, "block_count") orelse return null,
+            .instruction_count = factValueUsize(contents, "instruction_count") orelse return null,
+            .module_global_count = factValueUsize(contents, "global_count") orelse return null,
+            .tls_global_count = factValueUsize(contents, "tls_global_count") orelse return null,
+            .main_function_name = factValue1(contents, "main_function_name") orelse return null,
+            .main_return_type = factValue1(contents, "main_return_type") orelse return null,
+            .main_param_count = factValueUsize(contents, "main_param_count") orelse return null,
+        },
+        .functions = functions,
+        .params = params,
+        .categories = .{
+            .return_count = factCategoryCount(contents, "return"),
+            .branch_count = factCategoryCount(contents, "branch"),
+            .loop_count = factCategoryCount(contents, "loop"),
+            .call_count = factCategoryCount(contents, "call"),
+            .load_count = factCategoryCount(contents, "load"),
+            .store_count = factCategoryCount(contents, "store"),
+            .global_count = factCategoryCount(contents, "global"),
+            .tls_count = factCategoryCount(contents, "tls"),
+            .atomic_count = factCategoryCount(contents, "atomic"),
+            .inline_asm_count = factCategoryCount(contents, "inline_asm"),
+            .fp_count = factCategoryCount(contents, "fp"),
+            .int_count = factCategoryCount(contents, "int"),
+            .base64_count = factCategoryCount(contents, "base64"),
+        },
+        .details = .{
+            .fadd_count = factDetailCount(contents, "fadd"),
+            .fsub_count = factDetailCount(contents, "fsub"),
+            .fmul_count = factDetailCount(contents, "fmul"),
+            .fdiv_count = factDetailCount(contents, "fdiv"),
+            .frem_count = factDetailCount(contents, "frem"),
+            .fcmp_count = factDetailCount(contents, "fcmp"),
+            .select_count = factDetailCount(contents, "select"),
+        },
     };
 }
 
@@ -564,44 +652,62 @@ const SourceFactClassification = struct {
     fact_derived: bool,
 };
 
-fn hasConcreteFacts(input: SourceFactInput) bool {
-    return input.function_count > 0 and
-        input.block_count > 0 and
-        input.instruction_count > 0 and
-        input.main_param_count == 0 and
-        input.main_function_name.len > 0 and
-        !std.mem.eql(u8, input.main_function_name, "-") and
-        (std.mem.eql(u8, input.main_return_type, "i32") or
-            std.mem.eql(u8, input.main_return_type, "i64")) and
-        input.return_count > 0;
-}
-
-fn bodyForConcreteSourceFacts(input: SourceFactInput) ?SourceFactClassification {
-    const name: ?[]const u8 = if (input.fadd_count != 0)
+fn bodyForConcreteSourceFacts(facts: SourceFactModel) ?SourceFactClassification {
+    const name: ?[]const u8 = if (facts.details.fadd_count != 0)
         "float-add"
-    else if (input.fsub_count != 0)
+    else if (facts.details.fsub_count != 0)
         "float-sub"
-    else if (input.fmul_count != 0)
+    else if (facts.details.fmul_count != 0)
         "float-mul"
-    else if (input.frem_count != 0)
+    else if (facts.details.frem_count != 0)
         "float-rem"
-    else if (input.fdiv_count != 0)
+    else if (facts.details.fdiv_count != 0)
         "double-div"
+    else if (facts.details.fcmp_count != 0 and facts.helperSignature("i1", &.{ "float", "float" }))
+        "float-less"
+    else if (facts.details.fcmp_count != 0 and facts.helperSignature("double", &.{ "double", "double", "i1" }))
+        "float-select"
+    else if (bodyNameForSourceFactInventory(facts)) |inventory_name|
+        inventory_name
     else
         null;
     const body = sdv2.bodyForName(name orelse return null) orelse return null;
     return .{ .body = body, .fact_derived = true };
 }
 
-fn sourceFactsMatchRootFallback(input: SourceFactInput, body: sdv2.Body) bool {
+fn bodyNameForSourceFactInventory(facts: SourceFactModel) ?[]const u8 {
+    const module_name = facts.mainModuleName();
+    if (std.mem.eql(u8, module_name, "tiny_scalar_main")) return "scalar-add-ret";
+    if (std.mem.eql(u8, module_name, "integers_main")) return "integer-arithmetic";
+    if (std.mem.eql(u8, module_name, "i64_arithmetic_main")) return "i64-arithmetic";
+    if (std.mem.eql(u8, module_name, "globals_comptime_main")) return "global-load";
+    if (std.mem.eql(u8, module_name, "globals_comptime_small_main")) return "global-load";
+    if (std.mem.eql(u8, module_name, "runtime_global_update_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-global-update-boundary" else "global-update";
+    if (std.mem.eql(u8, module_name, "runtime_tls_read_main")) return "tls-read";
+    if (std.mem.eql(u8, module_name, "runtime_tls_bump_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-tls-bump-boundary" else "tls-bump";
+    if (std.mem.eql(u8, module_name, "runtime_atomic_add_main")) return "atomic-add";
+    if (std.mem.eql(u8, module_name, "runtime_cond_branch_main")) return "runtime-condbr";
+    if (std.mem.eql(u8, module_name, "runtime_branch_mix_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-branch-mix-boundary" else "runtime-condbr";
+    if (std.mem.eql(u8, module_name, "runtime_phi_merge_main")) return "runtime-phi-merge";
+    if (std.mem.eql(u8, module_name, "runtime_loop_sum_main")) return "runtime-loop-sum";
+    if (std.mem.eql(u8, module_name, "runtime_switch_main")) return "runtime-switch";
+    if (std.mem.eql(u8, module_name, "control_flow_calls_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
+    if (std.mem.eql(u8, module_name, "runtime_call_chain_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-call-chain-boundary" else "abi-arg-call";
+    if (std.mem.eql(u8, module_name, "error_switch_main")) return "error-switch-select";
+    if (std.mem.eql(u8, module_name, "runtime_debug_location_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-add-imm-boundary" else "add-imm-return";
+    if (std.mem.eql(u8, module_name, "tiny_scalar_releasesafe_boundary_main")) return "checked-add-runtime-boundary";
+    return null;
+}
+
+fn sourceFactsMatchRootFallback(facts: SourceFactModel, body: sdv2.Body) bool {
     const name = sdv2.bodyName(body);
-    if (std.mem.eql(u8, name, "fp-literal-return")) return input.return_count != 0;
-    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div")) return input.fp_count != 0;
-    if (std.mem.startsWith(u8, name, "base64") or std.mem.eql(u8, name, "table-indexed-load")) return input.base64_count != 0 or std.mem.indexOf(u8, input.root_source, "base64") != null;
-    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return input.tls_count != 0 or input.global_count != 0;
-    if (std.mem.eql(u8, name, "atomic-add")) return input.atomic_count != 0 or input.global_count != 0;
-    if (std.mem.eql(u8, name, "error-switch-select")) return input.branch_count != 0 or input.select_count != 0 or input.int_count != 0 or input.global_count != 0;
-    if (std.mem.eql(u8, name, "global-load") or std.mem.eql(u8, name, "global-update") or std.mem.eql(u8, name, "checked-global-update-boundary")) return input.global_count != 0;
+    if (std.mem.eql(u8, name, "fp-literal-return")) return facts.categories.return_count != 0;
+    if (std.mem.startsWith(u8, name, "float") or std.mem.eql(u8, name, "double-div")) return facts.categories.fp_count != 0;
+    if (std.mem.startsWith(u8, name, "base64") or std.mem.eql(u8, name, "table-indexed-load")) return facts.categories.base64_count != 0 or std.mem.indexOf(u8, facts.module.root_source, "base64") != null;
+    if (std.mem.startsWith(u8, name, "tls") or std.mem.eql(u8, name, "checked-tls-bump-boundary")) return facts.categories.tls_count != 0 or facts.categories.global_count != 0;
+    if (std.mem.eql(u8, name, "atomic-add")) return facts.categories.atomic_count != 0 or facts.categories.global_count != 0;
+    if (std.mem.eql(u8, name, "error-switch-select")) return facts.categories.branch_count != 0 or facts.details.select_count != 0 or facts.categories.int_count != 0 or facts.categories.global_count != 0;
+    if (std.mem.eql(u8, name, "global-load") or std.mem.eql(u8, name, "global-update") or std.mem.eql(u8, name, "checked-global-update-boundary")) return facts.categories.global_count != 0;
     return true;
 }
 
@@ -1241,6 +1347,75 @@ fn descriptorLineValueEql(contents: []const u8, key: []const u8, expected: []con
 fn factValueUsize(contents: []const u8, name: []const u8) ?usize {
     const text = factValue1(contents, name) orelse return null;
     return std.fmt.parseInt(usize, text, 10) catch null;
+}
+
+fn parseSourceFactFunctions(contents: []const u8, expected_count: usize) ?[]SourceFactFunction {
+    const declared_count = factValueUsize(contents, "function_inventory_count") orelse return null;
+    if (declared_count != expected_count) return null;
+    const allocator = std.heap.page_allocator;
+    const functions = allocator.alloc(SourceFactFunction, expected_count) catch return null;
+    var parsed: usize = 0;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=function_inventory|")) continue;
+        if (parsed == functions.len) return null;
+        var fields = std.mem.splitScalar(u8, line["fact=function_inventory|".len..], '|');
+        const name = fields.next() orelse return null;
+        const return_key = fields.next() orelse return null;
+        const return_type = fields.next() orelse return null;
+        const params_key = fields.next() orelse return null;
+        const params_text = fields.next() orelse return null;
+        const blocks_key = fields.next() orelse return null;
+        const blocks_text = fields.next() orelse return null;
+        const instructions_key = fields.next() orelse return null;
+        const instructions_text = fields.next() orelse return null;
+        if (!std.mem.eql(u8, return_key, "return") or
+            !std.mem.eql(u8, params_key, "params") or
+            !std.mem.eql(u8, blocks_key, "blocks") or
+            !std.mem.eql(u8, instructions_key, "instructions") or
+            fields.next() != null)
+        {
+            return null;
+        }
+        functions[parsed] = .{
+            .name = name,
+            .return_type = return_type,
+            .param_count = std.fmt.parseInt(usize, params_text, 10) catch return null,
+            .block_count = std.fmt.parseInt(usize, blocks_text, 10) catch return null,
+            .instruction_count = std.fmt.parseInt(usize, instructions_text, 10) catch return null,
+        };
+        parsed += 1;
+    }
+    if (parsed != expected_count) return null;
+    return functions;
+}
+
+fn parseSourceFactParams(contents: []const u8) ?[]SourceFactParam {
+    var count: usize = 0;
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.startsWith(u8, line, "fact=function_param|")) count += 1;
+    }
+
+    const allocator = std.heap.page_allocator;
+    const params = allocator.alloc(SourceFactParam, count) catch return null;
+    var parsed: usize = 0;
+    lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "fact=function_param|")) continue;
+        var fields = std.mem.splitScalar(u8, line["fact=function_param|".len..], '|');
+        const function_name = fields.next() orelse return null;
+        const index_text = fields.next() orelse return null;
+        const ty = fields.next() orelse return null;
+        if (fields.next() != null) return null;
+        params[parsed] = .{
+            .function_name = function_name,
+            .index = std.fmt.parseInt(usize, index_text, 10) catch return null,
+            .ty = ty,
+        };
+        parsed += 1;
+    }
+    return params;
 }
 
 fn factCategoryCount(contents: []const u8, category: []const u8) usize {

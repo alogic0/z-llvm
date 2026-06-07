@@ -3,6 +3,7 @@ const common = @import("tool_common.zig");
 
 const expected_selected_ir_writer_rows = 146;
 const expected_release_source_owned_rows = 100;
+const min_release_source_owned_fact_derived_rows = 30;
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
 const Validation = enum {
@@ -1924,9 +1925,9 @@ pub fn main(init: std.process.Init) !void {
             if (zig_compile_context_descriptor_rows != expected_rows or env_source_tag_selector_rows != 0 or wrapper_body_selector_rows != 0 or source_tag_body_selector_rows != 0 or fixture_metadata_selector_rows != 0 or source_tag_env_present_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires compile-context descriptor provenance; zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={}\n", .{ zig_compile_context_descriptor_rows, env_source_tag_selector_rows, wrapper_body_selector_rows, source_tag_body_selector_rows, fixture_metadata_selector_rows, source_tag_env_present_rows });
             }
-            const require_fact_derived_rows = case_filter == null;
-            if (concrete_source_fact_rows != expected_rows or (require_fact_derived_rows and fact_derived_classification_rows == 0) or fact_derived_classification_rows + root_source_classification_fallback_rows != expected_rows) {
-                try common.validationError(io, "release source-owned gate requires concrete source facts with complete classification accounting; concrete_source_fact_rows={} fact_derived_classification_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ concrete_source_fact_rows, fact_derived_classification_rows, root_source_classification_fallback_rows, expected_rows });
+            const min_fact_derived_rows: usize = if (case_filter == null) min_release_source_owned_fact_derived_rows else 0;
+            if (concrete_source_fact_rows != expected_rows or fact_derived_classification_rows < min_fact_derived_rows or fact_derived_classification_rows + root_source_classification_fallback_rows != expected_rows) {
+                try common.validationError(io, "release source-owned gate requires concrete source facts with complete classification accounting; concrete_source_fact_rows={} fact_derived_classification_rows={} min_fact_derived_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ concrete_source_fact_rows, fact_derived_classification_rows, min_fact_derived_rows, root_source_classification_fallback_rows, expected_rows });
             }
             if (descriptor_owned_rows != expected_rows or descriptor_v2_rows != expected_rows or real_descriptor_program_rows != expected_rows or full_descriptor_program_rows != expected_rows or serialized_function_rows != expected_rows or serialized_instruction_rows != expected_rows or serialized_global_rows != expected_rows or semantic_serialized_rows != expected_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_rows or source_fact_stream_rows != expected_rows or concrete_source_fact_rows != expected_rows or source_derived_descriptor_rows != expected_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_rows or generic_codegen_rows != expected_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records from Zig source facts; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_fact_stream_rows={} concrete_source_fact_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, concrete_source_fact_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
@@ -2350,93 +2351,142 @@ fn runSourceOwnedWrongSourceFactsProbe(
         .validation = .executable,
         .fallback = "ir-construction:zllvm-structured-builder;object-emission:z_llvm;linker:zig-native-fno-lld;source-backed:wrong-source-facts-probe",
     };
-    const ir_path = try common.allocTempFile(allocator, temp, probe_case.id, ".external.ll");
-    defer allocator.free(ir_path);
-    const marker = try common.allocTempFile(allocator, temp, probe_case.id, "_zllvm_marker.txt");
-    defer allocator.free(marker);
-    const descriptor_path = try common.allocTempFile(allocator, temp, probe_case.id, ".semantic_descriptor");
-    defer allocator.free(descriptor_path);
+    const probes = [_]WrongSourceFactsProbe{
+        .{ .name = "fp-sub", .main_function = "runtime_float_sub_main.main", .fp = 2, .fsub = 1 },
+        .{ .name = "scalar", .main_function = "tiny_scalar_main.main" },
+        .{ .name = "global", .main_function = "runtime_global_update_main.main" },
+        .{ .name = "tls", .main_function = "runtime_tls_bump_main.main", .tls_global = 1, .tls = 1, .call = 1, .load = 1, .store = 1 },
+        .{ .name = "atomic", .main_function = "runtime_atomic_add_main.main", .atomic = 1 },
+        .{ .name = "control-loop", .main_function = "runtime_loop_sum_main.main", .branch = 1 },
+        .{ .name = "call-chain", .main_function = "control_flow_calls_main.main", .call = 1 },
+    };
+    const argv = [_][]const u8{ zllvm_exe, "--emit=ir-writer" };
+    var rejected: usize = 0;
+    for (probes) |probe| {
+        const probe_id = try std.fmt.allocPrint(allocator, "{s}_{s}", .{ probe_case.id, probe.name });
+        defer allocator.free(probe_id);
+        const ir_path = try common.allocTempFile(allocator, temp, probe_id, ".external.ll");
+        defer allocator.free(ir_path);
+        const marker = try common.allocTempFile(allocator, temp, probe_id, "_zllvm_marker.txt");
+        defer allocator.free(marker);
+        const descriptor_path = try common.allocTempFile(allocator, temp, probe_id, ".semantic_descriptor");
+        defer allocator.free(descriptor_path);
+        const bad_descriptor = try renderWrongSourceFactsProbeDescriptor(allocator, probe_case, probe);
+        defer allocator.free(bad_descriptor);
+        try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = descriptor_path, .data = bad_descriptor });
 
-    const bad_descriptor =
+        var probe_env = std.process.Environ.Map.init(allocator);
+        defer probe_env.deinit();
+        try copyEnvironment(&probe_env, base_env);
+        try probe_env.put("ZLLVM_MARKER_PATH", marker);
+        try probe_env.put("ZLLVM_ZIG_MODE", probe_case.mode);
+        try probe_env.put("ZLLVM_CASE_ID", source_wrapper_dispatch_case_id);
+        try probe_env.put("ZLLVM_WRAPPER", probe_case.wrapper);
+        try probe_env.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
+        try probe_env.put("ZLLVM_SOURCE_FIXTURE", probe_case.covered_fixture);
+        try probe_env.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
+        try probe_env.put("ZLLVM_IR_PATH", ir_path);
+
+        const result = std.process.run(allocator, io, .{
+            .argv = &argv,
+            .environ_map = &probe_env,
+            .stdout_limit = .limited(128 * 1024 * 1024),
+            .stderr_limit = .limited(32 * 1024 * 1024),
+        }) catch |err| {
+            try common.validationError(io, "source-owned wrong-source-facts probe {s} could not run z_llvm: {t}\n", .{ probe.name, err });
+        };
+        defer common.freeRunResult(allocator, result);
+        if (common.termOk(result.term)) {
+            try common.validationError(io, "source-owned wrong-source-facts probe {s} accepted mismatched facts for wrapper={s} descriptor={s}\n", .{ probe.name, probe_case.wrapper, descriptor_path });
+        }
+        rejected += 1;
+    }
+
+    try output.print(
+        "ok release-source-owned wrong-source-facts-probe wrapper={s} mode={s} rejected_mismatch={}\n",
+        .{ probe_case.wrapper, probe_case.mode, rejected },
+    );
+    try output.flush();
+}
+
+const WrongSourceFactsProbe = struct {
+    name: []const u8,
+    main_function: []const u8,
+    branch: usize = 0,
+    call: usize = 0,
+    load: usize = 0,
+    store: usize = 0,
+    tls: usize = 0,
+    tls_global: usize = 0,
+    atomic: usize = 0,
+    fp: usize = 0,
+    fsub: usize = 0,
+};
+
+fn renderWrongSourceFactsProbeDescriptor(allocator: std.mem.Allocator, probe_case: Case, probe: WrongSourceFactsProbe) ![]const u8 {
+    return std.fmt.allocPrint(allocator,
         \\zllvm-source-facts-v1
         \\facts_contract_version=1
         \\facts_source=zig-compile-context
         \\facts_emitter=patched-zig-hook
         \\facts_payload=generic-compiler-facts
         \\root_source=runtime_float_add_main.zig
-        \\wrapper=test/zig/integrated/runtime_float_add_main.zig
-        \\mode=ReleaseFast
+        \\wrapper={s}
+        \\mode={s}
         \\target=x86_64-linux-gnu
-        \\fixture=test/distribution/releasefast_x86_64/inputs/floats_math_basic.ll
+        \\fixture={s}
         \\source_tag=-
         \\source_tag_env_present=not-present
         \\fact=module|root_source|runtime_float_add_main.zig
-        \\fact=module|mode|ReleaseFast
+        \\fact=module|mode|{s}
         \\fact=module|target|x86_64-linux-gnu
-        \\fact=function_count|2
-        \\fact=block_count|2
-        \\fact=instruction_count|8
-        \\fact=global_count|0
-        \\fact=tls_global_count|0
-        \\fact=main_function_name|main
+        \\fact=function_count|1
+        \\fact=block_count|1
+        \\fact=instruction_count|2
+        \\fact=global_count|1
+        \\fact=tls_global_count|{}
+        \\fact=main_function_name|{s}
         \\fact=main_return_type|i32
         \\fact=main_param_count|0
-        \\fact=function_inventory_count|2
-        \\fact=function_inventory|main|return|i32|params|0|blocks|1|instructions|4
-        \\fact=inst_category|return|2
-        \\fact=inst_category|branch|0
-        \\fact=inst_category|call|1
-        \\fact=inst_category|load|0
-        \\fact=inst_category|store|0
-        \\fact=inst_category|global|0
-        \\fact=inst_category|tls|0
-        \\fact=inst_category|atomic|0
+        \\fact=function_inventory_count|1
+        \\fact=function_inventory|{s}|return|i32|params|0|blocks|1|instructions|2
+        \\fact=inst_category|return|1
+        \\fact=inst_category|branch|{}
+        \\fact=inst_category|call|{}
+        \\fact=inst_category|load|{}
+        \\fact=inst_category|store|{}
+        \\fact=inst_category|global|1
+        \\fact=inst_category|tls|{}
+        \\fact=inst_category|atomic|{}
         \\fact=inst_category|inline_asm|0
-        \\fact=inst_category|fp|0
-        \\fact=inst_category|int|4
+        \\fact=inst_category|fp|{}
+        \\fact=inst_category|int|0
         \\fact=inst_category|base64|0
         \\fact=inst_detail|fadd|0
-        \\fact=inst_detail|fsub|0
+        \\fact=inst_detail|fsub|{}
         \\fact=inst_detail|fmul|0
         \\fact=inst_detail|fdiv|0
         \\fact=inst_detail|frem|0
         \\fact=inst_detail|fcmp|0
         \\fact=inst_detail|select|0
         \\
-    ;
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = descriptor_path, .data = bad_descriptor });
-
-    var probe_env = std.process.Environ.Map.init(allocator);
-    defer probe_env.deinit();
-    try copyEnvironment(&probe_env, base_env);
-    try probe_env.put("ZLLVM_MARKER_PATH", marker);
-    try probe_env.put("ZLLVM_ZIG_MODE", probe_case.mode);
-    try probe_env.put("ZLLVM_CASE_ID", source_wrapper_dispatch_case_id);
-    try probe_env.put("ZLLVM_WRAPPER", probe_case.wrapper);
-    try probe_env.put("ZLLVM_IR_WRITER_DISPATCH", "source-owned");
-    try probe_env.put("ZLLVM_SOURCE_FIXTURE", probe_case.covered_fixture);
-    try probe_env.put("ZLLVM_SEMANTIC_DESCRIPTOR_PATH", descriptor_path);
-    try probe_env.put("ZLLVM_IR_PATH", ir_path);
-
-    const argv = [_][]const u8{ zllvm_exe, "--emit=ir-writer" };
-    const result = std.process.run(allocator, io, .{
-        .argv = &argv,
-        .environ_map = &probe_env,
-        .stdout_limit = .limited(128 * 1024 * 1024),
-        .stderr_limit = .limited(32 * 1024 * 1024),
-    }) catch |err| {
-        try common.validationError(io, "source-owned wrong-source-facts probe could not run z_llvm: {t}\n", .{err});
-    };
-    defer common.freeRunResult(allocator, result);
-    if (common.termOk(result.term)) {
-        try common.validationError(io, "source-owned wrong-source-facts probe accepted mismatched facts for wrapper={s} descriptor={s}\n", .{ probe_case.wrapper, descriptor_path });
-    }
-
-    try output.print(
-        "ok release-source-owned wrong-source-facts-probe wrapper={s} mode={s} rejected_mismatch=1\n",
-        .{ probe_case.wrapper, probe_case.mode },
-    );
-    try output.flush();
+    , .{
+        probe_case.wrapper,
+        probe_case.mode,
+        probe_case.covered_fixture,
+        probe_case.mode,
+        probe.tls_global,
+        probe.main_function,
+        probe.main_function,
+        probe.branch,
+        probe.call,
+        probe.load,
+        probe.store,
+        probe.tls,
+        probe.atomic,
+        probe.fp,
+        probe.fsub,
+    });
 }
 
 fn requireMarkerField(io: std.Io, contents: []const u8, field: []const u8, value: []const u8, case: Case) !void {

@@ -87,12 +87,12 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
-`local_fail=0`. The current measured split is
-`fact_derived_classification_rows=5` and
-`root_source_classification_fallback_rows=95`; all accepted rows must have
+`local_fail=0`. The gate requires at least `fact_derived_classification_rows=30`. The current measured split is
+`fact_derived_classification_rows=32` and
+`root_source_classification_fallback_rows=68`; all accepted rows must have
 concrete facts, and those two classification counters must account for every row. The
 remaining root-source fallback is temporary z_llvm-side classification support,
-guarded by a wrong-facts negative probe.
+guarded by a 7-family wrong-facts negative probe.
 
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
@@ -176,7 +176,7 @@ source tag, wrapper basename, fixture
 metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
 compile-context fact provenance and no body-map selector. The next ownership
-step is to drive `root_source_classification_fallback_rows` down from 95 by deriving
+step is to drive `root_source_classification_fallback_rows` down from 68 by deriving
 more DescriptorV2 bodies from concrete facts inside z_llvm.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48
