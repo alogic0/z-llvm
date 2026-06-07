@@ -43,6 +43,10 @@ Selected IR-writer rows now print and enforce:
 `llvm_text_parse=not-used` and
 `codegen_ownership=codegen=generic-x86_64-lowering`, plus
 `ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
+The x86_64 lowering layer now shares SysV direct-call frame helpers for the
+aligned call prologue/epilogue and the one-slot live-parameter spill/reload
+shape used by simple direct calls; remaining raw stack-frame emission is kept
+to custom multi-call, f128 comparison, and explicit stack-slot boundary rows.
 The gate fails if a selected row reports libLLVM module parse/print,
 LLVM TargetMachine object emission, a minimal wrapper surface, a full-gate
 structured-direct count other than 146, any structured row reports textual

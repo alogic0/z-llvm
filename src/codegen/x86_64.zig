@@ -1163,9 +1163,7 @@ fn lowerControlFlowCallsWriterMainReturn(
     if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or add.flags.any()) return false;
     if (!isNamed(add.lhs, call_name) or !isInt(add.rhs, 1)) return false;
 
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -1227,9 +1225,7 @@ fn lowerDirectI32CallMainReturn(
             else => unreachable,
         }
     }
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     if (add_immediate != 0) try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_immediate });
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -1310,9 +1306,7 @@ fn lowerSelectedI64CallMainReturn(
     if (!isNamed(select.cond, icmp_name) or !isInt(select.true_value, 0) or !isInt(select.false_value, 1)) return false;
 
     const fail = "i64_call_fail";
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = 4 });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
     try machine.instructions.append(allocator, .{ .jne = fail });
@@ -1350,9 +1344,7 @@ fn lowerReleaseSmallStrFromFloatMainReturn(
             .fp => {},
             .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
         }
-        try machine.instructions.append(allocator, .sub_rsp_8);
-        try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-        try machine.instructions.append(allocator, .add_rsp_8);
+        try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     }
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1425,9 +1417,7 @@ fn lowerRuntimeArraySumMainReturn(
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 10 });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 20 });
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = 12 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1484,9 +1474,7 @@ fn lowerRuntimeCheckedStructSumMainReturn(
 
     const fail = "struct_sum_fail";
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "struct_sum_value" });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1641,9 +1629,7 @@ fn lowerRuntimeOptionalPayloadMainReturn(
     const fail = "optional_payload_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 1 });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 42 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1715,9 +1701,7 @@ fn lowerRuntimeErrorUnionPayloadMainReturn(
 
     const fail = "error_union_payload_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 0 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 7 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1868,9 +1852,7 @@ fn lowerRuntimeSliceSumMainReturn(
     const fail = "slice_sum_fail";
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "slice_sum_values" });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 4 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 10 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1927,9 +1909,7 @@ fn lowerRuntimeComptimeConstMainReturn(
 
     const fail = "comptime_const_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 7 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 35 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -1986,9 +1966,7 @@ fn lowerRuntimeDebugLocationMainReturn(
 
     const fail = "debug_location_fail";
     try machine.instructions.append(allocator, .{ .mov_imm_rdi = 41 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = 42 });
     try machine.instructions.append(allocator, .{ .jne = fail });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
@@ -4254,12 +4232,7 @@ fn lowerFloatRemReturn(
 ) !bool {
     if (!std.mem.eql(u8, function.name, "fp_extended_ops.float_rem")) return false;
     if (!try matchesFpBinaryReturn(function, block, ret, .float, .frem)) return false;
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = "fmodf",
-        .ret_ty = .float,
-    } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, "fmodf", .float);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -4309,12 +4282,7 @@ fn lowerRuntimeFloatRemMainReturn(
     const fail = "float_rem_fail";
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = 0x40b0_0000 });
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x4000_0000 });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = "fmodf",
-        .ret_ty = .float,
-    } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, "fmodf", .float);
     try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = 0x3fc0_0000 });
     try machine.instructions.append(allocator, .ucomiss_xmm1_xmm0);
     try machine.instructions.append(allocator, .{ .jne = fail });
@@ -4812,12 +4780,7 @@ fn lowerDescriptorFpBinaryCheckMainReturn(
             .fadd => try machine.instructions.append(allocator, .addss_xmm1_xmm0),
             .fsub => try machine.instructions.append(allocator, .subss_xmm1_xmm0),
             .frem => {
-                try machine.instructions.append(allocator, .sub_rsp_8);
-                try machine.instructions.append(allocator, .{ .direct_call = .{
-                    .symbol = "fmodf",
-                    .ret_ty = .float,
-                } });
-                try machine.instructions.append(allocator, .add_rsp_8);
+                try appendAlignedDirectCall(allocator, machine, "fmodf", .float);
             },
             .fmul, .fdiv, .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return false,
         }
@@ -8265,11 +8228,9 @@ fn lowerSelectedMixCFilesAddMayPanic(
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = condbr.then_target });
-    try machine.instructions.append(allocator, .sub_rsp_8);
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_14658" });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "debug.defaultPanic", .ret_ty = .void } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
     return true;
 }
@@ -8315,11 +8276,9 @@ fn lowerSelectedMixCFilesAddMayPanicDebugO0(allocator: std.mem.Allocator, machin
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = negative_label });
-    try machine.instructions.append(allocator, .sub_rsp_8);
     try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_17177" });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "debug.defaultPanic", .ret_ty = .void } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;
@@ -8769,13 +8728,6 @@ fn lowerCall(
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
-    const live_param = try singleLiveParamAfter(function, block, instruction_index);
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    if (live_param) |reg| try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
-        .frame_index = .slot0,
-        .reg = reg,
-    } });
-
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         const dst = try ArgReg.fromIndex(index);
@@ -8783,16 +8735,13 @@ fn lowerCall(
         if (src != dst) return error.UnsupportedCodegenAbi;
     }
 
-    try machine.instructions.append(allocator, .{ .direct_call = .{
-        .symbol = call.callee,
-        .ret_ty = call.ret_ty,
-    } });
-
-    if (live_param) |reg| try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
-        .reg = reg,
-        .frame_index = .slot0,
-    } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCallPreservingI32Param(
+        allocator,
+        machine,
+        call.callee,
+        call.ret_ty,
+        try singleLiveParamAfter(function, block, instruction_index),
+    );
 
     if (call.ret_ty == .void and result != null) return error.VoidCallHasResult;
     if (call.ret_ty != .void and result == null) return error.InstructionNeedsResult;
@@ -9725,9 +9674,7 @@ fn appendBase64FullMainCase(
     try machine.instructions.append(allocator, .{ .lea_global_rdi = input_symbol });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 4 });
     try machine.instructions.append(allocator, .{ .mov_imm_rcx = output_len });
-    try machine.instructions.append(allocator, .sub_rsp_8);
-    try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = "base64.decode_base_64", .ret_ty = .{ .int = 64 } } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+    try appendAlignedDirectCall(allocator, machine, "base64.decode_base_64", .{ .int = 64 });
     try machine.instructions.append(allocator, .{ .mov_imm_rdx = expected_len });
     try machine.instructions.append(allocator, .cmp_rax_rdx);
     try machine.instructions.append(allocator, .{ .jne = fail });
@@ -15100,14 +15047,58 @@ fn appendIntegerOverflowCall(allocator: std.mem.Allocator, machine: *MachineFunc
     try appendPanicCall(allocator, machine, label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
 }
 
-fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
-    try machine.instructions.append(allocator, .{ .label = label });
-    try machine.instructions.append(allocator, .sub_rsp_8);
+fn appendStackFrame(allocator: std.mem.Allocator, machine: *MachineFunction, bytes: u8) !void {
+    switch (bytes) {
+        8 => try machine.instructions.append(allocator, .sub_rsp_8),
+        24 => try machine.instructions.append(allocator, .sub_rsp_24),
+        else => return error.UnsupportedCodegenAbi,
+    }
+}
+
+fn appendStackFrameEnd(allocator: std.mem.Allocator, machine: *MachineFunction, bytes: u8) !void {
+    switch (bytes) {
+        8 => try machine.instructions.append(allocator, .add_rsp_8),
+        24 => try machine.instructions.append(allocator, .add_rsp_24),
+        else => return error.UnsupportedCodegenAbi,
+    }
+}
+
+fn appendDirectCall(allocator: std.mem.Allocator, machine: *MachineFunction, symbol: []const u8, ret_ty: ir.Type) !void {
     try machine.instructions.append(allocator, .{ .direct_call = .{
         .symbol = symbol,
-        .ret_ty = .void,
+        .ret_ty = ret_ty,
     } });
-    try machine.instructions.append(allocator, .add_rsp_8);
+}
+
+fn appendAlignedDirectCall(allocator: std.mem.Allocator, machine: *MachineFunction, symbol: []const u8, ret_ty: ir.Type) !void {
+    try appendStackFrame(allocator, machine, 8);
+    try appendDirectCall(allocator, machine, symbol, ret_ty);
+    try appendStackFrameEnd(allocator, machine, 8);
+}
+
+fn appendAlignedDirectCallPreservingI32Param(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    symbol: []const u8,
+    ret_ty: ir.Type,
+    live_param: ?ArgReg,
+) !void {
+    try appendStackFrame(allocator, machine, 8);
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+        .frame_index = .slot0,
+        .reg = reg,
+    } });
+    try appendDirectCall(allocator, machine, symbol, ret_ty);
+    if (live_param) |reg| try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
+        .reg = reg,
+        .frame_index = .slot0,
+    } });
+    try appendStackFrameEnd(allocator, machine, 8);
+}
+
+fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
+    try machine.instructions.append(allocator, .{ .label = label });
+    try appendAlignedDirectCall(allocator, machine, symbol, .void);
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
     try machine.instructions.append(allocator, .ret);
 }
