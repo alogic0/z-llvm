@@ -353,6 +353,31 @@ uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
+The same 100-row release source-owned replacement boundary now has a pre-link
+ELF object-format proof before Zig native linker handoff:
+
+```text
+gate=zig build distribution-native-link-object-inspection -- --release-source-owned
+target=x86_64-linux-gnu
+modes=ReleaseFast,ReleaseSafe,ReleaseSmall
+inventory=release-source-owned
+inspected=100
+elf64_rel=100
+relocation_rows=12
+tls_rows=8
+undefined_import_rows=0
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+checks=readelf -W -h -S -s -r; objdump -dr
+object_contract=ELF64 REL x86_64, accounted section flags/alignment,
+                symbol binding/type, allowed relocation families, local-exec
+                TLS shape, no accidental COMDAT, no accidental unwind
+linker_boundary=final linking remains Zig-owned through native ELF linker;
+                z_llvm does not implement a linker
+```
+
 The selected x86_64 musl object subset is a target-boundary proof. It also
 inherits the selected ReleaseSafe executable harnesses embedded in the M2 gate,
 but does not claim broad executable replacement or local linker ownership for

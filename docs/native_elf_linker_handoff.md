@@ -76,11 +76,15 @@ Current selected x86_64 ELF objects handed to Zig's native linker are:
 `zig build distribution-native-link-object-inspection` emits each selected
 native-link object with `z_llvm`, runs `readelf -W -h -S -s -r` and
 `objdump -dr`, and validates the object before any Zig linker invocation.
+With `--release-source-owned`, it reuses the same 100-row source-owned
+ReleaseFast/ReleaseSafe/ReleaseSmall inventory as
+`distribution-x86_64-release-source-owned` and emits each object through the
+patched-Zig source-owned z_llvm hook before inspecting it.
 
 It reports:
 
 ```text
-summary native-link-object-inspection target=<target> mode=<mode> case=<case>
+summary native-link-object-inspection inventory=<selected-native-link|release-source-owned> target=<target> mode=<mode> case=<case>
   inspected=<n>
   elf64_rel=<n>
   relocation_rows=<n>
@@ -97,10 +101,28 @@ Focused usage:
 ```text
 zig build distribution-native-link-object-inspection -- --case=releasefast_tiny_scalar
 zig build distribution-native-link-object-inspection -- --mode=ReleaseFast
+zig build distribution-native-link-object-inspection -- --release-source-owned --case=releasefast_source_tiny_scalar
+zig build distribution-native-link-object-inspection -- --release-source-owned --mode=ReleaseFast
 ```
 
 Run this gate before native-link executable gates when changing object emission,
 relocations, symbol tables, TLS lowering, or section layout.
+
+Current source-owned boundary proof:
+
+```text
+zig build distribution-native-link-object-inspection -- --release-source-owned
+summary native-link-object-inspection inventory=release-source-owned
+  inspected=100
+  elf64_rel=100
+  relocation_rows=12
+  tls_rows=8
+  undefined_import_rows=0
+  comdat_rows=0
+  eh_frame_rows=0
+  unsupported_relocation_rows=0
+  local_fail=0
+```
 
 ## Failure Classes
 

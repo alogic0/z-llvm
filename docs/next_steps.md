@@ -121,6 +121,15 @@ direct SourceFactProgram DescriptorV2 records without root-source/body-enum
 fallback. A 7-family wrong-facts negative probe still rejects mismatched
 wrapper/fact streams without using root source as the body selector.
 
+The same 100-row boundary now has pre-link ELF object-format evidence:
+`zig build distribution-native-link-object-inspection -- --release-source-owned`
+emits each row through the patched-Zig source-owned z_llvm object path, then
+checks the object with `readelf -W -h -S -s -r` and `objdump -dr`. Current
+counters are `inspected=100`, `elf64_rel=100`, `relocation_rows=12`,
+`tls_rows=8`, `undefined_import_rows=0`, `comdat_rows=0`, `eh_frame_rows=0`,
+`unsupported_relocation_rows=0`, and `local_fail=0`. Final linking remains
+Zig-owned; this is object-format proof, not a z_llvm linker implementation.
+
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
 
@@ -923,6 +932,7 @@ zig build test
 zig build readiness
 zig build distribution-all
 zig build distribution-native-link-object-inspection
+zig build distribution-native-link-object-inspection -- --release-source-owned
 zig build distribution-native-link
 zig build probe-native-linker
 zig build distribution-zig-source-native-link

@@ -8,7 +8,7 @@ const required_release_source_owned_fact_program_direct_rows = 100;
 const required_release_source_owned_body_enum_fallback_rows = 0;
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
-const Validation = enum {
+pub const Validation = enum {
     executable,
     link_only,
 };
@@ -18,7 +18,7 @@ const Pipeline = enum {
     preopt,
 };
 
-const Case = struct {
+pub const Case = struct {
     id: []const u8,
     wrapper: []const u8,
     covered_fixture: []const u8,
@@ -47,7 +47,7 @@ const SourceFixtureSkip = struct {
 
 const source_fixture_skips = [_]SourceFixtureSkip{};
 
-const cases = [_]Case{
+pub const cases = [_]Case{
     .{
         .id = "releasefast_tiny_scalar",
         .wrapper = "test/zig/integrated/tiny_scalar_main.zig",
@@ -2248,7 +2248,7 @@ fn isReleaseDistributionFixture(path: []const u8) bool {
         std.mem.indexOf(u8, path, "releasesmall_x86_64/") != null;
 }
 
-fn isReleaseSourceOwnedCase(case: Case) bool {
+pub fn isReleaseSourceOwnedCase(case: Case) bool {
     if (isReleaseDistributionFixture(case.covered_fixture)) return true;
     return std.mem.eql(u8, case.id, "releasefast_globals_comptime") or
         std.mem.eql(u8, case.id, "releasesmall_globals_comptime") or
