@@ -87,15 +87,19 @@ structured-direct IR. Current measured output is `release_source_rows=100`,
 `external_writer_delegate_rows=0`, `semantic_lowering_rows=100`,
 `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`,
 `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and
-`local_fail=0`. The gate requires at least `fact_derived_classification_rows=30`. The current measured split is
-`fact_derived_classification_rows=32` and
-`root_source_classification_fallback_rows=68`. Those counters are mirrored by
-the first SourceFactProgram ownership split:
-`source_fact_program_rows=32` and `body_enum_fallback_rows=68`. All accepted
-rows must have concrete facts, and the fact-program plus body-enum fallback
-counters must account for every row. The remaining root-source/body-enum
-fallback is temporary z_llvm-side classification support, guarded by a
-7-family wrong-facts negative probe.
+`local_fail=0`. The gate requires at least
+`fact_derived_classification_rows=45`, at least
+`source_fact_program_direct_rows=10`, and no more than
+`body_enum_fallback_rows=55`. The current measured split is
+`fact_derived_classification_rows=50`,
+`source_fact_program_rows=50`,
+`source_fact_program_direct_rows=50`,
+`source_fact_body_wrapper_rows=0`,
+`root_source_classification_fallback_rows=50`, and
+`body_enum_fallback_rows=50`. All accepted rows must have concrete facts, and
+the fact-program plus body-enum fallback counters must account for every row.
+The remaining root-source/body-enum fallback is temporary z_llvm-side
+classification support, guarded by a 7-family wrong-facts negative probe.
 
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
@@ -180,7 +184,7 @@ metadata, body-template, and body-enum ownership are no longer accepted by that
 gate. Every source-owned row now uses the extracted-record path with
 compile-context fact provenance and no body-map selector. The next ownership
 step is to drive `root_source_classification_fallback_rows` and
-`body_enum_fallback_rows` down from 68 by deriving more SourceFactProgram
+`body_enum_fallback_rows` down from 50 by deriving more SourceFactProgram
 records from concrete facts inside z_llvm.
 The narrower source-wrapper compatibility
 proof remains a separate regression rung; that compatibility gate now has 48

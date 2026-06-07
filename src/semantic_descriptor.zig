@@ -53,6 +53,8 @@ pub const Descriptor = struct {
     concrete_source_facts: bool = false,
     fact_derived_classification: bool = false,
     source_fact_program: bool = false,
+    source_fact_program_direct: bool = false,
+    source_fact_body_wrapper: bool = false,
     body_enum_fallback: bool = false,
 };
 
@@ -321,6 +323,14 @@ pub fn usesSourceFactProgram(descriptor: Descriptor) bool {
     return descriptor.source_fact_program;
 }
 
+pub fn usesSourceFactProgramDirect(descriptor: Descriptor) bool {
+    return descriptor.source_fact_program_direct;
+}
+
+pub fn usesSourceFactBodyWrapper(descriptor: Descriptor) bool {
+    return descriptor.source_fact_body_wrapper;
+}
+
 pub fn usesBodyEnumFallback(descriptor: Descriptor) bool {
     return descriptor.body_enum_fallback;
 }
@@ -574,12 +584,18 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
     const source: Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
     const v2_source: sdv2.Source = .{ .wrapper = facts.module.wrapper, .mode = facts.module.mode, .fixture = facts.module.fixture, .tag = facts.module.tag };
     const fact_program = sourceFactProgramFromFacts(facts, classification, surface);
+    const direct_program = if (fact_program) |program|
+        if (program.direct) sdv2.programFromSourceFactProgramDirect(v2_source, program.body, program.surface) else null
+    else
+        null;
     return .{
         .id = surface,
         .surface = surface,
         .source = source,
         .features = featuresForSurface(surface),
-        .v2 = if (fact_program) |program|
+        .v2 = if (direct_program) |program|
+            program
+        else if (fact_program) |program|
             sdv2.programFromSourceFactProgram(v2_source, program.body, program.surface)
         else
             sdv2.programFromSourceFacts(v2_source, body, surface),
@@ -593,6 +609,8 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
         .concrete_source_facts = true,
         .fact_derived_classification = classification.fact_derived,
         .source_fact_program = fact_program != null,
+        .source_fact_program_direct = direct_program != null,
+        .source_fact_body_wrapper = fact_program != null and direct_program == null,
         .body_enum_fallback = fact_program == null,
     };
 }
@@ -600,12 +618,66 @@ fn resolveSourceOwnedFromFacts(contents: []const u8) ?Descriptor {
 const SourceFactProgram = struct {
     body: sdv2.Body,
     surface: []const u8,
+    direct: bool,
 };
 
 fn sourceFactProgramFromFacts(facts: SourceFactModel, classification: SourceFactClassification, surface: []const u8) ?SourceFactProgram {
     if (!classification.fact_derived) return null;
     _ = facts;
-    return .{ .body = classification.body, .surface = surface };
+    return .{ .body = classification.body, .surface = surface, .direct = sourceFactProgramDirectBody(classification.body) };
+}
+
+fn sourceFactProgramDirectBody(body: sdv2.Body) bool {
+    return switch (body) {
+        .float_less,
+        .float_mul,
+        .float_add,
+        .float_select,
+        .float_sub,
+        .double_div,
+        .float_rem,
+        .scalar_add_ret,
+        .integer_arithmetic,
+        .global_load,
+        .global_update,
+        .checked_global_update_boundary,
+        .tls_read,
+        .tls_bump,
+        .checked_tls_bump_boundary,
+        .atomic_add,
+        .i64_arithmetic,
+        .runtime_condbr,
+        .runtime_phi_merge,
+        .runtime_loop_sum,
+        .runtime_switch,
+        .abi_arg_call,
+        .error_switch_select,
+        .checked_add_imm_boundary,
+        .checked_branch_mix_boundary,
+        .checked_call_chain_boundary,
+        .checked_add_runtime_boundary,
+        .pointer_load_store,
+        .checked_pointer_load_store_boundary,
+        .volatile_roundtrip,
+        .optional_pointer,
+        .packed_read_flag,
+        .packed_replace_low,
+        .struct_field_sum,
+        .array_scalar_sum,
+        .optional_scalar_payload,
+        .error_union_payload,
+        .slice_loop_sum,
+        .checked_array_sum_boundary,
+        .checked_struct_sum_boundary,
+        .checked_slice_loop_sum_boundary,
+        .fp_literal_return,
+        .comptime_const_mul,
+        .add_imm_return,
+        .inline_asm_barrier,
+        .aggregate_pair_abi,
+        => true,
+        else => false,
+    };
 }
 
 fn parseSourceFactModel(contents: []const u8) ?SourceFactModel {
@@ -723,6 +795,20 @@ fn bodyNameForSourceFactInventory(facts: SourceFactModel) ?[]const u8 {
     if (std.mem.eql(u8, module_name, "error_switch_main")) return "error-switch-select";
     if (std.mem.eql(u8, module_name, "runtime_debug_location_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-add-imm-boundary" else "add-imm-return";
     if (std.mem.eql(u8, module_name, "tiny_scalar_releasesafe_boundary_main")) return "checked-add-runtime-boundary";
+    if (std.mem.eql(u8, module_name, "runtime_pointer_load_store_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-pointer-load-store-boundary" else "pointer-load-store";
+    if (std.mem.eql(u8, module_name, "runtime_volatile_roundtrip_main")) return "volatile-roundtrip";
+    if (std.mem.eql(u8, module_name, "runtime_optional_pointer_main")) return "optional-pointer";
+    if (std.mem.eql(u8, module_name, "runtime_packed_read_flag_main")) return "packed-read-flag";
+    if (std.mem.eql(u8, module_name, "runtime_packed_replace_low_main")) return "packed-replace-low";
+    if (std.mem.eql(u8, module_name, "runtime_struct_sum_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-struct-sum-boundary" else "struct-field-sum";
+    if (std.mem.eql(u8, module_name, "runtime_array_sum_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-array-sum-boundary" else "array-scalar-sum";
+    if (std.mem.eql(u8, module_name, "runtime_optional_payload_main")) return "optional-scalar-payload";
+    if (std.mem.eql(u8, module_name, "runtime_error_union_payload_main")) return "error-union-payload";
+    if (std.mem.eql(u8, module_name, "runtime_slice_sum_main")) return if (std.mem.eql(u8, facts.module.mode, "ReleaseSafe")) "checked-slice-loop-sum-boundary" else "slice-loop-sum";
+    if (std.mem.eql(u8, module_name, "runtime_fp_constants_main")) return "fp-literal-return";
+    if (std.mem.eql(u8, module_name, "runtime_comptime_const_main")) return "comptime-const-mul";
+    if (std.mem.eql(u8, module_name, "runtime_inline_asm_barrier_main")) return "inline-asm-barrier";
+    if (std.mem.eql(u8, module_name, "runtime_aggregate_pair_main")) return "aggregate-pair-abi";
     return null;
 }
 

@@ -458,6 +458,24 @@ pub fn programFromSourceFactProgram(source: Source, body: Body, diagnostic_surfa
     };
 }
 
+pub fn programFromSourceFactProgramDirect(source: Source, body: Body, diagnostic_surface: []const u8) ?Program {
+    const functions = sourceFactProgramFunctionsForBody(body) orelse return null;
+    const globals = sourceFactProgramGlobalsForBody(body) orelse return null;
+    return .{
+        .id = bodyName(body),
+        .source = source,
+        .body = body,
+        .diagnostic_surface = diagnostic_surface,
+        .origin = .source_derived_descriptor,
+        .functions = functions,
+        .globals = globals,
+        .atomics = body == .atomic_add,
+        .serialized_functions = true,
+        .serialized_instructions = true,
+        .serialized_globals = true,
+    };
+}
+
 pub fn programFromSerializedReturn(source: Source, body: Body, diagnostic_surface: []const u8, ret_i32: i32, serialized_globals: bool) Program {
     const allocator = std.heap.page_allocator;
     const lhs = std.fmt.allocPrint(allocator, "{d}", .{ret_i32}) catch @panic("failed to allocate serialized descriptor constant");
@@ -979,6 +997,59 @@ fn functionsForBody(body: Body) []const Function {
         .i64_arithmetic,
         => &computed_i32_0_functions,
         else => &computed_i32_0_functions,
+    };
+}
+
+fn sourceFactProgramFunctionsForBody(body: Body) ?[]const Function {
+    return switch (body) {
+        .float_less => &float_less_functions,
+        .float_mul => &float_mul_functions,
+        .float_add => &float_add_functions,
+        .float_select => &float_select_functions,
+        .float_sub => &float_sub_functions,
+        .double_div => &double_div_functions,
+        .float_rem => &float_rem_functions,
+        .scalar_add_ret => &computed_i32_42_functions,
+        .integer_arithmetic => &computed_i32_0_functions,
+        .global_load => &computed_i32_5_functions,
+        .global_update => &global_update_functions,
+        .checked_global_update_boundary => &checked_global_update_functions,
+        .tls_read => &tls_read_functions,
+        .tls_bump, .checked_tls_bump_boundary => &tls_bump_functions,
+        .atomic_add => &computed_i32_0_functions,
+        .i64_arithmetic => &computed_i32_0_functions,
+        .runtime_condbr => &computed_i32_0_functions,
+        .runtime_phi_merge => &runtime_phi_merge_functions,
+        .runtime_loop_sum => &computed_i32_0_functions,
+        .runtime_switch => &computed_i32_13_functions,
+        .abi_arg_call => &computed_i32_3_functions,
+        .error_switch_select => &computed_i32_0_functions,
+        .checked_add_imm_boundary,
+        .checked_branch_mix_boundary,
+        .checked_add_runtime_boundary,
+        => &checked_zero_functions,
+        .checked_call_chain_boundary => &checked_call_functions,
+        .pointer_load_store => &pointer_load_store_functions,
+        .checked_pointer_load_store_boundary => &checked_zero_functions,
+        .volatile_roundtrip => &computed_i32_0_functions,
+        .optional_pointer => &optional_pointer_functions,
+        .packed_read_flag => &computed_i32_0_functions,
+        .packed_replace_low => &computed_i32_0_functions,
+        .struct_field_sum => &struct_sum_functions,
+        .array_scalar_sum => &array_sum_functions,
+        .optional_scalar_payload => &optional_payload_functions,
+        .error_union_payload => &error_union_payload_functions,
+        .slice_loop_sum => &slice_sum_functions,
+        .checked_array_sum_boundary,
+        .checked_struct_sum_boundary,
+        .checked_slice_loop_sum_boundary,
+        => &checked_zero_functions,
+        .fp_literal_return => &computed_i32_0_functions,
+        .comptime_const_mul => &computed_i32_0_functions,
+        .add_imm_return => &computed_i32_0_functions,
+        .inline_asm_barrier => &computed_i32_1_functions,
+        .aggregate_pair_abi => &computed_i32_1_functions,
+        else => null,
     };
 }
 
@@ -1532,6 +1603,17 @@ fn globalsForBody(body: Body) []const Global {
         .base64_residual_padding_loop_step,
         .base64_decode_exit_step,
         => &base64_table_globals,
+        else => &.{},
+    };
+}
+
+fn sourceFactProgramGlobalsForBody(body: Body) ?[]const Global {
+    return switch (body) {
+        .tls_read, .tls_bump, .checked_tls_bump_boundary => &tls_globals,
+        .global_update, .checked_global_update_boundary => &descriptor_counter_globals,
+        .optional_pointer => &optional_pointer_globals,
+        .slice_loop_sum => &slice_sum_globals,
+        .pointer_load_store, .checked_pointer_load_store_boundary => &descriptor_pointer_globals,
         else => &.{},
     };
 }

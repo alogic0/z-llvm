@@ -18,10 +18,12 @@ fixture_metadata_selector_rows=0
 source_tag_env_present_rows=0
 descriptor_supported_wrappers=82
 out_of_scope_wrappers=0
-fact_derived_classification_rows=32
-source_fact_program_rows=32
-root_source_classification_fallback_rows=68
-body_enum_fallback_rows=68
+fact_derived_classification_rows=50
+source_fact_program_rows=50
+source_fact_program_direct_rows=50
+source_fact_body_wrapper_rows=0
+root_source_classification_fallback_rows=50
+body_enum_fallback_rows=50
 ```
 
 All rows still serialize DescriptorV2 records. All 100 rows now use the
@@ -37,11 +39,13 @@ the target.
 ## Source Fact Program Split
 
 The frozen `zllvm-source-facts-v1` contract is now parsed into a typed model
-inside z_llvm. The release source-owned gate requires at least 30
-fact-derived rows and currently measures 32. Those 32 rows enter the
-`SourceFactProgram` bridge before DescriptorV2 lowering. The remaining 68 rows
-still use z_llvm-side root-source classification fallback and are counted
-separately as `body_enum_fallback_rows=68`.
+inside z_llvm. The release source-owned gate requires at least 45
+fact-derived rows and currently measures 50. Those 50 rows enter direct
+`SourceFactProgram` DescriptorV2 construction before structured IR lowering:
+`source_fact_program_direct_rows=50` and
+`source_fact_body_wrapper_rows=0`. The remaining 50 rows still use
+z_llvm-side root-source classification fallback and are counted separately as
+`body_enum_fallback_rows=50`.
 
 This is the current v1 fact exhaustion point. The remaining rows should not
 trigger row-specific Zig patches. If they cannot be derived from the frozen
@@ -52,9 +56,8 @@ facts, the next Zig-side change should be one deliberate
 | --- | ---: | --- |
 | Full and reduced base64 plus table-indexed load | 26 | Per-block terminators, loop latch/backedge shape, table/global initializer shape, byte-load/store opcodes, pointer index advancement, mask/shift/or opcodes, and residual/padding branch predicates |
 | `strFromFloatHelp` | 1 | Concrete call target records, stack-slot/lifetime records, memcpy/memset records, i128 arithmetic/truncation opcodes, table-load records, and indirect/vtable call boundary records |
-| Aggregate, pointer, slice, packed, optional, and error-union rows | 14 | Aggregate layout summaries, field/index access records, payload tag/data shape, GEP index records, load/store value types and alignments, and checked aggregate panic-edge terminators |
-| Literal and constant-result rows | 4 | Global/string initializer shape, scalar literal kind/value records, comptime constant expression summaries, and returned aggregate/slice layout |
-| Inline asm, volatile, start, address-space, and unreachable boundaries | 10 | Inline-asm boundary records, address-space/inttoptr records, volatile memory operation records, noreturn/unreachable terminators, and raw `_start` loop terminator summaries |
+| Constant-result rows | 2 | Global/string initializer shape, scalar literal kind/value records, and returned aggregate/slice layout |
+| Compile asm, start, address-space, unreachable, and void-call boundaries | 8 | Inline-asm boundary records, address-space/inttoptr records, noreturn/unreachable terminators, simple void-call boundary facts, and raw `_start` loop terminator summaries |
 | Hidden globals, mixed C/Zig, i64 helper, getauxval, f128 ABI, and vtable rows | 13 | Linkage/visibility records, C/Zig ABI/callconv summaries, TLS input records, i64 saturating helper signatures, pointer-walk terminators, f128 sret/byval ABI shape, and indirect call target summaries |
 
 ## Descriptor Body Inventory

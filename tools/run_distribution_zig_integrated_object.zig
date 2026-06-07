@@ -3,7 +3,9 @@ const common = @import("tool_common.zig");
 
 const expected_selected_ir_writer_rows = 146;
 const expected_release_source_owned_rows = 100;
-const min_release_source_owned_fact_derived_rows = 30;
+const min_release_source_owned_fact_derived_rows = 45;
+const min_release_source_owned_fact_program_direct_rows = 10;
+const max_release_source_owned_body_enum_fallback_rows = 55;
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
 
 const Validation = enum {
@@ -1372,6 +1374,8 @@ pub fn main(init: std.process.Init) !void {
     var fact_derived_classification_rows: usize = 0;
     var root_source_classification_fallback_rows: usize = 0;
     var source_fact_program_rows: usize = 0;
+    var source_fact_program_direct_rows: usize = 0;
+    var source_fact_body_wrapper_rows: usize = 0;
     var body_enum_fallback_rows: usize = 0;
     var serialized_function_rows: usize = 0;
     var serialized_instruction_rows: usize = 0;
@@ -1625,6 +1629,10 @@ pub fn main(init: std.process.Init) !void {
         defer if (use_ir_writer) allocator.free(root_source_classification_fallback);
         const source_fact_program = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_fact_program = \"", "zllvm_source_fact_program") else "-";
         defer if (use_ir_writer) allocator.free(source_fact_program);
+        const source_fact_program_direct = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_fact_program_direct = \"", "zllvm_source_fact_program_direct") else "-";
+        defer if (use_ir_writer) allocator.free(source_fact_program_direct);
+        const source_fact_body_wrapper = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_source_fact_body_wrapper = \"", "zllvm_source_fact_body_wrapper") else "-";
+        defer if (use_ir_writer) allocator.free(source_fact_body_wrapper);
         const body_enum_fallback = if (use_ir_writer) try readIrWriterHeaderValue(allocator, io, ir_path, case, "; zllvm_body_enum_fallback = \"", "zllvm_body_enum_fallback") else "-";
         defer if (use_ir_writer) allocator.free(body_enum_fallback);
         if (use_ir_writer) {
@@ -1805,6 +1813,13 @@ pub fn main(init: std.process.Init) !void {
                 }
                 if (std.mem.eql(u8, source_fact_program, "used")) {
                     source_fact_program_rows += 1;
+                    if (std.mem.eql(u8, source_fact_program_direct, "used")) {
+                        source_fact_program_direct_rows += 1;
+                    } else if (std.mem.eql(u8, source_fact_body_wrapper, "used")) {
+                        source_fact_body_wrapper_rows += 1;
+                    } else {
+                        try common.validationError(io, "release source-owned row {s} did not report source fact program lowering ownership: source_fact_program_direct={s} source_fact_body_wrapper={s} wrapper={s} fixture={s} mode={s} source_tag={s}\n", .{ case.id, source_fact_program_direct, source_fact_body_wrapper, case.wrapper, case.covered_fixture, case.mode, sourceMetadataTag(case.fallback) });
+                    }
                 } else if (std.mem.eql(u8, body_enum_fallback, "used")) {
                     body_enum_fallback_rows += 1;
                 } else {
@@ -1945,6 +1960,11 @@ pub fn main(init: std.process.Init) !void {
             if (source_fact_program_rows != fact_derived_classification_rows or body_enum_fallback_rows != root_source_classification_fallback_rows or source_fact_program_rows + body_enum_fallback_rows != expected_rows) {
                 try common.validationError(io, "release source-owned gate requires source fact program accounting to match classification; source_fact_program_rows={} fact_derived_classification_rows={} body_enum_fallback_rows={} root_source_classification_fallback_rows={} expected_rows={}\n", .{ source_fact_program_rows, fact_derived_classification_rows, body_enum_fallback_rows, root_source_classification_fallback_rows, expected_rows });
             }
+            const min_direct_rows: usize = if (case_filter == null) min_release_source_owned_fact_program_direct_rows else 0;
+            const max_body_enum_fallback_rows: usize = if (case_filter == null) max_release_source_owned_body_enum_fallback_rows else expected_rows;
+            if (source_fact_program_direct_rows + source_fact_body_wrapper_rows != source_fact_program_rows or source_fact_program_direct_rows < min_direct_rows or body_enum_fallback_rows > max_body_enum_fallback_rows) {
+                try common.validationError(io, "release source-owned gate requires direct source fact program lowering for converted families; source_fact_program_rows={} source_fact_program_direct_rows={} min_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} max_body_enum_fallback_rows={}\n", .{ source_fact_program_rows, source_fact_program_direct_rows, min_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows, max_body_enum_fallback_rows });
+            }
             if (descriptor_owned_rows != expected_rows or descriptor_v2_rows != expected_rows or real_descriptor_program_rows != expected_rows or full_descriptor_program_rows != expected_rows or serialized_function_rows != expected_rows or serialized_instruction_rows != expected_rows or serialized_global_rows != expected_rows or semantic_serialized_rows != expected_rows or serialized_return_stub_rows != 0 or air_derived_descriptor_rows != expected_rows or static_descriptor_map_rows != 0 or descriptor_body_name_rows != 0 or zllvm_body_expansion_rows != 0 or descriptor_program_body_expansion_rows != 0 or functions_for_body_rows != 0 or globals_for_body_rows != 0 or zig_emitted_descriptor_rows != expected_rows or runner_generated_descriptor_rows != 0 or descriptor_file_consumed_rows != expected_rows or source_fact_stream_rows != expected_rows or concrete_source_fact_rows != expected_rows or source_derived_descriptor_rows != expected_rows or tag_table_descriptor_rows != 0 or body_enum_dispatch_rows != 0 or surface_to_body_adapter_rows != 0 or canned_return_descriptor_rows != 0 or manual_fixture_dispatch_rows != 0 or legacy_semantic_record_rows != 0 or semantic_record_rows != 0 or external_writer_delegate_rows != 0 or semantic_lowering_rows != expected_rows or manifest_structured_rows != 0 or case_id_rows != 0 or surface_dispatch_rows != 0 or fallback_rows != 0 or structured_direct_rows != expected_rows or generic_codegen_rows != expected_rows or case_specific_codegen_rows != 0) {
                 try common.validationError(io, "release source-owned gate requires semantic serialized AIR-derived DescriptorV2 records from Zig source facts; release_source_rows={} descriptor_owned_rows={} descriptor_v2_rows={} real_descriptor_program_rows={} full_descriptor_program_rows={} serialized_function_rows={} serialized_instruction_rows={} serialized_global_rows={} semantic_serialized_rows={} serialized_return_stub_rows={} air_derived_descriptor_rows={} static_descriptor_map_rows={} descriptor_body_name_rows={} zllvm_body_expansion_rows={} descriptor_program_body_expansion_rows={} functions_for_body_rows={} globals_for_body_rows={} zig_emitted_descriptor_rows={} runner_generated_descriptor_rows={} descriptor_file_consumed_rows={} source_fact_stream_rows={} concrete_source_fact_rows={} source_derived_descriptor_rows={} structured_direct_rows={} generic_codegen_rows={} fallback_rows={}\n", .{ release_source_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, air_derived_descriptor_rows, static_descriptor_map_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, concrete_source_fact_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows });
             }
@@ -1953,8 +1973,8 @@ pub fn main(init: std.process.Init) !void {
                 .{ release_source_rows, source_wrapper_rows, descriptor_owned_rows, descriptor_v2_rows, real_descriptor_program_rows, full_descriptor_program_rows, serialized_function_rows, serialized_instruction_rows, serialized_global_rows, semantic_serialized_rows, serialized_return_stub_rows, descriptor_body_name_rows, zllvm_body_expansion_rows, descriptor_program_body_expansion_rows, functions_for_body_rows, globals_for_body_rows, air_derived_descriptor_rows, static_descriptor_map_rows, air_extracted_descriptor_rows, template_descriptor_rows, wrapper_body_map_rows, source_tag_body_map_rows, zig_emitted_descriptor_rows, runner_generated_descriptor_rows, descriptor_file_consumed_rows, source_fact_stream_rows, source_derived_descriptor_rows, structured_direct_rows, generic_codegen_rows, fallback_rows },
             );
             try stdout_writer.interface.print(
-                "summary release-source-owned-classification concrete_source_fact_rows={} fact_derived_classification_rows={} root_source_classification_fallback_rows={} source_fact_program_rows={} body_enum_fallback_rows={} local_fail=0\n",
-                .{ concrete_source_fact_rows, fact_derived_classification_rows, root_source_classification_fallback_rows, source_fact_program_rows, body_enum_fallback_rows },
+                "summary release-source-owned-classification concrete_source_fact_rows={} fact_derived_classification_rows={} root_source_classification_fallback_rows={} source_fact_program_rows={} source_fact_program_direct_rows={} source_fact_body_wrapper_rows={} body_enum_fallback_rows={} local_fail=0\n",
+                .{ concrete_source_fact_rows, fact_derived_classification_rows, root_source_classification_fallback_rows, source_fact_program_rows, source_fact_program_direct_rows, source_fact_body_wrapper_rows, body_enum_fallback_rows },
             );
             try stdout_writer.interface.print(
                 "summary release-source-owned-zero tag_table_descriptor_rows={} body_enum_dispatch_rows={} surface_to_body_adapter_rows={} canned_return_descriptor_rows={} manual_fixture_dispatch_rows={} semantic_lowering_rows={} legacy_semantic_record_rows={} semantic_record_rows={} external_writer_delegate_rows={} manifest_structured_rows={} case_id_rows={} surface_dispatch_rows={} case_specific_codegen_rows={} zig_compile_context_descriptor_rows={} env_source_tag_selector_rows={} wrapper_body_selector_rows={} source_tag_body_selector_rows={} fixture_metadata_selector_rows={} source_tag_env_present_rows={} local_fail=0\n",

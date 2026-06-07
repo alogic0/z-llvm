@@ -366,6 +366,8 @@ fn writeIrWriterModuleFromEnv(
         \\; zllvm_fact_derived_classification = "{s}"
         \\; zllvm_root_source_classification_fallback = "{s}"
         \\; zllvm_source_fact_program = "{s}"
+        \\; zllvm_source_fact_program_direct = "{s}"
+        \\; zllvm_source_fact_body_wrapper = "{s}"
         \\; zllvm_body_enum_fallback = "{s}"
         \\
     , .{
@@ -395,6 +397,8 @@ fn writeIrWriterModuleFromEnv(
         if (descriptor) |desc| if (sd.usesFactDerivedClassification(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesRootSourceClassificationFallback(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesSourceFactProgram(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesSourceFactProgramDirect(desc)) "used" else "not-used" else "-",
+        if (descriptor) |desc| if (sd.usesSourceFactBodyWrapper(desc)) "used" else "not-used" else "-",
         if (descriptor) |desc| if (sd.usesBodyEnumFallback(desc)) "used" else "not-used" else "-",
     }) catch |err| {
         try fatal(io, "failed to write external IR writer descriptor header {s}: {any}\n", .{ ir_path, err });

@@ -266,10 +266,12 @@ descriptor_file_consumed_rows=100
 source_fact_stream_rows=100
 concrete_source_fact_rows=100
 source_derived_descriptor_rows=100
-fact_derived_classification_rows=32
-root_source_classification_fallback_rows=68
-source_fact_program_rows=32
-body_enum_fallback_rows=68
+fact_derived_classification_rows=50
+root_source_classification_fallback_rows=50
+source_fact_program_rows=50
+source_fact_program_direct_rows=50
+source_fact_body_wrapper_rows=0
+body_enum_fallback_rows=50
 tag_table_descriptor_rows=0
 body_enum_dispatch_rows=0
 surface_to_body_adapter_rows=0
@@ -312,13 +314,16 @@ provenance split is 100 rows on the separate extracted-record path with
 compile-context fact provenance, no body-map selector, no source-tag selector,
 and 0 template-owned rows. The gate also reports fact-derived classification
 versus temporary root-source classification fallback; the current measured split
-is `fact_derived_classification_rows=32` and
-`root_source_classification_fallback_rows=68`. Those classification counters
-are mirrored by `source_fact_program_rows=32` and
-`body_enum_fallback_rows=68`, so the gate proves the fact-derived rows enter
-the SourceFactProgram bridge while remaining root-source fallback rows are
-still counted as body-enum fallback. All rows must have concrete facts, the
-fact-program plus body-enum fallback counters must account for all rows, and
+is `fact_derived_classification_rows=50` and
+`root_source_classification_fallback_rows=50`. Those classification counters
+are mirrored by `source_fact_program_rows=50` and
+`body_enum_fallback_rows=50`, and the SourceFactProgram rows now report
+`source_fact_program_direct_rows=50` and
+`source_fact_body_wrapper_rows=0`. The gate proves the fact-derived rows enter
+direct SourceFactProgram DescriptorV2 construction while remaining root-source
+fallback rows are still counted as body-enum fallback. All rows must have
+concrete facts, the fact-program plus body-enum fallback counters must account
+for all rows, and
 the 7-family wrong-facts probe rejects mismatched root/fact streams.
 `ZLLVM_SOURCE_TAG` is not present in accepted source-owned rows. The
 source-owned gate fails if any row delegates back to the external
@@ -599,10 +604,12 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           source_fact_stream_rows=100
                           concrete_source_fact_rows=100
                           source_derived_descriptor_rows=100
-                          fact_derived_classification_rows=32
-                          root_source_classification_fallback_rows=68
-                          source_fact_program_rows=32
-                          body_enum_fallback_rows=68
+                          fact_derived_classification_rows=50
+                          root_source_classification_fallback_rows=50
+                          source_fact_program_rows=50
+                          source_fact_program_direct_rows=50
+                          source_fact_body_wrapper_rows=0
+                          body_enum_fallback_rows=50
                           tag_table_descriptor_rows=0
                           body_enum_dispatch_rows=0
                           surface_to_body_adapter_rows=0
