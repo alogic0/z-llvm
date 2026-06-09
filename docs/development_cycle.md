@@ -139,6 +139,16 @@ Use this ladder:
 6. zig build distribution-native-link-object-inspection -- --release-source-owned  # milestone object-boundary proof
 7. zig build distribution-native-link -- --release-source-owned  # milestone native-link executable proof
 8. zig build probe-native-linker -- --release-source-owned  # milestone native-link acceptance probe
+
+For real AIR work, keep the loop source-driven and ReleaseFast-only:
+
+1. export or run one source through `ZLLVM_AIR_EXPORT_PATH`
+2. run `zig build test`
+3. run `zig build distribution-zig-air-uncurated-releasefast`
+
+The uncurated gate discovers `test/zig/inputs/*.zig`; it does not use selected
+case IDs or source-fact body classification. Do not add `distribution-all`,
+ELF inspection, or native-link probes to this inner loop.
 9. zig build distribution-all          # milestone confirmation only
 ```
 

@@ -67,6 +67,17 @@ pub fn build(b: *std.Build) void {
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-source-backed-structured", "Run broad x86_64 release source-backed structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-backed-broad"});
     addToolStepWithFixedAndUserArgs(b, "distribution-zig-source-structured-direct", "Run x86_64 release source-wrapper structured-direct gate without case-id ownership", "tools/run_distribution_zig_integrated_object.zig", &.{"--source-wrapper-dispatch"});
     addToolStepWithFixedAndUserArgs(b, "distribution-x86_64-release-source-owned", "Run x86_64 release source-owned semantic structured-direct gate", "tools/run_distribution_zig_integrated_object.zig", &.{"--release-source-owned"});
+    const uncurated_air_gate = b.addExecutable(.{
+        .name = "uncurated_air_gate",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/uncurated_air_gate.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    const run_uncurated_air_gate = b.addRunArtifact(uncurated_air_gate);
+    const uncurated_air_step = b.step("distribution-zig-air-uncurated-releasefast", "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR");
+    uncurated_air_step.dependOn(&run_uncurated_air_gate.step);
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
     addToolStepWithArgs(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");

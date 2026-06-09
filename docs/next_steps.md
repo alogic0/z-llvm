@@ -1191,3 +1191,35 @@ Commit:
 Use `unknown` only while selecting a slice. Before implementation is marked
 complete, replace every `unknown` with a concrete answer or document why the
 slice is preparatory infrastructure only.
+# Uncurated Zig AIR Milestone
+
+The frozen `zllvm-air-export-v1` hook now exports compiler-owned functions,
+blocks, instruction text, types, globals, calls, and liveness from patched Zig.
+z_llvm parses that contract and directly lowers an uncurated x86_64
+ReleaseFast subset without case IDs, wrapper maps, source-fact body
+classification, or canned DescriptorV2 bodies.
+
+Current measured gate:
+
+```text
+gate=zig build distribution-zig-air-uncurated-releasefast
+source_rows=19
+discovered_functions=44
+structured_functions=31
+generic_codegen_functions=29
+unsupported_functions=13
+codegen_failures=2
+case_id_rows=0
+source_fact_classification_rows=0
+top_unsupported_construct=block
+top_unsupported_count=3
+local_fail=0
+```
+
+The next automatically measured AIR blocker is `block` control-flow shape,
+covering optional payload, error-union payload, and optional-pointer functions.
+Other explicit boundaries are aggregate ABI function types, slice `ptr_add`,
+inline `assembly`, base64 `array_elem_val`, error-union `is_non_err`, packed
+field pointer operations, and FP literal return codegen. The uncurated gate
+prints every unsupported function with its opcode/reason so this list cannot
+silently fall back.
