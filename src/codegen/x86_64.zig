@@ -830,6 +830,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerIntegerSwitchReturn(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 3) {
         if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
             try verifyFunction(machine);
@@ -9508,6 +9513,64 @@ fn lowerDenseSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 19 });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerIntegerSwitchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1 or
+        !function.params.items[0].ty.eql(.{ .int = 8 }))
+    {
+        return false;
+    }
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 0) return false;
+    const switch_term = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .@"switch" => |switch_term| switch_term,
+        else => return false,
+    };
+    if (!switch_term.cond_ty.eql(.{ .int = 8 })) return false;
+    const cond_reg = try paramValueReg(function, switch_term.cond, .{ .int = 8 });
+
+    for (switch_term.cases.items) |case| {
+        if (!case.value_ty.eql(.{ .int = 8 })) return false;
+        const value = switch (case.value) {
+            .int => |int| if (int >= 0 and int <= std.math.maxInt(u8))
+                @as(u8, @intCast(int))
+            else
+                return false,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+        const target_block = blockByName(function, case.target) orelse return error.InvalidBranchTarget;
+        if (!isConstantI32ReturnBlock(target_block)) return false;
+        try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = cond_reg, .imm = value } });
+        try machine.instructions.append(allocator, .{ .je = case.target });
+    }
+    const default_block = blockByName(function, switch_term.default_target) orelse return error.InvalidBranchTarget;
+    if (!isConstantI32ReturnBlock(default_block)) return false;
+    try machine.instructions.append(allocator, .{ .jmp = switch_term.default_target });
+
+    for (function.blocks.items[1..]) |block| {
+        if (!isConstantI32ReturnBlock(block)) return false;
+        try machine.instructions.append(allocator, .{ .label = block.name });
+        try lowerReturnTerminator(allocator, machine, function, block);
+    }
+    return true;
+}
+
+fn isConstantI32ReturnBlock(block: ir.BasicBlock) bool {
+    if (block.instructions.items.len != 0) return false;
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    return switch (ret.value orelse return false) {
+        .int => true,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
 }
 
 fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

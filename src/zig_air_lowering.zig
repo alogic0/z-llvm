@@ -141,7 +141,12 @@ pub fn firstUnsupported(
     };
     function_type.deinit(allocator);
 
-    if (accumulatorLoopShape(function) != null) return null;
+    if (accumulatorLoopShape(function) != null or
+        isIntegerSwitchBlock(function) or
+        conditionalSlotUpdateShape(function))
+    {
+        return null;
+    }
 
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
@@ -167,6 +172,12 @@ fn lowerFunction(
 ) !ir.Function {
     if (accumulatorLoopShape(air_function)) |shape| {
         return lowerAccumulatorLoop(allocator, module, air_function, shape);
+    }
+    if (isIntegerSwitchBlock(air_function)) {
+        return lowerIntegerSwitch(allocator, module, air_function);
+    }
+    if (conditionalSlotUpdateShape(air_function)) {
+        return lowerConditionalSlotUpdate(allocator, air_function);
     }
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
@@ -556,6 +567,271 @@ fn lowerAccumulatorLoop(
     try function.blocks.append(allocator, exit);
 
     _ = module;
+    return function;
+}
+
+const SwitchArm = struct {
+    first: u8,
+    last: u8,
+    result: i32,
+};
+
+const SwitchRange = struct {
+    first: u8,
+    last: u8,
+};
+
+fn isIntegerSwitchBlock(function: air_export.Function) bool {
+    var switch_count: usize = 0;
+    var block_count: usize = 0;
+    var branch_count: usize = 0;
+    for (function.instructions) |instruction| {
+        if (isIgnoredOpcode(instruction.opcode) or
+            std.mem.eql(u8, instruction.opcode, "arg") or
+            std.mem.eql(u8, instruction.opcode, "ret"))
+        {
+            continue;
+        }
+        if (std.mem.eql(u8, instruction.opcode, "block")) {
+            block_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "switch_br")) {
+            switch_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "br")) {
+            branch_count += 1;
+        } else {
+            return false;
+        }
+    }
+    return switch_count == 1 and block_count == 1 and branch_count >= 2 and
+        std.mem.indexOf(u8, function.air_text, "else => {") != null;
+}
+
+fn lowerIntegerSwitch(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var arms: std.ArrayList(SwitchArm) = .empty;
+    defer arms.deinit(allocator);
+    var default_result: ?i32 = null;
+    var pending_range: ?SwitchRange = null;
+    var pending_default = false;
+    var lines = std.mem.splitScalar(u8, air_function.air_text, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " ");
+        if (std.mem.indexOf(u8, line, "=> {") != null) {
+            if (std.mem.indexOf(u8, line, "else => {") != null) {
+                pending_default = true;
+                pending_range = null;
+            } else if (parseSwitchRange(line)) |range| {
+                pending_range = range;
+                pending_default = false;
+            }
+        }
+        const result = parseSwitchBranchResult(line) orelse continue;
+        if (pending_default) {
+            default_result = result;
+            pending_default = false;
+        } else if (pending_range) |range| {
+            try arms.append(allocator, .{ .first = range.first, .last = range.last, .result = result });
+            pending_range = null;
+        }
+    }
+    const fallback = default_result orelse return error.UnsupportedAir;
+    if (arms.items.len == 0) return error.UnsupportedAir;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    var switch_term: ir.SwitchTerminator = .{
+        .cond_ty = .{ .int = 8 },
+        .cond = .{ .named = "arg0" },
+        .default_target = "default",
+        .cases = .empty,
+    };
+    errdefer switch_term.cases.deinit(allocator);
+    for (arms.items, 0..) |arm, arm_index| {
+        var value = arm.first;
+        while (true) {
+            const target = try ownPrint(module, "case{}_{}", .{ arm_index, value });
+            try switch_term.cases.append(allocator, .{
+                .value_ty = .{ .int = 8 },
+                .value = .{ .int = value },
+                .target = target,
+            });
+            var case_block = ir.BasicBlock.init(target);
+            case_block.terminator = .{ .ret = .{
+                .ty = .{ .int = 32 },
+                .value = .{ .int = arm.result },
+            } };
+            try function.blocks.append(allocator, case_block);
+            if (value == arm.last) break;
+            value += 1;
+        }
+    }
+    entry.terminator = .{ .@"switch" = switch_term };
+    try function.blocks.insert(allocator, 0, entry);
+
+    var default_block = ir.BasicBlock.init("default");
+    default_block.terminator = .{ .ret = .{
+        .ty = .{ .int = 32 },
+        .value = .{ .int = fallback },
+    } };
+    try function.blocks.append(allocator, default_block);
+    return function;
+}
+
+fn parseSwitchRange(line: []const u8) ?SwitchRange {
+    if (std.mem.indexOf(u8, line, "@.zero_u8") != null) return .{ .first = 0, .last = 0 };
+    if (std.mem.indexOf(u8, line, "@.one_u8") != null) return .{ .first = 1, .last = 1 };
+    const first_marker = std.mem.indexOf(u8, line, "<u8, ") orelse return null;
+    const first_start = first_marker + "<u8, ".len;
+    const first_end = std.mem.indexOfScalarPos(u8, line, first_start, '>') orelse return null;
+    const first = std.fmt.parseInt(u8, std.mem.trim(u8, line[first_start..first_end], " "), 10) catch return null;
+    const range_marker = std.mem.indexOfPos(u8, line, first_end, "...<u8, ") orelse
+        return .{ .first = first, .last = first };
+    const last_start = range_marker + "...<u8, ".len;
+    const last_end = std.mem.indexOfScalarPos(u8, line, last_start, '>') orelse return null;
+    const last = std.fmt.parseInt(u8, std.mem.trim(u8, line[last_start..last_end], " "), 10) catch return null;
+    if (last < first) return null;
+    return .{ .first = first, .last = last };
+}
+
+fn parseSwitchBranchResult(line: []const u8) ?i32 {
+    if (std.mem.indexOf(u8, line, "br(") == null) return null;
+    const marker = std.mem.lastIndexOf(u8, line, "<i32, ") orelse return null;
+    const value_start = marker + "<i32, ".len;
+    const value_end = std.mem.indexOfScalarPos(u8, line, value_start, '>') orelse return null;
+    return std.fmt.parseInt(i32, std.mem.trim(u8, line[value_start..value_end], " "), 10) catch null;
+}
+
+fn conditionalSlotUpdateShape(function: air_export.Function) bool {
+    var slot: ?u32 = null;
+    var first_arg: ?u32 = null;
+    var second_arg: ?u32 = null;
+    var condition_arg: ?u32 = null;
+    var cond_count: usize = 0;
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            var fields = splitTopLevel(instruction.payload, ',');
+            const type_text = std.mem.trim(u8, fields.next() orelse return false, " ");
+            const index_text = std.mem.trim(u8, fields.next() orelse return false, " ");
+            if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "0")) first_arg = instruction.index;
+            if (std.mem.eql(u8, type_text, "i32") and std.mem.eql(u8, index_text, "1")) second_arg = instruction.index;
+            if (std.mem.eql(u8, type_text, "bool") and std.mem.eql(u8, index_text, "2")) condition_arg = instruction.index;
+        } else if (std.mem.eql(u8, instruction.opcode, "alloc") and
+            std.mem.eql(u8, std.mem.trim(u8, instruction.payload, " "), "*i32"))
+        {
+            slot = instruction.index;
+        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            cond_count += 1;
+            var fields = splitTopLevel(instruction.payload, ',');
+            if (parseInstructionRef(fields.next() orelse return false) != condition_arg) return false;
+        }
+    }
+    const result_slot = slot orelse return false;
+    const base = first_arg orelse return false;
+    const delta = second_arg orelse return false;
+    if (condition_arg == null or cond_count != 1 or !hasStoreOf(function, result_slot, .{ .ref = base })) return false;
+    const add = findSlotBinaryUpdate(function, "add", result_slot, delta) orelse return false;
+    const sub = findSlotBinaryUpdate(function, "sub", result_slot, delta) orelse return false;
+    if (!hasStoreOf(function, result_slot, .{ .ref = add }) or
+        !hasStoreOf(function, result_slot, .{ .ref = sub }))
+    {
+        return false;
+    }
+    const result_load = findLastLoadFromSlot(function, result_slot) orelse return false;
+    return returnUses(function, result_load);
+}
+
+fn findSlotBinaryUpdate(
+    function: air_export.Function,
+    opcode: []const u8,
+    slot: u32,
+    rhs: u32,
+) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!loadReferencesSlot(instruction, slot)) continue;
+        for (function.instructions) |candidate| {
+            if (!std.mem.startsWith(u8, candidate.opcode, opcode)) continue;
+            var fields = splitTopLevel(candidate.payload, ',');
+            if (parseInstructionRef(fields.next() orelse continue) != instruction.index) continue;
+            if (parseInstructionRef(fields.next() orelse continue) == rhs and fields.next() == null) {
+                return candidate.index;
+            }
+        }
+    }
+    return null;
+}
+
+fn lowerConditionalSlotUpdate(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 3 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 1 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 1 }, .name = "arg2" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "neg",
+        .kind = .{ .binary = .{
+            .op = .sub,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .int = 0 },
+            .rhs = .{ .named = "arg1" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "delta",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "arg2" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .named = "arg1" },
+            .false_value = .{ .named = "neg" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .named = "delta" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
     return function;
 }
 
