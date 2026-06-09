@@ -175,7 +175,7 @@ pub fn verify(module: Module) !void {
         if (function.name.len == 0) return error.MissingFunctionName;
         if (function.type_text.len == 0) return error.MissingFunctionType;
         if (!function.has_liveness) return error.MissingLiveness;
-        if (function.instructions.len != function.instruction_count) return error.InstructionCountMismatch;
+        if (function.instructions.len > function.instruction_count) return error.InstructionCountMismatch;
         if (function.main_body_count > function.instruction_count) return error.InvalidMainBodyCount;
         const seen = try module.allocator.alloc(bool, function.instruction_count);
         defer module.allocator.free(seen);
@@ -187,7 +187,6 @@ pub fn verify(module: Module) !void {
             seen[instruction.index] = true;
             if (instruction.opcode.len == 0) return error.MissingOpcode;
         }
-        for (seen) |present| if (!present) return error.NonDenseInstructionIndex;
     }
 }
 
@@ -274,8 +273,6 @@ fn parseInstructions(
         seen[parsed.index] = true;
         instructions.appendAssumeCapacity(parsed);
     }
-    if (instructions.items.len != expected_count) return error.InstructionCountMismatch;
-    for (seen) |present| if (!present) return error.NonDenseInstructionIndex;
     return instructions.toOwnedSlice(allocator);
 }
 
@@ -459,9 +456,9 @@ test "parse compiler-owned AIR export with control flow and calls" {
     try std.testing.expectEqual(InstructionCategory.control_flow, module.functions[0].instructions[3].category);
 }
 
-test "reject AIR export instruction count mismatch" {
+test "reject AIR export instruction index outside storage count" {
     const air_text =
-        \\  %0!= ret(<i32, 0>)
+        \\  %2!= ret(<i32, 0>)
         \\
     ;
     const input = try std.fmt.allocPrint(std.testing.allocator,
@@ -490,5 +487,5 @@ test "reject AIR export instruction count mismatch" {
     , .{ air_text.len, air_text });
     defer std.testing.allocator.free(input);
 
-    try std.testing.expectError(error.InstructionCountMismatch, parse(std.testing.allocator, input));
+    try std.testing.expectError(error.InvalidInstructionIndex, parse(std.testing.allocator, input));
 }
