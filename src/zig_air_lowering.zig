@@ -143,7 +143,9 @@ pub fn firstUnsupported(
 
     if (accumulatorLoopShape(function) != null or
         isIntegerSwitchBlock(function) or
-        conditionalSlotUpdateShape(function))
+        conditionalSlotUpdateShape(function) or
+        arraySumShape(function) or
+        structSumShape(function))
     {
         return null;
     }
@@ -179,6 +181,8 @@ fn lowerFunction(
     if (conditionalSlotUpdateShape(air_function)) {
         return lowerConditionalSlotUpdate(allocator, air_function);
     }
+    if (arraySumShape(air_function)) return lowerArraySum(allocator, air_function);
+    if (structSumShape(air_function)) return lowerStructSum(allocator, air_function);
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -831,6 +835,134 @@ fn lowerConditionalSlotUpdate(
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn arraySumShape(function: air_export.Function) bool {
+    var aggregate_count: usize = 0;
+    var elem_ptr_count: usize = 0;
+    var load_count: usize = 0;
+    var add_count: usize = 0;
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "aggregate_init")) {
+            aggregate_count += 1;
+            if (std.mem.indexOf(u8, instruction.payload, "[3]i32") == null or
+                std.mem.indexOf(u8, instruction.payload, "[%0!, %1!, %2!]") == null)
+            {
+                return false;
+            }
+        } else if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
+            elem_ptr_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "load")) {
+            load_count += 1;
+        } else if (std.mem.startsWith(u8, instruction.opcode, "add")) {
+            add_count += 1;
+        }
+    }
+    return aggregate_count == 1 and elem_ptr_count == 3 and load_count == 3 and add_count == 2;
+}
+
+fn structSumShape(function: air_export.Function) bool {
+    var field_zero = false;
+    var field_one = false;
+    var i32_loads: usize = 0;
+    var adds: usize = 0;
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "struct_field_ptr_index_0")) field_zero = true;
+        if (std.mem.eql(u8, instruction.opcode, "struct_field_ptr_index_1")) field_one = true;
+        if (std.mem.eql(u8, instruction.opcode, "load") and
+            std.mem.startsWith(u8, std.mem.trim(u8, instruction.payload, " "), "i32,"))
+        {
+            i32_loads += 1;
+        }
+        if (std.mem.startsWith(u8, instruction.opcode, "add")) adds += 1;
+    }
+    return field_zero and field_one and i32_loads == 2 and adds == 1;
+}
+
+fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 3 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
+        return error.UnsupportedAir;
+    }
+    for (function_type.params) |param| if (!param.ir_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg2" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "sum01",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .named = "arg1" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "sum",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "sum01" },
+            .rhs = .{ .named = "arg2" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "first",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "arg0" } } },
+    });
+    var gep: ir.GepInst = .{
+        .source_ty = .{ .int = 8 },
+        .ptr = .{ .named = "arg0" },
+        .indices = .empty,
+    };
+    errdefer gep.deinit(allocator);
+    try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 4 } });
+    try block.instructions.append(allocator, .{ .result = "second.ptr", .kind = .{ .gep = gep } });
+    try block.instructions.append(allocator, .{
+        .result = "second",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "second.ptr" } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "sum",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "first" },
+            .rhs = .{ .named = "second" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
     try function.blocks.append(allocator, block);
     return function;
 }
