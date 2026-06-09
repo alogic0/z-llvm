@@ -177,10 +177,17 @@ pub fn verify(module: Module) !void {
         if (!function.has_liveness) return error.MissingLiveness;
         if (function.instructions.len != function.instruction_count) return error.InstructionCountMismatch;
         if (function.main_body_count > function.instruction_count) return error.InvalidMainBodyCount;
-        for (function.instructions, 0..) |instruction, expected_index| {
-            if (instruction.index != expected_index) return error.NonDenseInstructionIndex;
+        const seen = try module.allocator.alloc(bool, function.instruction_count);
+        defer module.allocator.free(seen);
+        @memset(seen, false);
+        for (function.instructions) |instruction| {
+            if (instruction.index >= seen.len or seen[instruction.index]) {
+                return error.InvalidInstructionIndex;
+            }
+            seen[instruction.index] = true;
             if (instruction.opcode.len == 0) return error.MissingOpcode;
         }
+        for (seen) |present| if (!present) return error.NonDenseInstructionIndex;
     }
 }
 
@@ -256,15 +263,19 @@ fn parseInstructions(
     var instructions: std.ArrayList(Instruction) = .empty;
     errdefer instructions.deinit(allocator);
     try instructions.ensureTotalCapacity(allocator, expected_count);
+    const seen = try allocator.alloc(bool, expected_count);
+    defer allocator.free(seen);
+    @memset(seen, false);
 
     var lines = std.mem.splitScalar(u8, air_text, '\n');
     while (lines.next()) |line| {
         const parsed = parseInstructionLine(line) orelse continue;
-        if (parsed.index >= expected_count) return error.InvalidInstructionIndex;
-        if (parsed.index != instructions.items.len) return error.NonDenseInstructionIndex;
+        if (parsed.index >= expected_count or seen[parsed.index]) return error.InvalidInstructionIndex;
+        seen[parsed.index] = true;
         instructions.appendAssumeCapacity(parsed);
     }
     if (instructions.items.len != expected_count) return error.InstructionCountMismatch;
+    for (seen) |present| if (!present) return error.NonDenseInstructionIndex;
     return instructions.toOwnedSlice(allocator);
 }
 
@@ -397,11 +408,11 @@ test "parse compiler-owned AIR export with control flow and calls" {
         \\# AIR Instructions: 5
         \\  %0 = arg(u32, 0)
         \\  %1 = block(void, {
-        \\    %2 = cmp_lt(%0, <u32, 4>)
-        \\    %3!= cond_br(%2!, poi {
+        \\    %4 = cmp_lt(%0, <u32, 4>)
+        \\    %2!= cond_br(%4!, poi {
         \\    })
         \\  })
-        \\  %4!= ret(<i32, 0>)
+        \\  %3!= ret(<i32, 0>)
         \\
     ;
     const input = try std.fmt.allocPrint(std.testing.allocator,
