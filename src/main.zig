@@ -9,6 +9,8 @@ const sd = @import("semantic_descriptor.zig");
 const sdv2 = @import("semantic_descriptor_v2.zig");
 const sib = @import("structured_ir_builder.zig");
 const target = @import("target.zig");
+const zae = @import("zig_air_export.zig");
+const zal = @import("zig_air_lowering.zig");
 const zsl = @import("zig_semantic_lowering.zig");
 
 const source_wrapper_dispatch_case_id = "source-wrapper-dispatch";
@@ -126,7 +128,36 @@ pub fn main(init: std.process.Init) !void {
     const input = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(input_limit));
     defer allocator.free(input);
 
-    if (resolveDirectSemanticDescriptor(io, input)) |descriptor| {
+    if (std.mem.startsWith(u8, input, zae.contract_name)) {
+        var air_module = zae.parse(allocator, input) catch |err| {
+            try fatal(io, "AIR export parse failed for {s}: {any}\n", .{ path, err });
+        };
+        defer air_module.deinit();
+        var lowered = zal.lowerCompatible(allocator, air_module) catch |err| {
+            try fatal(io, "AIR lowering failed for {s}: {any}\n", .{ path, err });
+        };
+        defer lowered.deinit();
+        try reportAirLowering(io, air_module, lowered);
+        if (lowered.accepted_functions == 0) {
+            try fatal(io, "AIR lowering accepted no functions for {s}\n", .{path});
+        }
+        if (target_triple) |triple| {
+            _ = target.Triple.parse(triple) catch {
+                try fatal(io, "invalid target triple: {s}\n", .{triple});
+            };
+            lowered.module.target_triple = triple;
+        }
+        if (emit == .obj or emit == .@"asm") {
+            try emitCodegenModule(allocator, io, lowered.module, emit, target_triple, quiet);
+            return;
+        }
+        if (emit != .ir) return error.UnsupportedEmitMode;
+        var stdout_buffer: [4096]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+        if (!quiet) try lowered.module.print(&stdout_writer.interface);
+        try stdout_writer.interface.flush();
+        return;
+    } else if (resolveDirectSemanticDescriptor(io, input)) |descriptor| {
         if (emit == .ir) {
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -216,6 +247,32 @@ pub fn main(init: std.process.Init) !void {
     });
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn reportAirLowering(
+    io: std.Io,
+    air_module: zae.Module,
+    lowered: zal.Result,
+) !void {
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    const first = if (lowered.unsupported.len == 0) null else lowered.unsupported[0];
+    try stderr_writer.interface.print(
+        "summary air-lowering contract={s} root={s} mode={s} target={s} discovered_functions={} accepted_functions={} unsupported_functions={} first_unsupported_function={s} first_unsupported_opcode={s} first_unsupported_reason={s}\n",
+        .{
+            zae.contract_name,
+            air_module.root_source,
+            air_module.mode,
+            air_module.target,
+            air_module.functions.len,
+            lowered.accepted_functions,
+            lowered.unsupported.len,
+            if (first) |diagnostic| diagnostic.function else "-",
+            if (first) |diagnostic| diagnostic.opcode else "-",
+            if (first) |diagnostic| @tagName(diagnostic.reason) else "-",
+        },
+    );
+    try stderr_writer.interface.flush();
 }
 
 fn writeIrWriterModuleFromEnv(

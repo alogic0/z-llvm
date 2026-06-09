@@ -1000,6 +1000,7 @@ fn lowerStraightLineReturn(
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
             if (try lowerRuntimePhiSelectReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerIcmpSelectMinReturn(allocator, machine, function, block, ret)) return;
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerErrorSwitchSelectReturn(allocator, machine, function, block, ret)) return;
@@ -2439,6 +2440,57 @@ fn lowerIcmpSelectConstReturn(
     return true;
 }
 
+fn lowerIcmpSelectMinReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or
+        !function.params.items[1].ty.eql(.{ .int = 32 }) or
+        block.instructions.items.len != 2)
+    {
+        return false;
+    }
+
+    const icmp_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (icmp_inst.removed or select_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    const select_result = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_result)) return false;
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[0].name) or
+        !isNamed(icmp.rhs, function.params.items[1].name))
+    {
+        return false;
+    }
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or
+        !select.ty.eql(.{ .int = 32 }) or
+        !isNamed(select.cond, icmp_result) or
+        !isNamed(select.true_value, function.params.items[0].name) or
+        !isNamed(select.false_value, function.params.items[1].name))
+    {
+        return false;
+    }
+
+    try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerRuntimePhiSelectReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -2860,9 +2912,11 @@ fn lowerIntegerShiftMixReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "integers.shift_mix")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len == 6) {
+        return lowerCastShiftMixReturn(allocator, machine, function, block, ret);
+    }
     if (block.instructions.items.len != 4) return false;
 
     const and_inst = block.instructions.items[0];
@@ -2900,6 +2954,105 @@ fn lowerIntegerShiftMixReturn(
     };
     if (lshr.op != .lshr or !lshr.ty.eql(.{ .int = 32 })) return false;
     if (!isNamed(lshr.lhs, function.params.items[0].name) or !isNamed(lshr.rhs, and_result)) return false;
+
+    const xor_binary = switch (xor_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (xor_binary.op != .xor or !xor_binary.ty.eql(.{ .int = 32 })) return false;
+    if (!((isNamed(xor_binary.lhs, shl_result) and isNamed(xor_binary.rhs, lshr_result)) or
+        (isNamed(xor_binary.lhs, lshr_result) and isNamed(xor_binary.rhs, shl_result)))) return false;
+
+    try machine.instructions.append(allocator, .shift_mix_i32_edi_esi_eax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerCastShiftMixReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const trunc_inst = block.instructions.items[0];
+    const first_ext_inst = block.instructions.items[1];
+    const shl_inst = block.instructions.items[2];
+    const second_ext_inst = block.instructions.items[3];
+    const lshr_inst = block.instructions.items[4];
+    const xor_inst = block.instructions.items[5];
+    if (trunc_inst.removed or first_ext_inst.removed or shl_inst.removed or
+        second_ext_inst.removed or lshr_inst.removed or xor_inst.removed)
+    {
+        return false;
+    }
+    const trunc_result = trunc_inst.result orelse return false;
+    const first_ext_result = first_ext_inst.result orelse return false;
+    const shl_result = shl_inst.result orelse return false;
+    const second_ext_result = second_ext_inst.result orelse return false;
+    const lshr_result = lshr_inst.result orelse return false;
+    const xor_result = xor_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, xor_result)) return false;
+
+    const trunc = switch (trunc_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (trunc.op != .trunc or
+        !trunc.from_ty.eql(.{ .int = 32 }) or
+        !trunc.to_ty.eql(.{ .int = 5 }) or
+        !isNamed(trunc.value, function.params.items[1].name))
+    {
+        return false;
+    }
+
+    const first_ext = switch (first_ext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (first_ext.op != .zext or
+        !first_ext.from_ty.eql(.{ .int = 5 }) or
+        !first_ext.to_ty.eql(.{ .int = 32 }) or
+        !isNamed(first_ext.value, trunc_result))
+    {
+        return false;
+    }
+
+    const shl = switch (shl_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (shl.op != .shl or
+        !shl.ty.eql(.{ .int = 32 }) or
+        !isNamed(shl.lhs, function.params.items[0].name) or
+        !isNamed(shl.rhs, first_ext_result))
+    {
+        return false;
+    }
+
+    const second_ext = switch (second_ext_inst.kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (second_ext.op != .zext or
+        !second_ext.from_ty.eql(.{ .int = 5 }) or
+        !second_ext.to_ty.eql(.{ .int = 32 }) or
+        !isNamed(second_ext.value, trunc_result))
+    {
+        return false;
+    }
+
+    const lshr = switch (lshr_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (lshr.op != .lshr or
+        !lshr.ty.eql(.{ .int = 32 }) or
+        !isNamed(lshr.lhs, function.params.items[0].name) or
+        !isNamed(lshr.rhs, second_ext_result))
+    {
+        return false;
+    }
 
     const xor_binary = switch (xor_inst.kind) {
         .binary => |binary| binary,
@@ -3268,9 +3421,6 @@ fn lowerPointerVolatileRoundtripReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    const source_fixture = std.mem.eql(u8, function.name, "pointers_memory.volatile_roundtrip");
-    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_volatile_roundtrip_main.volatileRoundtrip");
-    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 32 })) return false;
 
@@ -3506,18 +3656,15 @@ fn lowerPointerLoadStoreReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    const source_fixture = std.mem.eql(u8, function.name, "pointers_memory.load_store");
-    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.loadStore");
-    if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.ptr)) return false;
-    if (source_fixture and block.instructions.items.len != 3) return false;
-    if (integrated_preopt and block.instructions.items.len != 4) return false;
+    const reload_result = block.instructions.items.len == 4;
+    if (block.instructions.items.len != 3 and !reload_result) return false;
 
     const load_inst = block.instructions.items[0];
     const add_inst = block.instructions.items[1];
     const store_inst = block.instructions.items[2];
-    const reload_inst = if (integrated_preopt) block.instructions.items[3] else null;
+    const reload_inst = if (reload_result) block.instructions.items[3] else null;
     if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
     if (reload_inst) |instruction| if (instruction.removed) return false;
     const load_result = load_inst.result orelse return false;
@@ -3526,7 +3673,7 @@ fn lowerPointerLoadStoreReturn(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    if (source_fixture and !std.mem.eql(u8, ret_name, add_result)) return false;
+    if (!reload_result and !std.mem.eql(u8, ret_name, add_result)) return false;
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
@@ -8724,7 +8871,7 @@ fn lowerCall(
 ) !void {
     if (call.callee_value != null) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
-    try validateDefaultCallConv(call.calling_conv);
+    if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 

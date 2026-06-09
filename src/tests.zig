@@ -23,6 +23,7 @@ const target_library_info = @import("analysis/target_library_info.zig");
 const target_transform_info = @import("analysis/target_transform_info.zig");
 const instcombine = @import("passes/instcombine.zig");
 const zig_air_export = @import("zig_air_export.zig");
+const zig_air_lowering = @import("zig_air_lowering.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
@@ -36,6 +37,7 @@ const sroa = @import("passes/sroa.zig");
 
 test {
     _ = zig_air_export;
+    _ = zig_air_lowering;
 }
 
 test "named pipelines expand to stable pass sequences" {
@@ -5177,24 +5179,24 @@ test "x86_64 codegen rejects stack-passed parameters" {
 }
 
 test "x86_64 codegen rejects unsupported call ABI shapes" {
-    const fastcc_input =
+    const unsupported_cc_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\declare fastcc i32 @callee()
+        \\declare coldcc i32 @callee()
         \\
         \\define i32 @caller() {
         \\entry:
-        \\  %r = call fastcc i32 @callee()
+        \\  %r = call coldcc i32 @callee()
         \\  ret i32 %r
         \\}
         \\
     ;
-    var fastcc_module = try ir.Module.parse(std.testing.allocator, fastcc_input);
-    defer fastcc_module.deinit();
-    try fastcc_module.verify();
+    var unsupported_cc_module = try ir.Module.parse(std.testing.allocator, unsupported_cc_input);
+    defer unsupported_cc_module.deinit();
+    try unsupported_cc_module.verify();
     try std.testing.expectError(
         error.UnsupportedCodegenCallingConvention,
-        codegen.x86_64.lowerFunction(std.testing.allocator, fastcc_module.target_triple.?, fastcc_module.functions.items[0]),
+        codegen.x86_64.lowerFunction(std.testing.allocator, unsupported_cc_module.target_triple.?, unsupported_cc_module.functions.items[0]),
     );
 
     const stack_arg_input =
