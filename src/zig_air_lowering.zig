@@ -80,6 +80,28 @@ pub fn lowerCompatible(
     var unsupported: std.ArrayList(Diagnostic) = .empty;
     errdefer unsupported.deinit(allocator);
 
+    for (air_module.globals) |air_global| {
+        if (air_global.is_constant) continue;
+        const global_type = parseZigType(air_global.type_text) orelse continue;
+        if (global_type.ir_type != .int and global_type.ir_type != .float and
+            global_type.ir_type != .double and global_type.ir_type != .ptr)
+        {
+            continue;
+        }
+        const address_attrs = if (!std.mem.eql(u8, air_global.thread_local, "default"))
+            try ownPrint(&module, "thread_local({s})", .{air_global.thread_local})
+        else
+            null;
+        try module.globals.append(allocator, .{
+            .name = air_global.name,
+            .linkage = .external,
+            .address_attrs = address_attrs,
+            .kind = .global,
+            .ty = global_type.ir_type,
+            .initializer = .none,
+        });
+    }
+
     var accepted_functions: usize = 0;
     for (air_module.functions) |air_function| {
         if (firstUnsupported(allocator, air_function)) |diagnostic| {
@@ -154,6 +176,9 @@ fn lowerFunction(
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    if (runtimeNavSymbol(air_function)) |tls_symbol| {
+        function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
+    }
 
     for (function_type.params, 0..) |param_type, param_index| {
         const name = try ownPrint(module, "arg{}", .{param_index});
@@ -199,6 +224,10 @@ fn lowerFunction(
             try context.lowerStore(instruction);
         } else if (isCallOpcode(instruction.opcode)) {
             try context.lowerCall(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
+            try context.lowerRuntimeNavPtr(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "atomic_rmw")) {
+            try context.lowerAtomicRmw(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
@@ -421,6 +450,22 @@ fn returnUses(function: air_export.Function, value: u32) bool {
 fn airInstructionByIndex(function: air_export.Function, index: u32) ?air_export.Instruction {
     for (function.instructions) |instruction| {
         if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
+fn runtimeNavSymbol(function: air_export.Function) ?[]const u8 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        _ = fields.next() orelse return null;
+        const symbol_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+        if (fields.next() != null or symbol_text.len < 3 or
+            symbol_text[0] != '\'' or symbol_text[symbol_text.len - 1] != '\'')
+        {
+            return null;
+        }
+        return symbol_text[1 .. symbol_text.len - 1];
     }
     return null;
 }
@@ -765,6 +810,52 @@ const LoweringContext = struct {
         }
     }
 
+    fn lowerRuntimeNavPtr(self: *LoweringContext, instruction: air_export.Instruction) !void {
+        var fields = splitTopLevel(instruction.payload, ',');
+        const pointer_type = parseZigType(std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ")) orelse
+            return error.UnsupportedAir;
+        const symbol_text = std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ");
+        if (fields.next() != null or pointer_type.ir_type != .ptr or symbol_text.len < 3 or
+            symbol_text[0] != '\'' or symbol_text[symbol_text.len - 1] != '\'')
+        {
+            return error.UnsupportedAir;
+        }
+        const symbol = try ownPrint(self.module, "@{s}", .{symbol_text[1 .. symbol_text.len - 1]});
+        self.values[instruction.index] = .{
+            .ty = pointer_type,
+            .value = .{ .named = symbol },
+        };
+    }
+
+    fn lowerAtomicRmw(self: *LoweringContext, instruction: air_export.Instruction) !void {
+        var fields = splitTopLevel(instruction.payload, ',');
+        const pointer = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
+        const value = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
+        const operation = std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ");
+        const ordering = std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ");
+        if (fields.next() != null or pointer.ty.ir_type != .ptr or
+            !std.mem.eql(u8, operation, "Add") or
+            !std.mem.eql(u8, ordering, "monotonic"))
+        {
+            return error.UnsupportedAir;
+        }
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .atomicrmw = .{
+                .op = "add",
+                .ty = value.ty.ir_type,
+                .ptr = pointer.value,
+                .value = value.value,
+                .ordering = ordering,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = value.ty,
+            .value = .{ .named = result_name },
+        };
+    }
+
     fn lowerReturn(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const payload = std.mem.trim(u8, instruction.payload, " ");
         if (self.function_type.return_type.ir_type == .void) {
@@ -793,6 +884,12 @@ const LoweringContext = struct {
                 }
             }
             return error.UnsupportedAir;
+        }
+        if (parseSymbolPointer(trimmed)) |symbol_pointer| {
+            return .{
+                .ty = symbol_pointer.ty,
+                .value = .{ .named = try ownPrint(self.module, "@{s}", .{symbol_pointer.symbol}) },
+            };
         }
         return parseConstant(trimmed) orelse error.UnsupportedAir;
     }
@@ -936,6 +1033,22 @@ fn parseConstant(text: []const u8) ?TypedValue {
     return null;
 }
 
+const SymbolPointer = struct {
+    ty: ZigType,
+    symbol: []const u8,
+};
+
+fn parseSymbolPointer(text: []const u8) ?SymbolPointer {
+    if (!std.mem.startsWith(u8, text, "<") or !std.mem.endsWith(u8, text, ">")) return null;
+    var fields = splitTopLevel(text[1 .. text.len - 1], ',');
+    const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+    const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+    if (fields.next() != null or !std.mem.startsWith(u8, value_text, "&") or value_text.len == 1) return null;
+    const ty = parseZigType(type_text) orelse return null;
+    if (ty.ir_type != .ptr) return null;
+    return .{ .ty = ty, .symbol = value_text[1..] };
+}
+
 fn parseStaticIntegerType(text: []const u8) ?ZigType {
     return parseZigType(if (std.mem.eql(u8, text, "usize")) "usize" else text);
 }
@@ -1007,6 +1120,8 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "load") or
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
+        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
+        std.mem.eql(u8, opcode, "atomic_rmw") or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or

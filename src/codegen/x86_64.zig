@@ -1051,6 +1051,8 @@ fn lowerStraightLineReturn(
             if (try lowerDirectI32CallMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerControlFlowCallsWriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64CallMainReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateCheckMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerGlobalUpdateReturn(allocator, machine, function, block, ret)) return;
@@ -5719,7 +5721,6 @@ fn lowerGlobalReadReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "globals_comptime.read_global")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
     if (block.instructions.items.len != 1) return false;
 
@@ -5754,21 +5755,23 @@ fn lowerGlobalUpdateReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "globals_comptime.update_global")) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
-    if (block.instructions.items.len != 3) return false;
+    const has_reload = block.instructions.items.len == 4;
+    if (block.instructions.items.len != 3 and !has_reload) return false;
 
     const load_inst = block.instructions.items[0];
     const add_inst = block.instructions.items[1];
     const store_inst = block.instructions.items[2];
+    const reload_inst = if (has_reload) block.instructions.items[3] else null;
     if (load_inst.removed or add_inst.removed or store_inst.removed) return false;
+    if (reload_inst) |instruction| if (instruction.removed) return false;
     const load_result = load_inst.result orelse return false;
     const add_result = add_inst.result orelse return false;
     const ret_name = switch (ret.value orelse return error.InvalidRet) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    if (!std.mem.eql(u8, ret_name, add_result)) return false;
+    if (!has_reload and !std.mem.eql(u8, ret_name, add_result)) return false;
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
@@ -5802,6 +5805,16 @@ fn lowerGlobalUpdateReturn(
     try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .{ .store_eax_global_i32 = global_name });
+    if (reload_inst) |instruction| {
+        const reload_name = instruction.result orelse return false;
+        if (!std.mem.eql(u8, ret_name, reload_name)) return false;
+        const reload = switch (instruction.kind) {
+            .load => |reload_load| reload_load,
+            else => return false,
+        };
+        if (!reload.ty.eql(.{ .int = 32 }) or reload.attrs.isBarrier() or !reload.ptr.eql(load.ptr)) return false;
+        try machine.instructions.append(allocator, .{ .load_global_i32_eax = global_name });
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -8632,9 +8645,13 @@ fn lowerTlsReadReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "tls_concurrency.read_tls")) return false;
-    if (!try matchGlobalRead(function, block, ret, "tls_concurrency.tls_counter")) return false;
-    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = "tls_concurrency.tls_counter" });
+    const global_name = tlsSymbolFromFunctionAttrs(function) orelse
+        if (std.mem.eql(u8, function.name, "tls_concurrency.read_tls"))
+            "tls_concurrency.tls_counter"
+        else
+            return false;
+    if (!try matchGlobalRead(function, block, ret, global_name)) return false;
+    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = global_name });
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -8730,18 +8747,29 @@ fn lowerTlsBumpReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    const global_name: []const u8 = if (std.mem.eql(u8, function.name, "tls_concurrency.bump_tls"))
-        "tls_concurrency.tls_counter"
-    else if (std.mem.endsWith(u8, function.name, ".bumpTls"))
-        "runtime_tls_bump_main.tls_counter"
-    else
-        return false;
+    const global_name: []const u8 = tlsSymbolFromFunctionAttrs(function) orelse
+        if (std.mem.eql(u8, function.name, "tls_concurrency.bump_tls"))
+            "tls_concurrency.tls_counter"
+        else if (std.mem.endsWith(u8, function.name, ".bumpTls"))
+            "runtime_tls_bump_main.tls_counter"
+        else
+            return false;
     const arg_reg = (try matchGlobalUpdate(function, block, ret, global_name)) orelse return false;
     try machine.instructions.append(allocator, .{ .load_tls_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = global_name });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn tlsSymbolFromFunctionAttrs(function: ir.Function) ?[]const u8 {
+    const attrs = function.attrs orelse return null;
+    const marker = "\"zllvm-tls-symbol\"=\"";
+    const start = std.mem.indexOf(u8, attrs, marker) orelse return null;
+    const symbol_start = start + marker.len;
+    const symbol_end = std.mem.indexOfScalarPos(u8, attrs, symbol_start, '"') orelse return null;
+    if (symbol_end == symbol_start) return null;
+    return attrs[symbol_start..symbol_end];
 }
 
 fn matchGlobalRead(function: ir.Function, block: ir.BasicBlock, ret: anytype, expected_global: []const u8) !bool {
@@ -8771,7 +8799,8 @@ fn matchGlobalRead(function: ir.Function, block: ir.BasicBlock, ret: anytype, ex
 
 fn matchGlobalUpdate(function: ir.Function, block: ir.BasicBlock, ret: anytype, expected_global: []const u8) !?ArgReg {
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return null;
-    if (block.instructions.items.len != 3) return null;
+    const has_reload = block.instructions.items.len == 4;
+    if (block.instructions.items.len != 3 and !has_reload) return null;
 
     const load_inst = block.instructions.items[0];
     const add_inst = block.instructions.items[1];
@@ -8783,7 +8812,7 @@ fn matchGlobalUpdate(function: ir.Function, block: ir.BasicBlock, ret: anytype, 
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
     };
-    if (!std.mem.eql(u8, ret_name, add_result)) return null;
+    if (!has_reload and !std.mem.eql(u8, ret_name, add_result)) return null;
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
@@ -8814,6 +8843,15 @@ fn matchGlobalUpdate(function: ir.Function, block: ir.BasicBlock, ret: anytype, 
     };
     if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return null;
     if (!store.ptr.eql(load.ptr) or !isNamed(store.value, add_result)) return null;
+    if (has_reload) {
+        const reload_inst = block.instructions.items[3];
+        if (reload_inst.removed or !isNamed(ret.value orelse return error.InvalidRet, reload_inst.result orelse return null)) return null;
+        const reload = switch (reload_inst.kind) {
+            .load => |reload_load| reload_load,
+            else => return null,
+        };
+        if (!reload.ty.eql(.{ .int = 32 }) or reload.attrs.isBarrier() or !reload.ptr.eql(load.ptr)) return null;
+    }
     return arg_reg;
 }
 
