@@ -4384,7 +4384,6 @@ fn lowerFloatRemReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "fp_extended_ops.float_rem")) return false;
     if (!try matchesFpBinaryReturn(function, block, ret, .float, .frem)) return false;
     try appendAlignedDirectCall(allocator, machine, "fmodf", .float);
     try machine.instructions.append(allocator, .ret);
