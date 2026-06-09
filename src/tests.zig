@@ -5245,6 +5245,40 @@ test "x86_64 codegen rejects unsupported call live pressure" {
     );
 }
 
+test "x86_64 codegen lowers canonical accumulator loops without function-name dispatch" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @uncurated_accumulator(i32 %limit) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %index = phi i32 [ 0, %entry ], [ %index.next, %body ]
+        \\  %sum = phi i32 [ 0, %entry ], [ %sum.next, %body ]
+        \\  %continue = icmp ult i32 %index, %limit
+        \\  br i1 %continue, label %body, label %exit
+        \\body:
+        \\  %sum.next = add i32 %sum, %index
+        \\  %index.next = add i32 %index, 1
+        \\  br label %loop
+        \\exit:
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+}
+
 test "x86_64 machine verifier checks call stack alignment and frame balance" {
     var misaligned = codegen.x86_64.MachineFunction.init("bad_call", .{ .int = 32 });
     defer misaligned.deinit(std.testing.allocator);

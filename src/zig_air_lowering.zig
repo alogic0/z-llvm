@@ -119,6 +119,8 @@ pub fn firstUnsupported(
     };
     function_type.deinit(allocator);
 
+    if (accumulatorLoopShape(function) != null) return null;
+
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
         if (std.mem.eql(u8, instruction.opcode, "block")) {
@@ -141,6 +143,10 @@ fn lowerFunction(
     module: *ir.Module,
     air_function: air_export.Function,
 ) !ir.Function {
+    if (accumulatorLoopShape(air_function)) |shape| {
+        return lowerAccumulatorLoop(allocator, module, air_function, shape);
+    }
+
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
 
@@ -210,6 +216,301 @@ fn lowerFunction(
     }
     if (block.terminator == null) return error.UnsupportedAir;
     try function.blocks.append(allocator, block);
+    return function;
+}
+
+const AccumulatorLoopShape = struct {
+    limit_arg: u32,
+};
+
+fn accumulatorLoopShape(function: air_export.Function) ?AccumulatorLoopShape {
+    var limit_arg: ?u32 = null;
+    var index_slot: ?u32 = null;
+    var sum_slot: ?u32 = null;
+    var condition_count: usize = 0;
+    var loop_count: usize = 0;
+    var repeat_count: usize = 0;
+    var branch_count: usize = 0;
+
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            var fields = splitTopLevel(instruction.payload, ',');
+            const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
+            const param_index = std.mem.trim(u8, fields.next() orelse return null, " ");
+            if (fields.next() != null) return null;
+            if (std.mem.eql(u8, type_text, "u32") and std.mem.eql(u8, param_index, "0")) {
+                limit_arg = instruction.index;
+            }
+        } else if (std.mem.eql(u8, instruction.opcode, "alloc")) {
+            const allocated = std.mem.trim(u8, instruction.payload, " ");
+            if (std.mem.eql(u8, allocated, "*u32")) {
+                index_slot = instruction.index;
+            } else if (std.mem.eql(u8, allocated, "*i32")) {
+                sum_slot = instruction.index;
+            }
+        } else if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            condition_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "loop")) {
+            loop_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "repeat")) {
+            repeat_count += 1;
+        } else if (std.mem.eql(u8, instruction.opcode, "br")) {
+            branch_count += 1;
+        }
+    }
+
+    const arg = limit_arg orelse return null;
+    const index = index_slot orelse return null;
+    const sum = sum_slot orelse return null;
+    if (condition_count != 1 or loop_count != 1 or repeat_count != 1 or branch_count < 2) return null;
+    if (!hasStoreOf(function, index, .{ .int = 0 }) or !hasStoreOf(function, sum, .{ .int = 0 })) return null;
+
+    const compare = findCompareAgainstArg(function, index, arg) orelse return null;
+    if (!condBrUses(function, compare)) return null;
+    const cast = findCastFromSlot(function, "intcast", index) orelse return null;
+    const sum_load = findAnyLoadFromSlot(function, sum) orelse return null;
+    const sum_add = findBinaryUsing(function, "add", sum_load, cast) orelse return null;
+    if (!hasStoreOf(function, sum, .{ .ref = sum_add })) return null;
+    const index_add = findBinaryFromSlotUsingConstant(function, "add", index, 1) orelse return null;
+    if (!hasStoreOf(function, index, .{ .ref = index_add })) return null;
+    const result_load = findLastLoadFromSlot(function, sum) orelse return null;
+    if (!returnUses(function, result_load)) return null;
+
+    return .{ .limit_arg = arg };
+}
+
+const AirExpectedValue = union(enum) {
+    int: i128,
+    ref: u32,
+};
+
+fn hasStoreOf(function: air_export.Function, slot: u32, expected: AirExpectedValue) bool {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and
+            !std.mem.eql(u8, instruction.opcode, "store_safe"))
+        {
+            continue;
+        }
+        var fields = splitTopLevel(instruction.payload, ',');
+        if (parseInstructionRef(fields.next() orelse continue) != slot) continue;
+        const value_text = fields.next() orelse continue;
+        if (fields.next() != null) continue;
+        switch (expected) {
+            .int => |value| {
+                const constant = parseConstant(std.mem.trim(u8, value_text, " ")) orelse continue;
+                if (constant.value == .int and constant.value.int == value) return true;
+            },
+            .ref => |index| if (parseInstructionRef(value_text) == index) return true,
+        }
+    }
+    return false;
+}
+
+fn findCompareAgainstArg(function: air_export.Function, slot: u32, arg: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cmp_lt")) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        const lhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
+        const rhs = parseInstructionRef(fields.next() orelse continue) orelse continue;
+        if (fields.next() != null or rhs != arg) continue;
+        const load = airInstructionByIndex(function, lhs) orelse continue;
+        if (loadReferencesSlot(load, slot)) return instruction.index;
+    }
+    return null;
+}
+
+fn condBrUses(function: air_export.Function, value: u32) bool {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "cond_br")) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        return parseInstructionRef(fields.next() orelse return false) == value;
+    }
+    return false;
+}
+
+fn findAnyLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (loadReferencesSlot(instruction, slot)) return instruction.index;
+    }
+    return null;
+}
+
+fn findLastLoadFromSlot(function: air_export.Function, slot: u32) ?u32 {
+    var result: ?u32 = null;
+    for (function.instructions) |instruction| {
+        if (loadReferencesSlot(instruction, slot)) result = instruction.index;
+    }
+    return result;
+}
+
+fn loadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
+    if (!std.mem.eql(u8, instruction.opcode, "load")) return false;
+    var fields = splitTopLevel(instruction.payload, ',');
+    _ = fields.next() orelse return false;
+    return parseInstructionRef(fields.next() orelse return false) == slot and fields.next() == null;
+}
+
+fn findCastOf(function: air_export.Function, opcode: []const u8, source: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        _ = fields.next() orelse continue;
+        if (parseInstructionRef(fields.next() orelse continue) == source and fields.next() == null) {
+            return instruction.index;
+        }
+    }
+    return null;
+}
+
+fn findCastFromSlot(function: air_export.Function, opcode: []const u8, slot: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!loadReferencesSlot(instruction, slot)) continue;
+        if (findCastOf(function, opcode, instruction.index)) |cast| return cast;
+    }
+    return null;
+}
+
+fn findBinaryUsing(function: air_export.Function, opcode: []const u8, lhs: u32, rhs: u32) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        const first = parseInstructionRef(fields.next() orelse continue) orelse continue;
+        const second = parseInstructionRef(fields.next() orelse continue) orelse continue;
+        if (fields.next() != null) continue;
+        if ((first == lhs and second == rhs) or (first == rhs and second == lhs)) return instruction.index;
+    }
+    return null;
+}
+
+fn findBinaryFromSlotUsingConstant(
+    function: air_export.Function,
+    opcode: []const u8,
+    slot: u32,
+    value: i128,
+) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!loadReferencesSlot(instruction, slot)) continue;
+        if (findBinaryUsingConstant(function, opcode, instruction.index, value)) |binary| return binary;
+    }
+    return null;
+}
+
+fn findBinaryUsingConstant(function: air_export.Function, opcode: []const u8, lhs: u32, value: i128) ?u32 {
+    for (function.instructions) |instruction| {
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
+        var fields = splitTopLevel(instruction.payload, ',');
+        if (parseInstructionRef(fields.next() orelse continue) != lhs) continue;
+        const constant = parseConstant(std.mem.trim(u8, fields.next() orelse continue, " ")) orelse continue;
+        if (fields.next() == null and constant.value == .int and constant.value.int == value) return instruction.index;
+    }
+    return null;
+}
+
+fn returnUses(function: air_export.Function, value: u32) bool {
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "ret") and
+            !std.mem.eql(u8, instruction.opcode, "ret_safe"))
+        {
+            continue;
+        }
+        return parseInstructionRef(instruction.payload) == value;
+    }
+    return false;
+}
+
+fn airInstructionByIndex(function: air_export.Function, index: u32) ?air_export.Instruction {
+    for (function.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
+fn lowerAccumulatorLoop(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    shape: AccumulatorLoopShape,
+) !ir.Function {
+    _ = shape;
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    entry.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, entry);
+
+    var loop = ir.BasicBlock.init("loop");
+    errdefer loop.deinit(allocator);
+    var index_phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer index_phi.deinit(allocator);
+    try index_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try index_phi.incoming.append(allocator, .{ .value = .{ .named = "index.next" }, .block = "body" });
+    try loop.instructions.append(allocator, .{ .result = "index", .kind = .{ .phi = index_phi } });
+    var sum_phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer sum_phi.deinit(allocator);
+    try sum_phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "entry" });
+    try sum_phi.incoming.append(allocator, .{ .value = .{ .named = "sum.next" }, .block = "body" });
+    try loop.instructions.append(allocator, .{ .result = "sum", .kind = .{ .phi = sum_phi } });
+    try loop.instructions.append(allocator, .{
+        .result = "continue",
+        .kind = .{ .icmp = .{
+            .predicate = .ult,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .named = "arg0" },
+        } },
+    });
+    loop.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "continue" },
+        .then_target = "body",
+        .else_target = "exit",
+    } };
+    try function.blocks.append(allocator, loop);
+
+    var body = ir.BasicBlock.init("body");
+    errdefer body.deinit(allocator);
+    try body.instructions.append(allocator, .{
+        .result = "sum.next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "sum" },
+            .rhs = .{ .named = "index" },
+        } },
+    });
+    try body.instructions.append(allocator, .{
+        .result = "index.next",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "index" },
+            .rhs = .{ .int = 1 },
+        } },
+    });
+    body.terminator = .{ .br = .{ .target = "loop" } };
+    try function.blocks.append(allocator, body);
+
+    var exit = ir.BasicBlock.init("exit");
+    exit.terminator = .{ .ret = .{
+        .ty = .{ .int = 32 },
+        .value = .{ .named = "sum" },
+    } };
+    try function.blocks.append(allocator, exit);
+
+    _ = module;
     return function;
 }
 
@@ -955,6 +1256,56 @@ test "lower AIR block result conditional as select" {
     const instructions = lowered.module.functions.items[0].blocks.items[0].instructions.items;
     try std.testing.expectEqual(@as(usize, 2), instructions.len);
     try std.testing.expect(instructions[1].kind == .select);
+}
+
+test "lower AIR accumulator loop into SSA control flow" {
+    const air_text =
+        \\  %0 = arg(u32, 0)
+        \\  %1 = alloc(*u32)
+        \\  %2!= store(%1, <u32, 0>)
+        \\  %3 = alloc(*i32)
+        \\  %4!= store(%3, <i32, 0>)
+        \\  %5!= block(void, {
+        \\    %6!= loop(noreturn, {
+        \\      %7!= block(void, {
+        \\        %8 = load(u32, %1)
+        \\        %9 = cmp_lt(%8!, %0)
+        \\        %18!= cond_br(%9!, poi {
+        \\          %10 = load(i32, %3)
+        \\          %11 = load(u32, %1)
+        \\          %12 = intcast(i32, %11!)
+        \\          %13 = add(%10!, %12!)
+        \\          %14!= store(%3, %13!)
+        \\          %15 = load(u32, %1)
+        \\          %16 = add(%15!, <u32, 1>)
+        \\          %17!= store(%1, %16!)
+        \\          %19!= br(%7, @.void_value)
+        \\        }, poi {
+        \\          %20!= br(%5, @.void_value)
+        \\        })
+        \\      })
+        \\      %21!= repeat(%6)
+        \\    })
+        \\  })
+        \\  %22 = load(i32, %3)
+        \\  %23!= ret(%22!)
+        \\
+    ;
+    const input = try makeTestExport(
+        std.testing.allocator,
+        "uncurated_loop_sum",
+        "fn (u32) callconv(.c) i32",
+        air_text,
+        24,
+    );
+    defer std.testing.allocator.free(input);
+    var parsed = try air_export.parse(std.testing.allocator, input);
+    defer parsed.deinit();
+    var lowered = try lowerCompatible(std.testing.allocator, parsed);
+    defer lowered.deinit();
+    try std.testing.expectEqual(@as(usize, 1), lowered.accepted_functions);
+    try std.testing.expectEqual(@as(usize, 4), lowered.module.functions.items[0].blocks.items.len);
+    try std.testing.expect(lowered.module.functions.items[0].blocks.items[1].instructions.items[0].kind == .phi);
 }
 
 fn makeTestExport(

@@ -9473,10 +9473,9 @@ fn lowerDenseSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
 }
 
 fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "control_flow_calls.loop_sum") and
-        !std.mem.eql(u8, function.name, "debug_loop_sum")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
+    if (!matchesAccumulatorLoop(function)) return false;
     const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
     if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
 
@@ -9508,6 +9507,106 @@ fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFuncti
     if (has_overflow_check) try appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
     if (has_out_of_bounds_check) try appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
     return true;
+}
+
+fn matchesAccumulatorLoop(function: ir.Function) bool {
+    if (function.blocks.items.len != 4) return false;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const body = function.blocks.items[2];
+    const exit = function.blocks.items[3];
+    if (entry.instructions.items.len != 0 or
+        loop.instructions.items.len != 3 or
+        body.instructions.items.len != 2 or
+        exit.instructions.items.len != 0)
+    {
+        return false;
+    }
+
+    const entry_target = switch (entry.terminator orelse return false) {
+        .br => |br| br.target,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, entry_target, loop.name)) return false;
+
+    const index_name = loop.instructions.items[0].result orelse return false;
+    const sum_name = loop.instructions.items[1].result orelse return false;
+    const condition_name = loop.instructions.items[2].result orelse return false;
+    const index_phi = switch (loop.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    const sum_phi = switch (loop.instructions.items[1].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!index_phi.ty.eql(.{ .int = 32 }) or !sum_phi.ty.eql(.{ .int = 32 })) return false;
+
+    const sum_next_name = body.instructions.items[0].result orelse return false;
+    const index_next_name = body.instructions.items[1].result orelse return false;
+    if (!phiHasIncomingInt(index_phi, 0, entry.name) or
+        !phiHasIncoming(index_phi, index_next_name, body.name) or
+        !phiHasIncomingInt(sum_phi, 0, entry.name) or
+        !phiHasIncoming(sum_phi, sum_next_name, body.name))
+    {
+        return false;
+    }
+
+    const condition = switch (loop.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (condition.predicate != .ult or
+        !condition.operand_ty.eql(.{ .int = 32 }) or
+        !isNamed(condition.lhs, index_name) or
+        !isNamed(condition.rhs, function.params.items[0].name))
+    {
+        return false;
+    }
+    const loop_branch = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!loop_branch.cond_ty.eql(.{ .int = 1 }) or
+        !isNamed(loop_branch.cond, condition_name) or
+        !std.mem.eql(u8, loop_branch.then_target, body.name) or
+        !std.mem.eql(u8, loop_branch.else_target, exit.name))
+    {
+        return false;
+    }
+
+    const sum_next = switch (body.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (sum_next.op != .add or
+        !sum_next.ty.eql(.{ .int = 32 }) or
+        !isNamed(sum_next.lhs, sum_name) or
+        !isNamed(sum_next.rhs, index_name))
+    {
+        return false;
+    }
+    const index_next = switch (body.instructions.items[1].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (index_next.op != .add or
+        !index_next.ty.eql(.{ .int = 32 }) or
+        !isNamed(index_next.lhs, index_name) or
+        !isInt(index_next.rhs, 1))
+    {
+        return false;
+    }
+    switch (body.terminator orelse return false) {
+        .br => |br| if (!std.mem.eql(u8, br.target, loop.name)) return false,
+        else => return false,
+    }
+
+    const ret = switch (exit.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, sum_name);
 }
 
 fn lowerBase64DecodeBase64FullBoundary(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
