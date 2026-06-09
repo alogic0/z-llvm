@@ -22,6 +22,7 @@ const target = @import("target.zig");
 const target_library_info = @import("analysis/target_library_info.zig");
 const target_transform_info = @import("analysis/target_transform_info.zig");
 const instcombine = @import("passes/instcombine.zig");
+const zig_air_export = @import("zig_air_export.zig");
 const dce = @import("passes/dce.zig");
 const dse = @import("passes/dse.zig");
 const early_cse = @import("passes/early_cse.zig");
@@ -32,6 +33,10 @@ const sccp = @import("passes/sccp.zig");
 const simplifycfg = @import("passes/simplifycfg.zig");
 const slp_vectorizer = @import("passes/slp_vectorizer.zig");
 const sroa = @import("passes/sroa.zig");
+
+test {
+    _ = zig_air_export;
+}
 
 test "named pipelines expand to stable pass sequences" {
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
