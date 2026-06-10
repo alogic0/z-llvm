@@ -34,7 +34,63 @@ pub const Function = struct {
     main_body_count: usize,
     has_liveness: bool,
     air_text: []const u8,
+    structured_air_text: ?[]const u8,
+    structured_air: ?StructuredAir,
     instructions: []Instruction,
+};
+
+pub const StructuredAir = struct {
+    instructions: []StructuredInstruction,
+    bodies: []StructuredBody,
+    branches: []StructuredBranch,
+    cond_branches: []StructuredCondBranch,
+    repeats: []StructuredRepeat,
+
+    fn deinit(self: StructuredAir, allocator: std.mem.Allocator) void {
+        for (self.bodies) |structured_body| allocator.free(structured_body.instructions);
+        allocator.free(self.instructions);
+        allocator.free(self.bodies);
+        allocator.free(self.branches);
+        allocator.free(self.cond_branches);
+        allocator.free(self.repeats);
+    }
+
+    pub fn body(self: StructuredAir, kind: StructuredBodyKind, owner: ?u32) ?StructuredBody {
+        for (self.bodies) |candidate| {
+            if (candidate.kind == kind and candidate.owner == owner) return candidate;
+        }
+        return null;
+    }
+};
+
+pub const StructuredInstruction = struct {
+    index: u32,
+    opcode: []const u8,
+    type_text: []const u8,
+};
+
+pub const StructuredBodyKind = enum { main, block, loop, then_body, else_body };
+
+pub const StructuredBody = struct {
+    kind: StructuredBodyKind,
+    owner: ?u32,
+    instructions: []u32,
+};
+
+pub const StructuredBranch = struct {
+    index: u32,
+    target: u32,
+    operand_ref: u32,
+};
+
+pub const StructuredCondBranch = struct {
+    index: u32,
+    condition_ref: u32,
+};
+
+pub const StructuredRepeat = struct {
+    index: u32,
+    loop_index: u32,
 };
 
 pub const Global = struct {
@@ -56,7 +112,10 @@ pub const Module = struct {
     functions: []Function,
 
     pub fn deinit(self: *Module) void {
-        for (self.functions) |function| self.allocator.free(function.instructions);
+        for (self.functions) |function| {
+            if (function.structured_air) |structured_air| structured_air.deinit(self.allocator);
+            self.allocator.free(function.instructions);
+        }
         self.allocator.free(self.functions);
         self.allocator.free(self.globals);
         self.allocator.free(self.storage);
@@ -128,8 +187,13 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         else
             return error.InvalidLiveness;
         const air_text = try cursor.readFramed("air_bytes");
+        const structured_air_text: ?[]const u8 = if (cursor.peekValueLine("structured_air_bytes"))
+            try cursor.readFramed("structured_air_bytes")
+        else
+            null;
         try cursor.expectLine("function_end");
         const instructions = try parseInstructions(allocator, air_text, instruction_count);
+        const structured_air = if (structured_air_text) |text| try parseStructuredAir(allocator, text) else null;
         functions.appendAssumeCapacity(.{
             .name = name,
             .type_text = type_text,
@@ -137,6 +201,8 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
             .main_body_count = main_body_count,
             .has_liveness = has_liveness,
             .air_text = air_text,
+            .structured_air_text = structured_air_text,
+            .structured_air = structured_air,
             .instructions = instructions,
         });
     }
@@ -157,6 +223,108 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
     errdefer module.deinit();
     try verify(module);
     return module;
+}
+
+fn parseStructuredAir(allocator: std.mem.Allocator, text: []const u8) !StructuredAir {
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    const header = lines.next() orelse return error.InvalidStructuredAir;
+    if (!std.mem.eql(u8, header, "structured_air-v1")) return error.InvalidStructuredAir;
+
+    var instructions: std.ArrayList(StructuredInstruction) = .empty;
+    errdefer instructions.deinit(allocator);
+    var bodies: std.ArrayList(StructuredBody) = .empty;
+    errdefer {
+        for (bodies.items) |body| allocator.free(body.instructions);
+        bodies.deinit(allocator);
+    }
+    var branches: std.ArrayList(StructuredBranch) = .empty;
+    errdefer branches.deinit(allocator);
+    var cond_branches: std.ArrayList(StructuredCondBranch) = .empty;
+    errdefer cond_branches.deinit(allocator);
+    var repeats: std.ArrayList(StructuredRepeat) = .empty;
+    errdefer repeats.deinit(allocator);
+
+    var saw_end = false;
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        if (std.mem.eql(u8, line, "structured_air_end")) {
+            saw_end = true;
+            break;
+        }
+        var fields = std.mem.splitScalar(u8, line, '|');
+        const kind = fields.next() orelse return error.InvalidStructuredAir;
+        if (std.mem.eql(u8, kind, "inst")) {
+            const index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir);
+            const opcode = fields.next() orelse return error.InvalidStructuredAir;
+            const type_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAir);
+            const type_text = fields.next() orelse return error.InvalidStructuredAir;
+            if (type_text.len != type_len or fields.next() != null) return error.InvalidStructuredAir;
+            try instructions.append(allocator, .{
+                .index = index,
+                .opcode = opcode,
+                .type_text = type_text,
+            });
+        } else if (std.mem.eql(u8, kind, "body")) {
+            const body_kind = parseStructuredBodyKind(fields.next() orelse return error.InvalidStructuredAir) orelse
+                return error.InvalidStructuredAir;
+            const owner_text = fields.next() orelse return error.InvalidStructuredAir;
+            const owner = if (std.mem.eql(u8, owner_text, "-"))
+                null
+            else
+                try parseUnsigned(u32, owner_text);
+            const count = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAir);
+            const body_instructions = try allocator.alloc(u32, count);
+            errdefer allocator.free(body_instructions);
+            for (body_instructions) |*instruction| {
+                instruction.* = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir);
+            }
+            if (fields.next() != null) return error.InvalidStructuredAir;
+            try bodies.append(allocator, .{
+                .kind = body_kind,
+                .owner = owner,
+                .instructions = body_instructions,
+            });
+        } else if (std.mem.eql(u8, kind, "br")) {
+            try branches.append(allocator, .{
+                .index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+                .target = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+                .operand_ref = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+            });
+            if (fields.next() != null) return error.InvalidStructuredAir;
+        } else if (std.mem.eql(u8, kind, "cond_br")) {
+            try cond_branches.append(allocator, .{
+                .index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+                .condition_ref = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+            });
+            if (fields.next() != null) return error.InvalidStructuredAir;
+        } else if (std.mem.eql(u8, kind, "repeat")) {
+            try repeats.append(allocator, .{
+                .index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+                .loop_index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAir),
+            });
+            if (fields.next() != null) return error.InvalidStructuredAir;
+        } else {
+            return error.InvalidStructuredAir;
+        }
+    }
+    if (!saw_end) return error.InvalidStructuredAir;
+
+    return .{
+        .instructions = try instructions.toOwnedSlice(allocator),
+        .bodies = try bodies.toOwnedSlice(allocator),
+        .branches = try branches.toOwnedSlice(allocator),
+        .cond_branches = try cond_branches.toOwnedSlice(allocator),
+        .repeats = try repeats.toOwnedSlice(allocator),
+    };
+}
+
+fn parseStructuredBodyKind(text: []const u8) ?StructuredBodyKind {
+    if (std.mem.eql(u8, text, "main")) return .main;
+    if (std.mem.eql(u8, text, "block")) return .block;
+    if (std.mem.eql(u8, text, "loop")) return .loop;
+    if (std.mem.eql(u8, text, "then")) return .then_body;
+    if (std.mem.eql(u8, text, "else")) return .else_body;
+    return null;
 }
 
 pub fn verify(module: Module) !void {
@@ -395,6 +563,14 @@ const Cursor = struct {
         return self.contents[start..end];
     }
 
+    fn peekValueLine(self: Cursor, key: []const u8) bool {
+        if (self.offset >= self.contents.len) return false;
+        const relative_end = std.mem.indexOfScalar(u8, self.contents[self.offset..], '\n') orelse
+            return false;
+        const line = self.contents[self.offset .. self.offset + relative_end];
+        return line.len > key.len and std.mem.eql(u8, line[0..key.len], key) and line[key.len] == '=';
+    }
+
     fn onlyWhitespaceRemaining(self: Cursor) bool {
         return std.mem.trim(u8, self.contents[self.offset..], " \t\r\n").len == 0;
     }
@@ -454,6 +630,58 @@ test "parse compiler-owned AIR export with control flow and calls" {
     try std.testing.expectEqual(@as(usize, 5), module.instructionCount());
     try std.testing.expectEqualStrings("block", module.functions[0].instructions[1].opcode);
     try std.testing.expectEqual(InstructionCategory.control_flow, module.functions[0].instructions[3].category);
+}
+
+test "parse optional structured AIR records" {
+    const air_text =
+        \\  %0 = arg(i32, 0)
+        \\  %1!= ret(%0!)
+        \\
+    ;
+    const structured_air_text =
+        \\structured_air-v1
+        \\body|main|-|2|0|1
+        \\inst|0|arg|3|i32
+        \\inst|1|ret|8|noreturn
+        \\structured_air_end
+        \\
+    ;
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\zllvm-air-export-v1
+        \\contract_version=1
+        \\payload=zig-air-print-v1
+        \\producer=test
+        \\root_source=structured.zig
+        \\wrapper=structured.zig
+        \\mode=ReleaseFast
+        \\target=x86_64-linux-gnu
+        \\function_count=1
+        \\global_count=0
+        \\function_begin
+        \\name_bytes=4
+        \\main
+        \\type_bytes=9
+        \\fn () i32
+        \\instruction_count=2
+        \\main_body_count=2
+        \\liveness=present
+        \\air_bytes={}
+        \\{s}
+        \\structured_air_bytes={}
+        \\{s}
+        \\function_end
+        \\
+    , .{ air_text.len, air_text, structured_air_text.len, structured_air_text });
+    defer std.testing.allocator.free(input);
+
+    var module = try parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    const structured_air = module.functions[0].structured_air.?;
+    try std.testing.expectEqual(@as(usize, 2), structured_air.instructions.len);
+    try std.testing.expectEqualStrings("arg", structured_air.instructions[0].opcode);
+    const main_body = structured_air.body(.main, null).?;
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1 }, main_body.instructions);
 }
 
 test "reject AIR export instruction index outside storage count" {
