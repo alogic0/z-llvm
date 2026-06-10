@@ -192,6 +192,19 @@ the z_llvm object for each broad source module with a tiny C `main` harness via
 `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. This is link-only progress evidence, not executable ABI proof.
 
+The broad ReleaseFast executable progress gate adds stable C-ABI harnesses for
+the runnable pure input modules while keeping integrated/runtime-heavy rows as
+link-only accounting:
+`zig build distribution-zig-air-uncurated-releasefast-broad-executable` reports
+`native_link_accepted_rows=100`, `executable_ok_rows=15`,
+`link_only_rows=85`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
+`unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. It does not
+claim executable proof for modules without a stable callable ABI harness.
+The matching ReleaseSafe executable progress gate reports the same measured
+split: `executable_ok_rows=15`, `link_only_rows=85`,
+`runtime_boundary_rows=1`, `native_link_failures=0`, and `local_fail=0`.
+
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`

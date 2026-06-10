@@ -284,6 +284,30 @@ zig build distribution-zig-air-uncurated-releasefast-broad-native-link
   local_fail=0
 ```
 
+The executable progress layer keeps that same object/native-link path but uses
+small C harnesses for stable callable ABI source modules and runs the linked
+executables:
+
+```text
+zig build distribution-zig-air-uncurated-releasefast-broad-executable
+  native_link_accepted_rows=100
+  executable_ok_rows=15
+  link_only_rows=85
+  runtime_boundary_rows=1
+  unsupported_zig_linker_feature_rows=0
+  native_link_failures=0
+  llvm_targetmachine_rows=0
+  lld_rows=0
+  local_fail=0
+```
+
+Rows without a stable callable ABI harness remain link-only rows, not
+executable evidence. The named runtime boundary is `debug.defaultPanic`.
+The matching ReleaseSafe executable progress gate currently reports the same
+split: `native_link_accepted_rows=100`, `executable_ok_rows=15`,
+`link_only_rows=85`, `runtime_boundary_rows=1`, `native_link_failures=0`, and
+`local_fail=0`.
+
 The one runtime boundary row is the named `debug.defaultPanic` import from
 `runtime_mix_c_add_may_panic_main.zig`; the gate is link-only progress evidence
 and remains outside `distribution-all`.
