@@ -147,8 +147,11 @@ For real AIR work, keep the loop source-driven and ReleaseFast-only:
 3. run `zig build distribution-zig-air-uncurated-releasefast`
 
 The uncurated gate discovers `test/zig/inputs/*.zig`; it does not use selected
-case IDs or source-fact body classification. Do not add `distribution-all`,
-ELF inspection, or native-link probes to this inner loop.
+case IDs or source-fact body classification. Its current hook contract is
+`zllvm-air-export-v1` plus a `structured_air-v1` body/branch metadata section;
+iterate in z_llvm unless that generic contract is missing a real compiler fact.
+Do not add `distribution-all`, ELF inspection, or native-link probes to this
+inner loop.
 9. zig build distribution-all          # milestone confirmation only
 ```
 

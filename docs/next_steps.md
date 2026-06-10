@@ -1194,10 +1194,14 @@ slice is preparatory infrastructure only.
 # Uncurated Zig AIR Milestone
 
 The frozen `zllvm-air-export-v1` hook now exports compiler-owned functions,
-blocks, instruction text, types, globals, calls, and liveness from patched Zig.
-z_llvm parses that contract and directly lowers an uncurated x86_64
+instruction text, types, globals, calls, and liveness from patched Zig. It also
+exports a `structured_air-v1` section with reachable AIR body records,
+instruction tags, block branch records, conditional-branch records, and repeat
+metadata. z_llvm parses that contract and lowers an uncurated x86_64
 ReleaseFast subset without case IDs, wrapper maps, source-fact body
-classification, or canned DescriptorV2 bodies.
+classification, or canned DescriptorV2 bodies. Operand and type details still
+come from the legacy AIR text stream where the structured contract does not yet
+carry a stable typed record.
 
 Current measured gate:
 
@@ -1205,21 +1209,23 @@ Current measured gate:
 gate=zig build distribution-zig-air-uncurated-releasefast
 source_rows=19
 discovered_functions=44
-structured_functions=31
-generic_codegen_functions=29
-unsupported_functions=13
-codegen_failures=2
+structured_functions=38
+generic_codegen_functions=38
+unsupported_functions=6
+codegen_failures=0
 case_id_rows=0
 source_fact_classification_rows=0
-top_unsupported_construct=block
-top_unsupported_count=3
+top_unsupported_construct=assembly
+top_unsupported_count=1
 local_fail=0
 ```
 
-The next automatically measured AIR blocker is `block` control-flow shape,
-covering optional payload, error-union payload, and optional-pointer functions.
-Other explicit boundaries are aggregate ABI function types, slice `ptr_add`,
-inline `assembly`, base64 `array_elem_val`, error-union `is_non_err`, packed
-field pointer operations, and FP literal return codegen. The uncurated gate
-prints every unsupported function with its opcode/reason so this list cannot
-silently fall back.
+This milestone closed the previous `block` control-flow blockers for optional
+pointer, optional payload, and error-union payload rows; closed slice
+`ptr_add`/slice element access for the current slice-sum row; added
+base64-style `array_elem_val` table lookup lowering; added packed bit read and
+replace-low lowering; and fixed f32/f64 literal return object codegen. The
+remaining measured unsupported functions are aggregate ABI helper
+`function-type` rows, the error-switch `is_non_err`/payload path, and the
+inline `assembly` boundary. The uncurated gate prints every unsupported
+function with its opcode/reason so this list cannot silently fall back.

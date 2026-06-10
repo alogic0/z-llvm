@@ -353,6 +353,39 @@ uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
+The strongest current real-AIR ownership gate is ReleaseFast-only and
+source-discovered rather than row-selected:
+
+```text
+gate=zig build distribution-zig-air-uncurated-releasefast
+target=x86_64-linux-gnu
+mode=ReleaseFast
+source_rows=19
+discovered_functions=44
+structured_functions=38
+generic_codegen_functions=38
+unsupported_functions=6
+codegen_failures=0
+case_id_rows=0
+source_fact_classification_rows=0
+top_unsupported_construct=assembly
+top_unsupported_count=1
+local_fail=0
+```
+
+Patched Zig emits `zllvm-air-export-v1` with the legacy AIR text and a
+`structured_air-v1` section containing reachable body records, instruction
+tags, branch/conditional-branch records, and repeat metadata. z_llvm consumes
+that compiler-owned stream directly for the uncurated gate; it does not select
+rows by case ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The
+current slice closes optional pointer, optional payload, error-union payload,
+slice pointer arithmetic, base64-style `array_elem_val`, packed bit access, and
+f32/f64 literal return codegen. Remaining measured blockers are aggregate ABI
+helper function types, the error-switch `is_non_err`/payload path, and inline
+assembly. Operand/type details still rely on the legacy AIR text until the next
+typed export contract bump, so this is not yet a full AIR/liveness lowering
+replacement.
+
 The same 100-row release source-owned replacement boundary now has a pre-link
 ELF object-format proof before Zig native linker handoff:
 
@@ -713,6 +746,13 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           manifest_structured_rows=0 case_id_rows=0
                           surface_dispatch_rows=0 structured_direct_rows=100
                           generic_codegen_rows=100 fallback_rows=0 local_fail=0
+uncurated_real_air_gate=zig build distribution-zig-air-uncurated-releasefast
+uncurated_real_air_rows=source_rows=19 discovered_functions=44
+                         structured_functions=38 generic_codegen_functions=38
+                         unsupported_functions=6 codegen_failures=0
+                         case_id_rows=0 source_fact_classification_rows=0
+                         top_unsupported_construct=assembly
+                         top_unsupported_count=1 local_fail=0
 semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        release_source_owned_rows=100;
