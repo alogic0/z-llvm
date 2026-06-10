@@ -236,8 +236,9 @@ compiler-owned AIR/liveness via `zllvm-air-export-v1` and `structured_air-v1`,
 while z_llvm parses and lowers the source functions without selected case IDs,
 wrapper maps, source-fact body classification, canned DescriptorV2 bodies,
 LLVM module parse/print, LLVM optimizer ownership, or LLVM TargetMachine
-codegen. Object-format proof has started for the broad ReleaseFast gate; Zig
-native-link handoff for this uncurated AIR path remains future matrix evidence.
+codegen. Object-format proof covers ReleaseFast and ReleaseSafe broad gates,
+and native-link/executable progress is tracked as separate milestone-cost gates
+outside `distribution-all`.
 
 The broader ReleaseFast discovery gate is green for real AIR lowering and
 generic x86_64 codegen:
@@ -250,6 +251,10 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   discovered_functions=152
   structured_functions=152
   generic_codegen_functions=152
+  structured_air_v1_functions=152
+  legacy_air_text_lowering_functions=152
+  generic_lowering_functions=120
+  shape_recognizer_functions=32
   unsupported_functions=0
   codegen_failures=0
   case_id_rows=0
@@ -320,10 +325,19 @@ zig build distribution-zig-air-uncurated-releasesafe-broad
   discovered_functions=152
   structured_functions=152
   generic_codegen_functions=152
+  structured_air_v1_functions=152
+  legacy_air_text_lowering_functions=152
+  generic_lowering_functions=120
+  shape_recognizer_functions=32
   unsupported_functions=0
   codegen_failures=0
   local_fail=0
 ```
+
+The remaining 32 shape-recognizer functions are audited in
+`docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` is
+present for every accepted broad function, but z_llvm still uses legacy AIR text
+for operand/type authority until a typed `structured_air-v2` contract lands.
 
 The companion broad ReleaseSafe object gate also emits all 152 machine
 functions without LLVM TargetMachine:

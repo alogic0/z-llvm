@@ -41,6 +41,10 @@ pub fn main(init: std.process.Init) !void {
     var discovered_functions: usize = 0;
     var structured_functions: usize = 0;
     var generic_codegen_functions: usize = 0;
+    var structured_air_v1_functions: usize = 0;
+    var legacy_air_text_lowering_functions: usize = 0;
+    var generic_lowering_functions: usize = 0;
+    var shape_recognizer_functions: usize = 0;
     var object_emitted_functions: usize = 0;
     var native_link_accepted_rows: usize = 0;
     var executable_ok_rows: usize = 0;
@@ -135,6 +139,10 @@ pub fn main(init: std.process.Init) !void {
 
         discovered_functions += rootFunctionCount(parsed);
         structured_functions += lowered.accepted_functions;
+        structured_air_v1_functions += lowered.structured_air_v1_functions;
+        legacy_air_text_lowering_functions += lowered.legacy_air_text_lowering_functions;
+        generic_lowering_functions += lowered.generic_lowering_functions;
+        shape_recognizer_functions += lowered.shape_recognizer_functions;
         unsupported_functions += lowered.unsupported.len;
         for (lowered.unsupported) |diagnostic| {
             if (diagnostic.reason == .opcode or diagnostic.reason == .control_flow_shape) {
@@ -281,13 +289,17 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
+        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} legacy_air_text_lowering_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
         .{
             mode.name(),
             source_rows,
             discovered_functions,
             structured_functions,
             generic_codegen_functions,
+            structured_air_v1_functions,
+            legacy_air_text_lowering_functions,
+            generic_lowering_functions,
+            shape_recognizer_functions,
             unsupported_functions,
             codegen_failures,
             first_unsupported_source orelse "-",

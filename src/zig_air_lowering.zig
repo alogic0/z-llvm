@@ -20,6 +20,10 @@ pub const Diagnostic = struct {
 pub const Result = struct {
     module: ir.Module,
     accepted_functions: usize,
+    structured_air_v1_functions: usize,
+    legacy_air_text_lowering_functions: usize,
+    generic_lowering_functions: usize,
+    shape_recognizer_functions: usize,
     unsupported: []Diagnostic,
 
     pub fn deinit(self: *Result) void {
@@ -103,6 +107,10 @@ pub fn lowerCompatible(
     }
 
     var accepted_functions: usize = 0;
+    var structured_air_v1_functions: usize = 0;
+    var legacy_air_text_lowering_functions: usize = 0;
+    var generic_lowering_functions: usize = 0;
+    var shape_recognizer_functions: usize = 0;
     const root_stem = std.fs.path.stem(air_module.root_source);
     const matched_root_functions = rootFunctionCount(air_module.functions, root_stem);
     for (air_module.functions) |air_function| {
@@ -125,6 +133,12 @@ pub fn lowerCompatible(
         errdefer function.deinit(allocator);
         try module.functions.append(allocator, function);
         accepted_functions += 1;
+        if (air_function.structured_air != null) structured_air_v1_functions += 1;
+        legacy_air_text_lowering_functions += 1;
+        switch (loweringPath(air_function)) {
+            .generic_instruction_path => generic_lowering_functions += 1,
+            .shape_recognizer => shape_recognizer_functions += 1,
+        }
     }
 
     try addMissingCallDeclarations(allocator, &module);
@@ -132,6 +146,10 @@ pub fn lowerCompatible(
     return .{
         .module = module,
         .accepted_functions = accepted_functions,
+        .structured_air_v1_functions = structured_air_v1_functions,
+        .legacy_air_text_lowering_functions = legacy_air_text_lowering_functions,
+        .generic_lowering_functions = generic_lowering_functions,
+        .shape_recognizer_functions = shape_recognizer_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
     };
 }
@@ -244,6 +262,39 @@ pub fn firstUnsupported(
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
     }
     return null;
+}
+
+const LoweringPath = enum {
+    generic_instruction_path,
+    shape_recognizer,
+};
+
+fn loweringPath(function: air_export.Function) LoweringPath {
+    if (accumulatorLoopShape(function) != null or
+        errorClassifyShape(function) or
+        isIntegerSwitchBlock(function) or
+        conditionalSlotUpdateShape(function) or
+        arraySumShape(function) or
+        structSumShape(function) or
+        base64TableLookupShape(function) or
+        runtimeOptionalPointerMainShape(function) or
+        optionalPointerShape(function) or
+        runtimePointerLoadStoreMainShape(function) or
+        optionalPayloadShape(function) or
+        errorSwitchShape(function) or
+        errorUnionPayloadShape(function) or
+        sliceSumShape(function) or
+        packedReadFlagShape(function) or
+        packedReplaceLowShape(function) or
+        aggregatePairFirstShape(function) or
+        aggregateMakePairShape(function) or
+        mixCAddMayPanicShape(function) or
+        maybeErrorShape(function) or
+        inlineAsmBarrierShape(function))
+    {
+        return .shape_recognizer;
+    }
+    return .generic_instruction_path;
 }
 
 fn lowerFunction(
