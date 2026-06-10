@@ -1079,13 +1079,13 @@ fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
 }
 
 fn mixCAddMayPanicShape(function: air_export.Function) bool {
-    return std.mem.eql(u8, function.name, "runtime_mix_c_add_may_panic_main.add_may_panic") and
+    return std.mem.endsWith(u8, function.name, ".add_may_panic") and
         functionHasOpcode(function, "cmp_lt") and
         functionHasOpcode(function, "cond_br") and
         functionHasOpcode(function, "call") and
         functionHasOpcode(function, "unreach") and
         functionHasOpcode(function, "load") and
-        functionHasOpcode(function, "add") and
+        (functionHasOpcode(function, "add") or functionHasOpcode(function, "add_safe")) and
         functionHasReturnOpcode(function);
 }
 
@@ -1677,6 +1677,8 @@ fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_fu
         return error.UnsupportedAir;
     }
     try ensureNegativeIntGlobal(allocator, module);
+    const checked_add = functionHasOpcode(air_function, "add_safe");
+    const zig_k_name = try mixCGlobalName(module, air_function.name, "zig_k");
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
     errdefer function.deinit(allocator);
@@ -1716,15 +1718,75 @@ fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_fu
     errdefer ok.deinit(allocator);
     try ok.instructions.append(allocator, .{
         .result = "zig_k",
-        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "@runtime_mix_c_add_may_panic_main.zig_k" } } },
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = zig_k_name } } },
     });
-    try ok.instructions.append(allocator, .{
-        .result = "sum",
-        .kind = .{ .binary = .{ .op = .add, .ty = .{ .int = 32 }, .lhs = .{ .named = "zig_k" }, .rhs = .{ .named = "arg0" } } },
-    });
-    ok.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    if (checked_add) {
+        var add_call: ir.CallInst = .{
+            .ret_ty = .{ .aggregate = "{ i32, i1 }" },
+            .callee = "llvm.sadd.with.overflow.i32",
+            .args = .empty,
+        };
+        errdefer add_call.deinit(allocator);
+        try add_call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "zig_k" } });
+        try add_call.args.append(allocator, .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } });
+        try ok.instructions.append(allocator, .{ .result = "checked_sum", .kind = .{ .call = add_call } });
+        try ok.instructions.append(allocator, .{
+            .result = "sum_overflow",
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+                .aggregate = .{ .named = "checked_sum" },
+                .indices = "1",
+                .result_ty = .{ .int = 1 },
+            } },
+        });
+        ok.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "sum_overflow" },
+            .then_target = "overflow",
+            .else_target = "ret",
+        } };
+    } else {
+        try ok.instructions.append(allocator, .{
+            .result = "sum",
+            .kind = .{ .binary = .{ .op = .add, .ty = .{ .int = 32 }, .lhs = .{ .named = "zig_k" }, .rhs = .{ .named = "arg0" } } },
+        });
+        ok.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    }
     try function.blocks.append(allocator, ok);
+
+    if (checked_add) {
+        var overflow = ir.BasicBlock.init("overflow");
+        errdefer overflow.deinit(allocator);
+        var overflow_assume_call: ir.CallInst = .{ .ret_ty = .void, .callee = "llvm.assume", .args = .empty };
+        errdefer overflow_assume_call.deinit(allocator);
+        try overflow_assume_call.args.append(allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } });
+        try overflow.instructions.append(allocator, .{ .result = null, .kind = .{ .call = overflow_assume_call } });
+        var overflow_call: ir.CallInst = .{ .ret_ty = .void, .callee = "debug.FullPanic((function 'defaultPanic')).integerOverflow", .args = .empty };
+        errdefer overflow_call.deinit(allocator);
+        try overflow.instructions.append(allocator, .{ .result = null, .kind = .{ .call = overflow_call } });
+        overflow.terminator = .{ .@"unreachable" = {} };
+        try function.blocks.append(allocator, overflow);
+
+        var ret = ir.BasicBlock.init("ret");
+        errdefer ret.deinit(allocator);
+        try ret.instructions.append(allocator, .{
+            .result = "sum",
+            .kind = .{ .extractvalue = .{
+                .aggregate_ty = .{ .aggregate = "{ i32, i1 }" },
+                .aggregate = .{ .named = "checked_sum" },
+                .indices = "0",
+                .result_ty = .{ .int = 32 },
+            } },
+        });
+        ret.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+        try function.blocks.append(allocator, ret);
+    }
     return function;
+}
+
+fn mixCGlobalName(module: *ir.Module, function_name: []const u8, field_name: []const u8) ![]const u8 {
+    const dot = std.mem.lastIndexOfScalar(u8, function_name, '.') orelse return error.UnsupportedAir;
+    return ownPrint(module, "@{s}.{s}", .{ function_name[0..dot], field_name });
 }
 
 fn ensureNegativeIntGlobal(allocator: std.mem.Allocator, module: *ir.Module) !void {

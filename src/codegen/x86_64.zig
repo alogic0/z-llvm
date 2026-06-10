@@ -835,11 +835,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 3) {
-        if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
-            try verifyFunction(machine);
-            return machine;
-        }
         if (try lowerSelectedDebugScopeBranch(allocator, &machine, function)) {
             try verifyFunction(machine);
             return machine;
@@ -8512,13 +8513,10 @@ fn lowerSelectedMixCFilesAddMayPanic(
     machine: *MachineFunction,
     function: ir.Function,
 ) !bool {
-    const integrated_preopt = std.mem.eql(u8, function.name, "runtime_mix_c_add_may_panic_main.add_may_panic");
-    if (!std.mem.eql(u8, function.name, "main.add_may_panic") and !integrated_preopt) return false;
+    if (!std.mem.endsWith(u8, function.name, ".add_may_panic")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
-    if (function.blocks.items.len != 3) return false;
-    const zig_k_value = if (integrated_preopt) "@runtime_mix_c_add_may_panic_main.zig_k" else "@main.zig_k";
-    const zig_k_name = if (integrated_preopt) "runtime_mix_c_add_may_panic_main.zig_k" else "main.zig_k";
+    if (function.blocks.items.len != 3 and function.blocks.items.len != 5) return false;
 
     const entry = function.blocks.items[0];
     if (entry.instructions.items.len != 1) return false;
@@ -8540,6 +8538,16 @@ fn lowerSelectedMixCFilesAddMayPanic(
     try validateMixCFilesNegativePanicBlock(function.blocks.items[panic_index]);
 
     const ok = function.blocks.items[ok_index];
+    if (function.blocks.items.len == 5) {
+        return lowerSelectedMixCFilesCheckedAddMayPanic(
+            allocator,
+            machine,
+            function,
+            condbr,
+            ok,
+        );
+    }
+
     if (ok.instructions.items.len != 2) return false;
     const load_result = ok.instructions.items[0].result orelse return false;
     const add_result = ok.instructions.items[1].result orelse return false;
@@ -8547,7 +8555,8 @@ fn lowerSelectedMixCFilesAddMayPanic(
         .load => |load| load,
         else => return false,
     };
-    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, zig_k_value)) return false;
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const zig_k_name = try mixCAddMayPanicGlobalName(load.ptr);
     const add = switch (ok.instructions.items[1].kind) {
         .binary => |binary| binary,
         else => return false,
@@ -8577,6 +8586,108 @@ fn lowerSelectedMixCFilesAddMayPanic(
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+fn lowerSelectedMixCFilesCheckedAddMayPanic(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    negative_condbr: anytype,
+    ok: ir.BasicBlock,
+) !bool {
+    if (ok.instructions.items.len != 3) return false;
+    const load_result = ok.instructions.items[0].result orelse return false;
+    const pair_name = ok.instructions.items[1].result orelse return false;
+    const overflow_name = ok.instructions.items[2].result orelse return false;
+
+    const load = switch (ok.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const zig_k_name = try mixCAddMayPanicGlobalName(load.ptr);
+
+    const call = switch (ok.instructions.items[1].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!isCalleeName(call.callee, "llvm.sadd.with.overflow.i32")) return false;
+    if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or call.args.items.len != 2) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 32 }) or !isNamed(call.args.items[0].value, load_result)) return false;
+    const arg_reg = try paramValueReg(function, call.args.items[1].value, .{ .int = 32 });
+
+    const overflow_extract = switch (ok.instructions.items[2].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!overflow_extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or
+        !overflow_extract.result_ty.eql(.{ .int = 1 }) or
+        !isNamed(overflow_extract.aggregate, pair_name) or
+        !std.mem.eql(u8, overflow_extract.indices, "1"))
+    {
+        return false;
+    }
+
+    const overflow_condbr = switch (ok.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!overflow_condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(overflow_condbr.cond, overflow_name)) return false;
+
+    const overflow_index = blockIndex(function, overflow_condbr.then_target) orelse return error.InvalidBranchTarget;
+    const ret_index = blockIndex(function, overflow_condbr.else_target) orelse return error.InvalidBranchTarget;
+    const overflow = function.blocks.items[overflow_index];
+    if (overflow.instructions.items.len != 2) return false;
+    try validateAssumeColdCall(overflow.instructions.items[0]);
+    try validateIntegerOverflowPanicCall(overflow.instructions.items[1]);
+    switch (overflow.terminator orelse return error.BlockWithoutTerminator) {
+        .@"unreachable" => {},
+        else => return false,
+    }
+
+    const ret_block = function.blocks.items[ret_index];
+    if (ret_block.instructions.items.len != 1) return false;
+    const value_name = ret_block.instructions.items[0].result orelse return false;
+    const value_extract = switch (ret_block.instructions.items[0].kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!value_extract.aggregate_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or
+        !value_extract.result_ty.eql(.{ .int = 32 }) or
+        !isNamed(value_extract.aggregate, pair_name) or
+        !std.mem.eql(u8, value_extract.indices, "0"))
+    {
+        return false;
+    }
+    const ret = switch (ret_block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, value_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .test_arg32 = arg_reg });
+    try machine.instructions.append(allocator, .{ .js = negative_condbr.then_target });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = zig_k_name });
+    try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
+    try machine.instructions.append(allocator, .{ .jo = overflow_condbr.then_target });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = negative_condbr.then_target });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_14658" });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
+    try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
+    try machine.instructions.append(allocator, .ud2);
+    try appendIntegerOverflowCall(allocator, machine, overflow_condbr.then_target);
+    return true;
+}
+
+fn mixCAddMayPanicGlobalName(value: ir.Value) ![]const u8 {
+    const name = switch (value) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    if (!std.mem.endsWith(u8, name, ".zig_k")) return error.UnsupportedCodegenValue;
+    return name;
 }
 
 fn lowerSelectedMixCFilesAddZigDebugO0(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
