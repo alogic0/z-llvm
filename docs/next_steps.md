@@ -167,6 +167,20 @@ safety/runtime shapes fail-closed. Object-format inspection and native-link
 handoff for this uncurated AIR gate are the next evidence layer; they are not
 part of the current inner-loop gate.
 
+Broad real-AIR discovery progress:
+`zig build distribution-zig-air-uncurated-releasefast-broad` extends the
+ReleaseFast discovery surface to `test/zig/inputs/*.zig` plus
+`test/zig/integrated/*.zig`. Current measured output is `source_rows=101`,
+`discovered_functions=147`, `structured_functions=143`,
+`generic_codegen_functions=133`, `unsupported_functions=6`,
+`codegen_failures=10`, `case_id_rows=0`,
+`source_fact_classification_rows=0`, and `local_fail=0`. This is not yet a
+zero-failure replacement claim. The active broad blockers are aggregate-pair
+verifier ownership (`UnknownFunction`), mixed C/Zig runtime-boundary calls,
+optional/pointer/slice block lowering, packed-bit backend codegen, TLS wrapper
+return codegen, and a small set of wrapper main call/compare returns that need
+more generic backend handling.
+
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`

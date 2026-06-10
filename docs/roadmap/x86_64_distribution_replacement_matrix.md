@@ -239,6 +239,27 @@ LLVM module parse/print, LLVM optimizer ownership, or LLVM TargetMachine
 codegen. Object-format proof and Zig native-link handoff for this uncurated
 AIR path remain future matrix evidence.
 
+The broader ReleaseFast discovery gate is active but not yet green:
+
+```text
+zig build distribution-zig-air-uncurated-releasefast-broad
+  target=x86_64-linux-gnu
+  source_roots=test/zig/inputs,test/zig/integrated
+  source_rows=101
+  discovered_functions=147
+  structured_functions=143
+  generic_codegen_functions=133
+  unsupported_functions=6
+  codegen_failures=10
+  case_id_rows=0
+  source_fact_classification_rows=0
+  local_fail=0
+```
+
+This gate is a progress/inventory gate for broad real-AIR ownership. It remains
+outside `distribution-all` until unsupported/codegen failures reach zero or are
+converted into named, accepted runtime boundaries.
+
 Link/LTO handoff remains a deferred boundary rather than an implementation row
 for the selected x86_64 distribution subset:
 
