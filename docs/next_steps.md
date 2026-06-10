@@ -177,10 +177,10 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `structured_functions=152`, `generic_codegen_functions=152`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
-`legacy_air_text_lowering_functions=152`, `generic_lowering_functions=120`,
-`shape_recognizer_functions=32`, `unsupported_functions=0`,
+`legacy_air_text_lowering_functions=152`, `generic_lowering_functions=121`,
+`shape_recognizer_functions=31`, `unsupported_functions=0`,
 `codegen_failures=0`, `case_id_rows=0`, `source_fact_classification_rows=0`,
-and `local_fail=0`. The 32 remaining shape-recognizer functions and the
+and `local_fail=0`. The 31 remaining shape-recognizer functions and the
 legacy AIR text lowering dependency are listed in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`.
 

@@ -17,8 +17,8 @@ structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
 legacy_air_text_lowering_functions=152
-generic_lowering_functions=120
-shape_recognizer_functions=32
+generic_lowering_functions=121
+shape_recognizer_functions=31
 unsupported_functions=0
 codegen_failures=0
 ```
@@ -51,7 +51,6 @@ The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 - aggregate pair first/make pair
 - mixed C/Zig add-may-panic
 - maybe-error helper
-- inline asm barrier
 
 Next typed-contract target:
 

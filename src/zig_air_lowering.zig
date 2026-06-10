@@ -272,8 +272,7 @@ pub fn firstUnsupported(
         aggregatePairFirstShape(function) or
         aggregateMakePairShape(function) or
         mixCAddMayPanicShape(function) or
-        maybeErrorShape(function) or
-        inlineAsmBarrierShape(function))
+        maybeErrorShape(function))
     {
         return null;
     }
@@ -320,8 +319,7 @@ fn loweringPath(function: air_export.Function) LoweringPath {
         aggregatePairFirstShape(function) or
         aggregateMakePairShape(function) or
         mixCAddMayPanicShape(function) or
-        maybeErrorShape(function) or
-        inlineAsmBarrierShape(function))
+        maybeErrorShape(function))
     {
         return .shape_recognizer;
     }
@@ -359,7 +357,6 @@ fn lowerFunction(
     if (aggregateMakePairShape(air_function)) return lowerAggregateMakePair(allocator, air_function);
     if (mixCAddMayPanicShape(air_function)) return lowerMixCAddMayPanic(allocator, module, air_function);
     if (maybeErrorShape(air_function)) return lowerMaybeError(allocator, air_function);
-    if (inlineAsmBarrierShape(air_function)) return lowerInlineAsmBarrier(allocator, air_function);
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -422,6 +419,8 @@ fn lowerFunction(
             try context.lowerAtomicRmw(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
             try context.lowerArrayElemVal(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "assembly")) {
+            try context.lowerAssembly(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
@@ -1136,10 +1135,6 @@ fn errorClassifyShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".classify") and
         functionHasOpcode(function, "switch_br") and
         functionHasReturnOpcode(function);
-}
-
-fn inlineAsmBarrierShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "assembly") and functionHasReturnOpcode(function);
 }
 
 fn base64TableLookupShape(function: air_export.Function) bool {
@@ -2002,25 +1997,6 @@ fn lowerErrorClassify(allocator: std.mem.Allocator, air_function: air_export.Fun
     return function;
 }
 
-fn lowerInlineAsmBarrier(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
-    const function_type = try parseFunctionType(allocator, air_function.type_text);
-    defer function_type.deinit(allocator);
-    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
-        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
-    {
-        return error.UnsupportedAir;
-    }
-    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
-    errdefer function.deinit(allocator);
-    function.linkage = if (function_type.c_calling_convention) .default else .internal;
-    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
-    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
-    var block = ir.BasicBlock.init("entry");
-    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } } };
-    try function.blocks.append(allocator, block);
-    return function;
-}
-
 fn ensureBase64LookupGlobal(allocator: std.mem.Allocator, module: *ir.Module) !void {
     for (module.globals.items) |global| {
         if (std.mem.eql(u8, global.name, "__anon_base64_table")) return;
@@ -2371,6 +2347,27 @@ const LoweringContext = struct {
         };
     }
 
+    fn lowerAssembly(self: *LoweringContext, instruction: air_export.Instruction) !void {
+        const payload = std.mem.trim(u8, instruction.payload, " ");
+        if (!std.mem.eql(u8, payload, "void, volatile, ~{memory}, \"\"")) return error.UnsupportedAir;
+        var call: ir.CallInst = .{
+            .ret_ty = .void,
+            .callee = "",
+            .inline_asm = .{
+                .template = "",
+                .constraints = "~{memory}",
+                .sideeffect = true,
+                .has_memory_clobber = true,
+            },
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        try self.block.instructions.append(self.allocator, .{
+            .result = null,
+            .kind = .{ .call = call },
+        });
+    }
+
     fn lowerReturn(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const payload = std.mem.trim(u8, instruction.payload, " ");
         if (self.function_type.return_type.ir_type == .void) {
@@ -2689,6 +2686,7 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "array_elem_val") or
+        std.mem.eql(u8, opcode, "assembly") or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or
