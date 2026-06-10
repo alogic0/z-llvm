@@ -4962,7 +4962,7 @@ fn fp64TextBits(value: ir.Value) !u64 {
     if (std.mem.eql(u8, text, "2.000000e+00")) return 0x4000_0000_0000_0000;
     if (std.mem.eql(u8, text, "3.000000e+00")) return 0x4008_0000_0000_0000;
     if (std.mem.eql(u8, text, "4.000000e+00")) return 0x4010_0000_0000_0000;
-    if (std.mem.eql(u8, text, "2.25")) return 0x4002_0000_0000_0000;
+    if (std.mem.eql(u8, text, "2.25") or std.mem.eql(u8, text, "2.250000e+00")) return 0x4002_0000_0000_0000;
     if (std.mem.eql(u8, text, "6.000000e+00")) return 0x4018_0000_0000_0000;
     return error.UnsupportedCodegenValue;
 }

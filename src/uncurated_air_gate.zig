@@ -6,7 +6,8 @@ const codegen = @import("codegen.zig");
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
-    const mode = try parseMode(init.minimal.args);
+    const options = try parseOptions(init.minimal.args);
+    const mode = options.mode;
 
     const zig_emitter_env = init.minimal.environ.getAlloc(allocator, "ZIG_EMITTER") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
@@ -18,7 +19,7 @@ pub fn main(init: std.process.Init) !void {
         return error.MissingZigAirEmitter;
     };
 
-    const sources = try collectSources(allocator, io);
+    const sources = try collectSources(allocator, io, options.corpus);
     defer {
         for (sources) |source| allocator.free(source);
         allocator.free(sources);
@@ -201,6 +202,11 @@ fn rootFunctionCount(module: air_export.Module) usize {
     return count;
 }
 
+const Options = struct {
+    mode: Mode = .ReleaseFast,
+    corpus: Corpus = .inputs,
+};
+
 const Mode = enum {
     ReleaseFast,
     ReleaseSafe,
@@ -227,35 +233,40 @@ const Mode = enum {
     }
 };
 
-fn parseMode(args: std.process.Args) !Mode {
-    var mode: Mode = .ReleaseFast;
+const Corpus = enum {
+    inputs,
+    broad,
+};
+
+fn parseOptions(args: std.process.Args) !Options {
+    var options: Options = .{};
     var iterator = std.process.Args.Iterator.init(args);
     _ = iterator.skip();
     while (iterator.next()) |arg| {
         if (std.mem.eql(u8, arg, "--mode=ReleaseFast")) {
-            mode = .ReleaseFast;
+            options.mode = .ReleaseFast;
         } else if (std.mem.eql(u8, arg, "--mode=ReleaseSafe")) {
-            mode = .ReleaseSafe;
+            options.mode = .ReleaseSafe;
+        } else if (std.mem.eql(u8, arg, "--corpus=inputs")) {
+            options.corpus = .inputs;
+        } else if (std.mem.eql(u8, arg, "--corpus=broad")) {
+            options.corpus = .broad;
         } else {
             return error.UnsupportedUncuratedAirArgument;
         }
     }
-    return mode;
+    return options;
 }
 
-fn collectSources(allocator: std.mem.Allocator, io: std.Io) ![][]const u8 {
-    const root = "test/zig/inputs";
-    var dir = try std.Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
-    defer dir.close(io);
+fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) ![][]const u8 {
     var sources: std.ArrayList([]const u8) = .empty;
     errdefer {
         for (sources.items) |source| allocator.free(source);
         sources.deinit(allocator);
     }
-    var iterator = dir.iterate();
-    while (try iterator.next(io)) |entry| {
-        if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".zig")) continue;
-        try sources.append(allocator, try std.fs.path.join(allocator, &.{ root, entry.name }));
+    try collectSourcesFromRoot(allocator, io, &sources, "test/zig/inputs");
+    if (corpus == .broad) {
+        try collectSourcesFromRoot(allocator, io, &sources, "test/zig/integrated");
     }
     std.mem.sort([]const u8, sources.items, {}, struct {
         fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
@@ -263,6 +274,21 @@ fn collectSources(allocator: std.mem.Allocator, io: std.Io) ![][]const u8 {
         }
     }.lessThan);
     return sources.toOwnedSlice(allocator);
+}
+
+fn collectSourcesFromRoot(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    sources: *std.ArrayList([]const u8),
+    root: []const u8,
+) !void {
+    var dir = try std.Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
+    defer dir.close(io);
+    var iterator = dir.iterate();
+    while (try iterator.next(io)) |entry| {
+        if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".zig")) continue;
+        try sources.append(allocator, try std.fs.path.join(allocator, &.{ root, entry.name }));
+    }
 }
 
 fn incrementCount(

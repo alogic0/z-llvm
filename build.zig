@@ -78,6 +78,11 @@ pub fn build(b: *std.Build) void {
     const run_uncurated_air_gate = b.addRunArtifact(uncurated_air_gate);
     const uncurated_air_step = b.step("distribution-zig-air-uncurated-releasefast", "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR");
     uncurated_air_step.dependOn(&run_uncurated_air_gate.step);
+    const run_uncurated_air_releasefast_broad_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasefast_broad_gate.addArg("--mode=ReleaseFast");
+    run_uncurated_air_releasefast_broad_gate.addArg("--corpus=broad");
+    const uncurated_air_releasefast_broad_step = b.step("distribution-zig-air-uncurated-releasefast-broad", "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR");
+    uncurated_air_releasefast_broad_step.dependOn(&run_uncurated_air_releasefast_broad_gate.step);
     const run_uncurated_air_releasesafe_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesafe_gate.addArg("--mode=ReleaseSafe");
     const uncurated_air_releasesafe_step = b.step("distribution-zig-air-uncurated-releasesafe", "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR");

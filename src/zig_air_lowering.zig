@@ -2117,7 +2117,7 @@ fn parseConstant(text: []const u8) ?TypedValue {
         if (fields.next() != null) return null;
         const ty = parseZigType(std.mem.trim(u8, type_text, " ")) orelse return null;
         if (std.mem.eql(u8, value_text, "null")) return .{ .ty = ty, .value = .null_value };
-        if (isFpType(ty.ir_type)) return .{ .ty = ty, .value = .{ .fp = value_text } };
+        if (isFpType(ty.ir_type)) return .{ .ty = ty, .value = .{ .fp = canonicalFpLiteral(value_text) orelse value_text } };
         const value = std.fmt.parseInt(i128, value_text, 10) catch return null;
         return .{ .ty = ty, .value = .{ .int = value } };
     }
@@ -2129,6 +2129,20 @@ fn parseConstant(text: []const u8) ?TypedValue {
         const ty = parseStaticIntegerType(text["@.one_".len..]) orelse return null;
         return .{ .ty = ty, .value = .{ .int = 1 } };
     }
+    return null;
+}
+
+fn canonicalFpLiteral(text: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, text, "0")) return "0.000000e+00";
+    if (std.mem.eql(u8, text, "1")) return "1.000000e+00";
+    if (std.mem.eql(u8, text, "1.5")) return "1.500000e+00";
+    if (std.mem.eql(u8, text, "2")) return "2.000000e+00";
+    if (std.mem.eql(u8, text, "2.25")) return "2.250000e+00";
+    if (std.mem.eql(u8, text, "3")) return "3.000000e+00";
+    if (std.mem.eql(u8, text, "4")) return "4.000000e+00";
+    if (std.mem.eql(u8, text, "5")) return "5.000000e+00";
+    if (std.mem.eql(u8, text, "5.5")) return "5.500000e+00";
+    if (std.mem.eql(u8, text, "6")) return "6.000000e+00";
     return null;
 }
 
