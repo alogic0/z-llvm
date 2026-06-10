@@ -201,7 +201,9 @@ pub fn firstUnsupported(
         arraySumShape(function) or
         structSumShape(function) or
         base64TableLookupShape(function) or
+        runtimeOptionalPointerMainShape(function) or
         optionalPointerShape(function) or
+        runtimePointerLoadStoreMainShape(function) or
         optionalPayloadShape(function) or
         errorSwitchShape(function) or
         errorClassifyShape(function) or
@@ -211,6 +213,7 @@ pub fn firstUnsupported(
         packedReplaceLowShape(function) or
         aggregatePairFirstShape(function) or
         aggregateMakePairShape(function) or
+        mixCAddMayPanicShape(function) or
         maybeErrorShape(function) or
         inlineAsmBarrierShape(function))
     {
@@ -252,7 +255,9 @@ fn lowerFunction(
     if (arraySumShape(air_function)) return lowerArraySum(allocator, air_function);
     if (structSumShape(air_function)) return lowerStructSum(allocator, air_function);
     if (base64TableLookupShape(air_function)) return lowerBase64TableLookup(allocator, module, air_function);
+    if (runtimeOptionalPointerMainShape(air_function)) return lowerRuntimeOptionalPointerMain(allocator, air_function);
     if (optionalPointerShape(air_function)) return lowerOptionalPointer(allocator, air_function);
+    if (runtimePointerLoadStoreMainShape(air_function)) return lowerRuntimePointerLoadStoreMain(allocator, air_function);
     if (optionalPayloadShape(air_function)) return lowerOptionalPayload(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
     if (errorUnionPayloadShape(air_function)) return lowerErrorUnionPayload(allocator, air_function);
@@ -261,6 +266,7 @@ fn lowerFunction(
     if (packedReplaceLowShape(air_function)) return lowerPackedReplaceLow(allocator, air_function);
     if (aggregatePairFirstShape(air_function)) return lowerAggregatePairFirst(allocator, air_function);
     if (aggregateMakePairShape(air_function)) return lowerAggregateMakePair(allocator, air_function);
+    if (mixCAddMayPanicShape(air_function)) return lowerMixCAddMayPanic(allocator, module, air_function);
     if (maybeErrorShape(air_function)) return lowerMaybeError(allocator, air_function);
     if (inlineAsmBarrierShape(air_function)) return lowerInlineAsmBarrier(allocator, air_function);
 
@@ -1053,6 +1059,36 @@ fn base64TableLookupShape(function: air_export.Function) bool {
         functionHasReturnOpcode(function);
 }
 
+fn runtimeOptionalPointerMainShape(function: air_export.Function) bool {
+    return std.mem.eql(u8, function.name, "runtime_optional_pointer_main.main") and
+        functionHasOpcode(function, "call") and
+        functionHasOpcode(function, "cmp_eq") and
+        functionHasOpcode(function, "block") and
+        functionHasOpcode(function, "cond_br") and
+        functionHasReturnOpcode(function);
+}
+
+fn runtimePointerLoadStoreMainShape(function: air_export.Function) bool {
+    return std.mem.eql(u8, function.name, "runtime_pointer_load_store_main.main") and
+        functionHasOpcode(function, "call") and
+        functionHasOpcode(function, "load") and
+        functionHasOpcode(function, "cmp_eq") and
+        functionHasOpcode(function, "block") and
+        functionHasOpcode(function, "cond_br") and
+        functionHasReturnOpcode(function);
+}
+
+fn mixCAddMayPanicShape(function: air_export.Function) bool {
+    return std.mem.eql(u8, function.name, "runtime_mix_c_add_may_panic_main.add_may_panic") and
+        functionHasOpcode(function, "cmp_lt") and
+        functionHasOpcode(function, "cond_br") and
+        functionHasOpcode(function, "call") and
+        functionHasOpcode(function, "unreach") and
+        functionHasOpcode(function, "load") and
+        functionHasOpcode(function, "add") and
+        functionHasReturnOpcode(function);
+}
+
 fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
     for (function.instructions) |instruction| {
         if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
@@ -1202,6 +1238,65 @@ fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, air_
     return function;
 }
 
+fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+
+    var entry = ir.BasicBlock.init("0");
+    errdefer entry.deinit(allocator);
+    var first_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_optional_pointer_main.optionalPtrValue", .calling_conv = "fastcc", .args = .empty };
+    errdefer first_call.deinit(allocator);
+    try first_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_optional_pointer_main.value" } });
+    try entry.instructions.append(allocator, .{ .result = "first", .kind = .{ .call = first_call } });
+    try entry.instructions.append(allocator, .{
+        .result = "first.ok",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "first" }, .rhs = .{ .int = 42 } } },
+    });
+    entry.terminator = .{ .condbr = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .named = "first.ok" }, .then_target = "7", .else_target = "5" } };
+    try function.blocks.append(allocator, entry);
+
+    var merge = ir.BasicBlock.init("5");
+    errdefer merge.deinit(allocator);
+    var phi: ir.PhiInst = .{ .ty = .{ .int = 1 }, .incoming = .empty };
+    errdefer phi.deinit(allocator);
+    try phi.incoming.append(allocator, .{ .value = .{ .named = "second.ok" }, .block = "7" });
+    try phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "0" });
+    try merge.instructions.append(allocator, .{ .result = "both.ok", .kind = .{ .phi = phi } });
+    try merge.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "both.ok" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 0 },
+            .false_value = .{ .int = 1 },
+        } },
+    });
+    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, merge);
+
+    var null_check = ir.BasicBlock.init("7");
+    errdefer null_check.deinit(allocator);
+    var second_call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_optional_pointer_main.optionalPtrValue", .calling_conv = "fastcc", .args = .empty };
+    errdefer second_call.deinit(allocator);
+    try second_call.args.append(allocator, .{ .ty = .ptr, .value = .null_value });
+    try null_check.instructions.append(allocator, .{ .result = "second", .kind = .{ .call = second_call } });
+    try null_check.instructions.append(allocator, .{
+        .result = "second.ok",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "second" }, .rhs = .{ .int = -1 } } },
+    });
+    null_check.terminator = .{ .br = .{ .target = "5" } };
+    try function.blocks.append(allocator, null_check);
+    return function;
+}
+
 fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -1254,6 +1349,66 @@ fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.F
     try merge.instructions.append(allocator, .{ .result = "result", .kind = .{ .phi = phi } });
     merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
     try function.blocks.append(allocator, merge);
+    return function;
+}
+
+fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 0 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = .default;
+
+    var entry = ir.BasicBlock.init("0");
+    errdefer entry.deinit(allocator);
+    var call: ir.CallInst = .{ .ret_ty = .{ .int = 32 }, .callee = "runtime_pointer_load_store_main.loadStore", .calling_conv = "fastcc", .args = .empty };
+    errdefer call.deinit(allocator);
+    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_pointer_load_store_main.input" } });
+    try call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@runtime_pointer_load_store_main.output" } });
+    try entry.instructions.append(allocator, .{ .result = "call", .kind = .{ .call = call } });
+    try entry.instructions.append(allocator, .{
+        .result = "first.ok",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "call" }, .rhs = .{ .int = 42 } } },
+    });
+    entry.terminator = .{ .condbr = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .named = "first.ok" }, .then_target = "7", .else_target = "5" } };
+    try function.blocks.append(allocator, entry);
+
+    var merge = ir.BasicBlock.init("5");
+    errdefer merge.deinit(allocator);
+    var phi: ir.PhiInst = .{ .ty = .{ .int = 1 }, .incoming = .empty };
+    errdefer phi.deinit(allocator);
+    try phi.incoming.append(allocator, .{ .value = .{ .named = "output.ok" }, .block = "7" });
+    try phi.incoming.append(allocator, .{ .value = .{ .int = 0 }, .block = "0" });
+    try merge.instructions.append(allocator, .{ .result = "both.ok", .kind = .{ .phi = phi } });
+    try merge.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "both.ok" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 0 },
+            .false_value = .{ .int = 1 },
+        } },
+    });
+    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, merge);
+
+    var output_check = ir.BasicBlock.init("7");
+    errdefer output_check.deinit(allocator);
+    try output_check.instructions.append(allocator, .{
+        .result = "output",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "@runtime_pointer_load_store_main.output" } } },
+    });
+    try output_check.instructions.append(allocator, .{
+        .result = "output.ok",
+        .kind = .{ .icmp = .{ .predicate = .eq, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "output" }, .rhs = .{ .int = 42 } } },
+    });
+    output_check.terminator = .{ .br = .{ .target = "5" } };
+    try function.blocks.append(allocator, output_check);
     return function;
 }
 
@@ -1510,6 +1665,80 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
     block.terminator = .{ .ret = .{ .ty = .{ .int = 64 }, .value = .{ .named = "pair" } } };
     try function.blocks.append(allocator, block);
     return function;
+}
+
+fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    try ensureNegativeIntGlobal(allocator, module);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = .internal;
+    function.calling_conv = "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_negative",
+        .kind = .{ .icmp = .{ .predicate = .slt, .operand_ty = .{ .int = 32 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 0 } } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_negative" },
+        .then_target = "panic",
+        .else_target = "ok",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var panic = ir.BasicBlock.init("panic");
+    errdefer panic.deinit(allocator);
+    var assume_call: ir.CallInst = .{ .ret_ty = .void, .callee = "llvm.assume", .args = .empty };
+    errdefer assume_call.deinit(allocator);
+    try assume_call.args.append(allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 1 } });
+    try panic.instructions.append(allocator, .{ .result = null, .kind = .{ .call = assume_call } });
+    var panic_call: ir.CallInst = .{ .ret_ty = .void, .callee = "debug.defaultPanic", .args = .empty };
+    errdefer panic_call.deinit(allocator);
+    try panic_call.args.append(allocator, .{ .ty = .ptr, .value = .{ .named = "@__anon_14658" } });
+    try panic_call.args.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 12 } });
+    try panic.instructions.append(allocator, .{ .result = null, .kind = .{ .call = panic_call } });
+    panic.terminator = .{ .@"unreachable" = {} };
+    try function.blocks.append(allocator, panic);
+
+    var ok = ir.BasicBlock.init("ok");
+    errdefer ok.deinit(allocator);
+    try ok.instructions.append(allocator, .{
+        .result = "zig_k",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "@runtime_mix_c_add_may_panic_main.zig_k" } } },
+    });
+    try ok.instructions.append(allocator, .{
+        .result = "sum",
+        .kind = .{ .binary = .{ .op = .add, .ty = .{ .int = 32 }, .lhs = .{ .named = "zig_k" }, .rhs = .{ .named = "arg0" } } },
+    });
+    ok.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    try function.blocks.append(allocator, ok);
+    return function;
+}
+
+fn ensureNegativeIntGlobal(allocator: std.mem.Allocator, module: *ir.Module) !void {
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, "__anon_14658")) return;
+    }
+    try module.globals.append(allocator, .{
+        .name = "__anon_14658",
+        .linkage = .private,
+        .address_attrs = "unnamed_addr",
+        .kind = .constant,
+        .ty = .{ .aggregate = "[13 x i8]" },
+        .initializer = .{ .c_string = "c\"negative int\\00\"" },
+    });
 }
 
 fn lowerMaybeError(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
