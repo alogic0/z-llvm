@@ -1205,19 +1205,23 @@ fn lowerDirectI32CallMainReturn(
     if (block.instructions.items.len == 1) {
         if (!isNamed(ret.value orelse return error.InvalidRet, call_name)) return false;
     } else {
-        const add_inst = block.instructions.items[1];
-        if (add_inst.removed) return false;
-        const add_name = add_inst.result orelse return false;
-        if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
-        const add = switch (add_inst.kind) {
-            .binary => |binary| binary,
-            else => return false,
-        };
-        if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or add.flags.any() or !isNamed(add.lhs, call_name)) return false;
-        add_immediate = switch (add.rhs) {
-            .int => |int| try i32Value(int),
-            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-        };
+        const second_inst = block.instructions.items[1];
+        if (second_inst.removed) return false;
+        if (identityCastFrom(second_inst, call_name, .{ .int = 32 }, .{ .int = 32 })) |cast_name| {
+            if (!isNamed(ret.value orelse return error.InvalidRet, cast_name)) return false;
+        } else {
+            const add_name = second_inst.result orelse return false;
+            if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
+            const add = switch (second_inst.kind) {
+                .binary => |binary| binary,
+                else => return false,
+            };
+            if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or add.flags.any() or !isNamed(add.lhs, call_name)) return false;
+            add_immediate = switch (add.rhs) {
+                .int => |int| try i32Value(int),
+                .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+            };
+        }
     }
 
     for (call.args.items, 0..) |arg, index| {
@@ -5236,6 +5240,7 @@ fn lowerRuntimeAggregatePairMainReturn(
 ) !bool {
     if (!std.mem.eql(u8, function.name, "runtime_aggregate_pair_main.main")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
+    if (try lowerRuntimeAggregatePairDirectMainReturn(allocator, machine, block, ret)) return true;
     if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
 
     const alloca_inst = block.instructions.items[0];
@@ -5274,6 +5279,49 @@ fn lowerRuntimeAggregatePairMainReturn(
     if (!std.mem.eql(u8, pair_first.callee, "runtime_aggregate_pair_main.pairFirst")) return false;
     if (pair_first.args.items.len != 1) return false;
     if (!pair_first.args.items[0].ty.eql(.ptr) or !isNamed(pair_first.args.items[0].value, pair_slot_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerRuntimeAggregatePairDirectMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+
+    const make_pair_inst = block.instructions.items[0];
+    const pair_first_inst = block.instructions.items[1];
+    const bitcast_inst = block.instructions.items[2];
+    if (make_pair_inst.removed or pair_first_inst.removed or bitcast_inst.removed) return false;
+    const make_pair_name = make_pair_inst.result orelse return false;
+    const pair_first_name = pair_first_inst.result orelse return false;
+    const bitcast_name = identityCastFrom(bitcast_inst, pair_first_name, .{ .int = 32 }, .{ .int = 32 }) orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, bitcast_name)) return false;
+
+    const make_pair = switch (make_pair_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(make_pair.calling_conv) or !make_pair.ret_ty.eql(.{ .int = 64 })) return false;
+    if (make_pair.callee_value != null or make_pair.inline_asm != null) return false;
+    if (!std.mem.eql(u8, make_pair.callee, "runtime_aggregate_pair_main.makePair")) return false;
+    if (make_pair.args.items.len != 2) return false;
+    if (!make_pair.args.items[0].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[0].value, 1)) return false;
+    if (!make_pair.args.items[1].ty.eql(.{ .int = 32 }) or !isInt(make_pair.args.items[1].value, 2)) return false;
+
+    const pair_first = switch (pair_first_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!callIsFastcc(pair_first.calling_conv) or !pair_first.ret_ty.eql(.{ .int = 32 })) return false;
+    if (pair_first.callee_value != null or pair_first.inline_asm != null) return false;
+    if (!std.mem.eql(u8, pair_first.callee, "runtime_aggregate_pair_main.pairFirst")) return false;
+    if (pair_first.args.items.len != 1) return false;
+    if (!pair_first.args.items[0].ty.eql(.{ .int = 64 }) or !isNamed(pair_first.args.items[0].value, make_pair_name)) return false;
 
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
     try machine.instructions.append(allocator, .ret);
@@ -8263,7 +8311,7 @@ fn lowerReleaseSmallHiddenAccessMainReturn(
     const integrated_preopt = std.mem.eql(u8, function.name, "runtime_hidden_access_main.main");
     if (!std.mem.eql(u8, function.name, "main") and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 0) return false;
-    if (block.instructions.items.len != 2) return false;
+    if (block.instructions.items.len != 2 and block.instructions.items.len != 3) return false;
     const update_name = if (integrated_preopt) "runtime_hidden_access_main.updateHidden" else "exports.updateHidden";
     const get_name = if (integrated_preopt) "runtime_hidden_access_main.getHidden" else "exports.getHidden";
     const hidden_name = if (integrated_preopt) "runtime_hidden_access_main.hidden" else "exports.hidden";
@@ -8273,7 +8321,14 @@ fn lowerReleaseSmallHiddenAccessMainReturn(
     if (update_inst.removed or get_inst.removed) return false;
     if (update_inst.result != null) return false;
     const get_result = get_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, get_result)) return false;
+    if (block.instructions.items.len == 2) {
+        if (!isNamed(ret.value orelse return error.InvalidRet, get_result)) return false;
+    } else {
+        const bitcast_inst = block.instructions.items[2];
+        if (bitcast_inst.removed) return false;
+        const bitcast_name = identityCastFrom(bitcast_inst, get_result, .{ .int = 32 }, .{ .int = 32 }) orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, bitcast_name)) return false;
+    }
 
     const update_call = switch (update_inst.kind) {
         .call => |call| call,
@@ -15894,6 +15949,17 @@ fn isNamed(value: ir.Value, name: []const u8) bool {
         .named => |value_name| std.mem.eql(u8, value_name, name),
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+fn identityCastFrom(instruction: ir.Instruction, value_name: []const u8, from_ty: ir.Type, to_ty: ir.Type) ?[]const u8 {
+    const result = instruction.result orelse return null;
+    const cast = switch (instruction.kind) {
+        .cast => |cast| cast,
+        else => return null,
+    };
+    if (cast.op != .bitcast or !cast.from_ty.eql(from_ty) or !cast.to_ty.eql(to_ty)) return null;
+    if (!isNamed(cast.value, value_name)) return null;
+    return result;
 }
 
 fn isSelectI1ToI32ZeroOne(instruction: ir.Instruction, cond_name: []const u8) bool {
