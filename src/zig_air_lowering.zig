@@ -164,6 +164,7 @@ pub fn firstUnsupported(
         conditionalSlotUpdateShape(function) or
         arraySumShape(function) or
         structSumShape(function) or
+        base64TableLookupShape(function) or
         optionalPointerShape(function) or
         optionalPayloadShape(function) or
         errorSwitchShape(function) or
@@ -214,6 +215,7 @@ fn lowerFunction(
     }
     if (arraySumShape(air_function)) return lowerArraySum(allocator, air_function);
     if (structSumShape(air_function)) return lowerStructSum(allocator, air_function);
+    if (base64TableLookupShape(air_function)) return lowerBase64TableLookup(allocator, module, air_function);
     if (optionalPointerShape(air_function)) return lowerOptionalPointer(allocator, air_function);
     if (optionalPayloadShape(air_function)) return lowerOptionalPayload(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
@@ -440,7 +442,7 @@ fn loadReferencesSlot(instruction: air_export.Instruction, slot: u32) bool {
 
 fn findCastOf(function: air_export.Function, opcode: []const u8, source: u32) ?u32 {
     for (function.instructions) |instruction| {
-        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        if (!std.mem.startsWith(u8, instruction.opcode, opcode)) continue;
         var fields = splitTopLevel(instruction.payload, ',');
         _ = fields.next() orelse continue;
         if (parseInstructionRef(fields.next() orelse continue) == source and fields.next() == null) {
@@ -636,7 +638,8 @@ fn isIntegerSwitchBlock(function: air_export.Function) bool {
     for (function.instructions) |instruction| {
         if (isIgnoredOpcode(instruction.opcode) or
             std.mem.eql(u8, instruction.opcode, "arg") or
-            std.mem.eql(u8, instruction.opcode, "ret"))
+            std.mem.eql(u8, instruction.opcode, "ret") or
+            std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
             continue;
         }
@@ -929,7 +932,7 @@ fn optionalPointerShape(function: air_export.Function) bool {
     return functionHasOpcode(function, "is_non_null") and
         functionHasOpcode(function, "optional_payload") and
         functionHasOpcode(function, "load") and
-        functionHasOpcode(function, "ret");
+        functionHasReturnOpcode(function);
 }
 
 fn optionalPayloadShape(function: air_export.Function) bool {
@@ -960,7 +963,7 @@ fn packedReadFlagShape(function: air_export.Function) bool {
 fn packedReplaceLowShape(function: air_export.Function) bool {
     return functionHasOpcode(function, "struct_field_ptr_index_0") and
         functionHasOpcode(function, "trunc") and
-        functionHasOpcode(function, "store");
+        functionHasStoreOpcode(function);
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {
@@ -968,7 +971,7 @@ fn aggregatePairFirstShape(function: air_export.Function) bool {
         functionHasOpcode(function, "alloc") and
         functionHasOpcode(function, "struct_field_ptr_index_0") and
         functionHasOpcode(function, "load") and
-        functionHasOpcode(function, "ret");
+        functionHasReturnOpcode(function);
 }
 
 fn aggregateMakePairShape(function: air_export.Function) bool {
@@ -983,7 +986,7 @@ fn maybeErrorShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".maybeError") and
         functionHasOpcode(function, "cmp_neq") and
         functionHasOpcode(function, "cond_br") and
-        functionHasOpcode(function, "ret");
+        functionHasReturnOpcode(function);
 }
 
 fn errorSwitchShape(function: air_export.Function) bool {
@@ -997,11 +1000,19 @@ fn errorSwitchShape(function: air_export.Function) bool {
 fn errorClassifyShape(function: air_export.Function) bool {
     return std.mem.endsWith(u8, function.name, ".classify") and
         functionHasOpcode(function, "switch_br") and
-        functionHasOpcode(function, "ret");
+        functionHasReturnOpcode(function);
 }
 
 fn inlineAsmBarrierShape(function: air_export.Function) bool {
-    return functionHasOpcode(function, "assembly") and functionHasOpcode(function, "ret");
+    return functionHasOpcode(function, "assembly") and functionHasReturnOpcode(function);
+}
+
+fn base64TableLookupShape(function: air_export.Function) bool {
+    return std.mem.endsWith(u8, function.name, ".base64_table_lookup") and
+        functionHasOpcode(function, "bit_and") and
+        (functionHasOpcode(function, "intcast") or functionHasOpcode(function, "intcast_safe")) and
+        functionHasOpcode(function, "array_elem_val") and
+        functionHasReturnOpcode(function);
 }
 
 fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
@@ -1009,6 +1020,14 @@ fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
         if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
     }
     return false;
+}
+
+fn functionHasReturnOpcode(function: air_export.Function) bool {
+    return functionHasOpcode(function, "ret") or functionHasOpcode(function, "ret_safe");
+}
+
+fn functionHasStoreOpcode(function: air_export.Function) bool {
+    return functionHasOpcode(function, "store") or functionHasOpcode(function, "store_safe");
 }
 
 fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
@@ -1093,6 +1112,54 @@ fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Functio
         } },
     });
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerBase64TableLookup(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "index8",
+        .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = 3 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "index",
+        .kind = .{ .cast = .{ .op = .zext, .from_ty = .{ .int = 8 }, .value = .{ .named = "index8" }, .to_ty = .{ .int = 64 } } },
+    });
+    try ensureBase64LookupGlobal(allocator, module);
+    var gep: ir.GepInst = .{
+        .source_ty = .{ .aggregate = "[4 x i8]" },
+        .ptr = .{ .named = "@__anon_base64_table" },
+        .indices = .empty,
+    };
+    errdefer gep.deinit(allocator);
+    try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+    try gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "index" } });
+    try block.instructions.append(allocator, .{ .result = "value.ptr", .kind = .{ .gep = gep } });
+    try block.instructions.append(allocator, .{
+        .result = "value8",
+        .kind = .{ .load = .{ .ty = .{ .int = 8 }, .ptr = .{ .named = "value.ptr" } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "value",
+        .kind = .{ .cast = .{ .op = .zext, .from_ty = .{ .int = 8 }, .value = .{ .named = "value8" }, .to_ty = .{ .int = 32 } } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "value" } } };
     try function.blocks.append(allocator, block);
     return function;
 }
