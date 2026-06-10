@@ -103,7 +103,10 @@ pub fn lowerCompatible(
     }
 
     var accepted_functions: usize = 0;
+    const root_stem = std.fs.path.stem(air_module.root_source);
+    const matched_root_functions = rootFunctionCount(air_module.functions, root_stem);
     for (air_module.functions) |air_function| {
+        if (matched_root_functions != 0 and !isRootSourceFunction(root_stem, air_function.name)) continue;
         if (firstUnsupported(allocator, air_function)) |diagnostic| {
             try unsupported.append(allocator, diagnostic);
             continue;
@@ -130,6 +133,20 @@ pub fn lowerCompatible(
         .accepted_functions = accepted_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
     };
+}
+
+pub fn isRootSourceFunction(root_stem: []const u8, function_name: []const u8) bool {
+    return std.mem.eql(u8, function_name, root_stem) or
+        (std.mem.startsWith(u8, function_name, root_stem) and
+            function_name.len > root_stem.len and function_name[root_stem.len] == '.');
+}
+
+fn rootFunctionCount(functions: []const air_export.Function, root_stem: []const u8) usize {
+    var count: usize = 0;
+    for (functions) |function| {
+        if (isRootSourceFunction(root_stem, function.name)) count += 1;
+    }
+    return count;
 }
 
 pub fn firstUnsupported(

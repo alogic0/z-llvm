@@ -123,7 +123,7 @@ pub fn main(init: std.process.Init) !void {
         };
         defer lowered.deinit();
 
-        discovered_functions += parsed.functions.len;
+        discovered_functions += rootFunctionCount(parsed);
         structured_functions += lowered.accepted_functions;
         unsupported_functions += lowered.unsupported.len;
         for (lowered.unsupported) |diagnostic| {
@@ -190,6 +190,15 @@ pub fn main(init: std.process.Init) !void {
         },
     );
     try stdout_writer.interface.flush();
+}
+
+fn rootFunctionCount(module: air_export.Module) usize {
+    const root_stem = std.fs.path.stem(module.root_source);
+    var count: usize = 0;
+    for (module.functions) |function| {
+        if (air_lowering.isRootSourceFunction(root_stem, function.name)) count += 1;
+    }
+    return count;
 }
 
 const Mode = enum {

@@ -337,7 +337,10 @@ pub fn verify(module: Module) !void {
     if (!std.mem.startsWith(u8, module.target, "x86_64-")) return error.UnsupportedTarget;
 
     for (module.globals) |global| {
-        if (global.name.len == 0) return error.MissingGlobalName;
+        if (global.name.len == 0) {
+            if (global.is_constant) continue;
+            return error.MissingGlobalName;
+        }
         if (global.type_text.len == 0) return error.MissingGlobalType;
         if (global.thread_local.len == 0) return error.MissingThreadLocalModel;
     }
