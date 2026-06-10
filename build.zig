@@ -94,6 +94,12 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasesafe_broad_gate.addArg("--corpus=broad");
     const uncurated_air_releasesafe_broad_step = b.step("distribution-zig-air-uncurated-releasesafe-broad", "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress");
     uncurated_air_releasesafe_broad_step.dependOn(&run_uncurated_air_releasesafe_broad_gate.step);
+    const run_uncurated_air_releasesafe_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesafe_broad_object_gate.addArg("--mode=ReleaseSafe");
+    run_uncurated_air_releasesafe_broad_object_gate.addArg("--corpus=broad");
+    run_uncurated_air_releasesafe_broad_object_gate.addArg("--object-progress");
+    const uncurated_air_releasesafe_broad_object_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting");
+    uncurated_air_releasesafe_broad_object_step.dependOn(&run_uncurated_air_releasesafe_broad_object_gate.step);
     const run_uncurated_air_releasesafe_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesafe_gate.addArg("--mode=ReleaseSafe");
     const uncurated_air_releasesafe_step = b.step("distribution-zig-air-uncurated-releasesafe", "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR");
