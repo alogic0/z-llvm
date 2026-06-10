@@ -94,11 +94,11 @@ pub fn lowerCompatible(
             null;
         try module.globals.append(allocator, .{
             .name = air_global.name,
-            .linkage = .external,
+            .linkage = .default,
             .address_attrs = address_attrs,
             .kind = .global,
             .ty = global_type.ir_type,
-            .initializer = .none,
+            .initializer = materializedGlobalInitializer(global_type.ir_type),
         });
     }
 
@@ -133,6 +133,15 @@ pub fn lowerCompatible(
         .module = module,
         .accepted_functions = accepted_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
+    };
+}
+
+fn materializedGlobalInitializer(ty: ir.Type) ir.GlobalInitializer {
+    return switch (ty) {
+        .int => .{ .scalar = .{ .int = 0 } },
+        .ptr => .{ .scalar = .null_value },
+        .float, .double, .x86_fp80, .fp128 => .{ .scalar = .{ .fp = "0.0" } },
+        .void, .metadata, .aggregate, .vector => .none,
     };
 }
 

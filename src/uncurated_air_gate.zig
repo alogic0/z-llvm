@@ -42,9 +42,15 @@ pub fn main(init: std.process.Init) !void {
     var structured_functions: usize = 0;
     var generic_codegen_functions: usize = 0;
     var object_emitted_functions: usize = 0;
+    var native_link_accepted_rows: usize = 0;
+    const executable_ok_rows: usize = 0;
+    var link_only_rows: usize = 0;
+    var runtime_boundary_rows: usize = 0;
+    var unsupported_zig_linker_feature_rows: usize = 0;
     var unsupported_functions: usize = 0;
     var codegen_failures: usize = 0;
     var object_failures: usize = 0;
+    var native_link_failures: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
     defer if (first_unsupported_source) |value| allocator.free(value);
     var first_unsupported_function: ?[]const u8 = null;
@@ -165,7 +171,7 @@ pub fn main(init: std.process.Init) !void {
             try machines.append(allocator, machine);
             generic_codegen_functions += 1;
         }
-        if (options.object_progress and machines.items.len != 0) {
+        if ((options.object_progress or options.native_link_progress) and machines.items.len != 0) {
             const object = mc.elf.buildObjectWithModuleData(
                 allocator,
                 machines.items,
@@ -179,8 +185,52 @@ pub fn main(init: std.process.Init) !void {
                 );
                 continue;
             };
-            allocator.free(object);
+            defer allocator.free(object);
             object_emitted_functions += machines.items.len;
+
+            if (options.native_link_progress) {
+                const object_name = try std.fmt.allocPrint(allocator, "{s}.o", .{stem});
+                defer allocator.free(object_name);
+                const object_path = try std.fs.path.join(allocator, &.{ temp_path, object_name });
+                defer allocator.free(object_path);
+                const exe_name = try std.fmt.allocPrint(allocator, "{s}.link", .{stem});
+                defer allocator.free(exe_name);
+                const exe_path = try std.fs.path.join(allocator, &.{ temp_path, exe_name });
+                defer allocator.free(exe_path);
+                try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = object });
+
+                const link_result = try nativeLinkObject(allocator, io, zig_emitter, object_path, exe_path);
+                defer {
+                    allocator.free(link_result.stdout);
+                    allocator.free(link_result.stderr);
+                }
+                if (termOk(link_result.term)) {
+                    native_link_accepted_rows += 1;
+                    link_only_rows += 1;
+                } else switch (classifyNativeLinkFailure(link_result.stderr)) {
+                    .runtime_boundary => |symbol| {
+                        runtime_boundary_rows += 1;
+                        std.debug.print(
+                            "native-link-boundary source={s} function=module category=runtime/compiler-rt/libc symbol={s}\n",
+                            .{ source, symbol },
+                        );
+                    },
+                    .unsupported_zig_linker_feature => |category| {
+                        unsupported_zig_linker_feature_rows += 1;
+                        std.debug.print(
+                            "native-link-boundary source={s} function=module category={s} stderr={s}\n",
+                            .{ source, category, firstLine(link_result.stderr) },
+                        );
+                    },
+                    .local_failure => |category| {
+                        native_link_failures += 1;
+                        std.debug.print(
+                            "native-link-failure source={s} function=module category={s} stderr={s}\n",
+                            .{ source, category, firstLine(link_result.stderr) },
+                        );
+                    },
+                }
+            }
         }
     }
 
@@ -221,6 +271,22 @@ pub fn main(init: std.process.Init) !void {
             .{ mode.name(), object_emitted_functions, object_failures },
         );
     }
+    if (options.native_link_progress) {
+        const local_fail: usize = if (native_link_failures == 0) 0 else 1;
+        try stdout_writer.interface.print(
+            "summary uncurated-zig-air-native-link mode={s} target=x86_64-linux-gnu native_link_accepted_rows={} executable_ok_rows={} link_only_rows={} runtime_boundary_rows={} unsupported_zig_linker_feature_rows={} native_link_failures={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
+            .{
+                mode.name(),
+                native_link_accepted_rows,
+                executable_ok_rows,
+                link_only_rows,
+                runtime_boundary_rows,
+                unsupported_zig_linker_feature_rows,
+                native_link_failures,
+                local_fail,
+            },
+        );
+    }
     try stdout_writer.interface.flush();
 }
 
@@ -237,6 +303,7 @@ const Options = struct {
     mode: Mode = .ReleaseFast,
     corpus: Corpus = .inputs,
     object_progress: bool = false,
+    native_link_progress: bool = false,
 };
 
 const Mode = enum {
@@ -285,11 +352,123 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .broad;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
+        } else if (std.mem.eql(u8, arg, "--native-link-progress")) {
+            options.native_link_progress = true;
         } else {
             return error.UnsupportedUncuratedAirArgument;
         }
     }
     return options;
+}
+
+fn nativeLinkObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    zig_exe: []const u8,
+    object_path: []const u8,
+    exe_path: []const u8,
+) !std.process.RunResult {
+    const harness_c = try std.fmt.allocPrint(allocator, "{s}.c", .{exe_path});
+    defer allocator.free(harness_c);
+    const harness_o = try std.fmt.allocPrint(allocator, "{s}.harness.o", .{exe_path});
+    defer allocator.free(harness_o);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = harness_c, .data = "int main(void) { return 0; }\n" });
+    const cc_argv = [_][]const u8{
+        zig_exe,
+        "cc",
+        "-target",
+        "x86_64-linux-gnu",
+        "-c",
+        harness_c,
+        "-o",
+        harness_o,
+    };
+    const cc_result = try std.process.run(allocator, io, .{
+        .argv = &cc_argv,
+        .stdout_limit = .limited(16 * 1024 * 1024),
+        .stderr_limit = .limited(16 * 1024 * 1024),
+    });
+    if (!termOk(cc_result.term)) return cc_result;
+    allocator.free(cc_result.stdout);
+    allocator.free(cc_result.stderr);
+
+    const emit_bin_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{exe_path});
+    defer allocator.free(emit_bin_arg);
+    const argv = [_][]const u8{
+        zig_exe,
+        "build-exe",
+        "-target",
+        "x86_64-linux-gnu",
+        "-fno-lld",
+        harness_o,
+        object_path,
+        "-lc",
+        emit_bin_arg,
+    };
+    return std.process.run(allocator, io, .{
+        .argv = &argv,
+        .stdout_limit = .limited(16 * 1024 * 1024),
+        .stderr_limit = .limited(16 * 1024 * 1024),
+    });
+}
+
+fn termOk(term: std.process.Child.Term) bool {
+    return switch (term) {
+        .exited => |code| code == 0,
+        else => false,
+    };
+}
+
+const NativeLinkFailure = union(enum) {
+    runtime_boundary: []const u8,
+    unsupported_zig_linker_feature: []const u8,
+    local_failure: []const u8,
+};
+
+fn classifyNativeLinkFailure(stderr: []const u8) NativeLinkFailure {
+    if (firstUndefinedSymbol(stderr)) |symbol| {
+        if (isRuntimeBoundarySymbol(symbol)) return .{ .runtime_boundary = symbol };
+        return .{ .local_failure = "unresolved-symbol" };
+    }
+    const line = firstLine(stderr);
+    if (std.mem.indexOf(u8, line, "relocation") != null) return .{ .unsupported_zig_linker_feature = "unsupported-relocation" };
+    if (std.mem.indexOf(u8, line, "TLS") != null or std.mem.indexOf(u8, line, "thread-local") != null) return .{ .unsupported_zig_linker_feature = "tls-model" };
+    if (std.mem.indexOf(u8, line, "COMDAT") != null or std.mem.indexOf(u8, line, "group") != null) return .{ .unsupported_zig_linker_feature = "comdat-group" };
+    return .{ .local_failure = "unclassified-link-failed" };
+}
+
+fn firstUndefinedSymbol(stderr: []const u8) ?[]const u8 {
+    const needle = "undefined symbol: ";
+    const start = std.mem.indexOf(u8, stderr, needle) orelse return null;
+    var rest = stderr[start + needle.len ..];
+    rest = std.mem.trim(u8, rest, " \t'`\"");
+    const end = std.mem.indexOfAny(u8, rest, "\r\n'`\" ") orelse rest.len;
+    return rest[0..end];
+}
+
+fn isRuntimeBoundarySymbol(symbol: []const u8) bool {
+    return std.mem.startsWith(u8, symbol, "debug.") or
+        std.mem.startsWith(u8, symbol, "panic") or
+        std.mem.startsWith(u8, symbol, "__") or
+        std.mem.startsWith(u8, symbol, "compiler_rt.") or
+        std.mem.startsWith(u8, symbol, "memcpy") or
+        std.mem.startsWith(u8, symbol, "memset") or
+        std.mem.startsWith(u8, symbol, "memcmp") or
+        std.mem.startsWith(u8, symbol, "malloc") or
+        std.mem.startsWith(u8, symbol, "free") or
+        std.mem.startsWith(u8, symbol, "abort") or
+        std.mem.startsWith(u8, symbol, "exit") or
+        std.mem.startsWith(u8, symbol, "posix.") or
+        std.mem.startsWith(u8, symbol, "os.") or
+        std.mem.startsWith(u8, symbol, "Io.") or
+        std.mem.startsWith(u8, symbol, "Thread.") or
+        std.mem.startsWith(u8, symbol, "start.");
+}
+
+fn firstLine(text: []const u8) []const u8 {
+    const trimmed = std.mem.trim(u8, text, " \t\r\n");
+    const end = std.mem.indexOfAny(u8, trimmed, "\r\n") orelse trimmed.len;
+    return trimmed[0..end];
 }
 
 fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) ![][]const u8 {

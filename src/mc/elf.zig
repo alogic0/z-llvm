@@ -312,6 +312,19 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
         }
         if (parseByteArrayType(global.ty)) |array_len| {
             switch (global.initializer) {
+                .array => |array| {
+                    if (!array.elem_ty.eql(.{ .int = 8 }) or array.values.items.len != array_len) return null;
+                    for (array.values.items) |value| {
+                        const int = switch (value) {
+                            .int => |int| int,
+                            .undef, .poison, .zero_initializer => 0,
+                            .named, .fp, .null_value, .vector, .constant_expr => return null,
+                        };
+                        if (int < 0 or int > std.math.maxInt(u8)) return null;
+                        try data.append(allocator, @intCast(int));
+                    }
+                    return array_len;
+                },
                 .c_string => |text| {
                     const old_len = data.items.len;
                     const size = appendCString(data, allocator, text) catch {
@@ -331,7 +344,7 @@ fn appendSupportedGlobalData(allocator: std.mem.Allocator, data: *std.ArrayList(
                     },
                     .named, .int, .fp, .undef, .poison, .null_value, .vector, .constant_expr => return null,
                 },
-                .none, .array, .@"opaque" => return null,
+                .none, .@"opaque" => return null,
             }
         }
         if (std.mem.eql(u8, global.name, "__anon_16879")) {

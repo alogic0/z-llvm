@@ -89,6 +89,12 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasefast_broad_object_gate.addArg("--object-progress");
     const uncurated_air_releasefast_broad_object_step = b.step("distribution-zig-air-uncurated-releasefast-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting");
     uncurated_air_releasefast_broad_object_step.dependOn(&run_uncurated_air_releasefast_broad_object_gate.step);
+    const run_uncurated_air_releasefast_broad_native_link_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--mode=ReleaseFast");
+    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--corpus=broad");
+    run_uncurated_air_releasefast_broad_native_link_gate.addArg("--native-link-progress");
+    const uncurated_air_releasefast_broad_native_link_step = b.step("distribution-zig-air-uncurated-releasefast-broad-native-link", "Link broad uncurated x86_64 ReleaseFast real-AIR objects with Zig native linker progress accounting");
+    uncurated_air_releasefast_broad_native_link_step.dependOn(&run_uncurated_air_releasefast_broad_native_link_gate.step);
     const run_uncurated_air_releasesafe_broad_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesafe_broad_gate.addArg("--mode=ReleaseSafe");
     run_uncurated_air_releasesafe_broad_gate.addArg("--corpus=broad");
