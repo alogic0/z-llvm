@@ -21,6 +21,9 @@ pub const Result = struct {
     module: ir.Module,
     accepted_functions: usize,
     structured_air_v1_functions: usize,
+    structured_air_v2_functions: usize,
+    typed_air_type_functions: usize,
+    typed_air_operand_functions: usize,
     legacy_air_text_lowering_functions: usize,
     generic_lowering_functions: usize,
     shape_recognizer_functions: usize,
@@ -108,6 +111,9 @@ pub fn lowerCompatible(
 
     var accepted_functions: usize = 0;
     var structured_air_v1_functions: usize = 0;
+    var structured_air_v2_functions: usize = 0;
+    var typed_air_type_functions: usize = 0;
+    var typed_air_operand_functions: usize = 0;
     var legacy_air_text_lowering_functions: usize = 0;
     var generic_lowering_functions: usize = 0;
     var shape_recognizer_functions: usize = 0;
@@ -134,6 +140,11 @@ pub fn lowerCompatible(
         try module.functions.append(allocator, function);
         accepted_functions += 1;
         if (air_function.structured_air != null) structured_air_v1_functions += 1;
+        if (air_function.structured_air_v2) |structured_air_v2| {
+            structured_air_v2_functions += 1;
+            if (typedResultCoverage(air_function, structured_air_v2)) typed_air_type_functions += 1;
+            if (typedOperandCoverage(structured_air_v2)) typed_air_operand_functions += 1;
+        }
         legacy_air_text_lowering_functions += 1;
         switch (loweringPath(air_function)) {
             .generic_instruction_path => generic_lowering_functions += 1,
@@ -147,11 +158,31 @@ pub fn lowerCompatible(
         .module = module,
         .accepted_functions = accepted_functions,
         .structured_air_v1_functions = structured_air_v1_functions,
+        .structured_air_v2_functions = structured_air_v2_functions,
+        .typed_air_type_functions = typed_air_type_functions,
+        .typed_air_operand_functions = typed_air_operand_functions,
         .legacy_air_text_lowering_functions = legacy_air_text_lowering_functions,
         .generic_lowering_functions = generic_lowering_functions,
         .shape_recognizer_functions = shape_recognizer_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
     };
+}
+
+fn typedResultCoverage(function: air_export.Function, structured_air_v2: air_export.StructuredAirV2) bool {
+    if (structured_air_v2.instructions.len != function.instruction_count) return false;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.result_type, "-")) return false;
+    }
+    return true;
+}
+
+fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
+    for (structured_air_v2.instructions) |instruction| {
+        for (instruction.operands) |operand| {
+            if (std.mem.eql(u8, operand.type_text, "-")) return false;
+        }
+    }
+    return true;
 }
 
 fn materializedGlobalInitializer(ty: ir.Type) ir.GlobalInitializer {

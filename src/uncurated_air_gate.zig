@@ -53,6 +53,9 @@ pub fn main(init: std.process.Init) !void {
     var unsupported_zig_linker_feature_rows: usize = 0;
     var unsupported_functions: usize = 0;
     var codegen_failures: usize = 0;
+    var structured_air_v2_functions: usize = 0;
+    var typed_air_type_functions: usize = 0;
+    var typed_air_operand_functions: usize = 0;
     var object_failures: usize = 0;
     var native_link_failures: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
@@ -94,8 +97,20 @@ pub fn main(init: std.process.Init) !void {
             allocator.free(emit_result.stderr);
         }
         switch (emit_result.term) {
-            .exited => |code| if (code != 0) return error.ZigAirExportFailed,
-            else => return error.ZigAirExportFailed,
+            .exited => |code| if (code != 0) {
+                std.debug.print(
+                    "air-export-failure source={s} exit_code={} stdout={s} stderr={s}\n",
+                    .{ source, code, firstLine(emit_result.stdout), firstLine(emit_result.stderr) },
+                );
+                return error.ZigAirExportFailed;
+            },
+            else => {
+                std.debug.print(
+                    "air-export-failure source={s} term={s} stdout={s} stderr={s}\n",
+                    .{ source, termName(emit_result.term), firstLine(emit_result.stdout), firstLine(emit_result.stderr) },
+                );
+                return error.ZigAirExportFailed;
+            },
         }
 
         const descriptor = try std.Io.Dir.cwd().readFileAlloc(
@@ -140,6 +155,9 @@ pub fn main(init: std.process.Init) !void {
         discovered_functions += rootFunctionCount(parsed);
         structured_functions += lowered.accepted_functions;
         structured_air_v1_functions += lowered.structured_air_v1_functions;
+        structured_air_v2_functions += lowered.structured_air_v2_functions;
+        typed_air_type_functions += lowered.typed_air_type_functions;
+        typed_air_operand_functions += lowered.typed_air_operand_functions;
         legacy_air_text_lowering_functions += lowered.legacy_air_text_lowering_functions;
         generic_lowering_functions += lowered.generic_lowering_functions;
         shape_recognizer_functions += lowered.shape_recognizer_functions;
@@ -289,7 +307,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} legacy_air_text_lowering_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
+        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
         .{
             mode.name(),
             source_rows,
@@ -297,6 +315,9 @@ pub fn main(init: std.process.Init) !void {
             structured_functions,
             generic_codegen_functions,
             structured_air_v1_functions,
+            structured_air_v2_functions,
+            typed_air_type_functions,
+            typed_air_operand_functions,
             legacy_air_text_lowering_functions,
             generic_lowering_functions,
             shape_recognizer_functions,

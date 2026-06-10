@@ -252,6 +252,9 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_functions=152
   generic_codegen_functions=152
   structured_air_v1_functions=152
+  structured_air_v2_functions=152
+  typed_air_type_functions=152
+  typed_air_operand_functions=0
   legacy_air_text_lowering_functions=152
   generic_lowering_functions=120
   shape_recognizer_functions=32
@@ -326,6 +329,9 @@ zig build distribution-zig-air-uncurated-releasesafe-broad
   structured_functions=152
   generic_codegen_functions=152
   structured_air_v1_functions=152
+  structured_air_v2_functions=152
+  typed_air_type_functions=152
+  typed_air_operand_functions=0
   legacy_air_text_lowering_functions=152
   generic_lowering_functions=120
   shape_recognizer_functions=32
@@ -335,9 +341,11 @@ zig build distribution-zig-air-uncurated-releasesafe-broad
 ```
 
 The remaining 32 shape-recognizer functions are audited in
-`docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` is
-present for every accepted broad function, but z_llvm still uses legacy AIR text
-for operand/type authority until a typed `structured_air-v2` contract lands.
+`docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
+`structured_air-v2` are present for every accepted broad function. The initial
+v2 transport carries structural operand refs and result records, but
+`typed_air_operand_functions=0` and z_llvm still uses legacy AIR text for
+lowering authority until typed operands and generic v2 lowering land.
 
 The companion broad ReleaseSafe object gate also emits all 152 machine
 functions without LLVM TargetMachine:
