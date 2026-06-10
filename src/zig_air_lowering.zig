@@ -1833,7 +1833,7 @@ const LoweringContext = struct {
         const callee_start = function_marker + "(function '".len;
         const callee_relative_end = std.mem.indexOf(u8, instruction.payload[callee_start..], "')") orelse
             return error.UnsupportedAir;
-        const callee = instruction.payload[callee_start .. callee_start + callee_relative_end];
+        const callee = try self.qualifiedCalleeName(instruction.payload[callee_start .. callee_start + callee_relative_end]);
         const args_start = std.mem.indexOfScalarPos(u8, instruction.payload, callee_start + callee_relative_end, '[') orelse
             return error.UnsupportedAir;
         const args_end = std.mem.lastIndexOfScalar(u8, instruction.payload, ']') orelse
@@ -2047,6 +2047,12 @@ const LoweringContext = struct {
     fn blockParamName(self: LoweringContext, index: usize) []const u8 {
         return self.function.params.items[index].name;
     }
+
+    fn qualifiedCalleeName(self: *LoweringContext, callee: []const u8) ![]const u8 {
+        if (std.mem.indexOfScalar(u8, callee, '.') != null) return callee;
+        const dot = std.mem.lastIndexOfScalar(u8, self.air_function.name, '.') orelse return callee;
+        return ownPrint(self.module, "{s}.{s}", .{ self.air_function.name[0..dot], callee });
+    }
 };
 
 fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
@@ -2088,7 +2094,11 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f32")) return .{ .ir_type = .float };
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
-    if (std.mem.eql(u8, trimmed, "aggregate_abi.Pair")) return .{ .ir_type = .{ .int = 64 } };
+    if (std.mem.eql(u8, trimmed, "aggregate_abi.Pair") or
+        std.mem.eql(u8, trimmed, "runtime_aggregate_pair_main.Pair"))
+    {
+        return .{ .ir_type = .{ .int = 64 } };
+    }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
@@ -2328,8 +2338,7 @@ fn intBits(ty: ir.Type) ?u16 {
 }
 
 fn shortFunctionName(name: []const u8) []const u8 {
-    const dot = std.mem.lastIndexOfScalar(u8, name, '.') orelse return name;
-    return name[dot + 1 ..];
+    return name;
 }
 
 fn isPointerType(text: []const u8) bool {
