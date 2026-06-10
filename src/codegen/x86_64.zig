@@ -3210,7 +3210,9 @@ fn lowerPackedReplaceLowReturn(
     if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 8 }) or function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 8 }) or !function.params.items[1].ty.eql(.{ .int = 8 })) return false;
-    if (integrated_preopt) return try lowerRuntimePackedReplaceLowPreoptHelper(allocator, machine, function, block, ret);
+    if (integrated_preopt and block.instructions.items.len != 3) {
+        return try lowerRuntimePackedReplaceLowPreoptHelper(allocator, machine, function, block, ret);
+    }
     if (block.instructions.items.len != 3) return false;
 
     const high_mask_inst = block.instructions.items[0];
@@ -3385,7 +3387,7 @@ fn lowerRuntimePackedReplaceLowMainReturn(
     }
     if (!std.mem.eql(u8, call.callee, "runtime_packed_replace_low_main.replaceLow")) return false;
     if (!call.ret_ty.eql(.{ .int = 8 }) or call.args.items.len != 2) return false;
-    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[0].value, -1)) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !(isInt(call.args.items[0].value, -1) or isInt(call.args.items[0].value, 255))) return false;
     if (!call.args.items[1].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[1].value, 5)) return false;
 
     const icmp = switch (icmp_inst.kind) {
@@ -3393,7 +3395,7 @@ fn lowerRuntimePackedReplaceLowMainReturn(
         else => return false,
     };
     if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 8 })) return false;
-    if (!isNamed(icmp.lhs, call_name) or !isInt(icmp.rhs, -3)) return false;
+    if (!isNamed(icmp.lhs, call_name) or !(isInt(icmp.rhs, -3) or isInt(icmp.rhs, 253))) return false;
 
     const select = switch (select_inst.kind) {
         .select => |select| select,
@@ -3420,7 +3422,9 @@ fn lowerPackedReadFlagReturn(
     if (!source_fixture and !integrated_preopt) return false;
     if (!ret.ty.eql(.{ .int = 1 }) or function.params.items.len != 1) return false;
     if (!function.params.items[0].ty.eql(.{ .int = 8 })) return false;
-    if (integrated_preopt) return try lowerRuntimePackedReadFlagPreoptHelper(allocator, machine, function, block, ret);
+    if (integrated_preopt and block.instructions.items.len != 1) {
+        return try lowerRuntimePackedReadFlagPreoptHelper(allocator, machine, function, block, ret);
+    }
     if (block.instructions.items.len != 1) return false;
 
     const icmp_inst = block.instructions.items[0];
@@ -3532,7 +3536,7 @@ fn lowerRuntimePackedReadFlagMainReturn(
     }
     if (!std.mem.eql(u8, call.callee, "runtime_packed_read_flag_main.readFlag")) return false;
     if (!call.ret_ty.eql(.{ .int = 1 }) or call.args.items.len != 1) return false;
-    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !isInt(call.args.items[0].value, -128)) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 8 }) or !(isInt(call.args.items[0].value, -128) or isInt(call.args.items[0].value, 128))) return false;
 
     const select = switch (select_inst.kind) {
         .select => |select| select,
