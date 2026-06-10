@@ -168,26 +168,29 @@ handoff for this uncurated AIR gate are the next evidence layer; they are not
 part of the current inner-loop gate.
 
 Broad real-AIR discovery progress:
-`zig build distribution-zig-air-uncurated-releasefast-broad` extends the
-ReleaseFast discovery surface to `test/zig/inputs/*.zig` plus
-`test/zig/integrated/*.zig`. Current measured output is `source_rows=101`,
-`discovered_functions=152`, `structured_functions=152`,
-`generic_codegen_functions=152`, `unsupported_functions=0`,
-`codegen_failures=0`, `case_id_rows=0`,
-`source_fact_classification_rows=0`, and `local_fail=0`. The companion object
-progress gate, `zig build distribution-zig-air-uncurated-releasefast-broad-object`,
-reports `object_emitted_functions=152`, `object_failures=0`,
-`llvm_targetmachine_rows=0`, and `local_fail=0`. Native-link execution for this
-broad uncurated AIR path remains the next evidence layer.
+`zig build distribution-zig-air-uncurated-releasefast-broad` and
+`zig build distribution-zig-air-uncurated-releasesafe-broad` extend the real-AIR
+discovery surface to `test/zig/inputs/*.zig` plus `test/zig/integrated/*.zig`.
+Both modes now report `source_rows=101`, `discovered_functions=152`,
+`structured_functions=152`, `generic_codegen_functions=152`,
+`unsupported_functions=0`, `codegen_failures=0`, `case_id_rows=0`,
+`source_fact_classification_rows=0`, and `local_fail=0`.
 
-`zig build distribution-zig-air-uncurated-releasesafe-broad` has been added as
-the next progress gate but is not required green yet. Its current measured
-output is `source_rows=101`, `discovered_functions=152`,
-`structured_functions=151`, `generic_codegen_functions=151`,
-`unsupported_functions=1`, `codegen_failures=0`, `case_id_rows=0`,
-`source_fact_classification_rows=0`, and `local_fail=0`; the first blocker is
-`runtime_mix_c_add_may_panic_main.add_may_panic` with `opcode=block`,
-`reason=control_flow_shape`.
+The broad object progress gates now cover both modes without LLVM
+TargetMachine: `zig build distribution-zig-air-uncurated-releasefast-broad-object`
+and `zig build distribution-zig-air-uncurated-releasesafe-broad-object` both
+report `object_emitted_functions=152`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`.
+
+Broad ReleaseFast also has a native Zig linker progress gate outside
+`distribution-all`:
+`zig build distribution-zig-air-uncurated-releasefast-broad-native-link` links
+the z_llvm object for each broad source module with a tiny C `main` harness via
+`zig build-exe -fno-lld`. It reports `native_link_accepted_rows=100`,
+`executable_ok_rows=0`, `link_only_rows=100`, `runtime_boundary_rows=1`
+(`debug.defaultPanic`), `unsupported_zig_linker_feature_rows=0`,
+`native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
+`local_fail=0`. This is link-only progress evidence, not executable ABI proof.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected

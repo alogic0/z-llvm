@@ -268,24 +268,52 @@ zig build distribution-zig-air-uncurated-releasefast-broad-object
   local_fail=0
 ```
 
-The broad ReleaseSafe progress gate has been added but is not yet green:
+The broad ReleaseFast native-link progress gate links the z_llvm object for
+each broad source module with a tiny C `main` harness and Zig's native linker:
+
+```text
+zig build distribution-zig-air-uncurated-releasefast-broad-native-link
+  native_link_accepted_rows=100
+  executable_ok_rows=0
+  link_only_rows=100
+  runtime_boundary_rows=1
+  unsupported_zig_linker_feature_rows=0
+  native_link_failures=0
+  llvm_targetmachine_rows=0
+  lld_rows=0
+  local_fail=0
+```
+
+The one runtime boundary row is the named `debug.defaultPanic` import from
+`runtime_mix_c_add_may_panic_main.zig`; the gate is link-only progress evidence
+and remains outside `distribution-all`.
+
+The broad ReleaseSafe gate now matches ReleaseFast through lowering/codegen:
 
 ```text
 zig build distribution-zig-air-uncurated-releasesafe-broad
   source_rows=101
   discovered_functions=152
-  structured_functions=151
-  generic_codegen_functions=151
-  unsupported_functions=1
+  structured_functions=152
+  generic_codegen_functions=152
+  unsupported_functions=0
   codegen_failures=0
-  first_unsupported_source=test/zig/integrated/runtime_mix_c_add_may_panic_main.zig
-  first_unsupported_function=runtime_mix_c_add_may_panic_main.add_may_panic
-  first_unsupported_opcode=block
   local_fail=0
 ```
 
-These broad gates remain outside `distribution-all` while native-link evidence
-and broad ReleaseSafe closure are promoted separately.
+The companion broad ReleaseSafe object gate also emits all 152 machine
+functions without LLVM TargetMachine:
+
+```text
+zig build distribution-zig-air-uncurated-releasesafe-broad-object
+  object_emitted_functions=152
+  object_failures=0
+  llvm_targetmachine_rows=0
+  local_fail=0
+```
+
+These broad gates remain outside `distribution-all` while executable ABI
+evidence is promoted separately.
 
 Link/LTO handoff remains a deferred boundary rather than an implementation row
 for the selected x86_64 distribution subset:
