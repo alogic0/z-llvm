@@ -140,11 +140,14 @@ Use this ladder:
 7. zig build distribution-native-link -- --release-source-owned  # milestone native-link executable proof
 8. zig build probe-native-linker -- --release-source-owned  # milestone native-link acceptance probe
 
-For real AIR work, keep the loop source-driven and ReleaseFast-only:
+For real AIR work, keep the loop source-driven and release-mode focused:
 
 1. export or run one source through `ZLLVM_AIR_EXPORT_PATH`
 2. run `zig build test`
-3. run `zig build distribution-zig-air-uncurated-releasefast`
+3. run `zig build distribution-zig-air-uncurated-releasefast` or
+   `zig build distribution-zig-air-uncurated-releasesafe`
+4. run `zig build distribution-zig-air-uncurated-release` after a mode-shared
+   AIR lowering change
 
 The uncurated gate discovers `test/zig/inputs/*.zig`; it does not use selected
 case IDs or source-fact body classification. Its current hook contract is

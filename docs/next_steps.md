@@ -149,6 +149,24 @@ the same patched-Zig source-owned object path, links with `zig build-exe
 The Zig hook is frozen for this milestone: patch Zig only for fact-contract
 version changes, not for row expansion or surface classification.
 
+Current real-AIR ownership milestone:
+`zig build distribution-zig-air-uncurated-release` is the source-driven
+ReleaseFast/ReleaseSafe x86_64 AIR gate over `test/zig/inputs/*.zig`. It asks
+patched Zig for `zllvm-air-export-v1` plus `structured_air-v1` metadata and
+lowers real compiler-owned AIR/liveness in z_llvm without case IDs, wrapper
+maps, source-fact body classification, canned DescriptorV2 bodies, libLLVM
+module parse/print, LLVM optimizer ownership, or LLVM TargetMachine codegen.
+Current measured output for each mode is `source_rows=19`,
+`discovered_functions=44`, `structured_functions=44`,
+`generic_codegen_functions=44`, `unsupported_functions=0`,
+`codegen_failures=0`, `case_id_rows=0`,
+`source_fact_classification_rows=0`, and `local_fail=0`. ReleaseSafe is scoped
+to the same root-source function inventory and accepts safe opcode variants
+such as `ret_safe`, `store_safe`, and `intcast_safe` while keeping
+safety/runtime shapes fail-closed. Object-format inspection and native-link
+handoff for this uncurated AIR gate are the next evidence layer; they are not
+part of the current inner-loop gate.
+
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`

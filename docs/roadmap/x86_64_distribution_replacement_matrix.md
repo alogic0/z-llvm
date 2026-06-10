@@ -213,6 +213,32 @@ zig build distribution-no-llvm
   result=pass
 ```
 
+The uncurated real-AIR release gate is now green for the current
+`test/zig/inputs/*.zig` source corpus in both ReleaseFast and ReleaseSafe:
+
+```text
+zig build distribution-zig-air-uncurated-release
+  target=x86_64-linux-gnu
+  modes=ReleaseFast,ReleaseSafe
+  source_rows_per_mode=19
+  discovered_functions_per_mode=44
+  structured_functions_per_mode=44
+  generic_codegen_functions_per_mode=44
+  unsupported_functions_per_mode=0
+  codegen_failures_per_mode=0
+  case_id_rows=0
+  source_fact_classification_rows=0
+  local_fail=0
+```
+
+This is the strongest current real-AIR ownership evidence: patched Zig exports
+compiler-owned AIR/liveness via `zllvm-air-export-v1` and `structured_air-v1`,
+while z_llvm parses and lowers the source functions without selected case IDs,
+wrapper maps, source-fact body classification, canned DescriptorV2 bodies,
+LLVM module parse/print, LLVM optimizer ownership, or LLVM TargetMachine
+codegen. Object-format proof and Zig native-link handoff for this uncurated
+AIR path remain future matrix evidence.
+
 Link/LTO handoff remains a deferred boundary rather than an implementation row
 for the selected x86_64 distribution subset:
 
