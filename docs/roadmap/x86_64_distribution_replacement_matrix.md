@@ -254,7 +254,7 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v1_functions=152
   structured_air_v2_functions=152
   typed_air_type_functions=152
-  typed_air_operand_functions=0
+  typed_air_operand_functions=152
   legacy_air_text_lowering_functions=152
   generic_lowering_functions=120
   shape_recognizer_functions=32
@@ -336,7 +336,7 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v1_functions=152
   structured_air_v2_functions=152
   typed_air_type_functions=152
-  typed_air_operand_functions=0
+  typed_air_operand_functions=152
   legacy_air_text_lowering_functions=152
   generic_lowering_functions=120
   shape_recognizer_functions=32
@@ -347,10 +347,10 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
 
 The remaining 32 shape-recognizer functions are audited in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
-`structured_air-v2` are present for every accepted broad function. The initial
-v2 transport carries structural operand refs and result records, but
-`typed_air_operand_functions=0` and z_llvm still uses legacy AIR text for
-lowering authority until typed operands and generic v2 lowering land.
+`structured_air-v2` are present for every accepted broad function. The v2
+transport now carries typed operand records for all broad functions, but z_llvm
+still uses legacy AIR text for lowering authority until generic v2 lowering
+lands.
 
 These broad gates remain outside `distribution-all` while executable ABI
 evidence is promoted separately.
