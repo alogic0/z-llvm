@@ -15619,6 +15619,9 @@ fn lowerReturnValue(
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
                     const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+                    if (binary.op == .add and try lowerI32AddTreeReturn(allocator, machine, function, block, binary)) {
+                        return;
+                    }
                     const lhs_const: ?i128 = switch (binary.lhs) {
                         .int => |lhs| lhs,
                         else => null,
@@ -15645,6 +15648,82 @@ fn lowerReturnValue(
                 .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
+    }
+}
+
+fn lowerI32AddTreeReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    binary: ir.BinaryInst,
+) !bool {
+    var terms: std.ArrayList(ir.Value) = .empty;
+    defer terms.deinit(allocator);
+    try collectI32AddTerms(allocator, block, binary, &terms);
+    if (terms.items.len < 2) return false;
+    try emitI32ValueIntoEax(allocator, machine, function, terms.items[0]);
+    for (terms.items[1..]) |term| {
+        switch (term) {
+            .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+            .named => |name| {
+                const reg = try paramRegOrNull(function, name, .{ .int = 32 }) orelse return false;
+                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+            },
+            .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        }
+    }
+    return true;
+}
+
+fn collectI32AddTerms(
+    allocator: std.mem.Allocator,
+    block: ir.BasicBlock,
+    binary: ir.BinaryInst,
+    terms: *std.ArrayList(ir.Value),
+) anyerror!void {
+    if (binary.op != .add or !binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+    try collectI32AddValue(allocator, block, binary.lhs, terms);
+    try collectI32AddValue(allocator, block, binary.rhs, terms);
+}
+
+fn collectI32AddValue(
+    allocator: std.mem.Allocator,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    terms: *std.ArrayList(ir.Value),
+) anyerror!void {
+    switch (value) {
+        .named => |name| {
+            if (findInstruction(block, name)) |instruction| {
+                switch (instruction.kind) {
+                    .binary => |nested| if (nested.op == .add and nested.ty.eql(.{ .int = 32 })) {
+                        try collectI32AddTerms(allocator, block, nested, terms);
+                        return;
+                    },
+                    else => {},
+                }
+            }
+            try terms.append(allocator, value);
+        },
+        .int => try terms.append(allocator, value),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitI32ValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    value: ir.Value,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
+        .named => |name| {
+            const reg = try paramRegOrNull(function, name, .{ .int = 32 }) orelse return error.UnsupportedCodegenValue;
+            try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
 }
 
