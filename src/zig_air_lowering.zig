@@ -2179,6 +2179,12 @@ fn parseConstant(text: []const u8) ?TypedValue {
         const ty = parseStaticIntegerType(text["@.one_".len..]) orelse return null;
         return .{ .ty = ty, .value = .{ .int = 1 } };
     }
+    if (std.mem.eql(u8, text, "@.bool_true")) {
+        return .{ .ty = .{ .ir_type = .{ .int = 1 } }, .value = .{ .int = 1 } };
+    }
+    if (std.mem.eql(u8, text, "@.bool_false")) {
+        return .{ .ty = .{ .ir_type = .{ .int = 1 } }, .value = .{ .int = 0 } };
+    }
     return null;
 }
 
@@ -2206,10 +2212,25 @@ fn parseSymbolPointer(text: []const u8) ?SymbolPointer {
     var fields = splitTopLevel(text[1 .. text.len - 1], ',');
     const type_text = std.mem.trim(u8, fields.next() orelse return null, " ");
     const value_text = std.mem.trim(u8, fields.next() orelse return null, " ");
-    if (fields.next() != null or !std.mem.startsWith(u8, value_text, "&") or value_text.len == 1) return null;
+    if (fields.next() != null) return null;
     const ty = parseZigType(type_text) orelse return null;
     if (ty.ir_type != .ptr) return null;
-    return .{ .ty = ty, .symbol = value_text[1..] };
+    if (std.mem.startsWith(u8, value_text, "&") and value_text.len > 1) {
+        return .{ .ty = ty, .symbol = value_text[1..] };
+    }
+    if (ptrCastSymbol(value_text)) |symbol| {
+        return .{ .ty = ty, .symbol = symbol };
+    }
+    return null;
+}
+
+fn ptrCastSymbol(text: []const u8) ?[]const u8 {
+    const marker = "@ptrCast(&";
+    const marker_start = std.mem.indexOf(u8, text, marker) orelse return null;
+    const symbol_start = marker_start + marker.len;
+    const symbol_end = std.mem.indexOfScalarPos(u8, text, symbol_start, ')') orelse return null;
+    if (symbol_end == symbol_start) return null;
+    return text[symbol_start..symbol_end];
 }
 
 fn parseStaticIntegerType(text: []const u8) ?ZigType {
