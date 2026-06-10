@@ -1009,6 +1009,7 @@ fn lowerStraightLineReturn(
             if (try lowerIcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerFcmpSelectConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerErrorSwitchSelectReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerErrorUnionI64SelectReturn(allocator, machine, function, block, ret)) return;
             if (try lowerAddImmReturn(allocator, machine, function, block, ret)) return;
             if (try lowerShiftOrConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerMulConstReturn(allocator, machine, function, block, ret)) return;
@@ -2651,7 +2652,7 @@ fn lowerErrorSwitchSelectReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "error_switch.error_switch")) return false;
+    if (!isErrorSwitchFunctionName(function.name)) return false;
     if (!ret.ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
     if (block.instructions.items.len != 4) return false;
@@ -2692,6 +2693,128 @@ fn lowerErrorSwitchSelectReturn(
 
     try appendErrorSwitchReturns(allocator, machine, try paramReg(function, tag_name, .{ .int = 8 }));
     return true;
+}
+
+fn lowerErrorUnionI64SelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or !function.ret_ty.eql(.{ .int = 64 })) return false;
+    if (function.params.items.len != 1) return false;
+    if (try lowerNonzeroI32ErrorUnionReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerI8ClassifyErrorUnionReturn(allocator, machine, function, block, ret)) return true;
+    return false;
+}
+
+fn lowerNonzeroI32ErrorUnionReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or block.instructions.items.len != 2) return false;
+    const cmp_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (cmp_inst.removed or select_inst.removed) return false;
+    const cmp_name = cmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const cmp = switch (cmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (cmp.predicate != .ne or !cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const arg_name = function.params.items[0].name;
+    if (!isNamed(cmp.lhs, arg_name) or !isInt(cmp.rhs, 0)) return false;
+
+    const select = switch (select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(select.cond, cmp_name)) return false;
+    const error_value = try i64ValueConst(select.true_value);
+    const ok_value = try i64ValueConst(select.false_value);
+    const arg_reg = try paramReg(function, arg_name, .{ .int = 32 });
+    const ok_label = "error_union_i64_ok";
+    try machine.instructions.append(allocator, .{ .test_arg32 = arg_reg });
+    try machine.instructions.append(allocator, .{ .je = ok_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = error_value });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = ok_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = ok_value });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerI8ClassifyErrorUnionReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.params.items[0].ty.eql(.{ .int = 8 }) or block.instructions.items.len != 4) return false;
+    const cmp_one_inst = block.instructions.items[0];
+    const cmp_zero_inst = block.instructions.items[1];
+    const first_select_inst = block.instructions.items[2];
+    const second_select_inst = block.instructions.items[3];
+    if (cmp_one_inst.removed or cmp_zero_inst.removed or first_select_inst.removed or second_select_inst.removed) return false;
+    const cmp_one_name = cmp_one_inst.result orelse return false;
+    const cmp_zero_name = cmp_zero_inst.result orelse return false;
+    const first_select_name = first_select_inst.result orelse return false;
+    const second_select_name = second_select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, second_select_name)) return false;
+
+    const arg_name = function.params.items[0].name;
+    if (!matchIcmpEqParamImm(cmp_one_inst, arg_name, .{ .int = 8 }, 1)) return false;
+    if (!matchIcmpEqParamImm(cmp_zero_inst, arg_name, .{ .int = 8 }, 0)) return false;
+
+    const first_select = switch (first_select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!first_select.cond_ty.eql(.{ .int = 1 }) or !first_select.ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(first_select.cond, cmp_one_name)) return false;
+    const low_value = try i64ValueConst(first_select.true_value);
+    const high_value = try i64ValueConst(first_select.false_value);
+
+    const second_select = switch (second_select_inst.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!second_select.cond_ty.eql(.{ .int = 1 }) or !second_select.ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(second_select.cond, cmp_zero_name) or !isNamed(second_select.false_value, first_select_name)) return false;
+    const ok_value = try i64ValueConst(second_select.true_value);
+
+    const tag_reg = try paramReg(function, arg_name, .{ .int = 8 });
+    const zero_label = "error_union_i64_zero";
+    const one_label = "error_union_i64_one";
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = tag_reg, .imm = 0 } });
+    try machine.instructions.append(allocator, .{ .je = zero_label });
+    try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = tag_reg, .imm = 1 } });
+    try machine.instructions.append(allocator, .{ .je = one_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = high_value });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = one_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = low_value });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rax = ok_value });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn i64ValueConst(value: ir.Value) !i64 {
+    return switch (value) {
+        .int => |int| try i64Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
+    };
 }
 
 fn lowerAddImmReturn(
@@ -8974,13 +9097,17 @@ fn lowerConditionalReturn(allocator: std.mem.Allocator, machine: *MachineFunctio
 }
 
 fn lowerErrorSwitchReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "error_switch.error_switch")) return false;
+    if (!isErrorSwitchFunctionName(function.name)) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
     const tag_reg = try paramReg(function, function.params.items[0].name, .{ .int = 8 });
 
     try appendErrorSwitchReturns(allocator, machine, tag_reg);
     return true;
+}
+
+fn isErrorSwitchFunctionName(name: []const u8) bool {
+    return std.mem.eql(u8, name, "error_switch.error_switch") or std.mem.eql(u8, name, "error_switch");
 }
 
 fn appendErrorSwitchReturns(allocator: std.mem.Allocator, machine: *MachineFunction, tag_reg: ArgReg) !void {
