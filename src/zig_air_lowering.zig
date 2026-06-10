@@ -1847,9 +1847,9 @@ const LoweringContext = struct {
             .args = .empty,
         };
         errdefer call.deinit(self.allocator);
-        var args = splitTopLevel(instruction.payload[args_start + 1 .. args_end], ',');
         var arg_index: usize = 0;
-        while (args.next()) |arg_text| : (arg_index += 1) {
+        var args = splitTopLevel(instruction.payload[args_start + 1 .. args_end], ',');
+        while (args.next()) |arg_text| {
             if (std.mem.trim(u8, arg_text, " ").len == 0) continue;
             if (arg_index >= call_type.params.len) return error.UnsupportedAir;
             const arg = try self.resolveValue(arg_text);
@@ -1858,6 +1858,7 @@ const LoweringContext = struct {
                 .ty = arg.ty.ir_type,
                 .value = arg.value,
             });
+            arg_index += 1;
         }
         if (arg_index != call_type.params.len) return error.UnsupportedAir;
 
