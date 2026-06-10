@@ -6,6 +6,7 @@ const codegen = @import("codegen.zig");
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
+    const mode = try parseMode(init.minimal.args);
 
     const zig_emitter_env = init.minimal.environ.getAlloc(allocator, "ZIG_EMITTER") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
@@ -22,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
         for (sources) |source| allocator.free(source);
         allocator.free(sources);
     }
-    const temp_path = try std.fmt.allocPrint(allocator, "tmp/uncurated_zig_air_releasefast_{}", .{std.os.linux.getpid()});
+    const temp_path = try std.fmt.allocPrint(allocator, "tmp/uncurated_zig_air_{s}_{}", .{ mode.lowerName(), std.os.linux.getpid() });
     defer allocator.free(temp_path);
     try std.Io.Dir.cwd().createDirPath(io, temp_path);
     defer std.Io.Dir.cwd().deleteTree(io, temp_path) catch {};
@@ -63,7 +64,7 @@ pub fn main(init: std.process.Init) !void {
             "-fllvm",
             "-flibllvm",
             "-fno-emit-bin",
-            "-OReleaseFast",
+            mode.zigOptimizeArg(),
             "-target",
             "x86_64-linux-gnu",
             source,
@@ -90,12 +91,38 @@ pub fn main(init: std.process.Init) !void {
             .limited(32 * 1024 * 1024),
         );
         defer allocator.free(descriptor);
-        var parsed = try air_export.parse(allocator, descriptor);
+        source_rows += 1;
+        var parsed = air_export.parse(allocator, descriptor) catch |err| {
+            unsupported_functions += 1;
+            try incrementCount(allocator, &unsupported_counts, "parse");
+            std.debug.print(
+                "unsupported-air source={s} function=- opcode=parse reason={s}\n",
+                .{ source, @errorName(err) },
+            );
+            if (first_unsupported_source == null) {
+                first_unsupported_source = try allocator.dupe(u8, source);
+                first_unsupported_function = try allocator.dupe(u8, "-");
+                first_unsupported_opcode = try allocator.dupe(u8, "parse");
+            }
+            continue;
+        };
         defer parsed.deinit();
-        var lowered = try air_lowering.lowerCompatible(allocator, parsed);
+        var lowered = air_lowering.lowerCompatible(allocator, parsed) catch |err| {
+            unsupported_functions += 1;
+            try incrementCount(allocator, &unsupported_counts, "lowering");
+            std.debug.print(
+                "unsupported-air source={s} function=- opcode=lowering reason={s}\n",
+                .{ source, @errorName(err) },
+            );
+            if (first_unsupported_source == null) {
+                first_unsupported_source = try allocator.dupe(u8, source);
+                first_unsupported_function = try allocator.dupe(u8, "-");
+                first_unsupported_opcode = try allocator.dupe(u8, "lowering");
+            }
+            continue;
+        };
         defer lowered.deinit();
 
-        source_rows += 1;
         discovered_functions += parsed.functions.len;
         structured_functions += lowered.accepted_functions;
         unsupported_functions += lowered.unsupported.len;
@@ -146,8 +173,9 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode=ReleaseFast target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
+        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
         .{
+            mode.name(),
             source_rows,
             discovered_functions,
             structured_functions,
@@ -162,6 +190,48 @@ pub fn main(init: std.process.Init) !void {
         },
     );
     try stdout_writer.interface.flush();
+}
+
+const Mode = enum {
+    ReleaseFast,
+    ReleaseSafe,
+
+    fn name(self: Mode) []const u8 {
+        return switch (self) {
+            .ReleaseFast => "ReleaseFast",
+            .ReleaseSafe => "ReleaseSafe",
+        };
+    }
+
+    fn lowerName(self: Mode) []const u8 {
+        return switch (self) {
+            .ReleaseFast => "releasefast",
+            .ReleaseSafe => "releasesafe",
+        };
+    }
+
+    fn zigOptimizeArg(self: Mode) []const u8 {
+        return switch (self) {
+            .ReleaseFast => "-OReleaseFast",
+            .ReleaseSafe => "-OReleaseSafe",
+        };
+    }
+};
+
+fn parseMode(args: std.process.Args) !Mode {
+    var mode: Mode = .ReleaseFast;
+    var iterator = std.process.Args.Iterator.init(args);
+    _ = iterator.skip();
+    while (iterator.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--mode=ReleaseFast")) {
+            mode = .ReleaseFast;
+        } else if (std.mem.eql(u8, arg, "--mode=ReleaseSafe")) {
+            mode = .ReleaseSafe;
+        } else {
+            return error.UnsupportedUncuratedAirArgument;
+        }
+    }
+    return mode;
 }
 
 fn collectSources(allocator: std.mem.Allocator, io: std.Io) ![][]const u8 {

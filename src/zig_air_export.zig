@@ -131,7 +131,8 @@ pub const Module = struct {
 
 pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
     const storage = try allocator.dupe(u8, contents);
-    errdefer allocator.free(storage);
+    var storage_owned_by_parse = true;
+    errdefer if (storage_owned_by_parse) allocator.free(storage);
 
     var cursor: Cursor = .{ .contents = storage };
     try cursor.expectLine(contract_name);
@@ -220,6 +221,7 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         .globals = try globals.toOwnedSlice(allocator),
         .functions = try functions.toOwnedSlice(allocator),
     };
+    storage_owned_by_parse = false;
     errdefer module.deinit();
     try verify(module);
     return module;

@@ -78,6 +78,15 @@ pub fn build(b: *std.Build) void {
     const run_uncurated_air_gate = b.addRunArtifact(uncurated_air_gate);
     const uncurated_air_step = b.step("distribution-zig-air-uncurated-releasefast", "Discover and generically lower uncurated x86_64 ReleaseFast Zig AIR");
     uncurated_air_step.dependOn(&run_uncurated_air_gate.step);
+    const run_uncurated_air_releasesafe_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesafe_gate.addArg("--mode=ReleaseSafe");
+    const uncurated_air_releasesafe_step = b.step("distribution-zig-air-uncurated-releasesafe", "Discover and generically lower uncurated x86_64 ReleaseSafe Zig AIR");
+    uncurated_air_releasesafe_step.dependOn(&run_uncurated_air_releasesafe_gate.step);
+    const run_uncurated_air_releasefast_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasefast_gate.addArg("--mode=ReleaseFast");
+    const uncurated_air_release_step = b.step("distribution-zig-air-uncurated-release", "Run uncurated x86_64 release Zig AIR gates for ReleaseFast and ReleaseSafe");
+    uncurated_air_release_step.dependOn(&run_uncurated_air_releasefast_gate.step);
+    uncurated_air_release_step.dependOn(&run_uncurated_air_releasesafe_gate.step);
     addToolStep(b, "distribution-native-link-boundary2", "Run broad x86_64 native-link boundary accounting gate", "tools/run_distribution_native_link_boundary2.zig");
     addToolStepWithArgs(b, "probe-native-linker", "Probe selected local objects against Zig native linker acceptance", "tools/probe_native_linker_compatibility.zig");
     addToolStepWithArgs(b, "probe-native-linker-broad", "Probe broad optimized IR directories for native Zig linker link-only acceptance", "tools/probe_native_linker_broad.zig");
