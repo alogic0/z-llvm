@@ -36,6 +36,8 @@ pub const Function = struct {
     air_text: []const u8,
     structured_air_text: ?[]const u8,
     structured_air: ?StructuredAir,
+    structured_air_v2_text: ?[]const u8,
+    structured_air_v2: ?StructuredAirV2,
     instructions: []Instruction,
 };
 
@@ -93,6 +95,29 @@ pub const StructuredRepeat = struct {
     loop_index: u32,
 };
 
+pub const StructuredAirV2 = struct {
+    instructions: []TypedInstruction,
+
+    fn deinit(self: StructuredAirV2, allocator: std.mem.Allocator) void {
+        for (self.instructions) |instruction| allocator.free(instruction.operands);
+        allocator.free(self.instructions);
+    }
+};
+
+pub const TypedInstruction = struct {
+    index: u32,
+    opcode: []const u8,
+    result_type: []const u8,
+    data_kind: []const u8,
+    operands: []TypedOperand,
+};
+
+pub const TypedOperand = struct {
+    kind: []const u8,
+    value: []const u8,
+    type_text: []const u8,
+};
+
 pub const Global = struct {
     name: []const u8,
     type_text: []const u8,
@@ -114,6 +139,7 @@ pub const Module = struct {
     pub fn deinit(self: *Module) void {
         for (self.functions) |function| {
             if (function.structured_air) |structured_air| structured_air.deinit(self.allocator);
+            if (function.structured_air_v2) |structured_air_v2| structured_air_v2.deinit(self.allocator);
             self.allocator.free(function.instructions);
         }
         self.allocator.free(self.functions);
@@ -192,9 +218,14 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
             try cursor.readFramed("structured_air_bytes")
         else
             null;
+        const structured_air_v2_text: ?[]const u8 = if (cursor.peekValueLine("structured_air_v2_bytes"))
+            try cursor.readFramed("structured_air_v2_bytes")
+        else
+            null;
         try cursor.expectLine("function_end");
         const instructions = try parseInstructions(allocator, air_text, instruction_count);
         const structured_air = if (structured_air_text) |text| try parseStructuredAir(allocator, text) else null;
+        const structured_air_v2 = if (structured_air_v2_text) |text| try parseStructuredAirV2(allocator, text) else null;
         functions.appendAssumeCapacity(.{
             .name = name,
             .type_text = type_text,
@@ -204,6 +235,8 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
             .air_text = air_text,
             .structured_air_text = structured_air_text,
             .structured_air = structured_air,
+            .structured_air_v2_text = structured_air_v2_text,
+            .structured_air_v2 = structured_air_v2,
             .instructions = instructions,
         });
     }
@@ -320,6 +353,63 @@ fn parseStructuredAir(allocator: std.mem.Allocator, text: []const u8) !Structure
     };
 }
 
+fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !StructuredAirV2 {
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    const header = lines.next() orelse return error.InvalidStructuredAirV2;
+    if (!std.mem.eql(u8, header, "structured_air-v2")) return error.InvalidStructuredAirV2;
+
+    var instructions: std.ArrayList(TypedInstruction) = .empty;
+    errdefer {
+        for (instructions.items) |instruction| allocator.free(instruction.operands);
+        instructions.deinit(allocator);
+    }
+
+    var saw_end = false;
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+        if (std.mem.eql(u8, line, "structured_air_v2_end")) {
+            saw_end = true;
+            break;
+        }
+        var fields = std.mem.splitScalar(u8, line, '|');
+        const kind = fields.next() orelse return error.InvalidStructuredAirV2;
+        if (!std.mem.eql(u8, kind, "typed_inst")) return error.InvalidStructuredAirV2;
+        const index = try parseUnsigned(u32, fields.next() orelse return error.InvalidStructuredAirV2);
+        const opcode = fields.next() orelse return error.InvalidStructuredAirV2;
+        const result_type_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+        const result_type = fields.next() orelse return error.InvalidStructuredAirV2;
+        if (result_type.len != result_type_len) return error.InvalidStructuredAirV2;
+        const data_kind = fields.next() orelse return error.InvalidStructuredAirV2;
+        const operand_count = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+        const operands = try allocator.alloc(TypedOperand, operand_count);
+        errdefer allocator.free(operands);
+        for (operands) |*operand| {
+            const operand_kind = fields.next() orelse return error.InvalidStructuredAirV2;
+            const value_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+            const value = fields.next() orelse return error.InvalidStructuredAirV2;
+            if (value.len != value_len) return error.InvalidStructuredAirV2;
+            const type_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+            const type_text = fields.next() orelse return error.InvalidStructuredAirV2;
+            if (type_text.len != type_len) return error.InvalidStructuredAirV2;
+            operand.* = .{
+                .kind = operand_kind,
+                .value = value,
+                .type_text = type_text,
+            };
+        }
+        if (fields.next() != null) return error.InvalidStructuredAirV2;
+        try instructions.append(allocator, .{
+            .index = index,
+            .opcode = opcode,
+            .result_type = result_type,
+            .data_kind = data_kind,
+            .operands = operands,
+        });
+    }
+    if (!saw_end) return error.InvalidStructuredAirV2;
+    return .{ .instructions = try instructions.toOwnedSlice(allocator) };
+}
+
 fn parseStructuredBodyKind(text: []const u8) ?StructuredBodyKind {
     if (std.mem.eql(u8, text, "main")) return .main;
     if (std.mem.eql(u8, text, "block")) return .block;
@@ -359,6 +449,26 @@ pub fn verify(module: Module) !void {
             }
             seen[instruction.index] = true;
             if (instruction.opcode.len == 0) return error.MissingOpcode;
+        }
+        if (function.structured_air_v2) |structured_air_v2| {
+            if (structured_air_v2.instructions.len > function.instruction_count) return error.InvalidStructuredAirV2;
+            const typed_seen = try module.allocator.alloc(bool, function.instruction_count);
+            defer module.allocator.free(typed_seen);
+            @memset(typed_seen, false);
+            for (structured_air_v2.instructions) |instruction| {
+                if (instruction.index >= typed_seen.len or typed_seen[instruction.index]) {
+                    return error.InvalidStructuredAirV2;
+                }
+                if (instruction.opcode.len == 0 or instruction.result_type.len == 0 or instruction.data_kind.len == 0) {
+                    return error.InvalidStructuredAirV2;
+                }
+                typed_seen[instruction.index] = true;
+                for (instruction.operands) |operand| {
+                    if (operand.kind.len == 0 or operand.value.len == 0 or operand.type_text.len == 0) {
+                        return error.InvalidStructuredAirV2;
+                    }
+                }
+            }
         }
     }
 }
@@ -687,6 +797,70 @@ test "parse optional structured AIR records" {
     try std.testing.expectEqualStrings("arg", structured_air.instructions[0].opcode);
     const main_body = structured_air.body(.main, null).?;
     try std.testing.expectEqualSlices(u32, &.{ 0, 1 }, main_body.instructions);
+}
+
+test "parse optional structured AIR v2 typed instruction records" {
+    const air_text =
+        \\  %0 = arg(i32, 0)
+        \\  %1!= ret(%0!)
+        \\
+    ;
+    const structured_air_text =
+        \\structured_air-v1
+        \\body|main|-|2|0|1
+        \\inst|0|arg|3|i32
+        \\inst|1|ret|8|noreturn
+        \\structured_air_end
+        \\
+    ;
+    const structured_air_v2_text =
+        \\structured_air-v2
+        \\typed_inst|0|arg|3|i32|arg|0
+        \\typed_inst|1|ret|8|noreturn|un_op|1|inst|1|0|3|i32
+        \\structured_air_v2_end
+        \\
+    ;
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\zllvm-air-export-v1
+        \\contract_version=1
+        \\payload=zig-air-print-v1
+        \\producer=test
+        \\root_source=typed.zig
+        \\wrapper=typed.zig
+        \\mode=ReleaseFast
+        \\target=x86_64-linux-gnu
+        \\function_count=1
+        \\global_count=0
+        \\function_begin
+        \\name_bytes=4
+        \\main
+        \\type_bytes=9
+        \\fn () i32
+        \\instruction_count=2
+        \\main_body_count=2
+        \\liveness=present
+        \\air_bytes={}
+        \\{s}
+        \\structured_air_bytes={}
+        \\{s}
+        \\structured_air_v2_bytes={}
+        \\{s}
+        \\function_end
+        \\
+    , .{ air_text.len, air_text, structured_air_text.len, structured_air_text, structured_air_v2_text.len, structured_air_v2_text });
+    defer std.testing.allocator.free(input);
+
+    var module = try parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    const structured_air_v2 = module.functions[0].structured_air_v2.?;
+    try std.testing.expectEqual(@as(usize, 2), structured_air_v2.instructions.len);
+    try std.testing.expectEqualStrings("ret", structured_air_v2.instructions[1].opcode);
+    try std.testing.expectEqualStrings("noreturn", structured_air_v2.instructions[1].result_type);
+    try std.testing.expectEqual(@as(usize, 1), structured_air_v2.instructions[1].operands.len);
+    try std.testing.expectEqualStrings("inst", structured_air_v2.instructions[1].operands[0].kind);
+    try std.testing.expectEqualStrings("0", structured_air_v2.instructions[1].operands[0].value);
+    try std.testing.expectEqualStrings("i32", structured_air_v2.instructions[1].operands[0].type_text);
 }
 
 test "reject AIR export instruction index outside storage count" {
