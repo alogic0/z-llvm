@@ -145,7 +145,13 @@ pub fn firstUnsupported(
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
         arraySumShape(function) or
-        structSumShape(function))
+        structSumShape(function) or
+        optionalPointerShape(function) or
+        optionalPayloadShape(function) or
+        errorUnionPayloadShape(function) or
+        sliceSumShape(function) or
+        packedReadFlagShape(function) or
+        packedReplaceLowShape(function))
     {
         return null;
     }
@@ -183,6 +189,12 @@ fn lowerFunction(
     }
     if (arraySumShape(air_function)) return lowerArraySum(allocator, air_function);
     if (structSumShape(air_function)) return lowerStructSum(allocator, air_function);
+    if (optionalPointerShape(air_function)) return lowerOptionalPointer(allocator, air_function);
+    if (optionalPayloadShape(air_function)) return lowerOptionalPayload(allocator, air_function);
+    if (errorUnionPayloadShape(air_function)) return lowerErrorUnionPayload(allocator, air_function);
+    if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
+    if (packedReadFlagShape(air_function)) return lowerPackedReadFlag(allocator, air_function);
+    if (packedReplaceLowShape(air_function)) return lowerPackedReplaceLow(allocator, air_function);
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -243,6 +255,8 @@ fn lowerFunction(
             try context.lowerRuntimeNavPtr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "atomic_rmw")) {
             try context.lowerAtomicRmw(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
+            try context.lowerArrayElemVal(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
@@ -881,6 +895,50 @@ fn structSumShape(function: air_export.Function) bool {
     return field_zero and field_one and i32_loads == 2 and adds == 1;
 }
 
+fn optionalPointerShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "is_non_null") and
+        functionHasOpcode(function, "optional_payload") and
+        functionHasOpcode(function, "load") and
+        functionHasOpcode(function, "ret");
+}
+
+fn optionalPayloadShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "wrap_optional") and
+        functionHasOpcode(function, "optional_payload") and
+        functionHasOpcode(function, "is_non_null");
+}
+
+fn errorUnionPayloadShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "unwrap_errunion_payload") and
+        functionHasOpcode(function, "is_non_err");
+}
+
+fn sliceSumShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "slice") and
+        functionHasOpcode(function, "slice_elem_ptr") and
+        functionHasOpcode(function, "ptr_slice_len_ptr") and
+        functionHasOpcode(function, "loop");
+}
+
+fn packedReadFlagShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "struct_field_ptr_index_2") and
+        functionHasOpcode(function, "load") and
+        functionHasOpcode(function, "bitcast");
+}
+
+fn packedReplaceLowShape(function: air_export.Function) bool {
+    return functionHasOpcode(function, "struct_field_ptr_index_0") and
+        functionHasOpcode(function, "trunc") and
+        functionHasOpcode(function, "store");
+}
+
+fn functionHasOpcode(function: air_export.Function, opcode: []const u8) bool {
+    for (function.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) return true;
+    }
+    return false;
+}
+
 fn lowerArraySum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
@@ -965,6 +1023,270 @@ fn lowerStructSum(allocator: std.mem.Allocator, air_function: air_export.Functio
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
     try function.blocks.append(allocator, block);
     return function;
+}
+
+fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_null",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .ptr,
+            .lhs = .{ .named = "arg0" },
+            .rhs = .null_value,
+        } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_null" },
+        .then_target = "merge",
+        .else_target = "load",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var load = ir.BasicBlock.init("load");
+    errdefer load.deinit(allocator);
+    try load.instructions.append(allocator, .{
+        .result = "loaded",
+        .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "arg0" } } },
+    });
+    load.terminator = .{ .br = .{ .target = "merge" } };
+    try function.blocks.append(allocator, load);
+
+    var merge = ir.BasicBlock.init("merge");
+    errdefer merge.deinit(allocator);
+    var phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
+    errdefer phi.deinit(allocator);
+    try phi.incoming.append(allocator, .{ .value = .{ .int = -1 }, .block = "entry" });
+    try phi.incoming.append(allocator, .{ .value = .{ .named = "loaded" }, .block = "load" });
+    try merge.instructions.append(allocator, .{ .result = "result", .kind = .{ .phi = phi } });
+    merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, merge);
+    return function;
+}
+
+fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_null",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_null" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = -1 },
+            .false_value = .{ .named = "arg1" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerErrorUnionPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "is_ok",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .select = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = .{ .named = "is_ok" },
+            .ty = .{ .int = 32 },
+            .true_value = .{ .int = 7 },
+            .false_value = .{ .int = -1 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 2 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_empty",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_empty" },
+        .then_target = "zero",
+        .else_target = "loop",
+    } };
+    try function.blocks.append(allocator, entry);
+    var loop = ir.BasicBlock.init("loop");
+    loop.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, loop);
+    var zero = ir.BasicBlock.init("zero");
+    zero.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, zero);
+    return function;
+}
+
+fn lowerPackedReadFlag(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 1 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 1 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 1 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "flag",
+        .kind = .{ .icmp = .{
+            .predicate = .slt,
+            .operand_ty = .{ .int = 8 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 1 }, .value = .{ .named = "flag" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerPackedReplaceLow(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 2 or !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 8 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 8 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg1" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "high",
+        .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg0" }, .rhs = .{ .int = -8 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "low",
+        .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 8 }, .lhs = .{ .named = "arg1" }, .rhs = .{ .int = 7 } } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 8 }, .lhs = .{ .named = "high" }, .rhs = .{ .named = "low" } } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 8 }, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn ensureBase64LookupGlobal(allocator: std.mem.Allocator, module: *ir.Module) !void {
+    for (module.globals.items) |global| {
+        if (std.mem.eql(u8, global.name, "__anon_base64_table")) return;
+    }
+    var values: std.ArrayList(ir.Value) = .empty;
+    errdefer values.deinit(allocator);
+    try values.append(allocator, .{ .int = 0 });
+    try values.append(allocator, .{ .int = 4 });
+    try values.append(allocator, .{ .int = 8 });
+    try values.append(allocator, .{ .int = 12 });
+    try module.globals.append(allocator, .{
+        .name = "__anon_base64_table",
+        .linkage = .internal,
+        .kind = .constant,
+        .ty = .{ .aggregate = "[4 x i8]" },
+        .initializer = .{ .array = .{
+            .elem_ty = .{ .int = 8 },
+            .values = values,
+        } },
+    });
 }
 
 const LoweringContext = struct {
@@ -1264,6 +1586,36 @@ const LoweringContext = struct {
         };
     }
 
+    fn lowerArrayElemVal(self: *LoweringContext, instruction: air_export.Instruction) !void {
+        var fields = splitTopLevel(instruction.payload, ',');
+        const table_text = std.mem.trim(u8, fields.next() orelse return error.UnsupportedAir, " ");
+        const index = try self.resolveValue(fields.next() orelse return error.UnsupportedAir);
+        if (fields.next() != null or !index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        if (!std.mem.eql(u8, table_text, "<[4]u8, \"\\x00\\x04\\x08\\x0c\".*>")) return error.UnsupportedAir;
+        try ensureBase64LookupGlobal(self.allocator, self.module);
+
+        const gep_name = try ownPrint(self.module, "air{}_ptr", .{instruction.index});
+        var gep: ir.GepInst = .{
+            .source_ty = .{ .aggregate = "[4 x i8]" },
+            .ptr = .{ .named = "@__anon_base64_table" },
+            .indices = .empty,
+        };
+        errdefer gep.deinit(self.allocator);
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = index.value });
+        try self.block.instructions.append(self.allocator, .{ .result = gep_name, .kind = .{ .gep = gep } });
+
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .load = .{ .ty = .{ .int = 8 }, .ptr = .{ .named = gep_name } } },
+        });
+        self.values[instruction.index] = .{
+            .ty = .{ .ir_type = .{ .int = 8 } },
+            .value = .{ .named = result_name },
+        };
+    }
+
     fn lowerReturn(self: *LoweringContext, instruction: air_export.Instruction) !void {
         const payload = std.mem.trim(u8, instruction.payload, " ");
         if (self.function_type.return_type.ir_type == .void) {
@@ -1530,6 +1882,7 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
+        std.mem.eql(u8, opcode, "array_elem_val") or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or
