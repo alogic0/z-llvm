@@ -265,22 +265,26 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   local_fail=0
 ```
 
-The companion object-emission progress gate also emits all broad ReleaseFast
-machine functions through z_llvm's ELF object path without LLVM TargetMachine:
+The companion object-emission progress gates emit all broad ReleaseFast,
+ReleaseSafe, and ReleaseSmall machine functions through z_llvm's ELF object
+path without LLVM TargetMachine:
 
 ```text
 zig build distribution-zig-air-uncurated-releasefast-broad-object
+zig build distribution-zig-air-uncurated-releasesafe-broad-object
+zig build distribution-zig-air-uncurated-releasesmall-broad-object
   object_emitted_functions=152
   object_failures=0
   llvm_targetmachine_rows=0
   local_fail=0
 ```
 
-The broad ReleaseFast native-link progress gate links the z_llvm object for
-each broad source module with a tiny C `main` harness and Zig's native linker:
+The broad native-link progress gates link the z_llvm object for each broad
+source module with a tiny C `main` harness and Zig's native linker:
 
 ```text
 zig build distribution-zig-air-uncurated-releasefast-broad-native-link
+zig build distribution-zig-air-uncurated-releasesmall-broad-native-link
   native_link_accepted_rows=100
   executable_ok_rows=0
   link_only_rows=100
@@ -298,6 +302,8 @@ executables:
 
 ```text
 zig build distribution-zig-air-uncurated-releasefast-broad-executable
+zig build distribution-zig-air-uncurated-releasesafe-broad-executable
+zig build distribution-zig-air-uncurated-releasesmall-broad-executable
   native_link_accepted_rows=100
   executable_ok_rows=15
   link_only_rows=85
@@ -311,19 +317,18 @@ zig build distribution-zig-air-uncurated-releasefast-broad-executable
 
 Rows without a stable callable ABI harness remain link-only rows, not
 executable evidence. The named runtime boundary is `debug.defaultPanic`.
-The matching ReleaseSafe executable progress gate currently reports the same
-split: `native_link_accepted_rows=100`, `executable_ok_rows=15`,
-`link_only_rows=85`, `runtime_boundary_rows=1`, `native_link_failures=0`, and
-`local_fail=0`.
+ReleaseSafe and ReleaseSmall report the same executable split as ReleaseFast.
 
 The one runtime boundary row is the named `debug.defaultPanic` import from
 `runtime_mix_c_add_may_panic_main.zig`; the gate is link-only progress evidence
 and remains outside `distribution-all`.
 
-The broad ReleaseSafe gate now matches ReleaseFast through lowering/codegen:
+The broad ReleaseSafe and ReleaseSmall gates now match ReleaseFast through
+lowering/codegen:
 
 ```text
 zig build distribution-zig-air-uncurated-releasesafe-broad
+zig build distribution-zig-air-uncurated-releasesmall-broad
   source_rows=101
   discovered_functions=152
   structured_functions=152
@@ -346,17 +351,6 @@ The remaining 32 shape-recognizer functions are audited in
 v2 transport carries structural operand refs and result records, but
 `typed_air_operand_functions=0` and z_llvm still uses legacy AIR text for
 lowering authority until typed operands and generic v2 lowering land.
-
-The companion broad ReleaseSafe object gate also emits all 152 machine
-functions without LLVM TargetMachine:
-
-```text
-zig build distribution-zig-air-uncurated-releasesafe-broad-object
-  object_emitted_functions=152
-  object_failures=0
-  llvm_targetmachine_rows=0
-  local_fail=0
-```
 
 These broad gates remain outside `distribution-all` while executable ABI
 evidence is promoted separately.

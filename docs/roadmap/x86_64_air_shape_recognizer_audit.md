@@ -5,9 +5,10 @@ Current measured gates:
 ```text
 zig build distribution-zig-air-uncurated-releasefast-broad
 zig build distribution-zig-air-uncurated-releasesafe-broad
+zig build distribution-zig-air-uncurated-releasesmall-broad
 ```
 
-Both modes currently report:
+All three release modes currently report:
 
 ```text
 structured_functions=152

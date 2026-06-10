@@ -391,11 +391,13 @@ const Options = struct {
 const Mode = enum {
     ReleaseFast,
     ReleaseSafe,
+    ReleaseSmall,
 
     fn name(self: Mode) []const u8 {
         return switch (self) {
             .ReleaseFast => "ReleaseFast",
             .ReleaseSafe => "ReleaseSafe",
+            .ReleaseSmall => "ReleaseSmall",
         };
     }
 
@@ -403,6 +405,7 @@ const Mode = enum {
         return switch (self) {
             .ReleaseFast => "releasefast",
             .ReleaseSafe => "releasesafe",
+            .ReleaseSmall => "releasesmall",
         };
     }
 
@@ -410,6 +413,7 @@ const Mode = enum {
         return switch (self) {
             .ReleaseFast => "-OReleaseFast",
             .ReleaseSafe => "-OReleaseSafe",
+            .ReleaseSmall => "-OReleaseSmall",
         };
     }
 };
@@ -428,6 +432,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.mode = .ReleaseFast;
         } else if (std.mem.eql(u8, arg, "--mode=ReleaseSafe")) {
             options.mode = .ReleaseSafe;
+        } else if (std.mem.eql(u8, arg, "--mode=ReleaseSmall")) {
+            options.mode = .ReleaseSmall;
         } else if (std.mem.eql(u8, arg, "--corpus=inputs")) {
             options.corpus = .inputs;
         } else if (std.mem.eql(u8, arg, "--corpus=broad")) {

@@ -168,10 +168,12 @@ handoff for this uncurated AIR gate are the next evidence layer; they are not
 part of the current inner-loop gate.
 
 Broad real-AIR discovery progress:
-`zig build distribution-zig-air-uncurated-releasefast-broad` and
-`zig build distribution-zig-air-uncurated-releasesafe-broad` extend the real-AIR
-discovery surface to `test/zig/inputs/*.zig` plus `test/zig/integrated/*.zig`.
-Both modes now report `source_rows=101`, `discovered_functions=152`,
+`zig build distribution-zig-air-uncurated-releasefast-broad`,
+`zig build distribution-zig-air-uncurated-releasesafe-broad`, and
+`zig build distribution-zig-air-uncurated-releasesmall-broad` extend the
+real-AIR discovery surface to `test/zig/inputs/*.zig` plus
+`test/zig/integrated/*.zig`. All three release modes now report
+`source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=0`,
@@ -182,10 +184,9 @@ and `local_fail=0`. The 32 remaining shape-recognizer functions and the v2
 operand-typing gap are listed in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`.
 
-The broad object progress gates now cover both modes without LLVM
-TargetMachine: `zig build distribution-zig-air-uncurated-releasefast-broad-object`
-and `zig build distribution-zig-air-uncurated-releasesafe-broad-object` both
-report `object_emitted_functions=152`, `object_failures=0`,
+The broad object progress gates now cover all three release modes without LLVM
+TargetMachine. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
+`object_emitted_functions=152`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
@@ -198,18 +199,14 @@ the z_llvm object for each broad source module with a tiny C `main` harness via
 `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and
 `local_fail=0`. This is link-only progress evidence, not executable ABI proof.
 
-The broad ReleaseFast executable progress gate adds stable C-ABI harnesses for
-the runnable pure input modules while keeping integrated/runtime-heavy rows as
-link-only accounting:
-`zig build distribution-zig-air-uncurated-releasefast-broad-executable` reports
+The broad release executable progress gates add stable C-ABI harnesses for the
+runnable pure input modules while keeping integrated/runtime-heavy rows as
+link-only accounting. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
 `native_link_accepted_rows=100`, `executable_ok_rows=15`,
 `link_only_rows=85`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. It does not
 claim executable proof for modules without a stable callable ABI harness.
-The matching ReleaseSafe executable progress gate reports the same measured
-split: `executable_ok_rows=15`, `link_only_rows=85`,
-`runtime_boundary_rows=1`, `native_link_failures=0`, and `local_fail=0`.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
