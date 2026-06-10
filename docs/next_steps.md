@@ -171,15 +171,23 @@ Broad real-AIR discovery progress:
 `zig build distribution-zig-air-uncurated-releasefast-broad` extends the
 ReleaseFast discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. Current measured output is `source_rows=101`,
-`discovered_functions=147`, `structured_functions=143`,
-`generic_codegen_functions=133`, `unsupported_functions=6`,
-`codegen_failures=10`, `case_id_rows=0`,
-`source_fact_classification_rows=0`, and `local_fail=0`. This is not yet a
-zero-failure replacement claim. The active broad blockers are aggregate-pair
-verifier ownership (`UnknownFunction`), mixed C/Zig runtime-boundary calls,
-optional/pointer/slice block lowering, packed-bit backend codegen, TLS wrapper
-return codegen, and a small set of wrapper main call/compare returns that need
-more generic backend handling.
+`discovered_functions=152`, `structured_functions=152`,
+`generic_codegen_functions=152`, `unsupported_functions=0`,
+`codegen_failures=0`, `case_id_rows=0`,
+`source_fact_classification_rows=0`, and `local_fail=0`. The companion object
+progress gate, `zig build distribution-zig-air-uncurated-releasefast-broad-object`,
+reports `object_emitted_functions=152`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`. Native-link execution for this
+broad uncurated AIR path remains the next evidence layer.
+
+`zig build distribution-zig-air-uncurated-releasesafe-broad` has been added as
+the next progress gate but is not required green yet. Its current measured
+output is `source_rows=101`, `discovered_functions=152`,
+`structured_functions=151`, `generic_codegen_functions=151`,
+`unsupported_functions=1`, `codegen_failures=0`, `case_id_rows=0`,
+`source_fact_classification_rows=0`, and `local_fail=0`; the first blocker is
+`runtime_mix_c_add_may_panic_main.add_may_panic` with `opcode=block`,
+`reason=control_flow_shape`.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
@@ -1241,23 +1249,20 @@ Current measured gate:
 gate=zig build distribution-zig-air-uncurated-releasefast
 source_rows=19
 discovered_functions=44
-structured_functions=38
-generic_codegen_functions=38
-unsupported_functions=6
+structured_functions=44
+generic_codegen_functions=44
+unsupported_functions=0
 codegen_failures=0
 case_id_rows=0
 source_fact_classification_rows=0
-top_unsupported_construct=assembly
-top_unsupported_count=1
+top_unsupported_construct=-
+top_unsupported_count=0
 local_fail=0
 ```
 
 This milestone closed the previous `block` control-flow blockers for optional
-pointer, optional payload, and error-union payload rows; closed slice
-`ptr_add`/slice element access for the current slice-sum row; added
-base64-style `array_elem_val` table lookup lowering; added packed bit read and
-replace-low lowering; and fixed f32/f64 literal return object codegen. The
-remaining measured unsupported functions are aggregate ABI helper
-`function-type` rows, the error-switch `is_non_err`/payload path, and the
-inline `assembly` boundary. The uncurated gate prints every unsupported
-function with its opcode/reason so this list cannot silently fall back.
+pointer, optional payload, error-union payload, aggregate ABI helper,
+error-switch payload, inline-asm barrier, broad optional/pointer wrapper CFG,
+mixed C/Zig panic-edge, packed-bit, TLS wrapper, slice, and FP wrapper rows.
+The uncurated gates still print every unsupported function with its
+opcode/reason so future expansion cannot silently fall back.

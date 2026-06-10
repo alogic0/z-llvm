@@ -2,6 +2,7 @@ const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const air_lowering = @import("zig_air_lowering.zig");
 const codegen = @import("codegen.zig");
+const mc = @import("mc.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -40,8 +41,10 @@ pub fn main(init: std.process.Init) !void {
     var discovered_functions: usize = 0;
     var structured_functions: usize = 0;
     var generic_codegen_functions: usize = 0;
+    var object_emitted_functions: usize = 0;
     var unsupported_functions: usize = 0;
     var codegen_failures: usize = 0;
+    var object_failures: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
     defer if (first_unsupported_source) |value| allocator.free(value);
     var first_unsupported_function: ?[]const u8 = null;
@@ -141,8 +144,13 @@ pub fn main(init: std.process.Init) !void {
                 first_unsupported_opcode = try allocator.dupe(u8, diagnostic.opcode);
             }
         }
+        var machines: std.ArrayList(codegen.x86_64.MachineFunction) = .empty;
+        defer {
+            for (machines.items) |*machine| machine.deinit(allocator);
+            machines.deinit(allocator);
+        }
         for (lowered.module.functions.items) |function| {
-            var machine = codegen.x86_64.lowerFunction(
+            const machine = codegen.x86_64.lowerFunction(
                 allocator,
                 "x86_64-unknown-linux-gnu",
                 function,
@@ -154,8 +162,25 @@ pub fn main(init: std.process.Init) !void {
                 );
                 continue;
             };
-            machine.deinit(allocator);
+            try machines.append(allocator, machine);
             generic_codegen_functions += 1;
+        }
+        if (options.object_progress and machines.items.len != 0) {
+            const object = mc.elf.buildObjectWithModuleData(
+                allocator,
+                machines.items,
+                lowered.module.aliases.items,
+                lowered.module.globals.items,
+            ) catch |err| {
+                object_failures += 1;
+                std.debug.print(
+                    "unsupported-object source={s} error={s}\n",
+                    .{ source, @errorName(err) },
+                );
+                continue;
+            };
+            allocator.free(object);
+            object_emitted_functions += machines.items.len;
         }
     }
 
@@ -190,6 +215,12 @@ pub fn main(init: std.process.Init) !void {
             top_count,
         },
     );
+    if (options.object_progress) {
+        try stdout_writer.interface.print(
+            "summary uncurated-zig-air-object mode={s} target=x86_64-linux-gnu object_emitted_functions={} object_failures={} llvm_targetmachine_rows=0 local_fail=0\n",
+            .{ mode.name(), object_emitted_functions, object_failures },
+        );
+    }
     try stdout_writer.interface.flush();
 }
 
@@ -205,6 +236,7 @@ fn rootFunctionCount(module: air_export.Module) usize {
 const Options = struct {
     mode: Mode = .ReleaseFast,
     corpus: Corpus = .inputs,
+    object_progress: bool = false,
 };
 
 const Mode = enum {
@@ -251,6 +283,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .inputs;
         } else if (std.mem.eql(u8, arg, "--corpus=broad")) {
             options.corpus = .broad;
+        } else if (std.mem.eql(u8, arg, "--object-progress")) {
+            options.object_progress = true;
         } else {
             return error.UnsupportedUncuratedAirArgument;
         }

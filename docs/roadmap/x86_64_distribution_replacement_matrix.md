@@ -236,29 +236,56 @@ compiler-owned AIR/liveness via `zllvm-air-export-v1` and `structured_air-v1`,
 while z_llvm parses and lowers the source functions without selected case IDs,
 wrapper maps, source-fact body classification, canned DescriptorV2 bodies,
 LLVM module parse/print, LLVM optimizer ownership, or LLVM TargetMachine
-codegen. Object-format proof and Zig native-link handoff for this uncurated
-AIR path remain future matrix evidence.
+codegen. Object-format proof has started for the broad ReleaseFast gate; Zig
+native-link handoff for this uncurated AIR path remains future matrix evidence.
 
-The broader ReleaseFast discovery gate is active but not yet green:
+The broader ReleaseFast discovery gate is green for real AIR lowering and
+generic x86_64 codegen:
 
 ```text
 zig build distribution-zig-air-uncurated-releasefast-broad
   target=x86_64-linux-gnu
   source_roots=test/zig/inputs,test/zig/integrated
   source_rows=101
-  discovered_functions=147
-  structured_functions=143
-  generic_codegen_functions=133
-  unsupported_functions=6
-  codegen_failures=10
+  discovered_functions=152
+  structured_functions=152
+  generic_codegen_functions=152
+  unsupported_functions=0
+  codegen_failures=0
   case_id_rows=0
   source_fact_classification_rows=0
   local_fail=0
 ```
 
-This gate is a progress/inventory gate for broad real-AIR ownership. It remains
-outside `distribution-all` until unsupported/codegen failures reach zero or are
-converted into named, accepted runtime boundaries.
+The companion object-emission progress gate also emits all broad ReleaseFast
+machine functions through z_llvm's ELF object path without LLVM TargetMachine:
+
+```text
+zig build distribution-zig-air-uncurated-releasefast-broad-object
+  object_emitted_functions=152
+  object_failures=0
+  llvm_targetmachine_rows=0
+  local_fail=0
+```
+
+The broad ReleaseSafe progress gate has been added but is not yet green:
+
+```text
+zig build distribution-zig-air-uncurated-releasesafe-broad
+  source_rows=101
+  discovered_functions=152
+  structured_functions=151
+  generic_codegen_functions=151
+  unsupported_functions=1
+  codegen_failures=0
+  first_unsupported_source=test/zig/integrated/runtime_mix_c_add_may_panic_main.zig
+  first_unsupported_function=runtime_mix_c_add_may_panic_main.add_may_panic
+  first_unsupported_opcode=block
+  local_fail=0
+```
+
+These broad gates remain outside `distribution-all` while native-link evidence
+and broad ReleaseSafe closure are promoted separately.
 
 Link/LTO handoff remains a deferred boundary rather than an implementation row
 for the selected x86_64 distribution subset:
@@ -409,14 +436,14 @@ target=x86_64-linux-gnu
 mode=ReleaseFast
 source_rows=19
 discovered_functions=44
-structured_functions=38
-generic_codegen_functions=38
-unsupported_functions=6
+structured_functions=44
+generic_codegen_functions=44
+unsupported_functions=0
 codegen_failures=0
 case_id_rows=0
 source_fact_classification_rows=0
-top_unsupported_construct=assembly
-top_unsupported_count=1
+top_unsupported_construct=-
+top_unsupported_count=0
 local_fail=0
 ```
 
@@ -795,11 +822,11 @@ release_source_owned_rows=release_source_rows=100 source_wrapper_rows=100
                           generic_codegen_rows=100 fallback_rows=0 local_fail=0
 uncurated_real_air_gate=zig build distribution-zig-air-uncurated-releasefast
 uncurated_real_air_rows=source_rows=19 discovered_functions=44
-                         structured_functions=38 generic_codegen_functions=38
-                         unsupported_functions=6 codegen_failures=0
+                         structured_functions=44 generic_codegen_functions=44
+                         unsupported_functions=0 codegen_failures=0
                          case_id_rows=0 source_fact_classification_rows=0
-                         top_unsupported_construct=assembly
-                         top_unsupported_count=1 local_fail=0
+                         top_unsupported_construct=-
+                         top_unsupported_count=0 local_fail=0
 semantic_lowering_inventory=docs/roadmap/x86_64_source_wrapper_semantic_lowering.md
 combined_current_claim=fixed_selected_rows=146 broad_source_backed_rows=90;
                        release_source_owned_rows=100;
