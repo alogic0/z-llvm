@@ -127,6 +127,7 @@ pub fn lowerCompatible(
         accepted_functions += 1;
     }
 
+    try addMissingCallDeclarations(allocator, &module);
     try module.verify();
     return .{
         .module = module,
@@ -147,6 +148,41 @@ fn rootFunctionCount(functions: []const air_export.Function, root_stem: []const 
         if (isRootSourceFunction(root_stem, function.name)) count += 1;
     }
     return count;
+}
+
+fn addMissingCallDeclarations(allocator: std.mem.Allocator, module: *ir.Module) !void {
+    for (module.functions.items) |function| {
+        for (function.blocks.items) |block| {
+            for (block.instructions.items) |instruction| {
+                const call = switch (instruction.kind) {
+                    .call => |call| call,
+                    else => continue,
+                };
+                if (call.callee_value != null or call.inline_asm != null) continue;
+                if (moduleHasFunctionOrDeclaration(module.*, call.callee)) continue;
+                var decl = ir.FunctionDecl.init(call.callee, call.ret_ty);
+                errdefer decl.deinit(allocator);
+                decl.calling_conv = call.calling_conv;
+                for (call.args.items) |arg| {
+                    try decl.params.append(allocator, .{
+                        .ty = arg.ty,
+                        .attrs = arg.attrs,
+                    });
+                }
+                try module.declarations.append(allocator, decl);
+            }
+        }
+    }
+}
+
+fn moduleHasFunctionOrDeclaration(module: ir.Module, name: []const u8) bool {
+    for (module.functions.items) |function| {
+        if (std.mem.eql(u8, function.name, name)) return true;
+    }
+    for (module.declarations.items) |decl| {
+        if (std.mem.eql(u8, decl.name, name)) return true;
+    }
+    return false;
 }
 
 pub fn firstUnsupported(
@@ -967,7 +1003,8 @@ fn packedReplaceLowShape(function: air_export.Function) bool {
 }
 
 fn aggregatePairFirstShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".pair_first") and
+    return (std.mem.endsWith(u8, function.name, ".pair_first") or
+        std.mem.endsWith(u8, function.name, ".pairFirst")) and
         functionHasOpcode(function, "alloc") and
         functionHasOpcode(function, "struct_field_ptr_index_0") and
         functionHasOpcode(function, "load") and
@@ -975,7 +1012,8 @@ fn aggregatePairFirstShape(function: air_export.Function) bool {
 }
 
 fn aggregateMakePairShape(function: air_export.Function) bool {
-    return std.mem.endsWith(u8, function.name, ".make_pair") and
+    return (std.mem.endsWith(u8, function.name, ".make_pair") or
+        std.mem.endsWith(u8, function.name, ".makePair")) and
         functionHasOpcode(function, "ret_ptr") and
         functionHasOpcode(function, "struct_field_ptr_index_0") and
         functionHasOpcode(function, "struct_field_ptr_index_1") and
