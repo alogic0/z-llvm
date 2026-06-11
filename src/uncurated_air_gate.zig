@@ -531,6 +531,19 @@ const ModuleMainReturnType = enum {
 };
 
 fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
+    if (std.mem.eql(u8, source, "test/zig/inputs/aggregate_abi.zig")) return .{ .abi_mode = "c-stable-module", .expected = "aggregate ABI pair", .c_body =
+    \\struct Pair { int a; int b; };
+    \\extern struct Pair z_make_pair(int, int) __asm__("aggregate_abi.make_pair");
+    \\extern int z_pair_first(struct Pair) __asm__("aggregate_abi.pair_first");
+    \\int main(void) {
+    \\    struct Pair pair = z_make_pair(11, 31);
+    \\    if (pair.a != 11) return 1;
+    \\    if (pair.b != 31) return 2;
+    \\    if (z_pair_first(pair) != 11) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (std.mem.eql(u8, source, "test/zig/inputs/aggregates.zig")) return .{ .abi_mode = "c-stable-module", .expected = "array/struct/slice/optional/error-union checks", .c_body =
     \\struct Pair { int a; int b; };
     \\extern int z_array_sum(int, int, int) __asm__("aggregates.array_sum");
@@ -548,6 +561,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_optional_payload(0, 99) != -1) return 5;
     \\    if (z_error_union_payload(0) != 7) return 6;
     \\    if (z_error_union_payload(1) != -1) return 7;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/inputs/atomics_inline_asm_debug.zig")) return .{ .abi_mode = "c-stable-module", .expected = "atomic add, inline asm barrier, debug location", .c_body =
+    \\extern unsigned z_atomic_add(unsigned) __asm__("atomics_inline_asm_debug.atomic_add");
+    \\extern int z_inline_asm_barrier(int) __asm__("atomics_inline_asm_debug.inline_asm_barrier");
+    \\extern int z_debug_location(int) __asm__("atomics_inline_asm_debug.debug_location");
+    \\int main(void) {
+    \\    if (z_atomic_add(5) != 0) return 1;
+    \\    if (z_atomic_add(7) != 5) return 2;
+    \\    if (z_inline_asm_barrier(19) != 19) return 3;
+    \\    if (z_debug_location(41) != 42) return 4;
     \\    return 0;
     \\}
     \\

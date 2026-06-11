@@ -212,14 +212,14 @@ The broad release executable progress gates add stable C-ABI harnesses for the
 runnable pure input modules and integrated wrapper `main` exports while keeping
 initializer-dependent and runtime-heavy rows as link-only accounting.
 ReleaseFast, ReleaseSafe, and ReleaseSmall each report
-`native_link_accepted_rows=100`, `executable_ok_rows=92`,
-`link_only_rows=8`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
+`native_link_accepted_rows=100`, `executable_ok_rows=94`,
+`link_only_rows=6`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. It does not
 claim executable proof for modules without a stable callable ABI harness. The
-remaining link-only rows include the four input modules without executable
-harnesses and four integrated wrappers whose expected runtime value depends on
-global/TLS initializer facts not yet exported by the frozen AIR contract.
+remaining link-only rows include the two remaining input modules and four
+integrated wrappers whose runtime result depends on global/TLS initializer
+facts not yet exported by the frozen AIR contract.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
