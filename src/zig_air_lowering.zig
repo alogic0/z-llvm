@@ -306,6 +306,11 @@ pub fn firstUnsupported(
                 typedV2PackedReplaceLowRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_slice_sum =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2SliceSumRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
@@ -318,7 +323,7 @@ pub fn firstUnsupported(
         errorSwitchShape(function) or
         errorClassifyShape(function) or
         typed_error_union_payload or
-        sliceSumShape(function) or
+        typed_slice_sum or
         typed_packed_bits or
         typed_aggregate_pair or
         mixCAddMayPanicShape(function) or
@@ -419,7 +424,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
     if (errorSwitchShape(function)) return "error_switch";
-    if (sliceSumShape(function)) return "slice_sum";
     if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
     return null;
 }
@@ -495,7 +499,6 @@ fn lowerFunction(
     if (runtimeOptionalPointerMainShape(air_function)) return lowerRuntimeOptionalPointerMain(allocator, air_function);
     if (runtimePointerLoadStoreMainShape(air_function)) return lowerRuntimePointerLoadStoreMain(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
-    if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
     if (mixCAddMayPanicShape(air_function)) return lowerMixCAddMayPanic(allocator, module, air_function);
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
@@ -615,6 +618,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2PackedBits(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2SliceSum(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -967,6 +973,42 @@ fn typedV2PackedReplaceLowRecords(
         typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
         typedOpcodeCount(structured_air_v2, "trunc") == 1 and
         typedOpcodeCount(structured_air_v2, "load") == 1 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2SliceSum(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2SliceSumRecords(function_type, structured_air_v2)) return null;
+    return try lowerSliceSum(allocator, air_function);
+}
+
+fn typedV2SliceSumRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 2 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    return typedOpcodeCount(structured_air_v2, "arg") == 2 and
+        typedOpcodeCount(structured_air_v2, "ptr_add") == 1 and
+        typedOpcodeCount(structured_air_v2, "slice") == 1 and
+        typedOpcodeCount(structured_air_v2, "ptr_slice_len_ptr") == 1 and
+        typedOpcodeCount(structured_air_v2, "slice_elem_ptr") == 1 and
+        typedOpcodeCount(structured_air_v2, "loop") == 1 and
+        typedOpcodeCount(structured_air_v2, "repeat") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") >= 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_lt") >= 1 and
+        add_count == 2 and
+        typedOpcodeCount(structured_air_v2, "load") >= 6 and
+        typedStoreOpcodeCount(structured_air_v2) >= 5 and
         typedHasReturnOpcode(structured_air_v2);
 }
 

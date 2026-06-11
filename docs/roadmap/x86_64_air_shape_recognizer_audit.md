@@ -16,14 +16,14 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=12
-typed_v2_fallback_functions=12
-generic_lowering_functions=142
-shape_recognizer_functions=10
+legacy_air_text_lowering_functions=10
+typed_v2_fallback_functions=10
+generic_lowering_functions=144
+shape_recognizer_functions=8
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=shape_recognizer:slice_sum:-
-top_typed_v2_fallback_count=2
+top_typed_v2_fallback_reason=lowering_validation:assembly:opaque
+top_typed_v2_fallback_count=1
 ```
 
 `structured_air-v1` is present for every accepted function and carries
@@ -43,7 +43,8 @@ error-union scalar representation. Optional scalar-payload helpers now validate 
 wrap/null-check/payload branch records. Optional pointer-payload helpers now validate typed-v2
 null-check/payload/load records. Packed read/replace helpers now validate typed-v2
 packed field pointer/load/store records before lowering to the scalar bit representation.
-`legacy_air_text_lowering_functions=12` remains for families
+Slice-sum helpers now validate typed-v2 pointer-add/slice/len/element/loop records,
+including the ReleaseSafe safety-expanded form. `legacy_air_text_lowering_functions=10` remains for families
 that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, and runtime-boundary lowering.
 
@@ -52,7 +53,7 @@ function that still falls back to legacy AIR text. The summary records the first
 fallback function/opcode/data kind/reason and the top fallback bucket. Generic
 typed-v2 validation failures now report the concrete failing typed opcode and
 data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
-`shape_recognizer:slice_sum:-` with 2 functions.
+`lowering_validation:assembly:opaque` with 1 function.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 
@@ -62,7 +63,6 @@ The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 - runtime optional pointer main
 - runtime pointer load/store main
 - error switch and classifier
-- slice sum
 - mixed C/Zig add-may-panic
 
 Next typed-contract target:
