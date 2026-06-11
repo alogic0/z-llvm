@@ -31,11 +31,11 @@ structured_air_v2_functions=162
 typed_air_operand_functions=162
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=159
+generic_codegen_functions=160
 generic_lowering_functions=162
 shape_recognizer_functions=0
 unsupported_functions=0
-codegen_failures=3
+codegen_failures=2
 first_unsupported_source=-
 first_unsupported_function=-
 first_unsupported_opcode=-
@@ -55,8 +55,6 @@ Active expanded blocker families:
 
 - x86_64 backend gap: renamed pointer load/store and slice loop functions from
   `expanded_pointer_slices`.
-- x86_64 backend gap: renamed/simple f32 pipeline from
-  `expanded_float_calls.expanded_float_pipeline`.
 
 Ownership rules for this frontier:
 

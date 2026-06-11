@@ -4258,7 +4258,7 @@ fn lowerFloatMulReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (function.params.items.len != 2) return false;
+    if (function.params.items.len < 2) return false;
     if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double)) return false;
     if (!function.params.items[0].ty.eql(.double) or !function.params.items[1].ty.eql(.double)) return false;
     if (block.instructions.items.len != 1) return false;
@@ -4291,7 +4291,7 @@ fn lowerFloatAddReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (function.params.items.len != 2) return false;
+    if (function.params.items.len < 2) return false;
     if (!function.ret_ty.eql(.float) or !ret.ty.eql(.float)) return false;
     if (!function.params.items[0].ty.eql(.float) or !function.params.items[1].ty.eql(.float)) return false;
     if (block.instructions.items.len != 1) return false;

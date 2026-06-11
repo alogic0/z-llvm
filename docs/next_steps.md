@@ -221,7 +221,7 @@ from the closed broad baseline. The expanded bucket adds
 families remain. The first ReleaseFast expanded snapshot is recorded in
 `docs/roadmap/x86_64_expanded_air_corpus.md`; aggregate pair ABI function-type
 lowering is closed, and the current blockers are generic x86_64 backend
-support for renamed pointer/slice and f32 pipeline variants.
+support for renamed pointer/slice variants.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
