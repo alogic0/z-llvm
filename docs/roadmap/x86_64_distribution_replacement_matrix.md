@@ -255,10 +255,10 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=16
-  typed_v2_fallback_functions=16
-  generic_lowering_functions=138
-  shape_recognizer_functions=14
+  legacy_air_text_lowering_functions=12
+  typed_v2_fallback_functions=12
+  generic_lowering_functions=142
+  shape_recognizer_functions=10
   unsupported_functions=0
   codegen_failures=0
   case_id_rows=0
@@ -338,16 +338,16 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=16
-  typed_v2_fallback_functions=16
-  generic_lowering_functions=138
-  shape_recognizer_functions=14
+  legacy_air_text_lowering_functions=12
+  typed_v2_fallback_functions=12
+  generic_lowering_functions=142
+  shape_recognizer_functions=10
   unsupported_functions=0
   codegen_failures=0
   local_fail=0
 ```
 
-The remaining 14 shape-recognizer functions are audited in
+The remaining 10 shape-recognizer functions are audited in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
 `structured_air-v2` are present for every accepted broad function. The v2
 transport now carries typed operand records for all broad functions, but z_llvm
@@ -530,9 +530,10 @@ payload lowering through typed branch/payload records. Maybe-error helpers now
 lower through typed branch/return records into the selected error-union scalar
 representation, and optional scalar-payload helpers lower through typed
 wrap/null-check/payload branch records. Optional pointer-payload helpers lower
-through typed null-check/payload/load records. Remaining measured
+through typed null-check/payload/load records. Packed read/replace helpers lower
+through typed packed field pointer/load/store records. Remaining measured
 blockers include error-union/optional control-flow, pointer/slice recognizers,
-packed-field recognizers, mixed C/Zig panic-edge lowering, atomics, and inline
+mixed C/Zig panic-edge lowering, atomics, and inline
 assembly. Operand/type details still rely on the legacy AIR text for those
 fallback families, so this is not yet a full AIR/liveness lowering replacement.
 
