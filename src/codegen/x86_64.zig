@@ -3826,7 +3826,13 @@ fn lowerPointerLoadStoreReturn(
         else => return false,
     };
     if (add.op != .add or !add.ty.eql(.{ .int = 32 })) return false;
-    if (!isNamed(add.lhs, load_result) or !isInt(add.rhs, 1)) return false;
+    const add_imm = if (isNamed(add.lhs, load_result)) switch (add.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    } else if (isNamed(add.rhs, load_result)) switch (add.lhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    } else return false;
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
@@ -3835,9 +3841,11 @@ fn lowerPointerLoadStoreReturn(
     if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
     if (!isNamed(store.ptr, function.params.items[1].name) or !isNamed(store.value, add_result)) return false;
 
-    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rdi });
-    try machine.instructions.append(allocator, .{ .add_eax_imm32 = 1 });
-    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = .rsi });
+    const src_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const dst_reg = try paramReg(function, function.params.items[1].name, .ptr);
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = src_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_imm });
+    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = dst_reg });
     if (reload_inst) |instruction| {
         const reload_name = instruction.result orelse return false;
         if (!std.mem.eql(u8, ret_name, reload_name)) return false;
@@ -3847,7 +3855,7 @@ fn lowerPointerLoadStoreReturn(
         };
         if (!reload.ty.eql(.{ .int = 32 }) or reload.attrs.isBarrier()) return false;
         if (!isNamed(reload.ptr, function.params.items[1].name)) return false;
-        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = .rsi });
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = dst_reg });
     }
     try machine.instructions.append(allocator, .ret);
     return true;

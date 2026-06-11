@@ -31,11 +31,11 @@ structured_air_v2_functions=162
 typed_air_operand_functions=162
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=160
+generic_codegen_functions=161
 generic_lowering_functions=162
 shape_recognizer_functions=0
 unsupported_functions=0
-codegen_failures=2
+codegen_failures=1
 first_unsupported_source=-
 first_unsupported_function=-
 first_unsupported_opcode=-
@@ -50,11 +50,13 @@ Closed expanded blocker families:
 - AIR/type lowering gap: expanded aggregate pair ABI function type from
   `expanded_records_memory.expanded_make_pair` and
   `expanded_records_memory.expanded_pair_first`.
+- x86_64 backend gap: renamed pointer load/store function from
+  `expanded_pointer_slices.expanded_load_store`.
 
 Active expanded blocker families:
 
-- x86_64 backend gap: renamed pointer load/store and slice loop functions from
-  `expanded_pointer_slices`.
+- x86_64 backend gap: expanded slice loop function from
+  `expanded_pointer_slices.expanded_slice_sum`.
 
 Ownership rules for this frontier:
 

@@ -220,8 +220,8 @@ from the closed broad baseline. The expanded bucket adds
 `test/zig/expanded/*.zig` and fails closed while new unsupported AIR/backend
 families remain. The first ReleaseFast expanded snapshot is recorded in
 `docs/roadmap/x86_64_expanded_air_corpus.md`; aggregate pair ABI function-type
-lowering is closed, and the current blockers are generic x86_64 backend
-support for renamed pointer/slice variants.
+lowering and the renamed pointer load/store variant are closed, and the
+current blocker is generic x86_64 backend support for the expanded slice loop.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
