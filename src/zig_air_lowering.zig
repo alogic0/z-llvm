@@ -346,6 +346,11 @@ pub fn firstUnsupported(
             typedV2RuntimePointerLoadStoreMainRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_mix_c_add_may_panic =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2MixCAddMayPanicRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -368,6 +373,7 @@ pub fn firstUnsupported(
         typed_slice_sum or
         typed_packed_bits or
         typed_aggregate_pair or
+        typed_mix_c_add_may_panic or
         mixCAddMayPanicShape(function) or
         typed_maybe_error)
     {
@@ -459,7 +465,7 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
 }
 
 fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
-    if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
+    _ = function;
     return null;
 }
 
@@ -683,6 +689,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2RuntimePointerLoadStoreMain(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2MixCAddMayPanic(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -1454,6 +1463,37 @@ fn typedV2RuntimePointerLoadStoreMainRecords(
         typedOpcodeCount(structured_air_v2, "block") == 2 and
         typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
         typedOpcodeCount(structured_air_v2, "br") == 4 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2MixCAddMayPanic(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2MixCAddMayPanicRecords(function_type, structured_air_v2)) return null;
+    const checked_add = typedOpcodeCount(structured_air_v2, "add_safe") == 1;
+    return try lowerMixCAddMayPanicChecked(allocator, module, air_function, checked_add);
+}
+
+fn typedV2MixCAddMayPanicRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    return function_type.params.len == 1 and
+        function_type.params[0].ir_type.eql(.{ .int = 32 }) and
+        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "load") == 1 and
+        add_count == 1 and
+        typedCalleeNameCount(structured_air_v2, "defaultPanic") == 1 and
+        typedOpcodeCount(structured_air_v2, "unreach") == 1 and
         typedHasReturnOpcode(structured_air_v2);
 }
 
@@ -2770,6 +2810,15 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
 }
 
 fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
+    return lowerMixCAddMayPanicChecked(allocator, module, air_function, functionHasOpcode(air_function, "add_safe"));
+}
+
+fn lowerMixCAddMayPanicChecked(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    checked_add: bool,
+) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or
@@ -2779,7 +2828,6 @@ fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_fu
         return error.UnsupportedAir;
     }
     try ensureNegativeIntGlobal(allocator, module);
-    const checked_add = functionHasOpcode(air_function, "add_safe");
     const zig_k_name = try mixCGlobalName(module, air_function.name, "zig_k");
 
     var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });

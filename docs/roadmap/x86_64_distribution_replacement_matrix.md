@@ -255,10 +255,10 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=1
-  typed_v2_fallback_functions=1
-  generic_lowering_functions=151
-  shape_recognizer_functions=1
+  legacy_air_text_lowering_functions=0
+  typed_v2_fallback_functions=0
+  generic_lowering_functions=152
+  shape_recognizer_functions=0
   unsupported_functions=0
   codegen_failures=0
   case_id_rows=0
@@ -338,22 +338,21 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=1
-  typed_v2_fallback_functions=1
-  generic_lowering_functions=151
-  shape_recognizer_functions=1
+  legacy_air_text_lowering_functions=0
+  typed_v2_fallback_functions=0
+  generic_lowering_functions=152
+  shape_recognizer_functions=0
   unsupported_functions=0
   codegen_failures=0
   local_fail=0
 ```
 
-The remaining mixed C/Zig panic-edge shape-recognizer function is audited in
+The typed-v2 shape-recognizer closure is audited in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
 `structured_air-v2` are present for every accepted broad function. The v2
 transport now carries typed operand records for all broad functions, and z_llvm
-uses typed-v2 lowering authority for 151 broad functions. One integrated
-runtime recognizer still uses legacy AIR text until typed-v2 panic-edge runtime
-boundary lowering is promoted.
+uses typed-v2 lowering authority for all 152 broad functions. No broad function
+uses legacy AIR text fallback or shape-recognizer ownership.
 
 These broad gates remain outside `distribution-all` while executable ABI
 evidence is promoted separately.
@@ -498,17 +497,22 @@ uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
-The strongest current real-AIR ownership gate is ReleaseFast-only and
-source-discovered rather than row-selected:
+The strongest current real-AIR ownership gate is the broad x86_64 release
+source-discovered gate rather than row-selected case IDs:
 
 ```text
-gate=zig build distribution-zig-air-uncurated-releasefast
+gate=zig build distribution-zig-air-uncurated-releasefast-broad
+gate=zig build distribution-zig-air-uncurated-releasesafe-broad
+gate=zig build distribution-zig-air-uncurated-releasesmall-broad
 target=x86_64-linux-gnu
-mode=ReleaseFast
-source_rows=19
-discovered_functions=44
-structured_functions=44
-generic_codegen_functions=44
+modes=ReleaseFast,ReleaseSafe,ReleaseSmall
+source_rows=101
+discovered_functions=152
+structured_functions=152
+generic_codegen_functions=152
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
 case_id_rows=0
@@ -520,26 +524,14 @@ local_fail=0
 
 Patched Zig emits `zllvm-air-export-v1` with the legacy AIR text and a
 `structured_air-v1` section containing reachable body records, instruction
-tags, branch/conditional-branch records, and repeat metadata. z_llvm consumes
-that compiler-owned stream directly for the uncurated gate; it does not select
-rows by case ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The
-current slice closes optional pointer, optional payload, error-union payload,
-slice pointer arithmetic, base64-style `array_elem_val`, packed bit access, and
-f32/f64 literal return codegen. Broad typed-v2 now also owns aggregate pair
-first/make-pair ABI lowering through typed aggregate records and error-union
-payload lowering through typed branch/payload records. Maybe-error helpers now
-lower through typed branch/return records into the selected error-union scalar
-representation, and optional scalar-payload helpers lower through typed
-wrap/null-check/payload branch records. Optional pointer-payload helpers lower
-through typed null-check/payload/load records. Packed read/replace helpers lower
-through typed packed field pointer/load/store records, and slice-sum helpers lower
-through typed pointer-add/slice/len/element/loop records. Selected monotonic atomic add
-and empty inline-asm memory-barrier helpers lower from typed-v2 records directly. Accumulator-loop
-helpers lower from typed-v2 loop/repeat/branch records. Dense-switch and conditional
-slot-update helpers lower from typed-v2 switch/branch/update records. Remaining measured
-blockers include error-union/optional control-flow, pointer/slice recognizers,
-and mixed C/Zig panic-edge lowering. Operand/type details still rely on the legacy AIR text for those
-fallback families, so this is not yet a full AIR/liveness lowering replacement.
+tags, branch/conditional-branch records, and repeat metadata, plus typed
+`structured_air-v2` operand/type records. z_llvm consumes that compiler-owned
+stream directly for the broad uncurated gates; it does not select rows by case
+ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The broad
+ReleaseFast/ReleaseSafe/ReleaseSmall gates now lower all 152 discovered
+functions from typed-v2 authority without legacy AIR text fallback or
+shape-recognizer ownership. This is still a selected x86_64 release corpus, not
+a full AIR/liveness lowering replacement for every Zig source.
 
 The same 100-row release source-owned replacement boundary now has a pre-link
 ELF object-format proof before Zig native linker handoff:

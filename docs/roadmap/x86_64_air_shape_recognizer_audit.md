@@ -16,14 +16,14 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=1
-typed_v2_fallback_functions=1
-generic_lowering_functions=151
-shape_recognizer_functions=1
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=152
+shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=shape_recognizer:mix_c_add_may_panic:-
-top_typed_v2_fallback_count=1
+top_typed_v2_fallback_reason=-
+top_typed_v2_fallback_count=0
 ```
 
 `structured_air-v1` is present for every accepted function and carries
@@ -52,18 +52,17 @@ switch/branch and branch/store/update records before lowering. Error-switch and 
 now validate typed-v2 error-union switch, branch, payload, and classifier records before lowering
 to the scalar error representation. Runtime optional-pointer and pointer load/store wrapper mains
 now validate typed-v2 call, callee, branch, compare, and merge records before lowering. One
-mixed C/Zig panic-edge function still needs typed-v2 runtime-boundary lowering.
+mixed C/Zig panic-edge function now validates typed-v2 negative-check, `defaultPanic`, global-load,
+and add/add_safe records before lowering, preserving the named `debug.defaultPanic` runtime boundary.
 
-The broad gates now emit one `typed-v2-fallback` diagnostic per accepted
-function that still falls back to legacy AIR text. The summary records the first
-fallback function/opcode/data kind/reason and the top fallback bucket. Generic
-typed-v2 validation failures now report the concrete failing typed opcode and
-data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
-`shape_recognizer:mix_c_add_may_panic:-` with 1 function.
+The broad gates emit `typed-v2-fallback` diagnostics only when an accepted
+function falls back to legacy AIR text. The summary records the first fallback
+function/opcode/data kind/reason and the top fallback bucket. Generic typed-v2
+validation failures report the concrete failing typed opcode and data kind
+instead of a synthetic `typed_v2` bucket. The current broad gates have no typed
+v2 fallback bucket.
 
-The remaining shape recognizer family in `src/zig_air_lowering.zig` is:
-
-- mixed C/Zig add-may-panic
+No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Next typed-contract target:
 
@@ -72,5 +71,5 @@ Next typed-contract target:
 - convert control-flow, optional/error-union, pointer/slice/array, aggregate,
   lowering from recognizer families to generic typed AIR
   lowering
-- drive `legacy_air_text_lowering_functions` and
-  `shape_recognizer_functions` down as v2 coverage lands
+- keep `legacy_air_text_lowering_functions=0` and
+  `shape_recognizer_functions=0` as broad coverage expands
