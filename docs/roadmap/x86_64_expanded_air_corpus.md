@@ -26,29 +26,33 @@ Current ReleaseFast expanded diagnostic snapshot:
 ```text
 source_rows=105
 discovered_functions=162
-structured_functions=160
-structured_air_v2_functions=160
-typed_air_operand_functions=160
+structured_functions=162
+structured_air_v2_functions=162
+typed_air_operand_functions=162
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=160
+generic_codegen_functions=159
+generic_lowering_functions=162
 shape_recognizer_functions=0
-unsupported_functions=2
+unsupported_functions=0
 codegen_failures=3
-first_unsupported_source=test/zig/expanded/expanded_records_memory.zig
-first_unsupported_function=expanded_records_memory.expanded_pair_first
-first_unsupported_opcode=function-type
+first_unsupported_source=-
+first_unsupported_function=-
+first_unsupported_opcode=-
 top_unsupported_construct=-
 local_fail=1
 ```
 
 The expanded gate fails closed while these blockers remain.
 
-First expanded blocker families:
+Closed expanded blocker families:
 
 - AIR/type lowering gap: expanded aggregate pair ABI function type from
   `expanded_records_memory.expanded_make_pair` and
   `expanded_records_memory.expanded_pair_first`.
+
+Active expanded blocker families:
+
 - x86_64 backend gap: renamed pointer load/store and slice loop functions from
   `expanded_pointer_slices`.
 - x86_64 backend gap: renamed/simple f32 pipeline from
@@ -64,4 +68,3 @@ Ownership rules for this frontier:
 - no LLVM optimizer
 - no LLVM TargetMachine
 - no LLD
-

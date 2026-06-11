@@ -4062,7 +4062,8 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
     if (std.mem.eql(u8, trimmed, "aggregate_abi.Pair") or
-        std.mem.eql(u8, trimmed, "runtime_aggregate_pair_main.Pair"))
+        std.mem.eql(u8, trimmed, "runtime_aggregate_pair_main.Pair") or
+        std.mem.eql(u8, trimmed, "expanded_records_memory.Pair"))
     {
         return .{ .ir_type = .{ .int = 64 } };
     }
