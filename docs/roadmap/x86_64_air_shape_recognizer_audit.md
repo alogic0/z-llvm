@@ -16,7 +16,7 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=152
+legacy_air_text_lowering_functions=59
 generic_lowering_functions=121
 shape_recognizer_functions=31
 unsupported_functions=0
@@ -26,10 +26,12 @@ codegen_failures=0
 `structured_air-v1` is present for every accepted function and carries
 instruction tags plus body/branch metadata. `structured_air-v2` is also present
 for every accepted function after the contract bump; it currently carries
-instruction result records, typed value operands, typed control targets, and
-typed sentinel operands. z_llvm still uses legacy AIR text for lowering
-authority, so `legacy_air_text_lowering_functions=152` remains expected until
-generic v2 lowering lands.
+instruction result records, typed value operands, typed control targets, typed
+sentinel operands, operand text details, and call signature records. z_llvm now
+lowers the straight-line scalar, load/store, stack-slot, and direct-call subset
+from typed v2 records; `legacy_air_text_lowering_functions=59` remains for
+families that still need generic typed control-flow, aggregate, pointer/slice,
+optional/error-union, runtime-boundary, and packed-field lowering.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 
