@@ -326,9 +326,20 @@ pub fn firstUnsupported(
             typedV2DenseIntegerSwitchResults(function_type, structured_air_v2) != null
         else
             false;
+    const typed_error_switch =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2ErrorSwitchRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_error_classifier =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2ErrorClassifierRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
+        typed_error_classifier or
         errorClassifyShape(function) or
         typed_integer_switch or
         isIntegerSwitchBlock(function) or
@@ -338,6 +349,7 @@ pub fn firstUnsupported(
         typed_optional_pointer or
         runtimePointerLoadStoreMainShape(function) or
         typed_optional_payload or
+        typed_error_switch or
         errorSwitchShape(function) or
         errorClassifyShape(function) or
         typed_error_union_payload or
@@ -435,10 +447,8 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
 }
 
 fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
-    if (errorClassifyShape(function)) return "error_classifier";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
-    if (errorSwitchShape(function)) return "error_switch";
     if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
     return null;
 }
@@ -651,6 +661,12 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2DenseIntegerSwitch(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2ErrorSwitch(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2ErrorClassifier(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -1308,6 +1324,59 @@ fn typedV2DenseIntegerSwitchResults(
 fn parseTypedI32Constant(text: []const u8) ?i32 {
     if (!std.mem.startsWith(u8, text, "<i32, ") or !std.mem.endsWith(u8, text, ">")) return null;
     return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
+}
+
+fn lowerTypedV2ErrorSwitch(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2ErrorSwitchRecords(function_type, structured_air_v2)) return null;
+    return try lowerErrorSwitch(allocator, air_function);
+}
+
+fn typedV2ErrorSwitchRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return function_type.params.len == 1 and
+        function_type.params[0].ir_type.eql(.{ .int = 8 }) and
+        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "call") >= 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "is_non_err") == 1 and
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") == 1 and
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") == 1 and
+        typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 3 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2ErrorClassifier(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2ErrorClassifierRecords(function_type, structured_air_v2)) return null;
+    return try lowerErrorClassify(allocator, air_function);
+}
+
+fn typedV2ErrorClassifierRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return function_type.params.len == 1 and
+        function_type.params[0].ir_type.eql(.{ .int = 8 }) and
+        function_type.return_type.ir_type.eql(.{ .int = 64 }) and
+        typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 3 and
+        typedHasReturnOpcode(structured_air_v2);
 }
 
 const AccumulatorLoopShape = struct {
