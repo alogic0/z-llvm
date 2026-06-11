@@ -125,16 +125,25 @@ pub fn lowerCompatible(
             try unsupported.append(allocator, diagnostic);
             continue;
         }
-        var function = lowerFunction(allocator, &module, air_function) catch |err| switch (err) {
-            error.UnsupportedAir => {
-                try unsupported.append(allocator, .{
-                    .function = air_function.name,
-                    .opcode = "lowering",
-                    .reason = .instruction_type,
-                });
-                continue;
-            },
-            else => return err,
+        var lowered_from_typed_v2 = true;
+        var function = function: {
+            break :function lowerFunctionTypedV2(allocator, &module, air_function) catch |typed_err| switch (typed_err) {
+                error.UnsupportedAir => {
+                    lowered_from_typed_v2 = false;
+                    break :function lowerFunction(allocator, &module, air_function) catch |legacy_err| switch (legacy_err) {
+                        error.UnsupportedAir => {
+                            try unsupported.append(allocator, .{
+                                .function = air_function.name,
+                                .opcode = "lowering",
+                                .reason = .instruction_type,
+                            });
+                            continue;
+                        },
+                        else => return legacy_err,
+                    };
+                },
+                else => return typed_err,
+            };
         };
         errdefer function.deinit(allocator);
         try module.functions.append(allocator, function);
@@ -145,7 +154,7 @@ pub fn lowerCompatible(
             if (typedResultCoverage(air_function, structured_air_v2)) typed_air_type_functions += 1;
             if (typedOperandCoverage(structured_air_v2)) typed_air_operand_functions += 1;
         }
-        legacy_air_text_lowering_functions += 1;
+        if (!lowered_from_typed_v2) legacy_air_text_lowering_functions += 1;
         switch (loweringPath(air_function)) {
             .generic_instruction_path => generic_lowering_functions += 1,
             .shape_recognizer => shape_recognizer_functions += 1,
@@ -435,6 +444,61 @@ fn lowerFunction(
         } else {
             return error.UnsupportedAir;
         }
+    }
+    if (block.terminator == null) return error.UnsupportedAir;
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerFunctionTypedV2(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+) LowerError!ir.Function {
+    if (loweringPath(air_function) == .shape_recognizer) return error.UnsupportedAir;
+    const structured_air = air_function.structured_air orelse return error.UnsupportedAir;
+    const structured_air_v2 = air_function.structured_air_v2 orelse return error.UnsupportedAir;
+    const main_body = structured_air.body(.main, null) orelse return error.UnsupportedAir;
+
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    if (runtimeNavSymbol(air_function)) |tls_symbol| {
+        function.attrs = try ownPrint(module, "\"zllvm-tls-symbol\"=\"{s}\"", .{tls_symbol});
+    }
+
+    for (function_type.params, 0..) |param_type, param_index| {
+        const name = try ownPrint(module, "arg{}", .{param_index});
+        try function.params.append(allocator, .{
+            .ty = param_type.ir_type,
+            .name = name,
+        });
+    }
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    const values = try allocator.alloc(?TypedValue, air_function.instruction_count);
+    defer allocator.free(values);
+    @memset(values, null);
+
+    var context: LoweringContext = .{
+        .allocator = allocator,
+        .module = module,
+        .air_function = air_function,
+        .function_type = function_type,
+        .function = &function,
+        .block = &block,
+        .values = values,
+    };
+
+    for (main_body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
+            return error.UnsupportedAir;
+        try context.lowerTypedInstruction(instruction);
     }
     if (block.terminator == null) return error.UnsupportedAir;
     try function.blocks.append(allocator, block);
@@ -2027,6 +2091,134 @@ const LoweringContext = struct {
     function: *ir.Function,
     block: *ir.BasicBlock,
     values: []?TypedValue,
+    next_arg_index: usize = 0,
+
+    fn lowerTypedInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (isIgnoredOpcode(instruction.opcode)) return;
+        if (std.mem.eql(u8, instruction.opcode, "arg")) {
+            try self.lowerTypedArg(instruction);
+        } else if (isArithmeticOpcode(instruction.opcode)) {
+            try self.lowerTypedBinary(instruction);
+        } else if (std.mem.startsWith(u8, instruction.opcode, "cmp_")) {
+            try self.lowerTypedCompare(instruction);
+        } else if (isCastOpcode(instruction.opcode)) {
+            try self.lowerTypedCast(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "ret") or
+            std.mem.eql(u8, instruction.opcode, "ret_safe"))
+        {
+            try self.lowerTypedReturn(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "unreach")) {
+            self.block.terminator = .{ .@"unreachable" = {} };
+        } else {
+            return error.UnsupportedAir;
+        }
+    }
+
+    fn lowerTypedArg(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 0) return error.UnsupportedAir;
+        const param_index = self.next_arg_index;
+        self.next_arg_index += 1;
+        if (param_index >= self.function_type.params.len) return error.UnsupportedAir;
+        const parsed_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!parsed_type.ir_type.eql(self.function_type.params[param_index].ir_type)) return error.UnsupportedAir;
+        self.values[instruction.index] = .{
+            .ty = parsed_type,
+            .value = .{ .named = self.blockParamName(param_index) },
+        };
+    }
+
+    fn lowerTypedBinary(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const lhs = try self.resolveTypedOperand(instruction, 0);
+        var rhs = try self.resolveTypedOperand(instruction, 1);
+        if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) {
+            if (!isShiftOpcode(instruction.opcode)) return error.UnsupportedAir;
+            rhs = try self.extendShiftCount(instruction.index, lhs.ty, rhs);
+        }
+        const op = binaryOp(instruction.opcode, lhs.ty) orelse return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .binary = .{
+                .op = op,
+                .ty = lhs.ty.ir_type,
+                .lhs = lhs.value,
+                .rhs = rhs.value,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = lhs.ty,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedCompare(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const lhs = try self.resolveTypedOperand(instruction, 0);
+        const rhs = try self.resolveTypedOperand(instruction, 1);
+        if (!lhs.ty.ir_type.eql(rhs.ty.ir_type)) return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        if (isFpType(lhs.ty.ir_type)) {
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .fcmp = .{
+                    .predicate = fpPredicate(instruction.opcode) orelse return error.UnsupportedAir,
+                    .operand_ty = lhs.ty.ir_type,
+                    .lhs = lhs.value,
+                    .rhs = rhs.value,
+                } },
+            });
+        } else {
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .icmp = .{
+                    .predicate = intPredicate(instruction.opcode, lhs.ty.signed) orelse return error.UnsupportedAir,
+                    .operand_ty = lhs.ty.ir_type,
+                    .lhs = lhs.value,
+                    .rhs = rhs.value,
+                } },
+            });
+        }
+        self.values[instruction.index] = .{
+            .ty = .{ .ir_type = .{ .int = 1 } },
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedCast(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const source = try self.resolveTypedOperand(instruction, 0);
+        const target_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        const op = castOp(instruction.opcode, source.ty, target_type) orelse return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .cast = .{
+                .op = op,
+                .from_ty = source.ty.ir_type,
+                .value = source.value,
+                .to_ty = target_type.ir_type,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = target_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (self.function_type.return_type.ir_type == .void) {
+            self.block.terminator = .{ .ret = .{ .ty = .void } };
+            return;
+        }
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const value = try self.resolveTypedOperand(instruction, 0);
+        if (!value.ty.ir_type.eql(self.function_type.return_type.ir_type)) return error.UnsupportedAir;
+        self.block.terminator = .{ .ret = .{
+            .ty = self.function_type.return_type.ir_type,
+            .value = value.value,
+        } };
+    }
 
     fn lowerArg(self: *LoweringContext, instruction: air_export.Instruction) !void {
         var fields = splitTopLevel(instruction.payload, ',');
@@ -2406,6 +2598,27 @@ const LoweringContext = struct {
         return parseConstant(trimmed) orelse error.UnsupportedAir;
     }
 
+    fn resolveTypedOperand(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        operand_index: usize,
+    ) LowerError!TypedValue {
+        if (operand_index >= instruction.operands.len) return error.UnsupportedAir;
+        const operand = instruction.operands[operand_index];
+        if (std.mem.eql(u8, operand.kind, "inst")) {
+            const index = std.fmt.parseInt(u32, operand.value, 10) catch return error.UnsupportedAir;
+            if (index >= self.values.len) return error.UnsupportedAir;
+            return self.values[index] orelse error.UnsupportedAir;
+        }
+        if (std.mem.eql(u8, operand.kind, "const")) {
+            const literal = typedOperandTextDetail(instruction, operand_index) orelse
+                return error.UnsupportedAir;
+            return parseConstant(literal) orelse error.UnsupportedAir;
+        }
+        if (std.mem.eql(u8, operand.kind, "none")) return error.UnsupportedAir;
+        return error.UnsupportedAir;
+    }
+
     fn materializeSelectBlock(
         self: *LoweringContext,
         block_instruction: air_export.Instruction,
@@ -2668,6 +2881,28 @@ fn instructionPosition(function: air_export.Function, index: u32) ?usize {
         if (instruction.index == index) return position;
     }
     return null;
+}
+
+fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
+    for (structured_air_v2.instructions) |instruction| {
+        if (instruction.index == index) return instruction;
+    }
+    return null;
+}
+
+fn typedDetail(instruction: air_export.TypedInstruction, key: []const u8) ?[]const u8 {
+    for (instruction.details) |detail| {
+        if (std.mem.eql(u8, detail.key, key)) return detail.value;
+    }
+    return null;
+}
+
+fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_index: usize) ?[]const u8 {
+    var key_buffer: [32]u8 = undefined;
+    const key = std.fmt.bufPrint(&key_buffer, "operand{}_text", .{operand_index}) catch return null;
+    if (typedDetail(instruction, key)) |value| return value;
+    const legacy_key = std.fmt.bufPrint(&key_buffer, "operand{}", .{operand_index}) catch return null;
+    return typedDetail(instruction, legacy_key);
 }
 
 fn isIgnoredOpcode(opcode: []const u8) bool {
