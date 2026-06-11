@@ -2103,12 +2103,16 @@ const LoweringContext = struct {
             try self.lowerTypedCompare(instruction);
         } else if (isCastOpcode(instruction.opcode)) {
             try self.lowerTypedCast(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "alloc")) {
+            try self.lowerTypedAlloca(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "load")) {
             try self.lowerTypedLoad(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "store") or
             std.mem.eql(u8, instruction.opcode, "store_safe"))
         {
             try self.lowerTypedStore(instruction);
+        } else if (isCallOpcode(instruction.opcode)) {
+            try self.lowerTypedCall(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
@@ -2212,6 +2216,21 @@ const LoweringContext = struct {
         };
     }
 
+    fn lowerTypedAlloca(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 0) return error.UnsupportedAir;
+        const pointer_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        const allocated_type = pointer_type.pointer_child orelse return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .alloca = .{ .allocated_ty = allocated_type } },
+        });
+        self.values[instruction.index] = .{
+            .ty = pointer_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
     fn lowerTypedLoad(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
         const pointer = try self.resolveTypedOperand(instruction, 0);
@@ -2249,6 +2268,44 @@ const LoweringContext = struct {
                 .attrs = .{ .is_volatile = pointer.ty.is_volatile_pointer },
             } },
         });
+    }
+
+    fn lowerTypedCall(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len == 0) return error.UnsupportedAir;
+        const signature_text = typedDetail(instruction, "call_signature") orelse return error.UnsupportedAir;
+        const callee_text = typedDetail(instruction, "callee_text") orelse return error.UnsupportedAir;
+        const call_type = try parseFunctionType(self.allocator, signature_text);
+        defer call_type.deinit(self.allocator);
+        if (instruction.operands.len != call_type.params.len + 1) return error.UnsupportedAir;
+        const callee = try self.qualifiedCalleeName(typedCalleeName(callee_text) orelse return error.UnsupportedAir);
+
+        var call: ir.CallInst = .{
+            .ret_ty = call_type.return_type.ir_type,
+            .callee = callee,
+            .calling_conv = if (call_type.c_calling_convention) null else "fastcc",
+            .args = .empty,
+        };
+        errdefer call.deinit(self.allocator);
+        for (call_type.params, 0..) |param_type, arg_index| {
+            const arg = try self.resolveTypedOperand(instruction, arg_index + 1);
+            if (!arg.ty.ir_type.eql(param_type.ir_type)) return error.UnsupportedAir;
+            try call.args.append(self.allocator, .{
+                .ty = arg.ty.ir_type,
+                .value = arg.value,
+            });
+        }
+
+        const result_name = if (call.ret_ty == .void) null else try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .call = call },
+        });
+        if (result_name) |name| {
+            self.values[instruction.index] = .{
+                .ty = call_type.return_type,
+                .value = .{ .named = name },
+            };
+        }
     }
 
     fn lowerTypedReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
@@ -2948,6 +3005,15 @@ fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_inde
     if (typedDetail(instruction, key)) |value| return value;
     const legacy_key = std.fmt.bufPrint(&key_buffer, "operand{}", .{operand_index}) catch return null;
     return typedDetail(instruction, legacy_key);
+}
+
+fn typedCalleeName(callee_text: []const u8) ?[]const u8 {
+    const marker = "function '";
+    const start = std.mem.indexOf(u8, callee_text, marker) orelse return null;
+    const name_start = start + marker.len;
+    const name_end = std.mem.indexOf(u8, callee_text[name_start..], "'") orelse return null;
+    if (name_end == 0) return null;
+    return callee_text[name_start .. name_start + name_end];
 }
 
 fn isIgnoredOpcode(opcode: []const u8) bool {
