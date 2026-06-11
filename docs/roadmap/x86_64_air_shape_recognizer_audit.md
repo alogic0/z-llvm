@@ -22,8 +22,8 @@ generic_lowering_functions=121
 shape_recognizer_functions=31
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=lowering_validation:typed_v2:-
-top_typed_v2_fallback_count=8
+top_typed_v2_fallback_reason=lowering_validation:load:ty_op
+top_typed_v2_fallback_count=4
 ```
 
 `structured_air-v1` is present for every accepted function and carries
@@ -40,8 +40,10 @@ optional/error-union, runtime-boundary, and packed-field lowering.
 
 The broad gates now emit one `typed-v2-fallback` diagnostic per accepted
 function that still falls back to legacy AIR text. The summary records the first
-fallback function/opcode/data kind/reason and the top fallback bucket; the
-current top bucket is `lowering_validation:typed_v2:-` with 8 functions.
+fallback function/opcode/data kind/reason and the top fallback bucket. Generic
+typed-v2 validation failures now report the concrete failing typed opcode and
+data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
+`lowering_validation:load:ty_op` with 4 functions.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 

@@ -137,11 +137,12 @@ pub fn lowerCompatible(
             continue;
         }
         var lowered_from_typed_v2 = true;
+        var typed_v2_fallback: ?TypedV2Fallback = null;
         var function = function: {
-            break :function lowerFunctionTypedV2(allocator, &module, air_function) catch |typed_err| switch (typed_err) {
+            break :function lowerFunctionTypedV2(allocator, &module, air_function, &typed_v2_fallback) catch |typed_err| switch (typed_err) {
                 error.UnsupportedAir => {
                     lowered_from_typed_v2 = false;
-                    try typed_v2_fallbacks.append(allocator, firstTypedV2Fallback(air_function));
+                    try typed_v2_fallbacks.append(allocator, typed_v2_fallback orelse firstTypedV2Fallback(air_function));
                     break :function lowerFunction(allocator, &module, air_function) catch |legacy_err| switch (legacy_err) {
                         error.UnsupportedAir => {
                             try unsupported.append(allocator, .{
@@ -575,6 +576,7 @@ fn lowerFunctionTypedV2(
     allocator: std.mem.Allocator,
     module: *ir.Module,
     air_function: air_export.Function,
+    typed_v2_fallback: ?*?TypedV2Fallback,
 ) LowerError!ir.Function {
     if (loweringPath(air_function) == .shape_recognizer) return error.UnsupportedAir;
     const structured_air = air_function.structured_air orelse return error.UnsupportedAir;
@@ -616,6 +618,7 @@ fn lowerFunctionTypedV2(
         .values = values,
         .structured_air = structured_air,
         .structured_air_v2 = structured_air_v2,
+        .typed_v2_fallback = typed_v2_fallback,
     };
 
     for (main_body.instructions) |instruction_index| {
@@ -2216,9 +2219,20 @@ const LoweringContext = struct {
     values: []?TypedValue,
     structured_air: ?air_export.StructuredAir,
     structured_air_v2: ?air_export.StructuredAirV2,
+    typed_v2_fallback: ?*?TypedV2Fallback = null,
     next_arg_index: usize = 0,
 
     fn lowerTypedInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        self.lowerTypedInstructionImpl(instruction) catch |err| switch (err) {
+            error.UnsupportedAir => {
+                self.recordTypedV2Fallback(instruction);
+                return err;
+            },
+            else => return err,
+        };
+    }
+
+    fn lowerTypedInstructionImpl(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (isIgnoredOpcode(instruction.opcode)) return;
         if (std.mem.eql(u8, instruction.opcode, "arg")) {
             try self.lowerTypedArg(instruction);
@@ -2253,6 +2267,17 @@ const LoweringContext = struct {
         } else {
             return error.UnsupportedAir;
         }
+    }
+
+    fn recordTypedV2Fallback(self: *LoweringContext, instruction: air_export.TypedInstruction) void {
+        const slot = self.typed_v2_fallback orelse return;
+        if (slot.* != null) return;
+        slot.* = .{
+            .function = self.air_function.name,
+            .opcode = instruction.opcode,
+            .data_kind = instruction.data_kind,
+            .reason = "lowering_validation",
+        };
     }
 
     fn lowerTypedArg(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
