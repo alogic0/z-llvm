@@ -313,9 +313,13 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasefast-expanded`,
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
-`test/zig/expanded/*.zig` and fail closed while active frontier blockers remain.
-The expanded audit lives in
-`docs/roadmap/x86_64_expanded_air_corpus.md`.
+`test/zig/expanded/*.zig`. The first expanded slice is green for all three
+release modes at `source_rows=105`, `discovered_functions=162`,
+`generic_codegen_functions=162`, `legacy_air_text_lowering_functions=0`,
+`typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
+`unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
+object/native-link/executable proof is the next evidence layer. The expanded
+audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:

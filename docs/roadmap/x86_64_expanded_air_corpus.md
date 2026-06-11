@@ -21,7 +21,8 @@ Current expanded seed:
 - `test/zig/expanded/expanded_float_calls.zig`
 - `test/zig/expanded/expanded_error_optional.zig`
 
-Current ReleaseFast expanded diagnostic snapshot:
+Current expanded diagnostic snapshot for ReleaseFast, ReleaseSafe, and
+ReleaseSmall:
 
 ```text
 source_rows=105
@@ -31,19 +32,21 @@ structured_air_v2_functions=162
 typed_air_operand_functions=162
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=161
+generic_codegen_functions=162
 generic_lowering_functions=162
 shape_recognizer_functions=0
 unsupported_functions=0
-codegen_failures=1
+codegen_failures=0
 first_unsupported_source=-
 first_unsupported_function=-
 first_unsupported_opcode=-
 top_unsupported_construct=-
-local_fail=1
+local_fail=0
 ```
 
-The expanded gate fails closed while these blockers remain.
+The first expanded slice is clean for discovery/lowering/codegen. Expanded
+object inspection, native-link handoff, and executable ABI accounting are the
+next evidence layer.
 
 Closed expanded blocker families:
 
@@ -52,11 +55,12 @@ Closed expanded blocker families:
   `expanded_records_memory.expanded_pair_first`.
 - x86_64 backend gap: renamed pointer load/store function from
   `expanded_pointer_slices.expanded_load_store`.
+- x86_64 backend gap: expanded slice loop function from
+  `expanded_pointer_slices.expanded_slice_sum`.
 
 Active expanded blocker families:
 
-- x86_64 backend gap: expanded slice loop function from
-  `expanded_pointer_slices.expanded_slice_sum`.
+- none for the first expanded discovery/lowering/codegen slice.
 
 Ownership rules for this frontier:
 

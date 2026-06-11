@@ -10600,9 +10600,6 @@ fn lowerRuntimeSliceSumPreoptHelper(allocator: std.mem.Allocator, machine: *Mach
 }
 
 fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!std.mem.eql(u8, function.name, "aggregates.slice_sum") and
-        !std.mem.eql(u8, function.name, "slice_sum") and
-        !std.mem.eql(u8, function.name, "runtime_slice_sum_main.sliceSum")) return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 2) return false;
     if (!function.params.items[0].ty.eql(.ptr) or !function.params.items[1].ty.eql(.{ .int = 64 })) return false;

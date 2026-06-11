@@ -217,11 +217,15 @@ Expanded corpus frontier:
 `zig build distribution-zig-air-uncurated-releasesafe-expanded`, and
 `zig build distribution-zig-air-uncurated-releasesmall-expanded` are separate
 from the closed broad baseline. The expanded bucket adds
-`test/zig/expanded/*.zig` and fails closed while new unsupported AIR/backend
-families remain. The first ReleaseFast expanded snapshot is recorded in
-`docs/roadmap/x86_64_expanded_air_corpus.md`; aggregate pair ABI function-type
-lowering and the renamed pointer load/store variant are closed, and the
-current blocker is generic x86_64 backend support for the expanded slice loop.
+`test/zig/expanded/*.zig`. The first expanded slice is now green for
+ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=105`,
+`discovered_functions=162`, `generic_codegen_functions=162`,
+`legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
+`shape_recognizer_functions=0`, `unsupported_functions=0`,
+`codegen_failures=0`, and `local_fail=0`. The expanded audit is recorded in
+`docs/roadmap/x86_64_expanded_air_corpus.md`; the next evidence layer is
+expanded object inspection/native-link/executable accounting, followed by the
+next explicit source bucket.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
