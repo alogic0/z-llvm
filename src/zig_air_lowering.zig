@@ -311,8 +311,14 @@ pub fn firstUnsupported(
             typedV2SliceSumRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_accumulator_loop =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2AccumulatorLoopRecords(function_type, structured_air_v2)
+        else
+            false;
 
-    if (accumulatorLoopShape(function) != null or
+    if (typed_accumulator_loop or
+        accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
@@ -417,7 +423,6 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
 }
 
 fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
-    if (accumulatorLoopShape(function) != null) return "accumulator_loop";
     if (errorClassifyShape(function)) return "error_classifier";
     if (isIntegerSwitchBlock(function)) return "integer_switch_block";
     if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
@@ -627,6 +632,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2AtomicAdd(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2AccumulatorLoop(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -1121,6 +1129,42 @@ fn typedV2AtomicAddInstruction(
         return instruction;
     }
     return null;
+}
+
+fn lowerTypedV2AccumulatorLoop(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2AccumulatorLoopRecords(function_type, structured_air_v2)) return null;
+    return try lowerAccumulatorLoop(allocator, module, air_function, .{ .limit_arg = 0 });
+}
+
+fn typedV2AccumulatorLoopRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    const intcast_count = typedOpcodeCount(structured_air_v2, "intcast") + typedOpcodeCount(structured_air_v2, "intcast_safe");
+    return typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "alloc") == 2 and
+        typedOpcodeCount(structured_air_v2, "loop") == 1 and
+        typedOpcodeCount(structured_air_v2, "repeat") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
+        intcast_count == 1 and
+        add_count == 2 and
+        typedOpcodeCount(structured_air_v2, "load") >= 4 and
+        typedStoreOpcodeCount(structured_air_v2) >= 4 and
+        typedHasReturnOpcode(structured_air_v2);
 }
 
 const AccumulatorLoopShape = struct {

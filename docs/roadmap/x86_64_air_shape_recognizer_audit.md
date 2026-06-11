@@ -16,13 +16,13 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=8
-typed_v2_fallback_functions=8
-generic_lowering_functions=144
-shape_recognizer_functions=8
+legacy_air_text_lowering_functions=7
+typed_v2_fallback_functions=7
+generic_lowering_functions=145
+shape_recognizer_functions=7
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=shape_recognizer:accumulator_loop:-
+top_typed_v2_fallback_reason=shape_recognizer:conditional_slot_update:-
 top_typed_v2_fallback_count=1
 ```
 
@@ -46,7 +46,8 @@ packed field pointer/load/store records before lowering to the scalar bit repres
 Slice-sum helpers now validate typed-v2 pointer-add/slice/len/element/loop records,
 including the ReleaseSafe safety-expanded form. Selected monotonic atomic add and
 empty inline-asm memory-barrier helpers now lower from typed-v2 records directly.
-`legacy_air_text_lowering_functions=8` remains for families
+Accumulator-loop helpers now validate typed-v2 loop/repeat/branch records before lowering to
+the phi-based loop IR. `legacy_air_text_lowering_functions=7` remains for families
 that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, and runtime-boundary lowering.
 
@@ -55,11 +56,10 @@ function that still falls back to legacy AIR text. The summary records the first
 fallback function/opcode/data kind/reason and the top fallback bucket. Generic
 typed-v2 validation failures now report the concrete failing typed opcode and
 data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
-`shape_recognizer:accumulator_loop:-` with 1 function.
+`shape_recognizer:conditional_slot_update:-` with 1 function.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 
-- accumulator loop
 - integer switch block
 - conditional slot update
 - runtime optional pointer main
