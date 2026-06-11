@@ -290,6 +290,11 @@ pub fn firstUnsupported(
             typedV2MaybeErrorRecords(function, function_type, structured_air_v2)
         else
             false;
+    const typed_optional_payload =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2OptionalPayloadRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
@@ -298,7 +303,7 @@ pub fn firstUnsupported(
         runtimeOptionalPointerMainShape(function) or
         optionalPointerShape(function) or
         runtimePointerLoadStoreMainShape(function) or
-        optionalPayloadShape(function) or
+        typed_optional_payload or
         errorSwitchShape(function) or
         errorClassifyShape(function) or
         typed_error_union_payload or
@@ -404,7 +409,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (optionalPointerShape(function)) return "optional_pointer";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
-    if (optionalPayloadShape(function)) return "optional_payload";
     if (errorSwitchShape(function)) return "error_switch";
     if (sliceSumShape(function)) return "slice_sum";
     if (packedReadFlagShape(function)) return "packed_read_flag";
@@ -484,7 +488,6 @@ fn lowerFunction(
     if (runtimeOptionalPointerMainShape(air_function)) return lowerRuntimeOptionalPointerMain(allocator, air_function);
     if (optionalPointerShape(air_function)) return lowerOptionalPointer(allocator, air_function);
     if (runtimePointerLoadStoreMainShape(air_function)) return lowerRuntimePointerLoadStoreMain(allocator, air_function);
-    if (optionalPayloadShape(air_function)) return lowerOptionalPayload(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
     if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
     if (packedReadFlagShape(air_function)) return lowerPackedReadFlag(allocator, air_function);
@@ -599,6 +602,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2MaybeError(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2OptionalPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -836,6 +842,38 @@ fn typedV2MaybeErrorRecords(
         typedOpcodeCount(structured_air_v2, "br") == 1 and
         typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
         ret_count == 2;
+}
+
+fn lowerTypedV2OptionalPayload(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2OptionalPayloadRecords(function_type, structured_air_v2)) return null;
+    return try lowerOptionalPayload(allocator, air_function);
+}
+
+fn typedV2OptionalPayloadRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    return typedOpcodeCount(structured_air_v2, "arg") == 2 and
+        typedOpcodeCount(structured_air_v2, "block") == 2 and
+        typedOpcodeCount(structured_air_v2, "cmp_neq") == 1 and
+        typedOpcodeCount(structured_air_v2, "wrap_optional") == 1 and
+        typedOpcodeCount(structured_air_v2, "is_non_null") == 1 and
+        typedOpcodeCount(structured_air_v2, "optional_payload") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 4 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
+        typedHasReturnOpcode(structured_air_v2);
 }
 
 const AccumulatorLoopShape = struct {
