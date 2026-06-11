@@ -229,9 +229,13 @@ adds object emission for all three release modes at
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=105`, `elf64_rel=105`, `relocation_rows=15`,
 `tls_rows=4`, `undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
-`unsupported_relocation_rows=0`, and `local_fail=0`. The next evidence layer is
-expanded native-link/executable accounting, followed by the next explicit
-source bucket.
+`unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
+and executable progress gates are now green for all three release modes:
+`native_link_accepted_rows=104`, `executable_ok_rows=104`,
+`link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
+`unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The next
+frontier is the next explicit source bucket.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:

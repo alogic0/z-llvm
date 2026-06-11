@@ -69,8 +69,22 @@ unsupported_relocation_rows=0
 local_fail=0
 ```
 
-Expanded native-link handoff and executable ABI accounting are the next
-evidence layer.
+Expanded native-link handoff and executable ABI accounting are also green for
+ReleaseFast, ReleaseSafe, and ReleaseSmall:
+
+```text
+native_link_accepted_rows=104
+executable_ok_rows=104
+link_only_rows=0
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+The single named runtime boundary remains `debug.defaultPanic`.
 
 Closed expanded blocker families:
 
@@ -81,6 +95,11 @@ Closed expanded blocker families:
   `expanded_pointer_slices.expanded_load_store`.
 - x86_64 backend gap: expanded slice loop function from
   `expanded_pointer_slices.expanded_slice_sum`.
+- executable proof gap: expanded stable C-ABI harnesses for
+  `expanded_records_memory`, `expanded_pointer_slices`,
+  `expanded_float_calls`, and `expanded_error_optional`.
+- typed v2 ReleaseSafe gap: optional-pointer safe-add immediate extraction
+  from `expanded_error_optional.expanded_optional_pointer`.
 
 Active expanded blocker families:
 
@@ -108,4 +127,10 @@ Current expanded gates:
 - `distribution-zig-air-uncurated-releasefast-expanded-object-inspection`
 - `distribution-zig-air-uncurated-releasesafe-expanded-object-inspection`
 - `distribution-zig-air-uncurated-releasesmall-expanded-object-inspection`
+- `distribution-zig-air-uncurated-releasefast-expanded-native-link`
+- `distribution-zig-air-uncurated-releasesafe-expanded-native-link`
+- `distribution-zig-air-uncurated-releasesmall-expanded-native-link`
+- `distribution-zig-air-uncurated-releasefast-expanded-executable`
+- `distribution-zig-air-uncurated-releasesafe-expanded-executable`
+- `distribution-zig-air-uncurated-releasesmall-expanded-executable`
 - `distribution-zig-air-uncurated-release-expanded-finish`

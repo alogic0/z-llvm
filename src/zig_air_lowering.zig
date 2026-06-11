@@ -957,7 +957,20 @@ fn lowerTypedV2OptionalPayload(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2OptionalPayloadRecords(function_type, structured_air_v2)) return null;
-    return try lowerOptionalPayload(allocator, air_function);
+    return try lowerOptionalPayload(allocator, air_function, typedV2OptionalPayloadFallback(structured_air_v2) orelse return null);
+}
+
+fn typedV2OptionalPayloadFallback(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    var fallback: ?i32 = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
+        if (instruction.operands.len != 2) continue;
+        if (!std.mem.eql(u8, instruction.operands[1].kind, "const") or
+            !std.mem.eql(u8, instruction.operands[1].type_text, "i32")) continue;
+        const value_text = typedOperandTextDetail(instruction, 1) orelse continue;
+        fallback = parseTypedI32Constant(value_text) orelse continue;
+    }
+    return fallback;
 }
 
 fn typedV2OptionalPayloadRecords(
@@ -989,7 +1002,17 @@ fn lowerTypedV2OptionalPointer(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2OptionalPointerRecords(function_type, structured_air_v2)) return null;
-    return try lowerOptionalPointer(allocator, air_function);
+    return try lowerOptionalPointer(allocator, air_function, typedV2OptionalPointerAddImm(structured_air_v2) orelse 0);
+}
+
+fn typedV2OptionalPointerAddImm(structured_air_v2: air_export.StructuredAirV2) ?i32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "add") and !std.mem.eql(u8, instruction.opcode, "add_safe")) continue;
+        if (instruction.operands.len != 2) return null;
+        const value_text = typedOperandTextDetail(instruction, 1) orelse return null;
+        return parseTypedI32Constant(value_text);
+    }
+    return null;
 }
 
 fn typedV2OptionalPointerRecords(
@@ -2447,7 +2470,7 @@ fn lowerRuntimeOptionalPointerMain(allocator: std.mem.Allocator, air_function: a
     return function;
 }
 
-fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.Function, add_imm: i32) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
@@ -2487,6 +2510,18 @@ fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.F
         .result = "loaded",
         .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = "arg0" } } },
     });
+    const loaded_value_name = if (add_imm == 0) "loaded" else "adjusted";
+    if (add_imm != 0) {
+        try load.instructions.append(allocator, .{
+            .result = loaded_value_name,
+            .kind = .{ .binary = .{
+                .op = .add,
+                .ty = .{ .int = 32 },
+                .lhs = .{ .named = "loaded" },
+                .rhs = .{ .int = add_imm },
+            } },
+        });
+    }
     load.terminator = .{ .br = .{ .target = "merge" } };
     try function.blocks.append(allocator, load);
 
@@ -2495,7 +2530,7 @@ fn lowerOptionalPointer(allocator: std.mem.Allocator, air_function: air_export.F
     var phi: ir.PhiInst = .{ .ty = .{ .int = 32 }, .incoming = .empty };
     errdefer phi.deinit(allocator);
     try phi.incoming.append(allocator, .{ .value = .{ .int = -1 }, .block = "entry" });
-    try phi.incoming.append(allocator, .{ .value = .{ .named = "loaded" }, .block = "load" });
+    try phi.incoming.append(allocator, .{ .value = .{ .named = loaded_value_name }, .block = "load" });
     try merge.instructions.append(allocator, .{ .result = "result", .kind = .{ .phi = phi } });
     merge.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "result" } } };
     try function.blocks.append(allocator, merge);
@@ -2562,7 +2597,7 @@ fn lowerRuntimePointerLoadStoreMain(allocator: std.mem.Allocator, air_function: 
     return function;
 }
 
-fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.Function, fallback: i32) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     if (function_type.params.len != 2 or
@@ -2595,7 +2630,7 @@ fn lowerOptionalPayload(allocator: std.mem.Allocator, air_function: air_export.F
             .cond_ty = .{ .int = 1 },
             .cond = .{ .named = "is_null" },
             .ty = .{ .int = 32 },
-            .true_value = .{ .int = -1 },
+            .true_value = .{ .int = fallback },
             .false_value = .{ .named = "arg1" },
         } },
     });

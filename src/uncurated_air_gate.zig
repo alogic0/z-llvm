@@ -419,7 +419,7 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     if (options.native_link_progress) {
-        const local_fail: usize = if (native_link_failures == 0) 0 else 1;
+        const local_fail: usize = if (native_link_failures == 0 and unsupported_zig_linker_feature_rows == 0) 0 else 1;
         try stdout_writer.interface.print(
             "summary uncurated-zig-air-native-link mode={s} target=x86_64-linux-gnu native_link_accepted_rows={} executable_ok_rows={} link_only_rows={} runtime_boundary_rows={} unsupported_zig_linker_feature_rows={} native_link_failures={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
             .{
@@ -435,7 +435,7 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     if (options.executable_progress) {
-        const local_fail: usize = if (native_link_failures == 0) 0 else 1;
+        const local_fail: usize = if (native_link_failures == 0 and unsupported_zig_linker_feature_rows == 0) 0 else 1;
         try stdout_writer.interface.print(
             "summary uncurated-zig-air-executable mode={s} target=x86_64-linux-gnu native_link_accepted_rows={} executable_ok_rows={} link_only_rows={} runtime_boundary_rows={} unsupported_zig_linker_feature_rows={} native_link_failures={} llvm_targetmachine_rows=0 lld_rows=0 local_fail={}\n",
             .{
@@ -453,6 +453,11 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.flush();
 
     if (air_local_fail != 0) return error.ExpandedCorpusLocalFailure;
+    if ((options.native_link_progress or options.executable_progress) and
+        (native_link_failures != 0 or unsupported_zig_linker_feature_rows != 0))
+    {
+        return error.NativeLinkLocalFailure;
+    }
 
     if (options.strict_finish) {
         try validateStrictFinish(.{
@@ -1057,6 +1062,61 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    z_sideEffectFree();
     \\    if (z_add(40, 2) != 42) return 1;
     \\    if (z_add(-7, 9) != 2) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_error_optional.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded optional/error values", .c_body =
+    \\extern int z_expanded_error_optional(int, int) __asm__("expanded_error_optional.expanded_error_optional");
+    \\extern int z_expanded_optional_pointer(const int *) __asm__("expanded_error_optional.expanded_optional_pointer");
+    \\int main(void) {
+    \\    int value = 34;
+    \\    if (z_expanded_error_optional(1, 17) != 17) return 1;
+    \\    if (z_expanded_error_optional(0, 17) != -9) return 2;
+    \\    if (z_expanded_optional_pointer(&value) != 42) return 3;
+    \\    if (z_expanded_optional_pointer((const int *)0) != -1) return 4;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_float_calls.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded FP pipeline", .c_body =
+    \\#include <stdbool.h>
+    \\extern float z_expanded_float_pipeline(float, float, bool) __asm__("expanded_float_calls.expanded_float_pipeline");
+    \\extern double z_expanded_double_pipeline(double, double) __asm__("expanded_float_calls.expanded_double_pipeline");
+    \\int main(void) {
+    \\    if (z_expanded_float_pipeline(1.25f, 2.5f, true) != 3.75f) return 1;
+    \\    if (z_expanded_double_pipeline(9.0, 2.0) != 4.5) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_pointer_slices.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded pointer and slice operations", .c_body =
+    \\extern int z_expanded_slice_sum(const int *, unsigned long) __asm__("expanded_pointer_slices.expanded_slice_sum");
+    \\extern int z_expanded_load_store(int *, int *) __asm__("expanded_pointer_slices.expanded_load_store");
+    \\int main(void) {
+    \\    int values[4] = { 2, 4, 6, 8 };
+    \\    int input = 39;
+    \\    int output = 0;
+    \\    if (z_expanded_slice_sum(values, 4) != 20) return 1;
+    \\    if (z_expanded_load_store(&input, &output) != 42) return 2;
+    \\    if (output != 42) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_records_memory.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded aggregate/global/TLS operations", .c_body =
+    \\struct Pair { int a; int b; };
+    \\extern struct Pair z_expanded_make_pair(int, int) __asm__("expanded_records_memory.expanded_make_pair");
+    \\extern int z_expanded_pair_first(struct Pair) __asm__("expanded_records_memory.expanded_pair_first");
+    \\extern int z_expanded_global_update(int) __asm__("expanded_records_memory.expanded_global_update");
+    \\extern int z_expanded_tls_bump(int) __asm__("expanded_records_memory.expanded_tls_bump");
+    \\int main(void) {
+    \\    struct Pair pair = z_expanded_make_pair(12, 30);
+    \\    if (pair.a != 12) return 1;
+    \\    if (pair.b != 30) return 2;
+    \\    if (z_expanded_pair_first(pair) != 12) return 3;
+    \\    if (z_expanded_global_update(5) != 16) return 4;
+    \\    if (z_expanded_tls_bump(7) != 9) return 5;
     \\    return 0;
     \\}
     \\

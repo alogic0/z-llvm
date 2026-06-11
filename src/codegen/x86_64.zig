@@ -9352,7 +9352,9 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     const load_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
     const null_block = function.blocks.items[null_index];
     const load_block = function.blocks.items[load_index];
-    if (null_block.instructions.items.len != 1 or load_block.instructions.items.len != 1) return false;
+    if (null_block.instructions.items.len != 1) return false;
+    const load_has_adjust = load_block.instructions.items.len == 2;
+    if (load_block.instructions.items.len != 1 and !load_has_adjust) return false;
 
     const phi_inst = null_block.instructions.items[0];
     if (phi_inst.removed) return false;
@@ -9379,6 +9381,23 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     if (!load.ty.eql(.{ .int = 32 }) or !isNamed(load.ptr, ptr_name)) return false;
     if (load.attrs.isBarrier()) return error.UnsupportedCodegenInstruction;
 
+    var load_value_name = load_result;
+    var add_imm: ?i32 = null;
+    if (load_has_adjust) {
+        const add_inst = load_block.instructions.items[1];
+        if (add_inst.removed) return false;
+        load_value_name = add_inst.result orelse return false;
+        const add = switch (add_inst.kind) {
+            .binary => |binary| binary,
+            else => return false,
+        };
+        if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or !isNamed(add.lhs, load_result)) return false;
+        add_imm = switch (add.rhs) {
+            .int => |int| try i32Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+    }
+
     const load_br = switch (load_block.terminator orelse return error.BlockWithoutTerminator) {
         .br => |br| br,
         else => return false,
@@ -9397,7 +9416,7 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
                 .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
             }
         } else if (std.mem.eql(u8, incoming.block, load_block.name)) {
-            if (!isNamed(incoming.value, load_result)) return false;
+            if (!isNamed(incoming.value, load_value_name)) return false;
             saw_load_incoming = true;
         } else {
             return false;
@@ -9408,6 +9427,7 @@ fn lowerOptionalPointerLoadReturn(allocator: std.mem.Allocator, machine: *Machin
     try machine.instructions.append(allocator, .{ .test_arg64 = ptr_reg });
     try machine.instructions.append(allocator, .{ .je = null_block.name });
     try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+    if (add_imm) |imm| try machine.instructions.append(allocator, .{ .add_eax_imm32 = imm });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = null_block.name });
     try machine.instructions.append(allocator, .{ .mov_imm_eax = -1 });
