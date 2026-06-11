@@ -295,13 +295,18 @@ pub fn firstUnsupported(
             typedV2OptionalPayloadRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_optional_pointer =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2OptionalPointerRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
         runtimeOptionalPointerMainShape(function) or
-        optionalPointerShape(function) or
+        typed_optional_pointer or
         runtimePointerLoadStoreMainShape(function) or
         typed_optional_payload or
         errorSwitchShape(function) or
@@ -407,7 +412,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (isIntegerSwitchBlock(function)) return "integer_switch_block";
     if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
-    if (optionalPointerShape(function)) return "optional_pointer";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
     if (errorSwitchShape(function)) return "error_switch";
     if (sliceSumShape(function)) return "slice_sum";
@@ -486,7 +490,6 @@ fn lowerFunction(
     if (structSumShape(air_function)) return lowerStructSum(allocator, air_function);
     if (base64TableLookupShape(air_function)) return lowerBase64TableLookup(allocator, module, air_function);
     if (runtimeOptionalPointerMainShape(air_function)) return lowerRuntimeOptionalPointerMain(allocator, air_function);
-    if (optionalPointerShape(air_function)) return lowerOptionalPointer(allocator, air_function);
     if (runtimePointerLoadStoreMainShape(air_function)) return lowerRuntimePointerLoadStoreMain(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
     if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
@@ -605,6 +608,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2OptionalPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2OptionalPointer(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -874,6 +880,36 @@ fn typedV2OptionalPayloadRecords(
         typedOpcodeCount(structured_air_v2, "br") == 4 and
         typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
         typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2OptionalPointer(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2OptionalPointerRecords(function_type, structured_air_v2)) return null;
+    return try lowerOptionalPointer(allocator, air_function);
+}
+
+fn typedV2OptionalPointerRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or function_type.params[0].ir_type != .ptr or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    const ret_count = typedOpcodeCount(structured_air_v2, "ret") + typedOpcodeCount(structured_air_v2, "ret_safe");
+    return typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "is_non_null") == 1 and
+        typedOpcodeCount(structured_air_v2, "optional_payload") == 1 and
+        typedOpcodeCount(structured_air_v2, "load") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        ret_count == 2;
 }
 
 const AccumulatorLoopShape = struct {

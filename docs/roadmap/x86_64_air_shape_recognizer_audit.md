@@ -16,13 +16,13 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=18
-typed_v2_fallback_functions=18
-generic_lowering_functions=136
-shape_recognizer_functions=16
+legacy_air_text_lowering_functions=16
+typed_v2_fallback_functions=16
+generic_lowering_functions=138
+shape_recognizer_functions=14
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=shape_recognizer:optional_pointer:-
+top_typed_v2_fallback_reason=shape_recognizer:packed_read_flag:-
 top_typed_v2_fallback_count=2
 ```
 
@@ -40,7 +40,8 @@ aggregate ABI records before lowering to the scalar SysV representation. Error-u
 validates typed-v2 error-union branch/payload records before lowering to the selected payload value.
 Maybe-error helpers now validate typed-v2 branch/return records before lowering to the selected
 error-union scalar representation. Optional scalar-payload helpers now validate typed-v2
-wrap/null-check/payload branch records. `legacy_air_text_lowering_functions=18` remains for families
+wrap/null-check/payload branch records. Optional pointer-payload helpers now validate typed-v2
+null-check/payload/load records. `legacy_air_text_lowering_functions=16` remains for families
 that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, runtime-boundary, and packed-field lowering.
 
@@ -49,7 +50,7 @@ function that still falls back to legacy AIR text. The summary records the first
 fallback function/opcode/data kind/reason and the top fallback bucket. Generic
 typed-v2 validation failures now report the concrete failing typed opcode and
 data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
-`shape_recognizer:optional_pointer:-` with 2 functions.
+`shape_recognizer:packed_read_flag:-` with 2 functions.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 
@@ -57,7 +58,6 @@ The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 - integer switch block
 - conditional slot update
 - runtime optional pointer main
-- optional pointer
 - runtime pointer load/store main
 - error switch and classifier
 - slice sum
