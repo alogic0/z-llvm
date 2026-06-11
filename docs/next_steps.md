@@ -198,6 +198,13 @@ TargetMachine. ReleaseFast, ReleaseSafe, and ReleaseSmall each report
 `object_emitted_functions=152`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`.
 
+The broad object-inspection progress gates now validate the corresponding
+source-module ELF objects with `readelf -W -h -S -s -r` and `objdump -dr`.
+ReleaseFast, ReleaseSafe, and ReleaseSmall each report `inspected=101`,
+`elf64_rel=101`, `relocation_rows=14`, `tls_rows=3`,
+`undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
+`unsupported_relocation_rows=0`, and `local_fail=0`.
+
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
 `zig build distribution-zig-air-uncurated-releasefast-broad-native-link` links

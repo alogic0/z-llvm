@@ -280,6 +280,24 @@ zig build distribution-zig-air-uncurated-releasesmall-broad-object
   local_fail=0
 ```
 
+The broad object-inspection gates validate the emitted source-module ELF
+objects before native linker handoff:
+
+```text
+zig build distribution-zig-air-uncurated-releasefast-broad-object-inspection
+zig build distribution-zig-air-uncurated-releasesafe-broad-object-inspection
+zig build distribution-zig-air-uncurated-releasesmall-broad-object-inspection
+  inspected=101
+  elf64_rel=101
+  relocation_rows=14
+  tls_rows=3
+  undefined_import_rows=3
+  comdat_rows=0
+  eh_frame_rows=0
+  unsupported_relocation_rows=0
+  local_fail=0
+```
+
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
 

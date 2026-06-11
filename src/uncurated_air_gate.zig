@@ -52,6 +52,10 @@ pub fn main(init: std.process.Init) !void {
     var generic_lowering_functions: usize = 0;
     var shape_recognizer_functions: usize = 0;
     var object_emitted_functions: usize = 0;
+    var inspected_objects: usize = 0;
+    var relocation_rows: usize = 0;
+    var tls_rows: usize = 0;
+    var undefined_import_rows: usize = 0;
     var native_link_accepted_rows: usize = 0;
     var executable_ok_rows: usize = 0;
     var link_only_rows: usize = 0;
@@ -232,7 +236,7 @@ pub fn main(init: std.process.Init) !void {
             try machines.append(allocator, machine);
             generic_codegen_functions += 1;
         }
-        if ((options.object_progress or options.native_link_progress or options.executable_progress) and machines.items.len != 0) {
+        if ((options.object_progress or options.object_inspection or options.native_link_progress or options.executable_progress) and machines.items.len != 0) {
             const object = mc.elf.buildObjectWithModuleData(
                 allocator,
                 machines.items,
@@ -249,16 +253,27 @@ pub fn main(init: std.process.Init) !void {
             defer allocator.free(object);
             object_emitted_functions += machines.items.len;
 
-            if (options.native_link_progress or options.executable_progress) {
+            if (options.object_inspection or options.native_link_progress or options.executable_progress) {
                 const object_name = try std.fmt.allocPrint(allocator, "{s}.o", .{stem});
                 defer allocator.free(object_name);
                 const object_path = try std.fs.path.join(allocator, &.{ temp_path, object_name });
                 defer allocator.free(object_path);
+                try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = object });
+
+                if (options.object_inspection) {
+                    const inspection = try inspectObject(allocator, io, object_path, mode, source);
+                    inspected_objects += 1;
+                    if (inspection.has_relocations) relocation_rows += 1;
+                    if (inspection.has_tls) tls_rows += 1;
+                    if (inspection.has_undefined_imports) undefined_import_rows += 1;
+                }
+
+                if (!(options.native_link_progress or options.executable_progress)) continue;
+
                 const exe_name = try std.fmt.allocPrint(allocator, "{s}.link", .{stem});
                 defer allocator.free(exe_name);
                 const exe_path = try std.fs.path.join(allocator, &.{ temp_path, exe_name });
                 defer allocator.free(exe_path);
-                try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = object });
 
                 const harness = if (options.executable_progress) executableHarnessForSource(source) else null;
                 const link_result = if (harness) |executable_harness| link_result: {
@@ -390,6 +405,12 @@ pub fn main(init: std.process.Init) !void {
             .{ mode.name(), object_emitted_functions, object_failures },
         );
     }
+    if (options.object_inspection) {
+        try stdout_writer.interface.print(
+            "summary uncurated-zig-air-object-inspection mode={s} target=x86_64-linux-gnu inspected={} elf64_rel={} relocation_rows={} tls_rows={} undefined_import_rows={} comdat_rows=0 eh_frame_rows=0 unsupported_relocation_rows=0 local_fail=0\n",
+            .{ mode.name(), inspected_objects, inspected_objects, relocation_rows, tls_rows, undefined_import_rows },
+        );
+    }
     if (options.native_link_progress) {
         const local_fail: usize = if (native_link_failures == 0) 0 else 1;
         try stdout_writer.interface.print(
@@ -438,6 +459,7 @@ const Options = struct {
     mode: Mode = .ReleaseFast,
     corpus: Corpus = .inputs,
     object_progress: bool = false,
+    object_inspection: bool = false,
     native_link_progress: bool = false,
     executable_progress: bool = false,
 };
@@ -494,6 +516,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .broad;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
+        } else if (std.mem.eql(u8, arg, "--object-inspection")) {
+            options.object_inspection = true;
         } else if (std.mem.eql(u8, arg, "--native-link-progress")) {
             options.native_link_progress = true;
         } else if (std.mem.eql(u8, arg, "--executable-progress")) {
@@ -503,6 +527,180 @@ fn parseOptions(args: std.process.Args) !Options {
         }
     }
     return options;
+}
+
+const ObjectInspection = struct {
+    has_relocations: bool,
+    has_tls: bool,
+    has_undefined_imports: bool,
+};
+
+fn inspectObject(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    object_path: []const u8,
+    mode: Mode,
+    source: []const u8,
+) !ObjectInspection {
+    const readelf_argv = [_][]const u8{ "readelf", "-W", "-h", "-S", "-s", "-r", object_path };
+    const readelf_result = try std.process.run(allocator, io, .{
+        .argv = &readelf_argv,
+        .stdout_limit = .limited(32 * 1024 * 1024),
+        .stderr_limit = .limited(32 * 1024 * 1024),
+    });
+    defer {
+        allocator.free(readelf_result.stdout);
+        allocator.free(readelf_result.stderr);
+    }
+    if (!termOk(readelf_result.term)) {
+        std.debug.print(
+            "object-inspection-failure source={s} mode={s} category=readelf stderr={s}\n",
+            .{ source, mode.name(), firstLine(readelf_result.stderr) },
+        );
+        return error.ObjectInspectionFailed;
+    }
+
+    const objdump_argv = [_][]const u8{ "objdump", "-dr", object_path };
+    const objdump_result = try std.process.run(allocator, io, .{
+        .argv = &objdump_argv,
+        .stdout_limit = .limited(32 * 1024 * 1024),
+        .stderr_limit = .limited(32 * 1024 * 1024),
+    });
+    defer {
+        allocator.free(objdump_result.stdout);
+        allocator.free(objdump_result.stderr);
+    }
+    if (!termOk(objdump_result.term)) {
+        std.debug.print(
+            "object-inspection-failure source={s} mode={s} category=objdump stderr={s}\n",
+            .{ source, mode.name(), firstLine(objdump_result.stderr) },
+        );
+        return error.ObjectInspectionFailed;
+    }
+
+    try validateObjectHeader(mode, source, readelf_result.stdout);
+    try validateObjectSections(mode, source, readelf_result.stdout);
+    try validateObjectSymbols(mode, source, readelf_result.stdout);
+    try validateObjectRelocations(mode, source, readelf_result.stdout);
+    try validateObjectDisassembly(mode, source, objdump_result.stdout);
+
+    return .{
+        .has_relocations = std.mem.indexOf(u8, readelf_result.stdout, "R_X86_64_") != null,
+        .has_tls = std.mem.indexOf(u8, readelf_result.stdout, " TLS     GLOBAL DEFAULT") != null or
+            std.mem.indexOf(u8, readelf_result.stdout, "R_X86_64_TPOFF32") != null,
+        .has_undefined_imports = hasUndefinedImports(readelf_result.stdout),
+    };
+}
+
+fn validateObjectHeader(mode: Mode, source: []const u8, readelf: []const u8) !void {
+    if (std.mem.indexOf(u8, readelf, "Class:                             ELF64") == null)
+        return objectInspectionFailure(mode, source, "object-format", "missing ELF64 header class");
+    if (std.mem.indexOf(u8, readelf, "Data:                              2's complement, little endian") == null)
+        return objectInspectionFailure(mode, source, "object-format", "missing little-endian ELF data marker");
+    if (std.mem.indexOf(u8, readelf, "Type:                              REL (Relocatable file)") == null)
+        return objectInspectionFailure(mode, source, "object-format", "object is not ELF REL relocatable");
+    if (std.mem.indexOf(u8, readelf, "Machine:                           Advanced Micro Devices X86-64") == null)
+        return objectInspectionFailure(mode, source, "object-format", "object machine is not x86-64");
+    if (std.mem.indexOf(u8, readelf, "Number of program headers:         0") == null)
+        return objectInspectionFailure(mode, source, "section-layout", "relocatable handoff object must not contain program headers");
+}
+
+fn validateObjectSections(mode: Mode, source: []const u8, readelf: []const u8) !void {
+    if (!sectionLineHas(readelf, ".text", "PROGBITS", "AX", "16"))
+        return objectInspectionFailure(mode, source, "section-flag-alignment", "missing .text PROGBITS AX align=16 section");
+    if (!sectionLineHas(readelf, ".data", "PROGBITS", "WA", "16"))
+        return objectInspectionFailure(mode, source, "section-flag-alignment", "missing .data PROGBITS WA align=16 section");
+    if (!sectionLineHas(readelf, ".tdata", "PROGBITS", "WAT", "4"))
+        return objectInspectionFailure(mode, source, "tls-model", "missing .tdata PROGBITS WAT align=4 section");
+    if (!sectionLineHas(readelf, ".rela.text", "RELA", "", "8"))
+        return objectInspectionFailure(mode, source, "relocation", "missing .rela.text RELA align=8 section");
+    if (!sectionLineHas(readelf, ".symtab", "SYMTAB", "", "8"))
+        return objectInspectionFailure(mode, source, "symbol", "missing .symtab SYMTAB align=8 section");
+    if (!sectionLineHas(readelf, ".strtab", "STRTAB", "", "1"))
+        return objectInspectionFailure(mode, source, "section-layout", "missing .strtab STRTAB align=1 section");
+    if (!sectionLineHas(readelf, ".shstrtab", "STRTAB", "", "1"))
+        return objectInspectionFailure(mode, source, "section-layout", "missing .shstrtab STRTAB align=1 section");
+    if (std.mem.indexOf(u8, readelf, ".group") != null or std.mem.indexOf(u8, readelf, "COMDAT") != null)
+        return objectInspectionFailure(mode, source, "comdat", "COMDAT/group sections are outside the current broad AIR handoff contract");
+    if (std.mem.indexOf(u8, readelf, ".eh_frame") != null)
+        return objectInspectionFailure(mode, source, "unwind-boundary", ".eh_frame is outside the current broad AIR handoff contract");
+}
+
+fn sectionLineHas(readelf: []const u8, name: []const u8, kind: []const u8, flags: []const u8, alignment: []const u8) bool {
+    var lines = std.mem.splitScalar(u8, readelf, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.indexOf(u8, line, name) == null) continue;
+        if (std.mem.indexOf(u8, line, kind) == null) continue;
+        if (flags.len != 0 and std.mem.indexOf(u8, line, flags) == null) continue;
+        if (!std.mem.endsWith(u8, std.mem.trim(u8, line, " \t\r"), alignment)) continue;
+        return true;
+    }
+    return false;
+}
+
+fn validateObjectSymbols(mode: Mode, source: []const u8, readelf: []const u8) !void {
+    if (std.mem.indexOf(u8, readelf, "Symbol table '.symtab' contains") == null)
+        return objectInspectionFailure(mode, source, "symbol", "missing symbol table dump");
+    var has_global_function = false;
+    var lines = std.mem.splitScalar(u8, readelf, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.indexOf(u8, line, " FUNC    GLOBAL DEFAULT") != null) has_global_function = true;
+        if (std.mem.indexOf(u8, line, " UND ") != null and std.mem.indexOf(u8, line, "NOTYPE  LOCAL  DEFAULT  UND") == null) {
+            if (std.mem.indexOf(u8, line, "GLOBAL DEFAULT  UND") == null)
+                return objectInspectionFailure(mode, source, "bad-symbol-binding-type", "undefined import is not GLOBAL DEFAULT UND");
+        }
+    }
+    if (!has_global_function)
+        return objectInspectionFailure(mode, source, "symbol", "missing global function symbol");
+    if (std.mem.indexOf(u8, readelf, "R_X86_64_TPOFF32") != null and std.mem.indexOf(u8, readelf, " TLS     GLOBAL DEFAULT") == null)
+        return objectInspectionFailure(mode, source, "tls-model", "TLS relocation exists without a TLS GLOBAL symbol");
+}
+
+fn validateObjectRelocations(mode: Mode, source: []const u8, readelf: []const u8) !void {
+    var rest = readelf;
+    while (std.mem.indexOf(u8, rest, "R_X86_64_")) |index| {
+        const start = index;
+        var end = start;
+        while (end < rest.len and (std.ascii.isAlphanumeric(rest[end]) or rest[end] == '_')) : (end += 1) {}
+        const relocation = rest[start..end];
+        if (!isAllowedRelocation(relocation)) {
+            std.debug.print(
+                "object-inspection-failure source={s} mode={s} category=missing-relocation-support relocation={s}\n",
+                .{ source, mode.name(), relocation },
+            );
+            return error.ObjectInspectionFailed;
+        }
+        rest = rest[end..];
+    }
+}
+
+fn isAllowedRelocation(relocation: []const u8) bool {
+    return std.mem.eql(u8, relocation, "R_X86_64_PC32") or
+        std.mem.eql(u8, relocation, "R_X86_64_PLT32") or
+        std.mem.eql(u8, relocation, "R_X86_64_TPOFF32");
+}
+
+fn validateObjectDisassembly(mode: Mode, source: []const u8, objdump: []const u8) !void {
+    if (std.mem.indexOf(u8, objdump, "file format elf64-x86-64") == null)
+        return objectInspectionFailure(mode, source, "object-format", "objdump did not recognize elf64-x86-64");
+    if (std.mem.indexOf(u8, objdump, "Disassembly of section .text:") == null)
+        return objectInspectionFailure(mode, source, "section-layout", "objdump missing .text disassembly");
+}
+
+fn hasUndefinedImports(readelf: []const u8) bool {
+    var lines = std.mem.splitScalar(u8, readelf, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.indexOf(u8, line, " UND ") != null and std.mem.indexOf(u8, line, "NOTYPE  LOCAL  DEFAULT  UND") == null) return true;
+    }
+    return false;
+}
+
+fn objectInspectionFailure(mode: Mode, source: []const u8, category: []const u8, message: []const u8) error{ObjectInspectionFailed} {
+    std.debug.print(
+        "object-inspection-failure source={s} mode={s} category={s}: {s}\n",
+        .{ source, mode.name(), category, message },
+    );
+    return error.ObjectInspectionFailed;
 }
 
 const ExecutableHarness = struct {

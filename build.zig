@@ -89,6 +89,12 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasefast_broad_object_gate.addArg("--object-progress");
     const uncurated_air_releasefast_broad_object_step = b.step("distribution-zig-air-uncurated-releasefast-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseFast Zig AIR progress accounting");
     uncurated_air_releasefast_broad_object_step.dependOn(&run_uncurated_air_releasefast_broad_object_gate.step);
+    const run_uncurated_air_releasefast_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--mode=ReleaseFast");
+    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--corpus=broad");
+    run_uncurated_air_releasefast_broad_object_inspection_gate.addArg("--object-inspection");
+    const uncurated_air_releasefast_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasefast-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseFast real-AIR ELF objects with readelf/objdump");
+    uncurated_air_releasefast_broad_object_inspection_step.dependOn(&run_uncurated_air_releasefast_broad_object_inspection_gate.step);
     const run_uncurated_air_releasefast_broad_native_link_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasefast_broad_native_link_gate.addArg("--mode=ReleaseFast");
     run_uncurated_air_releasefast_broad_native_link_gate.addArg("--corpus=broad");
@@ -112,6 +118,12 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasesafe_broad_object_gate.addArg("--object-progress");
     const uncurated_air_releasesafe_broad_object_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSafe Zig AIR progress accounting");
     uncurated_air_releasesafe_broad_object_step.dependOn(&run_uncurated_air_releasesafe_broad_object_gate.step);
+    const run_uncurated_air_releasesafe_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--mode=ReleaseSafe");
+    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--corpus=broad");
+    run_uncurated_air_releasesafe_broad_object_inspection_gate.addArg("--object-inspection");
+    const uncurated_air_releasesafe_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesafe-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseSafe real-AIR ELF objects with readelf/objdump");
+    uncurated_air_releasesafe_broad_object_inspection_step.dependOn(&run_uncurated_air_releasesafe_broad_object_inspection_gate.step);
     const run_uncurated_air_releasesafe_broad_executable_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesafe_broad_executable_gate.addArg("--mode=ReleaseSafe");
     run_uncurated_air_releasesafe_broad_executable_gate.addArg("--corpus=broad");
@@ -129,6 +141,12 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasesmall_broad_object_gate.addArg("--object-progress");
     const uncurated_air_releasesmall_broad_object_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-object", "Emit z_llvm ELF objects for broad uncurated x86_64 ReleaseSmall Zig AIR progress accounting");
     uncurated_air_releasesmall_broad_object_step.dependOn(&run_uncurated_air_releasesmall_broad_object_gate.step);
+    const run_uncurated_air_releasesmall_broad_object_inspection_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--mode=ReleaseSmall");
+    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--corpus=broad");
+    run_uncurated_air_releasesmall_broad_object_inspection_gate.addArg("--object-inspection");
+    const uncurated_air_releasesmall_broad_object_inspection_step = b.step("distribution-zig-air-uncurated-releasesmall-broad-object-inspection", "Inspect broad uncurated x86_64 ReleaseSmall real-AIR ELF objects with readelf/objdump");
+    uncurated_air_releasesmall_broad_object_inspection_step.dependOn(&run_uncurated_air_releasesmall_broad_object_inspection_gate.step);
     const run_uncurated_air_releasesmall_broad_native_link_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesmall_broad_native_link_gate.addArg("--mode=ReleaseSmall");
     run_uncurated_air_releasesmall_broad_native_link_gate.addArg("--corpus=broad");
