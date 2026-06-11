@@ -318,8 +318,14 @@ release modes at `source_rows=105`, `discovered_functions=162`,
 `generic_codegen_functions=162`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
-object/native-link/executable proof is the next evidence layer. The expanded
-audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
+object emission is also green for all three modes at
+`object_emitted_functions=162`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
+reports `inspected=105`, `elf64_rel=105`, `relocation_rows=15`, `tls_rows=4`,
+`undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
+`unsupported_relocation_rows=0`, and `local_fail=0`. Expanded
+native-link/executable proof is the next evidence layer. The expanded audit
+lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:

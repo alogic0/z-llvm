@@ -44,9 +44,33 @@ top_unsupported_construct=-
 local_fail=0
 ```
 
-The first expanded slice is clean for discovery/lowering/codegen. Expanded
-object inspection, native-link handoff, and executable ABI accounting are the
-next evidence layer.
+The first expanded slice is clean for discovery/lowering/codegen. The expanded
+finish gate adds object emission for all three release modes:
+
+```text
+object_emitted_functions=162
+object_failures=0
+llvm_targetmachine_rows=0
+local_fail=0
+```
+
+The expanded object-inspection gates are also green for ReleaseFast,
+ReleaseSafe, and ReleaseSmall:
+
+```text
+inspected=105
+elf64_rel=105
+relocation_rows=15
+tls_rows=4
+undefined_import_rows=3
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+Expanded native-link handoff and executable ABI accounting are the next
+evidence layer.
 
 Closed expanded blocker families:
 
@@ -72,3 +96,16 @@ Ownership rules for this frontier:
 - no LLVM optimizer
 - no LLVM TargetMachine
 - no LLD
+
+Current expanded gates:
+
+- `distribution-zig-air-uncurated-releasefast-expanded`
+- `distribution-zig-air-uncurated-releasesafe-expanded`
+- `distribution-zig-air-uncurated-releasesmall-expanded`
+- `distribution-zig-air-uncurated-releasefast-expanded-object`
+- `distribution-zig-air-uncurated-releasesafe-expanded-object`
+- `distribution-zig-air-uncurated-releasesmall-expanded-object`
+- `distribution-zig-air-uncurated-releasefast-expanded-object-inspection`
+- `distribution-zig-air-uncurated-releasesafe-expanded-object-inspection`
+- `distribution-zig-air-uncurated-releasesmall-expanded-object-inspection`
+- `distribution-zig-air-uncurated-release-expanded-finish`

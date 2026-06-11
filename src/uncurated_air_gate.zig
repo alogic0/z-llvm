@@ -595,27 +595,31 @@ const StrictFinishCounters = struct {
 };
 
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
-    if (counters.corpus != .broad) {
-        std.debug.print(
-            "strict-finish-failure mode={s} field=corpus expected=broad actual=inputs\n",
-            .{counters.mode.name()},
-        );
-        return error.StrictFinishFailed;
-    }
-    try expectStrict(counters.mode, "source_rows", counters.source_rows, 101);
-    try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, 152);
-    try expectStrict(counters.mode, "structured_functions", counters.structured_functions, 152);
-    try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, 152);
-    try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, 152);
-    try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, 152);
+    const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
+        .broad => .{ 101, 152 },
+        .expanded => .{ 105, 162 },
+        .inputs => {
+            std.debug.print(
+                "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
+                .{ counters.mode.name(), counters.corpus.name() },
+            );
+            return error.StrictFinishFailed;
+        },
+    };
+    try expectStrict(counters.mode, "source_rows", counters.source_rows, expected_source_rows);
+    try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, expected_functions);
+    try expectStrict(counters.mode, "structured_functions", counters.structured_functions, expected_functions);
+    try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, expected_functions);
+    try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, expected_functions);
+    try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, expected_functions);
     try expectStrict(counters.mode, "legacy_air_text_lowering_functions", counters.legacy_air_text_lowering_functions, 0);
     try expectStrict(counters.mode, "typed_v2_fallback_functions", counters.typed_v2_fallback_functions, 0);
-    try expectStrict(counters.mode, "generic_lowering_functions", counters.generic_lowering_functions, 152);
+    try expectStrict(counters.mode, "generic_lowering_functions", counters.generic_lowering_functions, expected_functions);
     try expectStrict(counters.mode, "shape_recognizer_functions", counters.shape_recognizer_functions, 0);
     try expectStrict(counters.mode, "unsupported_functions", counters.unsupported_functions, 0);
     try expectStrict(counters.mode, "codegen_failures", counters.codegen_failures, 0);
     if (counters.object_progress) {
-        try expectStrict(counters.mode, "object_emitted_functions", counters.object_emitted_functions, 152);
+        try expectStrict(counters.mode, "object_emitted_functions", counters.object_emitted_functions, expected_functions);
         try expectStrict(counters.mode, "object_failures", counters.object_failures, 0);
     }
 }

@@ -223,9 +223,15 @@ ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=105`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The expanded audit is recorded in
-`docs/roadmap/x86_64_expanded_air_corpus.md`; the next evidence layer is
-expanded object inspection/native-link/executable accounting, followed by the
-next explicit source bucket.
+`docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish gate now
+adds object emission for all three release modes at
+`object_emitted_functions=162`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
+gates report `inspected=105`, `elf64_rel=105`, `relocation_rows=15`,
+`tls_rows=4`, `undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
+`unsupported_relocation_rows=0`, and `local_fail=0`. The next evidence layer is
+expanded native-link/executable accounting, followed by the next explicit
+source bucket.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
