@@ -132,6 +132,7 @@ pub const Global = struct {
     type_text: []const u8,
     thread_local: []const u8,
     is_constant: bool,
+    initializer_text: ?[]const u8 = null,
 };
 
 pub const Module = struct {
@@ -194,12 +195,17 @@ pub fn parse(allocator: std.mem.Allocator, contents: []const u8) !Module {
         const type_text = try cursor.readFramed("type_bytes");
         const thread_local = try cursor.readValueLine("thread_local");
         const is_constant = try parseBool(try cursor.readValueLine("constant"));
+        const initializer_text = if (cursor.peekValueLine("initializer_bytes"))
+            try cursor.readFramed("initializer_bytes")
+        else
+            null;
         try cursor.expectLine("global_end");
         globals.appendAssumeCapacity(.{
             .name = name,
             .type_text = type_text,
             .thread_local = thread_local,
             .is_constant = is_constant,
+            .initializer_text = initializer_text,
         });
     }
 

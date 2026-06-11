@@ -209,17 +209,24 @@ the z_llvm object for each broad source module with a tiny C `main` harness via
 `local_fail=0`. This is link-only progress evidence, not executable ABI proof.
 
 The broad release executable progress gates add stable C-ABI harnesses for the
-runnable pure input modules and integrated wrapper `main` exports while keeping
-initializer-dependent and runtime-heavy rows as link-only accounting.
+runnable pure input modules and integrated wrapper `main` exports. The patched
+Zig `zllvm-air-export-v1` hook now emits generic global/TLS initializer bytes,
+and z_llvm materializes those initializers before object emission.
 ReleaseFast, ReleaseSafe, and ReleaseSmall each report
-`native_link_accepted_rows=100`, `executable_ok_rows=94`,
-`link_only_rows=6`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
+`native_link_accepted_rows=100`, `executable_ok_rows=100`,
+`link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
-`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. It does not
-claim executable proof for modules without a stable callable ABI harness. The
-remaining link-only rows include the two remaining input modules and four
-integrated wrappers whose runtime result depends on global/TLS initializer
-facts not yet exported by the frozen AIR contract.
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`.
+
+The closed link-only set was:
+`test/zig/inputs/aggregate_abi.zig` and
+`test/zig/inputs/atomics_inline_asm_debug.zig` (missing C ABI harnesses),
+`test/zig/inputs/globals_comptime.zig`, `test/zig/inputs/tls_concurrency.zig`,
+`test/zig/integrated/runtime_mix_c_add_zig_main.zig`,
+`test/zig/integrated/runtime_optional_pointer_main.zig`,
+`test/zig/integrated/runtime_pointer_load_store_main.zig`, and
+`test/zig/integrated/runtime_tls_bump_main.zig` (global/TLS initializer
+materialization). No accepted broad executable row remains link-only.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected

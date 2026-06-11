@@ -655,6 +655,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/inputs/globals_comptime.zig")) return .{ .abi_mode = "c-stable-module", .expected = "global initializer/update and comptime constant", .c_body =
+    \\extern int z_read_global(void) __asm__("globals_comptime.read_global");
+    \\extern int z_update_global(int) __asm__("globals_comptime.update_global");
+    \\extern int z_comptime_const(int) __asm__("globals_comptime.comptime_const");
+    \\int main(void) {
+    \\    if (z_read_global() != 3) return 1;
+    \\    if (z_update_global(4) != 7) return 2;
+    \\    if (z_read_global() != 7) return 3;
+    \\    if (z_comptime_const(7) != 35) return 4;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (std.mem.eql(u8, source, "test/zig/inputs/i64_arithmetic.zig")) return .{ .abi_mode = "c-stable-module", .expected = "i64 return", .c_body =
     \\extern long long z_i64_value(void) __asm__("i64_arithmetic.i64_value");
     \\int main(void) {
@@ -724,6 +737,17 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/inputs/tls_concurrency.zig")) return .{ .abi_mode = "c-stable-module", .expected = "TLS initializer/read/bump", .c_body =
+    \\extern int z_read_tls(void) __asm__("tls_concurrency.read_tls");
+    \\extern int z_bump_tls(int) __asm__("tls_concurrency.bump_tls");
+    \\int main(void) {
+    \\    if (z_read_tls() != 1) return 1;
+    \\    if (z_bump_tls(5) != 6) return 2;
+    \\    if (z_read_tls() != 6) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (std.mem.eql(u8, source, "test/zig/inputs/tiny_scalar.zig")) return .{ .abi_mode = "c-stable-module", .expected = "tiny scalar add", .c_body =
     \\extern int z_add(int, int) __asm__("tiny_scalar.add");
     \\extern void z_sideEffectFree(void) __asm__("tiny_scalar.sideEffectFree");
@@ -747,14 +771,12 @@ fn integratedModuleMainHarness(source: []const u8) ?ModuleMainHarness {
     if (!std.mem.startsWith(u8, source, "test/zig/integrated/")) return null;
     const basename = std.fs.path.basename(source);
     if (std.mem.eql(u8, basename, "runtime_mix_c_add_may_panic_main.zig")) return null;
-    if (std.mem.eql(u8, basename, "runtime_mix_c_add_zig_main.zig")) return null;
-    if (std.mem.eql(u8, basename, "runtime_optional_pointer_main.zig")) return null;
-    if (std.mem.eql(u8, basename, "runtime_pointer_load_store_main.zig")) return null;
-    if (std.mem.eql(u8, basename, "runtime_tls_bump_main.zig")) return null;
 
     if (std.mem.eql(u8, basename, "runtime_aggregate_pair_main.zig")) return .{ .source = source, .expected_exit = 1 };
     if (std.mem.eql(u8, basename, "runtime_hidden_access_main.zig")) return .{ .source = source, .expected_exit = 7 };
     if (std.mem.eql(u8, basename, "runtime_inherit_want_safety_i64_main.zig")) return .{ .source = source, .return_type = .c_long, .expected_exit = 4 };
+    if (std.mem.eql(u8, basename, "runtime_mix_c_add_zig_main.zig")) return .{ .source = source, .expected_exit = 7 };
+    if (std.mem.eql(u8, basename, "runtime_tls_bump_main.zig")) return .{ .source = source, .expected_exit = 2 };
     if (std.mem.eql(u8, basename, "runtime_umul_fix_sat_i64_main.zig")) return .{ .source = source, .return_type = .c_long };
 
     return .{ .source = source };

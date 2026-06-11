@@ -1065,7 +1065,7 @@ fn stripGlobalPrefix(text: []const u8) []const u8 {
     return without_at;
 }
 
-fn parseGlobalInitializer(ty: ir.Type, text: []const u8) ir.GlobalInitializer {
+pub fn parseGlobalInitializer(ty: ir.Type, text: []const u8) ir.GlobalInitializer {
     const trimmed = std.mem.trim(u8, text, " \t");
     switch (ty) {
         .int => {

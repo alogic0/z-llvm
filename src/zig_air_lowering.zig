@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
+const sib = @import("structured_ir_builder.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -116,7 +117,7 @@ pub fn lowerCompatible(
             .address_attrs = address_attrs,
             .kind = .global,
             .ty = global_type.ir_type,
-            .initializer = materializedGlobalInitializer(global_type.ir_type),
+            .initializer = materializedGlobalInitializer(global_type.ir_type, air_global.initializer_text),
         });
     }
 
@@ -208,7 +209,14 @@ fn typedOperandCoverage(structured_air_v2: air_export.StructuredAirV2) bool {
     return true;
 }
 
-fn materializedGlobalInitializer(ty: ir.Type) ir.GlobalInitializer {
+fn materializedGlobalInitializer(ty: ir.Type, initializer_text: ?[]const u8) ir.GlobalInitializer {
+    if (initializer_text) |text| {
+        const trimmed = std.mem.trim(u8, text, " \t");
+        if (!std.mem.eql(u8, trimmed, "-")) {
+            const parsed = sib.parseGlobalInitializer(ty, trimmed);
+            if (parsed != .@"opaque") return parsed;
+        }
+    }
     return switch (ty) {
         .int => .{ .scalar = .{ .int = 0 } },
         .ptr => .{ .scalar = .null_value },

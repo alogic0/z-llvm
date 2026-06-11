@@ -306,8 +306,8 @@ zig build distribution-zig-air-uncurated-releasefast-broad-executable
 zig build distribution-zig-air-uncurated-releasesafe-broad-executable
 zig build distribution-zig-air-uncurated-releasesmall-broad-executable
   native_link_accepted_rows=100
-  executable_ok_rows=94
-  link_only_rows=6
+  executable_ok_rows=100
+  link_only_rows=0
   runtime_boundary_rows=1
   unsupported_zig_linker_feature_rows=0
   native_link_failures=0
@@ -316,10 +316,10 @@ zig build distribution-zig-air-uncurated-releasesmall-broad-executable
   local_fail=0
 ```
 
-Rows without a stable callable ABI harness remain link-only rows, not
-executable evidence. The remaining link-only set is the two input modules and
-four integrated wrappers whose runtime result depends on global/TLS initializer
-facts not yet exported by the frozen AIR contract. The named runtime boundary is
+The executable layer now covers all 100 accepted broad native-link rows in each
+release mode. The closed link-only set was two input modules that needed C ABI
+harnesses plus two input modules and four integrated wrappers that needed
+global/TLS initializer materialization. The named runtime boundary remains
 `debug.defaultPanic`. ReleaseSafe and ReleaseSmall report the same executable
 split as ReleaseFast.
 
