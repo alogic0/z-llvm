@@ -2103,6 +2103,12 @@ const LoweringContext = struct {
             try self.lowerTypedCompare(instruction);
         } else if (isCastOpcode(instruction.opcode)) {
             try self.lowerTypedCast(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "load")) {
+            try self.lowerTypedLoad(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "store") or
+            std.mem.eql(u8, instruction.opcode, "store_safe"))
+        {
+            try self.lowerTypedStore(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
             std.mem.eql(u8, instruction.opcode, "ret_safe"))
         {
@@ -2204,6 +2210,45 @@ const LoweringContext = struct {
             .ty = target_type,
             .value = .{ .named = result_name },
         };
+    }
+
+    fn lowerTypedLoad(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const pointer = try self.resolveTypedOperand(instruction, 0);
+        if (pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
+        const result_type = parseZigType(instruction.result_type) orelse blk: {
+            const child = pointer.ty.pointer_child orelse return error.UnsupportedAir;
+            break :blk ZigType{ .ir_type = child };
+        };
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .load = .{
+                .ty = result_type.ir_type,
+                .ptr = pointer.value,
+                .attrs = .{ .is_volatile = pointer.ty.is_volatile_pointer },
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn lowerTypedStore(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const pointer = try self.resolveTypedOperand(instruction, 0);
+        const value = try self.resolveTypedOperand(instruction, 1);
+        if (pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
+        try self.block.instructions.append(self.allocator, .{
+            .result = null,
+            .kind = .{ .store = .{
+                .ty = value.ty.ir_type,
+                .value = value.value,
+                .ptr = pointer.value,
+                .attrs = .{ .is_volatile = pointer.ty.is_volatile_pointer },
+            } },
+        });
     }
 
     fn lowerTypedReturn(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
