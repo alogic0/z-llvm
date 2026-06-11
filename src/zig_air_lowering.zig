@@ -415,10 +415,25 @@ fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "block") or
+        std.mem.eql(u8, opcode, "runtime_nav_ptr") or
+        isFieldPtrOpcode(opcode) or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or
         std.mem.eql(u8, opcode, "unreach");
+}
+
+fn isFieldPtrOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "struct_field_ptr") or
+        std.mem.startsWith(u8, opcode, "struct_field_ptr_index_");
+}
+
+fn isPlainFieldPointerChild(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits != 1 and bits % 8 == 0,
+        .float, .double, .ptr => true,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+    };
 }
 
 fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
@@ -2223,6 +2238,10 @@ const LoweringContext = struct {
             try self.lowerTypedStore(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "block")) {
             try self.lowerTypedBlock(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
+            try self.lowerTypedRuntimeNavPtr(instruction);
+        } else if (isFieldPtrOpcode(instruction.opcode)) {
+            try self.lowerTypedFieldPtr(instruction);
         } else if (isCallOpcode(instruction.opcode)) {
             try self.lowerTypedCall(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
@@ -2454,6 +2473,49 @@ const LoweringContext = struct {
             try self.lowerTypedInstruction(child);
         }
         return cond_instruction orelse error.UnsupportedAir;
+    }
+
+    fn lowerTypedRuntimeNavPtr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 0) return error.UnsupportedAir;
+        const pointer_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (pointer_type.ir_type != .ptr) return error.UnsupportedAir;
+        const nav_fqn = typedDetail(instruction, "nav_fqn") orelse return error.UnsupportedAir;
+        const symbol = try ownPrint(self.module, "@{s}", .{nav_fqn});
+        self.values[instruction.index] = .{
+            .ty = pointer_type,
+            .value = .{ .named = symbol },
+        };
+    }
+
+    fn lowerTypedFieldPtr(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 1) return error.UnsupportedAir;
+        const aggregate_ptr = try self.resolveTypedOperand(instruction, 0);
+        if (aggregate_ptr.ty.ir_type != .ptr) return error.UnsupportedAir;
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (result_type.ir_type != .ptr) return error.UnsupportedAir;
+        const field_child = result_type.pointer_child orelse return error.UnsupportedAir;
+        if (!isPlainFieldPointerChild(field_child)) return error.UnsupportedAir;
+        const field_index_text = typedDetail(instruction, "field_index") orelse return error.UnsupportedAir;
+        const field_index = std.fmt.parseInt(i128, field_index_text, 10) catch return error.UnsupportedAir;
+        const source_ty = aggregate_ptr.ty.pointer_child orelse return error.UnsupportedAir;
+
+        const result_name = try self.resultName(instruction.index);
+        var gep: ir.GepInst = .{
+            .source_ty = source_ty,
+            .ptr = aggregate_ptr.value,
+            .indices = .empty,
+        };
+        errdefer gep.deinit(self.allocator);
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 32 }, .value = .{ .int = field_index } });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .gep = gep },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
     }
 
     fn lowerTypedCall(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
