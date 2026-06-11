@@ -2988,6 +2988,12 @@ const LoweringContext = struct {
         if (std.mem.eql(u8, operand.kind, "const")) {
             const literal = typedOperandTextDetail(instruction, operand_index) orelse
                 return error.UnsupportedAir;
+            if (parseSymbolPointer(literal)) |symbol_pointer| {
+                return .{
+                    .ty = symbol_pointer.ty,
+                    .value = .{ .named = try ownPrint(self.module, "@{s}", .{symbol_pointer.symbol}) },
+                };
+            }
             return parseConstant(literal) orelse error.UnsupportedAir;
         }
         if (std.mem.eql(u8, operand.kind, "none")) return error.UnsupportedAir;
