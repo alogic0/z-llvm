@@ -336,6 +336,16 @@ pub fn firstUnsupported(
             typedV2ErrorClassifierRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_runtime_optional_pointer_main =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2RuntimeOptionalPointerMainRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_runtime_pointer_load_store_main =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2RuntimePointerLoadStoreMainRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -345,8 +355,10 @@ pub fn firstUnsupported(
         isIntegerSwitchBlock(function) or
         typed_conditional_slot_update or
         conditionalSlotUpdateShape(function) or
+        typed_runtime_optional_pointer_main or
         runtimeOptionalPointerMainShape(function) or
         typed_optional_pointer or
+        typed_runtime_pointer_load_store_main or
         runtimePointerLoadStoreMainShape(function) or
         typed_optional_payload or
         typed_error_switch or
@@ -447,8 +459,6 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
 }
 
 fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
-    if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
-    if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
     if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
     return null;
 }
@@ -669,6 +679,12 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2ErrorClassifier(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2RuntimeOptionalPointerMain(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2RuntimePointerLoadStoreMain(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
 
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
@@ -830,6 +846,17 @@ fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []con
     var count: usize = 0;
     for (structured_air_v2.instructions) |instruction| {
         if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
+    }
+    return count;
+}
+
+fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, callee_name: []const u8) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!isCallOpcode(instruction.opcode)) continue;
+        const callee_text = typedDetail(instruction, "callee_text") orelse continue;
+        const name = typedCalleeName(callee_text) orelse continue;
+        if (std.mem.eql(u8, name, callee_name)) count += 1;
     }
     return count;
 }
@@ -1376,6 +1403,57 @@ fn typedV2ErrorClassifierRecords(
         typedOpcodeCount(structured_air_v2, "block") == 1 and
         typedOpcodeCount(structured_air_v2, "switch_br") == 1 and
         typedOpcodeCount(structured_air_v2, "br") == 3 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2RuntimeOptionalPointerMain(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2RuntimeOptionalPointerMainRecords(function_type, structured_air_v2)) return null;
+    return try lowerRuntimeOptionalPointerMain(allocator, air_function);
+}
+
+fn typedV2RuntimeOptionalPointerMainRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return function_type.params.len == 0 and
+        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "call") == 2 and
+        typedCalleeNameCount(structured_air_v2, "optionalPtrValue") == 2 and
+        typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
+        typedOpcodeCount(structured_air_v2, "block") == 2 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
+        typedOpcodeCount(structured_air_v2, "br") == 4 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2RuntimePointerLoadStoreMain(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2RuntimePointerLoadStoreMainRecords(function_type, structured_air_v2)) return null;
+    return try lowerRuntimePointerLoadStoreMain(allocator, air_function);
+}
+
+fn typedV2RuntimePointerLoadStoreMainRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return function_type.params.len == 0 and
+        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "call") == 1 and
+        typedCalleeNameCount(structured_air_v2, "loadStore") == 1 and
+        typedOpcodeCount(structured_air_v2, "load") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_eq") == 2 and
+        typedOpcodeCount(structured_air_v2, "block") == 2 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
+        typedOpcodeCount(structured_air_v2, "br") == 4 and
         typedHasReturnOpcode(structured_air_v2);
 }
 

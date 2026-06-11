@@ -16,10 +16,10 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=3
-typed_v2_fallback_functions=3
-generic_lowering_functions=149
-shape_recognizer_functions=3
+legacy_air_text_lowering_functions=1
+typed_v2_fallback_functions=1
+generic_lowering_functions=151
+shape_recognizer_functions=1
 unsupported_functions=0
 codegen_failures=0
 top_typed_v2_fallback_reason=shape_recognizer:mix_c_add_may_panic:-
@@ -50,9 +50,9 @@ Accumulator-loop helpers now validate typed-v2 loop/repeat/branch records before
 the phi-based loop IR. Dense-switch and conditional slot-update helpers now validate typed-v2
 switch/branch and branch/store/update records before lowering. Error-switch and classifier helpers
 now validate typed-v2 error-union switch, branch, payload, and classifier records before lowering
-to the scalar error representation. `legacy_air_text_lowering_functions=3` remains for families
-that still need generic typed control-flow, aggregate, pointer/slice,
-optional/error-union, and runtime-boundary lowering.
+to the scalar error representation. Runtime optional-pointer and pointer load/store wrapper mains
+now validate typed-v2 call, callee, branch, compare, and merge records before lowering. One
+mixed C/Zig panic-edge function still needs typed-v2 runtime-boundary lowering.
 
 The broad gates now emit one `typed-v2-fallback` diagnostic per accepted
 function that still falls back to legacy AIR text. The summary records the first
@@ -61,10 +61,8 @@ typed-v2 validation failures now report the concrete failing typed opcode and
 data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
 `shape_recognizer:mix_c_add_may_panic:-` with 1 function.
 
-The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
+The remaining shape recognizer family in `src/zig_air_lowering.zig` is:
 
-- runtime optional pointer main
-- runtime pointer load/store main
 - mixed C/Zig add-may-panic
 
 Next typed-contract target:
