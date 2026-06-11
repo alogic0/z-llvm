@@ -298,6 +298,17 @@ zig build distribution-zig-air-uncurated-releasesmall-broad-object-inspection
   local_fail=0
 ```
 
+The strict finish-line gate
+`zig build distribution-zig-air-uncurated-release-broad-finish` combines the
+three broad release modes with object emission and fail-closed counter checks.
+It requires each mode to stay at `source_rows=101`,
+`discovered_functions=152`, `structured_functions=152`,
+`generic_codegen_functions=152`, `typed_air_operand_functions=152`,
+`legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
+`shape_recognizer_functions=0`, `unsupported_functions=0`,
+`codegen_failures=0`, `object_emitted_functions=152`,
+`object_failures=0`, and `local_fail=0`.
+
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
 

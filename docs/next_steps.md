@@ -205,6 +205,13 @@ ReleaseFast, ReleaseSafe, and ReleaseSmall each report `inspected=101`,
 `undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`.
 
+The strict finish-line gate
+`zig build distribution-zig-air-uncurated-release-broad-finish` runs the broad
+ReleaseFast, ReleaseSafe, and ReleaseSmall typed-v2/object paths and fails
+closed if any mode regresses from the 152-function generic lowering and object
+emission target. It remains outside `distribution-all` because it is a
+milestone confirmation gate, not the regular inner loop.
+
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
 `zig build distribution-zig-air-uncurated-releasefast-broad-native-link` links

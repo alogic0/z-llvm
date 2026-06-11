@@ -444,6 +444,28 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     try stdout_writer.interface.flush();
+
+    if (options.strict_finish) {
+        try validateStrictFinish(.{
+            .mode = mode,
+            .corpus = options.corpus,
+            .object_progress = options.object_progress,
+            .source_rows = source_rows,
+            .discovered_functions = discovered_functions,
+            .structured_functions = structured_functions,
+            .generic_codegen_functions = generic_codegen_functions,
+            .structured_air_v2_functions = structured_air_v2_functions,
+            .typed_air_operand_functions = typed_air_operand_functions,
+            .legacy_air_text_lowering_functions = legacy_air_text_lowering_functions,
+            .typed_v2_fallback_functions = typed_v2_fallback_functions,
+            .generic_lowering_functions = generic_lowering_functions,
+            .shape_recognizer_functions = shape_recognizer_functions,
+            .unsupported_functions = unsupported_functions,
+            .codegen_failures = codegen_failures,
+            .object_emitted_functions = object_emitted_functions,
+            .object_failures = object_failures,
+        });
+    }
 }
 
 fn rootFunctionCount(module: air_export.Module) usize {
@@ -462,6 +484,7 @@ const Options = struct {
     object_inspection: bool = false,
     native_link_progress: bool = false,
     executable_progress: bool = false,
+    strict_finish: bool = false,
 };
 
 const Mode = enum {
@@ -522,11 +545,68 @@ fn parseOptions(args: std.process.Args) !Options {
             options.native_link_progress = true;
         } else if (std.mem.eql(u8, arg, "--executable-progress")) {
             options.executable_progress = true;
+        } else if (std.mem.eql(u8, arg, "--strict-finish")) {
+            options.strict_finish = true;
         } else {
             return error.UnsupportedUncuratedAirArgument;
         }
     }
     return options;
+}
+
+const StrictFinishCounters = struct {
+    mode: Mode,
+    corpus: Corpus,
+    object_progress: bool,
+    source_rows: usize,
+    discovered_functions: usize,
+    structured_functions: usize,
+    generic_codegen_functions: usize,
+    structured_air_v2_functions: usize,
+    typed_air_operand_functions: usize,
+    legacy_air_text_lowering_functions: usize,
+    typed_v2_fallback_functions: usize,
+    generic_lowering_functions: usize,
+    shape_recognizer_functions: usize,
+    unsupported_functions: usize,
+    codegen_failures: usize,
+    object_emitted_functions: usize,
+    object_failures: usize,
+};
+
+fn validateStrictFinish(counters: StrictFinishCounters) !void {
+    if (counters.corpus != .broad) {
+        std.debug.print(
+            "strict-finish-failure mode={s} field=corpus expected=broad actual=inputs\n",
+            .{counters.mode.name()},
+        );
+        return error.StrictFinishFailed;
+    }
+    try expectStrict(counters.mode, "source_rows", counters.source_rows, 101);
+    try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, 152);
+    try expectStrict(counters.mode, "structured_functions", counters.structured_functions, 152);
+    try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, 152);
+    try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, 152);
+    try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, 152);
+    try expectStrict(counters.mode, "legacy_air_text_lowering_functions", counters.legacy_air_text_lowering_functions, 0);
+    try expectStrict(counters.mode, "typed_v2_fallback_functions", counters.typed_v2_fallback_functions, 0);
+    try expectStrict(counters.mode, "generic_lowering_functions", counters.generic_lowering_functions, 152);
+    try expectStrict(counters.mode, "shape_recognizer_functions", counters.shape_recognizer_functions, 0);
+    try expectStrict(counters.mode, "unsupported_functions", counters.unsupported_functions, 0);
+    try expectStrict(counters.mode, "codegen_failures", counters.codegen_failures, 0);
+    if (counters.object_progress) {
+        try expectStrict(counters.mode, "object_emitted_functions", counters.object_emitted_functions, 152);
+        try expectStrict(counters.mode, "object_failures", counters.object_failures, 0);
+    }
+}
+
+fn expectStrict(mode: Mode, field: []const u8, actual: usize, expected: usize) !void {
+    if (actual == expected) return;
+    std.debug.print(
+        "strict-finish-failure mode={s} field={s} expected={} actual={}\n",
+        .{ mode.name(), field, expected, actual },
+    );
+    return error.StrictFinishFailed;
 }
 
 const ObjectInspection = struct {
