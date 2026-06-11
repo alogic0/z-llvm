@@ -261,10 +261,11 @@ pub fn main(init: std.process.Init) !void {
                 try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = object_path, .data = object });
 
                 const harness = if (options.executable_progress) executableHarnessForSource(source) else null;
-                const link_result = if (harness) |executable_harness|
-                    try linkObjectWithHarness(allocator, io, zig_emitter, object_path, exe_path, executable_harness.c_body)
-                else
-                    try nativeLinkObject(allocator, io, zig_emitter, object_path, exe_path);
+                const link_result = if (harness) |executable_harness| link_result: {
+                    const harness_body = try executableHarnessBody(allocator, executable_harness);
+                    defer if (executable_harness.c_body == null) allocator.free(harness_body);
+                    break :link_result try linkObjectWithHarness(allocator, io, zig_emitter, object_path, exe_path, harness_body);
+                } else try nativeLinkObject(allocator, io, zig_emitter, object_path, exe_path);
                 defer {
                     allocator.free(link_result.stdout);
                     allocator.free(link_result.stderr);
@@ -507,7 +508,26 @@ fn parseOptions(args: std.process.Args) !Options {
 const ExecutableHarness = struct {
     abi_mode: []const u8,
     expected: []const u8,
-    c_body: []const u8,
+    c_body: ?[]const u8 = null,
+    module_main: ?ModuleMainHarness = null,
+};
+
+const ModuleMainHarness = struct {
+    source: []const u8,
+    return_type: ModuleMainReturnType = .c_int,
+    expected_exit: i64 = 0,
+};
+
+const ModuleMainReturnType = enum {
+    c_int,
+    c_long,
+
+    fn cType(self: ModuleMainReturnType) []const u8 {
+        return switch (self) {
+            .c_int => "int",
+            .c_long => "long",
+        };
+    }
 };
 
 fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
@@ -689,7 +709,47 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (integratedModuleMainHarness(source)) |module_main| return .{
+        .abi_mode = "c-stable-integrated-main",
+        .expected = "module main expected return",
+        .module_main = module_main,
+    };
     return null;
+}
+
+fn integratedModuleMainHarness(source: []const u8) ?ModuleMainHarness {
+    if (!std.mem.startsWith(u8, source, "test/zig/integrated/")) return null;
+    const basename = std.fs.path.basename(source);
+    if (std.mem.eql(u8, basename, "runtime_mix_c_add_may_panic_main.zig")) return null;
+    if (std.mem.eql(u8, basename, "runtime_mix_c_add_zig_main.zig")) return null;
+    if (std.mem.eql(u8, basename, "runtime_optional_pointer_main.zig")) return null;
+    if (std.mem.eql(u8, basename, "runtime_pointer_load_store_main.zig")) return null;
+    if (std.mem.eql(u8, basename, "runtime_tls_bump_main.zig")) return null;
+
+    if (std.mem.eql(u8, basename, "runtime_aggregate_pair_main.zig")) return .{ .source = source, .expected_exit = 1 };
+    if (std.mem.eql(u8, basename, "runtime_hidden_access_main.zig")) return .{ .source = source, .expected_exit = 7 };
+    if (std.mem.eql(u8, basename, "runtime_inherit_want_safety_i64_main.zig")) return .{ .source = source, .return_type = .c_long, .expected_exit = 4 };
+    if (std.mem.eql(u8, basename, "runtime_umul_fix_sat_i64_main.zig")) return .{ .source = source, .return_type = .c_long };
+
+    return .{ .source = source };
+}
+
+fn executableHarnessBody(allocator: std.mem.Allocator, harness: ExecutableHarness) ![]const u8 {
+    if (harness.c_body) |body| return body;
+    const module_main = harness.module_main orelse return error.MissingExecutableHarnessBody;
+    const stem = std.fs.path.stem(module_main.source);
+    const symbol = try std.fmt.allocPrint(allocator, "{s}.main", .{stem});
+    defer allocator.free(symbol);
+    return std.fmt.allocPrint(
+        allocator,
+        \\extern {s} z_module_main(void) __asm__("{s}");
+        \\int main(void) {{
+        \\    return z_module_main() == {d} ? 0 : 1;
+        \\}}
+        \\
+    ,
+        .{ module_main.return_type.cType(), symbol, module_main.expected_exit },
+    );
 }
 
 fn nativeLinkObject(
