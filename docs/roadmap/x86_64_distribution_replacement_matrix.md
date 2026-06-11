@@ -256,6 +256,7 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   typed_air_type_functions=152
   typed_air_operand_functions=152
   legacy_air_text_lowering_functions=59
+  typed_v2_fallback_functions=59
   generic_lowering_functions=121
   shape_recognizer_functions=31
   unsupported_functions=0
@@ -338,6 +339,7 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   typed_air_type_functions=152
   typed_air_operand_functions=152
   legacy_air_text_lowering_functions=59
+  typed_v2_fallback_functions=59
   generic_lowering_functions=121
   shape_recognizer_functions=31
   unsupported_functions=0

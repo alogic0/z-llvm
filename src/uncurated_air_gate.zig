@@ -36,6 +36,12 @@ pub fn main(init: std.process.Init) !void {
         while (key_iterator.next()) |key| allocator.free(key.*);
         unsupported_counts.deinit();
     }
+    var typed_v2_fallback_counts = std.StringHashMap(usize).init(allocator);
+    defer {
+        var key_iterator = typed_v2_fallback_counts.keyIterator();
+        while (key_iterator.next()) |key| allocator.free(key.*);
+        typed_v2_fallback_counts.deinit();
+    }
 
     var source_rows: usize = 0;
     var discovered_functions: usize = 0;
@@ -56,6 +62,7 @@ pub fn main(init: std.process.Init) !void {
     var structured_air_v2_functions: usize = 0;
     var typed_air_type_functions: usize = 0;
     var typed_air_operand_functions: usize = 0;
+    var typed_v2_fallback_functions: usize = 0;
     var object_failures: usize = 0;
     var native_link_failures: usize = 0;
     var first_unsupported_source: ?[]const u8 = null;
@@ -64,6 +71,14 @@ pub fn main(init: std.process.Init) !void {
     defer if (first_unsupported_function) |value| allocator.free(value);
     var first_unsupported_opcode: ?[]const u8 = null;
     defer if (first_unsupported_opcode) |value| allocator.free(value);
+    var first_typed_v2_fallback_function: ?[]const u8 = null;
+    defer if (first_typed_v2_fallback_function) |value| allocator.free(value);
+    var first_typed_v2_fallback_opcode: ?[]const u8 = null;
+    defer if (first_typed_v2_fallback_opcode) |value| allocator.free(value);
+    var first_typed_v2_fallback_data_kind: ?[]const u8 = null;
+    defer if (first_typed_v2_fallback_data_kind) |value| allocator.free(value);
+    var first_typed_v2_fallback_reason: ?[]const u8 = null;
+    defer if (first_typed_v2_fallback_reason) |value| allocator.free(value);
 
     for (sources) |source| {
         const stem = std.fs.path.stem(source);
@@ -161,6 +176,26 @@ pub fn main(init: std.process.Init) !void {
         legacy_air_text_lowering_functions += lowered.legacy_air_text_lowering_functions;
         generic_lowering_functions += lowered.generic_lowering_functions;
         shape_recognizer_functions += lowered.shape_recognizer_functions;
+        typed_v2_fallback_functions += lowered.typed_v2_fallbacks.len;
+        for (lowered.typed_v2_fallbacks) |fallback| {
+            const fallback_key = try std.fmt.allocPrint(allocator, "{s}:{s}:{s}", .{
+                fallback.reason,
+                fallback.opcode,
+                fallback.data_kind,
+            });
+            defer allocator.free(fallback_key);
+            try incrementCount(allocator, &typed_v2_fallback_counts, fallback_key);
+            std.debug.print(
+                "typed-v2-fallback source={s} function={s} opcode={s} data_kind={s} reason={s}\n",
+                .{ source, fallback.function, fallback.opcode, fallback.data_kind, fallback.reason },
+            );
+            if (first_typed_v2_fallback_function == null) {
+                first_typed_v2_fallback_function = try allocator.dupe(u8, fallback.function);
+                first_typed_v2_fallback_opcode = try allocator.dupe(u8, fallback.opcode);
+                first_typed_v2_fallback_data_kind = try allocator.dupe(u8, fallback.data_kind);
+                first_typed_v2_fallback_reason = try allocator.dupe(u8, fallback.reason);
+            }
+        }
         unsupported_functions += lowered.unsupported.len;
         for (lowered.unsupported) |diagnostic| {
             if (diagnostic.reason == .opcode or diagnostic.reason == .control_flow_shape) {
@@ -303,11 +338,22 @@ pub fn main(init: std.process.Init) !void {
             top_count = entry.value_ptr.*;
         }
     }
+    var top_typed_v2_fallback_reason: []const u8 = "-";
+    var top_typed_v2_fallback_count: usize = 0;
+    var typed_fallback_iterator = typed_v2_fallback_counts.iterator();
+    while (typed_fallback_iterator.next()) |entry| {
+        if (entry.value_ptr.* > top_typed_v2_fallback_count or
+            (entry.value_ptr.* == top_typed_v2_fallback_count and std.mem.lessThan(u8, entry.key_ptr.*, top_typed_v2_fallback_reason)))
+        {
+            top_typed_v2_fallback_reason = entry.key_ptr.*;
+            top_typed_v2_fallback_count = entry.value_ptr.*;
+        }
+    }
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} local_fail=0\n",
+        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail=0\n",
         .{
             mode.name(),
             source_rows,
@@ -319,6 +365,7 @@ pub fn main(init: std.process.Init) !void {
             typed_air_type_functions,
             typed_air_operand_functions,
             legacy_air_text_lowering_functions,
+            typed_v2_fallback_functions,
             generic_lowering_functions,
             shape_recognizer_functions,
             unsupported_functions,
@@ -328,6 +375,12 @@ pub fn main(init: std.process.Init) !void {
             first_unsupported_opcode orelse "-",
             top_construct,
             top_count,
+            first_typed_v2_fallback_function orelse "-",
+            first_typed_v2_fallback_opcode orelse "-",
+            first_typed_v2_fallback_data_kind orelse "-",
+            first_typed_v2_fallback_reason orelse "-",
+            top_typed_v2_fallback_reason,
+            top_typed_v2_fallback_count,
         },
     );
     if (options.object_progress) {

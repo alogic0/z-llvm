@@ -17,10 +17,13 @@ structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
 legacy_air_text_lowering_functions=59
+typed_v2_fallback_functions=59
 generic_lowering_functions=121
 shape_recognizer_functions=31
 unsupported_functions=0
 codegen_failures=0
+top_typed_v2_fallback_reason=unsupported_opcode:block:opaque
+top_typed_v2_fallback_count=18
 ```
 
 `structured_air-v1` is present for every accepted function and carries
@@ -32,6 +35,11 @@ lowers the straight-line scalar, load/store, stack-slot, and direct-call subset
 from typed v2 records; `legacy_air_text_lowering_functions=59` remains for
 families that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, runtime-boundary, and packed-field lowering.
+
+The broad gates now emit one `typed-v2-fallback` diagnostic per accepted
+function that still falls back to legacy AIR text. The summary records the first
+fallback function/opcode/data kind/reason and the top fallback bucket; the
+current top bucket is `unsupported_opcode:block:opaque` with 18 functions.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 

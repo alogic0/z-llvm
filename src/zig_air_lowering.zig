@@ -28,13 +28,22 @@ pub const Result = struct {
     generic_lowering_functions: usize,
     shape_recognizer_functions: usize,
     unsupported: []Diagnostic,
+    typed_v2_fallbacks: []TypedV2Fallback,
 
     pub fn deinit(self: *Result) void {
         const allocator = self.module.allocator;
         self.module.deinit();
         allocator.free(self.unsupported);
+        allocator.free(self.typed_v2_fallbacks);
         self.* = undefined;
     }
+};
+
+pub const TypedV2Fallback = struct {
+    function: []const u8,
+    opcode: []const u8,
+    data_kind: []const u8,
+    reason: []const u8,
 };
 
 const ZigType = struct {
@@ -86,6 +95,8 @@ pub fn lowerCompatible(
 
     var unsupported: std.ArrayList(Diagnostic) = .empty;
     errdefer unsupported.deinit(allocator);
+    var typed_v2_fallbacks: std.ArrayList(TypedV2Fallback) = .empty;
+    errdefer typed_v2_fallbacks.deinit(allocator);
 
     for (air_module.globals) |air_global| {
         if (air_global.is_constant) continue;
@@ -130,6 +141,7 @@ pub fn lowerCompatible(
             break :function lowerFunctionTypedV2(allocator, &module, air_function) catch |typed_err| switch (typed_err) {
                 error.UnsupportedAir => {
                     lowered_from_typed_v2 = false;
+                    try typed_v2_fallbacks.append(allocator, firstTypedV2Fallback(air_function));
                     break :function lowerFunction(allocator, &module, air_function) catch |legacy_err| switch (legacy_err) {
                         error.UnsupportedAir => {
                             try unsupported.append(allocator, .{
@@ -174,6 +186,7 @@ pub fn lowerCompatible(
         .generic_lowering_functions = generic_lowering_functions,
         .shape_recognizer_functions = shape_recognizer_functions,
         .unsupported = try unsupported.toOwnedSlice(allocator),
+        .typed_v2_fallbacks = try typed_v2_fallbacks.toOwnedSlice(allocator),
     };
 }
 
@@ -308,30 +321,120 @@ const LoweringPath = enum {
     shape_recognizer,
 };
 
-fn loweringPath(function: air_export.Function) LoweringPath {
-    if (accumulatorLoopShape(function) != null or
-        errorClassifyShape(function) or
-        isIntegerSwitchBlock(function) or
-        conditionalSlotUpdateShape(function) or
-        arraySumShape(function) or
-        structSumShape(function) or
-        base64TableLookupShape(function) or
-        runtimeOptionalPointerMainShape(function) or
-        optionalPointerShape(function) or
-        runtimePointerLoadStoreMainShape(function) or
-        optionalPayloadShape(function) or
-        errorSwitchShape(function) or
-        errorUnionPayloadShape(function) or
-        sliceSumShape(function) or
-        packedReadFlagShape(function) or
-        packedReplaceLowShape(function) or
-        aggregatePairFirstShape(function) or
-        aggregateMakePairShape(function) or
-        mixCAddMayPanicShape(function) or
-        maybeErrorShape(function))
-    {
-        return .shape_recognizer;
+fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
+    if (shapeRecognizerName(function)) |name| {
+        return .{
+            .function = function.name,
+            .opcode = name,
+            .data_kind = "-",
+            .reason = "shape_recognizer",
+        };
     }
+    const structured_air = function.structured_air orelse return .{
+        .function = function.name,
+        .opcode = "structured_air-v1",
+        .data_kind = "-",
+        .reason = "missing",
+    };
+    const structured_air_v2 = function.structured_air_v2 orelse return .{
+        .function = function.name,
+        .opcode = "structured_air-v2",
+        .data_kind = "-",
+        .reason = "missing",
+    };
+    const main_body = structured_air.body(.main, null) orelse return .{
+        .function = function.name,
+        .opcode = "main_body",
+        .data_kind = "-",
+        .reason = "missing",
+    };
+    for (main_body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return .{
+            .function = function.name,
+            .opcode = "typed_inst",
+            .data_kind = "-",
+            .reason = "missing_index",
+        };
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (!isTypedV2LowerableOpcode(instruction.opcode)) {
+            return .{
+                .function = function.name,
+                .opcode = instruction.opcode,
+                .data_kind = instruction.data_kind,
+                .reason = "unsupported_opcode",
+            };
+        }
+        if (typedV2InstructionMissingRequiredDetail(instruction)) |detail| {
+            return .{
+                .function = function.name,
+                .opcode = instruction.opcode,
+                .data_kind = instruction.data_kind,
+                .reason = detail,
+            };
+        }
+    }
+    return .{
+        .function = function.name,
+        .opcode = "typed_v2",
+        .data_kind = "-",
+        .reason = "lowering_validation",
+    };
+}
+
+fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
+    if (accumulatorLoopShape(function) != null) return "accumulator_loop";
+    if (errorClassifyShape(function)) return "error_classifier";
+    if (isIntegerSwitchBlock(function)) return "integer_switch_block";
+    if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
+    if (arraySumShape(function)) return "array_sum";
+    if (structSumShape(function)) return "struct_sum";
+    if (base64TableLookupShape(function)) return "base64_table_lookup";
+    if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
+    if (optionalPointerShape(function)) return "optional_pointer";
+    if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
+    if (optionalPayloadShape(function)) return "optional_payload";
+    if (errorSwitchShape(function)) return "error_switch";
+    if (errorUnionPayloadShape(function)) return "error_union_payload";
+    if (sliceSumShape(function)) return "slice_sum";
+    if (packedReadFlagShape(function)) return "packed_read_flag";
+    if (packedReplaceLowShape(function)) return "packed_replace_low";
+    if (aggregatePairFirstShape(function)) return "aggregate_pair_first";
+    if (aggregateMakePairShape(function)) return "aggregate_make_pair";
+    if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
+    if (maybeErrorShape(function)) return "maybe_error";
+    return null;
+}
+
+fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
+    return std.mem.eql(u8, opcode, "arg") or
+        isArithmeticOpcode(opcode) or
+        std.mem.startsWith(u8, opcode, "cmp_") or
+        isCastOpcode(opcode) or
+        std.mem.eql(u8, opcode, "alloc") or
+        std.mem.eql(u8, opcode, "load") or
+        std.mem.eql(u8, opcode, "store") or
+        std.mem.eql(u8, opcode, "store_safe") or
+        isCallOpcode(opcode) or
+        std.mem.eql(u8, opcode, "ret") or
+        std.mem.eql(u8, opcode, "ret_safe") or
+        std.mem.eql(u8, opcode, "unreach");
+}
+
+fn typedV2InstructionMissingRequiredDetail(instruction: air_export.TypedInstruction) ?[]const u8 {
+    if (isCallOpcode(instruction.opcode)) {
+        if (typedDetail(instruction, "callee_text") == null) return "missing_callee_text";
+        if (typedDetail(instruction, "call_signature") == null) return "missing_call_signature";
+    }
+    for (instruction.operands, 0..) |operand, operand_index| {
+        if (std.mem.eql(u8, operand.kind, "const") and typedOperandTextDetail(instruction, operand_index) == null) {
+            return "missing_const_text";
+        }
+    }
+    return null;
+}
+
+fn loweringPath(function: air_export.Function) LoweringPath {
+    if (shapeRecognizerName(function) != null) return .shape_recognizer;
     return .generic_instruction_path;
 }
 
