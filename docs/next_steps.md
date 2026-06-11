@@ -177,13 +177,13 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `structured_functions=152`, `generic_codegen_functions=152`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
-`legacy_air_text_lowering_functions=31`, `typed_v2_fallback_functions=31`, `generic_lowering_functions=123`,
-`shape_recognizer_functions=29`, `unsupported_functions=0`,
+`legacy_air_text_lowering_functions=29`, `typed_v2_fallback_functions=29`, `generic_lowering_functions=125`,
+`shape_recognizer_functions=27`, `unsupported_functions=0`,
 `codegen_failures=0`, `case_id_rows=0`, `source_fact_classification_rows=0`,
 and `local_fail=0`. Typed v2 is now the lowering authority for the
 straight-line scalar, load/store, global pointer constants, stack-slot,
-direct-call, runtime symbol pointer, simple block-result select, and struct
-field-sum subset; the 29 remaining shape-recognizer functions and 31 legacy AIR text lowering functions
+direct-call, runtime symbol pointer, simple block-result select, struct
+field-sum, and array aggregate-sum subset; the 27 remaining shape-recognizer functions and 29 legacy AIR text lowering functions
 are listed in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`.
 

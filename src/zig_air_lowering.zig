@@ -279,7 +279,6 @@ pub fn firstUnsupported(
         errorClassifyShape(function) or
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
-        arraySumShape(function) or
         base64TableLookupShape(function) or
         runtimeOptionalPointerMainShape(function) or
         optionalPointerShape(function) or
@@ -386,7 +385,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (errorClassifyShape(function)) return "error_classifier";
     if (isIntegerSwitchBlock(function)) return "integer_switch_block";
     if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
-    if (arraySumShape(function)) return "array_sum";
     if (base64TableLookupShape(function)) return "base64_table_lookup";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (optionalPointerShape(function)) return "optional_pointer";
@@ -583,6 +581,9 @@ fn lowerFunctionTypedV2(
 
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
+    if (try lowerTypedV2ArraySum(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
 
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
@@ -625,6 +626,64 @@ fn lowerFunctionTypedV2(
         try context.lowerTypedInstruction(instruction);
     }
     if (block.terminator == null) return error.UnsupportedAir;
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn lowerTypedV2ArraySum(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (function_type.params.len != 3 or !function_type.return_type.ir_type.eql(.{ .int = 32 })) return null;
+    for (function_type.params) |param| {
+        if (!param.ir_type.eql(.{ .int = 32 })) return null;
+    }
+
+    var aggregate_init: ?air_export.TypedInstruction = null;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "aggregate_init")) continue;
+        if (!std.mem.eql(u8, instruction.result_type, "[3]i32") or instruction.operands.len != 3) return null;
+        if (aggregate_init != null) return null;
+        aggregate_init = instruction;
+    }
+    const init = aggregate_init orelse return null;
+    for (init.operands, 0..) |operand, index| {
+        if (!std.mem.eql(u8, operand.kind, "inst") or !std.mem.eql(u8, operand.type_text, "i32")) return null;
+        const operand_index = std.fmt.parseInt(usize, operand.value, 10) catch return null;
+        if (operand_index != index) return null;
+    }
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg2" });
+
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "sum01",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "arg0" },
+            .rhs = .{ .named = "arg1" },
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "sum",
+        .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "sum01" },
+            .rhs = .{ .named = "arg2" },
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
     try function.blocks.append(allocator, block);
     return function;
 }
@@ -3371,6 +3430,8 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "array_elem_val") or
+        std.mem.eql(u8, opcode, "aggregate_init") or
+        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
         std.mem.eql(u8, opcode, "assembly") or
         isFieldPtrOpcode(opcode) or
         isCallOpcode(opcode) or

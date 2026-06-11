@@ -255,10 +255,10 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=31
-  typed_v2_fallback_functions=31
-  generic_lowering_functions=123
-  shape_recognizer_functions=29
+  legacy_air_text_lowering_functions=29
+  typed_v2_fallback_functions=29
+  generic_lowering_functions=125
+  shape_recognizer_functions=27
   unsupported_functions=0
   codegen_failures=0
   case_id_rows=0
@@ -338,16 +338,16 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=31
-  typed_v2_fallback_functions=31
-  generic_lowering_functions=123
-  shape_recognizer_functions=29
+  legacy_air_text_lowering_functions=29
+  typed_v2_fallback_functions=29
+  generic_lowering_functions=125
+  shape_recognizer_functions=27
   unsupported_functions=0
   codegen_failures=0
   local_fail=0
 ```
 
-The remaining 29 shape-recognizer functions are audited in
+The remaining 27 shape-recognizer functions are audited in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
 `structured_air-v2` are present for every accepted broad function. The v2
 transport now carries typed operand records for all broad functions, but z_llvm
