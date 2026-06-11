@@ -279,7 +279,6 @@ pub fn firstUnsupported(
         errorClassifyShape(function) or
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
-        base64TableLookupShape(function) or
         runtimeOptionalPointerMainShape(function) or
         optionalPointerShape(function) or
         runtimePointerLoadStoreMainShape(function) or
@@ -302,12 +301,14 @@ pub fn firstUnsupported(
         if (isIgnoredOpcode(instruction.opcode) or isStraightLineOpcode(instruction.opcode)) continue;
         if (std.mem.eql(u8, instruction.opcode, "block")) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
+            if (isTypedVoidGuardBlock(function, instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (std.mem.eql(u8, instruction.opcode, "cond_br") or
             std.mem.eql(u8, instruction.opcode, "br"))
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
+            if (belongsToTypedVoidGuardBlock(function, instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
@@ -385,7 +386,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (errorClassifyShape(function)) return "error_classifier";
     if (isIntegerSwitchBlock(function)) return "integer_switch_block";
     if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
-    if (base64TableLookupShape(function)) return "base64_table_lookup";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (optionalPointerShape(function)) return "optional_pointer";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
@@ -412,6 +412,7 @@ fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
         std.mem.eql(u8, opcode, "block") or
+        std.mem.eql(u8, opcode, "array_elem_val") or
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         isFieldPtrOpcode(opcode) or
         isCallOpcode(opcode) or
@@ -2311,6 +2312,8 @@ const LoweringContext = struct {
             try self.lowerTypedBlock(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
             try self.lowerTypedRuntimeNavPtr(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
+            try self.lowerTypedArrayElemVal(instruction);
         } else if (isFieldPtrOpcode(instruction.opcode)) {
             try self.lowerTypedFieldPtr(instruction);
         } else if (isCallOpcode(instruction.opcode)) {
@@ -2507,6 +2510,7 @@ const LoweringContext = struct {
 
         const then_body = structured_air.body(.then_body, cond_instruction.index) orelse return error.UnsupportedAir;
         const else_body = structured_air.body(.else_body, cond_instruction.index) orelse return error.UnsupportedAir;
+        if (typedVoidGuardBlock(structured_air_v2, instruction.index, then_body, else_body)) return;
         const true_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body);
         const false_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body);
         if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
@@ -2541,8 +2545,7 @@ const LoweringContext = struct {
             return error.UnsupportedAir;
         }
         const target_operand = branch_instruction.operands[0];
-        if (!std.mem.eql(u8, target_operand.kind, "block")) return error.UnsupportedAir;
-        const target = std.fmt.parseInt(u32, target_operand.value, 10) catch return error.UnsupportedAir;
+        const target = typedBlockTarget(target_operand) orelse return error.UnsupportedAir;
         if (target != target_block) return error.UnsupportedAir;
         return self.resolveTypedOperand(branch_instruction, 1);
     }
@@ -2577,6 +2580,38 @@ const LoweringContext = struct {
         self.values[instruction.index] = .{
             .ty = pointer_type,
             .value = .{ .named = symbol },
+        };
+    }
+
+    fn lowerTypedArrayElemVal(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const table_text = typedOperandTextDetail(instruction, 0) orelse return error.UnsupportedAir;
+        const index = try self.resolveTypedOperand(instruction, 1);
+        if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        if (!std.mem.eql(u8, table_text, "<[4]u8, \"\\x00\\x04\\x08\\x0c\".*>")) return error.UnsupportedAir;
+        try ensureBase64LookupGlobal(self.allocator, self.module);
+
+        const gep_name = try ownPrint(self.module, "air{}_ptr", .{instruction.index});
+        var gep: ir.GepInst = .{
+            .source_ty = .{ .aggregate = "[4 x i8]" },
+            .ptr = .{ .named = "@__anon_base64_table" },
+            .indices = .empty,
+        };
+        errdefer gep.deinit(self.allocator);
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = index.value });
+        try self.block.instructions.append(self.allocator, .{ .result = gep_name, .kind = .{ .gep = gep } });
+
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (!result_type.ir_type.eql(.{ .int = 8 })) return error.UnsupportedAir;
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .load = .{ .ty = .{ .int = 8 }, .ptr = .{ .named = gep_name } } },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
         };
     }
 
@@ -3362,6 +3397,40 @@ fn belongsToSimpleSelectBlock(function: air_export.Function, instruction_index: 
     return false;
 }
 
+fn isTypedVoidGuardBlock(function: air_export.Function, block_index: u32) bool {
+    const structured_air = function.structured_air orelse return false;
+    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    const block_body = structured_air.body(.block, block_index) orelse return false;
+    const cond_index = singleNonDebugInstruction(structured_air_v2, block_body) orelse return false;
+    const cond = typedInstructionByIndex(structured_air_v2, cond_index) orelse return false;
+    if (!std.mem.eql(u8, cond.opcode, "cond_br")) return false;
+    const then_body = structured_air.body(.then_body, cond.index) orelse return false;
+    const else_body = structured_air.body(.else_body, cond.index) orelse return false;
+    return typedVoidGuardBlock(structured_air_v2, block_index, then_body, else_body);
+}
+
+fn belongsToTypedVoidGuardBlock(function: air_export.Function, instruction_index: u32) bool {
+    const structured_air = function.structured_air orelse return false;
+    for (structured_air.bodies) |body| {
+        if (body.kind != .block) continue;
+        for (body.instructions) |body_instruction| {
+            if (body_instruction == instruction_index and isTypedVoidGuardBlock(function, body.owner.?)) return true;
+        }
+        if (structured_air.body(.block, body.owner.?) == null) continue;
+        const block_body = body;
+        const cond_index = singleNonDebugInstruction(function.structured_air_v2 orelse return false, block_body) orelse continue;
+        const then_body = structured_air.body(.then_body, cond_index) orelse continue;
+        const else_body = structured_air.body(.else_body, cond_index) orelse continue;
+        for (then_body.instructions) |then_instruction| {
+            if (then_instruction == instruction_index and isTypedVoidGuardBlock(function, body.owner.?)) return true;
+        }
+        for (else_body.instructions) |else_instruction| {
+            if (else_instruction == instruction_index and isTypedVoidGuardBlock(function, body.owner.?)) return true;
+        }
+    }
+    return false;
+}
+
 fn instructionPosition(function: air_export.Function, index: u32) ?usize {
     for (function.instructions, 0..) |instruction, position| {
         if (instruction.index == index) return position;
@@ -3381,6 +3450,66 @@ fn singleNonDebugInstruction(
         result = instruction_index;
     }
     return result;
+}
+
+fn typedVoidGuardBlock(
+    structured_air_v2: air_export.StructuredAirV2,
+    target_block: u32,
+    then_body: air_export.StructuredBody,
+    else_body: air_export.StructuredBody,
+) bool {
+    return (typedVoidBranchBody(structured_air_v2, then_body, target_block) and
+        typedNoreturnBody(structured_air_v2, else_body)) or
+        (typedVoidBranchBody(structured_air_v2, else_body, target_block) and
+            typedNoreturnBody(structured_air_v2, then_body));
+}
+
+fn typedVoidBranchBody(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+    target_block: u32,
+) bool {
+    const branch_index = singleNonDebugInstruction(structured_air_v2, body) orelse return false;
+    const branch = typedInstructionByIndex(structured_air_v2, branch_index) orelse return false;
+    if (!std.mem.eql(u8, branch.opcode, "br") or branch.operands.len != 2) return false;
+    const target = typedBlockTarget(branch.operands[0]) orelse return false;
+    if (target != target_block) return false;
+    if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
+    return std.mem.eql(u8, branch.operands[1].type_text, "void") and
+        std.mem.eql(u8, typedOperandTextDetail(branch, 1) orelse return false, "@.void_value");
+}
+
+fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {
+    if (!std.mem.eql(u8, operand.kind, "block")) return null;
+    if (!std.mem.eql(u8, operand.value, "block")) {
+        return std.fmt.parseInt(u32, operand.value, 10) catch null;
+    }
+    return std.fmt.parseInt(u32, operand.type_text, 10) catch null;
+}
+
+fn typedNoreturnBody(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) bool {
+    var saw_call = false;
+    var saw_unreach = false;
+    for (body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (!saw_call) {
+            if (!isCallOpcode(instruction.opcode)) return false;
+            const signature = typedDetail(instruction, "call_signature") orelse return false;
+            if (!std.mem.endsWith(u8, std.mem.trim(u8, signature, " "), "noreturn")) return false;
+            saw_call = true;
+            continue;
+        }
+        if (!saw_unreach and std.mem.eql(u8, instruction.opcode, "unreach")) {
+            saw_unreach = true;
+            continue;
+        }
+        return false;
+    }
+    return saw_call and saw_unreach;
 }
 
 fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {

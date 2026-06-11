@@ -16,10 +16,10 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=29
-typed_v2_fallback_functions=29
-generic_lowering_functions=125
-shape_recognizer_functions=27
+legacy_air_text_lowering_functions=28
+typed_v2_fallback_functions=28
+generic_lowering_functions=126
+shape_recognizer_functions=26
 unsupported_functions=0
 codegen_failures=0
 top_typed_v2_fallback_reason=shape_recognizer:aggregate_make_pair:-
@@ -33,9 +33,9 @@ instruction result records, typed value operands, typed control targets, typed
 sentinel operands, operand text details, and call signature records. z_llvm now
 lowers the straight-line scalar, load/store, global pointer constants,
 stack-slot, direct-call, runtime symbol pointer, simple block-result diamond
-select, struct field-sum, and array aggregate-sum subset from typed v2 records, using
+select, struct field-sum, array aggregate-sum, and base64 table-lookup subset from typed v2 records, using
 `structured_air-v1` body topology
-only where block structure is still required. `legacy_air_text_lowering_functions=29` remains for families
+only where block structure is still required. `legacy_air_text_lowering_functions=28` remains for families
 that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, runtime-boundary, and packed-field lowering.
 
@@ -51,7 +51,6 @@ The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 - accumulator loop
 - integer switch block
 - conditional slot update
-- base64 table lookup
 - runtime optional pointer main
 - optional pointer
 - runtime pointer load/store main

@@ -6170,13 +6170,15 @@ fn lowerBase64TableLookupReturn(
         return false;
     }
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
-    if (block.instructions.items.len != 4 and block.instructions.items.len != 5) return false;
+    if (block.instructions.items.len < 4 or block.instructions.items.len > 6) return false;
 
-    const has_mask = block.instructions.items.len == 5;
+    const has_safety_cmp = block.instructions.items.len == 6;
+    const has_mask = block.instructions.items.len == 5 or has_safety_cmp;
     const zext_index_index: usize = if (has_mask) 1 else 0;
-    const gep_index: usize = if (has_mask) 2 else 1;
-    const load_index: usize = if (has_mask) 3 else 2;
-    const zext_result_index: usize = if (has_mask) 4 else 3;
+    const safety_cmp_index: usize = 2;
+    const gep_index: usize = if (has_safety_cmp) 3 else if (has_mask) 2 else 1;
+    const load_index: usize = if (has_safety_cmp) 4 else if (has_mask) 3 else 2;
+    const zext_result_index: usize = if (has_safety_cmp) 5 else if (has_mask) 4 else 3;
     const zext_index_name = block.instructions.items[zext_index_index].result orelse return false;
     const gep_name = block.instructions.items[gep_index].result orelse return false;
     const load_name = block.instructions.items[load_index].result orelse return false;
@@ -6210,6 +6212,20 @@ fn lowerBase64TableLookupReturn(
     };
     if (first_zext.op != .zext or !first_zext.from_ty.eql(.{ .int = 8 }) or !first_zext.to_ty.eql(.{ .int = 64 })) return false;
     if (!isNamed(first_zext.value, zext_value_name)) return false;
+
+    if (has_safety_cmp) {
+        const safety_cmp = switch (block.instructions.items[safety_cmp_index].kind) {
+            .icmp => |icmp| icmp,
+            else => return false,
+        };
+        if (safety_cmp.predicate != .ult or
+            !safety_cmp.operand_ty.eql(.{ .int = 64 }) or
+            !isNamed(safety_cmp.lhs, zext_index_name) or
+            !isInt(safety_cmp.rhs, 4))
+        {
+            return false;
+        }
+    }
 
     const gep = switch (block.instructions.items[gep_index].kind) {
         .gep => |gep| gep,
