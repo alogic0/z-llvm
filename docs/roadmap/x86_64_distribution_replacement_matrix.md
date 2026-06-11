@@ -255,10 +255,10 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=22
-  typed_v2_fallback_functions=22
-  generic_lowering_functions=132
-  shape_recognizer_functions=20
+  legacy_air_text_lowering_functions=20
+  typed_v2_fallback_functions=20
+  generic_lowering_functions=134
+  shape_recognizer_functions=18
   unsupported_functions=0
   codegen_failures=0
   case_id_rows=0
@@ -338,16 +338,16 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=22
-  typed_v2_fallback_functions=22
-  generic_lowering_functions=132
-  shape_recognizer_functions=20
+  legacy_air_text_lowering_functions=20
+  typed_v2_fallback_functions=20
+  generic_lowering_functions=134
+  shape_recognizer_functions=18
   unsupported_functions=0
   codegen_failures=0
   local_fail=0
 ```
 
-The remaining 20 shape-recognizer functions are audited in
+The remaining 18 shape-recognizer functions are audited in
 `docs/roadmap/x86_64_air_shape_recognizer_audit.md`. `structured_air-v1` and
 `structured_air-v2` are present for every accepted broad function. The v2
 transport now carries typed operand records for all broad functions, but z_llvm
@@ -526,7 +526,9 @@ current slice closes optional pointer, optional payload, error-union payload,
 slice pointer arithmetic, base64-style `array_elem_val`, packed bit access, and
 f32/f64 literal return codegen. Broad typed-v2 now also owns aggregate pair
 first/make-pair ABI lowering through typed aggregate records and error-union
-payload lowering through typed branch/payload records. Remaining measured
+payload lowering through typed branch/payload records. Maybe-error helpers now
+lower through typed branch/return records into the selected error-union scalar
+representation. Remaining measured
 blockers include error-union/optional control-flow, pointer/slice recognizers,
 packed-field recognizers, mixed C/Zig panic-edge lowering, atomics, and inline
 assembly. Operand/type details still rely on the legacy AIR text for those
