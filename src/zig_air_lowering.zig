@@ -280,6 +280,11 @@ pub fn firstUnsupported(
                 typedV2AggregateMakePairRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_error_union_payload =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2ErrorUnionPayloadRecords(function, function_type, structured_air_v2)
+        else
+            false;
 
     if (accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
@@ -291,7 +296,7 @@ pub fn firstUnsupported(
         optionalPayloadShape(function) or
         errorSwitchShape(function) or
         errorClassifyShape(function) or
-        errorUnionPayloadShape(function) or
+        typed_error_union_payload or
         sliceSumShape(function) or
         packedReadFlagShape(function) or
         packedReplaceLowShape(function) or
@@ -396,7 +401,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
     if (optionalPayloadShape(function)) return "optional_payload";
     if (errorSwitchShape(function)) return "error_switch";
-    if (errorUnionPayloadShape(function)) return "error_union_payload";
     if (sliceSumShape(function)) return "slice_sum";
     if (packedReadFlagShape(function)) return "packed_read_flag";
     if (packedReplaceLowShape(function)) return "packed_replace_low";
@@ -478,7 +482,6 @@ fn lowerFunction(
     if (runtimePointerLoadStoreMainShape(air_function)) return lowerRuntimePointerLoadStoreMain(allocator, air_function);
     if (optionalPayloadShape(air_function)) return lowerOptionalPayload(allocator, air_function);
     if (errorSwitchShape(air_function)) return lowerErrorSwitch(allocator, air_function);
-    if (errorUnionPayloadShape(air_function)) return lowerErrorUnionPayload(allocator, air_function);
     if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
     if (packedReadFlagShape(air_function)) return lowerPackedReadFlag(allocator, air_function);
     if (packedReplaceLowShape(air_function)) return lowerPackedReplaceLow(allocator, air_function);
@@ -587,6 +590,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2AggregatePairAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2ErrorUnionPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -760,6 +766,39 @@ fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
 
 fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
     return typedOpcodeCount(structured_air_v2, "ret") != 0 or typedOpcodeCount(structured_air_v2, "ret_safe") != 0;
+}
+
+fn lowerTypedV2ErrorUnionPayload(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2ErrorUnionPayloadRecords(air_function, function_type, structured_air_v2)) return null;
+    return try lowerErrorUnionPayload(allocator, air_function);
+}
+
+fn typedV2ErrorUnionPayloadRecords(
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (std.mem.eql(u8, air_function.name, "error_switch.error_switch")) return false;
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    return typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "call") == 1 and
+        typedOpcodeCount(structured_air_v2, "is_non_err") == 1 and
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_payload") == 1 and
+        typedOpcodeCount(structured_air_v2, "unwrap_errunion_err") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 2 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedHasReturnOpcode(structured_air_v2);
 }
 
 const AccumulatorLoopShape = struct {

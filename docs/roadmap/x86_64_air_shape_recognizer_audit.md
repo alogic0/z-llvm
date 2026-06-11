@@ -16,13 +16,13 @@ structured_air_v1_functions=152
 structured_air_v2_functions=152
 typed_air_type_functions=152
 typed_air_operand_functions=152
-legacy_air_text_lowering_functions=24
-typed_v2_fallback_functions=24
-generic_lowering_functions=130
-shape_recognizer_functions=22
+legacy_air_text_lowering_functions=22
+typed_v2_fallback_functions=22
+generic_lowering_functions=132
+shape_recognizer_functions=20
 unsupported_functions=0
 codegen_failures=0
-top_typed_v2_fallback_reason=shape_recognizer:error_union_payload:-
+top_typed_v2_fallback_reason=shape_recognizer:maybe_error:-
 top_typed_v2_fallback_count=2
 ```
 
@@ -36,7 +36,9 @@ stack-slot, direct-call, runtime symbol pointer, simple block-result diamond
 select, struct field-sum, array aggregate-sum, and base64 table-lookup subset from typed v2 records, using
 `structured_air-v1` body topology
 only where block structure is still required. Aggregate pair first/make-pair now validates typed-v2
-aggregate ABI records before lowering to the scalar SysV representation. `legacy_air_text_lowering_functions=24` remains for families
+aggregate ABI records before lowering to the scalar SysV representation. Error-union payload now
+validates typed-v2 error-union branch/payload records before lowering to the selected payload value.
+`legacy_air_text_lowering_functions=22` remains for families
 that still need generic typed control-flow, aggregate, pointer/slice,
 optional/error-union, runtime-boundary, and packed-field lowering.
 
@@ -45,7 +47,7 @@ function that still falls back to legacy AIR text. The summary records the first
 fallback function/opcode/data kind/reason and the top fallback bucket. Generic
 typed-v2 validation failures now report the concrete failing typed opcode and
 data kind instead of a synthetic `typed_v2` bucket; the current top bucket is
-`shape_recognizer:error_union_payload:-` with 2 functions.
+`shape_recognizer:maybe_error:-` with 2 functions.
 
 The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 
@@ -57,7 +59,6 @@ The remaining shape recognizer families in `src/zig_air_lowering.zig` are:
 - runtime pointer load/store main
 - optional payload
 - error switch and classifier
-- error-union payload
 - slice sum
 - packed read flag
 - packed replace low
