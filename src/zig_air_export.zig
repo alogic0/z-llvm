@@ -99,7 +99,10 @@ pub const StructuredAirV2 = struct {
     instructions: []TypedInstruction,
 
     fn deinit(self: StructuredAirV2, allocator: std.mem.Allocator) void {
-        for (self.instructions) |instruction| allocator.free(instruction.operands);
+        for (self.instructions) |instruction| {
+            allocator.free(instruction.operands);
+            allocator.free(instruction.details);
+        }
         allocator.free(self.instructions);
     }
 };
@@ -110,12 +113,18 @@ pub const TypedInstruction = struct {
     result_type: []const u8,
     data_kind: []const u8,
     operands: []TypedOperand,
+    details: []TypedDetail = &.{},
 };
 
 pub const TypedOperand = struct {
     kind: []const u8,
     value: []const u8,
     type_text: []const u8,
+};
+
+pub const TypedDetail = struct {
+    key: []const u8,
+    value: []const u8,
 };
 
 pub const Global = struct {
@@ -360,7 +369,10 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
 
     var instructions: std.ArrayList(TypedInstruction) = .empty;
     errdefer {
-        for (instructions.items) |instruction| allocator.free(instruction.operands);
+        for (instructions.items) |instruction| {
+            allocator.free(instruction.operands);
+            allocator.free(instruction.details);
+        }
         instructions.deinit(allocator);
     }
 
@@ -397,6 +409,22 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
                 .type_text = type_text,
             };
         }
+        var details: []TypedDetail = &.{};
+        if (fields.next()) |detail_count_text| {
+            const detail_count = try parseUnsigned(usize, detail_count_text);
+            details = try allocator.alloc(TypedDetail, detail_count);
+            errdefer allocator.free(details);
+            for (details) |*detail| {
+                const key = fields.next() orelse return error.InvalidStructuredAirV2;
+                const detail_value_len = try parseUnsigned(usize, fields.next() orelse return error.InvalidStructuredAirV2);
+                const detail_value = fields.next() orelse return error.InvalidStructuredAirV2;
+                if (detail_value.len != detail_value_len) return error.InvalidStructuredAirV2;
+                detail.* = .{
+                    .key = key,
+                    .value = detail_value,
+                };
+            }
+        }
         if (fields.next() != null) return error.InvalidStructuredAirV2;
         try instructions.append(allocator, .{
             .index = index,
@@ -404,6 +432,7 @@ fn parseStructuredAirV2(allocator: std.mem.Allocator, text: []const u8) !Structu
             .result_type = result_type,
             .data_kind = data_kind,
             .operands = operands,
+            .details = details,
         });
     }
     if (!saw_end) return error.InvalidStructuredAirV2;
@@ -467,6 +496,9 @@ pub fn verify(module: Module) !void {
                     if (operand.kind.len == 0 or operand.value.len == 0 or operand.type_text.len == 0) {
                         return error.InvalidStructuredAirV2;
                     }
+                }
+                for (instruction.details) |detail| {
+                    if (detail.key.len == 0) return error.InvalidStructuredAirV2;
                 }
             }
         }
@@ -861,6 +893,63 @@ test "parse optional structured AIR v2 typed instruction records" {
     try std.testing.expectEqualStrings("inst", structured_air_v2.instructions[1].operands[0].kind);
     try std.testing.expectEqualStrings("0", structured_air_v2.instructions[1].operands[0].value);
     try std.testing.expectEqualStrings("i32", structured_air_v2.instructions[1].operands[0].type_text);
+}
+
+test "parse structured AIR v2 typed instruction details" {
+    const air_text =
+        \\  %0!= ret(<i32, 0>)
+        \\
+    ;
+    const structured_air_text =
+        \\structured_air-v1
+        \\body|main|-|1|0
+        \\inst|0|ret|8|noreturn
+        \\structured_air_end
+        \\
+    ;
+    const structured_air_v2_text =
+        \\structured_air-v2
+        \\typed_inst|0|ret|8|noreturn|un_op|1|const|1|0|3|i32|1|literal|8|<i32, 0>
+        \\structured_air_v2_end
+        \\
+    ;
+    const input = try std.fmt.allocPrint(std.testing.allocator,
+        \\zllvm-air-export-v1
+        \\contract_version=1
+        \\payload=zig-air-print-v1
+        \\producer=test
+        \\root_source=typed-details.zig
+        \\wrapper=typed-details.zig
+        \\mode=ReleaseFast
+        \\target=x86_64-linux-gnu
+        \\function_count=1
+        \\global_count=0
+        \\function_begin
+        \\name_bytes=4
+        \\main
+        \\type_bytes=9
+        \\fn () i32
+        \\instruction_count=1
+        \\main_body_count=1
+        \\liveness=present
+        \\air_bytes={}
+        \\{s}
+        \\structured_air_bytes={}
+        \\{s}
+        \\structured_air_v2_bytes={}
+        \\{s}
+        \\function_end
+        \\
+    , .{ air_text.len, air_text, structured_air_text.len, structured_air_text, structured_air_v2_text.len, structured_air_v2_text });
+    defer std.testing.allocator.free(input);
+
+    var module = try parse(std.testing.allocator, input);
+    defer module.deinit();
+
+    const instruction = module.functions[0].structured_air_v2.?.instructions[0];
+    try std.testing.expectEqual(@as(usize, 1), instruction.details.len);
+    try std.testing.expectEqualStrings("literal", instruction.details[0].key);
+    try std.testing.expectEqualStrings("<i32, 0>", instruction.details[0].value);
 }
 
 test "reject AIR export instruction index outside storage count" {
