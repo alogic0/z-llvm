@@ -83,6 +83,11 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasefast_broad_gate.addArg("--corpus=broad");
     const uncurated_air_releasefast_broad_step = b.step("distribution-zig-air-uncurated-releasefast-broad", "Discover and generically lower broad uncurated x86_64 ReleaseFast Zig AIR");
     uncurated_air_releasefast_broad_step.dependOn(&run_uncurated_air_releasefast_broad_gate.step);
+    const run_uncurated_air_releasefast_expanded_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasefast_expanded_gate.addArg("--mode=ReleaseFast");
+    run_uncurated_air_releasefast_expanded_gate.addArg("--corpus=expanded");
+    const uncurated_air_releasefast_expanded_step = b.step("distribution-zig-air-uncurated-releasefast-expanded", "Discover and lower the expanded x86_64 ReleaseFast Zig AIR frontier corpus");
+    uncurated_air_releasefast_expanded_step.dependOn(&run_uncurated_air_releasefast_expanded_gate.step);
     const run_uncurated_air_releasefast_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasefast_broad_object_gate.addArg("--mode=ReleaseFast");
     run_uncurated_air_releasefast_broad_object_gate.addArg("--corpus=broad");
@@ -112,6 +117,11 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasesafe_broad_gate.addArg("--corpus=broad");
     const uncurated_air_releasesafe_broad_step = b.step("distribution-zig-air-uncurated-releasesafe-broad", "Discover and generically lower broad uncurated x86_64 ReleaseSafe Zig AIR progress");
     uncurated_air_releasesafe_broad_step.dependOn(&run_uncurated_air_releasesafe_broad_gate.step);
+    const run_uncurated_air_releasesafe_expanded_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesafe_expanded_gate.addArg("--mode=ReleaseSafe");
+    run_uncurated_air_releasesafe_expanded_gate.addArg("--corpus=expanded");
+    const uncurated_air_releasesafe_expanded_step = b.step("distribution-zig-air-uncurated-releasesafe-expanded", "Discover and lower the expanded x86_64 ReleaseSafe Zig AIR frontier corpus");
+    uncurated_air_releasesafe_expanded_step.dependOn(&run_uncurated_air_releasesafe_expanded_gate.step);
     const run_uncurated_air_releasesafe_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesafe_broad_object_gate.addArg("--mode=ReleaseSafe");
     run_uncurated_air_releasesafe_broad_object_gate.addArg("--corpus=broad");
@@ -135,6 +145,11 @@ pub fn build(b: *std.Build) void {
     run_uncurated_air_releasesmall_broad_gate.addArg("--corpus=broad");
     const uncurated_air_releasesmall_broad_step = b.step("distribution-zig-air-uncurated-releasesmall-broad", "Discover and generically lower broad uncurated x86_64 ReleaseSmall Zig AIR progress");
     uncurated_air_releasesmall_broad_step.dependOn(&run_uncurated_air_releasesmall_broad_gate.step);
+    const run_uncurated_air_releasesmall_expanded_gate = b.addRunArtifact(uncurated_air_gate);
+    run_uncurated_air_releasesmall_expanded_gate.addArg("--mode=ReleaseSmall");
+    run_uncurated_air_releasesmall_expanded_gate.addArg("--corpus=expanded");
+    const uncurated_air_releasesmall_expanded_step = b.step("distribution-zig-air-uncurated-releasesmall-expanded", "Discover and lower the expanded x86_64 ReleaseSmall Zig AIR frontier corpus");
+    uncurated_air_releasesmall_expanded_step.dependOn(&run_uncurated_air_releasesmall_expanded_gate.step);
     const run_uncurated_air_releasesmall_broad_object_gate = b.addRunArtifact(uncurated_air_gate);
     run_uncurated_air_releasesmall_broad_object_gate.addArg("--mode=ReleaseSmall");
     run_uncurated_air_releasesmall_broad_object_gate.addArg("--corpus=broad");

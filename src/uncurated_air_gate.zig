@@ -368,10 +368,16 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const air_local_fail: usize = if (options.corpus == .expanded and
+        (unsupported_functions != 0 or codegen_failures != 0 or typed_v2_fallback_functions != 0 or legacy_air_text_lowering_functions != 0 or shape_recognizer_functions != 0))
+        1
+    else
+        0;
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail=0\n",
+        "summary uncurated-zig-air mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail={}\n",
         .{
             mode.name(),
+            options.corpus.name(),
             source_rows,
             discovered_functions,
             structured_functions,
@@ -397,6 +403,7 @@ pub fn main(init: std.process.Init) !void {
             first_typed_v2_fallback_reason orelse "-",
             top_typed_v2_fallback_reason,
             top_typed_v2_fallback_count,
+            air_local_fail,
         },
     );
     if (options.object_progress) {
@@ -444,6 +451,8 @@ pub fn main(init: std.process.Init) !void {
         );
     }
     try stdout_writer.interface.flush();
+
+    if (air_local_fail != 0) return error.ExpandedCorpusLocalFailure;
 
     if (options.strict_finish) {
         try validateStrictFinish(.{
@@ -520,6 +529,15 @@ const Mode = enum {
 const Corpus = enum {
     inputs,
     broad,
+    expanded,
+
+    fn name(self: Corpus) []const u8 {
+        return switch (self) {
+            .inputs => "inputs",
+            .broad => "broad",
+            .expanded => "expanded",
+        };
+    }
 };
 
 fn parseOptions(args: std.process.Args) !Options {
@@ -537,6 +555,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .inputs;
         } else if (std.mem.eql(u8, arg, "--corpus=broad")) {
             options.corpus = .broad;
+        } else if (std.mem.eql(u8, arg, "--corpus=expanded")) {
+            options.corpus = .expanded;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
         } else if (std.mem.eql(u8, arg, "--object-inspection")) {
@@ -1235,8 +1255,11 @@ fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) ![][
         sources.deinit(allocator);
     }
     try collectSourcesFromRoot(allocator, io, &sources, "test/zig/inputs");
-    if (corpus == .broad) {
+    if (corpus == .broad or corpus == .expanded) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/integrated");
+    }
+    if (corpus == .expanded) {
+        try collectSourcesFromRoot(allocator, io, &sources, "test/zig/expanded");
     }
     std.mem.sort([]const u8, sources.items, {}, struct {
         fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {

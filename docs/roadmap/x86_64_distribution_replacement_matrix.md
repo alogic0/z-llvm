@@ -309,6 +309,14 @@ It requires each mode to stay at `source_rows=101`,
 `codegen_failures=0`, `object_emitted_functions=152`,
 `object_failures=0`, and `local_fail=0`.
 
+The expanded corpus frontier is intentionally separate:
+`distribution-zig-air-uncurated-releasefast-expanded`,
+`distribution-zig-air-uncurated-releasesafe-expanded`, and
+`distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
+`test/zig/expanded/*.zig` and fail closed while active frontier blockers remain.
+The expanded audit lives in
+`docs/roadmap/x86_64_expanded_air_corpus.md`.
+
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
 

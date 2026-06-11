@@ -212,6 +212,17 @@ closed if any mode regresses from the 152-function generic lowering and object
 emission target. It remains outside `distribution-all` because it is a
 milestone confirmation gate, not the regular inner loop.
 
+Expanded corpus frontier:
+`zig build distribution-zig-air-uncurated-releasefast-expanded`,
+`zig build distribution-zig-air-uncurated-releasesafe-expanded`, and
+`zig build distribution-zig-air-uncurated-releasesmall-expanded` are separate
+from the closed broad baseline. The expanded bucket adds
+`test/zig/expanded/*.zig` and fails closed while new unsupported AIR/backend
+families remain. The first ReleaseFast expanded snapshot is recorded in
+`docs/roadmap/x86_64_expanded_air_corpus.md`; current blockers are aggregate
+pair ABI function-type lowering and generic x86_64 backend support for renamed
+pointer/slice and f32 pipeline variants.
+
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
 `zig build distribution-zig-air-uncurated-releasefast-broad-native-link` links
