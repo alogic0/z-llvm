@@ -414,6 +414,7 @@ fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "load") or
         std.mem.eql(u8, opcode, "store") or
         std.mem.eql(u8, opcode, "store_safe") or
+        std.mem.eql(u8, opcode, "block") or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or
@@ -503,6 +504,8 @@ fn lowerFunction(
         .function = &function,
         .block = &block,
         .values = values,
+        .structured_air = null,
+        .structured_air_v2 = null,
     };
 
     for (air_function.instructions) |instruction| {
@@ -596,6 +599,8 @@ fn lowerFunctionTypedV2(
         .function = &function,
         .block = &block,
         .values = values,
+        .structured_air = structured_air,
+        .structured_air_v2 = structured_air_v2,
     };
 
     for (main_body.instructions) |instruction_index| {
@@ -2194,6 +2199,8 @@ const LoweringContext = struct {
     function: *ir.Function,
     block: *ir.BasicBlock,
     values: []?TypedValue,
+    structured_air: ?air_export.StructuredAir,
+    structured_air_v2: ?air_export.StructuredAirV2,
     next_arg_index: usize = 0,
 
     fn lowerTypedInstruction(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
@@ -2214,6 +2221,8 @@ const LoweringContext = struct {
             std.mem.eql(u8, instruction.opcode, "store_safe"))
         {
             try self.lowerTypedStore(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "block")) {
+            try self.lowerTypedBlock(instruction);
         } else if (isCallOpcode(instruction.opcode)) {
             try self.lowerTypedCall(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "ret") or
@@ -2371,6 +2380,80 @@ const LoweringContext = struct {
                 .attrs = .{ .is_volatile = pointer.ty.is_volatile_pointer },
             } },
         });
+    }
+
+    fn lowerTypedBlock(self: *LoweringContext, instruction: air_export.TypedInstruction) LowerError!void {
+        const structured_air = self.structured_air orelse return error.UnsupportedAir;
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const block_body = structured_air.body(.block, instruction.index) orelse return error.UnsupportedAir;
+        const cond_instruction = try self.lowerTypedBlockBodyUntilCond(structured_air_v2, block_body);
+        if (!std.mem.eql(u8, cond_instruction.opcode, "cond_br") or cond_instruction.operands.len != 1) {
+            return error.UnsupportedAir;
+        }
+        const cond = try self.resolveTypedOperand(cond_instruction, 0);
+        if (!cond.ty.ir_type.eql(.{ .int = 1 })) return error.UnsupportedAir;
+
+        const then_body = structured_air.body(.then_body, cond_instruction.index) orelse return error.UnsupportedAir;
+        const else_body = structured_air.body(.else_body, cond_instruction.index) orelse return error.UnsupportedAir;
+        const true_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body);
+        const false_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body);
+        if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
+
+        const result_name = try self.resultName(instruction.index);
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .select = .{
+                .cond_ty = cond.ty.ir_type,
+                .cond = cond.value,
+                .ty = true_value.ty.ir_type,
+                .true_value = true_value.value,
+                .false_value = false_value.value,
+            } },
+        });
+        self.values[instruction.index] = .{
+            .ty = true_value.ty,
+            .value = .{ .named = result_name },
+        };
+    }
+
+    fn typedBlockBranchValue(
+        self: *LoweringContext,
+        structured_air_v2: air_export.StructuredAirV2,
+        target_block: u32,
+        body: air_export.StructuredBody,
+    ) LowerError!TypedValue {
+        const branch_index = singleNonDebugInstruction(structured_air_v2, body) orelse return error.UnsupportedAir;
+        const branch_instruction = typedInstructionByIndex(structured_air_v2, branch_index) orelse
+            return error.UnsupportedAir;
+        if (!std.mem.eql(u8, branch_instruction.opcode, "br") or branch_instruction.operands.len != 2) {
+            return error.UnsupportedAir;
+        }
+        const target_operand = branch_instruction.operands[0];
+        if (!std.mem.eql(u8, target_operand.kind, "block")) return error.UnsupportedAir;
+        const target = std.fmt.parseInt(u32, target_operand.value, 10) catch return error.UnsupportedAir;
+        if (target != target_block) return error.UnsupportedAir;
+        return self.resolveTypedOperand(branch_instruction, 1);
+    }
+
+    fn lowerTypedBlockBodyUntilCond(
+        self: *LoweringContext,
+        structured_air_v2: air_export.StructuredAirV2,
+        body: air_export.StructuredBody,
+    ) LowerError!air_export.TypedInstruction {
+        var cond_instruction: ?air_export.TypedInstruction = null;
+        for (body.instructions) |instruction_index| {
+            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
+                return error.UnsupportedAir;
+            if (isIgnoredOpcode(child.opcode)) continue;
+            if (std.mem.eql(u8, child.opcode, "cond_br")) {
+                if (cond_instruction != null) return error.UnsupportedAir;
+                cond_instruction = child;
+                continue;
+            }
+            if (cond_instruction != null) return error.UnsupportedAir;
+            try self.lowerTypedInstruction(child);
+        }
+        return cond_instruction orelse error.UnsupportedAir;
     }
 
     fn lowerTypedCall(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
@@ -3086,6 +3169,20 @@ fn instructionPosition(function: air_export.Function, index: u32) ?usize {
         if (instruction.index == index) return position;
     }
     return null;
+}
+
+fn singleNonDebugInstruction(
+    structured_air_v2: air_export.StructuredAirV2,
+    body: air_export.StructuredBody,
+) ?u32 {
+    var result: ?u32 = null;
+    for (body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return null;
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (result != null) return null;
+        result = instruction_index;
+    }
+    return result;
 }
 
 fn typedInstructionByIndex(structured_air_v2: air_export.StructuredAirV2, index: u32) ?air_export.TypedInstruction {
