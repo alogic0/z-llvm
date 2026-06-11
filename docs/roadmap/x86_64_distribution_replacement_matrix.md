@@ -255,8 +255,8 @@ zig build distribution-zig-air-uncurated-releasefast-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=10
-  typed_v2_fallback_functions=10
+  legacy_air_text_lowering_functions=8
+  typed_v2_fallback_functions=8
   generic_lowering_functions=144
   shape_recognizer_functions=8
   unsupported_functions=0
@@ -338,8 +338,8 @@ zig build distribution-zig-air-uncurated-releasesmall-broad
   structured_air_v2_functions=152
   typed_air_type_functions=152
   typed_air_operand_functions=152
-  legacy_air_text_lowering_functions=10
-  typed_v2_fallback_functions=10
+  legacy_air_text_lowering_functions=8
+  typed_v2_fallback_functions=8
   generic_lowering_functions=144
   shape_recognizer_functions=8
   unsupported_functions=0
@@ -532,10 +532,10 @@ representation, and optional scalar-payload helpers lower through typed
 wrap/null-check/payload branch records. Optional pointer-payload helpers lower
 through typed null-check/payload/load records. Packed read/replace helpers lower
 through typed packed field pointer/load/store records, and slice-sum helpers lower
-through typed pointer-add/slice/len/element/loop records. Remaining measured
+through typed pointer-add/slice/len/element/loop records. Selected monotonic atomic add
+and empty inline-asm memory-barrier helpers lower from typed-v2 records directly. Remaining measured
 blockers include error-union/optional control-flow, pointer/slice recognizers,
-mixed C/Zig panic-edge lowering, atomics, and inline
-assembly. Operand/type details still rely on the legacy AIR text for those
+and mixed C/Zig panic-edge lowering. Operand/type details still rely on the legacy AIR text for those
 fallback families, so this is not yet a full AIR/liveness lowering replacement.
 
 The same 100-row release source-owned replacement boundary now has a pre-link

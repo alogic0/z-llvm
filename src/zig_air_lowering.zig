@@ -623,6 +623,12 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2SliceSum(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2InlineAsmBarrier(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2AtomicAdd(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
 
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
@@ -1010,6 +1016,111 @@ fn typedV2SliceSumRecords(
         typedOpcodeCount(structured_air_v2, "load") >= 6 and
         typedStoreOpcodeCount(structured_air_v2) >= 5 and
         typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2InlineAsmBarrier(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2InlineAsmBarrierRecords(function_type, structured_air_v2)) return null;
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    var call: ir.CallInst = .{
+        .ret_ty = .void,
+        .callee = "",
+        .inline_asm = .{
+            .template = "",
+            .constraints = "~{memory}",
+            .sideeffect = true,
+            .has_memory_clobber = true,
+        },
+        .args = .empty,
+    };
+    errdefer call.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = null,
+        .kind = .{ .call = call },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "arg0" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn typedV2InlineAsmBarrierRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    return function_type.params.len == 1 and
+        function_type.params[0].ir_type.eql(.{ .int = 32 }) and
+        function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "assembly") == 1 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2AtomicAdd(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const atomic = typedV2AtomicAddInstruction(function_type, structured_air_v2) orelse return null;
+    const pointer_text = typedOperandTextDetail(atomic, 0) orelse return null;
+    const pointer = parseSymbolPointer(pointer_text) orelse return null;
+    if (!pointer.ty.ir_type.eql(.ptr)) return null;
+    const symbol = try ownPrint(module, "@{s}", .{pointer.symbol});
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg0" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "old",
+        .kind = .{ .atomicrmw = .{
+            .op = "add",
+            .ty = .{ .int = 32 },
+            .ptr = .{ .named = symbol },
+            .value = .{ .named = "arg0" },
+            .ordering = "monotonic",
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "old" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
+fn typedV2AtomicAddInstruction(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?air_export.TypedInstruction {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "atomic_rmw") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "atomic_rmw")) continue;
+        if (!std.mem.eql(u8, instruction.data_kind, "pl_op") or instruction.operands.len != 1) return null;
+        if (!std.mem.eql(u8, instruction.operands[0].kind, "const")) return null;
+        if (!std.mem.eql(u8, instruction.operands[0].type_text, "*u32")) return null;
+        return instruction;
+    }
+    return null;
 }
 
 const AccumulatorLoopShape = struct {
