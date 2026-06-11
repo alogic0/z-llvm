@@ -273,7 +273,13 @@ pub fn firstUnsupported(
     const function_type = parseFunctionType(allocator, function.type_text) catch {
         return .{ .function = function.name, .opcode = "function-type", .reason = .function_type };
     };
-    function_type.deinit(allocator);
+    defer function_type.deinit(allocator);
+    const typed_aggregate_pair =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2AggregatePairFirstRecords(function_type, structured_air_v2) or
+                typedV2AggregateMakePairRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
@@ -289,8 +295,7 @@ pub fn firstUnsupported(
         sliceSumShape(function) or
         packedReadFlagShape(function) or
         packedReplaceLowShape(function) or
-        aggregatePairFirstShape(function) or
-        aggregateMakePairShape(function) or
+        typed_aggregate_pair or
         mixCAddMayPanicShape(function) or
         maybeErrorShape(function))
     {
@@ -395,8 +400,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (sliceSumShape(function)) return "slice_sum";
     if (packedReadFlagShape(function)) return "packed_read_flag";
     if (packedReplaceLowShape(function)) return "packed_replace_low";
-    if (aggregatePairFirstShape(function)) return "aggregate_pair_first";
-    if (aggregateMakePairShape(function)) return "aggregate_make_pair";
     if (mixCAddMayPanicShape(function)) return "mix_c_add_may_panic";
     if (maybeErrorShape(function)) return "maybe_error";
     return null;
@@ -479,8 +482,6 @@ fn lowerFunction(
     if (sliceSumShape(air_function)) return lowerSliceSum(allocator, air_function);
     if (packedReadFlagShape(air_function)) return lowerPackedReadFlag(allocator, air_function);
     if (packedReplaceLowShape(air_function)) return lowerPackedReplaceLow(allocator, air_function);
-    if (aggregatePairFirstShape(air_function)) return lowerAggregatePairFirst(allocator, air_function);
-    if (aggregateMakePairShape(air_function)) return lowerAggregateMakePair(allocator, air_function);
     if (mixCAddMayPanicShape(air_function)) return lowerMixCAddMayPanic(allocator, module, air_function);
     if (maybeErrorShape(air_function)) return lowerMaybeError(allocator, air_function);
 
@@ -585,6 +586,9 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2ArraySum(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2AggregatePairAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
 
     var function = ir.Function.init(shortFunctionName(air_function.name), function_type.return_type.ir_type);
     errdefer function.deinit(allocator);
@@ -687,6 +691,75 @@ fn lowerTypedV2ArraySum(
     block.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "sum" } } };
     try function.blocks.append(allocator, block);
     return function;
+}
+
+fn lowerTypedV2AggregatePairAbi(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (typedV2AggregatePairFirstRecords(function_type, structured_air_v2)) {
+        return try lowerAggregatePairFirst(allocator, air_function);
+    }
+    if (typedV2AggregateMakePairRecords(function_type, structured_air_v2)) {
+        return try lowerAggregateMakePair(allocator, air_function);
+    }
+    return null;
+}
+
+fn typedV2AggregatePairFirstRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 64 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    return typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "alloc") == 1 and
+        typedStoreOpcodeCount(structured_air_v2) == 1 and
+        typedOpcodeCount(structured_air_v2, "bitcast") == 1 and
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        typedOpcodeCount(structured_air_v2, "load") == 1 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn typedV2AggregateMakePairRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 64 }))
+    {
+        return false;
+    }
+    return typedOpcodeCount(structured_air_v2, "arg") == 2 and
+        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
+        typedStoreOpcodeCount(structured_air_v2) == 2 and
+        typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+}
+
+fn typedOpcodeCount(structured_air_v2: air_export.StructuredAirV2, opcode: []const u8) usize {
+    var count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, opcode)) count += 1;
+    }
+    return count;
+}
+
+fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
+    return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+}
+
+fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
+    return typedOpcodeCount(structured_air_v2, "ret") != 0 or typedOpcodeCount(structured_air_v2, "ret_safe") != 0;
 }
 
 const AccumulatorLoopShape = struct {
