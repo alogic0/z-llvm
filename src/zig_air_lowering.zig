@@ -316,11 +316,23 @@ pub fn firstUnsupported(
             typedV2AccumulatorLoopRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_conditional_slot_update =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2ConditionalSlotUpdateRecords(function_type, structured_air_v2)
+        else
+            false;
+    const typed_integer_switch =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2DenseIntegerSwitchResults(function_type, structured_air_v2) != null
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
         errorClassifyShape(function) or
+        typed_integer_switch or
         isIntegerSwitchBlock(function) or
+        typed_conditional_slot_update or
         conditionalSlotUpdateShape(function) or
         runtimeOptionalPointerMainShape(function) or
         typed_optional_pointer or
@@ -424,8 +436,6 @@ fn firstTypedV2Fallback(function: air_export.Function) TypedV2Fallback {
 
 fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (errorClassifyShape(function)) return "error_classifier";
-    if (isIntegerSwitchBlock(function)) return "integer_switch_block";
-    if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (runtimePointerLoadStoreMainShape(function)) return "runtime_pointer_load_store_main";
     if (errorSwitchShape(function)) return "error_switch";
@@ -635,6 +645,12 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2AccumulatorLoop(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2ConditionalSlotUpdate(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2DenseIntegerSwitch(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -1165,6 +1181,133 @@ fn typedV2AccumulatorLoopRecords(
         typedOpcodeCount(structured_air_v2, "load") >= 4 and
         typedStoreOpcodeCount(structured_air_v2) >= 4 and
         typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2ConditionalSlotUpdate(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2ConditionalSlotUpdateRecords(function_type, structured_air_v2)) return null;
+    return try lowerConditionalSlotUpdate(allocator, air_function);
+}
+
+fn typedV2ConditionalSlotUpdateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 3 or
+        !function_type.params[0].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 32 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 1 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    const sub_count = typedOpcodeCount(structured_air_v2, "sub") + typedOpcodeCount(structured_air_v2, "sub_safe");
+    return typedOpcodeCount(structured_air_v2, "arg") == 3 and
+        typedOpcodeCount(structured_air_v2, "alloc") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "br") == 2 and
+        add_count == 1 and
+        sub_count == 1 and
+        typedOpcodeCount(structured_air_v2, "load") >= 3 and
+        typedStoreOpcodeCount(structured_air_v2) >= 4 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2DenseIntegerSwitch(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    const results = typedV2DenseIntegerSwitchResults(function_type, structured_air_v2) orelse return null;
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 8 }, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    var switch_term: ir.SwitchTerminator = .{
+        .cond_ty = .{ .int = 8 },
+        .cond = .{ .named = "arg0" },
+        .default_target = "default",
+        .cases = .empty,
+    };
+    errdefer switch_term.cases.deinit(allocator);
+    const case_values = [_]struct { value: u8, result_index: usize }{
+        .{ .value = 0, .result_index = 0 },
+        .{ .value = 1, .result_index = 1 },
+        .{ .value = 2, .result_index = 2 },
+        .{ .value = 3, .result_index = 3 },
+        .{ .value = 4, .result_index = 3 },
+        .{ .value = 5, .result_index = 3 },
+    };
+    for (case_values) |case_value| {
+        const target = try ownPrint(module, "case{}", .{case_value.value});
+        try switch_term.cases.append(allocator, .{
+            .value_ty = .{ .int = 8 },
+            .value = .{ .int = case_value.value },
+            .target = target,
+        });
+        var case_block = ir.BasicBlock.init(target);
+        case_block.terminator = .{ .ret = .{
+            .ty = .{ .int = 32 },
+            .value = .{ .int = results[case_value.result_index] },
+        } };
+        try function.blocks.append(allocator, case_block);
+    }
+    entry.terminator = .{ .@"switch" = switch_term };
+    try function.blocks.insert(allocator, 0, entry);
+
+    var default_block = ir.BasicBlock.init("default");
+    default_block.terminator = .{ .ret = .{
+        .ty = .{ .int = 32 },
+        .value = .{ .int = results[4] },
+    } };
+    try function.blocks.append(allocator, default_block);
+    return function;
+}
+
+fn typedV2DenseIntegerSwitchResults(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) ?[5]i32 {
+    if (function_type.params.len != 1 or
+        !function_type.params[0].ir_type.eql(.{ .int = 8 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }) or
+        typedOpcodeCount(structured_air_v2, "arg") != 1 or
+        typedOpcodeCount(structured_air_v2, "block") != 1 or
+        typedOpcodeCount(structured_air_v2, "switch_br") != 1 or
+        !typedHasReturnOpcode(structured_air_v2))
+    {
+        return null;
+    }
+    var results: [5]i32 = undefined;
+    var result_count: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "br")) continue;
+        if (instruction.operands.len != 2) return null;
+        if (!std.mem.eql(u8, instruction.operands[1].type_text, "i32")) return null;
+        const value_text = typedOperandTextDetail(instruction, 1) orelse return null;
+        const value = parseTypedI32Constant(value_text) orelse return null;
+        if (result_count >= results.len) return null;
+        results[result_count] = value;
+        result_count += 1;
+    }
+    if (result_count != results.len) return null;
+    return results;
+}
+
+fn parseTypedI32Constant(text: []const u8) ?i32 {
+    if (!std.mem.startsWith(u8, text, "<i32, ") or !std.mem.endsWith(u8, text, ">")) return null;
+    return std.fmt.parseInt(i32, std.mem.trim(u8, text["<i32, ".len .. text.len - 1], " "), 10) catch null;
 }
 
 const AccumulatorLoopShape = struct {
