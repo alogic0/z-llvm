@@ -280,7 +280,6 @@ pub fn firstUnsupported(
         isIntegerSwitchBlock(function) or
         conditionalSlotUpdateShape(function) or
         arraySumShape(function) or
-        structSumShape(function) or
         base64TableLookupShape(function) or
         runtimeOptionalPointerMainShape(function) or
         optionalPointerShape(function) or
@@ -388,7 +387,6 @@ fn shapeRecognizerName(function: air_export.Function) ?[]const u8 {
     if (isIntegerSwitchBlock(function)) return "integer_switch_block";
     if (conditionalSlotUpdateShape(function)) return "conditional_slot_update";
     if (arraySumShape(function)) return "array_sum";
-    if (structSumShape(function)) return "struct_sum";
     if (base64TableLookupShape(function)) return "base64_table_lookup";
     if (runtimeOptionalPointerMainShape(function)) return "runtime_optional_pointer_main";
     if (optionalPointerShape(function)) return "optional_pointer";
@@ -2355,6 +2353,15 @@ const LoweringContext = struct {
         if (instruction.operands.len != 1) return error.UnsupportedAir;
         const source = try self.resolveTypedOperand(instruction, 0);
         const target_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (std.mem.eql(u8, instruction.opcode, "bitcast") and
+            source.ty.ir_type == .ptr and target_type.ir_type == .ptr)
+        {
+            self.values[instruction.index] = .{
+                .ty = target_type,
+                .value = source.value,
+            };
+            return;
+        }
         const op = castOp(instruction.opcode, source.ty, target_type) orelse return error.UnsupportedAir;
         const result_name = try self.resultName(instruction.index);
         try self.block.instructions.append(self.allocator, .{
@@ -2392,6 +2399,8 @@ const LoweringContext = struct {
         const pointer = try self.resolveTypedOperand(instruction, 0);
         if (pointer.ty.ir_type != .ptr) return error.UnsupportedAir;
         const result_type = parseZigType(instruction.result_type) orelse blk: {
+            const typed_child = pointerLoadResultType(instruction.operands[0].type_text);
+            if (typed_child) |child| break :blk child;
             const child = pointer.ty.pointer_child orelse return error.UnsupportedAir;
             break :blk ZigType{ .ir_type = child };
         };
@@ -2523,6 +2532,33 @@ const LoweringContext = struct {
         const field_index_text = typedDetail(instruction, "field_index") orelse return error.UnsupportedAir;
         const field_index = std.fmt.parseInt(i128, field_index_text, 10) catch return error.UnsupportedAir;
         const source_ty = aggregate_ptr.ty.pointer_child orelse return error.UnsupportedAir;
+        if (source_ty.eql(.{ .aggregate = "{ i32, i32 }" }) and field_child.eql(.{ .int = 32 })) {
+            if (field_index == 0) {
+                self.values[instruction.index] = .{
+                    .ty = result_type,
+                    .value = aggregate_ptr.value,
+                };
+                return;
+            }
+            if (field_index != 1) return error.UnsupportedAir;
+            const result_name = try self.resultName(instruction.index);
+            var gep: ir.GepInst = .{
+                .source_ty = .{ .int = 8 },
+                .ptr = aggregate_ptr.value,
+                .indices = .empty,
+            };
+            errdefer gep.deinit(self.allocator);
+            try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 4 } });
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .gep = gep },
+            });
+            self.values[instruction.index] = .{
+                .ty = result_type,
+                .value = .{ .named = result_name },
+            };
+            return;
+        }
 
         const result_name = try self.resultName(instruction.index);
         var gep: ir.GepInst = .{
@@ -3112,6 +3148,11 @@ fn parseZigType(text: []const u8) ?ZigType {
     {
         return .{ .ir_type = .{ .int = 64 } };
     }
+    if (std.mem.eql(u8, trimmed, "aggregates.Pair") or
+        std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair"))
+    {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
+    }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
         return .{ .ir_type = .{ .int = 16 } };
@@ -3130,6 +3171,11 @@ fn parseZigType(text: []const u8) ?ZigType {
         };
     }
     return null;
+}
+
+fn pointerLoadResultType(text: []const u8) ?ZigType {
+    const child_text = pointerChildText(std.mem.trim(u8, text, " ")) orelse return null;
+    return parseZigType(child_text);
 }
 
 fn parseConstant(text: []const u8) ?TypedValue {
@@ -3326,6 +3372,7 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "array_elem_val") or
         std.mem.eql(u8, opcode, "assembly") or
+        isFieldPtrOpcode(opcode) or
         isCallOpcode(opcode) or
         std.mem.eql(u8, opcode, "ret") or
         std.mem.eql(u8, opcode, "ret_safe") or

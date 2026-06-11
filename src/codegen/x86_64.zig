@@ -2193,9 +2193,7 @@ fn lowerSingleStackSlotCallReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (std.mem.eql(u8, function.name, "runtime_struct_sum_main.structSum")) {
-        return try lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret);
-    }
+    if (try lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret)) return true;
     if (!ret.ty.eql(.{ .int = 32 })) return false;
     if (block.instructions.items.len != 4) return false;
 
