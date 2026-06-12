@@ -9997,7 +9997,9 @@ fn isConstantI32ReturnBlock(block: ir.BasicBlock) bool {
 fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
-    if (!matchesAccumulatorLoop(function)) return false;
+    if (!matchesAccumulatorLoop(function) and
+        !matchesUnrolledAccumulatorLoop(function) and
+        !matchesCheckedUnrolledAccumulatorLoop(function)) return false;
     const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
     if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
 
@@ -10078,7 +10080,7 @@ fn matchesAccumulatorLoop(function: ir.Function) bool {
         .icmp => |icmp| icmp,
         else => return false,
     };
-    if (condition.predicate != .ult or
+    if ((condition.predicate != .ult and condition.predicate != .slt) or
         !condition.operand_ty.eql(.{ .int = 32 }) or
         !isNamed(condition.lhs, index_name) or
         !isNamed(condition.rhs, function.params.items[0].name))
@@ -10129,6 +10131,414 @@ fn matchesAccumulatorLoop(function: ir.Function) bool {
         else => return false,
     };
     return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, sum_name);
+}
+
+fn unrolledLoopBinary(instruction: ir.Instruction, op: ir.BinaryOp) ?ir.BinaryInst {
+    if (instruction.removed) return null;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (binary.op != op or !binary.ty.eql(.{ .int = 32 })) return null;
+    return binary;
+}
+
+fn unrolledLoopIcmp(instruction: ir.Instruction, predicate: ir.IcmpPredicate) ?ir.IcmpInst {
+    if (instruction.removed) return null;
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return null,
+    };
+    if (icmp.predicate != predicate or !icmp.operand_ty.eql(.{ .int = 32 })) return null;
+    return icmp;
+}
+
+fn unrolledLoopAssume(instruction: ir.Instruction, cond_name: []const u8) bool {
+    if (instruction.removed) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.assume")) return false;
+    if (call.args.items.len != 1) return false;
+    return isNamed(call.args.items[0].value, cond_name);
+}
+
+fn unrolledLoopPhi(instruction: ir.Instruction) ?ir.PhiInst {
+    if (instruction.removed) return null;
+    const phi = switch (instruction.kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 })) return null;
+    return phi;
+}
+
+fn checkedUnrolledSaddTail(
+    block: ir.BasicBlock,
+    start: usize,
+    sum_value: []const u8,
+    index_value: []const u8,
+    overflow_target: []const u8,
+    cont_target: []const u8,
+) ?[]const u8 {
+    if (block.instructions.items.len != start + 2) return null;
+    const call_inst = block.instructions.items[start];
+    const extract_inst = block.instructions.items[start + 1];
+    if (call_inst.removed or extract_inst.removed) return null;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return null,
+    };
+    if (!std.mem.eql(u8, call.callee, "llvm.sadd.with.overflow.i32")) return null;
+    if (call.args.items.len != 2) return null;
+    if (!isNamed(call.args.items[0].value, sum_value) or !isNamed(call.args.items[1].value, index_value)) return null;
+    const call_name = call_inst.result orelse return null;
+    const overflow = switch (extract_inst.kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return null,
+    };
+    if (!overflow.result_ty.eql(.{ .int = 1 }) or !isNamed(overflow.aggregate, call_name)) return null;
+    if (!std.mem.eql(u8, overflow.indices, "1")) return null;
+    const condbr = switch (block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!isNamed(condbr.cond, extract_inst.result orelse return null)) return null;
+    if (!std.mem.eql(u8, condbr.then_target, overflow_target)) return null;
+    if (!std.mem.eql(u8, condbr.else_target, cont_target)) return null;
+    return call_name;
+}
+
+const CheckedUnrolledAdvance = struct {
+    next: []const u8,
+    value: []const u8,
+};
+
+fn checkedUnrolledAdvanceBlock(
+    block: ir.BasicBlock,
+    index_value: []const u8,
+    step: i128,
+    call_name: []const u8,
+    limit_name: []const u8,
+    exit_target: []const u8,
+    cont_target: []const u8,
+) ?CheckedUnrolledAdvance {
+    if (block.instructions.items.len != 3) return null;
+    const next = unrolledLoopBinary(block.instructions.items[0], .add) orelse return null;
+    if (!isNamed(next.lhs, index_value) or !isInt(next.rhs, step)) return null;
+    const next_name = block.instructions.items[0].result orelse return null;
+    const value_inst = block.instructions.items[1];
+    if (value_inst.removed) return null;
+    const value = switch (value_inst.kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return null,
+    };
+    if (!value.result_ty.eql(.{ .int = 32 }) or !isNamed(value.aggregate, call_name)) return null;
+    if (!std.mem.eql(u8, value.indices, "0")) return null;
+    const done = unrolledLoopIcmp(block.instructions.items[2], .eq) orelse return null;
+    if (!isNamed(done.lhs, next_name) or !isNamed(done.rhs, limit_name)) return null;
+    const condbr = switch (block.terminator orelse return null) {
+        .condbr => |condbr| condbr,
+        else => return null,
+    };
+    if (!isNamed(condbr.cond, block.instructions.items[2].result orelse return null)) return null;
+    if (!std.mem.eql(u8, condbr.then_target, exit_target)) return null;
+    if (!std.mem.eql(u8, condbr.else_target, cont_target)) return null;
+    return .{ .next = next_name, .value = value_inst.result orelse return null };
+}
+
+fn checkedUnrolledPanicBlock(block: ir.BasicBlock, callee: []const u8) bool {
+    if (block.instructions.items.len != 2) return false;
+    const assume_inst = block.instructions.items[0];
+    const panic_inst = block.instructions.items[1];
+    if (assume_inst.removed or panic_inst.removed) return false;
+    const assume_call = switch (assume_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, assume_call.callee, "llvm.assume")) return false;
+    const panic_call = switch (panic_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!isCalleeName(panic_call.callee, callee) or panic_call.args.items.len != 0) return false;
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
+}
+
+// Matches the captured ReleaseSafe LLVM shape for the checked counted
+// accumulator loop after 3x unrolling: each step adds through
+// llvm.sadd.with.overflow.i32 with an overflow panic edge, the third step
+// guards the index against i32 minimum with an out-of-bounds panic edge, and
+// every step can exit through the shared lcssa phi. The shape computes the
+// checked sum of 0..limit-1, so it lowers through the checked counted-loop
+// emission.
+fn matchesCheckedUnrolledAccumulatorLoop(function: ir.Function) bool {
+    if (function.blocks.items.len != 11) return false;
+    const limit_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    const header = function.blocks.items[1];
+    const exit = function.blocks.items[2];
+    const oob_panic = function.blocks.items[3];
+    const overflow_panic = function.blocks.items[4];
+    const step1 = function.blocks.items[5];
+    const step2_call = function.blocks.items[6];
+    const step2 = function.blocks.items[7];
+    const step3_guard = function.blocks.items[8];
+    const step3_call = function.blocks.items[9];
+    const step3 = function.blocks.items[10];
+
+    if (entry.instructions.items.len != 1 or
+        header.instructions.items.len != 4 or
+        exit.instructions.items.len != 1 or
+        step3_guard.instructions.items.len != 1)
+    {
+        return false;
+    }
+
+    const zero_check = unrolledLoopIcmp(entry.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(zero_check.lhs, limit_name) or !isInt(zero_check.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(entry_br.cond, entry.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, exit.name)) return false;
+    if (!std.mem.eql(u8, entry_br.else_target, header.name)) return false;
+
+    if (!checkedUnrolledPanicBlock(oob_panic, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds")) return false;
+    if (!checkedUnrolledPanicBlock(overflow_panic, "debug.FullPanic((function 'defaultPanic')).integerOverflow")) return false;
+
+    const index_phi = unrolledLoopPhi(header.instructions.items[0]) orelse return false;
+    const sum_phi = unrolledLoopPhi(header.instructions.items[1]) orelse return false;
+    const index_name = header.instructions.items[0].result orelse return false;
+    const sum_name = header.instructions.items[1].result orelse return false;
+    const call1 = checkedUnrolledSaddTail(header, 2, sum_name, index_name, overflow_panic.name, step1.name) orelse return false;
+    const advance1 = checkedUnrolledAdvanceBlock(step1, index_name, 1, call1, limit_name, exit.name, step2_call.name) orelse return false;
+    const call2 = checkedUnrolledSaddTail(step2_call, 0, advance1.value, advance1.next, overflow_panic.name, step2.name) orelse return false;
+    const advance2 = checkedUnrolledAdvanceBlock(step2, index_name, 2, call2, limit_name, exit.name, step3_guard.name) orelse return false;
+
+    const oob_check = unrolledLoopIcmp(step3_guard.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(oob_check.lhs, advance2.next) or !isInt(oob_check.rhs, std.math.minInt(i32))) return false;
+    const guard_br = switch (step3_guard.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(guard_br.cond, step3_guard.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, guard_br.then_target, oob_panic.name)) return false;
+    if (!std.mem.eql(u8, guard_br.else_target, step3_call.name)) return false;
+
+    const call3 = checkedUnrolledSaddTail(step3_call, 0, advance2.value, advance2.next, overflow_panic.name, step3.name) orelse return false;
+    const advance3 = checkedUnrolledAdvanceBlock(step3, index_name, 3, call3, limit_name, exit.name, header.name) orelse return false;
+
+    if (!phiHasIncomingInt(index_phi, 0, entry.name) or
+        !phiHasIncoming(index_phi, advance3.next, step3.name) or
+        !phiHasIncomingInt(sum_phi, 0, entry.name) or
+        !phiHasIncoming(sum_phi, advance3.value, step3.name))
+    {
+        return false;
+    }
+
+    const result_phi = unrolledLoopPhi(exit.instructions.items[0]) orelse return false;
+    if (!phiHasIncomingInt(result_phi, 0, entry.name) or
+        !phiHasIncoming(result_phi, advance1.value, step1.name) or
+        !phiHasIncoming(result_phi, advance2.value, step2.name) or
+        !phiHasIncoming(result_phi, advance3.value, step3.name))
+    {
+        return false;
+    }
+    const ret = switch (exit.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, exit.instructions.items[0].result orelse return false);
+}
+
+// Matches the captured ReleaseFast LLVM shape for the counted accumulator
+// loop after 8x unrolling: a zero guard, an unroll-count preheader pair, the
+// 8-step unrolled body, the loop-exit lcssa split, and the epilogue loop that
+// finishes the remaining iterations. The whole shape computes the sum of
+// 0..limit-1, so it lowers through the same simple counted-loop emission as
+// the canonical four-block accumulator loop.
+fn matchesUnrolledAccumulatorLoop(function: ir.Function) bool {
+    if (function.blocks.items.len != 8) return false;
+    const limit_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    const preheader = function.blocks.items[1];
+    const preheader_new = function.blocks.items[2];
+    const unrolled = function.blocks.items[3];
+    const unr_lcssa = function.blocks.items[4];
+    const epil_preheader = function.blocks.items[5];
+    const epil = function.blocks.items[6];
+    const crit_edge = function.blocks.items[7];
+    if (entry.instructions.items.len != 1 or
+        preheader.instructions.items.len != 2 or
+        preheader_new.instructions.items.len != 1 or
+        unrolled.instructions.items.len != 23 or
+        unr_lcssa.instructions.items.len != 1 or
+        epil_preheader.instructions.items.len != 4 or
+        epil.instructions.items.len != 9 or
+        crit_edge.instructions.items.len != 1)
+    {
+        return false;
+    }
+
+    const zero_check = unrolledLoopIcmp(entry.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(zero_check.lhs, limit_name) or !isInt(zero_check.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(entry_br.cond, entry.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, crit_edge.name)) return false;
+    if (!std.mem.eql(u8, entry_br.else_target, preheader.name)) return false;
+
+    const xtraiter = unrolledLoopBinary(preheader.instructions.items[0], .@"and") orelse return false;
+    if (!isNamed(xtraiter.lhs, limit_name) or !isInt(xtraiter.rhs, 7)) return false;
+    const xtraiter_name = preheader.instructions.items[0].result orelse return false;
+    const small_check = unrolledLoopIcmp(preheader.instructions.items[1], .ult) orelse return false;
+    if (!isNamed(small_check.lhs, limit_name) or !isInt(small_check.rhs, 8)) return false;
+    const preheader_br = switch (preheader.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(preheader_br.cond, preheader.instructions.items[1].result orelse return false)) return false;
+    if (!std.mem.eql(u8, preheader_br.then_target, epil_preheader.name)) return false;
+    if (!std.mem.eql(u8, preheader_br.else_target, preheader_new.name)) return false;
+
+    const unroll_iter = unrolledLoopBinary(preheader_new.instructions.items[0], .@"and") orelse return false;
+    if (!isNamed(unroll_iter.lhs, limit_name) or !isInt(unroll_iter.rhs, -8)) return false;
+    const unroll_iter_name = preheader_new.instructions.items[0].result orelse return false;
+    switch (preheader_new.terminator orelse return false) {
+        .br => |br| if (!std.mem.eql(u8, br.target, unrolled.name)) return false,
+        else => return false,
+    }
+
+    const index_phi = unrolledLoopPhi(unrolled.instructions.items[0]) orelse return false;
+    const sum_phi = unrolledLoopPhi(unrolled.instructions.items[1]) orelse return false;
+    const niter_phi = unrolledLoopPhi(unrolled.instructions.items[2]) orelse return false;
+    const index_name = unrolled.instructions.items[0].result orelse return false;
+    const sum_name = unrolled.instructions.items[1].result orelse return false;
+    const nonneg_check = unrolledLoopIcmp(unrolled.instructions.items[3], .sgt) orelse return false;
+    if (!isNamed(nonneg_check.lhs, index_name) or !isInt(nonneg_check.rhs, -1)) return false;
+    if (!unrolledLoopAssume(unrolled.instructions.items[4], unrolled.instructions.items[3].result orelse return false)) return false;
+
+    const first_add = unrolledLoopBinary(unrolled.instructions.items[5], .add) orelse return false;
+    if (!isNamed(first_add.lhs, index_name) or !isNamed(first_add.rhs, sum_name)) return false;
+    var running_sum = unrolled.instructions.items[5].result orelse return false;
+    var step: i128 = 1;
+    var item: usize = 6;
+    while (step <= 7) : (step += 1) {
+        const stride = unrolledLoopBinary(unrolled.instructions.items[item], .@"or") orelse return false;
+        if (!isNamed(stride.lhs, index_name) or !isInt(stride.rhs, step)) return false;
+        const stride_name = unrolled.instructions.items[item].result orelse return false;
+        const partial = unrolledLoopBinary(unrolled.instructions.items[item + 1], .add) orelse return false;
+        if (!isNamed(partial.lhs, stride_name) or !isNamed(partial.rhs, running_sum)) return false;
+        running_sum = unrolled.instructions.items[item + 1].result orelse return false;
+        item += 2;
+    }
+    const index_next = unrolledLoopBinary(unrolled.instructions.items[20], .add) orelse return false;
+    if (!isNamed(index_next.lhs, index_name) or !isInt(index_next.rhs, 8)) return false;
+    const index_next_name = unrolled.instructions.items[20].result orelse return false;
+    const niter_next = unrolledLoopBinary(unrolled.instructions.items[21], .add) orelse return false;
+    if (!isNamed(niter_next.lhs, unrolled.instructions.items[2].result orelse return false) or !isInt(niter_next.rhs, 8)) return false;
+    const niter_next_name = unrolled.instructions.items[21].result orelse return false;
+    const niter_check = unrolledLoopIcmp(unrolled.instructions.items[22], .eq) orelse return false;
+    if (!isNamed(niter_check.lhs, niter_next_name) or !isNamed(niter_check.rhs, unroll_iter_name)) return false;
+    if (!phiHasIncomingInt(index_phi, 0, preheader_new.name) or
+        !phiHasIncoming(index_phi, index_next_name, unrolled.name) or
+        !phiHasIncomingInt(sum_phi, 0, preheader_new.name) or
+        !phiHasIncoming(sum_phi, running_sum, unrolled.name) or
+        !phiHasIncomingInt(niter_phi, 0, preheader_new.name) or
+        !phiHasIncoming(niter_phi, niter_next_name, unrolled.name))
+    {
+        return false;
+    }
+    const unrolled_br = switch (unrolled.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(unrolled_br.cond, unrolled.instructions.items[22].result orelse return false)) return false;
+    if (!std.mem.eql(u8, unrolled_br.then_target, unr_lcssa.name)) return false;
+    if (!std.mem.eql(u8, unrolled_br.else_target, unrolled.name)) return false;
+
+    const mod_check = unrolledLoopIcmp(unr_lcssa.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(mod_check.lhs, xtraiter_name) or !isInt(mod_check.rhs, 0)) return false;
+    const unr_lcssa_br = switch (unr_lcssa.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(unr_lcssa_br.cond, unr_lcssa.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, unr_lcssa_br.then_target, crit_edge.name)) return false;
+    if (!std.mem.eql(u8, unr_lcssa_br.else_target, epil_preheader.name)) return false;
+
+    const epil_index_init = unrolledLoopPhi(epil_preheader.instructions.items[0]) orelse return false;
+    const epil_sum_init = unrolledLoopPhi(epil_preheader.instructions.items[1]) orelse return false;
+    if (!phiHasIncomingInt(epil_index_init, 0, preheader.name) or
+        !phiHasIncoming(epil_index_init, index_next_name, unr_lcssa.name) or
+        !phiHasIncomingInt(epil_sum_init, 0, preheader.name) or
+        !phiHasIncoming(epil_sum_init, running_sum, unr_lcssa.name))
+    {
+        return false;
+    }
+    const mod_nonzero = unrolledLoopIcmp(epil_preheader.instructions.items[2], .ne) orelse return false;
+    if (!isNamed(mod_nonzero.lhs, xtraiter_name) or !isInt(mod_nonzero.rhs, 0)) return false;
+    if (!unrolledLoopAssume(epil_preheader.instructions.items[3], epil_preheader.instructions.items[2].result orelse return false)) return false;
+    switch (epil_preheader.terminator orelse return false) {
+        .br => |br| if (!std.mem.eql(u8, br.target, epil.name)) return false,
+        else => return false,
+    }
+
+    const epil_index_phi = unrolledLoopPhi(epil.instructions.items[0]) orelse return false;
+    const epil_sum_phi = unrolledLoopPhi(epil.instructions.items[1]) orelse return false;
+    const epil_iter_phi = unrolledLoopPhi(epil.instructions.items[2]) orelse return false;
+    const epil_index_name = epil.instructions.items[0].result orelse return false;
+    const epil_sum_name = epil.instructions.items[1].result orelse return false;
+    const epil_nonneg = unrolledLoopIcmp(epil.instructions.items[3], .sgt) orelse return false;
+    if (!isNamed(epil_nonneg.lhs, epil_index_name) or !isInt(epil_nonneg.rhs, -1)) return false;
+    if (!unrolledLoopAssume(epil.instructions.items[4], epil.instructions.items[3].result orelse return false)) return false;
+    const epil_sum_next = unrolledLoopBinary(epil.instructions.items[5], .add) orelse return false;
+    if (!isNamed(epil_sum_next.lhs, epil_index_name) or !isNamed(epil_sum_next.rhs, epil_sum_name)) return false;
+    const epil_sum_next_name = epil.instructions.items[5].result orelse return false;
+    const epil_index_next = unrolledLoopBinary(epil.instructions.items[6], .add) orelse return false;
+    if (!isNamed(epil_index_next.lhs, epil_index_name) or !isInt(epil_index_next.rhs, 1)) return false;
+    const epil_iter_next = unrolledLoopBinary(epil.instructions.items[7], .add) orelse return false;
+    if (!isNamed(epil_iter_next.lhs, epil.instructions.items[2].result orelse return false) or !isInt(epil_iter_next.rhs, 1)) return false;
+    const epil_iter_next_name = epil.instructions.items[7].result orelse return false;
+    const epil_done = unrolledLoopIcmp(epil.instructions.items[8], .eq) orelse return false;
+    if (!isNamed(epil_done.lhs, epil_iter_next_name) or !isNamed(epil_done.rhs, xtraiter_name)) return false;
+    if (!phiHasIncoming(epil_index_phi, epil.instructions.items[6].result orelse return false, epil.name) or
+        !phiHasIncoming(epil_index_phi, epil_preheader.instructions.items[0].result orelse return false, epil_preheader.name) or
+        !phiHasIncoming(epil_sum_phi, epil_sum_next_name, epil.name) or
+        !phiHasIncoming(epil_sum_phi, epil_preheader.instructions.items[1].result orelse return false, epil_preheader.name) or
+        !phiHasIncoming(epil_iter_phi, epil_iter_next_name, epil.name) or
+        !phiHasIncomingInt(epil_iter_phi, 0, epil_preheader.name))
+    {
+        return false;
+    }
+    const epil_br = switch (epil.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(epil_br.cond, epil.instructions.items[8].result orelse return false)) return false;
+    if (!std.mem.eql(u8, epil_br.then_target, crit_edge.name)) return false;
+    if (!std.mem.eql(u8, epil_br.else_target, epil.name)) return false;
+
+    const result_phi = unrolledLoopPhi(crit_edge.instructions.items[0]) orelse return false;
+    if (!phiHasIncomingInt(result_phi, 0, entry.name) or
+        !phiHasIncoming(result_phi, running_sum, unr_lcssa.name) or
+        !phiHasIncoming(result_phi, epil_sum_next_name, epil.name))
+    {
+        return false;
+    }
+    const ret = switch (crit_edge.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, crit_edge.instructions.items[0].result orelse return false);
 }
 
 fn lowerBase64DecodeBase64FullBoundary(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

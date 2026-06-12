@@ -278,6 +278,21 @@ The closed link-only set was:
 `test/zig/integrated/runtime_tls_bump_main.zig` (global/TLS initializer
 materialization). No accepted broad executable row remains link-only.
 
+Captured loop-sum codegen regression closure:
+The structural accumulator-loop matcher introduced when name-based dispatch
+was removed (`Lower compiler AIR accumulator loops`) only accepted the
+canonical four-block AIR shape, which silently orphaned three captured
+loop-sum rows inside `zig build distribution-all`: the ReleaseFast 8x-unrolled
+`control_flow_calls_loop_sum.ll` fixture, the ReleaseSafe checked 3x-unrolled
+loop inside `control_flow_calls_checked.ll`, and the reduced Debug
+`debug_loop_sum.reduced.ll` row with a signed loop bound. The backend now has
+structural matchers for the unrolled shape (zero guard, unroll preheaders,
+8-step body, lcssa split, epilogue loop) and the checked unrolled shape
+(per-step `llvm.sadd.with.overflow.i32` with overflow panic edges and the
+third-step out-of-bounds guard), and the canonical matcher accepts the signed
+`slt` loop bound alongside `ult`. All three rows lower through the same
+counted-loop emission as before; `zig build distribution-all` is green again.
+
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected
 x86_64 release replacement gate. It emits one machine-readable `selected-zllvm`
