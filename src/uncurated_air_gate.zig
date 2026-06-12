@@ -10,6 +10,12 @@ pub fn main(init: std.process.Init) !void {
     const options = try parseOptions(init.minimal.args);
     const mode = options.mode;
 
+    const debug_dump_ir_source = init.minimal.environ.getAlloc(allocator, "ZLLVM_DEBUG_DUMP_IR_SOURCE") catch |err| switch (err) {
+        error.EnvironmentVariableMissing => null,
+        else => return err,
+    };
+    defer if (debug_dump_ir_source) |value| allocator.free(value);
+
     const zig_emitter_env = init.minimal.environ.getAlloc(allocator, "ZIG_EMITTER") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
         else => return err,
@@ -170,6 +176,15 @@ pub fn main(init: std.process.Init) !void {
             continue;
         };
         defer lowered.deinit();
+
+        if (debug_dump_ir_source) |dump_source| {
+            if (std.mem.indexOf(u8, source, dump_source) != null) {
+                var aw: std.Io.Writer.Allocating = .init(allocator);
+                defer aw.deinit();
+                lowered.module.print(&aw.writer) catch {};
+                std.debug.print("debug-dump-ir source={s}\n{s}\n", .{ source, aw.written() });
+            }
+        }
 
         discovered_functions += rootFunctionCount(parsed);
         structured_functions += lowered.accepted_functions;
@@ -602,7 +617,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 105, 162 },
+        .expanded => .{ 106, 167 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1086,6 +1101,25 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int main(void) {
     \\    if (z_expanded_float_pipeline(1.25f, 2.5f, true) != 3.75f) return 1;
     \\    if (z_expanded_double_pipeline(9.0, 2.0) != 4.5) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_numeric_casts.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded int/float conversion family", .c_body =
+    \\extern float z_expanded_float_from_int(int) __asm__("expanded_numeric_casts.expanded_float_from_int");
+    \\extern double z_expanded_double_from_unsigned(unsigned) __asm__("expanded_numeric_casts.expanded_double_from_unsigned");
+    \\extern int z_expanded_int_from_float(float) __asm__("expanded_numeric_casts.expanded_int_from_float");
+    \\extern float z_expanded_float_narrow(double) __asm__("expanded_numeric_casts.expanded_float_narrow");
+    \\extern double z_expanded_double_widen(float) __asm__("expanded_numeric_casts.expanded_double_widen");
+    \\void z_expanded_int_from_float_oob(void) __asm__("expanded_numeric_casts.integerPartOutOfBounds");
+    \\void z_expanded_int_from_float_oob(void) { __builtin_trap(); }
+    \\int main(void) {
+    \\    if (z_expanded_float_from_int(-7) != -7.0f) return 1;
+    \\    if (z_expanded_double_from_unsigned(3000000000u) != 3000000000.0) return 2;
+    \\    if (z_expanded_int_from_float(41.75f) != 41) return 3;
+    \\    if (z_expanded_int_from_float(-2.5f) != -2) return 4;
+    \\    if (z_expanded_float_narrow(1.5) != 1.5f) return 5;
+    \\    if (z_expanded_double_widen(2.25f) != 2.25) return 6;
     \\    return 0;
     \\}
     \\

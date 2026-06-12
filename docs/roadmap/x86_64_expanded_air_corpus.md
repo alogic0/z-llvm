@@ -20,20 +20,21 @@ Current expanded seed:
 - `test/zig/expanded/expanded_pointer_slices.zig`
 - `test/zig/expanded/expanded_float_calls.zig`
 - `test/zig/expanded/expanded_error_optional.zig`
+- `test/zig/expanded/expanded_numeric_casts.zig`
 
 Current expanded diagnostic snapshot for ReleaseFast, ReleaseSafe, and
 ReleaseSmall:
 
 ```text
-source_rows=105
-discovered_functions=162
-structured_functions=162
-structured_air_v2_functions=162
-typed_air_operand_functions=162
+source_rows=106
+discovered_functions=167
+structured_functions=167
+structured_air_v2_functions=167
+typed_air_operand_functions=167
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=162
-generic_lowering_functions=162
+generic_codegen_functions=167
+generic_lowering_functions=167
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -44,11 +45,11 @@ top_unsupported_construct=-
 local_fail=0
 ```
 
-The first expanded slice is clean for discovery/lowering/codegen. The expanded
+The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=162
+object_emitted_functions=167
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -58,11 +59,11 @@ The expanded object-inspection gates are also green for ReleaseFast,
 ReleaseSafe, and ReleaseSmall:
 
 ```text
-inspected=105
-elf64_rel=105
-relocation_rows=15
+inspected=106
+elf64_rel=106
+relocation_rows=15 (ReleaseSafe: 16)
 tls_rows=4
-undefined_import_rows=3
+undefined_import_rows=3 (ReleaseSafe: 4)
 comdat_rows=0
 eh_frame_rows=0
 unsupported_relocation_rows=0
@@ -73,8 +74,8 @@ Expanded native-link handoff and executable ABI accounting are also green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall:
 
 ```text
-native_link_accepted_rows=104
-executable_ok_rows=104
+native_link_accepted_rows=105
+executable_ok_rows=105
 link_only_rows=0
 runtime_boundary_rows=1
 unsupported_zig_linker_feature_rows=0
@@ -100,10 +101,25 @@ Closed expanded blocker families:
   `expanded_float_calls`, and `expanded_error_optional`.
 - typed v2 ReleaseSafe gap: optional-pointer safe-add immediate extraction
   from `expanded_error_optional.expanded_optional_pointer`.
+- IR/backend numeric-cast gap: `sitofp`/`uitofp`/`fptrunc` cast ops were
+  missing from the local IR, the AIR `float_from_int` opcode was mapped to the
+  wrong cast direction, and the x86_64 backend had no scalar int/float
+  conversion lowering. Closed by `expanded_numeric_casts.zig` with
+  `cvtsi2ss`/`cvtsi2sd` (signed i32/i64), zero-extended `cvtsi2ssq`/`cvtsi2sdq`
+  (unsigned u32), `cvttss2si`/`cvttsd2si`, `cvtsd2ss`, and `cvtss2sd`.
+- AIR export gap: the patched Zig `zllvm-air-export-v1` hook did not classify
+  `fpext` as a typed `ty_op` record, forcing a legacy text fallback for
+  `expanded_numeric_casts.expanded_double_widen`.
+- typed v2 ReleaseSafe gap: the checked `@intFromFloat` range-guard block
+  (`cmp_lte`/`cmp_gte` bound checks, `bit_or`, cold
+  `integerPartOutOfBounds` panic call) from
+  `expanded_numeric_casts.expanded_int_from_float`. The backend lowers the
+  guard CFG with `ucomiss`/`ucomisd` bound compares, `jae` panic edges, and an
+  aligned noreturn panic call.
 
 Active expanded blocker families:
 
-- none for the first expanded discovery/lowering/codegen slice.
+- none for the current expanded discovery/lowering/codegen/executable slices.
 
 Ownership rules for this frontier:
 

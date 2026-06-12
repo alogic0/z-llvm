@@ -129,6 +129,15 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .subss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5c, 0xc1 }),
             .divsd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5e, 0xc1 }),
             .movapd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x28, 0xc1 }),
+            .cvtsi2ss_edi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x2a, 0xc7 }),
+            .cvtsi2sd_edi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x2a, 0xc7 }),
+            .cvtsi2ss_rdi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x48, 0x0f, 0x2a, 0xc7 }),
+            .cvtsi2sd_rdi_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x48, 0x0f, 0x2a, 0xc7 }),
+            .cvttss2si_xmm0_eax => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x2c, 0xc0 }),
+            .cvttsd2si_xmm0_eax => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x2c, 0xc0 }),
+            .cvtsd2ss_xmm0_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf2, 0x0f, 0x5a, 0xc0 }),
+            .cvtss2sd_xmm0_xmm0 => try bytes.appendSlice(allocator, &.{ 0xf3, 0x0f, 0x5a, 0xc0 }),
+            .mov_edi_edi => try bytes.appendSlice(allocator, &.{ 0x89, 0xff }),
             .mov_imm64_xmm0 => |value| {
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb8 });
                 try appendU64(&bytes, allocator, value);
@@ -152,6 +161,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .ucomisd => |cmp| try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc0 | (@as(u8, cmp.dst.lowCode()) << 3) | @as(u8, cmp.src.lowCode()) }),
             .ucomisd_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x66, 0x0f, 0x2e, 0xc1 }),
             .ucomiss_xmm1_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc1 }),
+            .ucomiss_xmm0_xmm1 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x2e, 0xc8 }),
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
@@ -253,6 +263,14 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x88 });
                 try appendI32(&bytes, allocator, @intCast(displacement));
             },
+            .jae => |label| {
+                const target = offsets.get(label) orelse return error.InvalidBranchTarget;
+                const next = offset + instructionSize(instruction);
+                const displacement: i64 = @as(i64, @intCast(target)) - @as(i64, @intCast(next));
+                if (displacement < std.math.minInt(i32) or displacement > std.math.maxInt(i32)) return error.BranchOutOfRange;
+                try bytes.appendSlice(allocator, &.{ 0x0f, 0x83 });
+                try appendI32(&bytes, allocator, @intCast(displacement));
+            },
             .jmp => |label| {
                 const target = offsets.get(label) orelse return error.InvalidBranchTarget;
                 const next = offset + instructionSize(instruction);
@@ -319,6 +337,15 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .subss_xmm1_xmm0 => 4,
         .divsd_xmm1_xmm0 => 4,
         .movapd_xmm1_xmm0 => 4,
+        .cvtsi2ss_edi_xmm0 => 4,
+        .cvtsi2sd_edi_xmm0 => 4,
+        .cvtsi2ss_rdi_xmm0 => 5,
+        .cvtsi2sd_rdi_xmm0 => 5,
+        .cvttss2si_xmm0_eax => 4,
+        .cvttsd2si_xmm0_eax => 4,
+        .cvtsd2ss_xmm0_xmm0 => 4,
+        .cvtss2sd_xmm0_xmm0 => 4,
+        .mov_edi_edi => 2,
         .mov_imm64_xmm0 => 15,
         .mov_imm64_xmm1 => 15,
         .mov_imm32_xmm0 => 9,
@@ -326,6 +353,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ucomisd => 4,
         .ucomisd_xmm1_xmm0 => 4,
         .ucomiss_xmm1_xmm0 => 3,
+        .ucomiss_xmm0_xmm1 => 3,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
         .sub_rsp_24, .add_rsp_24 => 4,
@@ -363,7 +391,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .base64_raw_args_to_decode4_regs => @intCast(base64RawArgsToDecode4RegsBytes().len),
         .base64_decode4_from_table_rax => @intCast(base64Decode4FromTableRaxBytes().len),
         .ud2 => 2,
-        .je, .jne, .jo, .jp, .js => 6,
+        .je, .jne, .jo, .jp, .js, .jae => 6,
         .jmp => 5,
         .ret => 1,
     };

@@ -217,21 +217,32 @@ Expanded corpus frontier:
 `zig build distribution-zig-air-uncurated-releasesafe-expanded`, and
 `zig build distribution-zig-air-uncurated-releasesmall-expanded` are separate
 from the closed broad baseline. The expanded bucket adds
-`test/zig/expanded/*.zig`. The first expanded slice is now green for
-ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=105`,
-`discovered_functions=162`, `generic_codegen_functions=162`,
+`test/zig/expanded/*.zig`. The expanded slices, now including the
+`expanded_numeric_casts.zig` int/float conversion bucket, are green for
+ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=106`,
+`discovered_functions=167`, `generic_codegen_functions=167`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
-`codegen_failures=0`, and `local_fail=0`. The expanded audit is recorded in
-`docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish gate now
-adds object emission for all three release modes at
-`object_emitted_functions=162`, `object_failures=0`,
+`codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
+replacement gaps: the local IR gained `sitofp`/`uitofp`/`fptrunc` cast ops
+with verifier rules, the AIR `float_from_int` opcode mapping was corrected
+from `fptosi`/`fptoui` to `sitofp`/`uitofp`, the patched Zig AIR export hook
+now classifies `fpext` as a typed `ty_op` record, the x86_64 backend lowers
+scalar int/float conversions
+(`cvtsi2ss`/`cvtsi2sd`/`cvtsi2ssq`/`cvtsi2sdq`/`cvttss2si`/`cvttsd2si`/
+`cvtsd2ss`/`cvtss2sd`), and the ReleaseSafe checked `@intFromFloat`
+range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
+with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
+recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
+gate now adds object emission for all three release modes at
+`object_emitted_functions=167`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
-gates report `inspected=105`, `elf64_rel=105`, `relocation_rows=15`,
-`tls_rows=4`, `undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
+gates report `inspected=106`, `elf64_rel=106`, `relocation_rows=15`
+(ReleaseSafe: 16 for the checked panic boundary), `tls_rows=4`,
+`undefined_import_rows=3` (ReleaseSafe: 4), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
-and executable progress gates are now green for all three release modes:
-`native_link_accepted_rows=104`, `executable_ok_rows=104`,
+and executable progress gates are green for all three release modes:
+`native_link_accepted_rows=105`, `executable_ok_rows=105`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The next

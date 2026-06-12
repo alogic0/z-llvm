@@ -359,6 +359,11 @@ pub fn firstUnsupported(
             typedV2MixCAddMayPanicRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_checked_int_from_float =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2CheckedIntFromFloatRecords(function_type, structured_air_v2)
+        else
+            false;
 
     if (typed_accumulator_loop or
         accumulatorLoopShape(function) != null or
@@ -383,6 +388,7 @@ pub fn firstUnsupported(
         typed_aggregate_pair or
         typed_mix_c_add_may_panic or
         mixCAddMayPanicShape(function) or
+        typed_checked_int_from_float or
         typed_maybe_error)
     {
         return null;
@@ -700,6 +706,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2MixCAddMayPanic(allocator, module, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2CheckedIntFromFloat(allocator, module, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
 
@@ -1526,6 +1535,115 @@ fn typedV2MixCAddMayPanicRecords(
         typedCalleeNameCount(structured_air_v2, "defaultPanic") == 1 and
         typedOpcodeCount(structured_air_v2, "unreach") == 1 and
         typedHasReturnOpcode(structured_air_v2);
+}
+
+fn typedV2CheckedIntFromFloatRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 1) return false;
+    const param_ty = function_type.params[0].ir_type;
+    if (!param_ty.eql(.float) and !param_ty.eql(.double)) return false;
+    return function_type.return_type.ir_type.eql(.{ .int = 32 }) and
+        typedOpcodeCount(structured_air_v2, "arg") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_lte") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_gte") == 1 and
+        typedOpcodeCount(structured_air_v2, "bit_or") == 1 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 1 and
+        typedOpcodeCount(structured_air_v2, "int_from_float") == 1 and
+        typedCalleeNameCount(structured_air_v2, "integerPartOutOfBounds") == 1 and
+        typedOpcodeCount(structured_air_v2, "unreach") == 1 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn lowerTypedV2CheckedIntFromFloat(
+    allocator: std.mem.Allocator,
+    module: *ir.Module,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2CheckedIntFromFloatRecords(function_type, structured_air_v2)) return null;
+    const operand_ty = function_type.params[0].ir_type;
+    const low_value = typedConstantOperandValueText(structured_air_v2, "cmp_lte") orelse return null;
+    const high_value = typedConstantOperandValueText(structured_air_v2, "cmp_gte") orelse return null;
+    const low_text = try normalizedFpLiteralText(module, low_value);
+    const high_text = try normalizedFpLiteralText(module, high_value);
+    const callee = callee: {
+        const dot = std.mem.lastIndexOfScalar(u8, air_function.name, '.') orelse
+            break :callee "integerPartOutOfBounds";
+        break :callee try ownPrint(module, "{s}.integerPartOutOfBounds", .{air_function.name[0..dot]});
+    };
+
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = operand_ty, .name = "arg0" });
+
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "below_min",
+        .kind = .{ .fcmp = .{ .predicate = .ole, .operand_ty = operand_ty, .lhs = .{ .named = "arg0" }, .rhs = .{ .fp = low_text } } },
+    });
+    try entry.instructions.append(allocator, .{
+        .result = "above_max",
+        .kind = .{ .fcmp = .{ .predicate = .oge, .operand_ty = operand_ty, .lhs = .{ .named = "arg0" }, .rhs = .{ .fp = high_text } } },
+    });
+    try entry.instructions.append(allocator, .{
+        .result = "out_of_bounds",
+        .kind = .{ .binary = .{ .op = .@"or", .ty = .{ .int = 1 }, .lhs = .{ .named = "below_min" }, .rhs = .{ .named = "above_max" } } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "out_of_bounds" },
+        .then_target = "panic",
+        .else_target = "ok",
+    } };
+    try function.blocks.append(allocator, entry);
+
+    var panic = ir.BasicBlock.init("panic");
+    errdefer panic.deinit(allocator);
+    const panic_call: ir.CallInst = .{ .ret_ty = .void, .callee = callee, .calling_conv = "fastcc", .args = .empty };
+    try panic.instructions.append(allocator, .{ .result = null, .kind = .{ .call = panic_call } });
+    panic.terminator = .{ .@"unreachable" = {} };
+    try function.blocks.append(allocator, panic);
+
+    var ok = ir.BasicBlock.init("ok");
+    errdefer ok.deinit(allocator);
+    try ok.instructions.append(allocator, .{
+        .result = "converted",
+        .kind = .{ .cast = .{ .op = .fptosi, .from_ty = operand_ty, .value = .{ .named = "arg0" }, .to_ty = .{ .int = 32 } } },
+    });
+    ok.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .named = "converted" } } };
+    try function.blocks.append(allocator, ok);
+    return function;
+}
+
+fn typedConstantOperandValueText(
+    structured_air_v2: air_export.StructuredAirV2,
+    opcode: []const u8,
+) ?[]const u8 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, opcode)) continue;
+        const text = typedOperandTextDetail(instruction, 1) orelse return null;
+        return typedAngleConstantValue(text);
+    }
+    return null;
+}
+
+fn typedAngleConstantValue(text: []const u8) ?[]const u8 {
+    if (!std.mem.startsWith(u8, text, "<") or !std.mem.endsWith(u8, text, ">")) return null;
+    const inner = text[1 .. text.len - 1];
+    const comma = std.mem.indexOfScalar(u8, inner, ',') orelse return null;
+    return std.mem.trim(u8, inner[comma + 1 ..], " ");
+}
+
+fn normalizedFpLiteralText(module: *ir.Module, text: []const u8) ![]const u8 {
+    if (std.mem.indexOfAny(u8, text, ".eExX") != null) return ownPrint(module, "{s}", .{text});
+    return ownPrint(module, "{s}.0", .{text});
 }
 
 const AccumulatorLoopShape = struct {
@@ -4444,7 +4562,9 @@ fn isCastOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr") or
         std.mem.eql(u8, opcode, "float_from_int") or
-        std.mem.eql(u8, opcode, "int_from_float");
+        std.mem.eql(u8, opcode, "int_from_float") or
+        std.mem.eql(u8, opcode, "fpext") or
+        std.mem.eql(u8, opcode, "fptrunc");
 }
 
 fn isCallOpcode(opcode: []const u8) bool {
@@ -4493,8 +4613,10 @@ fn castOp(opcode: []const u8, from: ZigType, to: ZigType) ?ir.CastOp {
     if (std.mem.eql(u8, opcode, "bitcast")) return .bitcast;
     if (std.mem.eql(u8, opcode, "ptrtoint")) return .ptrtoint;
     if (std.mem.eql(u8, opcode, "inttoptr")) return .inttoptr;
-    if (std.mem.eql(u8, opcode, "float_from_int")) return if (from.signed) .fptosi else .fptoui;
+    if (std.mem.eql(u8, opcode, "float_from_int")) return if (from.signed) .sitofp else .uitofp;
     if (std.mem.eql(u8, opcode, "int_from_float")) return if (to.signed) .fptosi else .fptoui;
+    if (std.mem.eql(u8, opcode, "fpext")) return .fpext;
+    if (std.mem.eql(u8, opcode, "fptrunc")) return .fptrunc;
     if (!std.mem.eql(u8, opcode, "intcast")) return null;
     const from_bits = intBits(from.ir_type) orelse return null;
     const to_bits = intBits(to.ir_type) orelse return null;

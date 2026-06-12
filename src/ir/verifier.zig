@@ -1804,6 +1804,20 @@ fn verifyCast(cast: core.CastInst) !void {
             if (from_bits >= to_bits) return error.InvalidCast;
             return;
         },
+        .fptrunc => {
+            const from_bits = floatBits(cast.from_ty) orelse return error.InvalidCast;
+            const to_bits = floatBits(cast.to_ty) orelse return error.InvalidCast;
+            if (from_bits <= to_bits) return error.InvalidCast;
+            return;
+        },
+        .sitofp, .uitofp => {
+            switch (cast.from_ty) {
+                .int => {},
+                else => return error.InvalidCast,
+            }
+            _ = floatBits(cast.to_ty) orelse return error.InvalidCast;
+            return;
+        },
         .fptosi, .fptoui => {
             if (cast.from_ty == .vector or cast.to_ty == .vector) {
                 try verifyVectorFloatToIntCast(cast);
@@ -1838,7 +1852,7 @@ fn verifyCast(cast: core.CastInst) !void {
                 switch (cast.op) {
                     .trunc => if (from_bits <= to_bits) return error.InvalidCast,
                     .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-                    .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => unreachable,
+                    .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp, .bitcast, .ptrtoint, .inttoptr => unreachable,
                 }
                 return;
             }
@@ -1856,7 +1870,7 @@ fn verifyCast(cast: core.CastInst) !void {
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
-        .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => unreachable,
+        .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp, .bitcast, .ptrtoint, .inttoptr => unreachable,
     }
 }
 
@@ -1888,7 +1902,7 @@ fn verifyCastFlags(cast: core.CastInst) !void {
         .zext => {
             if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
         },
-        .sext, .fpext, .fptosi, .fptoui, .bitcast, .ptrtoint, .inttoptr => {
+        .sext, .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp, .bitcast, .ptrtoint, .inttoptr => {
             if (cast.flags.any()) return error.InvalidInstructionFlag;
         },
     }

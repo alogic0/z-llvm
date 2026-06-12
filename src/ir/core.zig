@@ -248,8 +248,11 @@ pub const CastOp = enum {
     zext,
     sext,
     fpext,
+    fptrunc,
     fptosi,
     fptoui,
+    sitofp,
+    uitofp,
     bitcast,
     ptrtoint,
     inttoptr,
@@ -259,8 +262,11 @@ pub const CastOp = enum {
         if (std.mem.eql(u8, text, "zext")) return .zext;
         if (std.mem.eql(u8, text, "sext")) return .sext;
         if (std.mem.eql(u8, text, "fpext")) return .fpext;
+        if (std.mem.eql(u8, text, "fptrunc")) return .fptrunc;
         if (std.mem.eql(u8, text, "fptosi")) return .fptosi;
         if (std.mem.eql(u8, text, "fptoui")) return .fptoui;
+        if (std.mem.eql(u8, text, "sitofp")) return .sitofp;
+        if (std.mem.eql(u8, text, "uitofp")) return .uitofp;
         if (std.mem.eql(u8, text, "bitcast")) return .bitcast;
         if (std.mem.eql(u8, text, "ptrtoint")) return .ptrtoint;
         if (std.mem.eql(u8, text, "inttoptr")) return .inttoptr;

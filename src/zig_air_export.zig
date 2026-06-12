@@ -559,6 +559,8 @@ pub fn categoryForOpcode(opcode: []const u8) InstructionCategory {
         std.mem.eql(u8, opcode, "trunc") or
         std.mem.eql(u8, opcode, "float_from_int") or
         std.mem.eql(u8, opcode, "int_from_float") or
+        std.mem.eql(u8, opcode, "fpext") or
+        std.mem.eql(u8, opcode, "fptrunc") or
         std.mem.eql(u8, opcode, "ptrtoint") or
         std.mem.eql(u8, opcode, "inttoptr"))
     {

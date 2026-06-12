@@ -42,7 +42,7 @@ InstSimplify when no arithmetic, rounding, or exception fact is needed
 fast-math `nsz` enables `fadd x, +0.0`, `nnan` enables self-compare
 orderedness folds, and `fast` enables local FP expression CSE/value numbering
 integer casts: trunc, zext, sext
-floating-point cast preservation: fpext for source-backed float-to-double varargs promotion; fptosi/fptoui for source-backed Debug safety checks
+floating-point cast preservation: fpext for source-backed float-to-double varargs promotion; fptrunc for source-backed double-to-float narrowing; fptosi/fptoui for source-backed Debug safety checks and the expanded AIR `@intFromFloat` family; sitofp/uitofp for the expanded AIR `@floatFromInt` family. Width and operand-type legality follows LLVM `CastInst::castIsValid` (llvm/lib/IR/Instructions.cpp): fpext widens, fptrunc narrows, fp-to-int requires an FP source and integer destination, and int-to-fp requires an integer source and FP destination.
 freeze for scalar integer values
 binary instruction flags parsed and printed: nsw, nuw, exact
 verifier rejects pointer binary ops, pointer casts, invalid cast widths, and invalid flag/op combinations
@@ -89,7 +89,9 @@ local-only conservative:
 unit-test only:
   parser/printer/verifier round-trip for casts, div/rem, flags, and freeze
   parser/printer/verifier round-trip for fpext float-to-double
+  parser/printer/verifier round-trip for fptrunc double-to-float
   parser/printer/verifier round-trip for fptosi/fptoui float-to-int casts
+  parser/printer/verifier round-trip for sitofp/uitofp int-to-float casts
   parser/printer/verifier round-trip for scalar float/double fadd/fsub/fmul/fdiv/frem, fcmp predicates, and select
   parser/printer/verifier round-trip for scalar x86_fp80/fp128 ABI surface
   scalar-condition vector select with identical arms folds through the same

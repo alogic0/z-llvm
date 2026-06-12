@@ -4665,6 +4665,24 @@ test "parser preserves scalar float arithmetic and compare IR" {
         \\  ret i32 %int
         \\}
         \\
+        \\define float @float_narrow(double %a) {
+        \\entry:
+        \\  %narrow = fptrunc double %a to float
+        \\  ret float %narrow
+        \\}
+        \\
+        \\define float @float_from_signed(i32 %a) {
+        \\entry:
+        \\  %value = sitofp i32 %a to float
+        \\  ret float %value
+        \\}
+        \\
+        \\define double @double_from_unsigned(i32 %a) {
+        \\entry:
+        \\  %value = uitofp i32 %a to double
+        \\  ret double %value
+        \\}
+        \\
     ;
 
     var module = try ir.Module.parse(std.testing.allocator, input);
@@ -4681,6 +4699,9 @@ test "parser preserves scalar float arithmetic and compare IR" {
     try std.testing.expectEqual(ir.CastOp.fpext, module.functions.items[7].blocks.items[0].instructions.items[0].kind.cast.op);
     try std.testing.expectEqual(ir.CastOp.fptosi, module.functions.items[8].blocks.items[0].instructions.items[0].kind.cast.op);
     try std.testing.expectEqual(ir.CastOp.fptoui, module.functions.items[9].blocks.items[0].instructions.items[0].kind.cast.op);
+    try std.testing.expectEqual(ir.CastOp.fptrunc, module.functions.items[10].blocks.items[0].instructions.items[0].kind.cast.op);
+    try std.testing.expectEqual(ir.CastOp.sitofp, module.functions.items[11].blocks.items[0].instructions.items[0].kind.cast.op);
+    try std.testing.expectEqual(ir.CastOp.uitofp, module.functions.items[12].blocks.items[0].instructions.items[0].kind.cast.op);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
