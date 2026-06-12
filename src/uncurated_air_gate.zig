@@ -294,8 +294,8 @@ pub fn main(init: std.process.Init) !void {
                 const link_result = if (harness) |executable_harness| link_result: {
                     const harness_body = try executableHarnessBody(allocator, executable_harness);
                     defer if (executable_harness.c_body == null) allocator.free(harness_body);
-                    break :link_result try linkObjectWithHarness(allocator, io, zig_emitter, object_path, exe_path, harness_body);
-                } else try nativeLinkObject(allocator, io, zig_emitter, object_path, exe_path);
+                    break :link_result try linkObjectWithHarness(allocator, io, zig_emitter, mode, object_path, exe_path, harness_body);
+                } else try nativeLinkObject(allocator, io, zig_emitter, mode, object_path, exe_path);
                 defer {
                     allocator.free(link_result.stdout);
                     allocator.free(link_result.stderr);
@@ -1105,7 +1105,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
-    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_numeric_casts.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded int/float conversion family", .c_body =
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_numeric_casts.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded int/float conversion family with checked panic-edge death proof", .c_body =
+    \\#include <sys/wait.h>
+    \\#include <unistd.h>
     \\extern float z_expanded_float_from_int(int) __asm__("expanded_numeric_casts.expanded_float_from_int");
     \\extern double z_expanded_double_from_unsigned(unsigned) __asm__("expanded_numeric_casts.expanded_double_from_unsigned");
     \\extern int z_expanded_int_from_float(float) __asm__("expanded_numeric_casts.expanded_int_from_float");
@@ -1113,6 +1115,20 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_expanded_double_widen(float) __asm__("expanded_numeric_casts.expanded_double_widen");
     \\void z_expanded_int_from_float_oob(void) __asm__("expanded_numeric_casts.integerPartOutOfBounds");
     \\void z_expanded_int_from_float_oob(void) { __builtin_trap(); }
+    \\#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
+    \\static int expect_out_of_range_trap(float value) {
+    \\    pid_t child = fork();
+    \\    if (child < 0) return -1;
+    \\    if (child == 0) {
+    \\        (void)z_expanded_int_from_float(value);
+    \\        _exit(0);
+    \\    }
+    \\    int status = 0;
+    \\    if (waitpid(child, &status, 0) != child) return -1;
+    \\    if (!WIFSIGNALED(status)) return -1;
+    \\    return 0;
+    \\}
+    \\#endif
     \\int main(void) {
     \\    if (z_expanded_float_from_int(-7) != -7.0f) return 1;
     \\    if (z_expanded_double_from_unsigned(3000000000u) != 3000000000.0) return 2;
@@ -1120,6 +1136,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_expanded_int_from_float(-2.5f) != -2) return 4;
     \\    if (z_expanded_float_narrow(1.5) != 1.5f) return 5;
     \\    if (z_expanded_double_widen(2.25f) != 2.25) return 6;
+    \\#ifdef ZLLVM_HARNESS_MODE_ReleaseSafe
+    \\    if (expect_out_of_range_trap(3000000000.0f) != 0) return 7;
+    \\    if (expect_out_of_range_trap(-3000000000.0f) != 0) return 8;
+    \\#endif
     \\    return 0;
     \\}
     \\
@@ -1200,6 +1220,7 @@ fn nativeLinkObject(
     allocator: std.mem.Allocator,
     io: std.Io,
     zig_exe: []const u8,
+    mode: Mode,
     object_path: []const u8,
     exe_path: []const u8,
 ) !std.process.RunResult {
@@ -1207,6 +1228,7 @@ fn nativeLinkObject(
         allocator,
         io,
         zig_exe,
+        mode,
         object_path,
         exe_path,
         "int main(void) { return 0; }\n",
@@ -1217,6 +1239,7 @@ fn linkObjectWithHarness(
     allocator: std.mem.Allocator,
     io: std.Io,
     zig_exe: []const u8,
+    mode: Mode,
     object_path: []const u8,
     exe_path: []const u8,
     harness_body: []const u8,
@@ -1225,12 +1248,15 @@ fn linkObjectWithHarness(
     defer allocator.free(harness_c);
     const harness_o = try std.fmt.allocPrint(allocator, "{s}.harness.o", .{exe_path});
     defer allocator.free(harness_o);
+    const mode_define = try std.fmt.allocPrint(allocator, "-DZLLVM_HARNESS_MODE_{s}", .{mode.name()});
+    defer allocator.free(mode_define);
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = harness_c, .data = harness_body });
     const cc_argv = [_][]const u8{
         zig_exe,
         "cc",
         "-target",
         "x86_64-linux-gnu",
+        mode_define,
         "-c",
         harness_c,
         "-o",

@@ -291,14 +291,33 @@ pub fn validationError(io: std.Io, comptime fmt: []const u8, args: anytype) !nor
 }
 
 pub fn forwardCommandFailure(io: std.Io, label: []const u8, result: std.process.RunResult) !noreturn {
+    // Forward bounded, clearly labeled tails of both streams so the failing
+    // tool and its real diagnostic survive into the orchestrator log.
+    const tail_limit = 8 * 1024;
     var stderr_buffer: [4096]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-    try stderr_writer.interface.print("{s} failed\n", .{label});
+    try stderr_writer.interface.print("command-failure label={s} term={any}\n", .{ label, result.term });
     if (result.stderr.len != 0) {
-        try stderr_writer.interface.writeAll(result.stderr);
-    } else {
-        try stderr_writer.interface.writeAll(result.stdout);
+        const tail = outputTail(result.stderr, tail_limit);
+        try stderr_writer.interface.print("command-failure-stderr label={s} bytes={} shown={}\n", .{ label, result.stderr.len, tail.len });
+        try stderr_writer.interface.writeAll(tail);
+        if (tail.len != 0 and tail[tail.len - 1] != '\n') try stderr_writer.interface.writeAll("\n");
     }
+    if (result.stdout.len != 0) {
+        const tail = outputTail(result.stdout, tail_limit);
+        try stderr_writer.interface.print("command-failure-stdout label={s} bytes={} shown={}\n", .{ label, result.stdout.len, tail.len });
+        try stderr_writer.interface.writeAll(tail);
+        if (tail.len != 0 and tail[tail.len - 1] != '\n') try stderr_writer.interface.writeAll("\n");
+    }
+    try stderr_writer.interface.print("command-failure-end label={s}\n", .{label});
     try stderr_writer.interface.flush();
     std.process.exit(1);
+}
+
+fn outputTail(text: []const u8, limit: usize) []const u8 {
+    if (text.len <= limit) return text;
+    const cut = text[text.len - limit ..];
+    // Start at the next full line so the tail never opens mid-line.
+    const newline = std.mem.indexOfScalar(u8, cut, '\n') orelse return cut;
+    return cut[newline + 1 ..];
 }

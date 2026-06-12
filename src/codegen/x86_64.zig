@@ -1083,8 +1083,6 @@ fn lowerStraightLineReturn(
             if (try lowerReleaseSmallStrFromFloatMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsMainReadReturn(allocator, machine, function, block, ret)) return;
             if (try lowerTlsMainUpdateReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerTlsReadReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerTlsBumpReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedI1ConstReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedStringSliceReturn(allocator, machine, function, block, ret)) return;
@@ -4976,14 +4974,20 @@ fn fp32TextBits(value: ir.Value) !u32 {
         .fp => |text| text,
         .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    if (std.mem.eql(u8, text, "1.000000e+00")) return 0x3f80_0000;
-    if (std.mem.eql(u8, text, "1.500000e+00") or std.mem.eql(u8, text, "1.5")) return 0x3fc0_0000;
-    if (std.mem.eql(u8, text, "2.000000e+00")) return 0x4000_0000;
-    if (std.mem.eql(u8, text, "3.000000e+00")) return 0x4040_0000;
-    if (std.mem.eql(u8, text, "5.000000e+00")) return 0x40a0_0000;
-    if (std.mem.eql(u8, text, "5.500000e+00")) return 0x40b0_0000;
+    // LLVM prints float constants as raw double bit patterns (0x...), not
+    // C99 hex-float literals, so raw-hex spellings must be bit-decoded.
+    if (rawHexFpBits(text)) |bits| {
+        const wide: f64 = @bitCast(bits);
+        const narrow: f32 = @floatCast(wide);
+        return @bitCast(narrow);
+    }
     const parsed = std.fmt.parseFloat(f32, text) catch return error.UnsupportedCodegenValue;
     return @bitCast(parsed);
+}
+
+fn rawHexFpBits(text: []const u8) ?u64 {
+    if (!std.mem.startsWith(u8, text, "0x") or text.len != 18) return null;
+    return std.fmt.parseInt(u64, text[2..], 16) catch null;
 }
 
 fn fp64TextBits(value: ir.Value) !u64 {
@@ -4991,12 +4995,7 @@ fn fp64TextBits(value: ir.Value) !u64 {
         .fp => |text| text,
         .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    if (std.mem.eql(u8, text, "1.000000e+00")) return 0x3ff0_0000_0000_0000;
-    if (std.mem.eql(u8, text, "2.000000e+00")) return 0x4000_0000_0000_0000;
-    if (std.mem.eql(u8, text, "3.000000e+00")) return 0x4008_0000_0000_0000;
-    if (std.mem.eql(u8, text, "4.000000e+00")) return 0x4010_0000_0000_0000;
-    if (std.mem.eql(u8, text, "2.25") or std.mem.eql(u8, text, "2.250000e+00")) return 0x4002_0000_0000_0000;
-    if (std.mem.eql(u8, text, "6.000000e+00")) return 0x4018_0000_0000_0000;
+    if (rawHexFpBits(text)) |bits| return bits;
     const parsed = std.fmt.parseFloat(f64, text) catch return error.UnsupportedCodegenValue;
     return @bitCast(parsed);
 }

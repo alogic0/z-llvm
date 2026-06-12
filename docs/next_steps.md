@@ -146,8 +146,15 @@ the same patched-Zig source-owned object path, links with `zig build-exe
 `unsupported_zig_linker_feature_rows=0`,
 `local_object_codegen_failures=0`, and `failed=0`.
 
-The Zig hook is frozen for this milestone: patch Zig only for fact-contract
-version changes, not for row expansion or surface classification.
+The Zig source-facts hook (`zllvm-source-facts-v1`) is frozen for this
+milestone: patch it only for fact-contract version changes, not for row
+expansion or surface classification. The separate AIR-export hook
+(`zllvm-air-export-v1` / `structured_air-v2`) is not frozen; it may gain
+generic data-kind and operand classification (for example the `fpext` ty_op
+record) as the uncurated corpus exposes unclassified opcodes, but it must
+never gain case- or row-specific behavior. Prefer closing classification gaps
+on the z_llvm side when the exported AIR text already carries the
+information.
 
 Current real-AIR ownership milestone:
 `zig build distribution-zig-air-uncurated-release` is the source-driven

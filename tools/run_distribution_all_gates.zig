@@ -45,6 +45,10 @@ pub fn main(init: std.process.Init) !void {
             try argv.append(allocator, "--");
             try argv.appendSlice(allocator, tool.args);
         }
+        try stdout_writer.interface.print("gate-start tool={s}", .{tool.path});
+        for (tool.args) |arg| try stdout_writer.interface.print(" {s}", .{arg});
+        try stdout_writer.interface.writeAll("\n");
+        try stdout_writer.interface.flush();
         const result = try common.runCapture(allocator, io, argv.items, tool.path);
         defer common.freeRunResult(allocator, result);
         try stdout_writer.interface.writeAll(result.stdout);
