@@ -290,8 +290,12 @@ structural matchers for the unrolled shape (zero guard, unroll preheaders,
 8-step body, lcssa split, epilogue loop) and the checked unrolled shape
 (per-step `llvm.sadd.with.overflow.i32` with overflow panic edges and the
 third-step out-of-bounds guard), and the canonical matcher accepts the signed
-`slt` loop bound alongside `ult`. All three rows lower through the same
-counted-loop emission as before; `zig build distribution-all` is green again.
+`slt` loop bound alongside `ult`. The external IR-writer loop-sum rows in the
+integrated `--ir-writer` gate needed the same closure: structural matchers now
+cover the writer's guarded do-while shape and its checked variant (loop-header
+out-of-bounds guard, checked-add block, continue block). All rows lower
+through the same counted-loop emission as before; `zig build distribution-all`
+is green again end to end.
 
 Regression distribution claim gates:
 `zig build distribution-x86_64-selected-zllvm` is the stable compact selected

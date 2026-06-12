@@ -9999,7 +9999,9 @@ fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFuncti
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     if (!matchesAccumulatorLoop(function) and
         !matchesUnrolledAccumulatorLoop(function) and
-        !matchesCheckedUnrolledAccumulatorLoop(function)) return false;
+        !matchesCheckedUnrolledAccumulatorLoop(function) and
+        !matchesGuardedDoWhileAccumulatorLoop(function) and
+        !matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return false;
     const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
     if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
 
@@ -10267,6 +10269,170 @@ fn checkedUnrolledPanicBlock(block: ir.BasicBlock, callee: []const u8) bool {
         .@"unreachable" => true,
         else => false,
     };
+}
+
+// Matches the external IR-writer shape for the counted accumulator loop: a
+// zero guard branching to a constant-zero return, then a single do-while loop
+// block whose phis, adds, and equality exit compute the sum of 0..limit-1.
+fn matchesGuardedDoWhileAccumulatorLoop(function: ir.Function) bool {
+    if (function.blocks.items.len != 4) return false;
+    const limit_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const exit_zero = function.blocks.items[2];
+    const exit = function.blocks.items[3];
+    if (entry.instructions.items.len != 1 or
+        loop.instructions.items.len != 5 or
+        exit_zero.instructions.items.len != 0 or
+        exit.instructions.items.len != 0)
+    {
+        return false;
+    }
+
+    const zero_check = unrolledLoopIcmp(entry.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(zero_check.lhs, limit_name) or !isInt(zero_check.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(entry_br.cond, entry.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, exit_zero.name)) return false;
+    if (!std.mem.eql(u8, entry_br.else_target, loop.name)) return false;
+
+    const index_phi = unrolledLoopPhi(loop.instructions.items[0]) orelse return false;
+    const sum_phi = unrolledLoopPhi(loop.instructions.items[1]) orelse return false;
+    const index_name = loop.instructions.items[0].result orelse return false;
+    const sum_name = loop.instructions.items[1].result orelse return false;
+    const sum_next = unrolledLoopBinary(loop.instructions.items[2], .add) orelse return false;
+    if (!isNamed(sum_next.lhs, sum_name) or !isNamed(sum_next.rhs, index_name)) return false;
+    const sum_next_name = loop.instructions.items[2].result orelse return false;
+    const index_next = unrolledLoopBinary(loop.instructions.items[3], .add) orelse return false;
+    if (!isNamed(index_next.lhs, index_name) or !isInt(index_next.rhs, 1)) return false;
+    const index_next_name = loop.instructions.items[3].result orelse return false;
+    const done = unrolledLoopIcmp(loop.instructions.items[4], .eq) orelse return false;
+    if (!isNamed(done.lhs, index_next_name) or !isNamed(done.rhs, limit_name)) return false;
+    if (!phiHasIncomingInt(index_phi, 0, entry.name) or
+        !phiHasIncoming(index_phi, index_next_name, loop.name) or
+        !phiHasIncomingInt(sum_phi, 0, entry.name) or
+        !phiHasIncoming(sum_phi, sum_next_name, loop.name))
+    {
+        return false;
+    }
+    const loop_br = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(loop_br.cond, loop.instructions.items[4].result orelse return false)) return false;
+    if (!std.mem.eql(u8, loop_br.then_target, exit.name)) return false;
+    if (!std.mem.eql(u8, loop_br.else_target, loop.name)) return false;
+
+    const zero_ret = switch (exit_zero.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!zero_ret.ty.eql(.{ .int = 32 }) or !isInt(zero_ret.value orelse return false, 0)) return false;
+    const ret = switch (exit.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, sum_next_name);
+}
+
+// Matches the checked external IR-writer shape for the counted accumulator
+// loop: a zero guard, a loop header that guards the index against i32
+// minimum with an out-of-bounds panic edge, a checked add block through
+// llvm.sadd.with.overflow.i32 with an overflow panic edge, and a continue
+// block that advances the index and exits on the limit equality.
+fn matchesCheckedGuardedDoWhileAccumulatorLoop(function: ir.Function) bool {
+    if (function.blocks.items.len != 8) return false;
+    const limit_name = function.params.items[0].name;
+    const entry = function.blocks.items[0];
+    const loop = function.blocks.items[1];
+    const checked_add = function.blocks.items[2];
+    const oob_panic = function.blocks.items[3];
+    const overflow_panic = function.blocks.items[4];
+    const cont = function.blocks.items[5];
+    const exit_zero = function.blocks.items[6];
+    const exit = function.blocks.items[7];
+    if (entry.instructions.items.len != 1 or
+        loop.instructions.items.len != 3 or
+        checked_add.instructions.items.len != 2 or
+        cont.instructions.items.len != 3 or
+        exit_zero.instructions.items.len != 0 or
+        exit.instructions.items.len != 0)
+    {
+        return false;
+    }
+
+    const zero_check = unrolledLoopIcmp(entry.instructions.items[0], .eq) orelse return false;
+    if (!isNamed(zero_check.lhs, limit_name) or !isInt(zero_check.rhs, 0)) return false;
+    const entry_br = switch (entry.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(entry_br.cond, entry.instructions.items[0].result orelse return false)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, exit_zero.name)) return false;
+    if (!std.mem.eql(u8, entry_br.else_target, loop.name)) return false;
+
+    if (!checkedUnrolledPanicBlock(oob_panic, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds")) return false;
+    if (!checkedUnrolledPanicBlock(overflow_panic, "debug.FullPanic((function 'defaultPanic')).integerOverflow")) return false;
+
+    const index_phi = unrolledLoopPhi(loop.instructions.items[0]) orelse return false;
+    const sum_phi = unrolledLoopPhi(loop.instructions.items[1]) orelse return false;
+    const index_name = loop.instructions.items[0].result orelse return false;
+    const sum_name = loop.instructions.items[1].result orelse return false;
+    const oob_check = unrolledLoopIcmp(loop.instructions.items[2], .eq) orelse return false;
+    if (!isNamed(oob_check.lhs, index_name) or !isInt(oob_check.rhs, std.math.minInt(i32))) return false;
+    const loop_br = switch (loop.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(loop_br.cond, loop.instructions.items[2].result orelse return false)) return false;
+    if (!std.mem.eql(u8, loop_br.then_target, oob_panic.name)) return false;
+    if (!std.mem.eql(u8, loop_br.else_target, checked_add.name)) return false;
+
+    const call_name = checkedUnrolledSaddTail(checked_add, 0, sum_name, index_name, overflow_panic.name, cont.name) orelse return false;
+
+    const sum_next_inst = cont.instructions.items[0];
+    if (sum_next_inst.removed) return false;
+    const sum_next = switch (sum_next_inst.kind) {
+        .extractvalue => |extractvalue| extractvalue,
+        else => return false,
+    };
+    if (!sum_next.result_ty.eql(.{ .int = 32 }) or !isNamed(sum_next.aggregate, call_name)) return false;
+    if (!std.mem.eql(u8, sum_next.indices, "0")) return false;
+    const sum_next_name = sum_next_inst.result orelse return false;
+    const index_next = unrolledLoopBinary(cont.instructions.items[1], .add) orelse return false;
+    if (!isNamed(index_next.lhs, index_name) or !isInt(index_next.rhs, 1)) return false;
+    const index_next_name = cont.instructions.items[1].result orelse return false;
+    const done = unrolledLoopIcmp(cont.instructions.items[2], .eq) orelse return false;
+    if (!isNamed(done.lhs, index_next_name) or !isNamed(done.rhs, limit_name)) return false;
+    const cont_br = switch (cont.terminator orelse return false) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(cont_br.cond, cont.instructions.items[2].result orelse return false)) return false;
+    if (!std.mem.eql(u8, cont_br.then_target, exit.name)) return false;
+    if (!std.mem.eql(u8, cont_br.else_target, loop.name)) return false;
+
+    if (!phiHasIncomingInt(index_phi, 0, entry.name) or
+        !phiHasIncoming(index_phi, index_next_name, cont.name) or
+        !phiHasIncomingInt(sum_phi, 0, entry.name) or
+        !phiHasIncoming(sum_phi, sum_next_name, cont.name))
+    {
+        return false;
+    }
+
+    const zero_ret = switch (exit_zero.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!zero_ret.ty.eql(.{ .int = 32 }) or !isInt(zero_ret.value orelse return false, 0)) return false;
+    const ret = switch (exit.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, sum_next_name);
 }
 
 // Matches the captured ReleaseSafe LLVM shape for the checked counted
