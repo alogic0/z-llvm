@@ -1000,6 +1000,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerCheckedTableLookup(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     return error.UnsupportedCodegenControlFlow;
 }
 
@@ -11625,6 +11630,118 @@ fn lowerCheckedIntFromFloat(allocator: std.mem.Allocator, machine: *MachineFunct
     try appendAlignedDirectCall(allocator, machine, panic_call.callee, .void);
     try machine.instructions.append(allocator, .ud2);
     return true;
+}
+
+// Lowers the ReleaseSafe guarded byte-table lookup CFG: a masked index,
+// zero-extension, and bounds compare in the entry block, a cold noreturn
+// out-of-bounds panic call in its own block, and the table load in the
+// continuation block. The bounds check is emitted, never elided.
+fn lowerCheckedTableLookup(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 8 })) return false;
+    if (function.blocks.items.len != 3) return false;
+    const param_name = function.params.items[0].name;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 3) return false;
+    const mask = switch (entry.instructions.items[0].kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (mask.op != .@"and" or !mask.ty.eql(.{ .int = 8 })) return false;
+    if (!((isNamed(mask.lhs, param_name) and isInt(mask.rhs, 3)) or
+        (isNamed(mask.rhs, param_name) and isInt(mask.lhs, 3))))
+    {
+        return false;
+    }
+    const mask_name = entry.instructions.items[0].result orelse return false;
+    const index_zext = switch (entry.instructions.items[1].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (index_zext.op != .zext or !index_zext.from_ty.eql(.{ .int = 8 }) or !index_zext.to_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(index_zext.value, mask_name)) return false;
+    const index_name = entry.instructions.items[1].result orelse return false;
+    const bounds = switch (entry.instructions.items[2].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (bounds.predicate != .ult or !bounds.operand_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(bounds.lhs, index_name) or !isInt(bounds.rhs, 4)) return false;
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!isNamed(condbr.cond, entry.instructions.items[2].result orelse return false)) return false;
+
+    // cond is `index < len`, so the in-bounds path is the branch-true side
+    // and the panic block is always the else target.
+    const cont = blockByName(function, condbr.then_target) orelse return false;
+    const panic_block = blockByName(function, condbr.else_target) orelse return false;
+    if (blockEndsUnreachable(cont) or !blockEndsUnreachable(panic_block)) return false;
+
+    if (panic_block.instructions.items.len != 1) return false;
+    const panic_call = switch (panic_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (panic_call.ret_ty != .void or panic_call.args.items.len != 2) return false;
+    if (!panic_call.args.items[0].ty.eql(.{ .int = 64 }) or !isNamed(panic_call.args.items[0].value, index_name)) return false;
+    if (!panic_call.args.items[1].ty.eql(.{ .int = 64 }) or !isInt(panic_call.args.items[1].value, 4)) return false;
+
+    if (cont.instructions.items.len != 3) return false;
+    const gep = switch (cont.instructions.items[0].kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    const table_symbol = switch (gep.ptr) {
+        .named => |name| symbolName(name),
+        else => return false,
+    };
+    if (!std.mem.startsWith(u8, table_symbol, "__anon_")) return false;
+    if (gep.indices.items.len != 2) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !gep.indices.items[0].value.eql(.{ .int = 0 })) return false;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 64 }) or !isNamed(gep.indices.items[1].value, index_name)) return false;
+    const gep_name = cont.instructions.items[0].result orelse return false;
+    const load = switch (cont.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+    const load_name = cont.instructions.items[1].result orelse return false;
+    const result_zext = switch (cont.instructions.items[2].kind) {
+        .cast => |cast| cast,
+        else => return false,
+    };
+    if (result_zext.op != .zext or !result_zext.from_ty.eql(.{ .int = 8 }) or !result_zext.to_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(result_zext.value, load_name)) return false;
+    const ret = switch (cont.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, cont.instructions.items[2].result orelse return false)) return false;
+
+    const panic_label = condbr.else_target;
+    try machine.instructions.append(allocator, .movzx_dil_edi);
+    try machine.instructions.append(allocator, .{ .and_edi_imm8 = 3 });
+    try machine.instructions.append(allocator, .{ .cmp_rdi_imm64 = 4 });
+    try machine.instructions.append(allocator, .{ .jae = panic_label });
+    try machine.instructions.append(allocator, .{ .lea_global_rax = table_symbol });
+    try machine.instructions.append(allocator, .load_rax_rdi_u8_eax);
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = panic_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = 4 });
+    try appendAlignedDirectCall(allocator, machine, panic_call.callee, .void);
+    try machine.instructions.append(allocator, .ud2);
+    return true;
+}
+
+fn blockEndsUnreachable(block: ir.BasicBlock) bool {
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
 }
 
 fn lowerCheckedAddRuntimeBoundaryMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

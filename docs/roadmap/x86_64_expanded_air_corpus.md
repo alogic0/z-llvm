@@ -63,7 +63,7 @@ inspected=106
 elf64_rel=106
 relocation_rows=15 (ReleaseSafe: 16)
 tls_rows=4
-undefined_import_rows=3 (ReleaseSafe: 4)
+undefined_import_rows=3 (ReleaseSafe: 5)
 comdat_rows=0
 eh_frame_rows=0
 unsupported_relocation_rows=0
@@ -110,6 +110,17 @@ Closed expanded blocker families:
 - AIR export gap: the patched Zig `zllvm-air-export-v1` hook did not classify
   `fpext` as a typed `ty_op` record, forcing a legacy text fallback for
   `expanded_numeric_casts.expanded_double_widen`.
+- ReleaseSafe void-guard preservation gap: typed v2 lowering previously
+  elided void guard blocks (a safety check whose passing branch is `br void`
+  and whose failing branch is a cold noreturn panic call), which made the
+  affected ReleaseSafe row behave like ReleaseFast. The only corpus function
+  that hit the elision was `base64_table_lookup.base64_table_lookup` (the
+  array bounds check). Typed v2 now lowers void guards into real control
+  flow (guard branch, dedicated panic-call block, continuation block), the
+  backend lowers the guarded table-lookup CFG with a `cmp`/`jae` bounds edge
+  and an aligned noreturn `outOfBounds` call, and the executable harness
+  stubs the panic symbol. The ReleaseSafe object row gains one undefined
+  import for the restored panic boundary.
 - typed v2 ReleaseSafe gap: the checked `@intFromFloat` range-guard block
   (`cmp_lte`/`cmp_gte` bound checks, `bit_or`, cold
   `integerPartOutOfBounds` panic call) from

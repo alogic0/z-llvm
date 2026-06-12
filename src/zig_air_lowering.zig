@@ -3487,7 +3487,12 @@ const LoweringContext = struct {
 
         const then_body = structured_air.body(.then_body, cond_instruction.index) orelse return error.UnsupportedAir;
         const else_body = structured_air.body(.else_body, cond_instruction.index) orelse return error.UnsupportedAir;
-        if (typedVoidGuardBlock(structured_air_v2, instruction.index, then_body, else_body)) return;
+        if (typedVoidGuardBlock(structured_air_v2, instruction.index, then_body, else_body)) {
+            const panic_body = if (typedNoreturnBody(structured_air_v2, then_body)) then_body else else_body;
+            const panic_is_then = typedNoreturnBody(structured_air_v2, then_body);
+            try self.lowerTypedVoidGuard(instruction, cond, panic_body, panic_is_then);
+            return;
+        }
         const true_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body);
         const false_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body);
         if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
@@ -3507,6 +3512,43 @@ const LoweringContext = struct {
             .ty = true_value.ty,
             .value = .{ .named = result_name },
         };
+    }
+
+    // Lowers a ReleaseSafe void guard block into real control flow: the
+    // current block ends with the guard branch, the cold noreturn panic call
+    // gets its own block, and lowering continues in a fresh continuation
+    // block. The guard is preserved, never elided.
+    fn lowerTypedVoidGuard(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        cond: TypedValue,
+        panic_body: air_export.StructuredBody,
+        panic_is_then: bool,
+    ) LowerError!void {
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        const panic_label = try ownPrint(self.module, "guard{}_panic", .{instruction.index});
+        const cont_label = try ownPrint(self.module, "guard{}_cont", .{instruction.index});
+
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = cond.value,
+            .then_target = if (panic_is_then) panic_label else cont_label,
+            .else_target = if (panic_is_then) cont_label else panic_label,
+        } };
+        self.block.* = ir.BasicBlock.init(panic_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        for (panic_body.instructions) |panic_index| {
+            const child = typedInstructionByIndex(structured_air_v2, panic_index) orelse return error.UnsupportedAir;
+            if (isIgnoredOpcode(child.opcode)) continue;
+            if (std.mem.eql(u8, child.opcode, "unreach")) continue;
+            try self.lowerTypedInstruction(child);
+        }
+        var panic_block = self.block.*;
+        panic_block.terminator = .{ .@"unreachable" = {} };
+        self.block.* = ir.BasicBlock.init(cont_label);
+        try self.function.blocks.append(self.allocator, panic_block);
     }
 
     fn typedBlockBranchValue(

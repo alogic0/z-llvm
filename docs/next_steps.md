@@ -170,7 +170,10 @@ Current measured output for each mode is `source_rows=19`,
 `source_fact_classification_rows=0`, and `local_fail=0`. ReleaseSafe is scoped
 to the same root-source function inventory and accepts safe opcode variants
 such as `ret_safe`, `store_safe`, and `intcast_safe` while keeping
-safety/runtime shapes fail-closed. Object-format inspection and native-link
+safety/runtime shapes fail-closed. ReleaseSafe void guard blocks are now
+lowered into real control flow (guard branch, cold noreturn panic block,
+continuation block) instead of being elided, so the emitted object preserves
+the safety check and its panic boundary. Object-format inspection and native-link
 handoff for this uncurated AIR gate are the next evidence layer; they are not
 part of the current inner-loop gate.
 
@@ -246,7 +249,7 @@ gate now adds object emission for all three release modes at
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=106`, `elf64_rel=106`, `relocation_rows=15`
 (ReleaseSafe: 16 for the checked panic boundary), `tls_rows=4`,
-`undefined_import_rows=3` (ReleaseSafe: 4), `comdat_rows=0`, `eh_frame_rows=0`,
+`undefined_import_rows=3` (ReleaseSafe: 5), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
 and executable progress gates are green for all three release modes:
 `native_link_accepted_rows=105`, `executable_ok_rows=105`,
@@ -400,6 +403,24 @@ fully accounted locally. Future expansion should add new fixtures or corpus
 inputs through reusable structured-builder and generic x86_64 lowering helpers;
 the broad gate should report the first unsupported fixture class exactly if a
 new row cannot be closed cleanly.
+
+Promoted structural frontier - generic x86_64 CFG lowering:
+The captured loop-sum regression showed the cost of the current backend
+architecture: one semantic function now needs five hand-written structural
+matchers (canonical, 8x-unrolled, checked 3x-unrolled, writer do-while,
+checked writer do-while), and any optimizer or writer change can orphan
+captured rows that only `distribution-all` exercises. The promoted long-term
+target is a generic lowering path that walks arbitrary single-function CFGs:
+a block-local operand-to-register mapping for the current scalar subset,
+generic binary/icmp/fcmp flag materialization, generic jcc/jmp emission from
+condbr/br terminators with machine labels per IR block, and phi resolution by
+copy insertion on edges. Adoption should be incremental and evidence-driven:
+route a function through the generic path only when every instruction and
+terminator in it is covered, keep the structural matchers as the fallback,
+and count `generic_cfg_functions` in the gates so progress is measured. The
+loop-sum family is the first candidate (all five matchers should collapse
+into the generic path); checked guard CFGs (`lowerCheckedIntFromFloat`,
+`lowerCheckedTableLookup`) are the second.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over
