@@ -10,6 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
+- `generic_cfg_functions=1` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=2` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -21,20 +23,23 @@ Current expanded seed:
 - `test/zig/expanded/expanded_float_calls.zig`
 - `test/zig/expanded/expanded_error_optional.zig`
 - `test/zig/expanded/expanded_numeric_casts.zig`
+- `test/zig/expanded/expanded_branch_arrays.zig`
 
 Current expanded diagnostic snapshot for ReleaseFast, ReleaseSafe, and
 ReleaseSmall:
 
 ```text
-source_rows=106
-discovered_functions=167
-structured_functions=167
-structured_air_v2_functions=167
-typed_air_operand_functions=167
+source_rows=107
+discovered_functions=168
+structured_functions=168
+structured_air_v2_functions=168
+typed_air_operand_functions=168
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=167
-generic_lowering_functions=167
+generic_codegen_functions=168
+generic_cfg_functions=1 (ReleaseSafe: 3)
+structural_matcher_functions=167 (ReleaseSafe: 165)
+generic_lowering_functions=168
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -49,7 +54,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=167
+object_emitted_functions=168
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -59,8 +64,8 @@ The expanded object-inspection gates are also green for ReleaseFast,
 ReleaseSafe, and ReleaseSmall:
 
 ```text
-inspected=106
-elf64_rel=106
+inspected=107
+elf64_rel=107
 relocation_rows=15 (ReleaseSafe: 16)
 tls_rows=4
 undefined_import_rows=3 (ReleaseSafe: 5)
@@ -74,8 +79,8 @@ Expanded native-link handoff and executable ABI accounting are also green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall:
 
 ```text
-native_link_accepted_rows=105
-executable_ok_rows=105
+native_link_accepted_rows=106
+executable_ok_rows=106
 link_only_rows=0
 runtime_boundary_rows=1
 unsupported_zig_linker_feature_rows=0
@@ -107,6 +112,19 @@ Closed expanded blocker families:
   conversion lowering. Closed by `expanded_numeric_casts.zig` with
   `cvtsi2ss`/`cvtsi2sd` (signed i32/i64), zero-extended `cvtsi2ssq`/`cvtsi2sdq`
   (unsigned u32), `cvttss2si`/`cvttsd2si`, `cvtsd2ss`, and `cvtss2sd`.
+- x86_64 backend structural matcher debt: canonical loop-sum functions now
+  route through a strict generic CFG admission path with block labels, branches,
+  scalar accumulator operations, returns, and simple integer edge-copy phi
+  handling. ReleaseSafe checked guard CFGs for numeric casts and table lookup
+  bounds also enter the generic CFG path before reusing the checked guard
+  emitters. Current expanded counters are ReleaseFast `generic_cfg_functions=1`
+  / `structural_matcher_functions=167`, ReleaseSafe `3` / `165`, and
+  ReleaseSmall `1` / `167`.
+- expanded frontier bucket: `expanded_branch_arrays.zig` adds a supported
+  optional-control-flow source row with executable ABI coverage. A wider
+  branch-return and byte-table-return version correctly failed closed with
+  `control_flow_shape` / backend diagnostics and remains future generic
+  block/select/table-return work.
 - AIR export gap: the patched Zig `zllvm-air-export-v1` hook did not classify
   `fpext` as a typed `ty_op` record, forcing a legacy text fallback for
   `expanded_numeric_casts.expanded_double_widen`.

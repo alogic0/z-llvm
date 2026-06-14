@@ -185,6 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
+`generic_cfg_functions=1` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=2` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -228,9 +230,12 @@ Expanded corpus frontier:
 `zig build distribution-zig-air-uncurated-releasesmall-expanded` are separate
 from the closed broad baseline. The expanded bucket adds
 `test/zig/expanded/*.zig`. The expanded slices, now including the
-`expanded_numeric_casts.zig` int/float conversion bucket, are green for
-ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=106`,
-`discovered_functions=167`, `generic_codegen_functions=167`,
+`expanded_numeric_casts.zig` int/float conversion bucket and the
+`expanded_branch_arrays.zig` optional-control-flow bucket, are green for
+ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=107`,
+`discovered_functions=168`, `generic_codegen_functions=168`,
+`generic_cfg_functions=1` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=3` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -245,18 +250,20 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=167`, `object_failures=0`,
+`object_emitted_functions=168`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
-gates report `inspected=106`, `elf64_rel=106`, `relocation_rows=15`
+gates report `inspected=107`, `elf64_rel=107`, `relocation_rows=15`
 (ReleaseSafe: 16 for the checked panic boundary), `tls_rows=4`,
 `undefined_import_rows=3` (ReleaseSafe: 5), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
 and executable progress gates are green for all three release modes:
-`native_link_accepted_rows=105`, `executable_ok_rows=105`,
+`native_link_accepted_rows=106`, `executable_ok_rows=106`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
-`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The next
-frontier is the next explicit source bucket.
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The wider
+branch-return and byte-table-return forms from the candidate bucket failed
+closed with typed/control-flow and backend diagnostics and remain the next
+explicit source-frontier work.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
@@ -405,22 +412,18 @@ the broad gate should report the first unsupported fixture class exactly if a
 new row cannot be closed cleanly.
 
 Promoted structural frontier - generic x86_64 CFG lowering:
-The captured loop-sum regression showed the cost of the current backend
-architecture: one semantic function now needs five hand-written structural
-matchers (canonical, 8x-unrolled, checked 3x-unrolled, writer do-while,
-checked writer do-while), and any optimizer or writer change can orphan
-captured rows that only `distribution-all` exercises. The promoted long-term
-target is a generic lowering path that walks arbitrary single-function CFGs:
-a block-local operand-to-register mapping for the current scalar subset,
-generic binary/icmp/fcmp flag materialization, generic jcc/jmp emission from
-condbr/br terminators with machine labels per IR block, and phi resolution by
-copy insertion on edges. Adoption should be incremental and evidence-driven:
-route a function through the generic path only when every instruction and
-terminator in it is covered, keep the structural matchers as the fallback,
-and count `generic_cfg_functions` in the gates so progress is measured. The
-loop-sum family is the first candidate (all five matchers should collapse
-into the generic path); checked guard CFGs (`lowerCheckedIntFromFloat`,
-`lowerCheckedTableLookup`) are the second.
+The first generic CFG backend route is active behind a strict eligibility
+check. It validates every instruction and terminator before routing, keeps the
+old structural matchers as fallback, and fails closed instead of silently
+falling back when an eligible row cannot use the generic path. The initial
+coverage includes the loop-sum family and checked guard CFGs for checked
+`@intFromFloat` and guarded table lookup/bounds paths. Gates now report
+`generic_cfg_functions` and `structural_matcher_functions`: broad reports
+ReleaseFast `1/151`, ReleaseSafe `2/150`, ReleaseSmall `1/151`; expanded
+reports ReleaseFast `1/167`, ReleaseSafe `3/165`, ReleaseSmall `1/167`.
+Remaining work is to replace more structural matcher families with the same
+block/branch/phi/value-map route rather than adding new shape-specific
+emitters.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over

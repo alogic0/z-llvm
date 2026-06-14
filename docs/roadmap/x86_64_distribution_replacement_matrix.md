@@ -303,7 +303,8 @@ The strict finish-line gate
 three broad release modes with object emission and fail-closed counter checks.
 It requires each mode to stay at `source_rows=101`,
 `discovered_functions=152`, `structured_functions=152`,
-`generic_codegen_functions=152`, `typed_air_operand_functions=152`,
+`generic_codegen_functions=152`, `generic_cfg_functions>0`,
+`typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, `object_emitted_functions=152`,
@@ -314,18 +315,21 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
 `test/zig/expanded/*.zig`. The first expanded slice is green for all three
-release modes at `source_rows=105`, `discovered_functions=162`,
-`generic_codegen_functions=162`, `legacy_air_text_lowering_functions=0`,
+release modes at `source_rows=107`, `discovered_functions=168`,
+`generic_codegen_functions=168`, `generic_cfg_functions=1` for ReleaseFast and
+ReleaseSmall, `generic_cfg_functions=3` for ReleaseSafe,
+`legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
 object emission is also green for all three modes at
-`object_emitted_functions=162`, `object_failures=0`,
+`object_emitted_functions=168`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
-reports `inspected=105`, `elf64_rel=105`, `relocation_rows=15`, `tls_rows=4`,
-`undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`,
+reports `inspected=107`, `elf64_rel=107`, `relocation_rows=15`
+(`16` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
+(`5` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link and
 executable progress are also green for all three modes at
-`native_link_accepted_rows=104`, `executable_ok_rows=104`,
+`native_link_accepted_rows=106`, `executable_ok_rows=106`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded

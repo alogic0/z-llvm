@@ -627,7 +627,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 106, 167 },
+        .expanded => .{ 107, 168 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1109,6 +1109,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_expanded_error_optional(0, 17) != -9) return 2;
     \\    if (z_expanded_optional_pointer(&value) != 42) return 3;
     \\    if (z_expanded_optional_pointer((const int *)0) != -1) return 4;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_branch_arrays.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded optional branch value", .c_body =
+    \\extern int z_expanded_optional_branch(int, int) __asm__("expanded_branch_arrays.expanded_optional_branch");
+    \\int main(void) {
+    \\    if (z_expanded_optional_branch(1, 11) != 11) return 1;
+    \\    if (z_expanded_optional_branch(0, 11) != -5) return 2;
     \\    return 0;
     \\}
     \\
