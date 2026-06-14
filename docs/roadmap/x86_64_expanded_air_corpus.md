@@ -24,22 +24,23 @@ Current expanded seed:
 - `test/zig/expanded/expanded_error_optional.zig`
 - `test/zig/expanded/expanded_numeric_casts.zig`
 - `test/zig/expanded/expanded_branch_arrays.zig`
+- `test/zig/expanded/expanded_cfg_memory_aggregates.zig`
 
 Current expanded diagnostic snapshot for ReleaseFast, ReleaseSafe, and
 ReleaseSmall:
 
 ```text
-source_rows=107
-discovered_functions=168
-structured_functions=168
-structured_air_v2_functions=168
-typed_air_operand_functions=168
+source_rows=108
+discovered_functions=172
+structured_functions=172
+structured_air_v2_functions=172
+typed_air_operand_functions=172
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=168
-generic_cfg_functions=67 (ReleaseSafe: 69)
+generic_codegen_functions=172
+generic_cfg_functions=71 (ReleaseSafe: 73)
 structural_matcher_functions=101 (ReleaseSafe: 99)
-generic_lowering_functions=168
+generic_lowering_functions=172
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -54,7 +55,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=168
+object_emitted_functions=172
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -64,9 +65,9 @@ The expanded object-inspection gates are also green for ReleaseFast,
 ReleaseSafe, and ReleaseSmall:
 
 ```text
-inspected=107
-elf64_rel=107
-relocation_rows=15 (ReleaseSafe: 16)
+inspected=108
+elf64_rel=108
+relocation_rows=16 (ReleaseSafe: 17)
 tls_rows=4
 undefined_import_rows=3 (ReleaseSafe: 5)
 comdat_rows=0
@@ -79,8 +80,8 @@ Expanded native-link handoff and executable ABI accounting are also green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall:
 
 ```text
-native_link_accepted_rows=106
-executable_ok_rows=106
+native_link_accepted_rows=107
+executable_ok_rows=107
 link_only_rows=0
 runtime_boundary_rows=1
 unsupported_zig_linker_feature_rows=0
@@ -117,10 +118,16 @@ Closed expanded blocker families:
   returns now route through strict generic CFG admission with block labels,
   branches, scalar operations, select join labels, returns, and simple integer
   edge-copy phi handling. ReleaseSafe checked guard CFGs for numeric casts and
-  table lookup bounds also enter the generic CFG path before reusing the checked
-  guard emitters. Current expanded counters are ReleaseFast
-  `generic_cfg_functions=67` / `structural_matcher_functions=101`,
-  ReleaseSafe `69` / `99`, and ReleaseSmall `67` / `101`.
+  table lookup bounds also enter the generic CFG path before reusing the
+  checked guard emitters. The expanded
+  `expanded_cfg_memory_aggregates.zig` bucket adds branch-to-merge CFG rows for
+  pointer loads, side-effecting pointer stores, and a direct call on one branch;
+  generic typed-v2 block lowering now constructs real entry/then/else/merge
+  blocks with phi incoming values, and the x86_64 generic CFG path lowers the
+  eligible branch paths without a structural matcher. Current expanded counters
+  are ReleaseFast `generic_cfg_functions=71` /
+  `structural_matcher_functions=101`, ReleaseSafe `73` / `99`, and
+  ReleaseSmall `71` / `101`.
 - expanded frontier bucket: `expanded_branch_arrays.zig` adds a supported
   optional-control-flow source row with executable ABI coverage. A wider
   branch-return and byte-table-return version correctly failed closed with
@@ -150,6 +157,10 @@ Closed expanded blocker families:
 Active expanded blocker families:
 
 - none for the current expanded discovery/lowering/codegen/executable slices.
+  Wider conditional slice-loop updates, nested optional-pointer branch payloads,
+  and offset aggregate field stores are intentionally not exported in the
+  current memory/CFG bucket; they remain future generic CFG memory-dependency and
+  aggregate-field candidates.
 
 Ownership rules for this frontier:
 

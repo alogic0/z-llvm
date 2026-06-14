@@ -315,21 +315,21 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
 `test/zig/expanded/*.zig`. The first expanded slice is green for all three
-release modes at `source_rows=107`, `discovered_functions=168`,
-`generic_codegen_functions=168`, `generic_cfg_functions=67` for ReleaseFast
-and ReleaseSmall, `generic_cfg_functions=69` for ReleaseSafe,
+release modes at `source_rows=108`, `discovered_functions=172`,
+`generic_codegen_functions=172`, `generic_cfg_functions=71` for ReleaseFast
+and ReleaseSmall, `generic_cfg_functions=73` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
 object emission is also green for all three modes at
-`object_emitted_functions=168`, `object_failures=0`,
+`object_emitted_functions=172`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
-reports `inspected=107`, `elf64_rel=107`, `relocation_rows=15`
-(`16` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
+reports `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
+(`17` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
 (`5` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link and
 executable progress are also green for all three modes at
-`native_link_accepted_rows=106`, `executable_ok_rows=106`,
+`native_link_accepted_rows=107`, `executable_ok_rows=107`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded

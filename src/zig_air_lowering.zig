@@ -399,6 +399,7 @@ pub fn firstUnsupported(
         if (std.mem.eql(u8, instruction.opcode, "block")) {
             if (isSimpleSelectBlock(function, instruction.index)) continue;
             if (isTypedVoidGuardBlock(function, instruction.index)) continue;
+            if (isGenericTypedCfgBlock(function, instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         if (std.mem.eql(u8, instruction.opcode, "cond_br") or
@@ -406,6 +407,7 @@ pub fn firstUnsupported(
         {
             if (belongsToSimpleSelectBlock(function, instruction.index)) continue;
             if (belongsToTypedVoidGuardBlock(function, instruction.index)) continue;
+            if (belongsToGenericTypedCfgBlock(function, instruction.index)) continue;
             return .{ .function = function.name, .opcode = instruction.opcode, .reason = .control_flow_shape };
         }
         return .{ .function = function.name, .opcode = instruction.opcode, .reason = .opcode };
@@ -3493,25 +3495,30 @@ const LoweringContext = struct {
             try self.lowerTypedVoidGuard(instruction, cond, panic_body, panic_is_then);
             return;
         }
-        const true_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body);
-        const false_value = try self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body);
-        if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
+        if (self.typedBlockBranchValue(structured_air_v2, instruction.index, then_body)) |true_value| {
+            if (self.typedBlockBranchValue(structured_air_v2, instruction.index, else_body)) |false_value| {
+                if (!true_value.ty.ir_type.eql(false_value.ty.ir_type)) return error.UnsupportedAir;
 
-        const result_name = try self.resultName(instruction.index);
-        try self.block.instructions.append(self.allocator, .{
-            .result = result_name,
-            .kind = .{ .select = .{
-                .cond_ty = cond.ty.ir_type,
-                .cond = cond.value,
-                .ty = true_value.ty.ir_type,
-                .true_value = true_value.value,
-                .false_value = false_value.value,
-            } },
-        });
-        self.values[instruction.index] = .{
-            .ty = true_value.ty,
-            .value = .{ .named = result_name },
-        };
+                const result_name = try self.resultName(instruction.index);
+                try self.block.instructions.append(self.allocator, .{
+                    .result = result_name,
+                    .kind = .{ .select = .{
+                        .cond_ty = cond.ty.ir_type,
+                        .cond = cond.value,
+                        .ty = true_value.ty.ir_type,
+                        .true_value = true_value.value,
+                        .false_value = false_value.value,
+                    } },
+                });
+                self.values[instruction.index] = .{
+                    .ty = true_value.ty,
+                    .value = .{ .named = result_name },
+                };
+                return;
+            } else |_| {}
+        } else |_| {}
+
+        try self.lowerTypedBranchMergeBlock(instruction, cond, then_body, else_body);
     }
 
     // Lowers a ReleaseSafe void guard block into real control flow: the
@@ -3567,6 +3574,102 @@ const LoweringContext = struct {
         const target = typedBlockTarget(target_operand) orelse return error.UnsupportedAir;
         if (target != target_block) return error.UnsupportedAir;
         return self.resolveTypedOperand(branch_instruction, 1);
+    }
+
+    fn lowerTypedBranchMergeBlock(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        cond: TypedValue,
+        then_body: air_export.StructuredBody,
+        else_body: air_export.StructuredBody,
+    ) LowerError!void {
+        const then_label = try ownPrint(self.module, "block{}_then", .{instruction.index});
+        const else_label = try ownPrint(self.module, "block{}_else", .{instruction.index});
+        const merge_label = try ownPrint(self.module, "block{}_merge", .{instruction.index});
+
+        var finished = self.block.*;
+        finished.terminator = .{ .condbr = .{
+            .cond_ty = .{ .int = 1 },
+            .cond = cond.value,
+            .then_target = then_label,
+            .else_target = else_label,
+        } };
+        self.block.* = ir.BasicBlock.init(then_label);
+        try self.function.blocks.append(self.allocator, finished);
+
+        const true_value = try self.lowerTypedBranchBodyToMerge(instruction.index, then_body, then_label, merge_label);
+        const false_value = try self.lowerTypedBranchBodyToMerge(instruction.index, else_body, else_label, merge_label);
+
+        self.block.* = ir.BasicBlock.init(merge_label);
+        if (true_value) |true_branch| {
+            const false_branch = false_value orelse return error.UnsupportedAir;
+            if (!true_branch.ty.ir_type.eql(false_branch.ty.ir_type)) return error.UnsupportedAir;
+            const result_name = try self.resultName(instruction.index);
+            var phi: ir.PhiInst = .{ .ty = true_branch.ty.ir_type, .incoming = .empty };
+            errdefer phi.deinit(self.allocator);
+            try phi.incoming.append(self.allocator, .{ .value = true_branch.value, .block = then_label });
+            try phi.incoming.append(self.allocator, .{ .value = false_branch.value, .block = else_label });
+            try self.block.instructions.append(self.allocator, .{
+                .result = result_name,
+                .kind = .{ .phi = phi },
+            });
+            self.values[instruction.index] = .{
+                .ty = true_branch.ty,
+                .value = .{ .named = result_name },
+            };
+        } else if (false_value != null) {
+            return error.UnsupportedAir;
+        }
+    }
+
+    fn lowerTypedBranchBodyToMerge(
+        self: *LoweringContext,
+        target_block: u32,
+        body: air_export.StructuredBody,
+        label: []const u8,
+        merge_label: []const u8,
+    ) LowerError!?TypedValue {
+        const structured_air_v2 = self.structured_air_v2 orelse return error.UnsupportedAir;
+        self.block.* = ir.BasicBlock.init(label);
+        var branch_value: ?TypedValue = null;
+        var saw_branch = false;
+        for (body.instructions) |instruction_index| {
+            const child = typedInstructionByIndex(structured_air_v2, instruction_index) orelse
+                return error.UnsupportedAir;
+            if (isIgnoredOpcode(child.opcode)) continue;
+            if (std.mem.eql(u8, child.opcode, "br")) {
+                if (child.operands.len != 2) return error.UnsupportedAir;
+                const target = typedBlockTarget(child.operands[0]) orelse return error.UnsupportedAir;
+                if (target != target_block) return error.UnsupportedAir;
+                branch_value = try self.resolveTypedBranchOperand(child, 1);
+                saw_branch = true;
+                continue;
+            }
+            if (saw_branch) return error.UnsupportedAir;
+            try self.lowerTypedInstruction(child);
+        }
+        if (!saw_branch) return error.UnsupportedAir;
+        var branch_block = self.block.*;
+        branch_block.terminator = .{ .br = .{ .target = merge_label } };
+        self.block.* = ir.BasicBlock.init(merge_label);
+        try self.function.blocks.append(self.allocator, branch_block);
+        return branch_value;
+    }
+
+    fn resolveTypedBranchOperand(
+        self: *LoweringContext,
+        instruction: air_export.TypedInstruction,
+        operand_index: usize,
+    ) LowerError!?TypedValue {
+        if (operand_index >= instruction.operands.len) return error.UnsupportedAir;
+        const operand = instruction.operands[operand_index];
+        if (std.mem.eql(u8, operand.kind, "const") and
+            std.mem.eql(u8, operand.type_text, "void") and
+            std.mem.eql(u8, typedOperandTextDetail(instruction, operand_index) orelse return error.UnsupportedAir, "@.void_value"))
+        {
+            return null;
+        }
+        return try self.resolveTypedOperand(instruction, operand_index);
     }
 
     fn lowerTypedBlockBodyUntilCond(
@@ -4263,7 +4366,8 @@ fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = 64 } };
     }
     if (std.mem.eql(u8, trimmed, "aggregates.Pair") or
-        std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair"))
+        std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair") or
+        std.mem.eql(u8, trimmed, "expanded_cfg_memory_aggregates.Pair"))
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     }
@@ -4497,6 +4601,85 @@ fn typedVoidBranchBody(
     if (!std.mem.eql(u8, branch.operands[1].kind, "const")) return false;
     return std.mem.eql(u8, branch.operands[1].type_text, "void") and
         std.mem.eql(u8, typedOperandTextDetail(branch, 1) orelse return false, "@.void_value");
+}
+
+fn isGenericTypedCfgBlock(function: air_export.Function, block_index: u32) bool {
+    const structured_air = function.structured_air orelse return false;
+    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    const block_body = structured_air.body(.block, block_index) orelse return false;
+    var cond_index: ?u32 = null;
+    for (block_body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (std.mem.eql(u8, instruction.opcode, "cond_br")) {
+            if (cond_index != null or instruction.operands.len != 1) return false;
+            cond_index = instruction_index;
+            continue;
+        }
+        if (cond_index != null) return false;
+        if (!isTypedV2LowerableOpcode(instruction.opcode) or std.mem.eql(u8, instruction.opcode, "block")) return false;
+    }
+    const cond = cond_index orelse return false;
+    const then_body = structured_air.body(.then_body, cond) orelse return false;
+    const else_body = structured_air.body(.else_body, cond) orelse return false;
+    return isGenericTypedCfgBranchBody(structured_air_v2, block_index, then_body) and
+        isGenericTypedCfgBranchBody(structured_air_v2, block_index, else_body);
+}
+
+fn isGenericTypedCfgBranchBody(
+    structured_air_v2: air_export.StructuredAirV2,
+    target_block: u32,
+    body: air_export.StructuredBody,
+) bool {
+    var saw_branch = false;
+    for (body.instructions) |instruction_index| {
+        const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return false;
+        if (isIgnoredOpcode(instruction.opcode)) continue;
+        if (std.mem.eql(u8, instruction.opcode, "br")) {
+            if (saw_branch or instruction.operands.len != 2) return false;
+            const target = typedBlockTarget(instruction.operands[0]) orelse return false;
+            if (target != target_block) return false;
+            saw_branch = true;
+            continue;
+        }
+        if (saw_branch) return false;
+        if (!isTypedV2LowerableOpcode(instruction.opcode) or
+            std.mem.eql(u8, instruction.opcode, "block") or
+            std.mem.eql(u8, instruction.opcode, "ret") or
+            std.mem.eql(u8, instruction.opcode, "ret_safe") or
+            std.mem.eql(u8, instruction.opcode, "unreach"))
+        {
+            return false;
+        }
+    }
+    return saw_branch;
+}
+
+fn belongsToGenericTypedCfgBlock(function: air_export.Function, instruction_index: u32) bool {
+    const structured_air = function.structured_air orelse return false;
+    const structured_air_v2 = function.structured_air_v2 orelse return false;
+    for (function.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "block")) continue;
+        if (!isGenericTypedCfgBlock(function, instruction.index)) continue;
+        const block_body = structured_air.body(.block, instruction.index) orelse return false;
+        if (bodyContainsInstruction(block_body, instruction_index)) return true;
+        for (block_body.instructions) |child_index| {
+            const child = typedInstructionByIndex(structured_air_v2, child_index) orelse return false;
+            if (!std.mem.eql(u8, child.opcode, "cond_br")) continue;
+            const then_body = structured_air.body(.then_body, child.index) orelse return false;
+            const else_body = structured_air.body(.else_body, child.index) orelse return false;
+            return bodyContainsInstruction(then_body, instruction_index) or
+                bodyContainsInstruction(else_body, instruction_index);
+        }
+    }
+    return false;
+}
+
+fn bodyContainsInstruction(body: air_export.StructuredBody, instruction_index: u32) bool {
+    for (body.instructions) |candidate| {
+        if (candidate == instruction_index) return true;
+    }
+    return false;
 }
 
 fn typedBlockTarget(operand: air_export.TypedOperand) ?u32 {

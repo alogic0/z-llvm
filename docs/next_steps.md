@@ -230,12 +230,13 @@ Expanded corpus frontier:
 `zig build distribution-zig-air-uncurated-releasesmall-expanded` are separate
 from the closed broad baseline. The expanded bucket adds
 `test/zig/expanded/*.zig`. The expanded slices, now including the
-`expanded_numeric_casts.zig` int/float conversion bucket and the
-`expanded_branch_arrays.zig` optional-control-flow bucket, are green for
-ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=107`,
-`discovered_functions=168`, `generic_codegen_functions=168`,
-`generic_cfg_functions=67` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=69` for ReleaseSafe,
+`expanded_numeric_casts.zig` int/float conversion bucket, the
+`expanded_branch_arrays.zig` optional-control-flow bucket, and the
+`expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
+for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
+`discovered_functions=172`, `generic_codegen_functions=172`,
+`generic_cfg_functions=71` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=73` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -250,20 +251,23 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=168`, `object_failures=0`,
+`object_emitted_functions=172`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
-gates report `inspected=107`, `elf64_rel=107`, `relocation_rows=15`
-(ReleaseSafe: 16 for the checked panic boundary), `tls_rows=4`,
+gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
+(ReleaseSafe: 17 for the checked panic boundary), `tls_rows=4`,
 `undefined_import_rows=3` (ReleaseSafe: 5), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
 and executable progress gates are green for all three release modes:
-`native_link_accepted_rows=106`, `executable_ok_rows=106`,
+`native_link_accepted_rows=107`, `executable_ok_rows=107`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The wider
 branch-return and byte-table-return forms from the candidate bucket failed
 closed with typed/control-flow and backend diagnostics and remain the next
-explicit source-frontier work.
+explicit source-frontier work. The memory/CFG bucket currently exports the
+branch pointer-load, branch store, and branch-call rows; conditional slice-loop
+updates, nested optional-pointer branch payloads, and offset aggregate field
+stores remain named future generic CFG memory/aggregate candidates.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:

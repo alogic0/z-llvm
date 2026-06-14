@@ -627,7 +627,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 107, 168 },
+        .expanded => .{ 108, 172 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1118,6 +1118,24 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\int main(void) {
     \\    if (z_expanded_optional_branch(1, 11) != 11) return 1;
     \\    if (z_expanded_optional_branch(0, 11) != -5) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_cfg_memory_aggregates.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded CFG memory/call values", .c_body =
+    \\extern int z_expanded_branch_pointer_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_load");
+    \\extern int z_expanded_branch_store(int, int *, int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store");
+    \\extern int z_expanded_branch_call(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call");
+    \\int main(void) {
+    \\    int left = 10;
+    \\    int right = 20;
+    \\    int out = 0;
+    \\    if (z_expanded_branch_pointer_load(1, &left, &right) != 10) return 1;
+    \\    if (z_expanded_branch_pointer_load(0, &left, &right) != 20) return 2;
+    \\    if (z_expanded_branch_store(1, &out, 31, 41) != 31 || out != 31) return 3;
+    \\    if (z_expanded_branch_store(0, &out, 31, 41) != 41 || out != 41) return 4;
+    \\    if (z_expanded_branch_call(1, 39) != 42) return 11;
+    \\    if (z_expanded_branch_call(0, 39) != 36) return 12;
     \\    return 0;
     \\}
     \\
