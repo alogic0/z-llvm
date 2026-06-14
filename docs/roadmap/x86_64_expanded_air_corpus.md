@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=1` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=2` for ReleaseSafe
+- `generic_cfg_functions=65` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=66` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -37,8 +37,8 @@ typed_air_operand_functions=168
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=168
-generic_cfg_functions=1 (ReleaseSafe: 3)
-structural_matcher_functions=167 (ReleaseSafe: 165)
+generic_cfg_functions=67 (ReleaseSafe: 69)
+structural_matcher_functions=101 (ReleaseSafe: 99)
 generic_lowering_functions=168
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -112,14 +112,15 @@ Closed expanded blocker families:
   conversion lowering. Closed by `expanded_numeric_casts.zig` with
   `cvtsi2ss`/`cvtsi2sd` (signed i32/i64), zero-extended `cvtsi2ssq`/`cvtsi2sdq`
   (unsigned u32), `cvttss2si`/`cvttsd2si`, `cvtsd2ss`, and `cvtss2sd`.
-- x86_64 backend structural matcher debt: canonical loop-sum functions now
-  route through a strict generic CFG admission path with block labels, branches,
-  scalar accumulator operations, returns, and simple integer edge-copy phi
-  handling. ReleaseSafe checked guard CFGs for numeric casts and table lookup
-  bounds also enter the generic CFG path before reusing the checked guard
-  emitters. Current expanded counters are ReleaseFast `generic_cfg_functions=1`
-  / `structural_matcher_functions=167`, ReleaseSafe `3` / `165`, and
-  ReleaseSmall `1` / `167`.
+- x86_64 backend structural matcher debt: canonical loop-sum functions, simple
+  single-block scalar integer returns, and scalar `icmp eq/ne` plus `select`
+  returns now route through strict generic CFG admission with block labels,
+  branches, scalar operations, select join labels, returns, and simple integer
+  edge-copy phi handling. ReleaseSafe checked guard CFGs for numeric casts and
+  table lookup bounds also enter the generic CFG path before reusing the checked
+  guard emitters. Current expanded counters are ReleaseFast
+  `generic_cfg_functions=67` / `structural_matcher_functions=101`,
+  ReleaseSafe `69` / `99`, and ReleaseSmall `67` / `101`.
 - expanded frontier bucket: `expanded_branch_arrays.zig` adds a supported
   optional-control-flow source row with executable ABI coverage. A wider
   branch-return and byte-table-return version correctly failed closed with

@@ -5336,6 +5336,75 @@ test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes single-block scalar select through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @expanded_optional_branch(i32 %tag, i32 %payload) {
+        \\entry:
+        \\  %is_null = icmp eq i32 %tag, 0
+        \\  %result = select i1 %is_null, i32 -5, i32 %payload
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try mc.assembly.printFunction(machine, &output.writer);
+
+    const expected =
+        "\t.text\n" ++
+        "\t.globl expanded_optional_branch\n" ++
+        "expanded_optional_branch:\n" ++
+        "\ttestl %edi, %edi\n" ++
+        "\tje .Lexpanded_optional_branch_generic_cfg_select_true\n" ++
+        "\tmovl %esi, %eax\n" ++
+        "\tjmp .Lexpanded_optional_branch_generic_cfg_select_end\n" ++
+        ".Lexpanded_optional_branch_generic_cfg_select_true:\n" ++
+        "\tmovl $-5, %eax\n" ++
+        ".Lexpanded_optional_branch_generic_cfg_select_end:\n" ++
+        "\tretq\n";
+    try std.testing.expectEqualStrings(expected, output.writer.buffered());
+}
+
+test "x86_64 codegen leaves unsupported scalar select outside generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @unsupported_select(i32 %a, i32 %b) {
+        \\entry:
+        \\  %is_lt = icmp slt i32 %a, %b
+        \\  %result = select i1 %is_lt, i32 %a, i32 %b
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.structural_matcher, machine.codegen_path);
+}
+
 test "x86_64 machine verifier checks call stack alignment and frame balance" {
     var misaligned = codegen.x86_64.MachineFunction.init("bad_call", .{ .int = 32 });
     defer misaligned.deinit(std.testing.allocator);

@@ -185,8 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=1` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=2` for ReleaseSafe,
+`generic_cfg_functions=65` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=66` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -234,8 +234,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_branch_arrays.zig` optional-control-flow bucket, are green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=107`,
 `discovered_functions=168`, `generic_codegen_functions=168`,
-`generic_cfg_functions=1` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=3` for ReleaseSafe,
+`generic_cfg_functions=67` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=69` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -412,15 +412,16 @@ the broad gate should report the first unsupported fixture class exactly if a
 new row cannot be closed cleanly.
 
 Promoted structural frontier - generic x86_64 CFG lowering:
-The first generic CFG backend route is active behind a strict eligibility
-check. It validates every instruction and terminator before routing, keeps the
-old structural matchers as fallback, and fails closed instead of silently
-falling back when an eligible row cannot use the generic path. The initial
-coverage includes the loop-sum family and checked guard CFGs for checked
-`@intFromFloat` and guarded table lookup/bounds paths. Gates now report
+The generic CFG backend route is active behind a strict eligibility check. It
+validates every instruction and terminator before routing, keeps the old
+structural matchers as fallback, and fails closed instead of silently falling
+back when an eligible row cannot use the generic path. Coverage now includes
+the loop-sum family, simple single-block scalar integer returns, scalar
+`icmp eq/ne` plus `select` returns, and checked guard CFGs for checked
+`@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `1/151`, ReleaseSafe `2/150`, ReleaseSmall `1/151`; expanded
-reports ReleaseFast `1/167`, ReleaseSafe `3/165`, ReleaseSmall `1/167`.
+ReleaseFast `65/87`, ReleaseSafe `66/86`, ReleaseSmall `65/87`; expanded
+reports ReleaseFast `67/101`, ReleaseSafe `69/99`, ReleaseSmall `67/101`.
 Remaining work is to replace more structural matcher families with the same
 block/branch/phi/value-map route rather than adding new shape-specific
 emitters.

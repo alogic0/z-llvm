@@ -842,6 +842,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (function.blocks.items.len == 1) {
         try lowerStraightLineReturn(allocator, &machine, function, function.blocks.items[0]);
         try verifyFunction(machine);
@@ -10035,6 +10040,129 @@ fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFuncti
     return false;
 }
 
+fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!genericCfgSupportsSingleBlockScalar(function)) return false;
+    const block = function.blocks.items[0];
+    try lowerReturnTerminator(allocator, machine, function, block);
+    machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+        if (!genericCfgSupportsSingleBlockScalarInstruction(function, block, instruction)) return false;
+    }
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    return genericCfgSupportsSingleBlockScalarReturnValue(function, block, ret.value orelse return false);
+}
+
+fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction) bool {
+    if (instruction.result == null) return false;
+    return switch (instruction.kind) {
+        .binary => |binary| genericCfgSupportsSingleBlockBinary(function, binary),
+        .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp),
+        .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
+        .phi, .fcmp, .cast, .freeze, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+    };
+}
+
+fn genericCfgSupportsSingleBlockBinary(function: ir.Function, binary: ir.BinaryInst) bool {
+    if (!binary.ty.eql(.{ .int = 32 })) return false;
+    if (machineBinaryOp(binary.op) == null) return false;
+    return genericCfgSupportsLowerableI32OperandPair(function, binary.lhs, binary.rhs);
+}
+
+fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.Value, rhs: ir.Value) bool {
+    switch (lhs) {
+        .int => return switch (rhs) {
+            .int => true,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        },
+        .named => |name| {
+            if (!genericCfgSupportsI32Param(function, name)) return false;
+            return switch (rhs) {
+                .int => true,
+                .named => |rhs_name| genericCfgSupportsI32Param(function, rhs_name),
+                .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+}
+
+fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    switch (icmp.predicate) {
+        .eq, .ne => {},
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return false,
+    }
+    return genericCfgSupportsI32ParamOrConst(function, icmp.lhs) and
+        genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
+}
+
+fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlock, select: ir.SelectInst) bool {
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
+    const cond_name = switch (select.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const cond_inst = findInstruction(block, cond_name) orelse return false;
+    const cond = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (!genericCfgSupportsSingleBlockIcmp(function, cond)) return false;
+    return genericCfgSupportsSelectedI32Value(function, select.true_value) and
+        genericCfgSupportsSelectedI32Value(function, select.false_value);
+}
+
+fn genericCfgSupportsSingleBlockScalarReturnValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| {
+            if (genericCfgSupportsI32Param(function, name)) return true;
+            const instruction = findInstruction(block, name) orelse return false;
+            return switch (instruction.kind) {
+                .binary => |binary| genericCfgSupportsSingleBlockBinary(function, binary),
+                .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
+                .icmp, .phi, .fcmp, .cast, .freeze, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+            };
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsI32Param(function: ir.Function, name: []const u8) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.{ .int = 32 });
+    }
+    return false;
+}
+
+fn genericCfgSupportsI32ParamOrConst(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| genericCfgSupportsI32Param(function, name),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsSelectedI32Value(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| genericCfgSupportsI32Param(function, name),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
 fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
     if (!function.ret_ty.eql(.{ .int = 32 })) return null;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return null;
@@ -17089,10 +17217,74 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return error.UnsupportedCodegenInstruction,
+                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select),
+                .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
     }
+}
+
+fn lowerGenericCfgSelectReturnValue(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    select: ir.SelectInst,
+) !void {
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
+    const cond_name = switch (select.cond) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    const cond_inst = findInstruction(block, cond_name) orelse return error.UnsupportedCodegenValue;
+    const cond = switch (cond_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+
+    const true_label = "generic_cfg_select_true";
+    const end_label = "generic_cfg_select_end";
+    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    try appendSelectedI32Return(allocator, machine, try selectedI32Value(function, select.false_value));
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    try appendSelectedI32Return(allocator, machine, try selectedI32Value(function, select.true_value));
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn emitGenericCfgIcmpCondition(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    icmp: ir.IcmpInst,
+) !GenericCfgBranchKind {
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+    const branch_kind: GenericCfgBranchKind = switch (icmp.predicate) {
+        .eq => .je,
+        .ne => .jne,
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return error.UnsupportedCodegenInstruction,
+    };
+
+    if (isInt(icmp.rhs, 0)) {
+        const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
+        try appendGenericCfgCompareParamZero(allocator, machine, lhs_reg);
+        return branch_kind;
+    }
+    if (isInt(icmp.lhs, 0)) {
+        const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 32 });
+        try appendGenericCfgCompareParamZero(allocator, machine, rhs_reg);
+        return branch_kind;
+    }
+
+    const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
+    const rhs_imm = switch (icmp.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    };
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs_reg });
+    try appendGenericCfgCompareLocalImm(allocator, machine, .eax, rhs_imm);
+    return branch_kind;
 }
 
 fn lowerI32AddTreeReturn(
@@ -17642,7 +17834,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var saw_terminator = false;
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
-        .label => eax_defined = function.ret_ty == .void,
+        .label => |label| {
+            if (!std.mem.endsWith(u8, label, "generic_cfg_select_end")) {
+                eax_defined = function.ret_ty == .void;
+            }
+        },
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .lea_global_rdi, .lea_global_rdx => {},
         .reload_rsp_eax => {
