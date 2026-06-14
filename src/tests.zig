@@ -5298,6 +5298,42 @@ test "x86_64 codegen lowers canonical accumulator loops without function-name di
     );
     defer machine.deinit(std.testing.allocator);
     try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes checked guard cfg through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc void @expanded_numeric_casts.integerPartOutOfBounds()
+        \\
+        \\define i32 @expanded_numeric_casts.expanded_int_from_float(float %arg0) {
+        \\entry:
+        \\  %below_min = fcmp ole float %arg0, -2147483904.0
+        \\  %above_max = fcmp oge float %arg0, 2147483648.0
+        \\  %out_of_bounds = or i1 %below_min, %above_max
+        \\  br i1 %out_of_bounds, label %panic, label %ok
+        \\panic:
+        \\  call fastcc void @expanded_numeric_casts.integerPartOutOfBounds()
+        \\  unreachable
+        \\ok:
+        \\  %converted = fptosi float %arg0 to i32
+        \\  ret i32 %converted
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
 test "x86_64 machine verifier checks call stack alignment and frame balance" {

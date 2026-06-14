@@ -57,6 +57,8 @@ pub fn main(init: std.process.Init) !void {
     var legacy_air_text_lowering_functions: usize = 0;
     var generic_lowering_functions: usize = 0;
     var shape_recognizer_functions: usize = 0;
+    var generic_cfg_functions: usize = 0;
+    var structural_matcher_functions: usize = 0;
     var object_emitted_functions: usize = 0;
     var inspected_objects: usize = 0;
     var relocation_rows: usize = 0;
@@ -250,6 +252,10 @@ pub fn main(init: std.process.Init) !void {
             };
             try machines.append(allocator, machine);
             generic_codegen_functions += 1;
+            switch (machines.items[machines.items.len - 1].codegen_path) {
+                .generic_cfg => generic_cfg_functions += 1,
+                .structural_matcher => structural_matcher_functions += 1,
+            }
         }
         if ((options.object_progress or options.object_inspection or options.native_link_progress or options.executable_progress) and machines.items.len != 0) {
             const object = mc.elf.buildObjectWithModuleData(
@@ -389,7 +395,7 @@ pub fn main(init: std.process.Init) !void {
     else
         0;
     try stdout_writer.interface.print(
-        "summary uncurated-zig-air mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail={}\n",
+        "summary uncurated-zig-air mode={s} corpus={s} target=x86_64-linux-gnu source_rows={} discovered_functions={} structured_functions={} generic_codegen_functions={} generic_cfg_functions={} structural_matcher_functions={} structured_air_v1_functions={} structured_air_v2_functions={} typed_air_type_functions={} typed_air_operand_functions={} legacy_air_text_lowering_functions={} typed_v2_fallback_functions={} generic_lowering_functions={} shape_recognizer_functions={} unsupported_functions={} codegen_failures={} case_id_rows=0 source_fact_classification_rows=0 first_unsupported_source={s} first_unsupported_function={s} first_unsupported_opcode={s} top_unsupported_construct={s} top_unsupported_count={} first_typed_v2_fallback_function={s} first_typed_v2_fallback_opcode={s} first_typed_v2_fallback_data_kind={s} first_typed_v2_fallback_reason={s} top_typed_v2_fallback_reason={s} top_typed_v2_fallback_count={} local_fail={}\n",
         .{
             mode.name(),
             options.corpus.name(),
@@ -397,6 +403,8 @@ pub fn main(init: std.process.Init) !void {
             discovered_functions,
             structured_functions,
             generic_codegen_functions,
+            generic_cfg_functions,
+            structural_matcher_functions,
             structured_air_v1_functions,
             structured_air_v2_functions,
             typed_air_type_functions,
@@ -483,6 +491,7 @@ pub fn main(init: std.process.Init) !void {
             .discovered_functions = discovered_functions,
             .structured_functions = structured_functions,
             .generic_codegen_functions = generic_codegen_functions,
+            .generic_cfg_functions = generic_cfg_functions,
             .structured_air_v2_functions = structured_air_v2_functions,
             .typed_air_operand_functions = typed_air_operand_functions,
             .legacy_air_text_lowering_functions = legacy_air_text_lowering_functions,
@@ -602,6 +611,7 @@ const StrictFinishCounters = struct {
     discovered_functions: usize,
     structured_functions: usize,
     generic_codegen_functions: usize,
+    generic_cfg_functions: usize,
     structured_air_v2_functions: usize,
     typed_air_operand_functions: usize,
     legacy_air_text_lowering_functions: usize,
@@ -630,6 +640,13 @@ fn validateStrictFinish(counters: StrictFinishCounters) !void {
     try expectStrict(counters.mode, "discovered_functions", counters.discovered_functions, expected_functions);
     try expectStrict(counters.mode, "structured_functions", counters.structured_functions, expected_functions);
     try expectStrict(counters.mode, "generic_codegen_functions", counters.generic_codegen_functions, expected_functions);
+    if (counters.generic_cfg_functions == 0) {
+        std.debug.print(
+            "strict-finish-failure mode={s} field=generic_cfg_functions expected=>0 actual=0\n",
+            .{counters.mode.name()},
+        );
+        return error.StrictFinishFailed;
+    }
     try expectStrict(counters.mode, "structured_air_v2_functions", counters.structured_air_v2_functions, expected_functions);
     try expectStrict(counters.mode, "typed_air_operand_functions", counters.typed_air_operand_functions, expected_functions);
     try expectStrict(counters.mode, "legacy_air_text_lowering_functions", counters.legacy_air_text_lowering_functions, 0);

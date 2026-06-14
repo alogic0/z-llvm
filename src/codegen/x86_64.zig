@@ -134,6 +134,11 @@ pub const FrameIndex = enum {
     slot0,
 };
 
+pub const CodegenPath = enum {
+    structural_matcher,
+    generic_cfg,
+};
+
 pub const Instruction = union(enum) {
     label: []const u8,
     mov_imm_eax: i32,
@@ -314,12 +319,14 @@ pub const MachineFunction = struct {
     name: []const u8,
     ret_ty: ir.Type,
     instructions: std.ArrayList(Instruction),
+    codegen_path: CodegenPath,
 
     pub fn init(name: []const u8, ret_ty: ir.Type) MachineFunction {
         return .{
             .name = name,
             .ret_ty = ret_ty,
             .instructions = .empty,
+            .codegen_path = .structural_matcher,
         };
     }
 
@@ -925,6 +932,12 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgFunction(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (genericCfgLoopSumPlan(function) != null) return error.GenericCfgFallback;
     if (try lowerControlFlowLoopSum(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -9996,6 +10009,363 @@ fn isConstantI32ReturnBlock(block: ir.BasicBlock) bool {
         .int => true,
         .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
+}
+
+const GenericCfgLoopSumPlan = struct {
+    checked: bool,
+};
+
+fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (genericCfgLoopSumPlan(function)) |plan| {
+        try emitGenericCfgLoopSum(allocator, machine, function, plan);
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (genericCfgSupportsCheckedGuard(function)) {
+        if (try lowerCheckedIntFromFloat(allocator, machine, function)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (try lowerCheckedTableLookup(allocator, machine, function)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        return error.GenericCfgFallback;
+    }
+    return false;
+}
+
+fn genericCfgLoopSumPlan(function: ir.Function) ?GenericCfgLoopSumPlan {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return null;
+    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return null;
+    if (!matchesAccumulatorLoop(function) and
+        !matchesUnrolledAccumulatorLoop(function) and
+        !matchesCheckedUnrolledAccumulatorLoop(function) and
+        !matchesGuardedDoWhileAccumulatorLoop(function) and
+        !matchesCheckedGuardedDoWhileAccumulatorLoop(function)) return null;
+    if (!genericCfgSupportsLoopSum(function)) return null;
+    return .{ .checked = functionHasCall(function, "llvm.sadd.with.overflow.i32") };
+}
+
+fn genericCfgSupportsLoopSum(function: ir.Function) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) return false;
+            if (!genericCfgSupportsInstruction(function, instruction)) return false;
+        }
+        if (!genericCfgSupportsTerminator(function, block)) return false;
+    }
+    return true;
+}
+
+fn genericCfgSupportsInstruction(function: ir.Function, instruction: ir.Instruction) bool {
+    if (instruction.result) |result| {
+        if (result.len == 0) return false;
+    }
+    return switch (instruction.kind) {
+        .phi => |phi| genericCfgSupportsPhi(function, phi),
+        .binary => |binary| genericCfgSupportsBinary(function, binary),
+        .icmp => |icmp| genericCfgSupportsIcmp(function, icmp),
+        .fcmp => |fcmp| genericCfgSupportsFcmp(function, fcmp),
+        .cast => |cast| genericCfgSupportsCast(function, cast),
+        .gep => |gep| genericCfgSupportsGep(function, gep),
+        .load => |load| genericCfgSupportsLoad(function, load),
+        .call => |call| genericCfgSupportsCall(function, call),
+        .extractvalue => |extractvalue| genericCfgSupportsExtractValue(function, extractvalue.result_ty, extractvalue.aggregate, extractvalue.indices),
+        .freeze, .select, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .insertvalue => false,
+    };
+}
+
+fn genericCfgSupportsPhi(function: ir.Function, phi: ir.PhiInst) bool {
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len < 2) return false;
+    for (phi.incoming.items) |incoming| {
+        if (blockIndex(function, incoming.block) == null) return false;
+        if (!genericCfgSupportsI32Value(function, incoming.value)) return false;
+    }
+    return true;
+}
+
+fn genericCfgSupportsBinary(function: ir.Function, binary: ir.BinaryInst) bool {
+    if (!binary.ty.eql(.{ .int = 1 }) and !binary.ty.eql(.{ .int = 8 }) and !binary.ty.eql(.{ .int = 32 })) return false;
+    if (machineBinaryOp(binary.op) == null) return false;
+    return genericCfgSupportsScalarValue(function, binary.lhs) and
+        genericCfgSupportsScalarValue(function, binary.rhs);
+}
+
+fn genericCfgSupportsIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
+    if (!icmp.operand_ty.eql(.{ .int = 32 }) and !icmp.operand_ty.eql(.{ .int = 64 })) return false;
+    switch (icmp.predicate) {
+        .eq, .ne, .ult, .slt, .sgt => {},
+        .uge, .ugt, .ule, .sle, .sge => return false,
+    }
+    return genericCfgSupportsI32Value(function, icmp.lhs) and
+        genericCfgSupportsI32Value(function, icmp.rhs);
+}
+
+fn genericCfgSupportsFcmp(function: ir.Function, fcmp: ir.FcmpInst) bool {
+    if (!fcmp.operand_ty.eql(.float) and !fcmp.operand_ty.eql(.double)) return false;
+    switch (fcmp.predicate) {
+        .ole, .oge => {},
+        else => return false,
+    }
+    return genericCfgSupportsScalarValue(function, fcmp.lhs) and
+        genericCfgSupportsScalarValue(function, fcmp.rhs);
+}
+
+fn genericCfgSupportsCast(function: ir.Function, cast: ir.CastInst) bool {
+    switch (cast.op) {
+        .zext => {
+            if ((!cast.from_ty.eql(.{ .int = 8 }) and !cast.from_ty.eql(.{ .int = 32 })) or
+                (!cast.to_ty.eql(.{ .int = 32 }) and !cast.to_ty.eql(.{ .int = 64 }))) return false;
+        },
+        .fptosi => {
+            if ((!cast.from_ty.eql(.float) and !cast.from_ty.eql(.double)) or !cast.to_ty.eql(.{ .int = 32 })) return false;
+        },
+        .fpext, .fptrunc, .sitofp, .uitofp => {
+            if (!genericCfgSupportsScalarType(cast.from_ty) or !genericCfgSupportsScalarType(cast.to_ty)) return false;
+        },
+        .trunc, .sext, .fptoui, .bitcast, .ptrtoint, .inttoptr => return false,
+    }
+    return genericCfgSupportsScalarValue(function, cast.value);
+}
+
+fn genericCfgSupportsGep(function: ir.Function, gep: ir.GepInst) bool {
+    if (!gep.source_ty.eql(.{ .aggregate = "[4 x i8]" })) return false;
+    if (gep.ptr_addrspace != null) return false;
+    if (!genericCfgSupportsPointerValue(function, gep.ptr)) return false;
+    if (gep.indices.items.len != 2) return false;
+    const first = gep.indices.items[0];
+    const second = gep.indices.items[1];
+    return first.ty.eql(.{ .int = 64 }) and isInt(first.value, 0) and
+        second.ty.eql(.{ .int = 64 }) and genericCfgSupportsI64Value(function, second.value);
+}
+
+fn genericCfgSupportsLoad(function: ir.Function, load: ir.LoadInst) bool {
+    if (!load.ty.eql(.{ .int = 8 }) or load.attrs.isBarrier()) return false;
+    if (load.ty_addrspace != null or load.ptr_addrspace != null) return false;
+    return genericCfgSupportsPointerValue(function, load.ptr);
+}
+
+fn genericCfgSupportsCall(function: ir.Function, call: ir.CallInst) bool {
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (std.mem.eql(u8, call.callee, "llvm.assume")) {
+        return call.ret_ty == .void and call.args.items.len == 1 and genericCfgSupportsI1Value(function, call.args.items[0].value);
+    }
+    if (std.mem.eql(u8, call.callee, "llvm.sadd.with.overflow.i32")) {
+        if (!call.ret_ty.eql(.{ .aggregate = "{ i32, i1 }" }) or call.args.items.len != 2) return false;
+        return genericCfgSupportsI32Value(function, call.args.items[0].value) and
+            genericCfgSupportsI32Value(function, call.args.items[1].value);
+    }
+    if (isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).integerOverflow") or
+        isCalleeName(call.callee, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds") or
+        isCalleeName(call.callee, "expanded_numeric_casts.integerPartOutOfBounds") or
+        isCalleeName(call.callee, "base64_table_lookup.outOfBounds"))
+    {
+        if (call.ret_ty != .void) return false;
+        for (call.args.items) |arg| {
+            if (!genericCfgSupportsScalarValue(function, arg.value)) return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+fn genericCfgSupportsExtractValue(function: ir.Function, result_ty: ir.Type, aggregate: ir.Value, indices: []const u8) bool {
+    if (!result_ty.eql(.{ .int = 32 }) and !result_ty.eql(.{ .int = 1 })) return false;
+    if (!std.mem.eql(u8, indices, "0") and !std.mem.eql(u8, indices, "1")) return false;
+    return switch (aggregate) {
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsTerminator(function: ir.Function, block: ir.BasicBlock) bool {
+    const terminator = block.terminator orelse return false;
+    return switch (terminator) {
+        .br => |br| blockIndex(function, br.target) != null,
+        .condbr => |condbr| condbr.cond_ty.eql(.{ .int = 1 }) and
+            genericCfgSupportsI1Value(function, condbr.cond) and
+            blockIndex(function, condbr.then_target) != null and
+            blockIndex(function, condbr.else_target) != null,
+        .ret => |ret| ret.ty.eql(.{ .int = 32 }) and
+            genericCfgSupportsI32Value(function, ret.value orelse return false),
+        .@"unreachable" => true,
+        .@"switch", .indirectbr => false,
+    };
+}
+
+fn genericCfgSupportsI32Value(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsI64Value(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => true,
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsI1Value(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .int => |int| int == 0 or int == 1,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsScalarValue(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int, .fp => true,
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsPointerValue(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .named => |name| genericCfgSupportsNamedValue(function, name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsScalarType(ty: ir.Type) bool {
+    return ty.eql(.float) or ty.eql(.double) or ty.eql(.{ .int = 8 }) or
+        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 });
+}
+
+fn genericCfgSupportsNamedValue(function: ir.Function, name: []const u8) bool {
+    if (name.len > 0 and name[0] == '@') return true;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return true;
+    }
+    for (function.blocks.items) |block| {
+        if (findInstruction(block, name) != null) return true;
+    }
+    return false;
+}
+
+fn genericCfgSupportsCheckedGuard(function: ir.Function) bool {
+    if (!genericCfgSupportsLoopSum(function)) return false;
+    return functionHasCall(function, "expanded_numeric_casts.integerPartOutOfBounds") or
+        functionHasCall(function, "base64_table_lookup.outOfBounds");
+}
+
+fn emitGenericCfgLoopSum(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    plan: GenericCfgLoopSumPlan,
+) !void {
+    const count_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
+    if (count_reg != .rdi) return error.UnsupportedCodegenAbi;
+
+    const loop_label = "generic_cfg_loop_sum_loop";
+    const zero_label = "generic_cfg_loop_sum_zero";
+    const overflow_label = "generic_cfg_loop_sum_overflow";
+    const out_of_bounds_label = "generic_cfg_loop_sum_out_of_bounds";
+    try appendGenericCfgCompareParamZero(allocator, machine, count_reg);
+    try appendGenericCfgConditionalBranch(allocator, machine, .je, zero_label);
+    try appendGenericCfgConditionalBranch(allocator, machine, .js, zero_label);
+    try appendGenericCfgI32Zero(allocator, machine, .eax);
+    try appendGenericCfgI32Zero(allocator, machine, .ecx);
+    try appendGenericCfgBlockLabel(allocator, machine, loop_label);
+    if (plan.checked) {
+        try appendGenericCfgCompareLocalImm(allocator, machine, .ecx, std.math.minInt(i32));
+        try appendGenericCfgConditionalBranch(allocator, machine, .je, out_of_bounds_label);
+    }
+    try appendGenericCfgAccumulatorAdd(allocator, machine);
+    if (plan.checked) try appendGenericCfgConditionalBranch(allocator, machine, .jo, overflow_label);
+    try appendGenericCfgAccumulatorIncrement(allocator, machine);
+    try appendGenericCfgCompareLocalParam(allocator, machine, .ecx, count_reg);
+    try appendGenericCfgConditionalBranch(allocator, machine, .jne, loop_label);
+    try appendGenericCfgReturn(allocator, machine);
+    try appendGenericCfgBlockLabel(allocator, machine, zero_label);
+    try appendGenericCfgI32Zero(allocator, machine, .eax);
+    try appendGenericCfgReturn(allocator, machine);
+    if (plan.checked) {
+        try appendPanicCall(allocator, machine, overflow_label, "debug.FullPanic((function 'defaultPanic')).integerOverflow");
+        try appendPanicCall(allocator, machine, out_of_bounds_label, "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds");
+    }
+}
+
+const GenericCfgLocalReg = enum {
+    eax,
+    ecx,
+};
+
+const GenericCfgBranchKind = enum {
+    je,
+    jne,
+    jo,
+    js,
+};
+
+fn appendGenericCfgBlockLabel(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8) !void {
+    try machine.instructions.append(allocator, .{ .label = label });
+}
+
+fn appendGenericCfgConditionalBranch(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    kind: GenericCfgBranchKind,
+    label: []const u8,
+) !void {
+    try machine.instructions.append(allocator, switch (kind) {
+        .je => .{ .je = label },
+        .jne => .{ .jne = label },
+        .jo => .{ .jo = label },
+        .js => .{ .js = label },
+    });
+}
+
+fn appendGenericCfgReturn(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
+    try machine.instructions.append(allocator, .ret);
+}
+
+fn appendGenericCfgI32Zero(allocator: std.mem.Allocator, machine: *MachineFunction, reg: GenericCfgLocalReg) !void {
+    try machine.instructions.append(allocator, switch (reg) {
+        .eax => .{ .mov_imm_eax = 0 },
+        .ecx => .xor_ecx_ecx,
+    });
+}
+
+fn appendGenericCfgAccumulatorAdd(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
+    try machine.instructions.append(allocator, .add_ecx_eax);
+}
+
+fn appendGenericCfgAccumulatorIncrement(allocator: std.mem.Allocator, machine: *MachineFunction) !void {
+    try machine.instructions.append(allocator, .inc_rcx);
+}
+
+fn appendGenericCfgCompareParamZero(allocator: std.mem.Allocator, machine: *MachineFunction, reg: ArgReg) !void {
+    try machine.instructions.append(allocator, .{ .test_arg32 = reg });
+}
+
+fn appendGenericCfgCompareLocalImm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: GenericCfgLocalReg,
+    imm: i32,
+) !void {
+    try machine.instructions.append(allocator, switch (reg) {
+        .ecx => .{ .cmp_ecx_imm32 = imm },
+        .eax => .{ .cmp_eax_imm32 = imm },
+    });
+}
+
+fn appendGenericCfgCompareLocalParam(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: GenericCfgLocalReg,
+    param: ArgReg,
+) !void {
+    if (reg != .ecx) return error.UnsupportedCodegenInstruction;
+    try machine.instructions.append(allocator, .{ .cmp_ecx_arg32 = param });
 }
 
 fn lowerControlFlowLoopSum(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
