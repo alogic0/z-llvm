@@ -7,9 +7,18 @@ fn addThree(value: i32) i32 {
     return value + 3;
 }
 
+fn subThree(value: i32) i32 {
+    return value - 3;
+}
+
 export fn expanded_branch_pointer_load(flag: i32, left: *const i32, right: *const i32) i32 {
     const result = if (flag != 0) left.* else right.*;
     return result;
+}
+
+export fn expanded_branch_pointer_phi_load(flag: i32, left: *const i32, right: *const i32) i32 {
+    const chosen = if (flag != 0) left else right;
+    return chosen.*;
 }
 
 export fn expanded_branch_store(flag: i32, out: *i32, left: i32, right: i32) i32 {
@@ -17,6 +26,15 @@ export fn expanded_branch_store(flag: i32, out: *i32, left: i32, right: i32) i32
         out.* = left;
     } else {
         out.* = right;
+    }
+    return out.*;
+}
+
+export fn expanded_branch_store_computed(flag: i32, out: *i32, value: i32) i32 {
+    if (flag != 0) {
+        out.* = value + 4;
+    } else {
+        out.* = value - 4;
     }
     return out.*;
 }
@@ -49,5 +67,10 @@ fn expanded_optional_pointer_branch(flag: i32, maybe_ptr: ?*const i32) i32 {
 
 export fn expanded_branch_call(flag: i32, value: i32) i32 {
     const result = if (flag != 0) addThree(value) else value - 3;
+    return result;
+}
+
+export fn expanded_branch_call_two(flag: i32, value: i32) i32 {
+    const result = if (flag != 0) addThree(value) else subThree(value);
     return result;
 }

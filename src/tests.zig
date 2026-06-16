@@ -5405,6 +5405,192 @@ test "x86_64 codegen leaves unsupported scalar select outside generic cfg path" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.structural_matcher, machine.codegen_path);
 }
 
+test "x86_64 codegen routes global i32 load store reload through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@counter = global i32 3
+        \\
+        \\define i32 @update_global(i32 %arg0) {
+        \\entry:
+        \\  %loaded = load i32, ptr @counter
+        \\  %next = add i32 %loaded, %arg0
+        \\  store i32 %next, ptr @counter
+        \\  %reloaded = load i32, ptr @counter
+        \\  ret i32 %reloaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes pointer load branch through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @pointer_load_branch(i32 %flag, ptr %left, ptr %right) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %left_value = load i32, ptr %left
+        \\  br label %merge
+        \\else:
+        \\  %right_value = load i32, ptr %right
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ %left_value, %then ], [ %right_value, %else ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes store branch load after store through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @store_branch_reload(i32 %flag, ptr %out, i32 %left, i32 %right) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  store i32 %left, ptr %out
+        \\  br label %merge
+        \\else:
+        \\  store i32 %right, ptr %out
+        \\  br label %merge
+        \\merge:
+        \\  %loaded = load i32, ptr %out
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes direct-call branch merge through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i32 @plus(i32)
+        \\declare i32 @minus(i32)
+        \\
+        \\define i32 @call_branch_merge(i32 %flag, i32 %value) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %a = call fastcc i32 @plus(i32 %value)
+        \\  br label %merge
+        \\else:
+        \\  %b = call i32 @minus(i32 %value)
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ %a, %then ], [ %b, %else ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes pointer select load through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @pointer_select_load(i32 %flag, ptr %left, ptr %right) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  %chosen = select i1 %cond, ptr %left, ptr %right
+        \\  %loaded = load i32, ptr %chosen
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen keeps volatile memory cfg out of generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @volatile_memory(i32 %flag, ptr %ptr) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %loaded = load volatile i32, ptr %ptr
+        \\  br label %merge
+        \\else:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ %loaded, %then ], [ 0, %else ]
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenControlFlow,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 machine verifier checks call stack alignment and frame balance" {
     var misaligned = codegen.x86_64.MachineFunction.init("bad_call", .{ .int = 32 });
     defer misaligned.deinit(std.testing.allocator);

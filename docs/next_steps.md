@@ -185,8 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=65` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=66` for ReleaseSafe,
+`generic_cfg_functions=79` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=80` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -234,9 +234,9 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_branch_arrays.zig` optional-control-flow bucket, and the
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
-`discovered_functions=172`, `generic_codegen_functions=172`,
-`generic_cfg_functions=71` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=73` for ReleaseSafe,
+`discovered_functions=176`, `generic_codegen_functions=176`,
+`generic_cfg_functions=92` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=94` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -251,7 +251,7 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=172`, `object_failures=0`,
+`object_emitted_functions=176`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
 (ReleaseSafe: 17 for the checked panic boundary), `tls_rows=4`,
@@ -264,10 +264,12 @@ and executable progress gates are green for all three release modes:
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The wider
 branch-return and byte-table-return forms from the candidate bucket failed
 closed with typed/control-flow and backend diagnostics and remain the next
-explicit source-frontier work. The memory/CFG bucket currently exports the
-branch pointer-load, branch store, and branch-call rows; conditional slice-loop
-updates, nested optional-pointer branch payloads, and offset aggregate field
-stores remain named future generic CFG memory/aggregate candidates.
+explicit source-frontier work. The memory/CFG bucket now exports the branch
+pointer-load, pointer-select load, branch store, computed store, and
+branch-call rows with executable ABI checks; conditional slice-loop updates,
+nested optional-pointer branch payloads, volatile memory roundtrips, and offset
+aggregate field stores remain named future generic CFG memory/aggregate
+candidates.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
@@ -421,14 +423,18 @@ validates every instruction and terminator before routing, keeps the old
 structural matchers as fallback, and fails closed instead of silently falling
 back when an eligible row cannot use the generic path. Coverage now includes
 the loop-sum family, simple single-block scalar integer returns, scalar
-`icmp eq/ne` plus `select` returns, and checked guard CFGs for checked
-`@intFromFloat` and guarded table lookup/bounds paths. Gates report
+`icmp eq/ne` plus `select` returns, parameter-pointer load/store branch CFGs,
+load-after-store merge returns, pointer-select loads, direct-call branch merge
+CFGs, single-block global/TLS i32 load/update forms, and checked guard CFGs for
+checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `65/87`, ReleaseSafe `66/86`, ReleaseSmall `65/87`; expanded
-reports ReleaseFast `71/101`, ReleaseSafe `73/99`, ReleaseSmall `71/101`.
-Remaining work is to replace more structural matcher families with the same
-block/branch/phi/value-map route rather than adding new shape-specific
-emitters.
+ReleaseFast `79/73`, ReleaseSafe `80/72`, ReleaseSmall `79/73`; expanded
+reports ReleaseFast `92/84`, ReleaseSafe `94/82`, ReleaseSmall `92/84`.
+Remaining structural families are mostly volatile memory, broader global/TLS
+addressing, slice-loop memory dependencies, nested optional-pointer branches,
+aggregate field-offset updates, and larger ABI/call shapes; each should move
+only when the generic CFG eligibility checks can prove the full instruction and
+terminator subset.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over

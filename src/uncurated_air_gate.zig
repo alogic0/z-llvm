@@ -627,7 +627,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 108, 172 },
+        .expanded => .{ 108, 176 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1124,18 +1124,27 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     };
     if (std.mem.eql(u8, source, "test/zig/expanded/expanded_cfg_memory_aggregates.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded CFG memory/call values", .c_body =
     \\extern int z_expanded_branch_pointer_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_load");
+    \\extern int z_expanded_branch_pointer_phi_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_phi_load");
     \\extern int z_expanded_branch_store(int, int *, int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store");
+    \\extern int z_expanded_branch_store_computed(int, int *, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store_computed");
     \\extern int z_expanded_branch_call(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call");
+    \\extern int z_expanded_branch_call_two(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call_two");
     \\int main(void) {
     \\    int left = 10;
     \\    int right = 20;
     \\    int out = 0;
     \\    if (z_expanded_branch_pointer_load(1, &left, &right) != 10) return 1;
     \\    if (z_expanded_branch_pointer_load(0, &left, &right) != 20) return 2;
-    \\    if (z_expanded_branch_store(1, &out, 31, 41) != 31 || out != 31) return 3;
-    \\    if (z_expanded_branch_store(0, &out, 31, 41) != 41 || out != 41) return 4;
+    \\    if (z_expanded_branch_pointer_phi_load(1, &left, &right) != 10) return 3;
+    \\    if (z_expanded_branch_pointer_phi_load(0, &left, &right) != 20) return 4;
+    \\    if (z_expanded_branch_store(1, &out, 31, 41) != 31 || out != 31) return 5;
+    \\    if (z_expanded_branch_store(0, &out, 31, 41) != 41 || out != 41) return 6;
+    \\    if (z_expanded_branch_store_computed(1, &out, 50) != 54 || out != 54) return 7;
+    \\    if (z_expanded_branch_store_computed(0, &out, 50) != 46 || out != 46) return 8;
     \\    if (z_expanded_branch_call(1, 39) != 42) return 11;
     \\    if (z_expanded_branch_call(0, 39) != 36) return 12;
+    \\    if (z_expanded_branch_call_two(1, 39) != 42) return 13;
+    \\    if (z_expanded_branch_call_two(0, 39) != 36) return 14;
     \\    return 0;
     \\}
     \\

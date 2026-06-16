@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=65` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=66` for ReleaseSafe
+- `generic_cfg_functions=79` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=80` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -31,16 +31,16 @@ ReleaseSmall:
 
 ```text
 source_rows=108
-discovered_functions=172
-structured_functions=172
-structured_air_v2_functions=172
-typed_air_operand_functions=172
+discovered_functions=176
+structured_functions=176
+structured_air_v2_functions=176
+typed_air_operand_functions=176
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=172
-generic_cfg_functions=71 (ReleaseSafe: 73)
-structural_matcher_functions=101 (ReleaseSafe: 99)
-generic_lowering_functions=172
+generic_codegen_functions=176
+generic_cfg_functions=92 (ReleaseSafe: 94)
+structural_matcher_functions=84 (ReleaseSafe: 82)
+generic_lowering_functions=176
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -55,7 +55,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=172
+object_emitted_functions=176
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -121,13 +121,13 @@ Closed expanded blocker families:
   table lookup bounds also enter the generic CFG path before reusing the
   checked guard emitters. The expanded
   `expanded_cfg_memory_aggregates.zig` bucket adds branch-to-merge CFG rows for
-  pointer loads, side-effecting pointer stores, and a direct call on one branch;
-  generic typed-v2 block lowering now constructs real entry/then/else/merge
-  blocks with phi incoming values, and the x86_64 generic CFG path lowers the
-  eligible branch paths without a structural matcher. Current expanded counters
-  are ReleaseFast `generic_cfg_functions=71` /
-  `structural_matcher_functions=101`, ReleaseSafe `73` / `99`, and
-  ReleaseSmall `71` / `101`.
+  pointer loads, side-effecting pointer stores, computed stores, pointer-select
+  loads, and direct calls on one or both branches; generic typed-v2 block
+  lowering now constructs real entry/then/else/merge blocks with phi incoming
+  values, and the x86_64 generic CFG path lowers the eligible branch paths
+  without a structural matcher. Current expanded counters are ReleaseFast
+  `generic_cfg_functions=92` / `structural_matcher_functions=84`, ReleaseSafe
+  `94` / `82`, and ReleaseSmall `92` / `84`.
 - expanded frontier bucket: `expanded_branch_arrays.zig` adds a supported
   optional-control-flow source row with executable ABI coverage. A wider
   branch-return and byte-table-return version correctly failed closed with
@@ -158,9 +158,9 @@ Active expanded blocker families:
 
 - none for the current expanded discovery/lowering/codegen/executable slices.
   Wider conditional slice-loop updates, nested optional-pointer branch payloads,
-  and offset aggregate field stores are intentionally not exported in the
-  current memory/CFG bucket; they remain future generic CFG memory-dependency and
-  aggregate-field candidates.
+  volatile memory roundtrips, and offset aggregate field stores are intentionally
+  not routed through generic CFG in the current memory/CFG bucket; they remain
+  future generic CFG memory-dependency and aggregate-field candidates.
 
 Ownership rules for this frontier:
 

@@ -858,6 +858,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgFunction(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -933,11 +938,6 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerBase64DecodeBase64FullBoundary(allocator, &machine, function)) {
-        try verifyFunction(machine);
-        return machine;
-    }
-
-    if (try lowerGenericCfgFunction(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -10021,6 +10021,10 @@ const GenericCfgLoopSumPlan = struct {
 };
 
 fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (try lowerGenericCfgOptionalPointerReturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -10040,6 +10044,105 @@ fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFuncti
             return true;
         }
         return error.GenericCfgFallback;
+    }
+    return false;
+}
+
+fn lowerGenericCfgOptionalPointerReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 3) return false;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const cond_result = entry.instructions.items[0].result orelse return false;
+    const icmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (!genericCfgSupportsPointerNullIcmp(function, icmp)) return false;
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, cond_result)) return false;
+
+    const then_block = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
+    const else_block = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
+    const then_is_merge = genericCfgOptionalPointerMergeValue(then_block, entry.name) != null;
+    const else_is_merge = genericCfgOptionalPointerMergeValue(else_block, entry.name) != null;
+    if (then_is_merge == else_is_merge) return false;
+    const merge_block = if (then_is_merge) then_block else else_block;
+    const load_block = if (then_is_merge) else_block else then_block;
+    const null_value = genericCfgOptionalPointerMergeValue(merge_block, entry.name) orelse return false;
+    const load_value = genericCfgOptionalPointerLoadValue(function, load_block, merge_block.name) orelse return false;
+    if (!genericCfgOptionalPointerMergeHasIncoming(merge_block, load_block.name, load_value)) return false;
+
+    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
+    if (then_is_merge) {
+        const null_label = "generic_cfg_optional_pointer_null";
+        try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, null_label);
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, load_block, load_value);
+        try appendGenericCfgReturn(allocator, machine);
+        try appendGenericCfgBlockLabel(allocator, machine, null_label);
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, merge_block, null_value);
+        try appendGenericCfgReturn(allocator, machine);
+    } else {
+        const load_label = "generic_cfg_optional_pointer_load";
+        try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, load_label);
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, merge_block, null_value);
+        try appendGenericCfgReturn(allocator, machine);
+        try appendGenericCfgBlockLabel(allocator, machine, load_label);
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, load_block, load_value);
+        try appendGenericCfgReturn(allocator, machine);
+    }
+    return true;
+}
+
+fn genericCfgOptionalPointerMergeValue(block: ir.BasicBlock, entry_name: []const u8) ?ir.Value {
+    if (block.instructions.items.len != 1) return null;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return null;
+    const phi_name = instruction.result orelse return null;
+    const phi = switch (instruction.kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return null;
+    const ret = switch (block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, phi_name)) return null;
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, entry_name)) return incoming.value;
+    }
+    return null;
+}
+
+fn genericCfgOptionalPointerLoadValue(function: ir.Function, block: ir.BasicBlock, merge_name: []const u8) ?ir.Value {
+    if (block.instructions.items.len != 1) return null;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return null;
+    const load_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return null;
+    const ptr_name = switch (load.ptr) {
+        .named => |name| name,
+        else => return null,
+    };
+    if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return null;
+    if (!std.mem.eql(u8, singleBrTarget(block) orelse return null, merge_name)) return null;
+    return .{ .named = load_name };
+}
+
+fn genericCfgOptionalPointerMergeHasIncoming(block: ir.BasicBlock, incoming_block: []const u8, expected: ir.Value) bool {
+    const phi = switch (block.instructions.items[0].kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    for (phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, incoming_block)) return incoming.value.eql(expected);
     }
     return false;
 }
@@ -10087,7 +10190,7 @@ fn genericCfgSupportsBranchMergeBlock(
     for (entry.instructions.items) |instruction| {
         if (instruction.removed) return false;
         switch (instruction.kind) {
-            .icmp => |icmp| if (!genericCfgSupportsSingleBlockIcmp(function, icmp)) return false,
+            .icmp => |icmp| if (!genericCfgSupportsBranchIcmp(function, icmp)) return false,
             else => return false,
         }
     }
@@ -10098,6 +10201,7 @@ fn genericCfgSupportsBranchMergeBlock(
         else => return false,
     };
     if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (genericCfgPointerPhiLoadReturn(function, merge_block) != null) return true;
     if (merge_block.instructions.items.len > 1) return false;
     if (merge_block.instructions.items.len == 1) {
         const instruction = merge_block.instructions.items[0];
@@ -10113,7 +10217,7 @@ fn genericCfgSupportsBranchMergeBlock(
                 if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return false;
             },
             .load => |load| {
-                if (!load.ty.eql(.{ .int = 32 })) return false;
+                if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
                 const ptr_name = switch (load.ptr) {
                     .named => |name| name,
                     else => return false,
@@ -10124,6 +10228,44 @@ fn genericCfgSupportsBranchMergeBlock(
         }
     }
     return true;
+}
+
+const GenericCfgPointerPhiLoad = struct {
+    phi_name: []const u8,
+    load_name: []const u8,
+    phi: ir.PhiInst,
+};
+
+fn genericCfgPointerPhiLoadReturn(function: ir.Function, merge_block: ir.BasicBlock) ?GenericCfgPointerPhiLoad {
+    if (merge_block.instructions.items.len != 2) return null;
+    const phi_instruction = merge_block.instructions.items[0];
+    const load_instruction = merge_block.instructions.items[1];
+    if (phi_instruction.removed or load_instruction.removed) return null;
+    const phi_name = phi_instruction.result orelse return null;
+    const load_name = load_instruction.result orelse return null;
+    const phi = switch (phi_instruction.kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.ptr) or phi.incoming.items.len != 2) return null;
+    for (phi.incoming.items) |incoming| {
+        const ptr_name = switch (incoming.value) {
+            .named => |name| name,
+            else => return null,
+        };
+        if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return null;
+    }
+    const load = switch (load_instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, phi_name)) return null;
+    const ret = switch (merge_block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, load_name)) return null;
+    return .{ .phi_name = phi_name, .load_name = load_name, .phi = phi };
 }
 
 fn genericCfgSupportsBranchSideEffects(function: ir.Function, block: ir.BasicBlock) bool {
@@ -10142,7 +10284,7 @@ fn genericCfgSupportsBranchSideEffects(function: ir.Function, block: ir.BasicBlo
                 if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return false;
             },
             .load => |load| {
-                if (!load.ty.eql(.{ .int = 32 })) return false;
+                if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
                 const ptr_name = switch (load.ptr) {
                     .named => |name| name,
                     else => return false,
@@ -10217,6 +10359,16 @@ fn emitGenericCfgBranchPathReturn(
         else => return error.UnsupportedCodegenControlFlow,
     };
     const ret_value = ret.value orelse return error.InvalidRet;
+    if (genericCfgPointerPhiLoadReturn(function, merge_block)) |pointer_load| {
+        for (pointer_load.phi.incoming.items) |incoming| {
+            if (!std.mem.eql(u8, incoming.block, branch_block.name)) continue;
+            const ptr_reg = try paramValueReg(function, incoming.value, .ptr);
+            try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+            try appendGenericCfgReturn(allocator, machine);
+            return;
+        }
+        return error.UnsupportedCodegenValue;
+    }
     if (merge_block.instructions.items.len > 0) {
         const phi = switch (merge_block.instructions.items[0].kind) {
             .phi => |phi| phi,
@@ -10252,8 +10404,7 @@ fn emitGenericCfgBranchSideEffects(
         switch (instruction.kind) {
             .store => |store| {
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
-                const ptr_reg = try paramValueReg(function, store.ptr, .ptr);
-                try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = ptr_reg });
+                try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
             },
             .load, .binary, .call => {},
             else => return error.UnsupportedCodegenInstruction,
@@ -10279,8 +10430,7 @@ fn emitGenericCfgI32ValueIntoEax(
             switch (instruction.kind) {
                 .load => |load| {
                     if (!load.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
-                    const ptr_reg = try paramValueReg(function, load.ptr, .ptr);
-                    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+                    try emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
                 },
                 .binary => |binary| {
                     if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -10292,18 +10442,77 @@ fn emitGenericCfgI32ValueIntoEax(
                             else => return error.UnsupportedCodegenInstruction,
                         },
                         .named => |rhs_name| {
-                            const rhs = try paramReg(function, rhs_name, .{ .int = 32 });
                             const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
-                            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
+                            if (try paramRegOrNull(function, rhs_name, .{ .int = 32 })) |rhs| {
+                                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
+                                return;
+                            }
+                            if (op != .add) return error.UnsupportedCodegenInstruction;
+                            const rhs_instruction = findInstruction(block, rhs_name) orelse return error.UnsupportedCodegenValue;
+                            const rhs_load = switch (rhs_instruction.kind) {
+                                .load => |load| load,
+                                else => return error.UnsupportedCodegenInstruction,
+                            };
+                            switch (genericCfgI32Address(function, rhs_load.ptr) orelse return error.UnsupportedCodegenValue) {
+                                .tls => |symbol| try machine.instructions.append(allocator, .{ .add_tls_i32_eax = symbol }),
+                                .param, .global => return error.UnsupportedCodegenValue,
+                            }
                         },
                         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                     }
                 },
                 .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, call),
-                .phi, .icmp, .fcmp, .cast, .freeze, .select, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
+                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select),
+                .phi, .icmp, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+const GenericCfgAddress = union(enum) {
+    param: []const u8,
+    global: []const u8,
+    tls: []const u8,
+};
+
+fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAddress {
+    const name = switch (ptr) {
+        .named => |name| name,
+        else => return null,
+    };
+    if (genericCfgSupportsPointerParam(function, name)) return .{ .param = name };
+    if (name.len == 0 or name[0] != '@') return null;
+    const symbol = globalSymbolName(name) catch return null;
+    if (tlsSymbolFromFunctionAttrs(function)) |tls_symbol| {
+        if (std.mem.eql(u8, tls_symbol, symbol)) return .{ .tls = symbol };
+    }
+    return .{ .global = symbol };
+}
+
+fn emitGenericCfgLoadI32IntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    ptr: ir.Value,
+) !void {
+    switch (genericCfgI32Address(function, ptr) orelse return error.UnsupportedCodegenValue) {
+        .param => |name| try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try paramReg(function, name, .ptr) }),
+        .global => |symbol| try machine.instructions.append(allocator, .{ .load_global_i32_eax = symbol }),
+        .tls => |symbol| try machine.instructions.append(allocator, .{ .load_tls_i32_eax = symbol }),
+    }
+}
+
+fn emitGenericCfgStoreEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    ptr: ir.Value,
+) !void {
+    switch (genericCfgI32Address(function, ptr) orelse return error.UnsupportedCodegenValue) {
+        .param => |name| try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = try paramReg(function, name, .ptr) }),
+        .global => |symbol| try machine.instructions.append(allocator, .{ .store_eax_global_i32 = symbol }),
+        .tls => |symbol| try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = symbol }),
     }
 }
 
@@ -10338,10 +10547,83 @@ fn emitGenericCfgI32CallIntoEax(
 }
 
 fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
-    if (!genericCfgSupportsSingleBlockScalar(function)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
-    try lowerReturnTerminator(allocator, machine, function, block);
+    if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (!genericCfgSupportsSingleBlockScalar(function)) return false;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return error.UnsupportedCodegenControlFlow,
+    };
+    for (block.instructions.items) |instruction| {
+        switch (instruction.kind) {
+            .store => |store| {
+                try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
+                try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
+            },
+            .binary, .icmp, .select, .load, .call => {},
+            .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
+        }
+    }
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
+    try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+fn lowerGenericCfgPointerSelectLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+    const icmp_name = block.instructions.items[0].result orelse return false;
+    const select_name = block.instructions.items[1].result orelse return false;
+    const load_name = block.instructions.items[2].result orelse return false;
+    const icmp = switch (block.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (!genericCfgSupportsBranchIcmp(function, icmp)) return false;
+    const select = switch (block.instructions.items[1].kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.ptr) or !isNamed(select.cond, icmp_name)) return false;
+    const true_ptr = switch (select.true_value) {
+        .named => |name| name,
+        else => return false,
+    };
+    const false_ptr = switch (select.false_value) {
+        .named => |name| name,
+        else => return false,
+    };
+    if (!genericCfgSupportsPointerParam(function, true_ptr) or !genericCfgSupportsPointerParam(function, false_ptr)) return false;
+    const load = switch (block.instructions.items[2].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, select_name)) return false;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+
+    const true_label = "generic_cfg_pointer_select_true";
+    const end_label = "generic_cfg_pointer_select_end";
+    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try paramReg(function, false_ptr, .ptr) });
+    try machine.instructions.append(allocator, .{ .jmp = end_label });
+    try appendGenericCfgBlockLabel(allocator, machine, true_label);
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = try paramReg(function, true_ptr, .ptr) });
+    try appendGenericCfgBlockLabel(allocator, machine, end_label);
+    try appendGenericCfgReturn(allocator, machine);
     return true;
 }
 
@@ -10362,19 +10644,37 @@ fn genericCfgSupportsSingleBlockScalar(function: ir.Function) bool {
 }
 
 fn genericCfgSupportsSingleBlockScalarInstruction(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction) bool {
-    if (instruction.result == null) return false;
     return switch (instruction.kind) {
-        .binary => |binary| genericCfgSupportsSingleBlockBinary(function, binary),
+        .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
         .icmp => |icmp| genericCfgSupportsSingleBlockIcmp(function, icmp),
         .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
-        .phi, .fcmp, .cast, .freeze, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+        .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
+        .store => |store| genericCfgSupportsSingleBlockStore(function, block, store),
+        .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
+        .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
     };
 }
 
-fn genericCfgSupportsSingleBlockBinary(function: ir.Function, binary: ir.BinaryInst) bool {
+fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.BasicBlock, binary: ir.BinaryInst) bool {
     if (!binary.ty.eql(.{ .int = 32 })) return false;
     if (machineBinaryOp(binary.op) == null) return false;
-    return genericCfgSupportsLowerableI32OperandPair(function, binary.lhs, binary.rhs);
+    if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return false;
+    switch (binary.rhs) {
+        .named => |rhs_name| {
+            if (genericCfgSupportsI32Param(function, rhs_name)) return true;
+            const rhs_instruction = findInstruction(block, rhs_name) orelse return false;
+            const rhs_load = switch (rhs_instruction.kind) {
+                .load => |load| load,
+                else => return false,
+            };
+            if (binary.op != .add or !rhs_load.ty.eql(.{ .int = 32 }) or rhs_load.attrs.isBarrier()) return false;
+            return switch (genericCfgI32Address(function, rhs_load.ptr) orelse return false) {
+                .tls => true,
+                .param, .global => false,
+            };
+        },
+        else => return genericCfgSupportsSingleBlockI32Value(function, block, binary.rhs),
+    }
 }
 
 fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.Value, rhs: ir.Value) bool {
@@ -10405,6 +10705,32 @@ fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpInst) b
         genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
 }
 
+fn genericCfgSupportsBranchIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
+    if (genericCfgSupportsSingleBlockIcmp(function, icmp)) return true;
+    return genericCfgSupportsPointerNullIcmp(function, icmp);
+}
+
+fn genericCfgSupportsPointerNullIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
+    if (!icmp.operand_ty.eql(.ptr)) return false;
+    switch (icmp.predicate) {
+        .eq, .ne => {},
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return false,
+    }
+    if (icmp.lhs == .null_value) {
+        return switch (icmp.rhs) {
+            .named => |name| genericCfgSupportsPointerParam(function, name),
+            else => false,
+        };
+    }
+    if (icmp.rhs == .null_value) {
+        return switch (icmp.lhs) {
+            .named => |name| genericCfgSupportsPointerParam(function, name),
+            else => false,
+        };
+    }
+    return false;
+}
+
 fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlock, select: ir.SelectInst) bool {
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return false;
     const cond_name = switch (select.cond) {
@@ -10422,24 +10748,97 @@ fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlo
 }
 
 fn genericCfgSupportsSingleBlockScalarReturnValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) bool {
+    return genericCfgSupportsSingleBlockI32Value(function, block, value);
+}
+
+fn genericCfgSupportsSingleBlockI32Value(function: ir.Function, maybe_block: ?ir.BasicBlock, value: ir.Value) bool {
     return switch (value) {
         .int => true,
         .named => |name| {
             if (genericCfgSupportsI32Param(function, name)) return true;
+            const block = maybe_block orelse return false;
             const instruction = findInstruction(block, name) orelse return false;
             return switch (instruction.kind) {
-                .binary => |binary| genericCfgSupportsSingleBlockBinary(function, binary),
+                .binary => |binary| genericCfgSupportsSingleBlockBinary(function, block, binary),
                 .select => |select| genericCfgSupportsSingleBlockSelect(function, block, select),
-                .icmp, .phi, .fcmp, .cast, .freeze, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => false,
+                .load => |load| genericCfgSupportsSingleBlockLoad(function, load),
+                .call => |call| genericCfgSupportsSingleBlockCall(function, block, instruction.result, call),
+                .icmp, .phi, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => false,
             };
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }
 
+fn genericCfgSupportsSingleBlockLoad(function: ir.Function, load: ir.LoadInst) bool {
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    return genericCfgI32Address(function, load.ptr) != null;
+}
+
+fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBlock, store: ir.StoreInst) bool {
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return false;
+    if (genericCfgI32Address(function, store.ptr) == null) return false;
+    return genericCfgSupportsSingleBlockI32Value(function, block, store.value);
+}
+
+fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
+    if (result == null) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 4) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    for (call.args.items) |arg| {
+        if (!arg.ty.eql(.{ .int = 32 })) return false;
+        if (!genericCfgSupportsSingleBlockI32Value(function, block, arg.value)) return false;
+    }
+    if (result) |name| return genericCfgSingleBlockResultIsUsed(block, name);
+    return false;
+}
+
+fn genericCfgSingleBlockResultIsUsed(block: ir.BasicBlock, name: []const u8) bool {
+    for (block.instructions.items) |instruction| {
+        switch (instruction.kind) {
+            .store => |store| if (genericCfgValueReferencesName(block, store.value, name)) return true,
+            .binary => |binary| {
+                if (genericCfgValueReferencesName(block, binary.lhs, name) or
+                    genericCfgValueReferencesName(block, binary.rhs, name)) return true;
+            },
+            else => {},
+        }
+    }
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return genericCfgValueReferencesName(block, ret.value orelse return false, name);
+}
+
+fn genericCfgValueReferencesName(block: ir.BasicBlock, value: ir.Value, name: []const u8) bool {
+    switch (value) {
+        .named => |candidate| {
+            if (std.mem.eql(u8, candidate, name)) return true;
+            const instruction = findInstruction(block, candidate) orelse return false;
+            return switch (instruction.kind) {
+                .binary => |binary| genericCfgValueReferencesName(block, binary.lhs, name) or
+                    genericCfgValueReferencesName(block, binary.rhs, name),
+                .select => |select| genericCfgValueReferencesName(block, select.true_value, name) or
+                    genericCfgValueReferencesName(block, select.false_value, name),
+                else => false,
+            };
+        },
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+}
+
 fn genericCfgSupportsI32Param(function: ir.Function, name: []const u8) bool {
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.{ .int = 32 });
+    }
+    return false;
+}
+
+fn genericCfgSupportsPointerParam(function: ir.Function, name: []const u8) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.ptr);
     }
     return false;
 }
@@ -17556,12 +17955,20 @@ fn emitGenericCfgIcmpCondition(
     function: ir.Function,
     icmp: ir.IcmpInst,
 ) !GenericCfgBranchKind {
-    if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
     const branch_kind: GenericCfgBranchKind = switch (icmp.predicate) {
         .eq => .je,
         .ne => .jne,
         .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return error.UnsupportedCodegenInstruction,
     };
+
+    if (icmp.operand_ty.eql(.ptr)) {
+        const ptr_value = if (icmp.lhs == .null_value) icmp.rhs else if (icmp.rhs == .null_value) icmp.lhs else return error.UnsupportedCodegenValue;
+        const ptr_reg = try paramValueReg(function, ptr_value, .ptr);
+        try machine.instructions.append(allocator, .{ .test_arg64 = ptr_reg });
+        return branch_kind;
+    }
+
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
     if (isInt(icmp.rhs, 0)) {
         const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 32 });
@@ -18132,7 +18539,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => |label| {
-            if (!std.mem.endsWith(u8, label, "generic_cfg_select_end")) {
+            if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
+                !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end"))
+            {
                 eax_defined = function.ret_ty == .void;
             }
         },
