@@ -5562,6 +5562,120 @@ test "x86_64 codegen routes pointer select load through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes alloca pointer struct field loads through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @field_a(ptr %pair) {
+        \\entry:
+        \\  %slot = alloca ptr
+        \\  store ptr %pair, ptr %slot
+        \\  %loaded_ptr = load ptr, ptr %slot
+        \\  %loaded = load i32, ptr %loaded_ptr
+        \\  ret i32 %loaded
+        \\}
+        \\
+        \\define i32 @field_b(ptr %pair) {
+        \\entry:
+        \\  %slot = alloca ptr
+        \\  store ptr %pair, ptr %slot
+        \\  %loaded_ptr = load ptr, ptr %slot
+        \\  %field_ptr = getelementptr i8, ptr %loaded_ptr, i64 4
+        \\  %loaded = load i32, ptr %field_ptr
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = try codegen.x86_64.lowerFunction(
+            std.testing.allocator,
+            module.target_triple.?,
+            function,
+        );
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    }
+}
+
+test "x86_64 codegen routes struct field branch update through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch_update(i32 %flag, ptr %pair) {
+        \\entry:
+        \\  %slot = alloca ptr
+        \\  store ptr %pair, ptr %slot
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %then_ptr = load ptr, ptr %slot
+        \\  %then_old = load i32, ptr %then_ptr
+        \\  %then_new = add i32 %then_old, 5
+        \\  store i32 %then_new, ptr %then_ptr
+        \\  br label %merge
+        \\else:
+        \\  %else_ptr = load ptr, ptr %slot
+        \\  %else_old = load i32, ptr %else_ptr
+        \\  %else_new = add i32 %else_old, 7
+        \\  store i32 %else_new, ptr %else_ptr
+        \\  br label %merge
+        \\merge:
+        \\  %ret_ptr = load ptr, ptr %slot
+        \\  %ret_value = load i32, ptr %ret_ptr
+        \\  ret i32 %ret_value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen rejects unsupported aggregate field offset from generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @field_c(ptr %pair) {
+        \\entry:
+        \\  %slot = alloca ptr
+        \\  store ptr %pair, ptr %slot
+        \\  %loaded_ptr = load ptr, ptr %slot
+        \\  %field_ptr = getelementptr i8, ptr %loaded_ptr, i64 8
+        \\  %loaded = load i32, ptr %field_ptr
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    if (codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    )) |machine| {
+        var owned = machine;
+        defer owned.deinit(std.testing.allocator);
+        try std.testing.expectEqual(codegen.x86_64.CodegenPath.structural_matcher, owned.codegen_path);
+    } else |err| switch (err) {
+        error.UnsupportedCodegenInstruction, error.UnsupportedCodegenValue => {},
+        else => return err,
+    }
+}
+
 test "x86_64 codegen keeps volatile memory cfg out of generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

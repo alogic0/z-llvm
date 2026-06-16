@@ -185,8 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=79` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=80` for ReleaseSafe,
+`generic_cfg_functions=83` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=84` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -234,9 +234,9 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_branch_arrays.zig` optional-control-flow bucket, and the
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
-`discovered_functions=176`, `generic_codegen_functions=176`,
-`generic_cfg_functions=92` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=94` for ReleaseSafe,
+`discovered_functions=179`, `generic_codegen_functions=179`,
+`generic_cfg_functions=100` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=102` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -251,7 +251,7 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=176`, `object_failures=0`,
+`object_emitted_functions=179`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
 (ReleaseSafe: 17 for the checked panic boundary), `tls_rows=4`,
@@ -265,11 +265,13 @@ and executable progress gates are green for all three release modes:
 branch-return and byte-table-return forms from the candidate bucket failed
 closed with typed/control-flow and backend diagnostics and remain the next
 explicit source-frontier work. The memory/CFG bucket now exports the branch
-pointer-load, pointer-select load, branch store, computed store, and
-branch-call rows with executable ABI checks; conditional slice-loop updates,
-nested optional-pointer branch payloads, volatile memory roundtrips, and offset
-aggregate field stores remain named future generic CFG memory/aggregate
-candidates.
+pointer-load, pointer-select load, branch store, computed store, branch-call,
+alloca-stored extern-struct field offset 0/4 load, and branch field-update rows
+with executable ABI checks; conditional slice-loop updates and nested
+optional-pointer branch payloads still fail closed at typed AIR
+`block/control_flow_shape`, while volatile memory roundtrips, broader aggregate
+field stores, and more loop-memory dependencies remain named future generic CFG
+memory/aggregate candidates.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
@@ -428,11 +430,13 @@ load-after-store merge returns, pointer-select loads, direct-call branch merge
 CFGs, single-block global/TLS i32 load/update forms, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `79/73`, ReleaseSafe `80/72`, ReleaseSmall `79/73`; expanded
-reports ReleaseFast `92/84`, ReleaseSafe `94/82`, ReleaseSmall `92/84`.
-Remaining structural families are mostly volatile memory, broader global/TLS
-addressing, slice-loop memory dependencies, nested optional-pointer branches,
-aggregate field-offset updates, and larger ABI/call shapes; each should move
+ReleaseFast `83/69`, ReleaseSafe `84/68`, ReleaseSmall `83/69`; expanded
+reports ReleaseFast `100/79`, ReleaseSafe `102/77`, ReleaseSmall `100/79`.
+Former structural aggregate field-offset rows now include alloca-stored pointer
+field loads at offsets 0 and 4 plus branch-local field-0 updates. Remaining
+structural families are mostly volatile memory, broader global/TLS addressing,
+conditional slice-loop and nested optional-pointer typed AIR block shapes,
+broader aggregate field stores, and larger ABI/call shapes; each should move
 only when the generic CFG eligibility checks can prove the full instruction and
 terminator subset.
 

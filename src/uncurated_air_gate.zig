@@ -627,7 +627,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 108, 176 },
+        .expanded => .{ 108, 179 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1129,10 +1129,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_expanded_branch_store_computed(int, int *, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store_computed");
     \\extern int z_expanded_branch_call(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call");
     \\extern int z_expanded_branch_call_two(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call_two");
+    \\struct pair_i32 { int a; int b; };
+    \\extern int z_expanded_struct_branch_update(int, struct pair_i32 *) __asm__("expanded_cfg_memory_aggregates.expanded_struct_branch_update");
+    \\extern int z_expanded_struct_field_b(const struct pair_i32 *) __asm__("expanded_cfg_memory_aggregates.expanded_struct_field_b");
+    \\extern int z_expanded_struct_field_a(const struct pair_i32 *) __asm__("expanded_cfg_memory_aggregates.expanded_struct_field_a");
     \\int main(void) {
     \\    int left = 10;
     \\    int right = 20;
     \\    int out = 0;
+    \\    struct pair_i32 pair = { 20, 44 };
     \\    if (z_expanded_branch_pointer_load(1, &left, &right) != 10) return 1;
     \\    if (z_expanded_branch_pointer_load(0, &left, &right) != 20) return 2;
     \\    if (z_expanded_branch_pointer_phi_load(1, &left, &right) != 10) return 3;
@@ -1145,6 +1150,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_expanded_branch_call(0, 39) != 36) return 12;
     \\    if (z_expanded_branch_call_two(1, 39) != 42) return 13;
     \\    if (z_expanded_branch_call_two(0, 39) != 36) return 14;
+    \\    if (z_expanded_struct_field_b(&pair) != 44) return 15;
+    \\    if (z_expanded_struct_field_a(&pair) != 20) return 16;
+    \\    if (z_expanded_struct_branch_update(1, &pair) != 25 || pair.a != 25) return 17;
+    \\    if (z_expanded_struct_branch_update(0, &pair) != 32 || pair.a != 32) return 18;
     \\    return 0;
     \\}
     \\

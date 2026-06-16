@@ -10025,12 +10025,20 @@ fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFuncti
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgStructBranchUpdateReturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
     if (genericCfgLoopSumPlan(function)) |plan| {
         try emitGenericCfgLoopSum(allocator, machine, function, plan);
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerSliceSumLoop(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -10145,6 +10153,98 @@ fn genericCfgOptionalPointerMergeHasIncoming(block: ir.BasicBlock, incoming_bloc
         if (std.mem.eql(u8, incoming.block, incoming_block)) return incoming.value.eql(expected);
     }
     return false;
+}
+
+fn lowerGenericCfgStructBranchUpdateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2 or function.blocks.items.len != 4) return false;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 3) return false;
+    const slot = genericCfgPointerSlotParam(function, entry.instructions.items[0], entry.instructions.items[1]) orelse return false;
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 })) return false;
+    const then_block = function.blocks.items[blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget];
+    const else_block = function.blocks.items[blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget];
+    const then_target = singleBrTarget(then_block) orelse return false;
+    const else_target = singleBrTarget(else_block) orelse return false;
+    if (!std.mem.eql(u8, then_target, else_target)) return false;
+    const merge_block = function.blocks.items[blockIndex(function, then_target) orelse return error.InvalidBranchTarget];
+
+    const then_add = genericCfgStructFieldZeroUpdateAdd(then_block, slot.slot_name) orelse return false;
+    const else_add = genericCfgStructFieldZeroUpdateAdd(else_block, slot.slot_name) orelse return false;
+    if (!genericCfgStructFieldZeroMergeReturn(merge_block, slot.slot_name)) return false;
+
+    try emitGenericCfgConditionTrueBranch(allocator, machine, function, entry, condbr.cond, then_block.name);
+    try emitGenericCfgStructFieldZeroUpdatePath(allocator, machine, slot.param_reg, else_add);
+    try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
+    try emitGenericCfgStructFieldZeroUpdatePath(allocator, machine, slot.param_reg, then_add);
+    return true;
+}
+
+fn genericCfgStructFieldZeroUpdateAdd(block: ir.BasicBlock, slot_name: []const u8) ?i32 {
+    if (block.instructions.items.len != 4) return null;
+    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[0], slot_name) orelse return null;
+
+    const load_name = block.instructions.items[1].result orelse return null;
+    const load = switch (block.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, loaded_ptr)) return null;
+
+    const add_name = block.instructions.items[2].result orelse return null;
+    const add = switch (block.instructions.items[2].kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (add.op != .add or !add.ty.eql(.{ .int = 32 }) or !isNamed(add.lhs, load_name)) return null;
+    const add_imm = switch (add.rhs) {
+        .int => |int| i32Value(int) catch return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+
+    const store = switch (block.instructions.items[3].kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!store.ty.eql(.{ .int = 32 }) or store.attrs.isBarrier()) return null;
+    if (!isNamed(store.value, add_name) or !isNamed(store.ptr, loaded_ptr)) return null;
+    return add_imm;
+}
+
+fn genericCfgStructFieldZeroMergeReturn(block: ir.BasicBlock, slot_name: []const u8) bool {
+    if (block.instructions.items.len != 2) return false;
+    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[0], slot_name) orelse return false;
+    const load_name = block.instructions.items[1].result orelse return false;
+    const load = switch (block.instructions.items[1].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, loaded_ptr)) return false;
+    const ret = switch (block.terminator orelse return false) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    return ret.ty.eql(.{ .int = 32 }) and isNamed(ret.value orelse return false, load_name);
+}
+
+fn emitGenericCfgStructFieldZeroUpdatePath(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    ptr_reg: ArgReg,
+    add_imm: i32,
+) !void {
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+    try machine.instructions.append(allocator, .{ .add_eax_imm32 = add_imm });
+    try machine.instructions.append(allocator, .{ .store_eax_arg_ptr = ptr_reg });
+    try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+    try appendGenericCfgReturn(allocator, machine);
 }
 
 fn lowerGenericCfgBranchMergeReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
@@ -10546,18 +10646,132 @@ fn emitGenericCfgI32CallIntoEax(
     try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
 }
 
+const GenericCfgPointerSlotParam = struct {
+    slot_name: []const u8,
+    param_name: []const u8,
+    param_reg: ArgReg,
+};
+
+fn genericCfgPointerSlotParam(
+    function: ir.Function,
+    alloca_instruction: ir.Instruction,
+    store_instruction: ir.Instruction,
+) ?GenericCfgPointerSlotParam {
+    if (alloca_instruction.removed or store_instruction.removed) return null;
+    const slot_name = alloca_instruction.result orelse return null;
+    const alloca = switch (alloca_instruction.kind) {
+        .alloca => |alloca| alloca,
+        else => return null,
+    };
+    if (!alloca.allocated_ty.eql(.ptr) or alloca.allocated_ty_addrspace != null) return null;
+    const store = switch (store_instruction.kind) {
+        .store => |store| store,
+        else => return null,
+    };
+    if (!store.ty.eql(.ptr) or store.ty_addrspace != null or store.ptr_addrspace != null or store.attrs.isBarrier()) return null;
+    if (!isNamed(store.ptr, slot_name)) return null;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    const param_reg = paramRegOrNull(function, param_name, .ptr) catch return null;
+    return .{ .slot_name = slot_name, .param_name = param_name, .param_reg = param_reg orelse return null };
+}
+
+fn genericCfgLoadPtrFromSlot(instruction: ir.Instruction, slot_name: []const u8) ?[]const u8 {
+    if (instruction.removed) return null;
+    const load_name = instruction.result orelse return null;
+    const load = switch (instruction.kind) {
+        .load => |load| load,
+        else => return null,
+    };
+    if (!load.ty.eql(.ptr) or load.ty_addrspace != null or load.ptr_addrspace != null or load.attrs.isBarrier()) return null;
+    if (!isNamed(load.ptr, slot_name)) return null;
+    return load_name;
+}
+
+fn lowerGenericCfgStructFieldLoadReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
+    if (block.instructions.items.len != 4 and block.instructions.items.len != 5) return false;
+    const slot = genericCfgPointerSlotParam(function, block.instructions.items[0], block.instructions.items[1]) orelse return false;
+    const loaded_ptr = genericCfgLoadPtrFromSlot(block.instructions.items[2], slot.slot_name) orelse return false;
+
+    const load_index: usize = if (block.instructions.items.len == 4) 3 else 4;
+    const load_ptr_name = if (block.instructions.items.len == 4) loaded_ptr else blk: {
+        const gep_name = block.instructions.items[3].result orelse return false;
+        const gep = switch (block.instructions.items[3].kind) {
+            .gep => |gep| gep,
+            else => return false,
+        };
+        if (!genericCfgI8GepOffset(gep, loaded_ptr, 4)) return false;
+        break :blk gep_name;
+    };
+
+    const load_name = block.instructions.items[load_index].result orelse return false;
+    const load = switch (block.instructions.items[load_index].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier() or !isNamed(load.ptr, load_ptr_name)) return false;
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+
+    if (block.instructions.items.len == 4) {
+        try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = slot.param_reg });
+    } else {
+        try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+        try machine.instructions.append(allocator, .{ .add_arg_ptr_disp4_eax = slot.param_reg });
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn genericCfgI8GepOffset(gep: ir.GepInst, ptr_name: []const u8, offset: i128) bool {
+    if (!gep.source_ty.eql(.{ .int = 8 }) or !isNamed(gep.ptr, ptr_name)) return false;
+    if (gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    return index.ty.eql(.{ .int = 64 }) and index.value.eql(.{ .int = offset });
+}
+
 fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 1) return false;
     const block = function.blocks.items[0];
+    const single_ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => null,
+    };
     if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgStructFieldLoadReturn(allocator, machine, function, block)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (single_ret) |ret| {
+        if (lowerStructSumReturn(allocator, machine, function, block, ret) catch false) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (lowerRuntimeStructSumPreoptHelper(allocator, machine, function, block, ret) catch false) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (lowerRuntimeArraySumPreoptHelper(allocator, machine, function, block, ret) catch false) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+    }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
-    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
-        .ret => |ret| ret,
-        else => return error.UnsupportedCodegenControlFlow,
-    };
+    const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
     for (block.instructions.items) |instruction| {
         switch (instruction.kind) {
             .store => |store| {

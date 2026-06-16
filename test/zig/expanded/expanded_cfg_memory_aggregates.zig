@@ -51,12 +51,20 @@ fn expanded_slice_conditional_sum(values: [*]const i32, len: usize, limit: i32) 
     return sum;
 }
 
-fn expanded_struct_branch_update(flag: i32, pair: *Pair) i32 {
+export fn expanded_struct_branch_update(flag: i32, pair: *Pair) i32 {
     if (flag != 0) {
         pair.a += 5;
     } else {
         pair.a += 7;
     }
+    return pair.a;
+}
+
+export fn expanded_struct_field_b(pair: *const Pair) i32 {
+    return pair.b;
+}
+
+export fn expanded_struct_field_a(pair: *const Pair) i32 {
     return pair.a;
 }
 
