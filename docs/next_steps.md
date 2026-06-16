@@ -425,7 +425,7 @@ the loop-sum family, simple single-block scalar integer returns, scalar
 `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `65/87`, ReleaseSafe `66/86`, ReleaseSmall `65/87`; expanded
-reports ReleaseFast `67/101`, ReleaseSafe `69/99`, ReleaseSmall `67/101`.
+reports ReleaseFast `71/101`, ReleaseSafe `73/99`, ReleaseSmall `71/101`.
 Remaining work is to replace more structural matcher families with the same
 block/branch/phi/value-map route rather than adding new shape-specific
 emitters.
