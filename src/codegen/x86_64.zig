@@ -10029,6 +10029,10 @@ fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFuncti
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgGuardedOptionalPointerBranchReturn(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgBranchMergeReturn(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -10247,6 +10251,131 @@ fn emitGenericCfgStructFieldZeroUpdatePath(
     try appendGenericCfgReturn(allocator, machine);
 }
 
+fn lowerGenericCfgGuardedOptionalPointerBranchReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 2) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 32 }) or !function.params.items[1].ty.eql(.ptr)) return false;
+    if (function.blocks.items.len != 6) return false;
+
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const outer_cond_name = entry.instructions.items[0].result orelse return false;
+    const outer_icmp = switch (entry.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (!genericCfgSupportsBranchIcmp(function, outer_icmp)) return false;
+    const outer_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!outer_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(outer_br.cond, outer_cond_name)) return false;
+
+    const then_block = blockByName(function, outer_br.then_target) orelse return false;
+    const else_block = blockByName(function, outer_br.else_target) orelse return false;
+    if (then_block.instructions.items.len != 1) return false;
+    const guard_cond_name = then_block.instructions.items[0].result orelse return false;
+    const guard_icmp = switch (then_block.instructions.items[0].kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (guard_icmp.predicate != .ne) return false;
+    if (!genericCfgSupportsPointerNullIcmp(function, guard_icmp)) return false;
+    const guard_br = switch (then_block.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!guard_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(guard_br.cond, guard_cond_name)) return false;
+    const cont_block = blockByName(function, guard_br.then_target) orelse return false;
+    const panic_block = blockByName(function, guard_br.else_target) orelse return false;
+    if (!genericCfgGuardPanicBlock(panic_block)) return false;
+
+    const merge_name = singleBrTarget(cont_block) orelse return false;
+    if (!std.mem.eql(u8, singleBrTarget(else_block) orelse return false, merge_name)) return false;
+    const merge_block = blockByName(function, merge_name) orelse return false;
+    const phi_binary = genericCfgPhiBinaryReturn(merge_block) orelse return false;
+
+    if (cont_block.instructions.items.len != 1) return false;
+    const load_name = cont_block.instructions.items[0].result orelse return false;
+    const load = switch (cont_block.instructions.items[0].kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const ptr_name = switch (load.ptr) {
+        .named => |name| name,
+        else => return false,
+    };
+    if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return false;
+
+    var loaded_incoming = false;
+    var fallback_value: ?ir.Value = null;
+    for (phi_binary.phi.incoming.items) |incoming| {
+        if (std.mem.eql(u8, incoming.block, cont_block.name)) {
+            if (!isNamed(incoming.value, load_name)) return false;
+            loaded_incoming = true;
+        } else if (std.mem.eql(u8, incoming.block, else_block.name)) {
+            fallback_value = incoming.value;
+        } else {
+            return false;
+        }
+    }
+    if (!loaded_incoming) return false;
+    const fallback = fallback_value orelse return false;
+
+    const outer_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, outer_icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, outer_branch_kind, then_block.name);
+    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, else_block, fallback);
+    try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
+    try appendGenericCfgReturn(allocator, machine);
+
+    try appendGenericCfgBlockLabel(allocator, machine, then_block.name);
+    const guard_branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, guard_icmp);
+    try appendGenericCfgConditionalBranch(allocator, machine, guard_branch_kind, cont_block.name);
+    try appendGenericCfgBlockLabel(allocator, machine, panic_block.name);
+    const panic_call = switch (panic_block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return error.UnsupportedCodegenInstruction,
+    };
+    try appendAlignedDirectCall(allocator, machine, panic_call.callee, .void);
+    try machine.instructions.append(allocator, .ud2);
+
+    try appendGenericCfgBlockLabel(allocator, machine, cont_block.name);
+    try emitGenericCfgLoadI32IntoEax(allocator, machine, function, load.ptr);
+    try appendGenericCfgPhiBinaryImmediate(allocator, machine, phi_binary);
+    try appendGenericCfgReturn(allocator, machine);
+    return true;
+}
+
+fn genericCfgGuardPanicBlock(block: ir.BasicBlock) bool {
+    if (block.instructions.items.len != 1) return false;
+    const call = switch (block.instructions.items[0].kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.args.items.len != 0 or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    return switch (block.terminator orelse return false) {
+        .@"unreachable" => true,
+        else => false,
+    };
+}
+
+fn appendGenericCfgPhiBinaryImmediate(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    phi_binary: GenericCfgPhiBinaryReturn,
+) !void {
+    switch (phi_binary.op) {
+        .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = phi_binary.imm }),
+        .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -phi_binary.imm }),
+        else => return error.UnsupportedCodegenInstruction,
+    }
+}
+
 fn lowerGenericCfgBranchMergeReturn(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.blocks.items.len != 4) return false;
     const entry = function.blocks.items[0];
@@ -10302,6 +10431,7 @@ fn genericCfgSupportsBranchMergeBlock(
     };
     if (!ret.ty.eql(.{ .int = 32 })) return false;
     if (genericCfgPointerPhiLoadReturn(function, merge_block) != null) return true;
+    if (genericCfgPhiBinaryReturn(merge_block) != null) return true;
     if (merge_block.instructions.items.len > 1) return false;
     if (merge_block.instructions.items.len == 1) {
         const instruction = merge_block.instructions.items[0];
@@ -10335,6 +10465,53 @@ const GenericCfgPointerPhiLoad = struct {
     load_name: []const u8,
     phi: ir.PhiInst,
 };
+
+const GenericCfgPhiBinaryReturn = struct {
+    phi_name: []const u8,
+    binary_name: []const u8,
+    phi: ir.PhiInst,
+    op: ir.BinaryOp,
+    imm: i32,
+};
+
+fn genericCfgPhiBinaryReturn(merge_block: ir.BasicBlock) ?GenericCfgPhiBinaryReturn {
+    if (merge_block.instructions.items.len != 2) return null;
+    const phi_instruction = merge_block.instructions.items[0];
+    const binary_instruction = merge_block.instructions.items[1];
+    if (phi_instruction.removed or binary_instruction.removed) return null;
+    const phi_name = phi_instruction.result orelse return null;
+    const binary_name = binary_instruction.result orelse return null;
+    const phi = switch (phi_instruction.kind) {
+        .phi => |phi| phi,
+        else => return null,
+    };
+    if (!phi.ty.eql(.{ .int = 32 }) or phi.incoming.items.len != 2) return null;
+    const binary = switch (binary_instruction.kind) {
+        .binary => |binary| binary,
+        else => return null,
+    };
+    if (!binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, phi_name)) return null;
+    const imm = switch (binary.rhs) {
+        .int => |int| i32Value(int) catch return null,
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+    };
+    switch (binary.op) {
+        .add, .sub => {},
+        else => return null,
+    }
+    const ret = switch (merge_block.terminator orelse return null) {
+        .ret => |ret| ret,
+        else => return null,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return null, binary_name)) return null;
+    return .{
+        .phi_name = phi_name,
+        .binary_name = binary_name,
+        .phi = phi,
+        .op = binary.op,
+        .imm = imm,
+    };
+}
 
 fn genericCfgPointerPhiLoadReturn(function: ir.Function, merge_block: ir.BasicBlock) ?GenericCfgPointerPhiLoad {
     if (merge_block.instructions.items.len != 2) return null;
@@ -10464,6 +10641,20 @@ fn emitGenericCfgBranchPathReturn(
             if (!std.mem.eql(u8, incoming.block, branch_block.name)) continue;
             const ptr_reg = try paramValueReg(function, incoming.value, .ptr);
             try machine.instructions.append(allocator, .{ .load_arg_ptr_eax = ptr_reg });
+            try appendGenericCfgReturn(allocator, machine);
+            return;
+        }
+        return error.UnsupportedCodegenValue;
+    }
+    if (genericCfgPhiBinaryReturn(merge_block)) |phi_binary| {
+        for (phi_binary.phi.incoming.items) |incoming| {
+            if (!std.mem.eql(u8, incoming.block, branch_block.name)) continue;
+            try emitGenericCfgI32ValueIntoEax(allocator, machine, function, branch_block, incoming.value);
+            switch (phi_binary.op) {
+                .add => try machine.instructions.append(allocator, .{ .add_eax_imm32 = phi_binary.imm }),
+                .sub => try machine.instructions.append(allocator, .{ .add_eax_imm32 = -phi_binary.imm }),
+                else => return error.UnsupportedCodegenInstruction,
+            }
             try appendGenericCfgReturn(allocator, machine);
             return;
         }

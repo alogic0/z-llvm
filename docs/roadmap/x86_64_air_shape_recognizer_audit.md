@@ -68,14 +68,15 @@ Backend generic CFG ownership is tracked separately from typed-v2 lowering.
 The current broad x86_64 release gates report `generic_cfg_functions=83` /
 `structural_matcher_functions=69` for ReleaseFast and ReleaseSmall, and
 `84` / `68` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=100` / `structural_matcher_functions=79` for
-ReleaseFast and ReleaseSmall, and `102` / `77` for ReleaseSafe. Newly promoted
+`generic_cfg_functions=101` / `structural_matcher_functions=79` for
+ReleaseFast and ReleaseSmall, and `103` / `77` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
-and 4, branch-local field-0 updates, and existing slice/aggregate sum shapes
-that pass strict generic CFG eligibility. Conditional slice-loop updates and
-nested optional-pointer branch payloads still fail closed at typed AIR
-`block/control_flow_shape`; volatile memory, broader aggregate field stores,
-and larger loop-memory dependencies remain structural/backend frontier work.
+and 4, branch-local field-0 updates, the nested optional-pointer branch payload
+with a preserved ReleaseSafe guard edge, and existing slice/aggregate sum shapes
+that pass strict generic CFG eligibility. Conditional slice-loop updates still
+fail closed at typed AIR `block/control_flow_shape`; volatile memory, broader
+aggregate field stores, and larger loop-memory dependencies remain
+structural/backend frontier work.
 
 Next typed-contract target:
 

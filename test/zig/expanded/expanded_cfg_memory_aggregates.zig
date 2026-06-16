@@ -68,7 +68,7 @@ export fn expanded_struct_field_a(pair: *const Pair) i32 {
     return pair.a;
 }
 
-fn expanded_optional_pointer_branch(flag: i32, maybe_ptr: ?*const i32) i32 {
+export fn expanded_optional_pointer_branch(flag: i32, maybe_ptr: ?*const i32) i32 {
     const result = if (flag != 0) maybe_ptr.?.* else -12;
     return result + 1;
 }

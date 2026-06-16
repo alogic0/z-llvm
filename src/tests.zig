@@ -5467,6 +5467,39 @@ test "x86_64 codegen routes pointer load branch through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes branch phi immediate add through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @branch_phi_add(i32 %flag, ptr %payload) {
+        \\entry:
+        \\  %cond = icmp ne i32 %flag, 0
+        \\  br i1 %cond, label %then, label %else
+        \\then:
+        \\  %loaded = load i32, ptr %payload
+        \\  br label %merge
+        \\else:
+        \\  br label %merge
+        \\merge:
+        \\  %result = phi i32 [ %loaded, %then ], [ -12, %else ]
+        \\  %biased = add i32 %result, 1
+        \\  ret i32 %biased
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes store branch load after store through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

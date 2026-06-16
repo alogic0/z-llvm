@@ -234,9 +234,9 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_branch_arrays.zig` optional-control-flow bucket, and the
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
-`discovered_functions=179`, `generic_codegen_functions=179`,
-`generic_cfg_functions=100` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=102` for ReleaseSafe,
+`discovered_functions=180`, `generic_codegen_functions=180`,
+`generic_cfg_functions=101` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=103` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -251,7 +251,7 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=179`, `object_failures=0`,
+`object_emitted_functions=180`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
 (ReleaseSafe: 17 for the checked panic boundary), `tls_rows=4`,
@@ -267,8 +267,11 @@ closed with typed/control-flow and backend diagnostics and remain the next
 explicit source-frontier work. The memory/CFG bucket now exports the branch
 pointer-load, pointer-select load, branch store, computed store, branch-call,
 alloca-stored extern-struct field offset 0/4 load, and branch field-update rows
-with executable ABI checks; conditional slice-loop updates and nested
-optional-pointer branch payloads still fail closed at typed AIR
+with executable ABI checks. The nested optional-pointer branch payload row is
+now exported and executable: typed v2 lowers pointer `optional_payload` and
+`is_non_null`, preserves the ReleaseSafe void guard/panic edge, and the generic
+x86_64 CFG path lowers the guarded branch with a phi/immediate return.
+Conditional slice-loop updates still fail closed at typed AIR
 `block/control_flow_shape`, while volatile memory roundtrips, broader aggregate
 field stores, and more loop-memory dependencies remain named future generic CFG
 memory/aggregate candidates.
@@ -431,14 +434,13 @@ CFGs, single-block global/TLS i32 load/update forms, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `83/69`, ReleaseSafe `84/68`, ReleaseSmall `83/69`; expanded
-reports ReleaseFast `100/79`, ReleaseSafe `102/77`, ReleaseSmall `100/79`.
+reports ReleaseFast `101/79`, ReleaseSafe `103/77`, ReleaseSmall `101/79`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. Remaining
 structural families are mostly volatile memory, broader global/TLS addressing,
-conditional slice-loop and nested optional-pointer typed AIR block shapes,
-broader aggregate field stores, and larger ABI/call shapes; each should move
-only when the generic CFG eligibility checks can prove the full instruction and
-terminator subset.
+conditional slice-loop typed AIR block shapes, broader aggregate field stores,
+and larger ABI/call shapes; each should move only when the generic CFG
+eligibility checks can prove the full instruction and terminator subset.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over

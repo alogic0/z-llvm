@@ -315,14 +315,14 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
 `test/zig/expanded/*.zig`. The first expanded slice is green for all three
-release modes at `source_rows=108`, `discovered_functions=179`,
-`generic_codegen_functions=179`, `generic_cfg_functions=100` for ReleaseFast
-and ReleaseSmall, `generic_cfg_functions=102` for ReleaseSafe,
+release modes at `source_rows=108`, `discovered_functions=180`,
+`generic_codegen_functions=180`, `generic_cfg_functions=101` for ReleaseFast
+and ReleaseSmall, `generic_cfg_functions=103` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
 object emission is also green for all three modes at
-`object_emitted_functions=179`, `object_failures=0`,
+`object_emitted_functions=180`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
 reports `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
 (`17` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
