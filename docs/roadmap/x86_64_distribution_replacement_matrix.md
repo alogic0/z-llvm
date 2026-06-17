@@ -314,21 +314,27 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasefast-expanded`,
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
-`test/zig/expanded/*.zig`. The first expanded slice is green for all three
-release modes at `source_rows=108`, `discovered_functions=181`,
-`generic_codegen_functions=181`, `generic_cfg_functions=181`,
+`test/zig/expanded/*.zig`. The expanded slice is green for all three
+release modes at `source_rows=109`, `discovered_functions=184`,
+`generic_codegen_functions=184`, `generic_cfg_functions=184`,
 `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
 object emission is also green for all three modes at
-`object_emitted_functions=181`, `object_failures=0`,
+`object_emitted_functions=184`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
-reports `inspected=108`, `elf64_rel=108`, `relocation_rows=17`
-(`18` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
+reports `inspected=109`, `elf64_rel=109`, `relocation_rows=18`
+(`19` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
 (`6` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`,
-`unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link and
-executable progress are also green for all three modes at
-`native_link_accepted_rows=107`, `executable_ok_rows=107`,
+`unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link
+progress is green: ReleaseFast and ReleaseSmall report
+`native_link_accepted_rows=108`, `link_only_rows=108`,
+`runtime_boundary_rows=1`, while ReleaseSafe reports
+`native_link_accepted_rows=105`, `link_only_rows=105`,
+`runtime_boundary_rows=4` after classifying `outOfBounds`,
+`integerPartOutOfBounds`, `unwrapNull`, and `debug.defaultPanic` as named
+runtime boundaries. Expanded executable progress is green for all three modes
+at `native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded

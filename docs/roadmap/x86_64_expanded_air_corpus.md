@@ -25,22 +25,23 @@ Current expanded seed:
 - `test/zig/expanded/expanded_numeric_casts.zig`
 - `test/zig/expanded/expanded_branch_arrays.zig`
 - `test/zig/expanded/expanded_cfg_memory_aggregates.zig`
+- `test/zig/expanded/expanded_abi_frontier.zig`
 
 Current expanded diagnostic snapshot for ReleaseFast, ReleaseSafe, and
 ReleaseSmall:
 
 ```text
-source_rows=108
-discovered_functions=181
-structured_functions=181
-structured_air_v2_functions=181
-typed_air_operand_functions=181
+source_rows=109
+discovered_functions=184
+structured_functions=184
+structured_air_v2_functions=184
+typed_air_operand_functions=184
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=181
-generic_cfg_functions=181
+generic_codegen_functions=184
+generic_cfg_functions=184
 structural_matcher_functions=0
-generic_lowering_functions=181
+generic_lowering_functions=184
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -55,7 +56,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=181
+object_emitted_functions=184
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -65,9 +66,9 @@ The expanded object-inspection gates are also green for ReleaseFast,
 ReleaseSafe, and ReleaseSmall:
 
 ```text
-inspected=108
-elf64_rel=108
-relocation_rows=17 (ReleaseSafe: 18)
+inspected=109
+elf64_rel=109
+relocation_rows=18 (ReleaseSafe: 19)
 tls_rows=4
 undefined_import_rows=3 (ReleaseSafe: 6)
 comdat_rows=0
@@ -76,12 +77,42 @@ unsupported_relocation_rows=0
 local_fail=0
 ```
 
-Expanded native-link handoff and executable ABI accounting are also green for
-ReleaseFast, ReleaseSafe, and ReleaseSmall:
+Expanded native-link handoff is green for ReleaseFast, ReleaseSafe, and
+ReleaseSmall. ReleaseFast and ReleaseSmall native-link progress report:
 
 ```text
-native_link_accepted_rows=107
-executable_ok_rows=107
+native_link_accepted_rows=108
+executable_ok_rows=0
+link_only_rows=108
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+ReleaseSafe native-link progress has additional named safety runtime
+boundaries and reports:
+
+```text
+native_link_accepted_rows=105
+executable_ok_rows=0
+link_only_rows=105
+runtime_boundary_rows=4
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Expanded executable ABI accounting is also green for ReleaseFast, ReleaseSafe,
+and ReleaseSmall:
+
+```text
+native_link_accepted_rows=108
+executable_ok_rows=108
 link_only_rows=0
 runtime_boundary_rows=1
 unsupported_zig_linker_feature_rows=0
@@ -91,7 +122,10 @@ lld_rows=0
 local_fail=0
 ```
 
-The single named runtime boundary remains `debug.defaultPanic`.
+The executable progress gate's remaining named runtime boundary is
+`debug.defaultPanic`; ReleaseSafe native-link-only progress also classifies
+`outOfBounds`, `integerPartOutOfBounds`, and `unwrapNull` as named safety
+runtime boundaries.
 
 Closed expanded blocker families:
 
@@ -107,6 +141,13 @@ Closed expanded blocker families:
   `expanded_float_calls`, and `expanded_error_optional`.
 - typed v2 ReleaseSafe gap: optional-pointer safe-add immediate extraction
   from `expanded_error_optional.expanded_optional_pointer`.
+- SysV ABI frontier gap: `expanded_abi_frontier.zig` adds a seven-argument
+  exported function plus a noinline helper call with one stack-passed integer
+  argument. Typed v2 now accepts qualified Zig function type spellings such as
+  `noinline fn (...)`, and the generic x86_64 SysV direct-call/frame helpers
+  cover the seventh integer parameter and one stack-passed call argument. The
+  expanded executable harness checks both direct C ABI calls and the internal
+  helper call wrapper.
 - IR/backend numeric-cast gap: `sitofp`/`uitofp`/`fptrunc` cast ops were
   missing from the local IR, the AIR `float_from_int` opcode was mapped to the
   wrong cast direction, and the x86_64 backend had no scalar int/float
@@ -130,7 +171,7 @@ Closed expanded blocker families:
   select, and literal-return rows now use the same generic CFG ownership path.
   Current expanded counters are
   ReleaseFast, ReleaseSafe, and ReleaseSmall all report
-  `generic_cfg_functions=181` / `structural_matcher_functions=0`. Expanded
+  `generic_cfg_functions=184` / `structural_matcher_functions=0`. Expanded
   optional-pointer payload rows with a
   load-plus-add payload block now use the same generic CFG optional-pointer
   path as the load-only forms, and the f32 pipeline row with an unused scalar

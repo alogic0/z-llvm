@@ -45,8 +45,10 @@ Selected IR-writer rows now print and enforce:
 `ownership=llvm-module=not-used;llvm-optimizer=not-used;llvm-targetmachine=not-used;object-emission=z_llvm;linker=zig-native-fno-lld`.
 The x86_64 lowering layer now shares SysV direct-call frame helpers for the
 aligned call prologue/epilogue and the one-slot live-parameter spill/reload
-shape used by simple direct calls; remaining raw stack-frame emission is kept
-to custom multi-call, f128 comparison, and explicit stack-slot boundary rows.
+shape used by simple direct calls. The generic helper path also covers the
+first stack-passed integer parameter/call argument in the expanded ABI frontier;
+remaining raw stack-frame emission is kept to custom multi-call, f128
+comparison, and explicit stack-slot boundary rows.
 The source-owned DescriptorV2 path now runs a local z_llvm release
 canonicalizer that rewrites eligible DescriptorV2 programs before structured
 lowering. The current source-owned gate reports
@@ -231,10 +233,11 @@ from the closed broad baseline. The expanded bucket adds
 `test/zig/expanded/*.zig`. The expanded slices, now including the
 `expanded_numeric_casts.zig` int/float conversion bucket, the
 `expanded_branch_arrays.zig` optional-control-flow bucket, and the
-`expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
-for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
-`discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=181`,
+`expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, and the
+`expanded_abi_frontier.zig` stack-argument ABI bucket, are green for
+ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=109`,
+`discovered_functions=184`, `generic_codegen_functions=184`,
+`generic_cfg_functions=184`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -249,14 +252,23 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=181`, `object_failures=0`,
+`object_emitted_functions=184`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
-gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=17`
-(ReleaseSafe: 18 for the checked panic boundary), `tls_rows=4`,
+gates report `inspected=109`, `elf64_rel=109`, `relocation_rows=18`
+(ReleaseSafe: 19 for the checked panic boundary), `tls_rows=4`,
 `undefined_import_rows=3` (ReleaseSafe: 6), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
-and executable progress gates are green for all three release modes:
-`native_link_accepted_rows=107`, `executable_ok_rows=107`,
+progress gates are green: ReleaseFast and ReleaseSmall report
+`native_link_accepted_rows=108`, `link_only_rows=108`,
+`runtime_boundary_rows=1`, while ReleaseSafe reports
+`native_link_accepted_rows=105`, `link_only_rows=105`,
+`runtime_boundary_rows=4` after classifying `outOfBounds`,
+`integerPartOutOfBounds`, `unwrapNull`, and `debug.defaultPanic` as named
+runtime boundaries. All three native-link progress gates report
+`unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
+`llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded
+executable progress gates are green for all three release modes:
+`native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `link_only_rows=0`, `runtime_boundary_rows=1` (`debug.defaultPanic`),
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The wider
@@ -272,9 +284,14 @@ x86_64 CFG path lowers the guarded branch with a phi/immediate return.
 The conditional slice-loop update row is now exported and executable: typed v2
 validates the nested loop body, inner conditional block, indexed pointer load,
 limit compare, and accumulator update, and generic x86_64 CFG emits the counted
-loop with conditional accumulation. Volatile memory roundtrips, broader
-aggregate field stores, broader global/TLS addressing, and larger loop-memory
-dependencies remain named future generic CFG memory/aggregate candidates.
+loop with conditional accumulation. The ABI frontier row is now exported and
+executable: typed v2 accepts qualified
+helper function types such as `noinline fn (...)`, and the reusable SysV
+direct-call/frame helpers cover a seventh integer stack parameter plus one
+stack-passed integer call argument.
+Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
+addressing, and larger loop-memory dependencies remain named future generic CFG
+memory/aggregate candidates.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
@@ -440,7 +457,7 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
-reports ReleaseFast `181/0`, ReleaseSafe `181/0`, ReleaseSmall `181/0`.
+reports ReleaseFast `184/0`, ReleaseSafe `184/0`, ReleaseSmall `184/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative

@@ -4454,7 +4454,7 @@ const TypedBranchMergeResult = struct {
 };
 
 fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionType {
-    const trimmed = std.mem.trim(u8, text, " ");
+    const trimmed = stripFunctionTypeQualifiers(std.mem.trim(u8, text, " "));
     if (!std.mem.startsWith(u8, trimmed, "fn (")) return error.UnsupportedAir;
     const params_end = findMatching(trimmed, 3, '(', ')') orelse return error.UnsupportedAir;
     const params_text = trimmed[4..params_end];
@@ -4479,6 +4479,21 @@ fn parseFunctionType(allocator: std.mem.Allocator, text: []const u8) !FunctionTy
         .return_type = return_type,
         .c_calling_convention = c_calling_convention,
     };
+}
+
+fn stripFunctionTypeQualifiers(text: []const u8) []const u8 {
+    var remaining = text;
+    while (true) {
+        if (std.mem.startsWith(u8, remaining, "noinline ")) {
+            remaining = std.mem.trim(u8, remaining["noinline ".len..], " ");
+            continue;
+        }
+        if (std.mem.startsWith(u8, remaining, "inline ")) {
+            remaining = std.mem.trim(u8, remaining["inline ".len..], " ");
+            continue;
+        }
+        return remaining;
+    }
 }
 
 fn parseZigType(text: []const u8) ?ZigType {
@@ -5257,6 +5272,15 @@ test "lower AIR accumulator loop into SSA control flow" {
     try std.testing.expectEqual(@as(usize, 1), lowered.accepted_functions);
     try std.testing.expectEqual(@as(usize, 4), lowered.module.functions.items[0].blocks.items.len);
     try std.testing.expect(lowered.module.functions.items[0].blocks.items[1].instructions.items[0].kind == .phi);
+}
+
+test "parse qualified Zig function types" {
+    const parsed = try parseFunctionType(std.testing.allocator, "noinline fn (i32, i32, i32, i32, i32, i32, i32) i32");
+    defer parsed.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 7), parsed.params.len);
+    try std.testing.expectEqual(ir.Type{ .int = 32 }, parsed.return_type.ir_type);
+    try std.testing.expect(!parsed.c_calling_convention);
 }
 
 fn makeTestExport(

@@ -640,7 +640,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 108, 181 },
+        .expanded => .{ 109, 184 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1135,6 +1135,17 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/expanded/expanded_abi_frontier.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded stack-argument ABI frontier", .c_body =
+    \\extern int z_expanded_stack_param_sum(int, int, int, int, int, int, int) __asm__("expanded_abi_frontier.expanded_stack_param_sum");
+    \\extern int z_expanded_stack_arg_call(void) __asm__("expanded_abi_frontier.expanded_stack_arg_call");
+    \\int main(void) {
+    \\    if (z_expanded_stack_param_sum(1, 2, 3, 4, 5, 6, 7) != 28) return 1;
+    \\    if (z_expanded_stack_param_sum(-4, 2, 3, 4, 5, 6, 7) != 23) return 2;
+    \\    if (z_expanded_stack_arg_call() != 28) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (std.mem.eql(u8, source, "test/zig/expanded/expanded_cfg_memory_aggregates.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded CFG memory/call values", .c_body =
     \\extern int z_expanded_branch_pointer_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_load");
     \\extern int z_expanded_branch_pointer_phi_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_phi_load");
@@ -1439,6 +1450,9 @@ fn firstUndefinedSymbol(stderr: []const u8) ?[]const u8 {
 
 fn isRuntimeBoundarySymbol(symbol: []const u8) bool {
     return std.mem.startsWith(u8, symbol, "debug.") or
+        std.mem.endsWith(u8, symbol, ".outOfBounds") or
+        std.mem.endsWith(u8, symbol, ".integerPartOutOfBounds") or
+        std.mem.endsWith(u8, symbol, ".unwrapNull") or
         std.mem.startsWith(u8, symbol, "panic") or
         std.mem.startsWith(u8, symbol, "__") or
         std.mem.startsWith(u8, symbol, "compiler_rt.") or

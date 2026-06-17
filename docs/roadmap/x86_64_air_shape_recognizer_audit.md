@@ -67,7 +67,7 @@ No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
 The current broad x86_64 release gates report `generic_cfg_functions=152` /
 `structural_matcher_functions=0` for ReleaseFast, ReleaseSafe, and
-ReleaseSmall. The expanded frontier reports `generic_cfg_functions=181` /
+ReleaseSmall. The expanded frontier reports `generic_cfg_functions=184` /
 `structural_matcher_functions=0` for all three release modes. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
@@ -84,7 +84,10 @@ slice/aggregate sum shapes plus small aggregate pair SysV pack/unpack helpers
 that pass strict generic CFG eligibility, plus selected monotonic atomic add
 and empty inline-asm memory-barrier leaves through a generic effect-barrier
 admission path, and empty no-op `ret void` helpers through the generic void CFG
-path. Generic no-arg void-call wrapper mains that return `i32 0` now route
+path. The expanded ABI frontier adds a seven-argument exported integer
+function and a noinline helper call with one stack-passed integer argument
+through the shared SysV call/frame helpers. Generic no-arg void-call wrapper
+mains that return `i32 0` now route
 through a shape-driven generic CFG admission instead of a wrapper-name-specific
 lowerer. Scalar multiply-by-constant leaves now reuse the existing generic
 `mul const` validator/emitter through generic CFG, covering
@@ -171,8 +174,10 @@ inventory groups as follows:
   `control_flow_calls.call_chain`, plus no-arg void-call wrapper mains such as
   `runtime_side_effect_free_main.main`, constant direct-call wrapper mains such
   as `runtime_mix_c_add_zig_main.main`, and panic-boundary direct-call wrapper
-  mains such as `runtime_mix_c_add_may_panic_main.main`. Structural examples
-  remain for aggregate and pointer/slice wrapper validation.
+  mains such as `runtime_mix_c_add_may_panic_main.main`. The
+  `expanded_abi_frontier` row extends this proof to the first stack-passed
+  integer call argument and the first stack-passed integer parameter in the
+  expanded corpus.
 - scalar FP, packed-bit, numeric-cast, and wrapper-check families: single-block scalar FP rows such as
   `float_compare.*`, `floats_math.*`, `fp_extended_ops.*`,
   `fp_constants.*`, and `expanded_float_calls.*` now route through generic CFG.
