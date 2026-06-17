@@ -5178,7 +5178,7 @@ test "x86_64 codegen rejects unsupported control flow" {
     );
 }
 
-test "x86_64 codegen rejects stack-passed parameters" {
+test "x86_64 codegen loads first stack-passed i32 parameter" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -5193,10 +5193,12 @@ test "x86_64 codegen rejects stack-passed parameters" {
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 8 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
 test "x86_64 codegen rejects unsupported call ABI shapes" {
@@ -5219,15 +5221,17 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
         error.UnsupportedCodegenCallingConvention,
         codegen.x86_64.lowerFunction(std.testing.allocator, unsupported_cc_module.target_triple.?, unsupported_cc_module.functions.items[0]),
     );
+}
 
+test "x86_64 codegen supports one stack-passed i32 call argument" {
     const stack_arg_input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @callee(i32, i32, i32, i32, i32, i32, i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\define i32 @caller() {
         \\entry:
-        \\  %r = call i32 @callee(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g)
+        \\  %r = call i32 @callee(i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7)
         \\  ret i32 %r
         \\}
         \\
@@ -5235,10 +5239,14 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
     var stack_arg_module = try ir.Module.parse(std.testing.allocator, stack_arg_input);
     defer stack_arg_module.deinit();
     try stack_arg_module.verify();
-    try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, stack_arg_module.target_triple.?, stack_arg_module.functions.items[0]),
-    );
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, stack_arg_module.target_triple.?, stack_arg_module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r8 = 5 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_r9 = 6 }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[6]);
 }
 
 test "x86_64 codegen rejects unsupported call live pressure" {

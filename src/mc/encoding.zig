@@ -46,11 +46,23 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb9 });
                 try appendU64(&bytes, allocator, @bitCast(value));
             },
+            .mov_imm_r8 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x49, 0xb8 });
+                try appendU64(&bytes, allocator, @bitCast(value));
+            },
+            .mov_imm_r9 => |value| {
+                try bytes.appendSlice(allocator, &.{ 0x49, 0xb9 });
+                try appendU64(&bytes, allocator, @bitCast(value));
+            },
             .mov_rax_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xc7 }),
             .movq_xmm_rax => |reg| try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x7e, @as(u8, 0xc0) + (@as(u8, reg.lowCode()) << 3) }),
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
+            .add_stack_disp8_eax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x03, 0x44, 0x24 });
+                try bytes.append(allocator, disp);
+            },
             .add_eax_imm32 => |value| {
                 try bytes.append(allocator, 0x05);
                 try appendI32(&bytes, allocator, value);
@@ -169,6 +181,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .oltss_xmm0_xmm1_al => try bytes.appendSlice(allocator, &.{ 0x31, 0xc0, 0x0f, 0x2e, 0xc8, 0x0f, 0x97, 0xc0 }),
             .sub_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x08 }),
             .add_rsp_8 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x08 }),
+            .push_imm32 => |value| {
+                try bytes.append(allocator, 0x68);
+                try appendI32(&bytes, allocator, value);
+            },
             .sub_rsp_24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x18 }),
             .add_rsp_24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x18 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
@@ -309,11 +325,14 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm_rdx => 10,
         .mov_imm_rsi => 10,
         .mov_imm_rcx => 10,
+        .mov_imm_r8 => 10,
+        .mov_imm_r9 => 10,
         .mov_rax_rdi => 3,
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
+        .add_stack_disp8_eax => 4,
         .add_eax_imm32 => 5,
         .shl_eax_imm5 => 3,
         .or_eax_imm32 => 5,
@@ -373,6 +392,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .ucomiss_xmm0_xmm1 => 3,
         .oltss_xmm0_xmm1_al => 8,
         .sub_rsp_8, .add_rsp_8 => 4,
+        .push_imm32 => 5,
         .sub_rsp_24, .add_rsp_24 => 4,
         .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
         .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
