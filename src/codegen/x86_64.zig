@@ -10771,7 +10771,7 @@ fn emitGenericCfgI32ValueIntoEax(
                     }
                 },
                 .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, call),
-                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select),
+                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
                 .phi, .icmp, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
         },
@@ -11393,11 +11393,16 @@ fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.Valu
 }
 
 fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
-    if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
     switch (icmp.predicate) {
         .eq, .ne, .slt => {},
         .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return false,
     }
+    if (icmp.operand_ty.eql(.{ .int = 8 })) {
+        if (icmp.predicate == .slt) return false;
+        return genericCfgSupportsI8ParamOrConst(function, icmp.lhs) and
+            genericCfgSupportsI8ParamOrConst(function, icmp.rhs);
+    }
+    if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
     return genericCfgSupportsI32ParamOrConst(function, icmp.lhs) and
         genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
 }
@@ -11441,8 +11446,8 @@ fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlo
     };
     if (genericCfgSupportsSminSelect(function, select, cond)) return true;
     if (!genericCfgSupportsSingleBlockIcmp(function, cond)) return false;
-    return genericCfgSupportsSelectedI32Value(function, select.true_value) and
-        genericCfgSupportsSelectedI32Value(function, select.false_value);
+    return genericCfgSupportsSingleBlockI32Value(function, block, select.true_value) and
+        genericCfgSupportsSingleBlockI32Value(function, block, select.false_value);
 }
 
 fn genericCfgSupportsSminSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {
@@ -11575,6 +11580,14 @@ fn genericCfgSupportsI32ParamOrConst(function: ir.Function, value: ir.Value) boo
     return switch (value) {
         .int => true,
         .named => |name| genericCfgSupportsI32Param(function, name),
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgSupportsI8ParamOrConst(function: ir.Function, value: ir.Value) bool {
+    return switch (value) {
+        .int => |int| int >= 0 and int <= std.math.maxInt(u8),
+        .named => |name| (paramRegOrNull(function, name, .{ .int = 8 }) catch null) != null,
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }
@@ -18710,7 +18723,7 @@ fn lowerReturnValue(
                     try machine.instructions.append(allocator, .{ .mov_arg_eax = lhs });
                     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = op, .reg = rhs } });
                 },
-                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select),
+                .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
                 .cast, .freeze, .icmp, .fcmp, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep, .call => return error.UnsupportedCodegenInstruction,
             }
         },
@@ -18723,7 +18736,8 @@ fn lowerGenericCfgSelectReturnValue(
     function: ir.Function,
     block: ir.BasicBlock,
     select: ir.SelectInst,
-) !void {
+    depth: u2,
+) anyerror!void {
     if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
     const cond_name = switch (select.cond) {
         .named => |name| name,
@@ -18736,15 +18750,60 @@ fn lowerGenericCfgSelectReturnValue(
     };
     if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
 
-    const true_label = "generic_cfg_select_true";
-    const end_label = "generic_cfg_select_end";
+    const true_label = genericCfgSelectTrueLabel(depth);
+    const end_label = genericCfgSelectEndLabel(depth);
     const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
     try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
-    try appendSelectedI32Return(allocator, machine, try selectedI32Value(function, select.false_value));
+    try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.false_value, depth +| 1);
     try machine.instructions.append(allocator, .{ .jmp = end_label });
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
-    try appendSelectedI32Return(allocator, machine, try selectedI32Value(function, select.true_value));
+    try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.true_value, depth +| 1);
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn lowerGenericCfgI32ValueIntoEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+    depth: u2,
+) anyerror!void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .mov_imm_eax = try i32Value(int) }),
+        .named => |name| {
+            if (try paramRegOrNull(function, name, .{ .int = 32 })) |reg| {
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const select = switch (instruction.kind) {
+                .select => |select| select,
+                else => return error.UnsupportedCodegenInstruction,
+            };
+            if (depth == std.math.maxInt(u2)) return error.UnsupportedCodegenInstruction;
+            try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, depth);
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn genericCfgSelectTrueLabel(depth: u2) []const u8 {
+    return switch (depth) {
+        0 => "generic_cfg_select_true",
+        1 => "generic_cfg_nested1_select_true",
+        2 => "generic_cfg_nested2_select_true",
+        3 => "generic_cfg_nested3_select_true",
+    };
+}
+
+fn genericCfgSelectEndLabel(depth: u2) []const u8 {
+    return switch (depth) {
+        0 => "generic_cfg_select_end",
+        1 => "generic_cfg_nested1_generic_cfg_select_end",
+        2 => "generic_cfg_nested2_generic_cfg_select_end",
+        3 => "generic_cfg_nested3_generic_cfg_select_end",
+    };
 }
 
 fn lowerGenericCfgSminSelectReturn(
@@ -18785,6 +18844,24 @@ fn emitGenericCfgIcmpCondition(
         const ptr_value = if (icmp.lhs == .null_value) icmp.rhs else if (icmp.rhs == .null_value) icmp.lhs else return error.UnsupportedCodegenValue;
         const ptr_reg = try paramValueReg(function, ptr_value, .ptr);
         try machine.instructions.append(allocator, .{ .test_arg64 = ptr_reg });
+        return branch_kind;
+    }
+
+    if (icmp.operand_ty.eql(.{ .int = 8 })) {
+        if (icmp.lhs == .int and icmp.rhs != .int) {
+            const rhs_reg = try paramValueReg(function, icmp.rhs, .{ .int = 8 });
+            try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = rhs_reg, .imm = try u8Value(switch (icmp.lhs) {
+                .int => |int| int,
+                else => unreachable,
+            }) } });
+            return branch_kind;
+        }
+        const lhs_reg = try paramValueReg(function, icmp.lhs, .{ .int = 8 });
+        const rhs_imm = switch (icmp.rhs) {
+            .int => |int| try u8Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        try machine.instructions.append(allocator, .{ .cmp_arg8_imm8 = .{ .reg = lhs_reg, .imm = rhs_imm } });
         return branch_kind;
     }
 
@@ -19219,6 +19296,11 @@ fn blockIndex(function: ir.Function, name: []const u8) ?usize {
 
 fn i32Value(value: i128) !i32 {
     if (value < std.math.minInt(i32) or value > std.math.maxInt(i32)) return error.UnsupportedCodegenValue;
+    return @intCast(value);
+}
+
+fn u8Value(value: i128) !u8 {
+    if (value < 0 or value > std.math.maxInt(u8)) return error.UnsupportedCodegenValue;
     return @intCast(value);
 }
 

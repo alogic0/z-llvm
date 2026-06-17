@@ -5440,6 +5440,34 @@ test "x86_64 codegen routes signed-min select through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes nested i8 error select through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @generic_error_select(i8 %tag) {
+        \\entry:
+        \\  %is_low = icmp eq i8 %tag, 1
+        \\  %is_zero = icmp eq i8 %tag, 0
+        \\  %error_value = select i1 %is_low, i32 -1, i32 -2
+        \\  %result = select i1 %is_zero, i32 0, i32 %error_value
+        \\  ret i32 %result
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes single-block fp binary through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
