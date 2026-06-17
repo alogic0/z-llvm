@@ -5387,6 +5387,59 @@ test "x86_64 codegen routes scalar numeric casts through generic cfg path" {
     }
 }
 
+test "x86_64 codegen routes smin intrinsic call through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @llvm.smin.i32(i32, i32)
+        \\
+        \\define i32 @any_signed_min(i32 %a, i32 %b) {
+        \\entry:
+        \\  %r = tail call i32 @llvm.smin.i32(i32 %a, i32 %b)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes signed-min select through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @any_signed_min_select(i32 %a, i32 %b) {
+        \\entry:
+        \\  %lt = icmp slt i32 %a, %b
+        \\  %r = select i1 %lt, i32 %a, i32 %b
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes single-block fp binary through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5456,14 +5509,14 @@ test "x86_64 codegen routes single-block scalar select through generic cfg path"
     try std.testing.expectEqualStrings(expected, output.writer.buffered());
 }
 
-test "x86_64 codegen leaves unsupported scalar select outside generic cfg path" {
+test "x86_64 codegen rejects unsupported scalar select predicate explicitly" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\define i32 @unsupported_select(i32 %a, i32 %b) {
         \\entry:
-        \\  %is_lt = icmp slt i32 %a, %b
-        \\  %result = select i1 %is_lt, i32 %a, i32 %b
+        \\  %is_le = icmp sle i32 %a, %b
+        \\  %result = select i1 %is_le, i32 %a, i32 %b
         \\  ret i32 %result
         \\}
         \\
@@ -5472,13 +5525,14 @@ test "x86_64 codegen leaves unsupported scalar select outside generic cfg path" 
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try module.verify();
-    var machine = try codegen.x86_64.lowerFunction(
-        std.testing.allocator,
-        module.target_triple.?,
-        module.functions.items[0],
+    try std.testing.expectError(
+        error.UnsupportedCodegenInstruction,
+        codegen.x86_64.lowerFunction(
+            std.testing.allocator,
+            module.target_triple.?,
+            module.functions.items[0],
+        ),
     );
-    defer machine.deinit(std.testing.allocator);
-    try std.testing.expectEqual(codegen.x86_64.CodegenPath.structural_matcher, machine.codegen_path);
 }
 
 test "x86_64 codegen routes global i32 load store reload through generic cfg path" {

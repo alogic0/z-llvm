@@ -10831,6 +10831,20 @@ fn emitGenericCfgI32CallIntoEax(
     function: ir.Function,
     call: ir.CallInst,
 ) !void {
+    if (genericCfgSupportsSminIntrinsicCall(function, call)) {
+        const lhs_name = switch (call.args.items[0].value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        const rhs_name = switch (call.args.items[1].value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        if ((try paramReg(function, lhs_name, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+        if ((try paramReg(function, rhs_name, .{ .int = 32 })) != .rsi) return error.UnsupportedCodegenAbi;
+        try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
+        return;
+    }
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 4) return error.UnsupportedCodegenInstruction;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
@@ -11381,8 +11395,8 @@ fn genericCfgSupportsLowerableI32OperandPair(function: ir.Function, lhs: ir.Valu
 fn genericCfgSupportsSingleBlockIcmp(function: ir.Function, icmp: ir.IcmpInst) bool {
     if (!icmp.operand_ty.eql(.{ .int = 32 })) return false;
     switch (icmp.predicate) {
-        .eq, .ne => {},
-        .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return false,
+        .eq, .ne, .slt => {},
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .sle => return false,
     }
     return genericCfgSupportsI32ParamOrConst(function, icmp.lhs) and
         genericCfgSupportsI32ParamOrConst(function, icmp.rhs);
@@ -11425,9 +11439,25 @@ fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlo
         .icmp => |icmp| icmp,
         else => return false,
     };
+    if (genericCfgSupportsSminSelect(function, select, cond)) return true;
     if (!genericCfgSupportsSingleBlockIcmp(function, cond)) return false;
     return genericCfgSupportsSelectedI32Value(function, select.true_value) and
         genericCfgSupportsSelectedI32Value(function, select.false_value);
+}
+
+fn genericCfgSupportsSminSelect(function: ir.Function, select: ir.SelectInst, icmp: ir.IcmpInst) bool {
+    if (icmp.predicate != .slt or !icmp.operand_ty.eql(.{ .int = 32 })) return false;
+    const lhs = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs = switch (icmp.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!isNamed(select.true_value, lhs) or !isNamed(select.false_value, rhs)) return false;
+    return (paramRegOrNull(function, lhs, .{ .int = 32 }) catch null) != null and
+        (paramRegOrNull(function, rhs, .{ .int = 32 }) catch null) != null;
 }
 
 fn genericCfgSupportsSingleBlockScalarReturnValue(function: ir.Function, block: ir.BasicBlock, value: ir.Value) bool {
@@ -11465,6 +11495,7 @@ fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBloc
 }
 
 fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
+    if (genericCfgSupportsSminIntrinsicCall(function, call)) return result != null;
     if (result == null) return false;
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 4) return false;
     if (call.callee_value != null or call.inline_asm != null) return false;
@@ -11475,6 +11506,20 @@ fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock
     }
     if (result) |name| return genericCfgSingleBlockResultIsUsed(block, name);
     return false;
+}
+
+fn genericCfgSupportsSminIntrinsicCall(function: ir.Function, call: ir.CallInst) bool {
+    if (!isCalleeName(call.callee, "llvm.smin.i32") or call.args.items.len != 2) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.callee_value != null or call.inline_asm != null) return false;
+    for (call.args.items) |arg| {
+        if (!arg.ty.eql(.{ .int = 32 })) return false;
+        const name = switch (arg.value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+        if (paramRegOrNull(function, name, .{ .int = 32 }) catch null == null) return false;
+    }
+    return true;
 }
 
 fn genericCfgSingleBlockResultIsUsed(block: ir.BasicBlock, name: []const u8) bool {
@@ -18689,6 +18734,7 @@ fn lowerGenericCfgSelectReturnValue(
         .icmp => |icmp| icmp,
         else => return error.UnsupportedCodegenInstruction,
     };
+    if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
 
     const true_label = "generic_cfg_select_true";
     const end_label = "generic_cfg_select_end";
@@ -18699,6 +18745,28 @@ fn lowerGenericCfgSelectReturnValue(
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
     try appendSelectedI32Return(allocator, machine, try selectedI32Value(function, select.true_value));
     try appendGenericCfgBlockLabel(allocator, machine, end_label);
+}
+
+fn lowerGenericCfgSminSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    select: ir.SelectInst,
+    icmp: ir.IcmpInst,
+) !bool {
+    if (!genericCfgSupportsSminSelect(function, select, icmp)) return false;
+    const lhs = switch (icmp.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs = switch (icmp.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if ((try paramReg(function, lhs, .{ .int = 32 })) != .rdi) return error.UnsupportedCodegenAbi;
+    if ((try paramReg(function, rhs, .{ .int = 32 })) != .rsi) return error.UnsupportedCodegenAbi;
+    try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
+    return true;
 }
 
 fn emitGenericCfgIcmpCondition(

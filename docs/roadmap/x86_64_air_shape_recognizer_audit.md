@@ -65,18 +65,19 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=105` /
-`structural_matcher_functions=47` for ReleaseFast and ReleaseSmall, and
-`106` / `46` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=130` / `structural_matcher_functions=51` for
-ReleaseFast and ReleaseSmall, and `127` / `54` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=106` /
+`structural_matcher_functions=46` for ReleaseFast and ReleaseSmall, and
+`107` / `45` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=131` / `structural_matcher_functions=50` for
+ReleaseFast and ReleaseSmall, and `132` / `49` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
 single-block scalar FP binary/compare/select/literal returns, single-block
 volatile i32 store/load roundtrips, single-block packed read/replace bit
-helpers, scalar numeric conversion casts, and existing slice/aggregate sum
-shapes that pass strict generic CFG eligibility. Multi-block volatile memory,
+helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`
+classifiers, and existing slice/aggregate sum shapes that pass strict generic
+CFG eligibility. Multi-block volatile memory, remaining scalar classifiers,
 wrapper-main packed/FP/check rows, broader aggregate field stores, broader
 global/TLS addressing, and larger loop-memory dependencies remain
 structural/backend frontier work.
@@ -134,11 +135,13 @@ inventory groups as follows:
   generic CFG, but mixed C/Zig panic-edge rows such as
   `runtime_mix_c_add_may_panic_main.*` remain structural until the generic CFG
   path preserves the full runtime-call boundary and global-load/add_safe shape.
-- other scalar classifier rows: `error_switch.error_switch`,
+- other scalar classifier rows: `integers.cmp_select` now routes through
+  generic CFG from the typed AIR block-result `icmp slt`/`select` shape.
+  Remaining scalar classifier rows are `error_switch.error_switch`,
   `error_switch.classify`, `switch_control.branch_mix`,
-  `switch_control.dense_switch`, `aggregates.maybeError`, and
-  `integers.cmp_select` remain structural because their backend lowering still
-  uses narrow scalar classifier helpers even though typed-v2 lowering is closed.
+  `switch_control.dense_switch`, and `aggregates.maybeError`; their backend
+  lowering still uses narrow scalar classifier helpers even though typed-v2
+  lowering is closed.
 
 Next typed-contract target:
 
