@@ -11155,7 +11155,11 @@ fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *Machin
         else => return false,
     };
     if (ret.ty != .void or ret.value != null) return false;
-    if (block.instructions.items.len == 0) return false;
+    if (block.instructions.items.len == 0) {
+        try appendGenericCfgReturn(allocator, machine);
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     for (block.instructions.items) |instruction| {
         if (instruction.removed) return false;
         const store = switch (instruction.kind) {

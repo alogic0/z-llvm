@@ -7329,6 +7329,25 @@ test "x86_64 codegen routes inline asm memory barrier through generic cfg path" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes empty void return through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @tiny_scalar.sideEffectFree() {
+        \\entry:
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "parser classifies inline asm side effects separately from memory constraints" {
     const input =
         \\define void @inline_asm_effects(ptr %p) {

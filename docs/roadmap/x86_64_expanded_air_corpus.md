@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=119` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=120` for ReleaseSafe
+- `generic_cfg_functions=121` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=122` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=146 (ReleaseSafe: 147)
-structural_matcher_functions=35 (ReleaseSafe: 34)
+generic_cfg_functions=148 (ReleaseSafe: 149)
+structural_matcher_functions=33 (ReleaseSafe: 32)
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -129,9 +129,9 @@ Closed expanded blocker families:
   paths without a structural matcher. Single-block scalar FP binary, compare,
   select, and literal-return rows now use the same generic CFG ownership path
   before the one-block structural fallback. Current expanded counters are
-  ReleaseFast `generic_cfg_functions=146` /
-  `structural_matcher_functions=35`, ReleaseSafe `147` / `34`, and
-  ReleaseSmall `146` / `35`. Single-block volatile roundtrip helpers now also
+  ReleaseFast `generic_cfg_functions=148` /
+  `structural_matcher_functions=33`, ReleaseSafe `149` / `32`, and
+  ReleaseSmall `148` / `33`. Single-block volatile roundtrip helpers now also
   validate volatile store/load ordering through generic CFG; single-block
   packed read/replace helpers validate their mask/shift/OR and sign-bit compare
   shapes through generic CFG; scalar numeric conversion rows validate fpext,
@@ -141,7 +141,8 @@ Closed expanded blocker families:
   add/sub selects, constant-return `i8 switch` CFGs, nested `i8` equality
   error-union/classifier selects, void `i32` global/TLS store helpers,
   small aggregate pair SysV pack/unpack helpers, selected monotonic atomic add,
-  and selected empty inline-asm memory barriers validate through generic CFG.
+  selected empty inline-asm memory barriers, and empty no-op `ret void` helpers
+  validate through generic CFG.
   Wrapper volatile and packed main checks remain
   structural.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from
