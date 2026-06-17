@@ -235,8 +235,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
 `discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=177` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=178` for ReleaseSafe,
+`generic_cfg_functions=178` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=179` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -442,11 +442,13 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `150/2`, ReleaseSafe `151/1`, ReleaseSmall `150/2`; expanded
-reports ReleaseFast `177/4`, ReleaseSafe `178/3`, ReleaseSmall `177/4`.
+reports ReleaseFast `178/3`, ReleaseSafe `179/2`, ReleaseSmall `178/3`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative
-loop-memory dependency subset, and `runtime_hidden_access_main.updateHidden`
+loop-memory dependency subset, expanded optional-pointer load-plus-add payload
+blocks now use the generic optional-pointer CFG path, and
+`runtime_hidden_access_main.updateHidden`
 now uses the same generic void global-store path as ordinary single-block
 store helpers. Source-facing and expanded small aggregate pair pack/unpack
 helpers, plus runtime aggregate pair leaf helpers, now route through the

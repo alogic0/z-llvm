@@ -68,11 +68,12 @@ Backend generic CFG ownership is tracked separately from typed-v2 lowering.
 The current broad x86_64 release gates report `generic_cfg_functions=150` /
 `structural_matcher_functions=2` for ReleaseFast and ReleaseSmall, and
 `151` / `1` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=177` / `structural_matcher_functions=4` for
-ReleaseFast and ReleaseSmall, and `178` / `3` for ReleaseSafe. Newly promoted
+`generic_cfg_functions=178` / `structural_matcher_functions=3` for
+ReleaseFast and ReleaseSmall, and `179` / `2` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
-with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
+with a preserved ReleaseSafe guard edge, optional-pointer load-plus-add payload
+blocks, the conditional slice-loop update row,
 single-block scalar FP binary/compare/select/literal returns, single-block
 volatile i32 store/load roundtrips, single-block packed read/replace bit
 helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`

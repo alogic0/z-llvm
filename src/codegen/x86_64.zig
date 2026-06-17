@@ -10163,11 +10163,11 @@ fn genericCfgOptionalPointerMergeValue(block: ir.BasicBlock, entry_name: []const
 }
 
 fn genericCfgOptionalPointerLoadValue(function: ir.Function, block: ir.BasicBlock, merge_name: []const u8) ?ir.Value {
-    if (block.instructions.items.len != 1) return null;
-    const instruction = block.instructions.items[0];
-    if (instruction.removed) return null;
-    const load_name = instruction.result orelse return null;
-    const load = switch (instruction.kind) {
+    if (block.instructions.items.len == 0 or block.instructions.items.len > 2) return null;
+    const load_instruction = block.instructions.items[0];
+    if (load_instruction.removed) return null;
+    const load_name = load_instruction.result orelse return null;
+    const load = switch (load_instruction.kind) {
         .load => |load| load,
         else => return null,
     };
@@ -10178,6 +10178,21 @@ fn genericCfgOptionalPointerLoadValue(function: ir.Function, block: ir.BasicBloc
     };
     if ((paramRegOrNull(function, ptr_name, .ptr) catch null) == null) return null;
     if (!std.mem.eql(u8, singleBrTarget(block) orelse return null, merge_name)) return null;
+    if (block.instructions.items.len == 2) {
+        const add_instruction = block.instructions.items[1];
+        if (add_instruction.removed) return null;
+        const add_name = add_instruction.result orelse return null;
+        const binary = switch (add_instruction.kind) {
+            .binary => |binary| binary,
+            else => return null,
+        };
+        if (binary.op != .add or !binary.ty.eql(.{ .int = 32 }) or !isNamed(binary.lhs, load_name)) return null;
+        switch (binary.rhs) {
+            .int => {},
+            else => return null,
+        }
+        return .{ .named = add_name };
+    }
     return .{ .named = load_name };
 }
 
