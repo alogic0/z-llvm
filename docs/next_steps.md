@@ -253,9 +253,9 @@ recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
 `object_emitted_functions=181`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
-gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
-(ReleaseSafe: 17 for the checked panic boundary), `tls_rows=4`,
-`undefined_import_rows=3` (ReleaseSafe: 5), `comdat_rows=0`, `eh_frame_rows=0`,
+gates report `inspected=108`, `elf64_rel=108`, `relocation_rows=17`
+(ReleaseSafe: 18 for the checked panic boundary), `tls_rows=4`,
+`undefined_import_rows=3` (ReleaseSafe: 6), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. The expanded native-link
 and executable progress gates are green for all three release modes:
 `native_link_accepted_rows=107`, `executable_ok_rows=107`,

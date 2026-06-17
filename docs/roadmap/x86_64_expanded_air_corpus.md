@@ -67,9 +67,9 @@ ReleaseSafe, and ReleaseSmall:
 ```text
 inspected=108
 elf64_rel=108
-relocation_rows=16 (ReleaseSafe: 17)
+relocation_rows=17 (ReleaseSafe: 18)
 tls_rows=4
-undefined_import_rows=3 (ReleaseSafe: 5)
+undefined_import_rows=3 (ReleaseSafe: 6)
 comdat_rows=0
 eh_frame_rows=0
 unsupported_relocation_rows=0

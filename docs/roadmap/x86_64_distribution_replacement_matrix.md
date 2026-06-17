@@ -324,9 +324,9 @@ and ReleaseSmall, `generic_cfg_functions=156` for ReleaseSafe,
 object emission is also green for all three modes at
 `object_emitted_functions=181`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
-reports `inspected=108`, `elf64_rel=108`, `relocation_rows=16`
-(`17` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
-(`5` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`,
+reports `inspected=108`, `elf64_rel=108`, `relocation_rows=17`
+(`18` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
+(`6` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`,
 `unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link and
 executable progress are also green for all three modes at
 `native_link_accepted_rows=107`, `executable_ok_rows=107`,
