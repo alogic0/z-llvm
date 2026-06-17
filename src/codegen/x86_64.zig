@@ -286,6 +286,7 @@ pub const Instruction = union(enum) {
     load_global_ptr_rax: []const u8,
     lea_global_rax: []const u8,
     lea_global_rdi: []const u8,
+    lea_global_rsi: []const u8,
     lea_global_rdx: []const u8,
     store_eax_global_i32: []const u8,
     load_tls_i32_eax: []const u8,
@@ -833,6 +834,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerRuntimeErrorUnionPayloadPreoptHelper(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerGenericCfgMultiBlockCallGlobalCheckMain(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -11279,6 +11285,119 @@ fn lowerGenericCfgSingleBlockCallChainMain(allocator: std.mem.Allocator, machine
     return true;
 }
 
+fn lowerGenericCfgMultiBlockCallGlobalCheckMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const merge = function.blocks.items[1];
+    const then_block = function.blocks.items[2];
+    if (entry.instructions.items.len != 2 or merge.instructions.items.len != 2 or then_block.instructions.items.len != 2) return false;
+
+    const call_inst = entry.instructions.items[0];
+    const first_cmp_inst = entry.instructions.items[1];
+    const phi_inst = merge.instructions.items[0];
+    const select_inst = merge.instructions.items[1];
+    const load_inst = then_block.instructions.items[0];
+    const second_cmp_inst = then_block.instructions.items[1];
+    if (call_inst.removed or first_cmp_inst.removed or phi_inst.removed or select_inst.removed or load_inst.removed or second_cmp_inst.removed) return false;
+
+    const call_name = call_inst.result orelse return false;
+    const first_cmp_name = first_cmp_inst.result orelse return false;
+    const phi_name = phi_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    const second_cmp_name = second_cmp_inst.result orelse return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!genericCfgCallTargetsWrapperSibling(function.name, call.callee)) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 2) return false;
+    const first_global = genericCfgGlobalPtrArg(call.args.items[0]) orelse return false;
+    const second_global = genericCfgGlobalPtrArg(call.args.items[1]) orelse return false;
+
+    const first_cmp = switch (first_cmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (first_cmp.predicate != .eq or !first_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(first_cmp.lhs, call_name)) return false;
+    const expected_call = switch (first_cmp.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, then_block.name) or !std.mem.eql(u8, entry_br.else_target, merge.name)) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+    const loaded_global = switch (load.ptr) {
+        .named => |name| try globalSymbolName(name),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (!std.mem.eql(u8, loaded_global, second_global)) return false;
+
+    const second_cmp = switch (second_cmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (second_cmp.predicate != .eq or !second_cmp.operand_ty.eql(.{ .int = 32 })) return false;
+    if (!isNamed(second_cmp.lhs, load_name)) return false;
+    const expected_load = switch (second_cmp.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const then_br = switch (then_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, then_br.target, merge.name)) return false;
+
+    const phi = switch (phi_inst.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 1 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, second_cmp_name, then_block.name) or !phiHasIncomingInt(phi, 0, entry.name)) return false;
+
+    if (!isSelectI1ToI32ZeroOne(select_inst, phi_name)) return false;
+    const ret = switch (merge.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "generic_cfg_call_global_check_fail";
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = first_global });
+    try machine.instructions.append(allocator, .{ .lea_global_rsi = second_global });
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected_call });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .load_global_i32_eax = loaded_global });
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = expected_load });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    machine.codegen_path = .generic_cfg;
+    return true;
+}
+
 fn lowerGenericCfgSingleBlockUpdateGetMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!isMainOrWrapperMain(function.name)) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
@@ -11507,6 +11626,14 @@ fn genericCfgSupportsConstantWrapperCallArg(arg: ir.CallArg) bool {
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         },
         .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+    };
+}
+
+fn genericCfgGlobalPtrArg(arg: ir.CallArg) ?[]const u8 {
+    if (arg.attrs != null or !arg.ty.eql(.ptr)) return null;
+    return switch (arg.value) {
+        .named => |name| if (name.len > 0 and name[0] == '@') globalSymbolName(name) catch null else null,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
 }
 
@@ -19928,6 +20055,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .load_global_ptr_rax,
         .lea_global_rax,
         .lea_global_rdi,
+        .lea_global_rsi,
         .lea_global_rdx,
         .store_eax_global_i32,
         .load_tls_i32_eax,
@@ -19964,7 +20092,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             }
         },
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_rax_rdi, .lea_global_rdi, .lea_global_rdx => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -20115,6 +20243,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .load_global_ptr_rax,
         .lea_global_rax,
         .lea_global_rdi,
+        .lea_global_rsi,
         .lea_global_rdx,
         .store_eax_global_i32,
         .load_tls_i32_eax,

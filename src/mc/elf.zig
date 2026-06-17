@@ -488,7 +488,7 @@ fn collectCallRelocations(
                     .addend = -4,
                 });
             },
-            .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi, .lea_global_rdx => |symbol| {
+            .load_global_ptr_rax, .lea_global_rax, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => |symbol| {
                 const symbol_index = try symbolIndexForCall(allocator, symbols, symbol_indices, symbol);
                 try relocations.append(allocator, .{
                     .offset = function_offset + offset + 3,

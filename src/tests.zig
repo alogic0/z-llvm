@@ -7563,6 +7563,42 @@ test "x86_64 codegen routes i64 to i32 call-chain main wrapper through generic c
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes call plus global load check main wrapper through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@sample.input = internal global i32 41
+        \\@sample.output = internal global i32 0
+        \\
+        \\declare fastcc i32 @sample.loadStore(ptr, ptr)
+        \\
+        \\define i32 @sample.main() {
+        \\0:
+        \\  %call = call fastcc i32 @sample.loadStore(ptr @sample.input, ptr @sample.output)
+        \\  %first.ok = icmp eq i32 %call, 42
+        \\  br i1 %first.ok, label %7, label %5
+        \\
+        \\5:
+        \\  %both.ok = phi i1 [ %output.ok, %7 ], [ 0, %0 ]
+        \\  %result = select i1 %both.ok, i32 0, i32 1
+        \\  ret i32 %result
+        \\
+        \\7:
+        \\  %output = load i32, ptr @sample.output
+        \\  %output.ok = icmp eq i32 %output, 42
+        \\  br label %5
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes shift mix through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
