@@ -856,6 +856,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockI64(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -11075,6 +11080,20 @@ fn lowerGenericCfgSingleBlockPackedBits(allocator: std.mem.Allocator, machine: *
         return true;
     }
     if (try lowerGenericCfgPackedReadFlagReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 64 }) or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerErrorUnionI64SelectReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

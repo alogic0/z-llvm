@@ -65,24 +65,24 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=109` /
-`structural_matcher_functions=43` for ReleaseFast and ReleaseSmall, and
-`110` / `42` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=134` / `structural_matcher_functions=47` for
-ReleaseFast and ReleaseSmall, and `135` / `46` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=112` /
+`structural_matcher_functions=40` for ReleaseFast and ReleaseSmall, and
+`113` / `39` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=137` / `structural_matcher_functions=44` for
+ReleaseFast and ReleaseSmall, and `138` / `43` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
 single-block scalar FP binary/compare/select/literal returns, single-block
 volatile i32 store/load roundtrips, single-block packed read/replace bit
 helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`
-classifiers, nested `i8` equality error-switch selects, boolean-parameter
-branch-mix add/sub selects, constant-return `i8 switch` CFGs, and existing
+classifiers, nested `i8` equality error-switch selects, nested `i8` equality
+error-union/classifier selects, boolean-parameter branch-mix add/sub selects,
+constant-return `i8 switch` CFGs, and existing
 slice/aggregate sum shapes that pass strict generic CFG eligibility.
-Multi-block volatile memory, remaining scalar classifiers,
-wrapper-main packed/FP/check rows, broader aggregate field stores, broader
-global/TLS addressing, and larger loop-memory dependencies remain
-structural/backend frontier work.
+Multi-block volatile memory, wrapper-main packed/FP/check rows, broader
+aggregate field stores, broader global/TLS addressing, and larger loop-memory
+dependencies remain structural/backend frontier work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -141,12 +141,12 @@ inventory groups as follows:
   generic CFG from the typed AIR block-result `icmp slt`/`select` shape, and
   `error_switch.error_switch` routes through generic CFG from nested `i8`
   equality selects. `switch_control.branch_mix` now routes through generic CFG
-  from the boolean-parameter select plus add/sub expression shape. Remaining
-  `switch_control.dense_switch` now routes through generic CFG from the
-  constant-return `i8 switch` terminator shape. Remaining scalar classifier
-  rows are `error_switch.classify` and `aggregates.maybeError`; their backend
-  lowering still uses narrow scalar classifier helpers even though typed-v2
-  lowering is closed.
+  from the boolean-parameter select plus add/sub expression shape.
+  `switch_control.dense_switch` routes through generic CFG from the
+  constant-return `i8 switch` terminator shape. `error_switch.classify`,
+  `aggregates.maybeError`, and
+  `runtime_error_union_payload_main.maybeError` now route through the generic
+  i64 CFG path for nested `i8` equality error-union/classifier selects.
 
 Next typed-contract target:
 
