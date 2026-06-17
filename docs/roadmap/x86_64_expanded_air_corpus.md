@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=140` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=141` for ReleaseSafe
+- `generic_cfg_functions=141` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=142` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=167 (ReleaseSafe: 168)
-structural_matcher_functions=14 (ReleaseSafe: 13)
+generic_cfg_functions=168 (ReleaseSafe: 169)
+structural_matcher_functions=13 (ReleaseSafe: 12)
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -129,9 +129,9 @@ Closed expanded blocker families:
   paths without a structural matcher. Single-block scalar FP binary, compare,
   select, and literal-return rows now use the same generic CFG ownership path
   before the one-block structural fallback. Current expanded counters are
-  ReleaseFast `generic_cfg_functions=167` /
-  `structural_matcher_functions=14`, ReleaseSafe `168` / `13`, and
-  ReleaseSmall `167` / `14`. Single-block volatile roundtrip helpers now also
+  ReleaseFast `generic_cfg_functions=168` /
+  `structural_matcher_functions=13`, ReleaseSafe `169` / `12`, and
+  ReleaseSmall `168` / `13`. Single-block volatile roundtrip helpers now also
   validate volatile store/load ordering through generic CFG; single-block
   packed read/replace helpers validate their mask/shift/OR and sign-bit compare
   shapes through generic CFG; scalar numeric conversion rows validate fpext,
@@ -143,12 +143,13 @@ Closed expanded blocker families:
   small aggregate pair SysV pack/unpack helpers, selected monotonic atomic add,
   selected empty inline-asm memory barriers, empty no-op `ret void` helpers,
   no-arg void-call wrapper mains returning `i32 0`, constant FP/bool
-  sibling-wrapper call/check mains, and integer-return sibling-wrapper
-  call/check mains validate through generic CFG. Scalar
+  sibling-wrapper call/check mains, integer-return sibling-wrapper
+  call/check mains, and sibling update/get wrapper mains validate through
+  generic CFG. Scalar
   `shift_mix`, scalar multiply-by-constant, and i64
   constant-return leaves, including the selected i64 wrapper-family mains that
   reduce to those leaves, validate through generic CFG.
-  Wrapper volatile, pointer/global/TLS, aggregate/runtime main checks remain
+  Wrapper volatile, pointer/TLS, aggregate/runtime main checks remain
   structural.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from
   `expanded_cfg_memory_aggregates.expanded_optional_pointer_branch`. Typed v2
@@ -195,7 +196,7 @@ Active expanded blocker families:
 
 - none for the current exported expanded discovery/lowering/codegen/executable
   slices. Volatile memory roundtrips, broader aggregate field stores, broader
-  global/TLS addressing, and larger loop-memory dependency shapes are
+  TLS wrapper checks, and larger loop-memory dependency shapes are
   intentionally not routed through generic CFG in the current memory/CFG bucket
   and remain future generic CFG memory-dependency and aggregate-field
   candidates.
