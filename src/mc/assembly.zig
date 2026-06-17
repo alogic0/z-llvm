@@ -13,6 +13,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_imm_rdx => |value| try writer.print("\tmovabsq ${}, %rdx\n", .{value}),
             .mov_imm_rsi => |value| try writer.print("\tmovabsq ${}, %rsi\n", .{value}),
             .mov_imm_rcx => |value| try writer.print("\tmovabsq ${}, %rcx\n", .{value}),
+            .mov_rax_rdi => try writer.writeAll("\tmovq %rax, %rdi\n"),
             .movq_xmm_rax => |reg| try writer.print("\tmovq {s}, %rax\n", .{reg.name()}),
             .mov_arg_eax => |reg| try writer.print("\tmovl {s}, %eax\n", .{reg.name32()}),
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),

@@ -185,8 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=147` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=148` for ReleaseSafe,
+`generic_cfg_functions=148` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=149` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -235,8 +235,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
 `discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=174` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=175` for ReleaseSafe,
+`generic_cfg_functions=175` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=176` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -441,8 +441,8 @@ selects, constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers,
 small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `147/5`, ReleaseSafe `148/4`, ReleaseSmall `147/5`; expanded
-reports ReleaseFast `174/7`, ReleaseSafe `175/6`, ReleaseSmall `174/7`.
+ReleaseFast `148/4`, ReleaseSafe `149/3`, ReleaseSmall `148/4`; expanded
+reports ReleaseFast `175/6`, ReleaseSafe `176/5`, ReleaseSmall `175/6`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative
@@ -468,10 +468,12 @@ casts now use generic direct-call lowering, covering mixed C/Zig and TLS bump
 wrapper checks. Pointer-literal sibling call/check wrapper mains now validate
 `ptr @global`/`ptr null` arguments through the same generic admission, moving
 the slice-sum, struct-sum, and volatile roundtrip wrapper checks out of the
-structural bucket. Remaining structural families are mostly multi-block
-optional/pointer side-effect wrapper checks, aggregate-pair call-chain wrapper
-checks, base64 table lookup internals, the f32 pipeline variant, broader
-aggregate field stores, larger loop-memory
+structural bucket. Two-call aggregate wrapper chains that pass an i64 return
+into an i32 helper now emit real calls through generic CFG, moving
+`runtime_aggregate_pair_main.main` out of the structural bucket. Remaining
+structural families are mostly multi-block
+optional/pointer side-effect wrapper checks, base64 table lookup internals, the
+f32 pipeline variant, broader aggregate field stores, larger loop-memory
 variants, and larger ABI/call shapes; each should move only when the generic
 CFG eligibility checks can prove the full instruction and terminator subset.
 

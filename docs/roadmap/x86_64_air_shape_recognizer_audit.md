@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=147` /
-`structural_matcher_functions=5` for ReleaseFast and ReleaseSmall, and
-`148` / `4` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=174` / `structural_matcher_functions=7` for
-ReleaseFast and ReleaseSmall, and `175` / `6` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=148` /
+`structural_matcher_functions=4` for ReleaseFast and ReleaseSmall, and
+`149` / `3` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=175` / `structural_matcher_functions=6` for
+ReleaseFast and ReleaseSmall, and `176` / `5` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -104,10 +104,12 @@ optional identity cast now also route through generic direct-call lowering,
 covering the mixed C/Zig and TLS bump wrapper checks. Pointer-literal sibling
 call/check wrapper mains now validate `ptr @global` and `ptr null` arguments
 through the same generic admission, covering the slice-sum, struct-sum, and
-volatile roundtrip wrapper checks. Multi-block optional/pointer side-effect
-wrapper checks, aggregate-pair call-chain wrapper checks, base64 table lookup
-internals, the f32 pipeline variant, broader aggregate field stores, and larger
-loop-memory dependencies remain structural/backend frontier work.
+volatile roundtrip wrapper checks. Two-call aggregate wrapper chains that pass
+an i64 return into an i32 helper now emit real calls through generic CFG,
+covering `runtime_aggregate_pair_main.main`. Multi-block optional/pointer
+side-effect wrapper checks, base64 table lookup internals, the f32 pipeline
+variant, broader aggregate field stores, and larger loop-memory dependencies
+remain structural/backend frontier work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -144,9 +146,10 @@ inventory groups as follows:
   `expanded_records_memory.expanded_make_pair`,
   `runtime_aggregate_pair_main.makePair`, and
   `runtime_aggregate_pair_main.pairFirst` now route through generic CFG as
-  small aggregate pair ABI pack/unpack helpers. The remaining structural
-  aggregate example is the `runtime_aggregate_pair_main.main` call-chain
-  wrapper check.
+  small aggregate pair ABI pack/unpack helpers. The aggregate wrapper
+  `runtime_aggregate_pair_main.main` now routes through a generic two-call
+  chain admission that passes the first helper's i64 return to the second
+  helper.
 - ABI/call/aggregate-return shapes: generic CFG owns simple direct-call branch
   rows such as `expanded_cfg_memory_aggregates.expanded_branch_call*` and
   `control_flow_calls.call_chain`, plus no-arg void-call wrapper mains such as

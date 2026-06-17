@@ -147,6 +147,7 @@ pub const Instruction = union(enum) {
     mov_imm_rdx: i64,
     mov_imm_rsi: i64,
     mov_imm_rcx: i64,
+    mov_rax_rdi,
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
@@ -877,6 +878,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerGenericCfgSingleBlockDirectCallMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
+    if (try lowerGenericCfgSingleBlockCallChainMain(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
     }
@@ -11212,6 +11218,67 @@ fn lowerGenericCfgSingleBlockDirectCallMain(allocator: std.mem.Allocator, machin
     return true;
 }
 
+fn lowerGenericCfgSingleBlockCallChainMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or block.instructions.items.len != 3) return false;
+
+    const first_call_inst = block.instructions.items[0];
+    const second_call_inst = block.instructions.items[1];
+    const cast_inst = block.instructions.items[2];
+    if (first_call_inst.removed or second_call_inst.removed or cast_inst.removed) return false;
+    const first_result = first_call_inst.result orelse return false;
+    const second_result = second_call_inst.result orelse return false;
+    const cast_result = identityCastFrom(cast_inst, second_result, .{ .int = 32 }, .{ .int = 32 }) orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, cast_result)) return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (first_call.callee_value != null or first_call.inline_asm != null) return false;
+    if (!genericCfgCallTargetsWrapperSibling(function.name, first_call.callee)) return false;
+    if (!callIsFastcc(first_call.calling_conv)) validateDefaultCallConv(first_call.calling_conv) catch return false;
+    if (!first_call.ret_ty.eql(.{ .int = 64 }) or first_call.args.items.len != 2) return false;
+    for (first_call.args.items) |arg| {
+        if (arg.attrs != null or !arg.ty.eql(.{ .int = 32 })) return false;
+    }
+
+    const first_arg = switch (first_call.args.items[0].value) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const second_arg = switch (first_call.args.items[1].value) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (second_call.callee_value != null or second_call.inline_asm != null) return false;
+    if (!genericCfgCallTargetsWrapperSibling(function.name, second_call.callee)) return false;
+    if (!callIsFastcc(second_call.calling_conv)) validateDefaultCallConv(second_call.calling_conv) catch return false;
+    if (!second_call.ret_ty.eql(.{ .int = 32 }) or second_call.args.items.len != 1) return false;
+    const chain_arg = second_call.args.items[0];
+    if (chain_arg.attrs != null or !chain_arg.ty.eql(.{ .int = 64 }) or !isNamed(chain_arg.value, first_result)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_rdi = first_arg });
+    try machine.instructions.append(allocator, .{ .mov_imm_rsi = second_arg });
+    try appendAlignedDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try machine.instructions.append(allocator, .mov_rax_rdi);
+    try appendAlignedDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try machine.instructions.append(allocator, .ret);
+    machine.codegen_path = .generic_cfg;
+    return true;
+}
+
 fn lowerGenericCfgSingleBlockUpdateGetMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!isMainOrWrapperMain(function.name)) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
@@ -19768,6 +19835,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm_rdx,
         .mov_imm_rsi,
         .mov_imm_rcx,
+        .mov_rax_rdi,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -19896,7 +19964,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             }
         },
         .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
-        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .lea_global_rdi, .lea_global_rdx => {},
+        .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_rax_rdi, .lea_global_rdi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
             eax_defined = true;
@@ -19954,6 +20022,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm_rdx,
         .mov_imm_rsi,
         .mov_imm_rcx,
+        .mov_rax_rdi,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,

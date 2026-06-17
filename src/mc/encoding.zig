@@ -46,6 +46,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x48, 0xb9 });
                 try appendU64(&bytes, allocator, @bitCast(value));
             },
+            .mov_rax_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x89, 0xc7 }),
             .movq_xmm_rax => |reg| try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x7e, @as(u8, 0xc0) + (@as(u8, reg.lowCode()) << 3) }),
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
@@ -307,6 +308,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_imm_rdx => 10,
         .mov_imm_rsi => 10,
         .mov_imm_rcx => 10,
+        .mov_rax_rdi => 3,
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
