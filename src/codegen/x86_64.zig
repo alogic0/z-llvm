@@ -11161,6 +11161,10 @@ fn lowerGenericCfgSingleBlockCallCheckMain(allocator: std.mem.Allocator, machine
         else => return false,
     };
     if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (try lowerGenericCfgSingleBlockIntCallCheckMainReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgSingleBlockFpCallCheckMainReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -11170,6 +11174,55 @@ fn lowerGenericCfgSingleBlockCallCheckMain(allocator: std.mem.Allocator, machine
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgSingleBlockIntCallCheckMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (block.instructions.items.len != 3) return false;
+    const call_inst = block.instructions.items[0];
+    const icmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or icmp_inst.removed or select_inst.removed) return false;
+
+    const call_name = call_inst.result orelse return false;
+    const icmp_name = icmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!genericCfgSupportsConstantWrapperCall(function, call)) return false;
+    switch (call.ret_ty) {
+        .int => {},
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return false,
+    }
+
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    switch (icmp.predicate) {
+        .eq, .ne => {},
+        .ugt, .uge, .ult, .ule, .sgt, .sge, .slt, .sle => return false,
+    }
+    if (!icmp.operand_ty.eql(call.ret_ty)) return false;
+    if (!isNamed(icmp.lhs, call_name)) return false;
+    switch (icmp.rhs) {
+        .int => {},
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+    if (!isSelectI1ToI32ZeroOne(select_inst, icmp_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
 }
 
 fn lowerGenericCfgSingleBlockFpCallCheckMainReturn(

@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=136` /
-`structural_matcher_functions=16` for ReleaseFast and ReleaseSmall, and
-`137` / `15` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=163` / `structural_matcher_functions=18` for
-ReleaseFast and ReleaseSmall, and `164` / `17` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=140` /
+`structural_matcher_functions=12` for ReleaseFast and ReleaseSmall, and
+`141` / `11` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=167` / `structural_matcher_functions=14` for
+ReleaseFast and ReleaseSmall, and `168` / `13` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -94,6 +94,8 @@ scalar/i64 CFG admissions. Constant sibling-wrapper call/check mains with a
 direct `fastcc` FP or bool call, constant scalar arguments, and an
 `fcmp`/`select` or bool-call/`select` i32 0/1 return now validate through a
 generic CFG admission instead of the selected runtime float wrapper table.
+Integer-return sibling-wrapper call/check mains with constant scalar arguments,
+`icmp eq/ne`, and the same i32 0/1 select now use the same generic CFG path.
 Multi-block volatile memory, wrapper-main packed and aggregate/check rows, broader
 aggregate field stores, broader global/TLS addressing, and larger loop-memory
 dependencies remain structural/backend frontier work.
@@ -154,8 +156,10 @@ inventory groups as follows:
   int-to-double shapes. Runtime FP wrapper-main check rows such as
   `runtime_float_add_main.main`, `runtime_float_less_main.main`,
   `runtime_double_div_main.main`, and their sibling wrappers now route through
-  the generic constant call/check admission. The remaining packed wrapper-main
-  check example is `runtime_packed_replace_low_main.main`.
+  the generic constant call/check admission. Integer-return wrapper checks such
+  as `runtime_array_sum_main.main`, `runtime_optional_payload_main.main`,
+  `runtime_error_union_payload_main.main`, and
+  `runtime_packed_replace_low_main.main` now use that same generic admission.
 - ReleaseSafe checked/panic-edge shapes: selected checked guard shapes are
   generic CFG, but mixed C/Zig panic-edge rows such as
   `runtime_mix_c_add_may_panic_main.*` remain structural until the generic CFG
