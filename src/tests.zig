@@ -5788,6 +5788,41 @@ test "x86_64 codegen routes single-block volatile roundtrip through generic cfg 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes packed bit scalar helpers through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i8 @replace_low(i8 %a, i8 %b) {
+        \\entry:
+        \\  %high = and i8 %a, -8
+        \\  %low = and i8 %b, 7
+        \\  %result = or i8 %high, %low
+        \\  ret i8 %result
+        \\}
+        \\
+        \\define i1 @read_flag(i8 %a) {
+        \\entry:
+        \\  %flag = icmp slt i8 %a, 0
+        \\  ret i1 %flag
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = try codegen.x86_64.lowerFunction(
+            std.testing.allocator,
+            module.target_triple.?,
+            function,
+        );
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expect(machine.instructions.items.len > 0);
+        try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    }
+}
+
 test "x86_64 codegen keeps multi-block volatile memory cfg out of generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

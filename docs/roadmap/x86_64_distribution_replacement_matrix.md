@@ -316,8 +316,8 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
 `test/zig/expanded/*.zig`. The first expanded slice is green for all three
 release modes at `source_rows=108`, `discovered_functions=181`,
-`generic_codegen_functions=181`, `generic_cfg_functions=121` for ReleaseFast
-and ReleaseSmall, `generic_cfg_functions=123` for ReleaseSafe,
+`generic_codegen_functions=181`, `generic_cfg_functions=125` for ReleaseFast
+and ReleaseSmall, `generic_cfg_functions=127` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
