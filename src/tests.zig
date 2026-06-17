@@ -7287,6 +7287,48 @@ test "parser preserves inline asm calls as side-effecting barriers" {
     try std.testing.expect(source_backed_call.inline_asm.?.may_store);
 }
 
+test "x86_64 codegen routes monotonic atomic add through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@atomics_inline_asm_debug.atomic_counter = private unnamed_addr global i32 0, align 4
+        \\
+        \\define i32 @atomics_inline_asm_debug.atomic_add(i32 %value) {
+        \\entry:
+        \\  %old = atomicrmw add ptr @atomics_inline_asm_debug.atomic_counter, i32 %value monotonic, align 4
+        \\  ret i32 %old
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes inline asm memory barrier through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @atomics_inline_asm_debug.inline_asm_barrier(i32 %value) {
+        \\entry:
+        \\  call void asm sideeffect "", "~{memory},~{dirflag},~{fpsr},~{flags}"()
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "parser classifies inline asm side effects separately from memory constraints" {
     const input =
         \\define void @inline_asm_effects(ptr %p) {

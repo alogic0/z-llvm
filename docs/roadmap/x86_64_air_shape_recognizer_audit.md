@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=117` /
-`structural_matcher_functions=35` for ReleaseFast and ReleaseSmall, and
-`118` / `34` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=144` / `structural_matcher_functions=37` for
-ReleaseFast and ReleaseSmall, and `145` / `36` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=119` /
+`structural_matcher_functions=33` for ReleaseFast and ReleaseSmall, and
+`120` / `32` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=146` / `structural_matcher_functions=35` for
+ReleaseFast and ReleaseSmall, and `147` / `34` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -80,7 +80,9 @@ classifiers, nested `i8` equality error-switch selects, nested `i8` equality
 error-union/classifier selects, boolean-parameter branch-mix add/sub selects,
 constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers, and existing
 slice/aggregate sum shapes plus small aggregate pair SysV pack/unpack helpers
-that pass strict generic CFG eligibility.
+that pass strict generic CFG eligibility, plus selected monotonic atomic add
+and empty inline-asm memory-barrier leaves through a generic effect-barrier
+admission path.
 Multi-block volatile memory, wrapper-main packed/FP/check rows, broader
 aggregate field stores, broader global/TLS addressing, and larger loop-memory
 dependencies remain structural/backend frontier work.
