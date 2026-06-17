@@ -871,6 +871,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockVoidCallMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockVoid(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -1075,7 +1080,6 @@ fn lowerStraightLineReturn(
             if (try lowerRuntimeFloatLessMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedRuntimeFloatCallCompareMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDescriptorFpCheckMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerSimpleVoidCallBoundaryFamilyReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectAddSubReturn(allocator, machine, function, block, ret)) return;
@@ -4839,46 +4843,6 @@ fn lowerSelectedRuntimeFloatCallCompareMainReturn(
         )) return true;
     }
     return false;
-}
-
-fn lowerSimpleVoidCallBoundaryFamilyReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    if (try lowerRuntimeSideEffectFreeMainReturn(allocator, machine, function, block, ret)) return true;
-    return false;
-}
-
-fn lowerRuntimeSideEffectFreeMainReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
-    function: ir.Function,
-    block: ir.BasicBlock,
-    ret: anytype,
-) !bool {
-    if (!std.mem.eql(u8, function.name, "runtime_side_effect_free_main.main")) return false;
-    if (function.params.items.len != 0) return false;
-    if (!function.ret_ty.eql(.{ .int = 32 }) or !ret.ty.eql(.{ .int = 32 })) return false;
-    if (!isInt(ret.value orelse return error.InvalidRet, 0)) return false;
-    if (block.instructions.items.len != 1) return false;
-
-    const call_inst = block.instructions.items[0];
-    if (call_inst.removed or call_inst.result != null) return false;
-    const call = switch (call_inst.kind) {
-        .call => |call| call,
-        else => return false,
-    };
-    if (!callIsFastcc(call.calling_conv) or call.ret_ty != .void) return false;
-    if (call.callee_value != null or call.inline_asm != null) return false;
-    if (!std.mem.eql(u8, call.callee, "runtime_side_effect_free_main.sideEffectFree")) return false;
-    if (call.args.items.len != 0) return false;
-
-    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(allocator, .ret);
-    return true;
 }
 
 fn lowerRuntimeFloatCallCompareMainReturn(
@@ -11153,6 +11117,32 @@ fn lowerGenericCfgSingleBlockEffectBarrier(allocator: std.mem.Allocator, machine
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgSingleBlockVoidCallMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isInt(ret.value orelse return error.InvalidRet, 0)) return false;
+    if (block.instructions.items.len != 1) return false;
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed or call_inst.result != null) return false;
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.args.items.len != 0) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+
+    try appendAlignedDirectCall(allocator, machine, call.callee, .void);
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    machine.codegen_path = .generic_cfg;
+    return true;
 }
 
 fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

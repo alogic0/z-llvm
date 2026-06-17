@@ -7348,6 +7348,28 @@ test "x86_64 codegen routes empty void return through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes void-call main wrapper through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc void @sample.sideEffectFree()
+        \\
+        \\define i32 @sample.main() {
+        \\entry:
+        \\  call fastcc void @sample.sideEffectFree()
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes shift mix through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

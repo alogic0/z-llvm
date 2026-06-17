@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=125` /
-`structural_matcher_functions=27` for ReleaseFast and ReleaseSmall, and
-`126` / `26` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=152` / `structural_matcher_functions=29` for
-ReleaseFast and ReleaseSmall, and `153` / `28` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=126` /
+`structural_matcher_functions=26` for ReleaseFast and ReleaseSmall, and
+`127` / `25` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=153` / `structural_matcher_functions=28` for
+ReleaseFast and ReleaseSmall, and `154` / `27` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -83,9 +83,11 @@ slice/aggregate sum shapes plus small aggregate pair SysV pack/unpack helpers
 that pass strict generic CFG eligibility, plus selected monotonic atomic add
 and empty inline-asm memory-barrier leaves through a generic effect-barrier
 admission path, and empty no-op `ret void` helpers through the generic void CFG
-path. Scalar `shift_mix` and i64 constant-return leaves, including the selected
-i64 wrapper-family mains that reduce to those leaves, now route through generic
-scalar/i64 CFG admissions.
+path. Generic no-arg void-call wrapper mains that return `i32 0` now route
+through a shape-driven generic CFG admission instead of a wrapper-name-specific
+lowerer. Scalar `shift_mix` and i64 constant-return leaves, including the
+selected i64 wrapper-family mains that reduce to those leaves, now route
+through generic scalar/i64 CFG admissions.
 Multi-block volatile memory, wrapper-main packed/FP/check rows, broader
 aggregate field stores, broader global/TLS addressing, and larger loop-memory
 dependencies remain structural/backend frontier work.
@@ -128,7 +130,8 @@ inventory groups as follows:
   aggregate example is the `runtime_aggregate_pair_main.main` wrapper check.
 - ABI/call/aggregate-return shapes: generic CFG owns simple direct-call branch
   rows such as `expanded_cfg_memory_aggregates.expanded_branch_call*` and
-  `control_flow_calls.call_chain`. Structural examples remain for wrapper
+  `control_flow_calls.call_chain`, plus no-arg void-call wrapper mains such as
+  `runtime_side_effect_free_main.main`. Structural examples remain for wrapper
   validation and non-i32 return/argument families such as
   `runtime_mix_c_add_zig_main.main`.
 - scalar FP, packed-bit, numeric-cast, and wrapper-check families: single-block scalar FP rows such as
