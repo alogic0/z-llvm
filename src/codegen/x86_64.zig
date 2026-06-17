@@ -861,6 +861,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockVoid(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -11098,6 +11103,36 @@ fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Machine
         return true;
     }
     return false;
+}
+
+fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.ret_ty != .void or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (ret.ty != .void or ret.value != null) return false;
+    if (block.instructions.items.len == 0) return false;
+    for (block.instructions.items) |instruction| {
+        if (instruction.removed) return false;
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => return false,
+        };
+        if (!genericCfgSupportsSingleBlockStore(function, block, store)) return false;
+    }
+    for (block.instructions.items) |instruction| {
+        const store = switch (instruction.kind) {
+            .store => |store| store,
+            else => unreachable,
+        };
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
+        try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
+    }
+    try appendGenericCfgReturn(allocator, machine);
+    machine.codegen_path = .generic_cfg;
+    return true;
 }
 
 fn lowerGenericCfgPackedReplaceLowReturn(

@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=112` /
-`structural_matcher_functions=40` for ReleaseFast and ReleaseSmall, and
-`113` / `39` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=137` / `structural_matcher_functions=44` for
-ReleaseFast and ReleaseSmall, and `138` / `43` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=113` /
+`structural_matcher_functions=39` for ReleaseFast and ReleaseSmall, and
+`114` / `38` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=138` / `structural_matcher_functions=43` for
+ReleaseFast and ReleaseSmall, and `139` / `42` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -78,7 +78,7 @@ volatile i32 store/load roundtrips, single-block packed read/replace bit
 helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`
 classifiers, nested `i8` equality error-switch selects, nested `i8` equality
 error-union/classifier selects, boolean-parameter branch-mix add/sub selects,
-constant-return `i8 switch` CFGs, and existing
+constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers, and existing
 slice/aggregate sum shapes that pass strict generic CFG eligibility.
 Multi-block volatile memory, wrapper-main packed/FP/check rows, broader
 aggregate field stores, broader global/TLS addressing, and larger loop-memory
@@ -105,9 +105,10 @@ inventory groups as follows:
   `tls_concurrency.read_tls`, `tls_concurrency.bump_tls`,
   `expanded_records_memory.expanded_global_update`, and
   `expanded_records_memory.expanded_tls_bump` already route through generic
-  CFG. Remaining structural examples include wrapper or hidden-symbol shapes
-  such as `runtime_hidden_access_main.updateHidden`,
-  `runtime_hidden_access_main.main`, and `runtime_tls_bump_main.main`.
+  CFG. `runtime_hidden_access_main.updateHidden` now routes through the generic
+  void global-store path. Remaining structural examples are wrapper
+  call/check shapes such as `runtime_hidden_access_main.main` and
+  `runtime_tls_bump_main.main`.
 - aggregate field stores and ABI aggregate pairs:
   `expanded_cfg_memory_aggregates.expanded_struct_field_a`,
   `expanded_cfg_memory_aggregates.expanded_struct_field_b`, and

@@ -5496,6 +5496,33 @@ test "x86_64 codegen routes nested i8 i64 classifier select through generic cfg 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes void global store through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@hidden = global i32 0
+        \\
+        \\define void @store_hidden(i32 %value) {
+        \\entry:
+        \\  store i32 %value, ptr @hidden
+        \\  ret void
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes boolean branch-mix select through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
