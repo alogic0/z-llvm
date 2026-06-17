@@ -65,10 +65,10 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=151` /
-`structural_matcher_functions=1` for ReleaseFast, ReleaseSafe, and
-ReleaseSmall. The expanded frontier reports `generic_cfg_functions=180` /
-`structural_matcher_functions=1` for all three release modes. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=152` /
+`structural_matcher_functions=0` for ReleaseFast, ReleaseSafe, and
+ReleaseSmall. The expanded frontier reports `generic_cfg_functions=181` /
+`structural_matcher_functions=0` for all three release modes. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, optional-pointer load-plus-add payload
@@ -113,8 +113,10 @@ global-address arguments through generic CFG, covering
 `runtime_pointer_load_store_main.main`. Multi-block two-call optional-pointer
 wrapper checks now validate `ptr @global` and `ptr null` sibling call
 arguments through generic CFG, covering `runtime_optional_pointer_main.main`.
-ReleaseSafe/runtime-boundary arithmetic remains structural/backend frontier
-work.
+The mixed C/Zig panic-edge leaf now validates the negative guard,
+`debug.defaultPanic` noreturn call, global-load/add return, and checked
+overflow panic edge through generic CFG. No structural matcher backend rows
+remain in the current broad or expanded release gates.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -191,7 +193,7 @@ inventory groups as follows:
 - ReleaseSafe checked/panic-edge shapes: selected checked guard shapes are
   generic CFG, and the mixed C/Zig panic-edge wrapper main now uses generic
   direct-call lowering. The `runtime_mix_c_add_may_panic_main.add_may_panic`
-  helper remains structural until the generic CFG path preserves the full
+  helper now uses generic guarded global-add lowering while preserving the full
   runtime-call boundary and global-load/add_safe shape.
 - other scalar classifier rows: `integers.cmp_select` now routes through
   generic CFG from the typed AIR block-result `icmp slt`/`select` shape, and

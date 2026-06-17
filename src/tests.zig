@@ -5336,6 +5336,77 @@ test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes guarded global add panic edges through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@message = private unnamed_addr constant [12 x i8] c"negative int"
+        \\@global_value = global i32 3
+        \\
+        \\declare void @debug.defaultPanic(ptr, i64)
+        \\declare void @overflow()
+        \\declare void @llvm.assume(i1)
+        \\declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32)
+        \\
+        \\define fastcc i32 @guarded_global_add(i32 %arg0) {
+        \\entry:
+        \\  %negative = icmp slt i32 %arg0, 0
+        \\  br i1 %negative, label %panic, label %ok
+        \\panic:
+        \\  call void @llvm.assume(i1 1)
+        \\  call void @debug.defaultPanic(ptr @message, i64 12)
+        \\  unreachable
+        \\ok:
+        \\  %loaded = load i32, ptr @global_value
+        \\  %sum = add i32 %loaded, %arg0
+        \\  ret i32 %sum
+        \\}
+        \\
+        \\define fastcc i32 @guarded_global_checked_add(i32 %arg0) {
+        \\entry:
+        \\  %negative = icmp slt i32 %arg0, 0
+        \\  br i1 %negative, label %panic, label %ok
+        \\panic:
+        \\  call void @llvm.assume(i1 1)
+        \\  call void @debug.defaultPanic(ptr @message, i64 12)
+        \\  unreachable
+        \\ok:
+        \\  %loaded = load i32, ptr @global_value
+        \\  %checked = call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 %loaded, i32 %arg0)
+        \\  %overflowed = extractvalue { i32, i1 } %checked, 1
+        \\  br i1 %overflowed, label %overflow, label %ret
+        \\overflow:
+        \\  call void @llvm.assume(i1 1)
+        \\  call void @overflow()
+        \\  unreachable
+        \\ret:
+        \\  %value = extractvalue { i32, i1 } %checked, 0
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var unchecked = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer unchecked.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, unchecked.codegen_path);
+
+    var checked = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[1],
+    );
+    defer checked.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, checked.codegen_path);
+}
+
 test "x86_64 codegen routes scalar numeric casts through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

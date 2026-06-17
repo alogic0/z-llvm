@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=150` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=151` for ReleaseSafe
+- `generic_cfg_functions=152` for ReleaseFast, ReleaseSafe, and ReleaseSmall
+- `structural_matcher_functions=0` for ReleaseFast, ReleaseSafe, and ReleaseSmall
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=180
-structural_matcher_functions=1
+generic_cfg_functions=181
+structural_matcher_functions=0
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -127,10 +127,10 @@ Closed expanded blocker families:
   block lowering now constructs real entry/then/else/merge blocks with phi
   incoming values, and the x86_64 generic CFG path lowers the eligible branch
   paths without a structural matcher. Single-block scalar FP binary, compare,
-  select, and literal-return rows now use the same generic CFG ownership path
-  before the one-block structural fallback. Current expanded counters are
+  select, and literal-return rows now use the same generic CFG ownership path.
+  Current expanded counters are
   ReleaseFast, ReleaseSafe, and ReleaseSmall all report
-  `generic_cfg_functions=180` / `structural_matcher_functions=1`. Expanded
+  `generic_cfg_functions=181` / `structural_matcher_functions=0`. Expanded
   optional-pointer payload rows with a
   load-plus-add payload block now use the same generic CFG optional-pointer
   path as the load-only forms, and the f32 pipeline row with an unused scalar
@@ -164,7 +164,9 @@ Closed expanded blocker families:
   `runtime_pointer_load_store_main.main`. Multi-block two-call optional-pointer
   wrapper checks now validate `ptr @global` and `ptr null` sibling call
   arguments through generic CFG, covering `runtime_optional_pointer_main.main`.
-  ReleaseSafe/runtime-boundary arithmetic remains structural.
+  The mixed C/Zig panic-edge leaf now also validates the negative guard,
+  `debug.defaultPanic` noreturn edge, global load, plain add, and checked
+  overflow variant through generic CFG.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from
   `expanded_cfg_memory_aggregates.expanded_optional_pointer_branch`. Typed v2
   now lowers pointer `optional_payload` and `is_non_null`, accepts a nested
@@ -209,9 +211,8 @@ Closed expanded blocker families:
 Active expanded blocker families:
 
 - none for the current exported expanded discovery/lowering/codegen/executable
-  slices. ReleaseSafe/runtime-boundary arithmetic is intentionally not routed
-  through generic CFG in the current memory/CFG bucket and remains a future
-  candidate.
+  slices. The named runtime boundary remains `debug.defaultPanic`, but the
+  runtime-boundary arithmetic leaf is no longer a structural backend row.
 
 Ownership rules for this frontier:
 

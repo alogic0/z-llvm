@@ -185,8 +185,7 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=150` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=151` for ReleaseSafe,
+`generic_cfg_functions=152`, `structural_matcher_functions=0`,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -235,7 +234,7 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
 `discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=180`,
+`generic_cfg_functions=181`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -440,8 +439,8 @@ selects, constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers,
 small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
-ReleaseFast `151/1`, ReleaseSafe `151/1`, ReleaseSmall `151/1`; expanded
-reports ReleaseFast `180/1`, ReleaseSafe `180/1`, ReleaseSmall `180/1`.
+ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
+reports ReleaseFast `181/0`, ReleaseSafe `181/0`, ReleaseSmall `181/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative
@@ -479,11 +478,11 @@ RIP-relative global-address arguments through generic CFG, moving
 `runtime_pointer_load_store_main.main` out of the structural bucket. Multi-block
 two-call optional-pointer wrapper checks now validate `ptr @global` and
 `ptr null` sibling call arguments through generic CFG, moving
-`runtime_optional_pointer_main.main` out of the structural bucket. The
-remaining structural family in the broad/expanded release gates is the mixed
-C/Zig panic-edge/runtime-boundary arithmetic row; it should move only when the
-generic CFG eligibility checks can prove the full checked branch, panic-call,
-and return subset.
+`runtime_optional_pointer_main.main` out of the structural bucket. The mixed
+C/Zig panic-edge/runtime-boundary arithmetic leaf now also routes through
+generic CFG after proving the negative guard, `debug.defaultPanic` noreturn
+edge, global-load/add return, and checked overflow edge. The broad and expanded
+release gates currently have no structural matcher backend rows.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over
