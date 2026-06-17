@@ -876,6 +876,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockCallCheckMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockVoid(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -1077,8 +1082,6 @@ fn lowerStraightLineReturn(
         .ret => |ret| {
             if (!ret.ty.eql(function.ret_ty)) return error.ReturnTypeMismatch;
             if (try lowerAggregatePairAbiFamilyReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerRuntimeFloatLessMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerSelectedRuntimeFloatCallCompareMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerDescriptorFpCheckMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotCallReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSingleStackSlotReturn(allocator, machine, function, block, ret)) return;
@@ -11147,6 +11150,133 @@ fn lowerGenericCfgSingleBlockVoidCallMain(allocator: std.mem.Allocator, machine:
     try machine.instructions.append(allocator, .ret);
     machine.codegen_path = .generic_cfg;
     return true;
+}
+
+fn lowerGenericCfgSingleBlockCallCheckMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (try lowerGenericCfgSingleBlockFpCallCheckMainReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgSingleBlockBoolCallCheckMainReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgSingleBlockFpCallCheckMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (block.instructions.items.len != 3) return false;
+    const call_inst = block.instructions.items[0];
+    const fcmp_inst = block.instructions.items[1];
+    const select_inst = block.instructions.items[2];
+    if (call_inst.removed or fcmp_inst.removed or select_inst.removed) return false;
+
+    const call_name = call_inst.result orelse return false;
+    const fcmp_name = fcmp_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!genericCfgSupportsConstantWrapperCall(function, call)) return false;
+    if (!call.ret_ty.eql(.float) and !call.ret_ty.eql(.double)) return false;
+
+    const fcmp = switch (fcmp_inst.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .oeq or !fcmp.operand_ty.eql(call.ret_ty)) return false;
+    if (!isNamed(fcmp.lhs, call_name)) return false;
+    switch (fcmp.rhs) {
+        .fp => {},
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    }
+    if (!isSelectI1ToI32ZeroOne(select_inst, fcmp_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgSingleBlockBoolCallCheckMainReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (block.instructions.items.len != 2) return false;
+    const call_inst = block.instructions.items[0];
+    const select_inst = block.instructions.items[1];
+    if (call_inst.removed or select_inst.removed) return false;
+
+    const call_name = call_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!genericCfgSupportsConstantWrapperCall(function, call)) return false;
+    if (!call.ret_ty.eql(.{ .int = 1 })) return false;
+    if (!isSelectI1ToI32ZeroOne(select_inst, call_name)) return false;
+
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn genericCfgSupportsConstantWrapperCall(function: ir.Function, call: ir.CallInst) bool {
+    if (!callIsFastcc(call.calling_conv)) return false;
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!genericCfgCallTargetsWrapperSibling(function.name, call.callee)) return false;
+    if (call.args.items.len == 0 or call.args.items.len > 4) return false;
+    for (call.args.items) |arg| {
+        if (!genericCfgSupportsConstantWrapperCallArg(arg)) return false;
+    }
+    return true;
+}
+
+fn genericCfgSupportsConstantWrapperCallArg(arg: ir.CallArg) bool {
+    if (arg.attrs != null) return false;
+    return switch (arg.ty) {
+        .float, .double => switch (arg.value) {
+            .fp => true,
+            .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        },
+        .int => switch (arg.value) {
+            .int => true,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
+        },
+        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+    };
+}
+
+fn genericCfgCallTargetsWrapperSibling(function_name: []const u8, callee: []const u8) bool {
+    const name = symbolName(function_name);
+    if (!isMainOrWrapperMain(name)) return false;
+    const callee_name = symbolName(callee);
+    const dot = std.mem.lastIndexOfScalar(u8, name, '.') orelse return false;
+    if (!std.mem.eql(u8, name[dot + 1 ..], "main")) return false;
+    const prefix = name[0 .. dot + 1];
+    return std.mem.startsWith(u8, callee_name, prefix) and callee_name.len > prefix.len;
 }
 
 fn lowerGenericCfgSingleBlockVoid(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

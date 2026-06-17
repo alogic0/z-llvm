@@ -7370,6 +7370,53 @@ test "x86_64 codegen routes void-call main wrapper through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes fp call-check main wrapper through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc float @sample.floatAdd(float, float)
+        \\
+        \\define i32 @sample.main() {
+        \\entry:
+        \\  %call = call fastcc float @sample.floatAdd(float 1.000000e+00, float 2.000000e+00)
+        \\  %ok = fcmp oeq float %call, 3.000000e+00
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes bool call-check main wrapper through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i1 @sample.floatLess(float, float)
+        \\
+        \\define i32 @sample.main() {
+        \\entry:
+        \\  %call = call fastcc i1 @sample.floatLess(float 1.000000e+00, float 2.000000e+00)
+        \\  %ret = select i1 %call, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes shift mix through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
