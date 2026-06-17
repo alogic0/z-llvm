@@ -10952,6 +10952,12 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
         .ret => |ret| ret,
         else => null,
     };
+    if (single_ret) |ret| {
+        if (try lowerPointerVolatileRoundtripReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+    }
     if (try lowerGenericCfgPointerSelectLoadReturn(allocator, machine, function, block)) {
         machine.codegen_path = .generic_cfg;
         return true;

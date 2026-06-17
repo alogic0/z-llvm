@@ -65,18 +65,19 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=99` /
-`structural_matcher_functions=53` for ReleaseFast and ReleaseSmall, and
-`100` / `52` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=119` / `structural_matcher_functions=62` for
-ReleaseFast and ReleaseSmall, and `121` / `60` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=101` /
+`structural_matcher_functions=51` for ReleaseFast and ReleaseSmall, and
+`102` / `50` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=121` / `structural_matcher_functions=60` for
+ReleaseFast and ReleaseSmall, and `123` / `58` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
-single-block scalar FP binary/compare/select/literal returns, and existing
-slice/aggregate sum shapes that pass strict generic CFG eligibility. Volatile
-memory, broader aggregate field stores, broader global/TLS addressing, and
-larger loop-memory dependencies remain structural/backend frontier work.
+single-block scalar FP binary/compare/select/literal returns, single-block
+volatile i32 store/load roundtrips, and existing slice/aggregate sum shapes
+that pass strict generic CFG eligibility. Multi-block volatile memory, broader
+aggregate field stores, broader global/TLS addressing, and larger loop-memory
+dependencies remain structural/backend frontier work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -88,10 +89,12 @@ inventory groups as follows:
   `main` check functions such as `runtime_slice_sum_main.main` and
   `runtime_array_sum_main.main`, whose call/compare/select validation is still
   handled by selected structural wrapper helpers.
-- volatile memory: `pointers_memory.volatile_roundtrip`,
-  `runtime_volatile_roundtrip_main.volatileRoundtrip`, and
-  `runtime_volatile_roundtrip_main.main` remain structural until generic CFG
-  explicitly preserves volatile load/store ordering and address-space behavior.
+- volatile memory: `pointers_memory.volatile_roundtrip` and
+  `runtime_volatile_roundtrip_main.volatileRoundtrip` now route through generic
+  CFG after validating the exact volatile store-before-load order and pointer
+  parameter shape. `runtime_volatile_roundtrip_main.main` remains structural
+  because it is a wrapper call/check row, and multi-block volatile CFGs remain
+  rejected until branch-local volatile ordering is modeled explicitly.
 - broader global/TLS addressing: simple global/TLS data functions such as
   `globals_comptime.read_global`, `globals_comptime.update_global`,
   `tls_concurrency.read_tls`, `tls_concurrency.bump_tls`,

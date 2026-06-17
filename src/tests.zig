@@ -5762,7 +5762,33 @@ test "x86_64 codegen rejects unsupported aggregate field offset from generic cfg
     }
 }
 
-test "x86_64 codegen keeps volatile memory cfg out of generic cfg path" {
+test "x86_64 codegen routes single-block volatile roundtrip through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @volatile_roundtrip(ptr %ptr, i32 %value) {
+        \\entry:
+        \\  store volatile i32 %value, ptr %ptr
+        \\  %loaded = load volatile i32, ptr %ptr
+        \\  ret i32 %loaded
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen keeps multi-block volatile memory cfg out of generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
