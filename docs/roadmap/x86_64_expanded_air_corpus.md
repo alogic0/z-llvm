@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=125 (ReleaseSafe: 127)
-structural_matcher_functions=56 (ReleaseSafe: 54)
+generic_cfg_functions=130 (ReleaseSafe: 131)
+structural_matcher_functions=51 (ReleaseSafe: 50)
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -129,11 +129,13 @@ Closed expanded blocker families:
   paths without a structural matcher. Single-block scalar FP binary, compare,
   select, and literal-return rows now use the same generic CFG ownership path
   before the one-block structural fallback. Current expanded counters are
-  ReleaseFast `generic_cfg_functions=125` /
-  `structural_matcher_functions=56`, ReleaseSafe `127` / `54`, and
-  ReleaseSmall `125` / `56`. Single-block volatile roundtrip helpers now also
+  ReleaseFast `generic_cfg_functions=130` /
+  `structural_matcher_functions=51`, ReleaseSafe `131` / `50`, and
+  ReleaseSmall `130` / `51`. Single-block volatile roundtrip helpers now also
   validate volatile store/load ordering through generic CFG; single-block
   packed read/replace helpers validate their mask/shift/OR and sign-bit compare
+  shapes through generic CFG; scalar numeric conversion rows validate fpext,
+  fptrunc, int-from-float, signed int-to-float, and unsigned int-to-double
   shapes through generic CFG. Wrapper volatile and packed main checks remain
   structural.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from

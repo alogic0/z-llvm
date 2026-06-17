@@ -10984,6 +10984,10 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerScalarFpCastReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
@@ -11023,6 +11027,10 @@ fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineF
         return true;
     }
     if (try lowerGenericCfgFpLiteralReturn(allocator, machine, function, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerScalarFpCastReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }

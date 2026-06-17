@@ -235,8 +235,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
 `discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=125` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=127` for ReleaseSafe,
+`generic_cfg_functions=130` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=131` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -434,20 +434,20 @@ the loop-sum family, simple single-block scalar integer returns, scalar
 load-after-store merge returns, pointer-select loads, direct-call branch merge
 CFGs, single-block global/TLS i32 load/update forms, single-block scalar FP
 binary/compare/select/literal returns, single-block volatile i32 roundtrips,
-single-block packed read/replace bit helpers, and checked guard CFGs for
-checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
+single-block packed read/replace bit helpers, scalar numeric conversion casts,
+and checked guard CFGs for checked `@intFromFloat` and guarded table
+lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `105/47`, ReleaseSafe `106/46`, ReleaseSmall `105/47`; expanded
-reports ReleaseFast `125/56`, ReleaseSafe `127/54`, ReleaseSmall `125/56`.
+reports ReleaseFast `130/51`, ReleaseSafe `131/50`, ReleaseSmall `130/51`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative
 loop-memory dependency subset. Remaining structural families are mostly
-multi-block volatile memory, numeric conversions, wrapper-main packed/FP/check
-rows, broader global/TLS addressing, broader aggregate field stores, larger
-loop-memory variants, and larger ABI/call shapes; each should move only when
-the generic CFG eligibility checks can prove the full instruction and
-terminator subset.
+multi-block volatile memory, wrapper-main packed/FP/check rows, broader
+global/TLS addressing, broader aggregate field stores, larger loop-memory
+variants, and larger ABI/call shapes; each should move only when the generic
+CFG eligibility checks can prove the full instruction and terminator subset.
 
 Source coverage discovery:
 The current release-mode captured IR inventory was checked with `find` over

@@ -5336,6 +5336,57 @@ test "x86_64 codegen routes checked guard cfg through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes scalar numeric casts through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define double @widen(float %x) {
+        \\entry:
+        \\  %wide = fpext float %x to double
+        \\  ret double %wide
+        \\}
+        \\
+        \\define float @narrow(double %x) {
+        \\entry:
+        \\  %narrow = fptrunc double %x to float
+        \\  ret float %narrow
+        \\}
+        \\
+        \\define i32 @int_from_float(float %x) {
+        \\entry:
+        \\  %int = fptosi float %x to i32
+        \\  ret i32 %int
+        \\}
+        \\
+        \\define float @float_from_int(i32 %x) {
+        \\entry:
+        \\  %float = sitofp i32 %x to float
+        \\  ret float %float
+        \\}
+        \\
+        \\define double @double_from_unsigned(i32 %x) {
+        \\entry:
+        \\  %double = uitofp i32 %x to double
+        \\  ret double %double
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = try codegen.x86_64.lowerFunction(
+            std.testing.allocator,
+            module.target_triple.?,
+            function,
+        );
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expect(machine.instructions.items.len > 0);
+        try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    }
+}
+
 test "x86_64 codegen routes single-block fp binary through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
