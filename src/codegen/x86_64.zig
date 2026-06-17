@@ -843,6 +843,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgMultiBlockTwoCallCheckMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerRuntimePointerLoadStorePreoptMain(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -11398,6 +11403,88 @@ fn lowerGenericCfgMultiBlockCallGlobalCheckMain(allocator: std.mem.Allocator, ma
     return true;
 }
 
+fn lowerGenericCfgMultiBlockTwoCallCheckMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 3) return false;
+
+    const entry = function.blocks.items[0];
+    const merge = function.blocks.items[1];
+    const then_block = function.blocks.items[2];
+    if (entry.instructions.items.len != 2 or merge.instructions.items.len != 2 or then_block.instructions.items.len != 2) return false;
+
+    const first_call_inst = entry.instructions.items[0];
+    const first_cmp_inst = entry.instructions.items[1];
+    const phi_inst = merge.instructions.items[0];
+    const select_inst = merge.instructions.items[1];
+    const second_call_inst = then_block.instructions.items[0];
+    const second_cmp_inst = then_block.instructions.items[1];
+    if (first_call_inst.removed or first_cmp_inst.removed or phi_inst.removed or select_inst.removed or second_call_inst.removed or second_cmp_inst.removed) return false;
+
+    const first_call_name = first_call_inst.result orelse return false;
+    const first_cmp_name = first_cmp_inst.result orelse return false;
+    const phi_name = phi_inst.result orelse return false;
+    const select_name = select_inst.result orelse return false;
+    const second_call_name = second_call_inst.result orelse return false;
+    const second_cmp_name = second_cmp_inst.result orelse return false;
+
+    const first_call = switch (first_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!genericCfgSupportsUnaryPtrSiblingCall(function, first_call)) return false;
+    const first_expected = try genericCfgCallEqExpected(first_cmp_inst, first_call_name);
+
+    const entry_br = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!entry_br.cond_ty.eql(.{ .int = 1 }) or !isNamed(entry_br.cond, first_cmp_name)) return false;
+    if (!std.mem.eql(u8, entry_br.then_target, then_block.name) or !std.mem.eql(u8, entry_br.else_target, merge.name)) return false;
+
+    const second_call = switch (second_call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!genericCfgSupportsUnaryPtrSiblingCall(function, second_call)) return false;
+    const second_expected = try genericCfgCallEqExpected(second_cmp_inst, second_call_name);
+
+    const then_br = switch (then_block.terminator orelse return error.BlockWithoutTerminator) {
+        .br => |br| br,
+        else => return false,
+    };
+    if (!std.mem.eql(u8, then_br.target, merge.name)) return false;
+
+    const phi = switch (phi_inst.kind) {
+        .phi => |phi| phi,
+        else => return false,
+    };
+    if (!phi.ty.eql(.{ .int = 1 }) or phi.incoming.items.len != 2) return false;
+    if (!phiHasIncoming(phi, second_cmp_name, then_block.name) or !phiHasIncomingInt(phi, 0, entry.name)) return false;
+    if (!isSelectI1ToI32ZeroOne(select_inst, phi_name)) return false;
+    const ret = switch (merge.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 }) or !isNamed(ret.value orelse return error.InvalidRet, select_name)) return false;
+
+    const fail = "generic_cfg_two_call_check_fail";
+    try emitGenericCfgUnaryPtrCallArg(allocator, machine, first_call.args.items[0]);
+    try appendAlignedDirectCall(allocator, machine, first_call.callee, first_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = first_expected });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try emitGenericCfgUnaryPtrCallArg(allocator, machine, second_call.args.items[0]);
+    try appendAlignedDirectCall(allocator, machine, second_call.callee, second_call.ret_ty);
+    try machine.instructions.append(allocator, .{ .cmp_eax_imm32 = second_expected });
+    try machine.instructions.append(allocator, .{ .jne = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = fail });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 1 });
+    try machine.instructions.append(allocator, .ret);
+    machine.codegen_path = .generic_cfg;
+    return true;
+}
+
 fn lowerGenericCfgSingleBlockUpdateGetMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (!isMainOrWrapperMain(function.name)) return false;
     if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
@@ -11635,6 +11722,43 @@ fn genericCfgGlobalPtrArg(arg: ir.CallArg) ?[]const u8 {
         .named => |name| if (name.len > 0 and name[0] == '@') globalSymbolName(name) catch null else null,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => null,
     };
+}
+
+fn genericCfgSupportsUnaryPtrSiblingCall(function: ir.Function, call: ir.CallInst) bool {
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!genericCfgCallTargetsWrapperSibling(function.name, call.callee)) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len != 1) return false;
+    const arg = call.args.items[0];
+    if (arg.attrs != null or !arg.ty.eql(.ptr)) return false;
+    return switch (arg.value) {
+        .named => |name| name.len > 0 and name[0] == '@',
+        .null_value => true,
+        .int, .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
+    };
+}
+
+fn genericCfgCallEqExpected(instruction: ir.Instruction, call_name: []const u8) !i32 {
+    const icmp = switch (instruction.kind) {
+        .icmp => |icmp| icmp,
+        else => return error.UnsupportedCodegenValue,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 32 }) or !isNamed(icmp.lhs, call_name)) {
+        return error.UnsupportedCodegenValue;
+    }
+    return switch (icmp.rhs) {
+        .int => |int| try i32Value(int),
+        .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
+    };
+}
+
+fn emitGenericCfgUnaryPtrCallArg(allocator: std.mem.Allocator, machine: *MachineFunction, arg: ir.CallArg) !void {
+    if (arg.attrs != null or !arg.ty.eql(.ptr)) return error.UnsupportedCodegenValue;
+    switch (arg.value) {
+        .named => |name| try machine.instructions.append(allocator, .{ .lea_global_rdi = try globalSymbolName(name) }),
+        .null_value => try machine.instructions.append(allocator, .{ .mov_imm_rdi = 0 }),
+        .int, .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 fn genericCfgCallTargetsWrapperSibling(function_name: []const u8, callee: []const u8) bool {
