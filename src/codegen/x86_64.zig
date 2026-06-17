@@ -11426,6 +11426,11 @@ fn genericCfgSupportsConstantWrapperCall(function: ir.Function, call: ir.CallIns
 fn genericCfgSupportsConstantWrapperCallArg(arg: ir.CallArg) bool {
     if (arg.attrs != null) return false;
     return switch (arg.ty) {
+        .ptr => switch (arg.value) {
+            .named => |name| name.len > 0 and name[0] == '@',
+            .null_value => true,
+            .int, .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
+        },
         .float, .double => switch (arg.value) {
             .fp => true,
             .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
@@ -11434,7 +11439,7 @@ fn genericCfgSupportsConstantWrapperCallArg(arg: ir.CallArg) bool {
             .int => true,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         },
-        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

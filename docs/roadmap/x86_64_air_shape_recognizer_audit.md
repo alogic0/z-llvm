@@ -65,11 +65,11 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=144` /
-`structural_matcher_functions=8` for ReleaseFast and ReleaseSmall, and
-`145` / `7` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=171` / `structural_matcher_functions=10` for
-ReleaseFast and ReleaseSmall, and `172` / `9` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=147` /
+`structural_matcher_functions=5` for ReleaseFast and ReleaseSmall, and
+`148` / `4` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=174` / `structural_matcher_functions=7` for
+ReleaseFast and ReleaseSmall, and `175` / `6` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
@@ -101,10 +101,13 @@ Sibling update/get wrapper mains that issue a void update call with a constant
 direct-call lowering instead of hidden-global structural lowering. Wrapper
 mains that tail-call a direct `i32` helper with constant `i32` arguments and an
 optional identity cast now also route through generic direct-call lowering,
-covering the mixed C/Zig and TLS bump wrapper checks. Multi-block volatile
-memory, wrapper-main packed and aggregate/check rows, broader aggregate field
-stores, and larger loop-memory dependencies remain structural/backend frontier
-work.
+covering the mixed C/Zig and TLS bump wrapper checks. Pointer-literal sibling
+call/check wrapper mains now validate `ptr @global` and `ptr null` arguments
+through the same generic admission, covering the slice-sum, struct-sum, and
+volatile roundtrip wrapper checks. Multi-block optional/pointer side-effect
+wrapper checks, aggregate-pair call-chain wrapper checks, base64 table lookup
+internals, the f32 pipeline variant, broader aggregate field stores, and larger
+loop-memory dependencies remain structural/backend frontier work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -112,17 +115,16 @@ inventory groups as follows:
 
 - conditional slice-loop / loop-memory dependency: the exported
   `expanded_cfg_memory_aggregates.expanded_slice_conditional_sum` now routes
-  through generic CFG. Remaining structural loop-adjacent examples are wrapper
-  `main` check functions such as `runtime_slice_sum_main.main` and
-  `runtime_array_sum_main.main`, whose call/compare/select validation is still
-  handled by selected structural wrapper helpers.
-- volatile memory: `pointers_memory.volatile_roundtrip` and
-  `runtime_volatile_roundtrip_main.volatileRoundtrip` now route through generic
-  CFG after validating the exact volatile store-before-load order and pointer
-  parameter shape. `runtime_volatile_roundtrip_main.main` remains structural
-  because it is a volatile wrapper call/check row whose volatile ordering has
-  not yet been represented by the generic wrapper admission, and multi-block
-  volatile CFGs remain rejected until branch-local volatile ordering is modeled
+  through generic CFG. Wrapper `main` check functions with pointer-literal
+  calls, such as `runtime_slice_sum_main.main`, now use the generic sibling
+  call/check admission. Larger loop-memory dependency variants remain future
+  work.
+- volatile memory: `pointers_memory.volatile_roundtrip`,
+  `runtime_volatile_roundtrip_main.volatileRoundtrip`, and the wrapper
+  `runtime_volatile_roundtrip_main.main` now route through generic CFG after
+  validating the exact volatile store-before-load order, pointer parameter
+  shape, and pointer-literal wrapper call/check shape. Multi-block volatile
+  CFGs remain rejected until branch-local volatile ordering is modeled
   explicitly.
 - broader global/TLS addressing: simple global/TLS data functions such as
   `globals_comptime.read_global`, `globals_comptime.update_global`,
@@ -143,7 +145,8 @@ inventory groups as follows:
   `runtime_aggregate_pair_main.makePair`, and
   `runtime_aggregate_pair_main.pairFirst` now route through generic CFG as
   small aggregate pair ABI pack/unpack helpers. The remaining structural
-  aggregate example is the `runtime_aggregate_pair_main.main` wrapper check.
+  aggregate example is the `runtime_aggregate_pair_main.main` call-chain
+  wrapper check.
 - ABI/call/aggregate-return shapes: generic CFG owns simple direct-call branch
   rows such as `expanded_cfg_memory_aggregates.expanded_branch_call*` and
   `control_flow_calls.call_chain`, plus no-arg void-call wrapper mains such as
@@ -165,8 +168,9 @@ inventory groups as follows:
   `runtime_double_div_main.main`, and their sibling wrappers now route through
   the generic constant call/check admission. Integer-return wrapper checks such
   as `runtime_array_sum_main.main`, `runtime_optional_payload_main.main`,
-  `runtime_error_union_payload_main.main`, and
-  `runtime_packed_replace_low_main.main` now use that same generic admission.
+  `runtime_error_union_payload_main.main`, `runtime_packed_replace_low_main.main`,
+  `runtime_slice_sum_main.main`, `runtime_struct_sum_main.main`, and
+  `runtime_volatile_roundtrip_main.main` now use that same generic admission.
 - ReleaseSafe checked/panic-edge shapes: selected checked guard shapes are
   generic CFG, and the mixed C/Zig panic-edge wrapper main now uses generic
   direct-call lowering. The `runtime_mix_c_add_may_panic_main.add_may_panic`

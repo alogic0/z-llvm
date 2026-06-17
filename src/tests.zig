@@ -7418,6 +7418,32 @@ test "x86_64 codegen routes integer call-check main wrapper through generic cfg 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes pointer literal call-check main wrapper through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@sample.values = global [4 x i32] zeroinitializer
+        \\
+        \\declare fastcc i32 @sample.sum(ptr, i64)
+        \\
+        \\define i32 @sample.main() {
+        \\entry:
+        \\  %call = call fastcc i32 @sample.sum(ptr @sample.values, i64 4)
+        \\  %ok = icmp eq i32 %call, 10
+        \\  %ret = select i1 %ok, i32 0, i32 1
+        \\  ret i32 %ret
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes narrow integer call-check main wrapper through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
