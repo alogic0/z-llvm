@@ -65,18 +65,18 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=83` /
-`structural_matcher_functions=69` for ReleaseFast and ReleaseSmall, and
-`84` / `68` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=102` / `structural_matcher_functions=79` for
-ReleaseFast and ReleaseSmall, and `104` / `77` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=99` /
+`structural_matcher_functions=53` for ReleaseFast and ReleaseSmall, and
+`100` / `52` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=119` / `structural_matcher_functions=62` for
+ReleaseFast and ReleaseSmall, and `121` / `60` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
-and existing slice/aggregate sum shapes that pass strict generic CFG
-eligibility. Volatile memory, broader aggregate field stores, broader global/TLS
-addressing, and larger loop-memory dependencies remain structural/backend
-frontier work.
+single-block scalar FP binary/compare/select/literal returns, and existing
+slice/aggregate sum shapes that pass strict generic CFG eligibility. Volatile
+memory, broader aggregate field stores, broader global/TLS addressing, and
+larger loop-memory dependencies remain structural/backend frontier work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
@@ -114,11 +114,12 @@ inventory groups as follows:
   validation and non-i32 return/argument families such as
   `runtime_mix_c_add_zig_main.main`, `runtime_inherit_want_safety_i64_main.main`,
   and `runtime_umul_fix_sat_i64_main.main`.
-- scalar FP and packed-bit families: `float_compare.*`, `floats_math.*`,
-  `fp_extended_ops.*`, `expanded_float_calls.*`, `expanded_numeric_casts.*`,
-  `packed_bits.*`, and the matching runtime wrapper rows still use structural
-  backend helpers. They are typed-v2-owned in the front end, but backend CFG
-  ownership has not yet generalized FP registers and packed bit update values.
+- scalar FP and packed-bit families: single-block scalar FP rows such as
+  `float_compare.*`, `floats_math.*`, `fp_extended_ops.*`,
+  `fp_constants.*`, and `expanded_float_calls.*` now route through generic CFG.
+  Numeric conversion rows in `expanded_numeric_casts.*`, packed-bit rows in
+  `packed_bits.*`, and FP wrapper-main check rows still use structural backend
+  helpers until generic CFG covers those value/register and call/check shapes.
 - ReleaseSafe checked/panic-edge shapes: selected checked guard shapes are
   generic CFG, but mixed C/Zig panic-edge rows such as
   `runtime_mix_c_add_may_panic_main.*` remain structural until the generic CFG

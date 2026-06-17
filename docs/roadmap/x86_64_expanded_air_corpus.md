@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=83` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=84` for ReleaseSafe
+- `generic_cfg_functions=99` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=100` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=102 (ReleaseSafe: 104)
-structural_matcher_functions=79 (ReleaseSafe: 77)
+generic_cfg_functions=119 (ReleaseSafe: 121)
+structural_matcher_functions=62 (ReleaseSafe: 60)
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -126,9 +126,12 @@ Closed expanded blocker families:
   loads at offsets 0 and 4, and branch-local field-0 updates; generic typed-v2
   block lowering now constructs real entry/then/else/merge blocks with phi
   incoming values, and the x86_64 generic CFG path lowers the eligible branch
-  paths without a structural matcher. Current expanded counters are ReleaseFast
-  `generic_cfg_functions=102` / `structural_matcher_functions=79`, ReleaseSafe
-  `104` / `77`, and ReleaseSmall `102` / `79`.
+  paths without a structural matcher. Single-block scalar FP binary, compare,
+  select, and literal-return rows now use the same generic CFG ownership path
+  before the one-block structural fallback. Current expanded counters are
+  ReleaseFast `generic_cfg_functions=119` /
+  `structural_matcher_functions=62`, ReleaseSafe `121` / `60`, and
+  ReleaseSmall `119` / `62`.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from
   `expanded_cfg_memory_aggregates.expanded_optional_pointer_branch`. Typed v2
   now lowers pointer `optional_payload` and `is_non_null`, accepts a nested

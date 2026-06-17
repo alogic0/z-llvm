@@ -846,6 +846,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockFp(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockScalar(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -10985,6 +10990,161 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
     return true;
+}
+
+fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (try lowerGenericCfgFpBinaryReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgFpCompareReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgFpSelectReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgFpLiteralReturn(allocator, machine, function, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    return false;
+}
+
+fn lowerGenericCfgFpBinaryReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 2 or block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result)) return false;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (!ret.ty.eql(binary.ty) or !function.ret_ty.eql(binary.ty)) return false;
+    if ((!binary.ty.eql(.float) and !binary.ty.eql(.double)) or
+        !function.params.items[0].ty.eql(binary.ty) or
+        !function.params.items[1].ty.eql(binary.ty)) return false;
+    if (!isNamed(binary.lhs, function.params.items[0].name) or
+        !isNamed(binary.rhs, function.params.items[1].name)) return false;
+
+    if (binary.ty.eql(.float)) {
+        switch (binary.op) {
+            .fadd => try machine.instructions.append(allocator, .addss_xmm1_xmm0),
+            .fsub => try machine.instructions.append(allocator, .subss_xmm1_xmm0),
+            .frem => try appendAlignedDirectCall(allocator, machine, "fmodf", .float),
+            .fmul, .fdiv, .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return false,
+        }
+    } else if (binary.ty.eql(.double)) {
+        switch (binary.op) {
+            .fmul => try machine.instructions.append(allocator, .mulsd_xmm1_xmm0),
+            .fdiv => try machine.instructions.append(allocator, .divsd_xmm1_xmm0),
+            .fadd, .fsub, .frem, .add, .sub, .mul, .shl, .lshr, .ashr, .@"and", .@"or", .xor, .udiv, .sdiv, .urem, .srem => return false,
+        }
+    } else {
+        return false;
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpCompareReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 2 or block.instructions.items.len != 1) return false;
+    if (!function.ret_ty.eql(.{ .int = 1 }) or !ret.ty.eql(.{ .int = 1 })) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result)) return false;
+    const fcmp = switch (instruction.kind) {
+        .fcmp => |fcmp| fcmp,
+        else => return false,
+    };
+    if (fcmp.predicate != .olt or !fcmp.operand_ty.eql(.float)) return false;
+    if (!function.params.items[0].ty.eql(.float) or !function.params.items[1].ty.eql(.float)) return false;
+    if (!isNamed(fcmp.lhs, function.params.items[0].name) or
+        !isNamed(fcmp.rhs, function.params.items[1].name)) return false;
+
+    try machine.instructions.append(allocator, .oltss_xmm0_xmm1_al);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpSelectReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 3 or block.instructions.items.len != 1) return false;
+    if (!function.ret_ty.eql(.double) or !ret.ty.eql(.double)) return false;
+    if (!function.params.items[0].ty.eql(.double) or
+        !function.params.items[1].ty.eql(.double) or
+        !function.params.items[2].ty.eql(.{ .int = 1 })) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, result)) return false;
+    const select = switch (instruction.kind) {
+        .select => |select| select,
+        else => return false,
+    };
+    if (!select.cond_ty.eql(.{ .int = 1 }) or !select.ty.eql(.double)) return false;
+    if (!isNamed(select.cond, function.params.items[2].name) or
+        !isNamed(select.true_value, function.params.items[0].name) or
+        !isNamed(select.false_value, function.params.items[1].name)) return false;
+
+    const false_label = "generic_cfg_fp_select_false";
+    try machine.instructions.append(allocator, .{ .test_arg8 = .rdi });
+    try machine.instructions.append(allocator, .{ .je = false_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = false_label });
+    try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpLiteralReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    ret: anytype,
+) !bool {
+    if (function.params.items.len != 0) return false;
+    const value = switch (ret.value orelse return false) {
+        .fp => |fp| fp,
+        .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    if (function.ret_ty.eql(.double) and ret.ty.eql(.double)) {
+        try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = try fp64TextBits(.{ .fp = value }) });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    if (function.ret_ty.eql(.float) and ret.ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = try fp32TextBits(.{ .fp = value }) });
+        try machine.instructions.append(allocator, .ret);
+        return true;
+    }
+    return false;
 }
 
 fn lowerGenericCfgPointerSelectLoadReturn(
