@@ -15,6 +15,12 @@ pub fn main(init: std.process.Init) !void {
         else => return err,
     };
     defer if (debug_dump_ir_source) |value| allocator.free(value);
+    const debug_codegen_paths_value = init.minimal.environ.getAlloc(allocator, "ZLLVM_DEBUG_CODEGEN_PATHS") catch |err| switch (err) {
+        error.EnvironmentVariableMissing => null,
+        else => return err,
+    };
+    defer if (debug_codegen_paths_value) |value| allocator.free(value);
+    const debug_codegen_paths = debug_codegen_paths_value != null;
 
     const zig_emitter_env = init.minimal.environ.getAlloc(allocator, "ZIG_EMITTER") catch |err| switch (err) {
         error.EnvironmentVariableMissing => null,
@@ -252,7 +258,14 @@ pub fn main(init: std.process.Init) !void {
             };
             try machines.append(allocator, machine);
             generic_codegen_functions += 1;
-            switch (machines.items[machines.items.len - 1].codegen_path) {
+            const codegen_path = machines.items[machines.items.len - 1].codegen_path;
+            if (debug_codegen_paths) {
+                std.debug.print(
+                    "codegen-path source={s} function={s} path={s}\n",
+                    .{ source, function.name, @tagName(codegen_path) },
+                );
+            }
+            switch (codegen_path) {
                 .generic_cfg => generic_cfg_functions += 1,
                 .structural_matcher => structural_matcher_functions += 1,
             }

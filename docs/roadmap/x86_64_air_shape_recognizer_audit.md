@@ -78,6 +78,57 @@ eligibility. Volatile memory, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain structural/backend
 frontier work.
 
+Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
+per-function backend route. The current expanded ReleaseFast structural
+inventory groups as follows:
+
+- conditional slice-loop / loop-memory dependency: the exported
+  `expanded_cfg_memory_aggregates.expanded_slice_conditional_sum` now routes
+  through generic CFG. Remaining structural loop-adjacent examples are wrapper
+  `main` check functions such as `runtime_slice_sum_main.main` and
+  `runtime_array_sum_main.main`, whose call/compare/select validation is still
+  handled by selected structural wrapper helpers.
+- volatile memory: `pointers_memory.volatile_roundtrip`,
+  `runtime_volatile_roundtrip_main.volatileRoundtrip`, and
+  `runtime_volatile_roundtrip_main.main` remain structural until generic CFG
+  explicitly preserves volatile load/store ordering and address-space behavior.
+- broader global/TLS addressing: simple global/TLS data functions such as
+  `globals_comptime.read_global`, `globals_comptime.update_global`,
+  `tls_concurrency.read_tls`, `tls_concurrency.bump_tls`,
+  `expanded_records_memory.expanded_global_update`, and
+  `expanded_records_memory.expanded_tls_bump` already route through generic
+  CFG. Remaining structural examples include wrapper or hidden-symbol shapes
+  such as `runtime_hidden_access_main.updateHidden`,
+  `runtime_hidden_access_main.main`, and `runtime_tls_bump_main.main`.
+- aggregate field stores and ABI aggregate pairs:
+  `expanded_cfg_memory_aggregates.expanded_struct_field_a`,
+  `expanded_cfg_memory_aggregates.expanded_struct_field_b`, and
+  `expanded_cfg_memory_aggregates.expanded_struct_branch_update` are generic
+  CFG. Structural ABI examples remain in `aggregate_abi.pair_first`,
+  `aggregate_abi.make_pair`, `expanded_records_memory.expanded_pair_first`,
+  `expanded_records_memory.expanded_make_pair`, and the
+  `runtime_aggregate_pair_main.*` wrapper/helper family.
+- ABI/call/aggregate-return shapes: generic CFG owns simple direct-call branch
+  rows such as `expanded_cfg_memory_aggregates.expanded_branch_call*` and
+  `control_flow_calls.call_chain`. Structural examples remain for wrapper
+  validation and non-i32 return/argument families such as
+  `runtime_mix_c_add_zig_main.main`, `runtime_inherit_want_safety_i64_main.main`,
+  and `runtime_umul_fix_sat_i64_main.main`.
+- scalar FP and packed-bit families: `float_compare.*`, `floats_math.*`,
+  `fp_extended_ops.*`, `expanded_float_calls.*`, `expanded_numeric_casts.*`,
+  `packed_bits.*`, and the matching runtime wrapper rows still use structural
+  backend helpers. They are typed-v2-owned in the front end, but backend CFG
+  ownership has not yet generalized FP registers and packed bit update values.
+- ReleaseSafe checked/panic-edge shapes: selected checked guard shapes are
+  generic CFG, but mixed C/Zig panic-edge rows such as
+  `runtime_mix_c_add_may_panic_main.*` remain structural until the generic CFG
+  path preserves the full runtime-call boundary and global-load/add_safe shape.
+- other scalar classifier rows: `error_switch.error_switch`,
+  `error_switch.classify`, `switch_control.branch_mix`,
+  `switch_control.dense_switch`, `aggregates.maybeError`, and
+  `integers.cmp_select` remain structural because their backend lowering still
+  uses narrow scalar classifier helpers even though typed-v2 lowering is closed.
+
 Next typed-contract target:
 
 - lower directly from typed `structured_air-v2` records instead of legacy AIR
