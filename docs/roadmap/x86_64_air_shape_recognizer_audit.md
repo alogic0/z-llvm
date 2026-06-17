@@ -65,19 +65,20 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=107` /
-`structural_matcher_functions=45` for ReleaseFast and ReleaseSmall, and
-`108` / `44` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=132` / `structural_matcher_functions=49` for
-ReleaseFast and ReleaseSmall, and `133` / `48` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=108` /
+`structural_matcher_functions=44` for ReleaseFast and ReleaseSmall, and
+`109` / `43` for ReleaseSafe. The expanded frontier reports
+`generic_cfg_functions=133` / `structural_matcher_functions=48` for
+ReleaseFast and ReleaseSmall, and `134` / `47` for ReleaseSafe. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, the conditional slice-loop update row,
 single-block scalar FP binary/compare/select/literal returns, single-block
 volatile i32 store/load roundtrips, single-block packed read/replace bit
 helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`
-classifiers, nested `i8` equality error-switch selects, and existing
-slice/aggregate sum shapes that pass strict generic CFG eligibility.
+classifiers, nested `i8` equality error-switch selects, boolean-parameter
+branch-mix add/sub selects, and existing slice/aggregate sum shapes that pass
+strict generic CFG eligibility.
 Multi-block volatile memory, remaining scalar classifiers,
 wrapper-main packed/FP/check rows, broader aggregate field stores, broader
 global/TLS addressing, and larger loop-memory dependencies remain
@@ -139,8 +140,9 @@ inventory groups as follows:
 - other scalar classifier rows: `integers.cmp_select` now routes through
   generic CFG from the typed AIR block-result `icmp slt`/`select` shape, and
   `error_switch.error_switch` routes through generic CFG from nested `i8`
-  equality selects. Remaining scalar classifier rows are
-  `error_switch.classify`, `switch_control.branch_mix`,
+  equality selects. `switch_control.branch_mix` now routes through generic CFG
+  from the boolean-parameter select plus add/sub expression shape. Remaining
+  scalar classifier rows are `error_switch.classify`,
   `switch_control.dense_switch`, and `aggregates.maybeError`; their backend
   lowering still uses narrow scalar classifier helpers even though typed-v2
   lowering is closed.

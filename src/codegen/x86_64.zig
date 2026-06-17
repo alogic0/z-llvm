@@ -10758,13 +10758,24 @@ fn emitGenericCfgI32ValueIntoEax(
                             }
                             if (op != .add) return error.UnsupportedCodegenInstruction;
                             const rhs_instruction = findInstruction(block, rhs_name) orelse return error.UnsupportedCodegenValue;
-                            const rhs_load = switch (rhs_instruction.kind) {
-                                .load => |load| load,
+                            switch (rhs_instruction.kind) {
+                                .load => |rhs_load| switch (genericCfgI32Address(function, rhs_load.ptr) orelse return error.UnsupportedCodegenValue) {
+                                    .tls => |symbol| try machine.instructions.append(allocator, .{ .add_tls_i32_eax = symbol }),
+                                    .param, .global => return error.UnsupportedCodegenValue,
+                                },
+                                .binary, .select, .call => {
+                                    if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return error.UnsupportedCodegenValue;
+                                    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, binary.rhs);
+                                    switch (binary.lhs) {
+                                        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+                                        .named => |lhs_name| {
+                                            const lhs_reg = try paramReg(function, lhs_name, .{ .int = 32 });
+                                            try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = lhs_reg } });
+                                        },
+                                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+                                    }
+                                },
                                 else => return error.UnsupportedCodegenInstruction,
-                            };
-                            switch (genericCfgI32Address(function, rhs_load.ptr) orelse return error.UnsupportedCodegenValue) {
-                                .tls => |symbol| try machine.instructions.append(allocator, .{ .add_tls_i32_eax = symbol }),
-                                .param, .global => return error.UnsupportedCodegenValue,
                             }
                         },
                         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -11360,15 +11371,21 @@ fn genericCfgSupportsSingleBlockBinary(function: ir.Function, block: ir.BasicBlo
         .named => |rhs_name| {
             if (genericCfgSupportsI32Param(function, rhs_name)) return true;
             const rhs_instruction = findInstruction(block, rhs_name) orelse return false;
-            const rhs_load = switch (rhs_instruction.kind) {
-                .load => |load| load,
+            switch (rhs_instruction.kind) {
+                .load => |load| {
+                    if (binary.op != .add or !load.ty.eql(.{ .int = 32 }) or load.attrs.isBarrier()) return false;
+                    return switch (genericCfgI32Address(function, load.ptr) orelse return false) {
+                        .tls => true,
+                        .param, .global => false,
+                    };
+                },
+                .binary, .select, .call => {
+                    return binary.op == .add and
+                        genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs) and
+                        genericCfgSupportsSingleBlockI32Value(function, block, binary.rhs);
+                },
                 else => return false,
-            };
-            if (binary.op != .add or !rhs_load.ty.eql(.{ .int = 32 }) or rhs_load.attrs.isBarrier()) return false;
-            return switch (genericCfgI32Address(function, rhs_load.ptr) orelse return false) {
-                .tls => true,
-                .param, .global => false,
-            };
+            }
         },
         else => return genericCfgSupportsSingleBlockI32Value(function, block, binary.rhs),
     }
@@ -11439,6 +11456,10 @@ fn genericCfgSupportsSingleBlockSelect(function: ir.Function, block: ir.BasicBlo
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
+    if (genericCfgSupportsI1Param(function, cond_name)) {
+        return genericCfgSupportsSingleBlockI32Value(function, block, select.true_value) and
+            genericCfgSupportsSingleBlockI32Value(function, block, select.false_value);
+    }
     const cond_inst = findInstruction(block, cond_name) orelse return false;
     const cond = switch (cond_inst.kind) {
         .icmp => |icmp| icmp,
@@ -11572,6 +11593,13 @@ fn genericCfgSupportsI32Param(function: ir.Function, name: []const u8) bool {
 fn genericCfgSupportsPointerParam(function: ir.Function, name: []const u8) bool {
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.ptr);
+    }
+    return false;
+}
+
+fn genericCfgSupportsI1Param(function: ir.Function, name: []const u8) bool {
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, name)) return param.ty.eql(.{ .int = 1 });
     }
     return false;
 }
@@ -18743,17 +18771,22 @@ fn lowerGenericCfgSelectReturnValue(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    const cond_inst = findInstruction(block, cond_name) orelse return error.UnsupportedCodegenValue;
-    const cond = switch (cond_inst.kind) {
-        .icmp => |icmp| icmp,
-        else => return error.UnsupportedCodegenInstruction,
-    };
-    if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
-
     const true_label = genericCfgSelectTrueLabel(depth);
     const end_label = genericCfgSelectEndLabel(depth);
-    const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
-    try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    if (genericCfgSupportsI1Param(function, cond_name)) {
+        const cond_reg = try paramReg(function, cond_name, .{ .int = 1 });
+        try machine.instructions.append(allocator, .{ .test_arg8 = cond_reg });
+        try machine.instructions.append(allocator, .{ .jne = true_label });
+    } else {
+        const cond_inst = findInstruction(block, cond_name) orelse return error.UnsupportedCodegenValue;
+        const cond = switch (cond_inst.kind) {
+            .icmp => |icmp| icmp,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (try lowerGenericCfgSminSelectReturn(allocator, machine, function, select, cond)) return;
+        const branch_kind = try emitGenericCfgIcmpCondition(allocator, machine, function, cond);
+        try appendGenericCfgConditionalBranch(allocator, machine, branch_kind, true_label);
+    }
     try lowerGenericCfgI32ValueIntoEax(allocator, machine, function, block, select.false_value, depth +| 1);
     try machine.instructions.append(allocator, .{ .jmp = end_label });
     try appendGenericCfgBlockLabel(allocator, machine, true_label);
@@ -18779,6 +18812,10 @@ fn lowerGenericCfgI32ValueIntoEax(
             const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
             const select = switch (instruction.kind) {
                 .select => |select| select,
+                .binary => {
+                    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, value);
+                    return;
+                },
                 else => return error.UnsupportedCodegenInstruction,
             };
             if (depth == std.math.maxInt(u2)) return error.UnsupportedCodegenInstruction;
