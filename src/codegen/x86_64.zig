@@ -1201,7 +1201,7 @@ fn lowerStraightLineReturn(
             if (try lowerBase64DecodeStepMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64WriterMainReturn(allocator, machine, function, block, ret)) return;
             if (try lowerBase64TableLookupMainReturn(allocator, machine, function, block, ret)) return;
-            if (try lowerBase64TableLookupReturn(allocator, machine, function, block, ret)) return;
+            if (try lowerGenericCfgByteTableLookupReturn(allocator, machine, function, block, ret)) return;
             if (try lowerSelectedLibfuzzerTestRun(allocator, machine, function, block, ret)) return;
             if (try lowerI64SaturatingHelperFamilyReturn(allocator, machine, function, block, ret)) return;
             if (hasLiveInstructions(block)) {
@@ -6300,21 +6300,16 @@ fn lowerBase64TableLookupMainReturn(
     return true;
 }
 
-fn lowerBase64TableLookupReturn(
+fn lowerGenericCfgByteTableLookupReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!std.mem.eql(u8, function.name, "base64.table_lookup") and
-        !std.mem.eql(u8, function.name, "base64_table_lookup.base64_table_lookup") and
-        !std.mem.eql(u8, function.name, "base64_table_lookup"))
-    {
-        return false;
-    }
     if (!ret.ty.eql(.{ .int = 32 }) or function.params.items.len != 1) return false;
     if (block.instructions.items.len < 4 or block.instructions.items.len > 6) return false;
+    if (!function.params.items[0].ty.eql(.{ .int = 8 })) return false;
 
     const has_safety_cmp = block.instructions.items.len == 6;
     const has_mask = block.instructions.items.len == 5 or has_safety_cmp;
@@ -11040,6 +11035,10 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
             return true;
         }
         if (try lowerScalarFpCastReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
+        if (try lowerGenericCfgByteTableLookupReturn(allocator, machine, function, block, ret)) {
             machine.codegen_path = .generic_cfg;
             return true;
         }

@@ -5884,6 +5884,36 @@ test "x86_64 codegen routes fp binary with unused scalar param through generic c
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes byte table lookup through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\@__anon_test_table = private unnamed_addr constant [4 x i8] c"\00\04\08\0C", align 4
+        \\
+        \\define i32 @byte_table_lookup(i8 %index) {
+        \\entry:
+        \\  %masked = and i8 %index, 3
+        \\  %idx = zext i8 %masked to i64
+        \\  %ptr = getelementptr inbounds [4 x i8], ptr @__anon_test_table, i64 0, i64 %idx
+        \\  %byte = load i8, ptr %ptr
+        \\  %value = zext i8 %byte to i32
+        \\  ret i32 %value
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes store branch load after store through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

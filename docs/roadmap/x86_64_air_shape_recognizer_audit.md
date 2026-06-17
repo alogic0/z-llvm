@@ -65,16 +65,15 @@ v2 fallback bucket.
 No broad shape-recognizer families remain in `src/zig_air_lowering.zig`.
 
 Backend generic CFG ownership is tracked separately from typed-v2 lowering.
-The current broad x86_64 release gates report `generic_cfg_functions=150` /
-`structural_matcher_functions=2` for ReleaseFast and ReleaseSmall, and
-`151` / `1` for ReleaseSafe. The expanded frontier reports
-`generic_cfg_functions=179` / `structural_matcher_functions=2` for
-ReleaseFast and ReleaseSmall, and `180` / `1` for ReleaseSafe. Newly promoted
+The current broad x86_64 release gates report `generic_cfg_functions=151` /
+`structural_matcher_functions=1` for ReleaseFast, ReleaseSafe, and
+ReleaseSmall. The expanded frontier reports `generic_cfg_functions=180` /
+`structural_matcher_functions=1` for all three release modes. Newly promoted
 backend families include alloca-stored extern-struct field loads at offsets 0
 and 4, branch-local field-0 updates, the nested optional-pointer branch payload
 with a preserved ReleaseSafe guard edge, optional-pointer load-plus-add payload
 blocks, the expanded f32 pipeline with an unused scalar bool parameter, the
-conditional slice-loop update row,
+base64 byte-table lookup leaf, the conditional slice-loop update row,
 single-block scalar FP binary/compare/select/literal returns, single-block
 volatile i32 store/load roundtrips, single-block packed read/replace bit
 helpers, scalar numeric conversion casts, signed-min `icmp slt`/`select`
@@ -114,8 +113,8 @@ global-address arguments through generic CFG, covering
 `runtime_pointer_load_store_main.main`. Multi-block two-call optional-pointer
 wrapper checks now validate `ptr @global` and `ptr null` sibling call
 arguments through generic CFG, covering `runtime_optional_pointer_main.main`.
-Base64 table lookup internals and ReleaseSafe/runtime-boundary arithmetic
-remain structural/backend frontier work.
+ReleaseSafe/runtime-boundary arithmetic remains structural/backend frontier
+work.
 
 Set `ZLLVM_DEBUG_CODEGEN_PATHS=1` on an uncurated AIR gate to print the
 per-function backend route. The current expanded ReleaseFast structural
