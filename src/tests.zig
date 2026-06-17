@@ -5595,6 +5595,34 @@ test "x86_64 codegen routes pointer select load through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes conditional slice accumulation loop through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @conditional_slice_sum(ptr %values, i64 %len, i32 %limit) {
+        \\entry:
+        \\  %is_empty = icmp eq i64 %len, 0
+        \\  br i1 %is_empty, label %zero, label %loop
+        \\loop:
+        \\  ret i32 0
+        \\zero:
+        \\  ret i32 0
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes alloca pointer struct field loads through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

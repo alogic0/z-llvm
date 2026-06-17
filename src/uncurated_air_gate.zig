@@ -627,7 +627,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 108, 180 },
+        .expanded => .{ 108, 181 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1127,6 +1127,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_expanded_branch_pointer_phi_load(int, const int *, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_branch_pointer_phi_load");
     \\extern int z_expanded_branch_store(int, int *, int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store");
     \\extern int z_expanded_branch_store_computed(int, int *, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_store_computed");
+    \\extern int z_expanded_slice_conditional_sum(const int *, unsigned long, int) __asm__("expanded_cfg_memory_aggregates.expanded_slice_conditional_sum");
     \\extern int z_expanded_branch_call(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call");
     \\extern int z_expanded_branch_call_two(int, int) __asm__("expanded_cfg_memory_aggregates.expanded_branch_call_two");
     \\extern int z_expanded_optional_pointer_branch(int, const int *) __asm__("expanded_cfg_memory_aggregates.expanded_optional_pointer_branch");
@@ -1141,6 +1142,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    int right = 20;
     \\    int out = 0;
     \\    struct pair_i32 pair = { 20, 44 };
+    \\    const int mixed_values[4] = { 1, 9, 4, 12 };
+    \\    const int below_values[3] = { 1, 2, 3 };
+    \\    const int above_values[3] = { 6, 7, 8 };
     \\    if (z_expanded_branch_pointer_load(1, &left, &right) != 10) return 1;
     \\    if (z_expanded_branch_pointer_load(0, &left, &right) != 20) return 2;
     \\    if (z_expanded_branch_pointer_phi_load(1, &left, &right) != 10) return 3;
@@ -1149,6 +1153,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_expanded_branch_store(0, &out, 31, 41) != 41 || out != 41) return 6;
     \\    if (z_expanded_branch_store_computed(1, &out, 50) != 54 || out != 54) return 7;
     \\    if (z_expanded_branch_store_computed(0, &out, 50) != 46 || out != 46) return 8;
+    \\    if (z_expanded_slice_conditional_sum(mixed_values, 4, 5) != 21) return 9;
+    \\    if (z_expanded_slice_conditional_sum(below_values, 3, 5) != 0) return 10;
+    \\    if (z_expanded_slice_conditional_sum(above_values, 3, 5) != 21) return 21;
+    \\    if (z_expanded_slice_conditional_sum(mixed_values, 0, 5) != 0) return 22;
     \\    if (z_expanded_branch_call(1, 39) != 42) return 11;
     \\    if (z_expanded_branch_call(0, 39) != 36) return 12;
     \\    if (z_expanded_branch_call_two(1, 39) != 42) return 13;

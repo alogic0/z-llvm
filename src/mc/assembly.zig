@@ -30,6 +30,9 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .xor_ecx_ecx => try writer.writeAll("\txorl %ecx, %ecx\n"),
             .xor_ebp_ebp => try writer.writeAll("\txorl %ebp, %ebp\n"),
             .add_rdi_rcx4_ptr_eax => try writer.writeAll("\taddl (%rdi,%rcx,4), %eax\n"),
+            .load_rdi_rcx4_ptr_r8d => try writer.writeAll("\tmovl (%rdi,%rcx,4), %r8d\n"),
+            .cmp_r8d_arg32 => |reg| try writer.print("\tcmpl {s}, %r8d\n", .{reg.name32()}),
+            .add_r8d_eax => try writer.writeAll("\taddl %r8d, %eax\n"),
             .inc_rcx => try writer.writeAll("\tincq %rcx\n"),
             .movzx_dil_edi => try writer.writeAll("\tmovzbl %dil, %edi\n"),
             .and_edi_imm8 => |value| try writer.print("\tandl ${}, %edi\n", .{value}),
@@ -209,6 +212,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .jp => |label| try writer.print("\tjp .L{s}_{s}\n", .{ function.name, label }),
             .js => |label| try writer.print("\tjs .L{s}_{s}\n", .{ function.name, label }),
             .jae => |label| try writer.print("\tjae .L{s}_{s}\n", .{ function.name, label }),
+            .jle => |label| try writer.print("\tjle .L{s}_{s}\n", .{ function.name, label }),
             .jmp => |label| try writer.print("\tjmp .L{s}_{s}\n", .{ function.name, label }),
             .ret => try writer.writeAll("\tretq\n"),
         }

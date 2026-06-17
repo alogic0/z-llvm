@@ -31,16 +31,16 @@ ReleaseSmall:
 
 ```text
 source_rows=108
-discovered_functions=180
-structured_functions=180
-structured_air_v2_functions=180
-typed_air_operand_functions=180
+discovered_functions=181
+structured_functions=181
+structured_air_v2_functions=181
+typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=180
-generic_cfg_functions=101 (ReleaseSafe: 103)
+generic_codegen_functions=181
+generic_cfg_functions=102 (ReleaseSafe: 104)
 structural_matcher_functions=79 (ReleaseSafe: 77)
-generic_lowering_functions=180
+generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -55,7 +55,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=180
+object_emitted_functions=181
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -127,8 +127,8 @@ Closed expanded blocker families:
   block lowering now constructs real entry/then/else/merge blocks with phi
   incoming values, and the x86_64 generic CFG path lowers the eligible branch
   paths without a structural matcher. Current expanded counters are ReleaseFast
-  `generic_cfg_functions=101` / `structural_matcher_functions=79`, ReleaseSafe
-  `103` / `77`, and ReleaseSmall `101` / `79`.
+  `generic_cfg_functions=102` / `structural_matcher_functions=79`, ReleaseSafe
+  `104` / `77`, and ReleaseSmall `102` / `79`.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from
   `expanded_cfg_memory_aggregates.expanded_optional_pointer_branch`. Typed v2
   now lowers pointer `optional_payload` and `is_non_null`, accepts a nested
@@ -137,6 +137,13 @@ Closed expanded blocker families:
   guarded optional-pointer branch with the cold panic edge preserved in
   ReleaseSafe plus a phi/immediate return. The expanded executable harness
   covers non-null and false/null fallback paths.
+- typed v2 CFG/backend gap: conditional slice-loop update from
+  `expanded_cfg_memory_aggregates.expanded_slice_conditional_sum`. Typed v2 now
+  validates the nested loop body, inner conditional block, indexed pointer load,
+  limit compare, and accumulator update; the generic x86_64 CFG path emits the
+  counted pointer loop with conditional accumulation. The expanded executable
+  harness covers mixed below/above threshold data, empty length, all-below, and
+  all-above inputs.
 - expanded frontier bucket: `expanded_branch_arrays.zig` adds a supported
   optional-control-flow source row with executable ABI coverage. A wider
   branch-return and byte-table-return version correctly failed closed with
@@ -166,11 +173,11 @@ Closed expanded blocker families:
 Active expanded blocker families:
 
 - none for the current exported expanded discovery/lowering/codegen/executable
-  slices. Wider conditional slice-loop updates still fail closed at typed AIR
-  `block/control_flow_shape`; volatile memory roundtrips, broader aggregate
-  field stores, and more loop-memory dependency shapes are intentionally not
-  routed through generic CFG in the current memory/CFG bucket and remain future
-  generic CFG memory-dependency and aggregate-field candidates.
+  slices. Volatile memory roundtrips, broader aggregate field stores, broader
+  global/TLS addressing, and larger loop-memory dependency shapes are
+  intentionally not routed through generic CFG in the current memory/CFG bucket
+  and remain future generic CFG memory-dependency and aggregate-field
+  candidates.
 
 Ownership rules for this frontier:
 

@@ -39,7 +39,7 @@ export fn expanded_branch_store_computed(flag: i32, out: *i32, value: i32) i32 {
     return out.*;
 }
 
-fn expanded_slice_conditional_sum(values: [*]const i32, len: usize, limit: i32) i32 {
+export fn expanded_slice_conditional_sum(values: [*]const i32, len: usize, limit: i32) i32 {
     var index: usize = 0;
     var sum: i32 = 0;
     while (index < len) : (index += 1) {

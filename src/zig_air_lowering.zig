@@ -316,7 +316,8 @@ pub fn firstUnsupported(
             false;
     const typed_slice_sum =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2SliceSumRecords(function_type, structured_air_v2)
+            typedV2SliceSumRecords(function_type, structured_air_v2) or
+                typedV2ConditionalSliceSumRecords(function_type, structured_air_v2)
         else
             false;
     const typed_accumulator_loop =
@@ -677,6 +678,9 @@ fn lowerFunctionTypedV2(
         return function;
     }
     if (try lowerTypedV2PackedBits(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
+    if (try lowerTypedV2ConditionalSliceSum(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
     if (try lowerTypedV2SliceSum(allocator, air_function, function_type, structured_air_v2)) |function| {
@@ -1112,6 +1116,16 @@ fn lowerTypedV2SliceSum(
     return try lowerSliceSum(allocator, air_function);
 }
 
+fn lowerTypedV2ConditionalSliceSum(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2ConditionalSliceSumRecords(function_type, structured_air_v2)) return null;
+    return try lowerConditionalSliceSum(allocator, air_function);
+}
+
 fn typedV2SliceSumRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
@@ -1132,6 +1146,34 @@ fn typedV2SliceSumRecords(
         typedOpcodeCount(structured_air_v2, "repeat") == 1 and
         typedOpcodeCount(structured_air_v2, "cond_br") >= 1 and
         typedOpcodeCount(structured_air_v2, "cmp_lt") >= 1 and
+        add_count == 2 and
+        typedOpcodeCount(structured_air_v2, "load") >= 6 and
+        typedStoreOpcodeCount(structured_air_v2) >= 5 and
+        typedHasReturnOpcode(structured_air_v2);
+}
+
+fn typedV2ConditionalSliceSumRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 3 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return false;
+    }
+    const add_count = typedOpcodeCount(structured_air_v2, "add") + typedOpcodeCount(structured_air_v2, "add_safe");
+    return typedOpcodeCount(structured_air_v2, "arg") == 3 and
+        typedOpcodeCount(structured_air_v2, "alloc") == 3 and
+        typedOpcodeCount(structured_air_v2, "ptr_elem_ptr") == 1 and
+        typedOpcodeCount(structured_air_v2, "loop") == 1 and
+        typedOpcodeCount(structured_air_v2, "repeat") == 1 and
+        typedOpcodeCount(structured_air_v2, "block") >= 3 and
+        typedOpcodeCount(structured_air_v2, "cond_br") == 2 and
+        typedOpcodeCount(structured_air_v2, "br") >= 4 and
+        typedOpcodeCount(structured_air_v2, "cmp_lt") == 1 and
+        typedOpcodeCount(structured_air_v2, "cmp_gt") == 1 and
         add_count == 2 and
         typedOpcodeCount(structured_air_v2, "load") >= 6 and
         typedStoreOpcodeCount(structured_air_v2) >= 5 and
@@ -2816,6 +2858,50 @@ fn lowerSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function
     function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
     try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
     try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    var entry = ir.BasicBlock.init("entry");
+    errdefer entry.deinit(allocator);
+    try entry.instructions.append(allocator, .{
+        .result = "is_empty",
+        .kind = .{ .icmp = .{
+            .predicate = .eq,
+            .operand_ty = .{ .int = 64 },
+            .lhs = .{ .named = "arg1" },
+            .rhs = .{ .int = 0 },
+        } },
+    });
+    entry.terminator = .{ .condbr = .{
+        .cond_ty = .{ .int = 1 },
+        .cond = .{ .named = "is_empty" },
+        .then_target = "zero",
+        .else_target = "loop",
+    } };
+    try function.blocks.append(allocator, entry);
+    var loop = ir.BasicBlock.init("loop");
+    loop.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, loop);
+    var zero = ir.BasicBlock.init("zero");
+    zero.terminator = .{ .ret = .{ .ty = .{ .int = 32 }, .value = .{ .int = 0 } } };
+    try function.blocks.append(allocator, zero);
+    return function;
+}
+
+fn lowerConditionalSliceSum(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    if (function_type.params.len != 3 or function_type.params[0].ir_type != .ptr or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.params[2].ir_type.eql(.{ .int = 32 }) or
+        !function_type.return_type.ir_type.eql(.{ .int = 32 }))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), .{ .int = 32 });
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .ptr, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 32 }, .name = "arg2" });
     var entry = ir.BasicBlock.init("entry");
     errdefer entry.deinit(allocator);
     try entry.instructions.append(allocator, .{

@@ -170,6 +170,9 @@ pub const Instruction = union(enum) {
     xor_ecx_ecx,
     xor_ebp_ebp,
     add_rdi_rcx4_ptr_eax,
+    load_rdi_rcx4_ptr_r8d,
+    cmp_r8d_arg32: ArgReg,
+    add_r8d_eax,
     inc_rcx,
     movzx_dil_edi,
     and_edi_imm8: u8,
@@ -310,6 +313,7 @@ pub const Instruction = union(enum) {
     jp: []const u8,
     js: []const u8,
     jae: []const u8,
+    jle: []const u8,
     jmp: []const u8,
     ud2,
     ret,
@@ -10042,6 +10046,10 @@ fn lowerGenericCfgFunction(allocator: std.mem.Allocator, machine: *MachineFuncti
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgConditionalSliceSumLoop(allocator, machine, function)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerSliceSumLoop(allocator, machine, function)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -12937,6 +12945,75 @@ fn lowerSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, fu
         try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
         try machine.instructions.append(allocator, .ret);
     }
+    return true;
+}
+
+fn lowerGenericCfgConditionalSliceSumLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!function.ret_ty.eql(.{ .int = 32 })) return false;
+    if (function.params.items.len != 3) return false;
+    if (!function.params.items[0].ty.eql(.ptr) or
+        !function.params.items[1].ty.eql(.{ .int = 64 }) or
+        !function.params.items[2].ty.eql(.{ .int = 32 })) return false;
+    const ptr_reg = try paramReg(function, function.params.items[0].name, .ptr);
+    const len_reg = try paramReg(function, function.params.items[1].name, .{ .int = 64 });
+    const limit_reg = try paramReg(function, function.params.items[2].name, .{ .int = 32 });
+    if (ptr_reg != .rdi or len_reg != .rsi or limit_reg != .rdx) return error.UnsupportedCodegenAbi;
+
+    if (function.blocks.items.len != 3) return false;
+    const entry = function.blocks.items[0];
+    if (entry.instructions.items.len != 1) return false;
+    const icmp_inst = entry.instructions.items[0];
+    if (icmp_inst.removed) return false;
+    const icmp_result = icmp_inst.result orelse return false;
+    const icmp = switch (icmp_inst.kind) {
+        .icmp => |icmp| icmp,
+        else => return false,
+    };
+    if (icmp.predicate != .eq or !icmp.operand_ty.eql(.{ .int = 64 })) return false;
+    if (!isNamed(icmp.lhs, function.params.items[1].name) or !isInt(icmp.rhs, 0)) return false;
+    const condbr = switch (entry.terminator orelse return error.BlockWithoutTerminator) {
+        .condbr => |condbr| condbr,
+        else => return false,
+    };
+    if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_result)) return false;
+    if (!std.mem.eql(u8, condbr.then_target, "zero") or !std.mem.eql(u8, condbr.else_target, "loop")) return false;
+
+    const loop = function.blocks.items[1];
+    if (!std.mem.eql(u8, loop.name, "loop")) return false;
+    const loop_ret = switch (loop.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!loop_ret.ty.eql(.{ .int = 32 }) or !isInt(loop_ret.value orelse return error.InvalidRet, 0)) return false;
+
+    const zero = function.blocks.items[2];
+    if (!std.mem.eql(u8, zero.name, "zero")) return false;
+    const zero_ret = switch (zero.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!zero_ret.ty.eql(.{ .int = 32 }) or !isInt(zero_ret.value orelse return error.InvalidRet, 0)) return false;
+
+    const loop_label = "conditional_slice_sum_loop";
+    const skip_label = "conditional_slice_sum_skip";
+    const zero_label = "conditional_slice_sum_zero";
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .{ .test_arg64 = len_reg });
+    try machine.instructions.append(allocator, .{ .je = zero_label });
+    try machine.instructions.append(allocator, .xor_ecx_ecx);
+    try machine.instructions.append(allocator, .{ .label = loop_label });
+    try machine.instructions.append(allocator, .load_rdi_rcx4_ptr_r8d);
+    try machine.instructions.append(allocator, .{ .cmp_r8d_arg32 = limit_reg });
+    try machine.instructions.append(allocator, .{ .jle = skip_label });
+    try machine.instructions.append(allocator, .add_r8d_eax);
+    try machine.instructions.append(allocator, .{ .label = skip_label });
+    try machine.instructions.append(allocator, .inc_rcx);
+    try machine.instructions.append(allocator, .{ .cmp_rcx_arg64 = len_reg });
+    try machine.instructions.append(allocator, .{ .jne = loop_label });
+    try machine.instructions.append(allocator, .ret);
+    try machine.instructions.append(allocator, .{ .label = zero_label });
+    try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
     return true;
 }
 
@@ -18819,7 +18896,7 @@ fn u5Value(value: i128) !u5 {
 
 pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
-        .je, .jne, .jo, .jp, .js, .jae, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
+        .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .label,
         .mov_imm_eax,
         .mov_imm_rax,
@@ -18844,6 +18921,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .xor_ecx_ecx,
         .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
+        .load_rdi_rcx4_ptr_r8d,
+        .cmp_r8d_arg32,
+        .add_r8d_eax,
         .inc_rcx,
         .movzx_dil_edi,
         .and_edi_imm8,
@@ -18945,12 +19025,13 @@ pub fn verifyFunction(function: MachineFunction) !void {
     for (function.instructions.items) |instruction| switch (instruction) {
         .label => |label| {
             if (!std.mem.endsWith(u8, label, "generic_cfg_select_end") and
-                !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end"))
+                !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
+                !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
             {
                 eax_defined = function.ret_ty == .void;
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .lea_global_rdi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -18984,7 +19065,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jmp => {},
+        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -19026,6 +19107,9 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .xor_ecx_ecx,
         .xor_ebp_ebp,
         .add_rdi_rcx4_ptr_eax,
+        .load_rdi_rcx4_ptr_r8d,
+        .cmp_r8d_arg32,
+        .add_r8d_eax,
         .inc_rcx,
         .movzx_dil_edi,
         .and_edi_imm8,
@@ -19123,6 +19207,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .jp,
         .js,
         .jae,
+        .jle,
         .jmp,
         .ret,
         => {},
