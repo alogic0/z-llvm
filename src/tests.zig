@@ -7348,6 +7348,48 @@ test "x86_64 codegen routes empty void return through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes shift mix through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @integers.shift_mix(i32 %a, i32 %b) {
+        \\entry:
+        \\  %mask = and i32 %b, 31
+        \\  %left = shl i32 %a, %mask
+        \\  %right = lshr i32 %a, %mask
+        \\  %mixed = xor i32 %left, %right
+        \\  ret i32 %mixed
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
+test "x86_64 codegen routes i64 constant return through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @i64_arithmetic.i64_value() {
+        \\entry:
+        \\  ret i64 1234567890123
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "parser classifies inline asm side effects separately from memory constraints" {
     const input =
         \\define void @inline_asm_effects(ptr %p) {

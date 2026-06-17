@@ -11034,6 +11034,10 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
             machine.codegen_path = .generic_cfg;
             return true;
         }
+        if (try lowerIntegerShiftMixReturn(allocator, machine, function, block, ret)) {
+            machine.codegen_path = .generic_cfg;
+            return true;
+        }
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
@@ -11122,6 +11126,10 @@ fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Machine
         .ret => |ret| ret,
         else => return false,
     };
+    if (try lowerSelectedI64ConstReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerErrorUnionI64SelectReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
