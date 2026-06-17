@@ -185,8 +185,8 @@ real-AIR discovery surface to `test/zig/inputs/*.zig` plus
 `test/zig/integrated/*.zig`. All three release modes now report
 `source_rows=101`, `discovered_functions=152`,
 `structured_functions=152`, `generic_codegen_functions=152`,
-`generic_cfg_functions=141` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=142` for ReleaseSafe,
+`generic_cfg_functions=144` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=145` for ReleaseSafe,
 `structured_air_v1_functions=152`, `structured_air_v2_functions=152`,
 `typed_air_type_functions=152`, `typed_air_operand_functions=152`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`,
@@ -235,8 +235,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, are green
 for ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=108`,
 `discovered_functions=181`, `generic_codegen_functions=181`,
-`generic_cfg_functions=168` for ReleaseFast/ReleaseSmall and
-`generic_cfg_functions=169` for ReleaseSafe,
+`generic_cfg_functions=171` for ReleaseFast/ReleaseSmall and
+`generic_cfg_functions=172` for ReleaseSafe,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -463,9 +463,11 @@ selected i64 wrapper-family mains that reduce to those leaves. Constant FP/bool
 and integer-return sibling-wrapper call/check mains now use a generic CFG
 admission rather than selected runtime wrapper tables, and sibling update/get
 wrapper mains now use generic direct-call lowering instead of hidden-global
-structural lowering. Remaining structural families are mostly multi-block
-volatile memory, pointer/TLS wrapper checks, aggregate/runtime check rows,
-aggregate wrapper-main checks, broader aggregate field stores, larger loop-memory
+structural lowering. Constant direct-call wrapper mains with optional identity
+casts now use generic direct-call lowering, covering mixed C/Zig and TLS bump
+wrapper checks. Remaining structural families are mostly multi-block volatile
+memory, pointer/slice wrapper checks, aggregate/runtime check rows, aggregate
+wrapper-main checks, broader aggregate field stores, larger loop-memory
 variants, and larger ABI/call shapes; each should move only when the generic
 CFG eligibility checks can prove the full instruction and terminator subset.
 

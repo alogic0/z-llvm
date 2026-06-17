@@ -876,6 +876,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerGenericCfgSingleBlockDirectCallMain(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerGenericCfgSingleBlockUpdateGetMain(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -11152,6 +11157,56 @@ fn lowerGenericCfgSingleBlockVoidCallMain(allocator: std.mem.Allocator, machine:
 
     try appendAlignedDirectCall(allocator, machine, call.callee, .void);
     try machine.instructions.append(allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(allocator, .ret);
+    machine.codegen_path = .generic_cfg;
+    return true;
+}
+
+fn lowerGenericCfgSingleBlockDirectCallMain(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
+    if (!isMainOrWrapperMain(function.name)) return false;
+    if (!function.ret_ty.eql(.{ .int = 32 }) or function.params.items.len != 0 or function.blocks.items.len != 1) return false;
+    const block = function.blocks.items[0];
+    const ret = switch (block.terminator orelse return error.BlockWithoutTerminator) {
+        .ret => |ret| ret,
+        else => return false,
+    };
+    if (!ret.ty.eql(.{ .int = 32 })) return false;
+    if (block.instructions.items.len != 1 and block.instructions.items.len != 2) return false;
+
+    const call_inst = block.instructions.items[0];
+    if (call_inst.removed) return false;
+    const call_result = call_inst.result orelse return false;
+    if (block.instructions.items.len == 1) {
+        if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+    } else {
+        const cast_inst = block.instructions.items[1];
+        if (cast_inst.removed) return false;
+        const cast_name = identityCastFrom(cast_inst, call_result, .{ .int = 32 }, .{ .int = 32 }) orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, cast_name)) return false;
+    }
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 4) return false;
+    for (call.args.items, 0..) |arg, index| {
+        if (arg.attrs != null or !arg.ty.eql(.{ .int = 32 })) return false;
+        const value = switch (arg.value) {
+            .int => |int| try i32Value(int),
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+        switch (index) {
+            0 => try machine.instructions.append(allocator, .{ .mov_imm_rdi = value }),
+            1 => try machine.instructions.append(allocator, .{ .mov_imm_rsi = value }),
+            2 => try machine.instructions.append(allocator, .{ .mov_imm_rdx = value }),
+            3 => try machine.instructions.append(allocator, .{ .mov_imm_rcx = value }),
+            else => unreachable,
+        }
+    }
+    try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
     try machine.instructions.append(allocator, .ret);
     machine.codegen_path = .generic_cfg;
     return true;
