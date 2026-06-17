@@ -11900,7 +11900,7 @@ fn lowerGenericCfgFpBinaryReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (function.params.items.len != 2 or block.instructions.items.len != 1) return false;
+    if (function.params.items.len < 2 or block.instructions.items.len != 1) return false;
     const instruction = block.instructions.items[0];
     if (instruction.removed) return false;
     const result = instruction.result orelse return false;
@@ -11913,6 +11913,9 @@ fn lowerGenericCfgFpBinaryReturn(
     if ((!binary.ty.eql(.float) and !binary.ty.eql(.double)) or
         !function.params.items[0].ty.eql(binary.ty) or
         !function.params.items[1].ty.eql(binary.ty)) return false;
+    for (function.params.items[2..]) |param| {
+        if (!genericCfgSupportsUnusedScalarParam(param.ty)) return false;
+    }
     if (!isNamed(binary.lhs, function.params.items[0].name) or
         !isNamed(binary.rhs, function.params.items[1].name)) return false;
 
@@ -11934,6 +11937,13 @@ fn lowerGenericCfgFpBinaryReturn(
     }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn genericCfgSupportsUnusedScalarParam(ty: ir.Type) bool {
+    return switch (ty) {
+        .int, .ptr, .float, .double => true,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+    };
 }
 
 fn lowerGenericCfgFpCompareReturn(

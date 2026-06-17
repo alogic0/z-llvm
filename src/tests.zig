@@ -5860,6 +5860,30 @@ test "x86_64 codegen routes optional pointer load plus add through generic cfg p
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes fp binary with unused scalar param through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define float @float_add_unused_bool(float %a, float %b, i1 %unused) {
+        \\entry:
+        \\  %sum = fadd float %a, %b
+        \\  ret float %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes store branch load after store through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
