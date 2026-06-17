@@ -7393,6 +7393,26 @@ test "x86_64 codegen routes shift mix through generic cfg path" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes scalar multiply-by-constant through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @control_flow_calls.callee(i32 %value) {
+        \\entry:
+        \\  %doubled = mul i32 %value, 2
+        \\  ret i32 %doubled
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes i64 constant return through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
