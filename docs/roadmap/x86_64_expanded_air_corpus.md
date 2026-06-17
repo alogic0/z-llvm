@@ -10,8 +10,8 @@ The closed broad corpus remains the regression baseline:
 - `typed_v2_fallback_functions=0`
 - `shape_recognizer_functions=0`
 - `generic_lowering_functions=152`
-- `generic_cfg_functions=108` for ReleaseFast and ReleaseSmall
-- `generic_cfg_functions=109` for ReleaseSafe
+- `generic_cfg_functions=109` for ReleaseFast and ReleaseSmall
+- `generic_cfg_functions=110` for ReleaseSafe
 
 The expanded corpus is a separate frontier bucket. It adds explicit fixtures
 under `test/zig/expanded/*.zig` and must not weaken the broad baseline.
@@ -38,8 +38,8 @@ typed_air_operand_functions=181
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 generic_codegen_functions=181
-generic_cfg_functions=133 (ReleaseSafe: 134)
-structural_matcher_functions=48 (ReleaseSafe: 47)
+generic_cfg_functions=134 (ReleaseSafe: 135)
+structural_matcher_functions=47 (ReleaseSafe: 46)
 generic_lowering_functions=181
 shape_recognizer_functions=0
 unsupported_functions=0
@@ -129,16 +129,17 @@ Closed expanded blocker families:
   paths without a structural matcher. Single-block scalar FP binary, compare,
   select, and literal-return rows now use the same generic CFG ownership path
   before the one-block structural fallback. Current expanded counters are
-  ReleaseFast `generic_cfg_functions=133` /
-  `structural_matcher_functions=48`, ReleaseSafe `134` / `47`, and
-  ReleaseSmall `133` / `48`. Single-block volatile roundtrip helpers now also
+  ReleaseFast `generic_cfg_functions=134` /
+  `structural_matcher_functions=47`, ReleaseSafe `135` / `46`, and
+  ReleaseSmall `134` / `47`. Single-block volatile roundtrip helpers now also
   validate volatile store/load ordering through generic CFG; single-block
   packed read/replace helpers validate their mask/shift/OR and sign-bit compare
   shapes through generic CFG; scalar numeric conversion rows validate fpext,
   fptrunc, int-from-float, signed int-to-float, and unsigned int-to-double
   shapes through generic CFG; signed-min `icmp slt`/`select` classifier rows
-  nested `i8` equality error-switch selects, and boolean-parameter
-  branch-mix add/sub selects validate through generic CFG.
+  nested `i8` equality error-switch selects, boolean-parameter branch-mix
+  add/sub selects, and constant-return `i8 switch` CFGs validate through
+  generic CFG.
   Wrapper volatile and packed main checks remain
   structural.
 - typed v2 CFG/backend gap: nested optional-pointer branch payload from

@@ -5495,6 +5495,42 @@ test "x86_64 codegen routes boolean branch-mix select through generic cfg path" 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
 }
 
+test "x86_64 codegen routes constant i8 switch through generic cfg path" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @generic_dense_switch(i8 %value) {
+        \\entry:
+        \\  switch i8 %value, label %default [
+        \\    i8 0, label %case0
+        \\    i8 1, label %case1
+        \\    i8 2, label %case2
+        \\  ]
+        \\case0:
+        \\  ret i32 11
+        \\case1:
+        \\  ret i32 13
+        \\case2:
+        \\  ret i32 17
+        \\default:
+        \\  ret i32 23
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try codegen.x86_64.lowerFunction(
+        std.testing.allocator,
+        module.target_triple.?,
+        module.functions.items[0],
+    );
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expect(machine.instructions.items.len > 0);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+}
+
 test "x86_64 codegen routes single-block fp binary through generic cfg path" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

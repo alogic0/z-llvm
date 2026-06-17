@@ -868,6 +868,7 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
     }
 
     if (try lowerIntegerSwitchReturn(allocator, &machine, function)) {
+        machine.codegen_path = .generic_cfg;
         try verifyFunction(machine);
         return machine;
     }
