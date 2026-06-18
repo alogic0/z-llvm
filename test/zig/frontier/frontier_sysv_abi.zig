@@ -22,6 +22,8 @@ noinline fn frontier_id_i32(value: i32) i32 {
 extern fn frontier_touch_f32(value: f32) void;
 extern fn frontier_touch_f64(value: f64) void;
 extern fn frontier_touch_none() void;
+extern fn frontier_sum5_f32(a: f32, b: f32, c: f32, d: f32, e: f32) f32;
+extern fn frontier_sum5_f64(a: f64, b: f64, c: f64, d: f64, e: f64) f64;
 
 export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
     return a + b + frontier_id_i32(c);
@@ -74,4 +76,12 @@ export fn frontier_three_f32_live_sum_after_call(a: f32, b: f32, c: f32) f32 {
 export fn frontier_three_f64_live_sum_after_call(a: f64, b: f64, c: f64) f64 {
     frontier_touch_none();
     return a + b + c;
+}
+
+export fn frontier_five_f32_external_call(a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
+    return frontier_sum5_f32(a, b, c, d, e);
+}
+
+export fn frontier_five_f64_external_call(a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
+    return frontier_sum5_f64(a, b, c, d, e);
 }

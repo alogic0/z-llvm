@@ -6426,6 +6426,93 @@ test "x86_64 codegen supports mixed integer and SSE call streams with stack args
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[8]);
 }
 
+test "x86_64 codegen supports five named f64 pass-through call args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @callee(double, double, double, double, double)
+        \\
+        \\define double @caller(double %a, double %b, double %c, double %d, double %e) {
+        \\entry:
+        \\  %r = call double @callee(double %a, double %b, double %c, double %d, double %e)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    const call = switch (machine.instructions.items[1]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("callee", call.symbol);
+    try std.testing.expectEqual(ir.Type.double, call.ret_ty);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
+test "x86_64 codegen supports five named f32 pass-through call args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare float @callee(float, float, float, float, float)
+        \\
+        \\define float @caller(float %a, float %b, float %c, float %d, float %e) {
+        \\entry:
+        \\  %r = call float @callee(float %a, float %b, float %c, float %d, float %e)
+        \\  ret float %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    const call = switch (machine.instructions.items[1]) {
+        .direct_call => |call| call,
+        else => return error.ExpectedDirectCall,
+    };
+    try std.testing.expectEqualStrings("callee", call.symbol);
+    try std.testing.expectEqual(ir.Type.float, call.ret_ty);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
+}
+
+test "x86_64 codegen rejects third FP constant call arg until xmm2 materialization exists" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare double @callee(double, double, double)
+        \\
+        \\define double @caller() {
+        \\entry:
+        \\  %r = call double @callee(double 1.000000e+00, double 2.000000e+00, double 3.000000e+00)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 codegen supports mixed integer and f64 direct call return" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

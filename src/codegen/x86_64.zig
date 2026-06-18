@@ -21595,8 +21595,10 @@ fn appendSysVScalarCallArgs(
     // pass-through register aggregates: i32/i64 integer or pointer-class values
     // in the integer stream, f32/f64 in the SSE stream, register aggregate
     // parameters that are already in the destination argument registers, and up
-    // to three constant i32 stack arguments. Varargs, byval/sret attrs, vectors,
-    // MEMORY aggregates, and aggregate register shuffles fail closed here.
+    // to three constant i32 stack arguments. FP constants are only materialized
+    // for %xmm0/%xmm1 today; named FP pass-through may use the full SysV SSE
+    // register stream. Varargs, byval/sret attrs, vectors, MEMORY aggregates,
+    // and aggregate register shuffles fail closed here.
     if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
@@ -21632,9 +21634,12 @@ fn appendSysVScalarCallArgs(
             continue;
         }
         if (arg.ty.eql(.float)) {
-            if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
-            const bits = switch (arg.value) {
-                .fp => try fp32TextBits(arg.value),
+            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
+            const bits = blk: switch (arg.value) {
+                .fp => {
+                    if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
+                    break :blk try fp32TextBits(arg.value);
+                },
                 .named => |name| {
                     const src_index = try fpParamIndex(function, name, .float);
                     if (src_index != fp_arg_index) {
@@ -21652,15 +21657,18 @@ fn appendSysVScalarCallArgs(
             switch (fp_arg_index) {
                 0 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = bits }),
                 1 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = bits }),
-                else => unreachable,
+                else => return error.UnsupportedCodegenAbi,
             }
             fp_arg_index += 1;
             continue;
         }
         if (arg.ty.eql(.double)) {
-            if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
-            const bits = switch (arg.value) {
-                .fp => try fp64TextBits(arg.value),
+            if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
+            const bits = blk: switch (arg.value) {
+                .fp => {
+                    if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
+                    break :blk try fp64TextBits(arg.value);
+                },
                 .named => |name| {
                     const src_index = try fpParamIndex(function, name, .double);
                     if (src_index != fp_arg_index) {

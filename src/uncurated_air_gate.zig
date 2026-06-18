@@ -1504,11 +1504,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_two_f64_live_sum_after_call(double, double) __asm__("frontier_sysv_abi.frontier_two_f64_live_sum_after_call");
     \\extern float z_frontier_three_f32_live_sum_after_call(float, float, float) __asm__("frontier_sysv_abi.frontier_three_f32_live_sum_after_call");
     \\extern double z_frontier_three_f64_live_sum_after_call(double, double, double) __asm__("frontier_sysv_abi.frontier_three_f64_live_sum_after_call");
+    \\extern float z_frontier_five_f32_external_call(float, float, float, float, float) __asm__("frontier_sysv_abi.frontier_five_f32_external_call");
+    \\extern double z_frontier_five_f64_external_call(double, double, double, double, double) __asm__("frontier_sysv_abi.frontier_five_f64_external_call");
     \\volatile float frontier_seen_f32 = 0.0f;
     \\volatile double frontier_seen_f64 = 0.0;
     \\void frontier_touch_f32(float value) { frontier_seen_f32 = value; }
     \\void frontier_touch_f64(double value) { frontier_seen_f64 = value; }
     \\void frontier_touch_none(void) {}
+    \\float frontier_sum5_f32(float a, float b, float c, float d, float e) { return a + b + c + d + e; }
+    \\double frontier_sum5_f64(double a, double b, double c, double d, double e) { return a + b + c + d + e; }
     \\int main(void) {
     \\    struct Pair64 pair = z_frontier_pair64_make(0x1122334455667788LL, 0x0102030405060708LL);
     \\    if (pair.a != 0x1122334455667788LL || pair.b != 0x0102030405060708LL) return 1;
@@ -1525,6 +1529,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_two_f64_live_sum_after_call(1.25, 2.5) != 3.75) return 12;
     \\    if (z_frontier_three_f32_live_sum_after_call(1.5f, 2.75f, 3.25f) != 7.5f) return 13;
     \\    if (z_frontier_three_f64_live_sum_after_call(1.25, 2.5, 3.75) != 7.5) return 14;
+    \\    if (z_frontier_five_f32_external_call(1.0f, 2.0f, 3.0f, 4.0f, 5.0f) != 15.0f) return 15;
+    \\    if (z_frontier_five_f64_external_call(1.5, 2.25, 3.75, 4.5, 5.0) != 17.0) return 16;
     \\    return 0;
     \\}
     \\

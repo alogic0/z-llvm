@@ -159,6 +159,9 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   three live f32/f64 values can also be spilled from %xmm0/%xmm1/%xmm2
   across the same no-argument helper shape and reloaded for a two-step
   post-call fadd return
+  five named f32/f64 arguments can be forwarded to external C ABI helpers
+  through %xmm0..%xmm4; immediate FP constant arguments are still materialized
+  only for %xmm0/%xmm1
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -174,4 +177,5 @@ no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes bey
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one-/two-/three-live f32/f64 shapes
+no FP immediate constant call arguments beyond %xmm1 yet, though named FP argument pass-through is proven through %xmm4
 ```
