@@ -22420,7 +22420,7 @@ fn lowerReturnValueAfterCalls(
             switch (instruction.kind) {
                 .binary => |binary| {
                     if (call_count != 1) return error.UnsupportedCodegenInstruction;
-                    try lowerBinaryReturnAfterCall(allocator, machine, function, binary, last_eax_value orelse return error.UnsupportedCodegenValue);
+                    try lowerBinaryReturnAfterCall(allocator, machine, function, block, binary, last_eax_value orelse return error.UnsupportedCodegenValue);
                 },
                 else => return lowerReturnValue(allocator, machine, function, block, value),
             }
@@ -22432,11 +22432,31 @@ fn lowerBinaryReturnAfterCall(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    block: ir.BasicBlock,
     binary: ir.BinaryInst,
     eax_name: []const u8,
 ) !void {
     if (!binary.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
     const op = machineBinaryOp(binary.op) orelse return error.UnsupportedCodegenInstruction;
+    if (binary.op == .add) {
+        var terms: std.ArrayList(ir.Value) = .empty;
+        defer terms.deinit(allocator);
+        try collectI32AddTerms(allocator, block, binary, &terms);
+        var has_eax_value = false;
+        for (terms.items) |term| {
+            if (isNamed(term, eax_name)) {
+                has_eax_value = true;
+                break;
+            }
+        }
+        if (has_eax_value) {
+            for (terms.items) |term| {
+                if (isNamed(term, eax_name)) continue;
+                try appendI32AddTermToEax(allocator, machine, function, term);
+            }
+            return;
+        }
+    }
     if (isNamed(binary.lhs, eax_name)) {
         if (binary.op == .add) {
             switch (binary.rhs) {
@@ -22466,6 +22486,29 @@ fn lowerBinaryReturnAfterCall(
         return;
     }
     return error.UnsupportedCodegenInstruction;
+}
+
+fn appendI32AddTermToEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    term: ir.Value,
+) !void {
+    switch (term) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named => |name| {
+            if (try registerParamRegOrNull(function, name, .{ .int = 32 })) |reg| {
+                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+                return;
+            }
+            if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
+                try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
+                return;
+            }
+            return error.UnsupportedCodegenValue;
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
 }
 
 fn machineBinaryOp(op: ir.BinaryOp) ?MachineBinaryOp {
@@ -22586,7 +22629,10 @@ fn noteLiveValueSet(function: ir.Function, block: ir.BasicBlock, value: ir.Value
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return,
     };
     if (paramRegOrNull(function, name, .{ .int = 32 }) catch |err| switch (err) {
-        error.UnsupportedCodegenAbi => return error.UnsupportedLiveAcrossCall,
+        error.UnsupportedCodegenAbi => {
+            _ = try scalarParamStackDisp8(function, name, .{ .int = 32 });
+            return;
+        },
         else => return err,
     }) |reg| {
         try live.add(reg);

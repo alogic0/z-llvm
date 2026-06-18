@@ -200,6 +200,8 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
+  the first stack-passed live i32 parameter can be added after a direct call
+  once the local call frame is restored
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -214,6 +216,6 @@ no full lowering for all classified SysV aggregate classes beyond selected INTEG
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one- through six-live f32/f64 shapes
-stack-passed live i32 pressure is rejected explicitly rather than spilling from the incoming stack area
+no multiple stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected first stack-passed i32 and one- through six-live f32/f64 shapes
+stack-passed live i32 pressure beyond the first selected incoming stack argument is rejected explicitly rather than guessed
 ```

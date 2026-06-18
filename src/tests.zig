@@ -7135,7 +7135,7 @@ test "x86_64 codegen keeps callee-saved registers out of the selected ABI alloca
     try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
 }
 
-test "x86_64 codegen rejects stack-passed live i32 across direct call boundary" {
+test "x86_64 codegen supports stack-passed live i32 across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -7159,10 +7159,11 @@ test "x86_64 codegen rejects stack-passed live i32 across direct call boundary" 
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectError(
-        error.UnsupportedLiveAcrossCall,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 8 });
 }
 
 test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {
@@ -7584,7 +7585,7 @@ test "x86_64 codegen preserves six live i32 params across direct call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
 }
 
-test "x86_64 codegen rejects seven live i32 params across direct call" {
+test "x86_64 codegen preserves six register and one stack i32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -7609,12 +7610,24 @@ test "x86_64 codegen rejects seven live i32 params across direct call" {
     defer module.deinit();
     try module.verify();
 
-    var lowered = codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]) catch |err| {
-        try std.testing.expectEqual(error.UnsupportedLiveAcrossCall, err);
-        return;
-    };
-    defer lowered.deinit(std.testing.allocator);
-    return error.TestExpectedError;
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_40);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = .rdx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot3, .reg = .rcx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = .r8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot3 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 8 });
 }
 
 test "x86_64 codegen lowers canonical accumulator loops without function-name dispatch" {
