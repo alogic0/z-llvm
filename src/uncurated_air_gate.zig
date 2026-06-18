@@ -1518,25 +1518,34 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big5 { long long a; long long b; long long c; long long d; long long e; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
+    \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
     \\extern struct Big4 z_frontier_big4_make(long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big4_make");
     \\extern long long z_frontier_big4_edges(struct Big4) __asm__("frontier_sysv_sret_byval.frontier_big4_edges");
+    \\extern struct Big4 z_frontier_big4_copy(struct Big4) __asm__("frontier_sysv_sret_byval.frontier_big4_copy");
     \\extern struct Big5 z_frontier_big5_make(long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big5_make");
     \\extern long long z_frontier_big5_edges(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_edges");
     \\extern long long z_frontier_big5_inner(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_inner");
+    \\extern struct Big5 z_frontier_big5_copy(struct Big5) __asm__("frontier_sysv_sret_byval.frontier_big5_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
     \\    struct Big3 input = { .a = 13, .b = 17, .c = 19 };
     \\    if (z_frontier_big3_edges(input) != 32) return 2;
+    \\    struct Big3 copied3 = z_frontier_big3_copy(input);
+    \\    if (copied3.a != 13 || copied3.b != 17 || copied3.c != 19) return 3;
     \\    struct Big4 made4 = z_frontier_big4_make(23, 29, 31, 37);
-    \\    if (made4.a != 23 || made4.b != 29 || made4.c != 31 || made4.d != 37) return 3;
+    \\    if (made4.a != 23 || made4.b != 29 || made4.c != 31 || made4.d != 37) return 4;
     \\    struct Big4 input4 = { .a = 41, .b = 43, .c = 47, .d = 53 };
-    \\    if (z_frontier_big4_edges(input4) != 94) return 4;
+    \\    if (z_frontier_big4_edges(input4) != 94) return 5;
+    \\    struct Big4 copied4 = z_frontier_big4_copy(input4);
+    \\    if (copied4.a != 41 || copied4.b != 43 || copied4.c != 47 || copied4.d != 53) return 6;
     \\    struct Big5 made5 = z_frontier_big5_make(2, 3, 5, 7, 11);
-    \\    if (made5.a != 2 || made5.b != 3 || made5.c != 5 || made5.d != 7 || made5.e != 11) return 5;
+    \\    if (made5.a != 2 || made5.b != 3 || made5.c != 5 || made5.d != 7 || made5.e != 11) return 7;
     \\    struct Big5 input5 = { .a = 13, .b = 17, .c = 19, .d = 23, .e = 29 };
-    \\    if (z_frontier_big5_edges(input5) != 42) return 6;
-    \\    if (z_frontier_big5_inner(input5) != 40) return 7;
+    \\    if (z_frontier_big5_edges(input5) != 42) return 8;
+    \\    if (z_frontier_big5_inner(input5) != 40) return 9;
+    \\    struct Big5 copied5 = z_frontier_big5_copy(input5);
+    \\    if (copied5.a != 13 || copied5.b != 17 || copied5.c != 19 || copied5.d != 23 || copied5.e != 29) return 10;
     \\    return 0;
     \\}
     \\

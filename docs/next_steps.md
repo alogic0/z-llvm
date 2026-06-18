@@ -295,7 +295,7 @@ mixed integer/f32/f64 call argument assignment, and selected two-i32 aggregate
 argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
 classification beyond the selected INTEGER and MEMORY aggregate forms,
-arbitrary sret/byval copies, varargs, vectors, and live-across-call shapes
+arbitrary non-selected sret/byval copies, varargs, vectors, and live-across-call shapes
 involving stack-passed or SSE values; focused unit tests now fail closed for these
 unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
@@ -304,11 +304,15 @@ from the SysV integer register pair, and a selected up-to-six-live-i32
 direct-call frame that covers all six SysV GPR argument registers,
 spilling and reloading caller parameters through aligned frame slots. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
-`{ i64, i64, i64 }` return through a hidden sret pointer in `%rdi` with user
-arguments shifted to `%rsi`/`%rdx`/`%rcx`, plus by-value stack aggregate field
-reads from offsets `8` and `24`. Boundaries still outside this wave are full
+`{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
+`{ i64, i64, i64, i64, i64 }` returns through a hidden sret pointer in `%rdi`
+with user arguments shifted through the SysV GPR stream, plus by-value
+stack-passed aggregate field reads and byval-to-sret copies for all fields in
+those selected normal i64 MEMORY aggregate forms. Boundaries still outside this
+wave are full
 SysV aggregate classification beyond the selected INTEGER/MEMORY classes,
-arbitrary sret/byval copies, varargs, vectors, and wider spill/reload pressure.
+arbitrary non-selected sret/byval copies, varargs, vectors, and wider
+spill/reload pressure.
 
 Scale corpus frontier:
 `zig build distribution-zig-air-uncurated-releasefast-scale`,
@@ -351,12 +355,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=54`,
-`generic_codegen_functions=54`, `generic_cfg_functions=54`,
+frontier gate reports `source_rows=13`, `discovered_functions=57`,
+`generic_codegen_functions=57`, `generic_cfg_functions=57`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=54`, `object_failures=0`,
+`object_emitted_functions=57`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -375,8 +379,9 @@ small aggregate argument field reads, nested INTEGER aggregate add-chain
 field reads, array-in-struct INTEGER aggregate sums, and the selected
 up-to-six-live direct-call spill frame with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
-`{ i64, i64, i64, i64, i64 }` hidden-sret returns plus first stack MEMORY
-aggregate field-read proof using layout-derived offsets. The mixed aggregate
+`{ i64, i64, i64, i64, i64 }` hidden-sret returns plus stack-passed MEMORY
+aggregate field-read and byval-to-sret copy proof using layout-derived offsets.
+The mixed aggregate
 class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
 through the independent SysV GPR/SSE streams. The SSE aggregate frontier row
@@ -389,7 +394,8 @@ private helper graphs with stack-passed or SSE live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field
-reads, and 3/4/5-field MEMORY forms, arbitrary sret/byval copies, varargs,
+reads, and 3/4/5-field MEMORY field/copy forms, arbitrary non-selected
+sret/byval copies, varargs,
 vectors, stack-passed live values, and SSE live-across-call frames. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM

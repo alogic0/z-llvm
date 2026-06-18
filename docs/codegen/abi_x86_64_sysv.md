@@ -105,7 +105,7 @@ the selected direct-call frame spills and reloads up to six live i32 caller para
 frontier_sysv_sret_byval.Big3, Big4, and Big5 lower as selected MEMORY classes:
   `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
   user i64 args are shifted through the SysV GPR stream after the hidden pointer
-  first by-value stack aggregate field reads use layout-derived stack offsets
+  by-value stack aggregate field reads and byval-to-sret copies use layout-derived stack offsets for all fields in these selected normal i64 MEMORY forms
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register
@@ -141,7 +141,7 @@ no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes
-no arbitrary sret/byval copy lowering
+no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or SSE live-across-call spill/reload-heavy call frames
 ```

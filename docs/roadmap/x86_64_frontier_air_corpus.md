@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=54
-structured_functions=54
-generic_codegen_functions=54
-generic_cfg_functions=54
+discovered_functions=57
+structured_functions=57
+generic_codegen_functions=57
+generic_cfg_functions=57
 structural_matcher_functions=0
-structured_air_v2_functions=54
-typed_air_operand_functions=54
+structured_air_v2_functions=57
+typed_air_operand_functions=57
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=54
+generic_lowering_functions=57
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=54
+object_emitted_functions=57
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -119,8 +119,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_sret_byval.zig`: `{ i64, i64, i64 }`,
   `{ i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64 }` returns
   through a hidden sret pointer in `%rdi` with user arguments shifted through
-  the SysV GPR stream, plus MEMORY aggregate by-value field reads from the
-  first stack aggregate argument using layout-derived offsets
+  the SysV GPR stream; the same selected normal MEMORY i64 aggregates now also
+  copy all fields from the stack-passed by-value argument to the hidden sret
+  destination using layout-derived offsets
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
@@ -155,8 +156,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE
   field reads/returns, and
-  selected 3/4/5-field MEMORY i64 aggregate sret/byval field forms; X87,
-  packed/unaligned aggregate ABI classes, arbitrary sret/byval copies,
+  selected 3/4/5-field MEMORY i64 aggregate sret/byval field/copy forms; X87,
+  packed/unaligned aggregate ABI classes, arbitrary non-selected sret/byval copies,
   varargs, vectors, stack-passed live values, and SSE live-across-call frames
 
 These blockers are the next local frontier backlog. They are not accepted rows
