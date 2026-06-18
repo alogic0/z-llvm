@@ -98,6 +98,16 @@ export fn frontier_two_f64_live_sum_after_call(a: f64, b: f64) f64 {
     return a + b;
 }
 
+export fn frontier_two_f32_live_sum_after_arg_call(a: f32, b: f32) f32 {
+    frontier_touch_f32(b);
+    return a + b;
+}
+
+export fn frontier_two_f64_live_sum_after_arg_call(a: f64, b: f64) f64 {
+    frontier_touch_f64(b);
+    return a + b;
+}
+
 export fn frontier_three_f32_live_sum_after_call(a: f32, b: f32, c: f32) f32 {
     frontier_touch_none();
     return a + b + c;

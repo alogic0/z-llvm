@@ -96,8 +96,9 @@ One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
 ABI void call are accepted for the selected post-call add-return shape.
 More than six stack-passed live i32 values, SSE live values beyond the
-selected one- through six-live f32/f64 shapes, and live values across multiple
-calls fail closed.
+selected one- through six-live f32/f64 no-argument-call shapes plus the
+two-live FP-argument call shape, and live values across multiple calls fail
+closed.
 ```
 
 Upstream mapping:
@@ -201,6 +202,8 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   four, five, and six live f32/f64 values can also be spilled from
   %xmm0..%xmm5 across the same no-argument helper shape and reloaded for
   three-, four-, and five-step post-call fadd returns
+  two live f32/f64 values can also be spilled across a direct void helper call
+  that consumes the second live value as its first FP argument
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
@@ -213,13 +216,13 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one- through six-live f32/f64 SSE spill shapes
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one- through six-live f32/f64 SSE spill shapes, and selected two-live FP-argument call shape
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-six stack-passed i32 and one- through six-live f32/f64 shapes
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-six stack-passed i32, one- through six-live f32/f64 no-argument-call shapes, and two-live FP-argument call shape
 stack-passed live i32 pressure beyond six selected incoming stack arguments is rejected explicitly rather than guessed
 ```

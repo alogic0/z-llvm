@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=120`,
-`generic_codegen_functions=120`, `generic_cfg_functions=120`,
+three release modes at `source_rows=13`, `discovered_functions=122`,
+`generic_codegen_functions=122`, `generic_cfg_functions=122`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=120`, `object_failures=0`,
+`object_emitted_functions=122`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -444,14 +444,16 @@ spill/reload around an external C ABI `void` helper call, selected two-live
 `fadd` return, selected three-live `f32`/`f64` spill/reload frames across the
 same helper shape before a two-step post-call `fadd` return, and selected
 four-, five-, and six-live `f32`/`f64` spill/reload frames across the same
-helper shape before three-, four-, and five-step post-call `fadd` returns.
+helper shape before three-, four-, and five-step post-call `fadd` returns,
+plus selected two-live `f32`/`f64` spill/reload across a helper call that
+consumes the second live value as its first FP argument.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
 pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.
 Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with
 more than six stack-passed live values, broader live SSE values beyond the selected
-one-/two-/three-live no-argument-call shapes, or live values across calls,
+no-argument-call shapes and two-live FP-argument call shape, or live values across calls,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
@@ -468,7 +470,8 @@ array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,
 varargs, vectors, more than six stack-passed live values,
 and broader SSE live-across-call frames beyond the selected one-live through
-six-live `f32`/`f64` no-argument-call shapes.
+six-live `f32`/`f64` no-argument-call shapes and two-live FP-argument call
+shape.
 The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

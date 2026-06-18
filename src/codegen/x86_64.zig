@@ -14146,12 +14146,13 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         .call => |call| call,
         else => return false,
     };
-    if (call.ret_ty != .void or call.args.items.len != 0 or call.callee_value != null or call.inline_asm != null) return false;
+    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
     if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
+    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
 
     const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
     if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
@@ -14168,6 +14169,7 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
             try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
         }
     }
+    _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
     try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });

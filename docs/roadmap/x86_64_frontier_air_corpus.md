@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=120
-structured_functions=120
-generic_codegen_functions=120
-generic_cfg_functions=120
+discovered_functions=122
+structured_functions=122
+generic_codegen_functions=122
+generic_cfg_functions=122
 structural_matcher_functions=0
-structured_air_v2_functions=120
-typed_air_operand_functions=120
+structured_air_v2_functions=122
+typed_air_operand_functions=122
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=120
+generic_lowering_functions=122
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=120
+object_emitted_functions=122
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -213,6 +213,10 @@ Closed in the current memory/aggregate frontier slice:
   live `f32` or `f64` parameters are spilled from `%xmm0..%xmm5` to aligned
   frame slots across the same no-argument helper shape and reloaded for a
   five-step post-call `fadd` return
+- selected FP-argument SSE live-across-call rows in `frontier_sysv_abi.zig`:
+  two live `f32` or `f64` parameters are spilled, `%xmm1` is assigned to the
+  helper's first FP argument, and both live values are reloaded for the
+  post-call `fadd` return
 - selected named FP argument pass-through rows in `frontier_sysv_abi.zig`:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
   through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP
@@ -223,8 +227,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
 - private helper call graphs with more than six stack-passed live values,
-  live SSE values beyond the selected no-argument-call spill shapes, or live
-  values across multiple calls
+  live SSE values beyond the selected no-argument-call spill shapes and
+  two-live FP-argument call shape, or live values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
@@ -241,8 +245,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than six
   stack-passed live values, and broader SSE live-across-call frames beyond the
-  selected one-live through six-live `f32`/`f64` no-argument-call shapes and
-  selected named `%xmm0..%xmm4` pass-through calls
+  selected one-live through six-live `f32`/`f64` no-argument-call shapes,
+  two-live FP-argument call shape, and selected named `%xmm0..%xmm4`
+  pass-through calls
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,
