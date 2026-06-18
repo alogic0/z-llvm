@@ -34,7 +34,7 @@ f32/f64 direct-call operands use the independent SSE register order
 up to three constant i32 stack-passed direct-call arguments are supported
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
-the selected two-live-i32 direct-call shape spills %rdi/%rsi into a 24-byte aligned frame and reloads them after the call
+up to three live i32 caller arguments can be spilled into 24-byte aligned frame slots and reloaded after one direct call
 one fixed i32 stack slot can be reloaded into %edi before a direct call
 small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class return in %rax/%rdx
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
@@ -56,14 +56,16 @@ The current project uses a local-only conservative sequence for tiny call fixtur
 For one live caller argument, the 8-byte alignment slot is also used as a deterministic spill slot.
 For the `call_stack_slot` handoff proof, the same fixed slot holds an explicit
 i32 alloca value and is reloaded into `%edi` before the direct call.
-For the first broader ABI closure wave, a selected two-live-i32 call frame uses:
+For the first broader ABI closure wave, a selected up-to-three-live-i32 call frame uses:
   subq $24, %rsp
-  movq %rdi, 8(%rsp)
-  movq %rsi, 16(%rsp)
+  movl %edi, (%rsp)
+  movl %esi, 4(%rsp)
+  movl %edx, 8(%rsp)
   ... argument setup ...
   callq callee
-  movq 8(%rsp), %rdi
-  movq 16(%rsp), %rsi
+  movl (%rsp), %edi
+  movl 4(%rsp), %esi
+  movl 8(%rsp), %edx
   addq $24, %rsp
 ```
 
@@ -73,9 +75,8 @@ Register preservation boundary:
 Caller-saved set considered clobbered by calls in this slice:
   %rax, %rcx, %rdx, %rsi, %rdi, %r8, %r9, %r10, %r11
 Callee-saved registers are not allocated by this project yet.
-One live i32 argument register across one direct call is accepted generally.
-The first two-live closure wave accepts the `%rdi`/`%rsi` selected shape.
-Wider live sets and live values across multiple calls fail closed.
+One to three live i32 argument registers across one direct call are accepted.
+Four-or-more live sets and live values across multiple calls fail closed.
 ```
 
 Upstream mapping:
@@ -96,7 +97,7 @@ First broader ABI closure wave:
 frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
-the selected two-live-i32 direct-call frame spills and reloads %rdi/%rsi
+the selected direct-call frame spills and reloads up to three live i32 caller parameters
 frontier_sysv_sret_byval.Big3 and Big4 lower as selected MEMORY classes:
   `{ i64, i64, i64 }` and `{ i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
   user i64 args are shifted through the SysV GPR stream after the hidden pointer
@@ -122,12 +123,12 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one- and two-live i32 spill shapes
+no full caller-saved clobber model beyond the selected one-, two-, and three-live i32 spill shapes
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes
 no arbitrary sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no high-register-pressure spill/reload-heavy call frames
+no four-or-more-live high-register-pressure spill/reload-heavy call frames
 ```

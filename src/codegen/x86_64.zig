@@ -144,6 +144,8 @@ pub const MachineBinaryOp = enum {
 
 pub const FrameIndex = enum {
     slot0,
+    slot1,
+    slot2,
 };
 
 pub const CodegenPath = enum {
@@ -21222,18 +21224,37 @@ fn appendAlignedDirectCallPreservingI32Params(
             } });
             try appendStackFrameEnd(allocator, machine, 8);
         },
-        2 => {
-            if (!live_params.has(.rdi) or !live_params.has(.rsi)) return error.UnsupportedLiveAcrossCall;
+        2, 3 => {
             try appendStackFrame(allocator, machine, 24);
-            try machine.instructions.append(allocator, .spill_rdi_rsi_rsp24);
+            var index: usize = 0;
+            while (index < live_params.count) : (index += 1) {
+                try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+                    .frame_index = frameIndexForLiveParam(index),
+                    .reg = live_params.regs[index],
+                } });
+            }
             _ = try appendI32CallArgs(allocator, machine, function, call);
             try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
-            try machine.instructions.append(allocator, .reload_rdi_rsp24);
-            try machine.instructions.append(allocator, .reload_rsi_rsp24);
+            index = 0;
+            while (index < live_params.count) : (index += 1) {
+                try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
+                    .reg = live_params.regs[index],
+                    .frame_index = frameIndexForLiveParam(index),
+                } });
+            }
             try appendStackFrameEnd(allocator, machine, 24);
         },
         else => return error.UnsupportedLiveAcrossCall,
     }
+}
+
+fn frameIndexForLiveParam(index: usize) FrameIndex {
+    return switch (index) {
+        0 => .slot0,
+        1 => .slot1,
+        2 => .slot2,
+        else => unreachable,
+    };
 }
 
 fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
@@ -21670,7 +21691,7 @@ fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction
 }
 
 const LiveParamSet = struct {
-    regs: [2]ArgReg = undefined,
+    regs: [3]ArgReg = undefined,
     count: usize = 0,
 
     fn add(self: *LiveParamSet, reg: ArgReg) !void {
@@ -22261,12 +22282,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .push_imm32 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
-        .spill_arg_rsp => |spill| {
-            if (spill.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
-        },
-        .reload_arg_rsp => |reload| {
-            if (reload.frame_index != .slot0 or rsp_mod16 != 0) return error.StackSlotWithoutFrame;
-        },
+        .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },

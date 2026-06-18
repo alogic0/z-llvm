@@ -22,3 +22,7 @@ noinline fn frontier_id_i32(value: i32) i32 {
 export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
     return a + b + frontier_id_i32(c);
 }
+
+export fn frontier_three_live_after_call(a: i32, b: i32, c: i32, d: i32) i32 {
+    return a + b + c + frontier_id_i32(d);
+}

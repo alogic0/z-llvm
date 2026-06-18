@@ -40,6 +40,13 @@ test {
     _ = zig_air_lowering;
 }
 
+fn expectMachineInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
+    for (instructions) |instruction| {
+        if (std.meta.eql(instruction, expected)) return;
+    }
+    return error.TestExpectedEqual;
+}
+
 test "named pipelines expand to stable pass sequences" {
     var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
     defer pm.deinit();
@@ -5103,6 +5110,30 @@ test "x86_64 encoding emits expected add args bytes" {
     try std.testing.expectEqualSlices(u8, &.{ 0x89, 0xf8, 0x01, 0xf0, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding sizes nonzero frame spill slots" {
+    var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .sub_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 0 });
+    try machine.instructions.append(std.testing.allocator, .add_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } }));
+    try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x83, 0xec, 0x18,
+        0x89, 0x74, 0x24, 0x04,
+        0x8b, 0x54, 0x24, 0x08,
+        0xb8, 0x00, 0x00, 0x00,
+        0x00, 0x48, 0x83, 0xc4,
+        0x18, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 elf writer emits relocatable object metadata" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5903,13 +5934,14 @@ test "x86_64 codegen preserves two live i32 params across direct call" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.spill_rdi_rsi_rsp24, machine.instructions.items[3]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.reload_rdi_rsp24, machine.instructions.items[6]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.reload_rsi_rsp24, machine.instructions.items[7]);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot1 } });
 }
 
-test "x86_64 codegen rejects unsupported call live pressure" {
+test "x86_64 codegen preserves three live i32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -5930,10 +5962,47 @@ test "x86_64 codegen rejects unsupported call live pressure" {
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectError(
-        error.UnsupportedLiveAcrossCall,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_24);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = .rdx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
+}
+
+test "x86_64 codegen rejects four live i32 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e) {
+        \\entry:
+        \\  %ab = add i32 %a, %b
+        \\  %abc = add i32 %ab, %c
+        \\  %abcd = add i32 %abc, %d
+        \\  %r = call i32 @callee(i32 %e)
+        \\  %sum = add i32 %abcd, %r
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var lowered = codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]) catch |err| {
+        try std.testing.expectEqual(error.UnsupportedLiveAcrossCall, err);
+        return;
+    };
+    defer lowered.deinit(std.testing.allocator);
+    return error.TestExpectedError;
 }
 
 test "x86_64 codegen lowers canonical accumulator loops without function-name dispatch" {

@@ -408,8 +408,8 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .sub_rsp_8, .add_rsp_8 => 4,
         .push_imm32 => 5,
         .sub_rsp_24, .add_rsp_24 => 4,
-        .spill_arg_rsp => |spill| if (spill.reg.rexR()) 4 else 3,
-        .reload_arg_rsp => |reload| if (reload.reg.rexR()) 4 else 3,
+        .spill_arg_rsp => |spill| frameSlotInstructionSize(spill.reg, spill.frame_index),
+        .reload_arg_rsp => |reload| frameSlotInstructionSize(reload.reg, reload.frame_index),
         .spill_rdi_rsi_rsp24 => 10,
         .reload_rdi_rsp24, .reload_rsi_rsp24 => 5,
         .reload_rsp_eax => 3,
@@ -552,19 +552,33 @@ fn encodeReg64ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, d
 }
 
 fn encodeRegToFrameSlot(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
-    if (frame_index != .slot0) return error.UnsupportedFrameIndex;
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, opcode);
-    try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
     try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
 }
 
 fn encodeFrameSlotToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, opcode: u8, reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) !void {
-    if (frame_index != .slot0) return error.UnsupportedFrameIndex;
     if (reg.rexR()) try bytes.append(allocator, 0x44);
     try bytes.append(allocator, opcode);
-    try bytes.append(allocator, 0x04 | (@as(u8, reg.lowCode()) << 3));
+    const disp = frameSlotDisp(frame_index);
+    try bytes.append(allocator, (if (disp == 0) @as(u8, 0x04) else @as(u8, 0x44)) | (@as(u8, reg.lowCode()) << 3));
     try bytes.append(allocator, 0x24);
+    if (disp != 0) try bytes.append(allocator, disp);
+}
+
+fn frameSlotDisp(frame_index: x86_64.FrameIndex) u8 {
+    return switch (frame_index) {
+        .slot0 => 0,
+        .slot1 => 4,
+        .slot2 => 8,
+    };
+}
+
+fn frameSlotInstructionSize(reg: x86_64.ArgReg, frame_index: x86_64.FrameIndex) u32 {
+    return (if (reg.rexR()) @as(u32, 1) else 0) + 3 + if (frameSlotDisp(frame_index) == 0) @as(u32, 0) else 1;
 }
 
 fn encodeArgPtrToEax(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg) !void {

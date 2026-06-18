@@ -1494,12 +1494,14 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_pair64_first(struct Pair64) __asm__("frontier_sysv_abi.frontier_pair64_first");
     \\extern long long z_frontier_pair64_second(struct Pair64) __asm__("frontier_sysv_abi.frontier_pair64_second");
     \\extern int z_frontier_two_live_after_call(int, int, int) __asm__("frontier_sysv_abi.frontier_two_live_after_call");
+    \\extern int z_frontier_three_live_after_call(int, int, int, int) __asm__("frontier_sysv_abi.frontier_three_live_after_call");
     \\int main(void) {
     \\    struct Pair64 pair = z_frontier_pair64_make(0x1122334455667788LL, 0x0102030405060708LL);
     \\    if (pair.a != 0x1122334455667788LL || pair.b != 0x0102030405060708LL) return 1;
     \\    if (z_frontier_pair64_first(pair) != 0x1122334455667788LL) return 2;
     \\    if (z_frontier_pair64_second(pair) != 0x0102030405060708LL) return 3;
     \\    if (z_frontier_two_live_after_call(7, 11, 13) != 31) return 4;
+    \\    if (z_frontier_three_live_after_call(7, 11, 13, 17) != 48) return 5;
     \\    return 0;
     \\}
     \\

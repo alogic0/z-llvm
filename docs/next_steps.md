@@ -300,8 +300,9 @@ spill/reload-heavy call frames; focused unit tests now fail closed for these
 unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate field reads
-from the SysV integer register pair, and a selected two-live-i32 direct-call
-frame that spills and reloads `%rdi`/`%rsi`. The follow-up
+from the SysV integer register pair, and a selected up-to-three-live-i32
+direct-call frame that spills and reloads caller parameters through aligned
+frame slots. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }` return through a hidden sret pointer in `%rdi` with user
 arguments shifted to `%rsi`/`%rdx`/`%rcx`, plus by-value stack aggregate field
@@ -350,12 +351,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=41`,
-`generic_codegen_functions=41`, `generic_cfg_functions=41`,
+frontier gate reports `source_rows=13`, `discovered_functions=42`,
+`generic_codegen_functions=42`, `generic_cfg_functions=42`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=41`, `object_failures=0`,
+`object_emitted_functions=42`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -371,15 +372,15 @@ nested extern-struct field GEP paths, selected dynamic pointer addition /
 pointer-element GEP loads, and branch-local global/TLS add/sub updates. The
 first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, nested INTEGER aggregate add-chain
-field reads, array-in-struct INTEGER aggregate sums, and the selected two-live
-direct-call spill frame with executable proof. The selected sret/byval
+field reads, array-in-struct INTEGER aggregate sums, and the selected
+up-to-three-live direct-call spill frame with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }` and `{ i64, i64, i64, i64 }`
 hidden-sret returns plus first stack MEMORY aggregate field-read proof using
 layout-derived offsets. The mixed aggregate class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
 through the independent SysV GPR/SSE streams. The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
-private helper graphs with more than two live integer values across calls,
+private helper graphs with more than three live integer values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, mixed INTEGER/SSE field reads, and MEMORY forms,

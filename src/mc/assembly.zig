@@ -234,5 +234,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
 fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {
     return switch (frame_index) {
         .slot0 => "(%rsp)",
+        .slot1 => "4(%rsp)",
+        .slot2 => "8(%rsp)",
     };
 }

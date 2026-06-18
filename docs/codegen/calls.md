@@ -38,7 +38,7 @@ selected backend subset:
   Machine IR direct-call representation supports assembly and ELF call relocations only
   x86_64 argument lowering supports selected i32/i64/pointer GPR args and f32/f64 SSE args
   up to three constant i32 stack call arguments are accepted
-  one live i32 caller argument, or the selected two-live %rdi/%rsi shape, can be spilled across one call
+  one to three live i32 caller arguments can be spilled across one direct call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
@@ -85,8 +85,7 @@ i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
 selected small INTEGER/INTEGER aggregate return in %rax/%rdx
 void calls with no result
 one straight-line basic block or accepted generic CFG wrapper shape
-at most one live i32 caller argument across one call generally
-selected two-live-i32 %rdi/%rsi frame across one direct call
+up to three live i32 caller arguments across one direct call
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -98,16 +97,19 @@ callq callee
 addq $8, %rsp
 ```
 
-For the first broader SysV closure wave, a selected two-live-i32 frame uses a
-24-byte aligned frame and spills `%rdi`/`%rsi` before argument setup:
+For the first broader SysV closure wave, the selected live-i32 frame uses a
+24-byte aligned frame and spills up to three live integer parameters before
+argument setup:
 
 ```asm
 subq $24, %rsp
-movq %rdi, 8(%rsp)
-movq %rsi, 16(%rsp)
+movl %edi, (%rsp)
+movl %esi, 4(%rsp)
+movl %edx, 8(%rsp)
 callq callee
-movq 8(%rsp), %rdi
-movq 16(%rsp), %rsi
+movl (%rsp), %edi
+movl 4(%rsp), %esi
+movl 8(%rsp), %edx
 addq $24, %rsp
 ```
 
@@ -214,8 +216,8 @@ multiple stack-passed i32 call arguments
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads
-selected two-live-i32 spill/reload call frame
-unsupported wider live-value call pressure diagnostic
+selected up-to-three-live-i32 spill/reload call frame
+unsupported four-or-more-live call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
 ```
 
