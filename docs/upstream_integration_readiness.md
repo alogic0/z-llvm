@@ -22,26 +22,677 @@ command, and captured IR path for each Zig-emitted fixture.
 
 ## Capability Map
 
-| Subsystem | Current capability | Zig boundary |
-| --- | --- | --- |
-| Parser/printer/verifier | Accepted scalar/control-flow/memory/global/module records with SSA checks | LLVM-compatibility input validation |
-| Scalar optimizer | Fixture-equivalent InstCombine, DCE, ADCE, SCCP, EarlyCSE, GVN, BDCE slices | Possible Sema/AIR/native optimizer design input |
-| Memory optimizer | Mem2Reg, SROA, DSE, alias/mod-ref, MemoryLocation, conservative MemorySSA slice | LLVM-compatibility legality study; not a Zig stack model |
-| Loop optimizer | LoopInfo, simple LCSSA helper, scalar LICM, loop placeholders | AIR/liveness loop optimization study |
-| Metadata and mode handling | Debug/profile/module flags, attributes, ReleaseSmall, target features preserved opaquely | Mode and metadata preservation input |
-| Backend handoff | Tiny x86_64 Machine IR, asm/object smoke checks | Validation-only, not a backend replacement |
-| Selected distribution replacement gate | `distribution-x86_64-selected-zllvm` proves 146 selected x86_64 release-mode structured-direct IR-writer rows, with 146/146 rows on generic x86_64 lowering, no textual boundary rows, no libLLVM module parse/print, no LLVM optimizer, no LLVM TargetMachine object emission, and Zig native `-fno-lld` linking | Selected release rows only; normal Zig/libLLVM fallback remains when env vars are unset |
-| Broad source-backed structured gate | `distribution-x86_64-source-backed-structured` discovers 55 x86_64 release `.ll` fixtures and proves all 55 accepted fixture families as 90 structured-direct/generic-codegen rows, with `skipped_with_reason=0`, `fallback_rows=0`, no textual LLVM parse fallback, no LLVM optimizer, no LLVM TargetMachine, z_llvm object emission, and Zig native linker handoff | ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 fixture inventory only; future fixture expansion must fail closed on the first unsupported class |
-| Source-owned DescriptorV2 gate | `distribution-x86_64-release-source-owned` proves the current 100-row x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall source-owned wrapper inventory from patched Zig compile-context facts without `ZLLVM_CASE_ID`, `ZLLVM_SOURCE_TAG`, wrapper basename, fixture metadata, body enum dispatch, or template-expansion ownership: patched Zig emits frozen `zllvm-source-facts-v1` `generic-compiler-facts` from compiler context and LLVM-builder summaries, and z_llvm classifies those facts into DescriptorV2 before verifying and lowering the records. Counters require `release_source_rows=100`, `source_wrapper_rows=100`, `descriptor_owned_rows=100`, `descriptor_v2_rows=100`, `real_descriptor_program_rows=100`, `full_descriptor_program_rows=100`, `serialized_function_rows=100`, `serialized_instruction_rows=100`, `serialized_global_rows=100`, `semantic_serialized_rows=100`, `serialized_return_stub_rows=0`, `descriptor_body_name_rows=0`, `zllvm_body_expansion_rows=0`, `descriptor_program_body_expansion_rows=0`, `functions_for_body_rows=0`, `globals_for_body_rows=0`, `air_derived_descriptor_rows=100`, `static_descriptor_map_rows=0`, `zig_compile_context_descriptor_rows=100`, `env_source_tag_selector_rows=0`, `wrapper_body_selector_rows=0`, `source_tag_body_selector_rows=0`, `fixture_metadata_selector_rows=0`, `source_tag_env_present_rows=0`, `zig_emitted_descriptor_rows=100`, `runner_generated_descriptor_rows=0`, `descriptor_file_consumed_rows=100`, `source_fact_stream_rows=100`, `concrete_source_fact_rows=100`, `source_derived_descriptor_rows=100`, `tag_table_descriptor_rows=0`, `body_enum_dispatch_rows=0`, `surface_to_body_adapter_rows=0`, `canned_return_descriptor_rows=0`, `manual_fixture_dispatch_rows=0`, `legacy_semantic_record_rows=0`, `semantic_record_rows=0`, `external_writer_delegate_rows=0`, `manifest_structured_rows=0`, `case_id_rows=0`, `surface_dispatch_rows=0`, `structured_direct_rows=100`, `generic_codegen_rows=100`, `fallback_rows=0`, and `local_fail=0`. It also requires `air_extracted_descriptor_rows=100`, `template_descriptor_rows=0`, `wrapper_body_map_rows=0`, and `source_tag_body_map_rows=0`, so wrapper/source-tag/body-template ownership is rejected. The gate now requires `fact_derived_classification_rows=100`, `root_source_classification_fallback_rows=0`, `source_fact_program_rows=100`, `source_fact_program_direct_rows=100`, `source_fact_body_wrapper_rows=0`, and `body_enum_fallback_rows=0`; a 7-family wrong-facts negative probe rejects mismatched wrapper/fact streams without using root source as a body selector. The DescriptorV2 path runs a local release canonicalizer before structured lowering and reports `release_canonicalizer_rows=100`, `observed_int_fold_rows=57`, `observed_fp_fold_rows=5`, `observed_dead_local_rows=41`, `observed_select_fcmp_rows=7`, `applied_int_fold_rows=57`, `applied_fp_fold_rows=5`, `applied_dead_local_rows=41`, `applied_select_fcmp_rows=7`, `checked_rows=9`, and `checks_preserved_rows=9`; eligible rows fail if they only observe integer/FP/select/CFG opportunities without applying them. The gate scans `test/zig/integrated/*.zig` as a source-wrapper discovery bucket and currently reports `discovered_source_wrappers=82`, `descriptor_supported_wrappers=82`, `out_of_scope_wrappers=0`, `unsupported_with_reason=0`. | Current release source-owned wrapper inventory only; all 100 rows use serialized AIR-shaped semantic records with compile-context fact provenance, direct SourceFactProgram DescriptorV2 construction, and no return-stub, static descriptor map fallback, template descriptor rows, body-map selector rows, root-source classification fallback, or body-enum fallback. This is not full Zig Sema/AIR/Liveness replacement or full ReleaseSmall optimizer parity |
-| Source-owned ELF object inspection | `distribution-native-link-object-inspection -- --release-source-owned` proves the same 100-row x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall source-owned replacement boundary emits ELF64 relocatable x86_64 objects through the patched-Zig source-owned z_llvm object path before Zig native linker handoff. The gate runs `readelf -W -h -S -s -r` and `objdump -dr`, requiring accounted sections, symbol binding/type, relocation families, TLS local-exec behavior, no accidental COMDAT, no accidental `.eh_frame`, and no unsupported relocations. Current counters: `inspected=100`, `elf64_rel=100`, `relocation_rows=12`, `tls_rows=8`, `undefined_import_rows=0`, `comdat_rows=0`, `eh_frame_rows=0`, `unsupported_relocation_rows=0`, and `local_fail=0`. | Object-format proof only; final linking, CRT policy, libc, dynamic loader behavior, archives, linker scripts, and new-linker feature gaps remain Zig linker/toolchain ownership |
-| Source-owned native-link handoff | `distribution-native-link -- --release-source-owned` and `probe-native-linker -- --release-source-owned` prove the same 100-row source-owned boundary reaches Zig native `-fno-lld` linker handoff from the patched-Zig z_llvm object path. Current executable gate counters: `total=100`, `executable_abi_proof_rows=100`, `link_only_rows=0`, `runtime_compiler_rt_libc_boundary_rows=0`, `unsupported_zig_linker_feature_rows=0`, `local_object_codegen_failures=0`, `local_fail=0`. Companion probe counters: `accepted=100`, `runtime_compiler_rt_libc_boundary_rows=0`, `unsupported_zig_linker_feature_rows=0`, `local_object_codegen_failures=0`, `failed=0`. | Native linker ownership remains Zig-owned; this proves handoff acceptance and runnable ABI behavior for the selected source-owned wrappers, not a z_llvm linker implementation |
-| Uncurated real AIR compatibility gate | `distribution-zig-air-uncurated-release` discovers `test/zig/inputs/*.zig`, asks patched Zig for `zllvm-air-export-v1` plus `structured_air-v1` body/branch metadata and typed `structured_air-v2` records, and lowers real ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 AIR without case IDs, wrapper maps, source-fact body classification, or canned DescriptorV2 construction. Current counters for each mode are `source_rows=19`, `discovered_functions=44`, `structured_functions=44`, `generic_codegen_functions=44`, `structured_air_v1_functions=44`, `structured_air_v2_functions=44`, `typed_air_type_functions=44`, `typed_air_operand_functions=44`, `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=44`, `shape_recognizer_functions=0`, `unsupported_functions=0`, `codegen_failures=0`, `case_id_rows=0`, `source_fact_classification_rows=0`, and `local_fail=0`. | Narrow compatibility gate retained for regression coverage; the broad real-AIR release gates below carry the current strongest typed-v2 ownership claim |
-| Broad uncurated ReleaseFast/ReleaseSafe/ReleaseSmall AIR discovery | `distribution-zig-air-uncurated-releasefast-broad`, `distribution-zig-air-uncurated-releasesafe-broad`, and `distribution-zig-air-uncurated-releasesmall-broad` discover `test/zig/inputs/*.zig` plus `test/zig/integrated/*.zig`. Each mode currently reports `source_rows=101`, `discovered_functions=152`, `structured_functions=152`, `generic_codegen_functions=152`, `generic_cfg_functions=152`, `structural_matcher_functions=0`, `structured_air_v1_functions=152`, `structured_air_v2_functions=152`, `typed_air_type_functions=152`, `typed_air_operand_functions=152`, `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=152`, `shape_recognizer_functions=0`, `unsupported_functions=0`, `codegen_failures=0`, `case_id_rows=0`, `source_fact_classification_rows=0`, and `local_fail=0`. The companion object progress gates for all three modes report `object_emitted_functions=152`, `object_failures=0`, `llvm_targetmachine_rows=0`, and `local_fail=0`; the broad object-inspection gates report `inspected=101`, `elf64_rel=101`, `relocation_rows=14`, `tls_rows=3`, `undefined_import_rows=3`, `comdat_rows=0`, `eh_frame_rows=0`, `unsupported_relocation_rows=0`, and `local_fail=0`. Broad ReleaseFast and ReleaseSmall also have native-link progress gates using `zig build-exe -fno-lld`; each reports `native_link_accepted_rows=100`, `executable_ok_rows=0`, `link_only_rows=100`, `runtime_boundary_rows=1`, `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The broad executable gates reuse the same object/native-link path and run stable C-ABI harnesses for runnable source modules in ReleaseFast, ReleaseSafe, and ReleaseSmall: `native_link_accepted_rows=100`, `executable_ok_rows=100`, `link_only_rows=0`, `runtime_boundary_rows=1`, `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0` for each mode. | Broad real-AIR lowering/codegen/object evidence for all three release modes. Broad real-AIR native-link has both link-only handoff accounting and executable ABI proof for stable callable rows. `structured_air-v1` and typed `structured_air-v2` are present for every broad function; typed v2 now owns straight-line scalar, load/store, global pointer constants, stack-slot, direct-call, runtime symbol pointer, simple block-result select, struct field-sum, array aggregate-sum, base64 table-lookup, aggregate pair ABI first/make-pair, error-union payload, maybe-error, optional scalar-payload, optional pointer-payload, error-switch/classifier, runtime optional-pointer wrapper main, runtime pointer load/store wrapper main, packed read/replace, slice-sum, selected monotonic atomic add, empty inline-asm memory-barrier, accumulator-loop, dense-switch, conditional slot-update, and mixed C/Zig panic-edge runtime-boundary lowering. No broad function uses legacy AIR text fallback, shape-recognizer ownership, or structural matcher backend lowering. A strict generic CFG x86_64 backend path now owns loop-sum, single-block scalar integer, single-block scalar FP binary/compare/select/literal returns, single-block volatile i32 roundtrips, single-block packed read/replace bit helpers, scalar `icmp`/`select`, nested `i8` equality error-switch selects, nested `i8` equality error-union/classifier selects, boolean-parameter branch-mix add/sub selects, constant-return `i8 switch` CFGs, void `i32` global/TLS store helpers, small aggregate pair SysV pack/unpack helpers, selected monotonic atomic add and empty inline-asm memory-barrier leaves, empty no-op `ret void` helpers, no-arg void-call wrapper mains returning `i32 0`, constant FP/bool and integer-return sibling-wrapper call/check mains including pointer-literal `ptr @global`/`ptr null` calls, two-call aggregate wrapper chains, multi-block call/global-load checks, multi-block two-call optional-pointer checks, sibling update/get wrapper mains, constant direct-call wrapper mains with optional identity casts, scalar `shift_mix`, scalar multiply-by-constant and i64 constant-return leaves, parameter-pointer load/store branch CFGs, load-after-store merge returns, pointer-select loads, direct-call branch merge CFGs, single-block global/TLS i32 load/update forms, alloca-stored aggregate field-offset loads/updates where eligible, shape-based byte-table lookup leaves, guarded global add with panic/overflow edges, and ReleaseSafe checked guard CFGs where eligible. The closed link-only set was two input modules that needed C ABI harnesses plus two input modules and four integrated wrappers that needed exported global/TLS initializer facts and z_llvm initializer materialization. The named runtime boundary is `debug.defaultPanic`. These gates stay out of `distribution-all` until runtime and executable proof cost is known |
-| Expanded uncurated release AIR frontier | `distribution-zig-air-uncurated-releasefast-expanded`, `distribution-zig-air-uncurated-releasesafe-expanded`, and `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources under `test/zig/expanded/*.zig` on top of the closed broad corpus. The expanded slice is green for all three release modes and reports `source_rows=109`, `discovered_functions=199`, `structured_functions=199`, `generic_codegen_functions=199`, `generic_cfg_functions=199`, `structural_matcher_functions=0`, `structured_air_v2_functions=199`, `typed_air_operand_functions=199`, `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=199`, `shape_recognizer_functions=0`, `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. The expanded finish gate reports `object_emitted_functions=199`, `object_failures=0`, `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection reports `inspected=109`, `elf64_rel=109`, `relocation_rows=18` (`19` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3` (`6` for ReleaseSafe), `comdat_rows=0`, `eh_frame_rows=0`, `unsupported_relocation_rows=0`, and `local_fail=0`. Expanded native-link progress is green: ReleaseFast and ReleaseSmall report `native_link_accepted_rows=108`, `link_only_rows=108`, `runtime_boundary_rows=1`, while ReleaseSafe reports `native_link_accepted_rows=105`, `link_only_rows=105`, `runtime_boundary_rows=4` after classifying `outOfBounds`, `integerPartOutOfBounds`, `unwrapNull`, and `debug.defaultPanic` as named runtime boundaries. Expanded executable gates are green for all three modes at `native_link_accepted_rows=108`, `executable_ok_rows=108`, `link_only_rows=0`, `runtime_boundary_rows=1`, `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. | New frontier only; aggregate pair ABI function-type lowering, renamed pointer load/store, expanded slice-loop lowering, optional-control-flow bucket expansion, expanded ELF object inspection, expanded executable ABI harnessing, scalar generic CFG backend routing, scalar branch/select CFG promotion, branch/memory/call CFG rows for pointer loads, pointer-select loads, stores, computed stores, branch-local direct calls, aggregate field-offset 0/4 load/update rows, nested optional-pointer branch payload lowering, optional-pointer load-plus-add payload lowering, f32 pipeline unused-bool generic FP binary lowering, shape-based byte-table lookup lowering, conditional slice-loop generic CFG lowering, single-block scalar FP generic CFG lowering, single-block volatile roundtrip generic CFG lowering, single-block packed read/replace generic CFG lowering, scalar numeric conversion generic CFG lowering, signed-min select generic CFG lowering, nested `i8` equality error-switch select generic CFG lowering, nested `i8` equality error-union/classifier generic CFG lowering, branch-mix boolean select generic CFG lowering, constant-return `i8 switch` generic CFG lowering, generic void global-store lowering, small aggregate pair SysV pack/unpack generic CFG lowering, selected monotonic atomic add generic CFG lowering, empty inline-asm memory-barrier generic CFG lowering, empty no-op `ret void` generic CFG lowering, generic no-arg void-call wrapper-main lowering, generic constant FP/bool and integer-return sibling-wrapper call/check main lowering, generic pointer-literal sibling-wrapper call/check main lowering, generic two-call aggregate wrapper-chain lowering, generic multi-block call/global-load check lowering, generic multi-block two-call optional-pointer check lowering, generic sibling update/get wrapper-main lowering, generic constant direct-call wrapper-main lowering, scalar `shift_mix` generic CFG lowering, scalar multiply-by-constant generic CFG lowering, i64 constant-return generic CFG lowering, guarded global add with panic/overflow edges, and the expanded stack/mixed SysV ABI frontier are closed. The ABI frontier proves seven- and nine-argument exported `i32` C ABI functions, noinline helper calls with one and three stack-passed integer arguments, f32/f64 direct-call returns, mixed integer/f32/f64 direct-call returns, i64 mixed-argument call/return paths, selected two-i32 aggregate argument/return rows, and frontier selected `{ i64, i64, i64 }` hidden-sret/MEMORY by-value field-read rows through reusable SysV direct-call/frame helpers and executable harnesses. Remaining non-selected ABI boundaries are full aggregate classification beyond the selected INTEGER/normal integer-leaf MEMORY forms, arbitrary non-selected sret/byval copies, varargs, vectors, and high-register-pressure spill/reload-heavy call frames. The executable gate's named runtime boundary remains `debug.defaultPanic`; ReleaseSafe native-link-only progress also classifies `outOfBounds`, `integerPartOutOfBounds`, and `unwrapNull` as named safety boundaries. No current expanded row is a structural backend fallback. It does not weaken the closed broad baseline |
-| Scale uncurated release AIR frontier | `distribution-zig-air-uncurated-releasefast-scale`, `distribution-zig-air-uncurated-releasesafe-scale`, and `distribution-zig-air-uncurated-releasesmall-scale` add explicit sources under `test/zig/scale/*.zig` on top of the expanded corpus. The current scale slice is green for all three release modes and reports `source_rows=112`, `discovered_functions=216`, `structured_functions=216`, `generic_codegen_functions=216`, `generic_cfg_functions=216`, `structural_matcher_functions=0`, `structured_air_v2_functions=216`, `typed_air_operand_functions=216`, `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=216`, `shape_recognizer_functions=0`, `unsupported_functions=0`, `codegen_failures=0`, `object_emitted_functions=216`, `object_failures=0`, `llvm_targetmachine_rows=0`, and `local_fail=0`. Scale object inspection is green for all three modes at `inspected=112`, `elf64_rel=112`, `unsupported_relocation_rows=0`, and `local_fail=0`; ReleaseFast/ReleaseSmall report `relocation_rows=20`, `undefined_import_rows=3`, while ReleaseSafe reports `relocation_rows=21`, `undefined_import_rows=6`. Scale native-link progress is green through Zig native `-fno-lld`: ReleaseFast/ReleaseSmall report `native_link_accepted_rows=111`, `link_only_rows=111`, `runtime_boundary_rows=1`, and ReleaseSafe reports `native_link_accepted_rows=108`, `link_only_rows=108`, `runtime_boundary_rows=4`. Scale executable ABI proof is green for all three modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`, `link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. | Frontier only. It keeps broad/expanded closed claims intact while adding broader SysV call shapes, memory loops, branch-local pointer memory, extern two-i32 field updates, direct-call branch merges, globals, and TLS. Scale object inspection/native-link/executable proof now exists for stable C ABI rows; new scale expansion must keep those proof layers paired with accepted rows. |
-| Frontier uncurated release AIR corpus | `distribution-zig-air-uncurated-release-frontier` covers only `test/zig/frontier/*.zig`, separate from the cumulative broad/expanded/scale gates. Current ReleaseFast/ReleaseSafe/ReleaseSmall counters are `source_rows=13`, `discovered_functions=116`, `structured_functions=116`, `generic_codegen_functions=116`, `generic_cfg_functions=116`, `structural_matcher_functions=0`, `structured_air_v2_functions=116`, `typed_air_operand_functions=116`, `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`, `generic_lowering_functions=116`, `shape_recognizer_functions=0`, `unsupported_functions=0`, `codegen_failures=0`, `object_emitted_functions=116`, `object_failures=0`, `llvm_targetmachine_rows=0`, and `local_fail=0`. Object inspection is green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`, `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and `local_fail=0`. Native-link and executable proof are green at `native_link_accepted_rows=13`, `executable_ok_rows=13`, `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. | New source-frontier evidence. Accepted rows use typed AIR v2 and generic CFG only. The frontier now includes selected nested loop/memory, aggregate field, pointer/GEP, global/TLS update, selected SysV INTEGER/INTEGER, selected nested INTEGER aggregate add-chain field reads, construction returns, and aggregate pass-through helper calls, selected nested mixed aggregate field reads/construction, selected array-in-struct INTEGER and SSE/SSE aggregate field reads and construction returns, selected stack-passed register aggregate field reads after GPR exhaustion, generated normal MEMORY integer-leaf sret/byval field/copy proof through eight flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate including multiple stack-passed user fields after the hidden sret pointer, and an array-backed `{ [5 x i64] }` MEMORY copy, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` aggregate field-read proof, direct helper-call return proof, and selected packed mixed construction-return proof, selected SSE/SSE aggregate field-read/return proof including nested `{ { double }, { double } }`, up-to-six-live-i32 direct-call spill/reload proof plus up-to-three stack-passed live i32 post-call add-tree rows, selected one-live `f32`/`f64` SSE spill/reload around an external C ABI `void` helper call, selected two-live `f32`/`f64` SSE spill/reload across a no-argument helper before a post-call `fadd` return, selected three-live `f32`/`f64` SSE spill/reload across the same helper shape before a two-step post-call `fadd` return, selected four-/five-/six-live `f32`/`f64` SSE spill/reload across the same helper shape before three-/four-/five-step post-call `fadd` returns, selected named `f32`/`f64` external-call argument pass-through through `%xmm0..%xmm4`, and backend FP constant materialization through `%xmm0..%xmm7`. Remaining non-accepted blockers include broader aggregate lowering beyond the selected INTEGER/SSE/SSE/MEMORY frontier, arbitrary non-selected sret/byval copies, varargs, vectors, mixed int/float multiply-add pipelines, more than three stack-passed live values, broader SSE live-across-call helpers beyond the selected one- through six-live f32/f64 no-argument-call shapes, and alternate safety-guard control flow. |
-| Source-wrapper compatibility gate | `distribution-zig-source-structured-direct` proves 49 selected x86_64 release Zig source wrappers without case-id dispatch ownership: `source_wrappers=49`, `case_id_rows=0`, `structured_direct_rows=49`, `generic_codegen_rows=49`, `fallback_rows=0`. Within that gate, 48 rows lower semantic records through `src/zig_semantic_lowering.zig`; one compatibility row remains an external writer delegate. | Unambiguous wrapper/mode subset only; weaker than the source-owned release gate |
-| Differential testing | Generated scalar diff runner plus fail-closed negative generation | Regression infrastructure input |
+### Parser/printer/verifier
+
+Current capability:
+Accepted scalar, control-flow, memory, global, and module records with SSA
+checks.
+
+Zig boundary:
+LLVM-compatibility input validation.
+
+### Scalar optimizer
+
+Current capability:
+Fixture-equivalent InstCombine, DCE, ADCE, SCCP, EarlyCSE, GVN, and BDCE
+slices.
+
+Zig boundary:
+Possible Sema/AIR/native optimizer design input.
+
+### Memory optimizer
+
+Current capability:
+Mem2Reg, SROA, DSE, alias/mod-ref, MemoryLocation, and conservative MemorySSA
+slice.
+
+Zig boundary:
+LLVM-compatibility legality study; not a Zig stack model.
+
+### Loop optimizer
+
+Current capability:
+LoopInfo, simple LCSSA helper, scalar LICM, and loop placeholders.
+
+Zig boundary:
+AIR/liveness loop optimization study.
+
+### Metadata and mode handling
+
+Current capability:
+Debug/profile/module flags, attributes, ReleaseSmall, and target features are
+preserved opaquely.
+
+Zig boundary:
+Mode and metadata preservation input.
+
+### Backend handoff
+
+Current capability:
+Tiny x86_64 Machine IR plus asm/object smoke checks.
+
+Zig boundary:
+Validation-only, not a backend replacement.
+
+### Selected distribution replacement gate
+
+Current capability:
+`distribution-x86_64-selected-zllvm` proves selected x86_64 release-mode
+structured-direct IR-writer rows:
+
+```text
+total_rows=146
+generic_x86_64_lowering_rows=146
+textual_boundary_rows=0
+libLLVM_module_parse_print_rows=0
+llvm_optimizer_rows=0
+llvm_targetmachine_rows=0
+linker=zig-native-fno-lld
+```
+
+Zig boundary:
+Selected release rows only; normal Zig/libLLVM fallback remains when env vars
+are unset.
+
+### Broad source-backed structured gate
+
+Current capability:
+`distribution-x86_64-source-backed-structured` discovers 55 x86_64 release
+`.ll` fixtures and proves all accepted fixture families as structured rows:
+
+```text
+fixture_families=55
+structured_direct_rows=90
+generic_codegen_rows=90
+skipped_with_reason=0
+fallback_rows=0
+textual_llvm_parse_fallback_rows=0
+llvm_optimizer_rows=0
+llvm_targetmachine_rows=0
+object_emission=z_llvm
+linker=zig-native
+```
+
+Zig boundary:
+ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 fixture inventory only; future
+fixture expansion must fail closed on the first unsupported class.
+
+### Source-owned DescriptorV2 gate
+
+Current capability:
+`distribution-x86_64-release-source-owned` proves the current 100-row x86_64
+ReleaseFast/ReleaseSafe/ReleaseSmall source-owned wrapper inventory from
+patched Zig compile-context facts.
+
+The path does not use `ZLLVM_CASE_ID`, `ZLLVM_SOURCE_TAG`, wrapper basenames,
+fixture metadata, body enum dispatch, or template-expansion ownership. Patched
+Zig emits frozen `zllvm-source-facts-v1` `generic-compiler-facts`; z_llvm
+classifies those facts into DescriptorV2 before verification and lowering.
+
+Required ownership counters:
+
+```text
+release_source_rows=100
+source_wrapper_rows=100
+descriptor_owned_rows=100
+descriptor_v2_rows=100
+real_descriptor_program_rows=100
+full_descriptor_program_rows=100
+serialized_function_rows=100
+serialized_instruction_rows=100
+serialized_global_rows=100
+semantic_serialized_rows=100
+serialized_return_stub_rows=0
+descriptor_body_name_rows=0
+zllvm_body_expansion_rows=0
+descriptor_program_body_expansion_rows=0
+functions_for_body_rows=0
+globals_for_body_rows=0
+air_derived_descriptor_rows=100
+static_descriptor_map_rows=0
+zig_compile_context_descriptor_rows=100
+env_source_tag_selector_rows=0
+wrapper_body_selector_rows=0
+source_tag_body_selector_rows=0
+fixture_metadata_selector_rows=0
+source_tag_env_present_rows=0
+zig_emitted_descriptor_rows=100
+runner_generated_descriptor_rows=0
+descriptor_file_consumed_rows=100
+source_fact_stream_rows=100
+concrete_source_fact_rows=100
+source_derived_descriptor_rows=100
+tag_table_descriptor_rows=0
+body_enum_dispatch_rows=0
+surface_to_body_adapter_rows=0
+canned_return_descriptor_rows=0
+manual_fixture_dispatch_rows=0
+legacy_semantic_record_rows=0
+semantic_record_rows=0
+external_writer_delegate_rows=0
+manifest_structured_rows=0
+case_id_rows=0
+surface_dispatch_rows=0
+structured_direct_rows=100
+generic_codegen_rows=100
+fallback_rows=0
+local_fail=0
+```
+
+Additional ownership requirements:
+
+```text
+air_extracted_descriptor_rows=100
+template_descriptor_rows=0
+wrapper_body_map_rows=0
+source_tag_body_map_rows=0
+fact_derived_classification_rows=100
+root_source_classification_fallback_rows=0
+source_fact_program_rows=100
+source_fact_program_direct_rows=100
+source_fact_body_wrapper_rows=0
+body_enum_fallback_rows=0
+```
+
+Release canonicalizer counters:
+
+```text
+release_canonicalizer_rows=100
+observed_int_fold_rows=57
+observed_fp_fold_rows=5
+observed_dead_local_rows=41
+observed_select_fcmp_rows=7
+applied_int_fold_rows=57
+applied_fp_fold_rows=5
+applied_dead_local_rows=41
+applied_select_fcmp_rows=7
+checked_rows=9
+checks_preserved_rows=9
+```
+
+Source-wrapper discovery counters:
+
+```text
+discovered_source_wrappers=82
+descriptor_supported_wrappers=82
+out_of_scope_wrappers=0
+unsupported_with_reason=0
+```
+
+Zig boundary:
+Current release source-owned wrapper inventory only. All 100 rows use
+serialized AIR-shaped semantic records with compile-context fact provenance and
+direct SourceFactProgram DescriptorV2 construction. This is not full Zig
+Sema/AIR/Liveness replacement or full ReleaseSmall optimizer parity.
+
+### Source-owned ELF object inspection
+
+Current capability:
+`distribution-native-link-object-inspection -- --release-source-owned` proves
+the same 100-row boundary emits ELF64 relocatable x86_64 objects through the
+patched-Zig source-owned z_llvm object path before Zig native linker handoff.
+
+```text
+inspected=100
+elf64_rel=100
+relocation_rows=12
+tls_rows=8
+undefined_import_rows=0
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+Zig boundary:
+Object-format proof only. Final linking, CRT policy, libc, dynamic loader
+behavior, archives, linker scripts, and new-linker feature gaps remain Zig
+linker/toolchain ownership.
+
+### Source-owned native-link handoff
+
+Current capability:
+`distribution-native-link -- --release-source-owned` and
+`probe-native-linker -- --release-source-owned` prove the same 100-row
+source-owned boundary reaches Zig native `-fno-lld` linker handoff.
+
+Executable gate counters:
+
+```text
+total=100
+executable_abi_proof_rows=100
+link_only_rows=0
+runtime_compiler_rt_libc_boundary_rows=0
+unsupported_zig_linker_feature_rows=0
+local_object_codegen_failures=0
+local_fail=0
+```
+
+Companion probe counters:
+
+```text
+accepted=100
+runtime_compiler_rt_libc_boundary_rows=0
+unsupported_zig_linker_feature_rows=0
+local_object_codegen_failures=0
+failed=0
+```
+
+Zig boundary:
+Native linker ownership remains Zig-owned. This proves handoff acceptance and
+runnable ABI behavior for selected source-owned wrappers, not a z_llvm linker
+implementation.
+
+### Uncurated real AIR compatibility gate
+
+Current capability:
+`distribution-zig-air-uncurated-release` discovers `test/zig/inputs/*.zig`,
+asks patched Zig for `zllvm-air-export-v1` plus `structured_air-v1`
+body/branch metadata and typed `structured_air-v2` records, and lowers real
+ReleaseFast/ReleaseSafe/ReleaseSmall x86_64 AIR without case IDs, wrapper maps,
+source-fact body classification, or canned DescriptorV2 construction.
+
+Current counters for each mode:
+
+```text
+source_rows=19
+discovered_functions=44
+structured_functions=44
+generic_codegen_functions=44
+structured_air_v1_functions=44
+structured_air_v2_functions=44
+typed_air_type_functions=44
+typed_air_operand_functions=44
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=44
+shape_recognizer_functions=0
+unsupported_functions=0
+codegen_failures=0
+case_id_rows=0
+source_fact_classification_rows=0
+local_fail=0
+```
+
+Zig boundary:
+Narrow compatibility gate retained for regression coverage. The broad real-AIR
+release gates below carry the current strongest typed-v2 ownership claim.
+
+### Broad uncurated ReleaseFast/ReleaseSafe/ReleaseSmall AIR discovery
+
+Current capability:
+`distribution-zig-air-uncurated-releasefast-broad`,
+`distribution-zig-air-uncurated-releasesafe-broad`, and
+`distribution-zig-air-uncurated-releasesmall-broad` discover
+`test/zig/inputs/*.zig` plus `test/zig/integrated/*.zig`.
+
+Discovery counters for each mode:
+
+```text
+source_rows=101
+discovered_functions=152
+structured_functions=152
+generic_codegen_functions=152
+generic_cfg_functions=152
+structural_matcher_functions=0
+structured_air_v1_functions=152
+structured_air_v2_functions=152
+typed_air_type_functions=152
+typed_air_operand_functions=152
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=152
+shape_recognizer_functions=0
+unsupported_functions=0
+codegen_failures=0
+case_id_rows=0
+source_fact_classification_rows=0
+local_fail=0
+```
+
+Object progress counters:
+
+```text
+object_emitted_functions=152
+object_failures=0
+llvm_targetmachine_rows=0
+local_fail=0
+```
+
+Object-inspection counters:
+
+```text
+inspected=101
+elf64_rel=101
+relocation_rows=14
+tls_rows=3
+undefined_import_rows=3
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+ReleaseFast and ReleaseSmall native-link progress:
+
+```text
+native_link_accepted_rows=100
+executable_ok_rows=0
+link_only_rows=100
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Executable proof counters for ReleaseFast, ReleaseSafe, and ReleaseSmall:
+
+```text
+native_link_accepted_rows=100
+executable_ok_rows=100
+link_only_rows=0
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Zig boundary:
+Broad real-AIR lowering/codegen/object evidence for all three release modes.
+The named runtime boundary is `debug.defaultPanic`. These gates stay out of
+`distribution-all` until runtime and executable proof cost is known.
+
+### Expanded uncurated release AIR frontier
+
+Current capability:
+`distribution-zig-air-uncurated-releasefast-expanded`,
+`distribution-zig-air-uncurated-releasesafe-expanded`, and
+`distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources
+under `test/zig/expanded/*.zig` on top of the closed broad corpus.
+
+Discovery counters for all three release modes:
+
+```text
+source_rows=109
+discovered_functions=199
+structured_functions=199
+generic_codegen_functions=199
+generic_cfg_functions=199
+structural_matcher_functions=0
+structured_air_v2_functions=199
+typed_air_operand_functions=199
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=199
+shape_recognizer_functions=0
+unsupported_functions=0
+codegen_failures=0
+local_fail=0
+```
+
+Object progress:
+
+```text
+object_emitted_functions=199
+object_failures=0
+llvm_targetmachine_rows=0
+local_fail=0
+```
+
+Object inspection:
+
+```text
+inspected=109
+elf64_rel=109
+relocation_rows=18  # 19 for ReleaseSafe
+tls_rows=4
+undefined_import_rows=3  # 6 for ReleaseSafe
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+Native-link progress:
+
+```text
+ReleaseFast/ReleaseSmall:
+native_link_accepted_rows=108
+link_only_rows=108
+runtime_boundary_rows=1
+
+ReleaseSafe:
+native_link_accepted_rows=105
+link_only_rows=105
+runtime_boundary_rows=4
+```
+
+Executable proof for all three modes:
+
+```text
+native_link_accepted_rows=108
+executable_ok_rows=108
+link_only_rows=0
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Zig boundary:
+New frontier only. The slice closes additional scalar CFG, memory, call,
+optional/error, branch/select, global/TLS, aggregate, atomic, inline-asm, and
+expanded stack/mixed SysV ABI rows. Remaining non-selected ABI boundaries are
+full aggregate classification beyond selected INTEGER/normal integer-leaf
+MEMORY forms, arbitrary non-selected sret/byval copies, varargs, vectors, and
+high-register-pressure spill/reload-heavy call frames.
+
+### Scale uncurated release AIR frontier
+
+Current capability:
+`distribution-zig-air-uncurated-releasefast-scale`,
+`distribution-zig-air-uncurated-releasesafe-scale`, and
+`distribution-zig-air-uncurated-releasesmall-scale` add explicit sources under
+`test/zig/scale/*.zig` on top of the expanded corpus.
+
+Discovery and object counters:
+
+```text
+source_rows=112
+discovered_functions=216
+structured_functions=216
+generic_codegen_functions=216
+generic_cfg_functions=216
+structural_matcher_functions=0
+structured_air_v2_functions=216
+typed_air_operand_functions=216
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=216
+shape_recognizer_functions=0
+unsupported_functions=0
+codegen_failures=0
+object_emitted_functions=216
+object_failures=0
+llvm_targetmachine_rows=0
+local_fail=0
+```
+
+Object inspection:
+
+```text
+inspected=112
+elf64_rel=112
+unsupported_relocation_rows=0
+local_fail=0
+
+ReleaseFast/ReleaseSmall:
+relocation_rows=20
+undefined_import_rows=3
+
+ReleaseSafe:
+relocation_rows=21
+undefined_import_rows=6
+```
+
+Native-link progress:
+
+```text
+ReleaseFast/ReleaseSmall:
+native_link_accepted_rows=111
+link_only_rows=111
+runtime_boundary_rows=1
+
+ReleaseSafe:
+native_link_accepted_rows=108
+link_only_rows=108
+runtime_boundary_rows=4
+```
+
+Executable proof:
+
+```text
+native_link_accepted_rows=111
+executable_ok_rows=111
+link_only_rows=0
+runtime_boundary_rows=1
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Zig boundary:
+Frontier only. It keeps broad/expanded claims intact while adding broader SysV
+call shapes, memory loops, branch-local pointer memory, extern two-i32 field
+updates, direct-call branch merges, globals, and TLS.
+
+### Frontier uncurated release AIR corpus
+
+Current capability:
+`distribution-zig-air-uncurated-release-frontier` covers only
+`test/zig/frontier/*.zig`, separate from the cumulative broad, expanded, and
+scale gates.
+
+ReleaseFast/ReleaseSafe/ReleaseSmall counters:
+
+```text
+source_rows=13
+discovered_functions=117
+structured_functions=117
+generic_codegen_functions=117
+generic_cfg_functions=117
+structural_matcher_functions=0
+structured_air_v2_functions=117
+typed_air_operand_functions=117
+legacy_air_text_lowering_functions=0
+typed_v2_fallback_functions=0
+generic_lowering_functions=117
+shape_recognizer_functions=0
+unsupported_functions=0
+codegen_failures=0
+object_emitted_functions=117
+object_failures=0
+llvm_targetmachine_rows=0
+local_fail=0
+```
+
+Object inspection:
+
+```text
+inspected=13
+elf64_rel=13
+relocation_rows=4
+tls_rows=1
+undefined_import_rows=1
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+Native-link and executable proof:
+
+```text
+native_link_accepted_rows=13
+executable_ok_rows=13
+link_only_rows=0
+runtime_boundary_rows=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Accepted frontier evidence:
+
+```text
+typed_air_v2=accepted
+generic_cfg=accepted
+selected_nested_loop_memory=accepted
+selected_aggregate_field_pointer_gep_global_tls=accepted
+selected_sysv_integer_integer=accepted
+selected_nested_integer_aggregate=accepted
+selected_nested_mixed_aggregate=accepted
+selected_array_integer_and_sse_aggregate=accepted
+selected_stack_passed_register_aggregate_fields=accepted
+selected_memory_sret_byval_integer_leaf=accepted
+selected_mixed_width_memory_aggregate=accepted
+selected_array_backed_memory_copy=accepted
+selected_mixed_integer_sse_and_sse_integer=accepted
+selected_sse_sse_aggregate=accepted
+selected_up_to_six_live_i32_spills=accepted
+selected_up_to_three_stack_passed_live_i32=accepted
+selected_one_to_six_live_f32_f64_spills=accepted
+selected_xmm0_to_xmm4_call_args=accepted
+backend_fp_constants_xmm0_to_xmm7=accepted
+```
+
+Remaining non-accepted blockers:
+
+```text
+broader aggregate lowering beyond selected INTEGER/SSE/MEMORY frontier
+arbitrary non-selected sret/byval copies
+varargs
+vectors
+mixed int/float multiply-add pipelines
+more than three stack-passed live values
+broader SSE live-across-call helpers beyond selected no-argument-call shapes
+alternate safety-guard control flow
+```
+
+Zig boundary:
+New source-frontier evidence only. Accepted rows use typed AIR v2 and generic
+CFG; unsupported rows remain measured boundaries.
+
+### Source-wrapper compatibility gate
+
+Current capability:
+`distribution-zig-source-structured-direct` proves 49 selected x86_64 release
+Zig source wrappers without case-id dispatch ownership:
+
+```text
+source_wrappers=49
+case_id_rows=0
+structured_direct_rows=49
+generic_codegen_rows=49
+fallback_rows=0
+semantic_record_rows=48
+external_writer_delegate_rows=1
+```
+
+Zig boundary:
+Unambiguous wrapper/mode subset only; weaker than the source-owned release gate.
+
+### Differential testing
+
+Current capability:
+Generated scalar diff runner plus fail-closed negative generation.
+
+Zig boundary:
+Regression infrastructure input.
 
 ## External Experiment Boundary
 
@@ -70,7 +721,8 @@ source-backed Zig-emitted IR corpus manifest
 fixture metadata separating opt-equivalent from local-conservative behavior
 MemorySSA/alias legality lessons for avoiding unsafe load CSE/GVN
 AIR/liveness handoff matrix separating LLVM facts from Zig-native concepts
-source-wrapper dispatch and source-owned semantic-record lowering ladder for selected rows
+source-wrapper dispatch and source-owned semantic-record lowering ladder for
+selected rows
 readiness check script that reproduces current claims
 ```
 
