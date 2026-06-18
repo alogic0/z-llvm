@@ -53,6 +53,16 @@ export fn frontier_seven_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32,
     return a + b + c + d + e + f + g + r;
 }
 
+export fn frontier_eight_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + g + h + r;
+}
+
+export fn frontier_nine_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + g + h + i + r;
+}
+
 export fn frontier_f32_live_after_call(a: f32, b: f32) f32 {
     frontier_touch_f32(b);
     return a;

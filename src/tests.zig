@@ -7585,13 +7585,13 @@ test "x86_64 codegen preserves six live i32 params across direct call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
 }
 
-test "x86_64 codegen preserves six register and one stack i32 params across direct call" {
+test "x86_64 codegen preserves six register and three stack i32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @callee(i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h, i32 %i) {
         \\entry:
         \\  %ab = add i32 %a, %b
         \\  %abc = add i32 %ab, %c
@@ -7599,8 +7599,10 @@ test "x86_64 codegen preserves six register and one stack i32 params across dire
         \\  %abcde = add i32 %abcd, %e
         \\  %abcdef = add i32 %abcde, %f
         \\  %abcdefg = add i32 %abcdef, %g
+        \\  %abcdefgh = add i32 %abcdefg, %h
+        \\  %abcdefghi = add i32 %abcdefgh, %i
         \\  %r = call i32 @callee(i32 %f)
-        \\  %sum = add i32 %abcdefg, %r
+        \\  %sum = add i32 %abcdefghi, %r
         \\  ret i32 %sum
         \\}
         \\
@@ -7628,6 +7630,8 @@ test "x86_64 codegen preserves six register and one stack i32 params across dire
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot4 } });
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 8 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 16 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 24 });
 }
 
 test "x86_64 codegen lowers canonical accumulator loops without function-name dispatch" {

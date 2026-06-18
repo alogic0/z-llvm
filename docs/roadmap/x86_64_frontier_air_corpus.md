@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=113
-structured_functions=113
-generic_codegen_functions=113
-generic_cfg_functions=113
+discovered_functions=115
+structured_functions=115
+generic_codegen_functions=115
+generic_cfg_functions=115
 structural_matcher_functions=0
-structured_air_v2_functions=113
-typed_air_operand_functions=113
+structured_air_v2_functions=115
+typed_air_operand_functions=115
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=113
+generic_lowering_functions=115
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=113
+object_emitted_functions=115
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -187,10 +187,10 @@ Closed in the current memory/aggregate frontier slice:
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
   and the saved value is reloaded to `%xmm0` for return
-- first stack-passed live i32 row in `frontier_sysv_abi.zig`: all six SysV GPR
-  `i32` parameters are spilled/reloaded around a direct helper call while the
-  first stack-passed `i32` parameter is read from the restored incoming stack
-  argument area for the post-call add-tree return
+- stack-passed live i32 rows in `frontier_sysv_abi.zig`: all six SysV GPR
+  `i32` parameters are spilled/reloaded around a direct helper call while up
+  to three stack-passed `i32` parameters are read from the restored incoming
+  stack argument area for the post-call add-tree return
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
@@ -220,9 +220,9 @@ Remaining measured frontier blockers kept out of accepted rows:
 
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
-- private helper call graphs with multiple stack-passed live values, live SSE
-  values beyond the selected no-argument-call spill shapes, or live values
-  across multiple calls
+- private helper call graphs with more than three stack-passed live values,
+  live SSE values beyond the selected no-argument-call spill shapes, or live
+  values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
@@ -237,7 +237,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   through eight flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,
   packed/unaligned aggregate ABI classes,
-  arbitrary non-selected sret/byval copies, varargs, vectors, multiple
+  arbitrary non-selected sret/byval copies, varargs, vectors, more than three
   stack-passed live values, and broader SSE live-across-call frames beyond the
   selected one-live through six-live `f32`/`f64` no-argument-call shapes and
   selected named `%xmm0..%xmm4` pass-through calls

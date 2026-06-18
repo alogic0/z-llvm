@@ -1499,6 +1499,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_five_live_after_call(int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_five_live_after_call");
     \\extern int z_frontier_six_live_after_call(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_six_live_after_call");
     \\extern int z_frontier_seven_live_after_call(int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_seven_live_after_call");
+    \\extern int z_frontier_eight_live_after_call(int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_eight_live_after_call");
+    \\extern int z_frontier_nine_live_after_call(int, int, int, int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_nine_live_after_call");
     \\extern float z_frontier_f32_live_after_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_live_after_call");
     \\extern double z_frontier_f64_live_after_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_live_after_call");
     \\extern float z_frontier_two_f32_live_sum_after_call(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_live_sum_after_call");
@@ -1531,6 +1533,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_five_live_after_call(2, 3, 5, 7, 11) != 39) return 7;
     \\    if (z_frontier_six_live_after_call(2, 3, 5, 7, 11, 13) != 54) return 8;
     \\    if (z_frontier_seven_live_after_call(2, 3, 5, 7, 11, 13, 17) != 71) return 23;
+    \\    if (z_frontier_eight_live_after_call(2, 3, 5, 7, 11, 13, 17, 19) != 90) return 24;
+    \\    if (z_frontier_nine_live_after_call(2, 3, 5, 7, 11, 13, 17, 19, 23) != 113) return 25;
     \\    if (z_frontier_f32_live_after_call(4.5f, 2.25f) != 4.5f || frontier_seen_f32 != 2.25f) return 9;
     \\    if (z_frontier_f64_live_after_call(9.5, 3.25) != 9.5 || frontier_seen_f64 != 3.25) return 10;
     \\    if (z_frontier_two_f32_live_sum_after_call(1.5f, 2.75f) != 4.25f) return 11;
