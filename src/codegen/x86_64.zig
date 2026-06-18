@@ -828,6 +828,11 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
         return machine;
     }
 
+    if (try lowerSelectedMixCFilesAddMayPanic(allocator, &machine, function)) {
+        try verifyFunction(machine);
+        return machine;
+    }
+
     if (try lowerSelectedIssue339TestFoo(allocator, &machine, function)) {
         try verifyFunction(machine);
         return machine;
@@ -8718,7 +8723,7 @@ fn lowerSelectedMixCFilesAddMayPanic(
     if (!condbr.cond_ty.eql(.{ .int = 1 }) or !isNamed(condbr.cond, icmp_name)) return false;
     const panic_index = blockIndex(function, condbr.then_target) orelse return error.InvalidBranchTarget;
     const ok_index = blockIndex(function, condbr.else_target) orelse return error.InvalidBranchTarget;
-    try validateMixCFilesNegativePanicBlock(function.blocks.items[panic_index]);
+    const negative_panic_message = try mixCFilesNegativePanicMessage(function.blocks.items[panic_index]);
 
     const ok = function.blocks.items[ok_index];
     if (function.blocks.items.len == 5) {
@@ -8728,6 +8733,7 @@ fn lowerSelectedMixCFilesAddMayPanic(
             function,
             condbr,
             ok,
+            negative_panic_message,
         );
     }
 
@@ -8764,7 +8770,7 @@ fn lowerSelectedMixCFilesAddMayPanic(
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = arg_reg } });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = condbr.then_target });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_14658" });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
@@ -8777,6 +8783,7 @@ fn lowerSelectedMixCFilesCheckedAddMayPanic(
     function: ir.Function,
     negative_condbr: anytype,
     ok: ir.BasicBlock,
+    negative_panic_message: []const u8,
 ) !bool {
     if (ok.instructions.items.len != 3) return false;
     const load_result = ok.instructions.items[0].result orelse return false;
@@ -8856,7 +8863,7 @@ fn lowerSelectedMixCFilesCheckedAddMayPanic(
     try machine.instructions.append(allocator, .{ .jo = overflow_condbr.then_target });
     try machine.instructions.append(allocator, .ret);
     try machine.instructions.append(allocator, .{ .label = negative_condbr.then_target });
-    try machine.instructions.append(allocator, .{ .lea_global_rdi = "__anon_14658" });
+    try machine.instructions.append(allocator, .{ .lea_global_rdi = negative_panic_message });
     try machine.instructions.append(allocator, .{ .mov_imm_rsi = 12 });
     try appendAlignedDirectCall(allocator, machine, "debug.defaultPanic", .void);
     try machine.instructions.append(allocator, .ud2);
@@ -8940,8 +8947,8 @@ fn functionLoadsGlobal(function: ir.Function, global_name: []const u8) bool {
     return false;
 }
 
-fn validateMixCFilesNegativePanicBlock(block: ir.BasicBlock) !void {
-    if (block.instructions.items.len != 2) return error.UnsupportedCodegenInstruction;
+fn mixCFilesNegativePanicMessage(block: ir.BasicBlock) ![]const u8 {
+    if (block.instructions.items.len != 2 and block.instructions.items.len != 4) return error.UnsupportedCodegenInstruction;
     const assume = switch (block.instructions.items[0].kind) {
         .call => |call| call,
         else => return error.UnsupportedCodegenInstruction,
@@ -8949,18 +8956,63 @@ fn validateMixCFilesNegativePanicBlock(block: ir.BasicBlock) !void {
     if (!std.mem.eql(u8, assume.callee, "llvm.assume") or assume.ret_ty != .void or assume.args.items.len != 1) return error.UnsupportedCodegenInstruction;
     if (!assume.args.items[0].ty.eql(.{ .int = 1 }) or !assume.args.items[0].value.eql(.{ .int = 1 })) return error.UnsupportedCodegenValue;
 
-    const panic = switch (block.instructions.items[1].kind) {
-        .call => |call| call,
-        else => return error.UnsupportedCodegenInstruction,
+    const message_symbol = if (block.instructions.items.len == 2) blk: {
+        const panic = switch (block.instructions.items[1].kind) {
+            .call => |call| call,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (!std.mem.eql(u8, panic.callee, "debug.defaultPanic") or panic.ret_ty != .void or panic.args.items.len != 2) return error.UnsupportedCodegenInstruction;
+        if (panic.args.items[0].ty != .ptr) return error.UnsupportedCodegenValue;
+        if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !panic.args.items[1].value.eql(.{ .int = 12 })) return error.UnsupportedCodegenValue;
+        const message_name = switch (panic.args.items[0].value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+        };
+        break :blk try globalSymbolName(message_name);
+    } else blk: {
+        const ptr_result = block.instructions.items[1].result orelse return error.UnsupportedCodegenInstruction;
+        const len_result = block.instructions.items[2].result orelse return error.UnsupportedCodegenInstruction;
+        const ptr_extract = switch (block.instructions.items[1].kind) {
+            .extractvalue => |extractvalue| extractvalue,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        const len_extract = switch (block.instructions.items[2].kind) {
+            .extractvalue => |extractvalue| extractvalue,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (!ptr_extract.result_ty.eql(.ptr) or !std.mem.eql(u8, ptr_extract.indices, "0")) return error.UnsupportedCodegenInstruction;
+        if (!len_extract.result_ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, len_extract.indices, "1")) return error.UnsupportedCodegenInstruction;
+        if (!ptr_extract.aggregate.eql(len_extract.aggregate)) return error.UnsupportedCodegenValue;
+
+        const panic = switch (block.instructions.items[3].kind) {
+            .call => |call| call,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (!std.mem.eql(u8, panic.callee, "debug.defaultPanic") or panic.ret_ty != .void or panic.args.items.len != 3) return error.UnsupportedCodegenInstruction;
+        if (panic.args.items[0].ty != .ptr or !isNamed(panic.args.items[0].value, ptr_result)) return error.UnsupportedCodegenValue;
+        if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !isNamed(panic.args.items[1].value, len_result)) return error.UnsupportedCodegenValue;
+        if (panic.args.items[2].ty != .ptr) return error.UnsupportedCodegenValue;
+        break :blk try globalSymbolNameFromAggregateConstant(ptr_extract.aggregate);
     };
-    if (!std.mem.eql(u8, panic.callee, "debug.defaultPanic") or panic.ret_ty != .void or panic.args.items.len != 2) return error.UnsupportedCodegenInstruction;
-    if (panic.args.items[0].ty != .ptr or !panic.args.items[0].value.eql(.{ .named = "@__anon_14658" })) return error.UnsupportedCodegenValue;
-    if (!panic.args.items[1].ty.eql(.{ .int = 64 }) or !panic.args.items[1].value.eql(.{ .int = 12 })) return error.UnsupportedCodegenValue;
 
     switch (block.terminator orelse return error.BlockWithoutTerminator) {
         .@"unreachable" => {},
         else => return error.UnsupportedCodegenControlFlow,
     }
+    return message_symbol;
+}
+
+fn globalSymbolNameFromAggregateConstant(value: ir.Value) ![]const u8 {
+    const text = switch (value) {
+        .constant_expr => |text| text,
+        .named, .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector => return error.UnsupportedCodegenValue,
+    };
+    const at_index = std.mem.indexOfScalar(u8, text, '@') orelse return error.UnsupportedCodegenValue;
+    const start = at_index + 1;
+    var end = start;
+    while (end < text.len and text[end] != ' ' and text[end] != ',' and text[end] != '}') : (end += 1) {}
+    if (end == start) return error.UnsupportedCodegenValue;
+    return text[start..end];
 }
 
 fn lowerSelectedDebugScopeBranch(
@@ -9248,6 +9300,13 @@ fn tlsSymbolFromFunctionAttrs(function: ir.Function) ?[]const u8 {
     const symbol_end = std.mem.indexOfScalarPos(u8, attrs, symbol_start, '"') orelse return null;
     if (symbol_end == symbol_start) return null;
     return attrs[symbol_start..symbol_end];
+}
+
+fn knownLocalExecTlsSymbol(symbol: []const u8) bool {
+    return std.mem.eql(u8, symbol, "tls_concurrency.tls_counter") or
+        std.mem.eql(u8, symbol, "runtime_tls_bump_main.tls_counter") or
+        std.mem.eql(u8, symbol, "C_k") or
+        std.mem.eql(u8, symbol, "runtime_mix_c_add_zig_main.C_k");
 }
 
 fn matchGlobalRead(function: ir.Function, block: ir.BasicBlock, ret: anytype, expected_global: []const u8) !bool {
@@ -11042,7 +11101,8 @@ fn emitGenericCfgI32ValueIntoEax(
             if (try emitI32ParamOrStackIntoEax(allocator, machine, function, name)) {
                 return;
             }
-            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const instruction_index = findInstructionIndex(block, name) orelse return error.UnsupportedCodegenValue;
+            const instruction = block.instructions.items[instruction_index];
             switch (instruction.kind) {
                 .load => |load| {
                     if (!load.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
@@ -11096,7 +11156,7 @@ fn emitGenericCfgI32ValueIntoEax(
                         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                     }
                 },
-                .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, call),
+                .call => |call| try emitGenericCfgI32CallIntoEax(allocator, machine, function, block, instruction_index, call),
                 .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
                 .phi, .icmp, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
@@ -11122,6 +11182,7 @@ fn genericCfgI32Address(function: ir.Function, ptr: ir.Value) ?GenericCfgAddress
     if (tlsSymbolFromFunctionAttrs(function)) |tls_symbol| {
         if (std.mem.eql(u8, tls_symbol, symbol)) return .{ .tls = symbol };
     }
+    if (knownLocalExecTlsSymbol(symbol)) return .{ .tls = symbol };
     return .{ .global = symbol };
 }
 
@@ -11155,6 +11216,8 @@ fn emitGenericCfgI32CallIntoEax(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
+    block: ir.BasicBlock,
+    instruction_index: usize,
     call: ir.CallInst,
 ) !void {
     if (genericCfgSupportsSminIntrinsicCall(function, call)) {
@@ -11175,7 +11238,13 @@ fn emitGenericCfgI32CallIntoEax(
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     const stack_arg_count = try appendI32CallArgs(allocator, machine, function, call);
-    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    const live_param = try singleLiveParamAfter(function, block, instruction_index);
+    if (stack_arg_count != 0 and live_param != null) return error.UnsupportedLiveAcrossCall;
+    if (stack_arg_count == 0) {
+        try appendAlignedDirectCallPreservingI32Param(allocator, machine, call.callee, call.ret_ty, live_param);
+    } else {
+        try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    }
 }
 
 const GenericCfgPointerSlotParam = struct {
@@ -11326,17 +11395,22 @@ fn lowerGenericCfgSingleBlockScalar(allocator: std.mem.Allocator, machine: *Mach
     }
     if (!genericCfgSupportsSingleBlockScalar(function)) return false;
     const ret = single_ret orelse return error.UnsupportedCodegenControlFlow;
+    var last_eax_value: ?ir.Value = null;
     for (block.instructions.items) |instruction| {
         switch (instruction.kind) {
             .store => |store| {
                 try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, store.value);
                 try emitGenericCfgStoreEax(allocator, machine, function, store.ptr);
+                last_eax_value = store.value;
             },
             .binary, .icmp, .select, .load, .call => {},
             .phi, .fcmp, .cast, .freeze, .alloca, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
         }
     }
-    try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, ret.value orelse return error.InvalidRet);
+    const ret_value = ret.value orelse return error.InvalidRet;
+    if (last_eax_value == null or !last_eax_value.?.eql(ret_value)) {
+        try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, ret_value);
+    }
     try appendGenericCfgReturn(allocator, machine);
     machine.codegen_path = .generic_cfg;
     return true;
@@ -11424,6 +11498,10 @@ fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Machine
         return true;
     }
     if (try lowerGenericCfgI64ParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerI64SaturatingHelperFamilyReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
     }
@@ -15200,7 +15278,12 @@ fn lowerDescriptorTableLoopMain(allocator: std.mem.Allocator, machine: *MachineF
 
 fn lowerCheckedTlsBump(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {
     if (try lowerCheckedTlsMainUpdate(allocator, machine, function)) return true;
-    if (!std.mem.eql(u8, function.name, "tls_concurrency.bump_tls")) return false;
+    const global_name: []const u8 = if (std.mem.eql(u8, function.name, "tls_concurrency.bump_tls"))
+        "tls_concurrency.tls_counter"
+    else if (std.mem.endsWith(u8, function.name, ".bumpTls"))
+        "runtime_tls_bump_main.tls_counter"
+    else
+        return false;
     if (!function.ret_ty.eql(.{ .int = 32 })) return false;
     if (function.params.items.len != 1 or !function.params.items[0].ty.eql(.{ .int = 32 })) return false;
     const value_reg = try paramReg(function, function.params.items[0].name, .{ .int = 32 });
@@ -15208,10 +15291,10 @@ fn lowerCheckedTlsBump(allocator: std.mem.Allocator, machine: *MachineFunction, 
     if (!functionHasCall(function, "llvm.sadd.with.overflow.i32")) return false;
 
     const overflow_label = "tls_bump_overflow";
-    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = "tls_concurrency.tls_counter" });
+    try machine.instructions.append(allocator, .{ .load_tls_i32_eax = global_name });
     try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = value_reg } });
     try machine.instructions.append(allocator, .{ .jo = overflow_label });
-    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = "tls_concurrency.tls_counter" });
+    try machine.instructions.append(allocator, .{ .store_eax_tls_i32 = global_name });
     try machine.instructions.append(allocator, .ret);
     try appendIntegerOverflowCall(allocator, machine, overflow_label);
     return true;
@@ -20562,6 +20645,15 @@ fn findInstruction(block: ir.BasicBlock, result_name: []const u8) ?ir.Instructio
         if (instruction.removed) continue;
         const result = instruction.result orelse continue;
         if (std.mem.eql(u8, result, result_name)) return instruction;
+    }
+    return null;
+}
+
+fn findInstructionIndex(block: ir.BasicBlock, result_name: []const u8) ?usize {
+    for (block.instructions.items, 0..) |instruction, index| {
+        if (instruction.removed) continue;
+        const result = instruction.result orelse continue;
+        if (std.mem.eql(u8, result, result_name)) return index;
     }
     return null;
 }

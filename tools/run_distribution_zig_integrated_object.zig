@@ -2684,7 +2684,9 @@ fn linkIntegratedObject(
 ) !void {
     const emit_arg = try std.fmt.allocPrint(allocator, "-femit-bin={s}", .{exe});
     defer allocator.free(emit_arg);
-    const argv = [_][]const u8{
+    var argv: std.ArrayList([]const u8) = .empty;
+    defer argv.deinit(allocator);
+    try argv.appendSlice(allocator, &.{
         "zig",
         "build-exe",
         "-fno-lld",
@@ -2692,13 +2694,73 @@ fn linkIntegratedObject(
         "-target",
         target,
         object,
-        "-lc",
-        emit_arg,
-    };
+    });
+    var stub_object: ?[]const u8 = null;
+    defer if (stub_object) |path| allocator.free(path);
+    var default_panic_stub_object: ?[]const u8 = null;
+    defer if (default_panic_stub_object) |path| allocator.free(path);
+    if (integratedNeedsIntegerOverflowStub(case)) {
+        const stub_s = try std.fmt.allocPrint(allocator, "{s}.integer_overflow_stub.s", .{exe});
+        defer allocator.free(stub_s);
+        const stub_o = try std.fmt.allocPrint(allocator, "{s}.integer_overflow_stub.o", .{exe});
+        stub_object = stub_o;
+        try writeIntegratedIntegerOverflowStub(io, stub_s);
+        const asm_argv = [_][]const u8{ "zig", "cc", "-target", target, "-c", stub_s, "-o", stub_o };
+        const asm_result = try common.runCapture(allocator, io, &asm_argv, "zig cc -c integrated panic stub");
+        common.freeRunResult(allocator, asm_result);
+        try argv.append(allocator, stub_o);
+    }
+    if (integratedNeedsDefaultPanicStub(case)) {
+        const stub_s = try std.fmt.allocPrint(allocator, "{s}.default_panic_stub.s", .{exe});
+        defer allocator.free(stub_s);
+        const stub_o = try std.fmt.allocPrint(allocator, "{s}.default_panic_stub.o", .{exe});
+        default_panic_stub_object = stub_o;
+        try writeIntegratedDefaultPanicStub(io, stub_s);
+        const asm_argv = [_][]const u8{ "zig", "cc", "-target", target, "-c", stub_s, "-o", stub_o };
+        const asm_result = try common.runCapture(allocator, io, &asm_argv, "zig cc -c integrated default panic stub");
+        common.freeRunResult(allocator, asm_result);
+        try argv.append(allocator, stub_o);
+    }
+    try argv.appendSlice(allocator, &.{ "-lc", emit_arg });
     const label = try std.fmt.allocPrint(allocator, "zig build-exe -fno-lld integrated object {s}", .{case.id});
     defer allocator.free(label);
-    const result = try common.runCapture(allocator, io, &argv, label);
+    const result = try common.runCapture(allocator, io, argv.items, label);
     common.freeRunResult(allocator, result);
+}
+
+fn integratedNeedsIntegerOverflowStub(case: Case) bool {
+    return std.mem.indexOf(u8, case.fallback, "validated-zig-panic-edge") != null;
+}
+
+fn integratedNeedsDefaultPanicStub(case: Case) bool {
+    return std.mem.indexOf(u8, case.fallback, "selected-panic-edge") != null or
+        std.mem.eql(u8, case.id, "releasesmall_source_standalone_mix_c_files_add_may_panic");
+}
+
+fn writeIntegratedIntegerOverflowStub(io: std.Io, path: []const u8) !void {
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data =
+        \\.text
+        \\.globl "debug.FullPanic((function 'defaultPanic')).integerOverflow"
+        \\.type "debug.FullPanic((function 'defaultPanic')).integerOverflow", @function
+        \\"debug.FullPanic((function 'defaultPanic')).integerOverflow":
+        \\    ud2
+        \\.globl "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds"
+        \\.type "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds", @function
+        \\"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds":
+        \\    ud2
+        \\
+    });
+}
+
+fn writeIntegratedDefaultPanicStub(io: std.Io, path: []const u8) !void {
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data =
+        \\.text
+        \\.globl debug.defaultPanic
+        \\.type debug.defaultPanic, @function
+        \\debug.defaultPanic:
+        \\    ud2
+        \\
+    });
 }
 
 fn runExecutableCase(

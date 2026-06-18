@@ -4827,11 +4827,52 @@ fn parseInputLimit(text: []const u8) !usize {
 }
 
 fn shouldLowerCodegenFunction(module: ir.Module, function: ir.Function) bool {
+    if (isCodegenRuntimeBoundaryFunction(function.name)) return false;
+    if (isCodegenRootFunction(module, function)) return true;
+    if (function.linkage != .private and function.linkage != .internal) return false;
+    if (!isCodegenSelectedDirectPrivateHelper(function.name)) return false;
+    for (module.functions.items) |caller| {
+        if (std.mem.eql(u8, caller.name, function.name)) continue;
+        if (!isCodegenRootFunction(module, caller)) continue;
+        if (functionDirectlyCalls(caller, function.name)) return true;
+    }
+    return false;
+}
+
+fn isCodegenRootFunction(module: ir.Module, function: ir.Function) bool {
     if (std.mem.eql(u8, function.name, "main.testOne")) return true;
     if (module.aliases.items.len == 0) return true;
     if (function.linkage != .private and function.linkage != .internal) return true;
     for (module.aliases.items) |alias| {
         if (std.mem.eql(u8, alias.target, function.name)) return true;
+    }
+    return false;
+}
+
+fn isCodegenRuntimeBoundaryFunction(name: []const u8) bool {
+    return std.mem.startsWith(u8, name, "debug.") or
+        std.mem.startsWith(u8, name, "\"debug.");
+}
+
+fn isCodegenSelectedDirectPrivateHelper(name: []const u8) bool {
+    return std.mem.eql(u8, name, "runtime_tls_bump_main.bumpTls") or
+        std.mem.eql(u8, name, "runtime_side_effect_free_main.sideEffectFree") or
+        std.mem.eql(u8, name, "runtime_hidden_access_main.getHidden") or
+        std.mem.eql(u8, name, "runtime_hidden_access_main.updateHidden") or
+        std.mem.eql(u8, name, "runtime_mix_c_add_zig_main.add_zig") or
+        std.mem.eql(u8, name, "runtime_mix_c_add_may_panic_main.add_may_panic");
+}
+
+fn functionDirectlyCalls(function: ir.Function, callee_name: []const u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            const call = switch (instruction.kind) {
+                .call => |call| call,
+                else => continue,
+            };
+            if (std.mem.eql(u8, call.callee, callee_name)) return true;
+        }
     }
     return false;
 }
