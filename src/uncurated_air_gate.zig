@@ -640,7 +640,7 @@ const StrictFinishCounters = struct {
 fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
-        .expanded => .{ 109, 190 },
+        .expanded => .{ 109, 197 },
         .inputs => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
@@ -1137,17 +1137,25 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     };
     if (std.mem.eql(u8, source, "test/zig/expanded/expanded_abi_frontier.zig")) return .{ .abi_mode = "c-stable-module", .expected = "expanded stack/mixed SysV ABI frontier", .c_body =
     \\extern int z_expanded_stack_param_sum(int, int, int, int, int, int, int) __asm__("expanded_abi_frontier.expanded_stack_param_sum");
+    \\extern int z_expanded_stack_param_sum9(int, int, int, int, int, int, int, int, int) __asm__("expanded_abi_frontier.expanded_stack_param_sum9");
     \\extern int z_expanded_stack_arg_call(void) __asm__("expanded_abi_frontier.expanded_stack_arg_call");
+    \\extern int z_expanded_multi_stack_arg_call(void) __asm__("expanded_abi_frontier.expanded_multi_stack_arg_call");
     \\extern float z_expanded_float_call(void) __asm__("expanded_abi_frontier.expanded_float_call");
     \\extern double z_expanded_double_call(void) __asm__("expanded_abi_frontier.expanded_double_call");
     \\extern double z_expanded_mixed_int_float_call(void) __asm__("expanded_abi_frontier.expanded_mixed_int_float_call");
+    \\extern double z_expanded_mixed_int_float_stack_call(void) __asm__("expanded_abi_frontier.expanded_mixed_int_float_stack_call");
+    \\extern long long z_expanded_i64_call(void) __asm__("expanded_abi_frontier.expanded_i64_call");
     \\int main(void) {
     \\    if (z_expanded_stack_param_sum(1, 2, 3, 4, 5, 6, 7) != 28) return 1;
     \\    if (z_expanded_stack_param_sum(-4, 2, 3, 4, 5, 6, 7) != 23) return 2;
-    \\    if (z_expanded_stack_arg_call() != 28) return 3;
-    \\    if (z_expanded_float_call() != 3.5f) return 4;
-    \\    if (z_expanded_double_call() != 3.0) return 5;
-    \\    if (z_expanded_mixed_int_float_call() != 6.0) return 6;
+    \\    if (z_expanded_stack_param_sum9(1, 2, 3, 4, 5, 6, 7, 8, 9) != 24) return 3;
+    \\    if (z_expanded_stack_arg_call() != 28) return 4;
+    \\    if (z_expanded_multi_stack_arg_call() != 24) return 5;
+    \\    if (z_expanded_float_call() != 3.5f) return 6;
+    \\    if (z_expanded_double_call() != 3.0) return 7;
+    \\    if (z_expanded_mixed_int_float_call() != 6.0) return 8;
+    \\    if (z_expanded_mixed_int_float_stack_call() != 4.0) return 9;
+    \\    if (z_expanded_i64_call() != 123456789LL) return 10;
     \\    return 0;
     \\}
     \\
