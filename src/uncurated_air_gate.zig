@@ -1300,6 +1300,63 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/scale/scale_abi_calls.zig")) return .{ .abi_mode = "c-stable-module", .expected = "scale stack/mixed ABI calls", .c_body =
+    \\extern int z_scale_stack_wide_call(void) __asm__("scale_abi_calls.scale_stack_wide_call");
+    \\extern double z_scale_mixed_wide_call(void) __asm__("scale_abi_calls.scale_mixed_wide_call");
+    \\extern long long z_scale_i64_echo_call(void) __asm__("scale_abi_calls.scale_i64_echo_call");
+    \\int main(void) {
+    \\    if (z_scale_stack_wide_call() != 24) return 1;
+    \\    if (z_scale_mixed_wide_call() != 4.0) return 2;
+    \\    if (z_scale_i64_echo_call() != 987654321LL) return 3;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/scale/scale_memory_loops.zig")) return .{ .abi_mode = "c-stable-module", .expected = "scale memory loops and branch pointer operations", .c_body =
+    \\extern int z_scale_slice_sum(const int *, unsigned long) __asm__("scale_memory_loops.scale_slice_sum");
+    \\extern int z_scale_slice_threshold_sum(const int *, unsigned long, int) __asm__("scale_memory_loops.scale_slice_threshold_sum");
+    \\extern int z_scale_branch_pointer_load(int, const int *, const int *) __asm__("scale_memory_loops.scale_branch_pointer_load");
+    \\extern int z_scale_branch_store(int, int *, int) __asm__("scale_memory_loops.scale_branch_store");
+    \\int main(void) {
+    \\    const int values[5] = { 1, 2, 3, 4, 5 };
+    \\    const int mixed[5] = { 1, 8, 4, 11, 2 };
+    \\    int left = 13;
+    \\    int right = 29;
+    \\    int out = 0;
+    \\    if (z_scale_slice_sum(values, 5) != 15) return 1;
+    \\    if (z_scale_slice_sum(values, 0) != 0) return 2;
+    \\    if (z_scale_slice_threshold_sum(mixed, 5, 5) != 19) return 3;
+    \\    if (z_scale_slice_threshold_sum(values, 5, 9) != 0) return 4;
+    \\    if (z_scale_branch_pointer_load(1, &left, &right) != 13) return 5;
+    \\    if (z_scale_branch_pointer_load(0, &left, &right) != 29) return 6;
+    \\    if (z_scale_branch_store(1, &out, 40) != 45 || out != 45) return 7;
+    \\    if (z_scale_branch_store(0, &out, 40) != 35 || out != 35) return 8;
+    \\    return 0;
+    \\}
+    \\
+    };
+    if (std.mem.eql(u8, source, "test/zig/scale/scale_records_globals.zig")) return .{ .abi_mode = "c-stable-module", .expected = "scale records globals TLS and branch calls", .c_body =
+    \\struct Pair { int a; int b; };
+    \\extern int z_scale_pair_update(int, struct Pair *) __asm__("scale_records_globals.scale_pair_update");
+    \\extern int z_scale_pair_read_b(const struct Pair *) __asm__("scale_records_globals.scale_pair_read_b");
+    \\extern int z_scale_branch_call(int, int) __asm__("scale_records_globals.scale_branch_call");
+    \\extern int z_scale_global_update(int) __asm__("scale_records_globals.scale_global_update");
+    \\extern int z_scale_tls_bump(int) __asm__("scale_records_globals.scale_tls_bump");
+    \\int main(void) {
+    \\    struct Pair pair = { 10, 33 };
+    \\    if (z_scale_pair_read_b(&pair) != 33) return 1;
+    \\    if (z_scale_pair_update(1, &pair) != 12 || pair.a != 12) return 2;
+    \\    if (z_scale_pair_update(0, &pair) != 16 || pair.a != 16) return 3;
+    \\    if (z_scale_branch_call(1, 20) != 24) return 4;
+    \\    if (z_scale_branch_call(0, 20) != 16) return 5;
+    \\    if (z_scale_global_update(4) != 17) return 6;
+    \\    if (z_scale_global_update(3) != 20) return 7;
+    \\    if (z_scale_tls_bump(2) != 7) return 8;
+    \\    if (z_scale_tls_bump(5) != 12) return 9;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (integratedModuleMainHarness(source)) |module_main| return .{
         .abi_mode = "c-stable-integrated-main",
         .expected = "module main expected return",

@@ -298,6 +298,6 @@ Current expanded gates:
 The next corpus-growth frontier is tracked separately in
 `docs/roadmap/x86_64_scale_air_corpus.md`. The scale gate currently adds
 `test/zig/scale/*.zig` and reports `source_rows=112`,
-`discovered_functions=214`, `generic_cfg_functions=214`,
-`structural_matcher_functions=0`, `object_emitted_functions=214`, and
+`discovered_functions=216`, `generic_cfg_functions=216`,
+`structural_matcher_functions=0`, `object_emitted_functions=216`, and
 `local_fail=0` for ReleaseFast, ReleaseSafe, and ReleaseSmall.

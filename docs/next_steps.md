@@ -306,16 +306,27 @@ Scale corpus frontier:
 closed broad or expanded baselines. The first scale bucket covers broader
 SysV call shapes, memory loops, branch-local pointer memory, extern-struct
 field updates, direct calls across branches, globals, and TLS. All three
-release modes currently report `source_rows=112`, `discovered_functions=214`,
-`generic_codegen_functions=214`, `generic_cfg_functions=214`,
+release modes currently report `source_rows=112`, `discovered_functions=216`,
+`generic_codegen_functions=216`, `generic_cfg_functions=216`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=214`, `object_failures=0`,
+`object_emitted_functions=216`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. The scale gate is fail-closed
-but intentionally remains a frontier outside `distribution-all`; object
-inspection, native-link, and executable proof for the scale bucket are the
-next evidence layer.
+but intentionally remains a frontier outside `distribution-all`. The scale
+object-inspection gates are green for all three modes at `inspected=112`,
+`elf64_rel=112`, `unsupported_relocation_rows=0`, and `local_fail=0`
+(`relocation_rows=20`, `undefined_import_rows=3` for ReleaseFast/ReleaseSmall;
+`relocation_rows=21`, `undefined_import_rows=6` for ReleaseSafe). Scale
+native-link progress is green with Zig native `-fno-lld`: ReleaseFast and
+ReleaseSmall report `native_link_accepted_rows=111`, `link_only_rows=111`,
+`runtime_boundary_rows=1`, while ReleaseSafe reports
+`native_link_accepted_rows=108`, `link_only_rows=108`,
+`runtime_boundary_rows=4` for the named safety/runtime boundaries. Scale
+executable gates are green for all three modes at
+`native_link_accepted_rows=111`, `executable_ok_rows=111`,
+`link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
+`lld_rows=0`, and `local_fail=0`.
 
 Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain named future generic CFG
@@ -486,8 +497,8 @@ checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
 reports ReleaseFast `199/0`, ReleaseSafe `199/0`, ReleaseSmall `199/0`.
-The scale frontier reports ReleaseFast `214/0`, ReleaseSafe `214/0`, and
-ReleaseSmall `214/0`.
+The scale frontier reports ReleaseFast `216/0`, ReleaseSafe `216/0`, and
+ReleaseSmall `216/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative

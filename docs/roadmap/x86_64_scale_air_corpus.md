@@ -27,16 +27,16 @@ ReleaseSmall:
 
 ```text
 source_rows=112
-discovered_functions=214
-structured_functions=214
-structured_air_v2_functions=214
-typed_air_operand_functions=214
+discovered_functions=216
+structured_functions=216
+structured_air_v2_functions=216
+typed_air_operand_functions=216
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=214
-generic_cfg_functions=214
+generic_codegen_functions=216
+generic_cfg_functions=216
 structural_matcher_functions=0
-generic_lowering_functions=214
+generic_lowering_functions=216
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -50,9 +50,68 @@ local_fail=0
 The scale gates include object progress:
 
 ```text
-object_emitted_functions=214
+object_emitted_functions=216
 object_failures=0
 llvm_targetmachine_rows=0
+local_fail=0
+```
+
+Scale object inspection now covers the source-module objects for all three
+release modes:
+
+```text
+inspected=112
+elf64_rel=112
+relocation_rows=20 (ReleaseSafe: 21)
+tls_rows=5
+undefined_import_rows=3 (ReleaseSafe: 6)
+comdat_rows=0
+eh_frame_rows=0
+unsupported_relocation_rows=0
+local_fail=0
+```
+
+Scale native-link handoff is green. ReleaseFast and ReleaseSmall report:
+
+```text
+native_link_accepted_rows=111
+executable_ok_rows=0
+link_only_rows=111
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+ReleaseSafe native-link-only progress has named safety runtime boundaries and
+reports:
+
+```text
+native_link_accepted_rows=108
+executable_ok_rows=0
+link_only_rows=108
+runtime_boundary_rows=4
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
+local_fail=0
+```
+
+Scale executable ABI accounting is green for ReleaseFast, ReleaseSafe, and
+ReleaseSmall:
+
+```text
+native_link_accepted_rows=111
+executable_ok_rows=111
+link_only_rows=0
+runtime_boundary_rows=1
+unsupported_zig_linker_feature_rows=0
+native_link_failures=0
+llvm_targetmachine_rows=0
+lld_rows=0
 local_fail=0
 ```
 
@@ -75,6 +134,15 @@ Current scale gates:
 - `distribution-zig-air-uncurated-releasesafe-scale`
 - `distribution-zig-air-uncurated-releasesmall-scale`
 - `distribution-zig-air-uncurated-release-scale`
+- `distribution-zig-air-uncurated-releasefast-scale-object-inspection`
+- `distribution-zig-air-uncurated-releasesafe-scale-object-inspection`
+- `distribution-zig-air-uncurated-releasesmall-scale-object-inspection`
+- `distribution-zig-air-uncurated-releasefast-scale-native-link`
+- `distribution-zig-air-uncurated-releasesafe-scale-native-link`
+- `distribution-zig-air-uncurated-releasesmall-scale-native-link`
+- `distribution-zig-air-uncurated-releasefast-scale-executable`
+- `distribution-zig-air-uncurated-releasesafe-scale-executable`
+- `distribution-zig-air-uncurated-releasesmall-scale-executable`
 
 Active scale blocker families:
 
@@ -82,8 +150,8 @@ Active scale blocker families:
 
 Next evidence layer:
 
-- add scale object-inspection gates
-- add scale native-link/executable gates for stable C ABI rows
 - expand the scale bucket with larger call graphs, broader aggregate layouts,
   additional TLS/global initializer forms, and more optional/error-union
   control-flow shapes
+- keep object-inspection, native-link, and executable proof paired with scale
+  expansion so new rows do not remain object-only evidence

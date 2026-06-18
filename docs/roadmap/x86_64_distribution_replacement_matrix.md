@@ -356,14 +356,25 @@ The scale corpus frontier is intentionally separate from both closed baselines:
 `distribution-zig-air-uncurated-releasesmall-scale` add explicit sources from
 `test/zig/scale/*.zig` on top of the expanded corpus. The current scale slice
 is green for all three release modes at `source_rows=112`,
-`discovered_functions=214`, `generic_codegen_functions=214`,
-`generic_cfg_functions=214`, `structural_matcher_functions=0`,
+`discovered_functions=216`, `generic_codegen_functions=216`,
+`generic_cfg_functions=216`, `structural_matcher_functions=0`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
-`codegen_failures=0`, `object_emitted_functions=214`, `object_failures=0`,
-`llvm_targetmachine_rows=0`, and `local_fail=0`. Scale object inspection,
-native-link, and executable proof are the next evidence layer. The scale audit
-lives in `docs/roadmap/x86_64_scale_air_corpus.md`.
+`codegen_failures=0`, `object_emitted_functions=216`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`. Scale object inspection is
+green for all three modes at `inspected=112`, `elf64_rel=112`,
+`unsupported_relocation_rows=0`, and `local_fail=0`; ReleaseFast and
+ReleaseSmall report `relocation_rows=20`, `undefined_import_rows=3`, while
+ReleaseSafe reports `relocation_rows=21`, `undefined_import_rows=6`. Scale
+native-link progress is green with Zig native `-fno-lld`: ReleaseFast and
+ReleaseSmall report `native_link_accepted_rows=111`, `link_only_rows=111`,
+`runtime_boundary_rows=1`, and ReleaseSafe reports
+`native_link_accepted_rows=108`, `link_only_rows=108`,
+`runtime_boundary_rows=4`. Scale executable ABI proof is green for all three
+modes at `native_link_accepted_rows=111`, `executable_ok_rows=111`,
+`link_only_rows=0`, `runtime_boundary_rows=1`, `llvm_targetmachine_rows=0`,
+`lld_rows=0`, and `local_fail=0`. The scale audit lives in
+`docs/roadmap/x86_64_scale_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
@@ -595,17 +606,17 @@ gate=zig build distribution-zig-air-uncurated-releasesmall-scale
 target=x86_64-linux-gnu
 modes=ReleaseFast,ReleaseSafe,ReleaseSmall
 source_rows=112
-discovered_functions=214
-structured_functions=214
-generic_codegen_functions=214
-generic_cfg_functions=214
+discovered_functions=216
+structured_functions=216
+generic_codegen_functions=216
+generic_cfg_functions=216
 structural_matcher_functions=0
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=214
+object_emitted_functions=216
 object_failures=0
 llvm_targetmachine_rows=0
 case_id_rows=0
@@ -624,9 +635,9 @@ ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The broad
 ReleaseFast/ReleaseSafe/ReleaseSmall gates now lower all 152 discovered
 functions from typed-v2 authority without legacy AIR text fallback or
 shape-recognizer ownership, the expanded gates raise that to 199 functions, and
-the current scale frontier raises it to 214 functions with object progress. This
-is still a selected x86_64 release corpus, not a full AIR/liveness lowering
-replacement for every Zig source.
+the current scale frontier raises it to 216 functions with object inspection,
+native-link, and executable ABI proof. This is still a selected x86_64 release
+corpus, not a full AIR/liveness lowering replacement for every Zig source.
 
 The same 100-row release source-owned replacement boundary now has a pre-link
 ELF object-format proof before Zig native linker handoff:
