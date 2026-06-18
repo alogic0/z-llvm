@@ -1,3 +1,8 @@
+const Pair = extern struct {
+    a: i32,
+    b: i32,
+};
+
 export fn expanded_stack_param_sum(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) i32 {
     return a + b + c + d + e + f + g;
 }
@@ -82,4 +87,12 @@ noinline fn i64Callee(tag: i32, value: i64) i64 {
 
 export fn expanded_i64_call() i64 {
     return i64Callee(5, 123456789);
+}
+
+export fn expanded_make_pair(a: i32, b: i32) Pair {
+    return .{ .a = a, .b = b };
+}
+
+export fn expanded_pair_first(pair: Pair) i32 {
+    return pair.a;
 }

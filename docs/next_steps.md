@@ -238,8 +238,8 @@ from the closed broad baseline. The expanded bucket adds
 `expanded_cfg_memory_aggregates.zig` branch/memory/call CFG bucket, and the
 `expanded_abi_frontier.zig` stack/mixed SysV ABI bucket, are green for
 ReleaseFast, ReleaseSafe, and ReleaseSmall at `source_rows=109`,
-`discovered_functions=197`, `generic_codegen_functions=197`,
-`generic_cfg_functions=197`,
+`discovered_functions=199`, `generic_codegen_functions=199`,
+`generic_cfg_functions=199`,
 `legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
 `shape_recognizer_functions=0`, `unsupported_functions=0`,
 `codegen_failures=0`, and `local_fail=0`. The numeric-cast slice closed real
@@ -254,7 +254,7 @@ range-guard block lowers as a real `ucomiss`/`ucomisd` + `jae` panic-edge CFG
 with an aligned noreturn `integerPartOutOfBounds` call. The expanded audit is
 recorded in `docs/roadmap/x86_64_expanded_air_corpus.md`. The expanded finish
 gate now adds object emission for all three release modes at
-`object_emitted_functions=197`, `object_failures=0`,
+`object_emitted_functions=199`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; the expanded object-inspection
 gates report `inspected=109`, `elf64_rel=109`, `relocation_rows=18`
 (ReleaseSafe: 19 for the checked panic boundary), `tls_rows=4`,
@@ -291,7 +291,12 @@ executable: typed v2 accepts qualified
 helper function types such as `noinline fn (...)`, and the reusable SysV
 direct-call/frame helpers cover multiple stack-passed integer parameters/call
 arguments, f32/f64 direct-call returns, i64 direct-call returns/pass-through,
-and mixed integer/f32/f64 call argument assignment.
+mixed integer/f32/f64 call argument assignment, and selected two-i32 aggregate
+argument/return rows. Milestone 1 is closed for this selected practical SysV
+ABI subset. Remaining non-selected ABI boundaries are full aggregate
+classification, sret/byval, varargs, vectors, and high-register-pressure
+spill/reload-heavy call frames; focused unit tests now fail closed for these
+unsupported classes.
 
 Scale corpus frontier:
 `zig build distribution-zig-air-uncurated-releasefast-scale`,
@@ -480,7 +485,7 @@ small aggregate pair SysV pack/unpack helpers, and checked guard CFGs for
 checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
-reports ReleaseFast `197/0`, ReleaseSafe `197/0`, ReleaseSmall `197/0`.
+reports ReleaseFast `199/0`, ReleaseSafe `199/0`, ReleaseSmall `199/0`.
 The scale frontier reports ReleaseFast `214/0`, ReleaseSafe `214/0`, and
 ReleaseSmall `214/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer

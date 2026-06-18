@@ -5472,6 +5472,113 @@ test "x86_64 codegen rejects vector call ABI boundary" {
     );
 }
 
+test "x86_64 codegen rejects varargs call ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @printf(ptr, ...)
+        \\
+        \\define i32 @caller(ptr %fmt) {
+        \\entry:
+        \\  %r = call i32 (ptr, ...) @printf(ptr %fmt, double 2.000000e+00)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects sret and byval call ABI boundaries" {
+    const sret_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @callee(ptr sret({ i32, i32 }), i32)
+        \\
+        \\define void @caller(ptr %out) {
+        \\entry:
+        \\  call void @callee(ptr sret({ i32, i32 }) %out, i32 7)
+        \\  ret void
+        \\}
+        \\
+    ;
+    var sret_module = try ir.Module.parse(std.testing.allocator, sret_input);
+    defer sret_module.deinit();
+    try sret_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, sret_module.target_triple.?, sret_module.functions.items[0]),
+    );
+
+    const byval_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(ptr byval({ i32, i32 }))
+        \\
+        \\define i32 @caller(ptr %arg) {
+        \\entry:
+        \\  %r = call i32 @callee(ptr byval({ i32, i32 }) %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var byval_module = try ir.Module.parse(std.testing.allocator, byval_input);
+    defer byval_module.deinit();
+    try byval_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, byval_module.target_triple.?, byval_module.functions.items[0]),
+    );
+}
+
+test "x86_64 codegen rejects larger aggregate call and vector return ABI boundaries" {
+    const aggregate_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee({ i32, i32, i32 })
+        \\
+        \\define i32 @caller({ i32, i32, i32 } %arg) {
+        \\entry:
+        \\  %r = call i32 @callee({ i32, i32, i32 } %arg)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var aggregate_module = try ir.Module.parse(std.testing.allocator, aggregate_input);
+    defer aggregate_module.deinit();
+    try aggregate_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.lowerFunction(std.testing.allocator, aggregate_module.target_triple.?, aggregate_module.functions.items[0]),
+    );
+
+    const vector_return_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare <2 x i32> @callee()
+        \\
+        \\define <2 x i32> @caller() {
+        \\entry:
+        \\  %r = call <2 x i32> @callee()
+        \\  ret <2 x i32> %r
+        \\}
+        \\
+    ;
+    var vector_return_module = try ir.Module.parse(std.testing.allocator, vector_return_input);
+    defer vector_return_module.deinit();
+    try vector_return_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.lowerFunction(std.testing.allocator, vector_return_module.target_triple.?, vector_return_module.functions.items[0]),
+    );
+}
+
 test "x86_64 codegen rejects unsupported call live pressure" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

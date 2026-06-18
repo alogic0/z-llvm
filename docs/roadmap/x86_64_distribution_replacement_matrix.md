@@ -317,13 +317,13 @@ The expanded corpus frontier is intentionally separate:
 `distribution-zig-air-uncurated-releasesafe-expanded`, and
 `distribution-zig-air-uncurated-releasesmall-expanded` add explicit sources from
 `test/zig/expanded/*.zig`. The expanded slice is green for all three
-release modes at `source_rows=109`, `discovered_functions=197`,
-`generic_codegen_functions=197`, `generic_cfg_functions=197`,
+release modes at `source_rows=109`, `discovered_functions=199`,
+`generic_codegen_functions=199`, `generic_cfg_functions=199`,
 `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`, and `local_fail=0`. Expanded
 object emission is also green for all three modes at
-`object_emitted_functions=197`, `object_failures=0`,
+`object_emitted_functions=199`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`; expanded object inspection
 reports `inspected=109`, `elf64_rel=109`, `relocation_rows=18`
 (`19` for ReleaseSafe), `tls_rows=4`, `undefined_import_rows=3`
@@ -341,6 +341,14 @@ at `native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded
 audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
+
+The selected practical SysV ABI milestone is closed for the expanded frontier:
+the reusable call/frame helpers cover multiple stack-passed integer arguments,
+independent integer/SSE argument streams, i32/i64/f32/f64 returns, mixed
+integer/floating direct calls, and selected two-i32 aggregate argument/return
+rows with executable C ABI proof. Non-selected ABI boundaries remain explicit:
+full aggregate classification, sret/byval, varargs, vectors, and
+high-register-pressure spill/reload-heavy call frames.
 
 The scale corpus frontier is intentionally separate from both closed baselines:
 `distribution-zig-air-uncurated-releasefast-scale`,
@@ -615,7 +623,7 @@ stream directly for the uncurated real-AIR gates; it does not select rows by cas
 ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The broad
 ReleaseFast/ReleaseSafe/ReleaseSmall gates now lower all 152 discovered
 functions from typed-v2 authority without legacy AIR text fallback or
-shape-recognizer ownership, the expanded gates raise that to 197 functions, and
+shape-recognizer ownership, the expanded gates raise that to 199 functions, and
 the current scale frontier raises it to 214 functions with object progress. This
 is still a selected x86_64 release corpus, not a full AIR/liveness lowering
 replacement for every Zig source.

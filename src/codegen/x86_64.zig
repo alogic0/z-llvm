@@ -9388,10 +9388,15 @@ fn lowerCall(
     if (call.callee_value != null) return error.UnsupportedCodegenInstruction;
     if (call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
     if (call.args.items.len > 6) return error.UnsupportedCodegenAbi;
     if (call.ret_ty != .void and !call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
 
     for (call.args.items, 0..) |arg, index| {
+        if (arg.attrs != null) return error.UnsupportedCodegenAbi;
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         const dst = try ArgReg.fromIndex(index);
         const src = try paramValueReg(function, arg.value, arg.ty);
@@ -19810,6 +19815,13 @@ fn appendSysVScalarCallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
+    // Selected x86_64 release rows currently support scalar SysV calls only:
+    // i32/i64 integer or pointer-class values in the integer stream, f32/f64 in
+    // the SSE stream, and up to three constant i32 stack arguments. Varargs,
+    // byval/sret attrs, vectors, and aggregate classes fail closed here.
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     var stack_arg_count: usize = 0;

@@ -32,16 +32,16 @@ ReleaseSmall:
 
 ```text
 source_rows=109
-discovered_functions=197
-structured_functions=197
-structured_air_v2_functions=197
-typed_air_operand_functions=197
+discovered_functions=199
+structured_functions=199
+structured_air_v2_functions=199
+typed_air_operand_functions=199
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_codegen_functions=197
-generic_cfg_functions=197
+generic_codegen_functions=199
+generic_cfg_functions=199
 structural_matcher_functions=0
-generic_lowering_functions=197
+generic_lowering_functions=199
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
@@ -56,7 +56,7 @@ The expanded slices are clean for discovery/lowering/codegen. The expanded
 finish gate adds object emission for all three release modes:
 
 ```text
-object_emitted_functions=197
+object_emitted_functions=199
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -145,13 +145,19 @@ Closed expanded blocker families:
   nine-argument exported functions, noinline helper calls with one and three
   stack-passed integer arguments, f32/f64 direct-call returns, mixed
   integer/f64 direct-call returns, a mixed integer/f32/f64 call with a
-  stack-passed integer argument, and an i64 mixed-argument call/return. Typed
-  v2 now accepts qualified Zig function type spellings such as
+  stack-passed integer argument, an i64 mixed-argument call/return, and selected
+  two-i32 aggregate argument/return rows. Typed v2 now accepts qualified Zig
+  function type spellings such as
   `noinline fn (...)`, and the generic x86_64 SysV direct-call/frame helpers
   cover multiple stack-passed call arguments, the seventh through ninth
   integer parameters, i64 return/pass-through, and separate integer/SSE
   argument register streams. The expanded executable harness checks direct C
-  ABI calls plus the internal helper call wrappers.
+  ABI calls plus the internal helper call wrappers and selected two-i32
+  aggregate pack/unpack rows. Milestone 1 is closed for the selected practical
+  SysV ABI subset. Remaining non-selected ABI boundaries are full aggregate
+  classification, sret/byval, varargs, vectors, and high-register-pressure
+  spill/reload-heavy call frames; focused unit tests now fail closed for these
+  unsupported classes.
 - IR/backend numeric-cast gap: `sitofp`/`uitofp`/`fptrunc` cast ops were
   missing from the local IR, the AIR `float_from_int` opcode was mapped to the
   wrong cast direction, and the x86_64 backend had no scalar int/float
@@ -175,7 +181,7 @@ Closed expanded blocker families:
   select, and literal-return rows now use the same generic CFG ownership path.
   Current expanded counters are
   ReleaseFast, ReleaseSafe, and ReleaseSmall all report
-  `generic_cfg_functions=197` / `structural_matcher_functions=0`. Expanded
+  `generic_cfg_functions=199` / `structural_matcher_functions=0`. Expanded
   optional-pointer payload rows with a
   load-plus-add payload block now use the same generic CFG optional-pointer
   path as the load-only forms, and the f32 pipeline row with an unused scalar
