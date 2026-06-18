@@ -65,6 +65,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try bytes.appendSlice(allocator, &.{ 0x03, 0x44, 0x24 });
                 try bytes.append(allocator, disp);
             },
+            .add_stack_disp8_rax => |disp| {
+                try bytes.appendSlice(allocator, &.{ 0x48, 0x03, 0x44, 0x24 });
+                try bytes.append(allocator, disp);
+            },
             .add_eax_imm32 => |value| {
                 try bytes.append(allocator, 0x05);
                 try appendI32(&bytes, allocator, value);
@@ -216,6 +220,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .add_arg_ptr_disp4_eax => |reg| try encodeArgPtrDisp4ToEax(&bytes, allocator, reg),
             .store_eax_arg_ptr => |reg| try encodeEaxToArgPtr(&bytes, allocator, reg),
             .store_imm64_arg_ptr_disp8 => |store| try encodeStoreImm64ArgPtrDisp8(&bytes, allocator, store.reg, store.offset, store.imm),
+            .store_arg64_arg_ptr_disp8 => |store| try encodeStoreArg64ToArgPtrDisp8(&bytes, allocator, store.ptr_reg, store.src_reg, store.offset),
             .store_imm8_arg_ptr_disp8 => |store| try encodeStoreImm8ArgPtrDisp8(&bytes, allocator, store.reg, store.offset, store.imm),
             .load_f128_arg_ptr_xmm0 => |load| try encodeF128ArgPtrToXmm0(&bytes, allocator, load.reg, load.offset),
             .load_f128_const_xmm0 => try bytes.appendSlice(allocator, &.{ 0x0f, 0x28, 0x05, 0, 0, 0, 0 }),
@@ -337,6 +342,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .mov_arg64_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .add_stack_disp8_eax => 4,
+        .add_stack_disp8_rax => 5,
         .add_eax_imm32 => 5,
         .shl_eax_imm5 => 3,
         .or_eax_imm32 => 5,
@@ -413,6 +419,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .add_arg_ptr_disp4_eax => |reg| if (reg.rexB()) 4 else 3,
         .store_eax_arg_ptr => |reg| if (reg.rexB()) 3 else 2,
         .store_imm64_arg_ptr_disp8 => |store| 7 + if (store.offset == 0) @as(u32, 0) else 1,
+        .store_arg64_arg_ptr_disp8 => |store| 3 + if (store.offset == 0) @as(u32, 0) else 1,
         .store_imm8_arg_ptr_disp8 => |store| (if (store.reg.rexB()) @as(u32, 1) else 0) + 3 + if (store.offset == 0) @as(u32, 0) else 1,
         .load_f128_arg_ptr_xmm0 => |load| f128ArgPtrInstructionSize(load.reg, load.offset),
         .load_f128_const_xmm0, .load_f128_const_xmm1 => 7,
@@ -579,6 +586,20 @@ fn encodeStoreImm64ArgPtrDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.All
     try bytes.append(allocator, 0xc7);
     try encodeArgPtrDisp8Tail(bytes, allocator, reg, offset);
     try appendI32(bytes, allocator, imm);
+}
+
+fn encodeStoreArg64ToArgPtrDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, ptr_reg: x86_64.ArgReg, src_reg: x86_64.ArgReg, offset: u8) !void {
+    var rex: u8 = 0x48;
+    if (src_reg.rexR()) rex |= 0x04;
+    if (ptr_reg.rexB()) rex |= 0x01;
+    try bytes.append(allocator, rex);
+    try bytes.append(allocator, 0x89);
+    if (offset == 0) {
+        try bytes.append(allocator, (@as(u8, src_reg.lowCode()) << 3) | @as(u8, ptr_reg.lowCode()));
+    } else {
+        try bytes.append(allocator, 0x40 | (@as(u8, src_reg.lowCode()) << 3) | @as(u8, ptr_reg.lowCode()));
+        try bytes.append(allocator, offset);
+    }
 }
 
 fn encodeStoreImm8ArgPtrDisp8(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, reg: x86_64.ArgReg, offset: u8, imm: u8) !void {

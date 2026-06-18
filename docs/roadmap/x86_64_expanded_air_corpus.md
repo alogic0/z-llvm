@@ -161,7 +161,8 @@ Closed expanded blocker families:
 - Broader SysV ABI first closure wave: the isolated frontier corpus now extends
   the selected ABI subset with a generic small INTEGER/INTEGER `{ i64, i64 }`
   aggregate return path, small aggregate argument field reads from SysV integer
-  registers, and a selected two-live-i32 direct-call spill frame. The expanded
+  registers, a selected two-live-i32 direct-call spill frame, and selected
+  `{ i64, i64, i64 }` hidden-sret/MEMORY by-value field-read lowering. The expanded
   baseline remains unchanged; the new frontier counters live in
   `docs/roadmap/x86_64_frontier_air_corpus.md`.
 - IR/backend numeric-cast gap: `sitofp`/`uitofp`/`fptrunc` cast ops were

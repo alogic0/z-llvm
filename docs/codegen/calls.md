@@ -139,7 +139,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected `{ i64, i64, i64 }` hidden-sret return storage, and selected first stack MEMORY aggregate by-value field reads
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -147,12 +147,14 @@ handoff doc: docs/codegen/zig_native_backend_handoff.md
 ABI-shaped attributes:
 
 ```text
-byval(...) and sret(...) are preserved only on pointer parameters and verified
-as pointer-only annotations
+byval(...) and sret(...) are preserved on pointer parameters and verified
+as pointer-only annotations; the frontier additionally lowers the selected
+source-backed `{ i64, i64, i64 }` hidden-sret return and first stack
+by-value aggregate field-read shape
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
-hidden sret storage, stack-passed byval copies, full aggregate classification,
-and multi-target ABI parity are not implemented
+arbitrary hidden sret storage, arbitrary stack-passed byval copies, full
+aggregate classification, and multi-target ABI parity are not implemented
 ```
 
 ## Rejected Surface
@@ -163,7 +165,7 @@ The first slice rejects:
 indirect calls
 inline assembly calls
 varargs
-byval/sret lowering beyond pointer-parameter textual preservation
+byval/sret lowering beyond the selected frontier MEMORY aggregate shape
 operand bundles
 invoke
 callbr

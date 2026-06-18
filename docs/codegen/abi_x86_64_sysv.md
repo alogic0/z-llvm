@@ -80,7 +80,9 @@ Upstream mapping:
 
 ```text
 LLVM models x86_64 SysV calling conventions with target lowering tables and call-lowering code.
-This project models the selected scalar register/stack assignments and the first small INTEGER/INTEGER aggregate class needed by the release frontier.
+This project models the selected scalar register/stack assignments, the first
+small INTEGER/INTEGER aggregate class, and the first selected MEMORY aggregate
+sret/by-value forms needed by the release frontier.
 LLVM often emits `pushq %rax`/`popq` around tiny calls at `-O0`; the local `subq`/`addq` sequence has the same stack-alignment purpose for the accepted fixtures.
 ```
 
@@ -91,6 +93,10 @@ frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
 the selected two-live-i32 direct-call frame spills and reloads %rdi/%rsi
+frontier_sysv_sret_byval.Big3 lowers as the selected MEMORY class:
+  `{ i64, i64, i64 }` return stores through the hidden sret pointer in %rdi
+  user i64 args are shifted to %rsi/%rdx/%rcx
+  first by-value stack aggregate field reads use 8(%rsp) and 24(%rsp)
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -101,7 +107,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one- and two-live i32 spill shapes
 no varargs
 no vectors
-no full SysV aggregate classifier beyond selected INTEGER/INTEGER classes
+no full SysV aggregate classifier beyond selected INTEGER and MEMORY classes
 no arbitrary MEMORY, SSE aggregate, X87, packed/unaligned, or complex aggregate ABI classes
 no arbitrary sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
