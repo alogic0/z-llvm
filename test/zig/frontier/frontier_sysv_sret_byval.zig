@@ -28,6 +28,16 @@ const Big6 = extern struct {
     f: i64,
 };
 
+const Big7 = extern struct {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+    e: i64,
+    f: i64,
+    g: i64,
+};
+
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
 }
@@ -77,5 +87,17 @@ export fn frontier_big6_middle(value: Big6) i64 {
 }
 
 export fn frontier_big6_copy(value: Big6) Big6 {
+    return value;
+}
+
+export fn frontier_big7_make(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64) Big7 {
+    return .{ .a = a, .b = b, .c = c, .d = d, .e = e, .f = f, .g = g };
+}
+
+export fn frontier_big7_inner(value: Big7) i64 {
+    return value.c + value.f + value.g;
+}
+
+export fn frontier_big7_copy(value: Big7) Big7 {
     return value;
 }

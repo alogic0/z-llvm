@@ -6139,25 +6139,12 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     const aggregate_ty = function.params.items[0].ty;
     const classification = classifySysVAggregate(aggregate_ty) catch return false;
     if (classification.kind != .memory or !isI64Aggregate(aggregate_ty)) return false;
-    if (block.instructions.items.len != 7) return false;
+    if (block.instructions.items.len < 5) return false;
 
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
-    const first_gep_inst = block.instructions.items[2];
-    const first_load_inst = block.instructions.items[3];
-    const second_gep_inst = block.instructions.items[4];
-    const second_load_inst = block.instructions.items[5];
-    const add_inst = block.instructions.items[6];
-    if (alloca_inst.removed or store_inst.removed or first_gep_inst.removed or first_load_inst.removed or
-        second_gep_inst.removed or second_load_inst.removed or add_inst.removed) return false;
-
+    if (alloca_inst.removed or store_inst.removed) return false;
     const alloca_name = alloca_inst.result orelse return false;
-    const first_gep_name = first_gep_inst.result orelse return false;
-    const first_load_name = first_load_inst.result orelse return false;
-    const second_gep_name = second_gep_inst.result orelse return false;
-    const second_load_name = second_load_inst.result orelse return false;
-    const add_name = add_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, add_name)) return false;
 
     const alloca = switch (alloca_inst.kind) {
         .alloca => |alloca| alloca,
@@ -6172,29 +6159,45 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name) or
         !isNamed(store.value, function.params.items[0].name)) return false;
 
-    const first_field_index = aggregateFieldIndexFromGep(first_gep_inst, aggregate_ty, alloca_name) orelse return false;
-    const second_field_index = aggregateFieldIndexFromGep(second_gep_inst, aggregate_ty, alloca_name) orelse return false;
-    if (first_field_index == second_field_index) return false;
+    var pointer_fields = std.StringHashMap(usize).init(allocator);
+    defer pointer_fields.deinit();
+    var field_loads = std.StringHashMap(AggregateIntegerFieldLoad).init(allocator);
+    defer field_loads.deinit();
 
-    const first_load = switch (first_load_inst.kind) {
-        .load => |load| load,
-        else => return false,
-    };
-    if (!first_load.ty.eql(.{ .int = 64 }) or first_load.attrs.isBarrier() or !isNamed(first_load.ptr, first_gep_name)) return false;
-    const second_load = switch (second_load_inst.kind) {
-        .load => |load| load,
-        else => return false,
-    };
-    if (!second_load.ty.eql(.{ .int = 64 }) or second_load.attrs.isBarrier() or !isNamed(second_load.ptr, second_gep_name)) return false;
+    for (block.instructions.items[2..]) |instruction| {
+        if (instruction.removed) return false;
+        switch (instruction.kind) {
+            .gep => {
+                const result = instruction.result orelse return false;
+                const field_index = aggregateFieldIndexFromGep(instruction, aggregate_ty, alloca_name) orelse return false;
+                try pointer_fields.put(result, field_index);
+            },
+            .load => |load| {
+                const result = instruction.result orelse return false;
+                if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier()) return false;
+                const ptr_name = switch (load.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const field_index = pointer_fields.get(ptr_name) orelse return false;
+                try field_loads.put(result, .{ .offset = field_index });
+            },
+            .binary => |binary| {
+                if (binary.op != .add or !binary.ty.eql(.{ .int = 64 })) return false;
+            },
+            .phi, .fcmp, .icmp, .select, .cast, .freeze, .alloca, .store, .call, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue => return false,
+        }
+    }
 
-    const add = switch (add_inst.kind) {
-        .binary => |binary| binary,
-        else => return false,
-    };
-    if (add.op != .add or !add.ty.eql(.{ .int = 64 }) or !isNamed(add.lhs, first_load_name) or !isNamed(add.rhs, second_load_name)) return false;
+    var terms: [8]AggregateIntegerAddTerm = undefined;
+    var term_count: usize = 0;
+    if (!try collectAggregateIntegerAddTerms(block, ret.value orelse return error.InvalidRet, .{ .int = 64 }, field_loads, &terms, &term_count)) return false;
+    if (term_count < 2) return false;
 
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, first_field_index) });
-    try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, second_field_index) });
+    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, @intCast(terms[0].offset)) });
+    for (terms[1..term_count]) |term| {
+        try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, @intCast(term.offset)) });
+    }
     try machine.instructions.append(allocator, .ret);
     return true;
 }

@@ -1525,6 +1525,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big4 { long long a; long long b; long long c; long long d; };
     \\struct Big5 { long long a; long long b; long long c; long long d; long long e; };
     \\struct Big6 { long long a; long long b; long long c; long long d; long long e; long long f; };
+    \\struct Big7 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1538,6 +1539,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big6 z_frontier_big6_make(long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big6_make");
     \\extern long long z_frontier_big6_middle(struct Big6) __asm__("frontier_sysv_sret_byval.frontier_big6_middle");
     \\extern struct Big6 z_frontier_big6_copy(struct Big6) __asm__("frontier_sysv_sret_byval.frontier_big6_copy");
+    \\extern struct Big7 z_frontier_big7_make(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big7_make");
+    \\extern long long z_frontier_big7_inner(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_inner");
+    \\extern struct Big7 z_frontier_big7_copy(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1564,6 +1568,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big6_middle(input6) != 134) return 12;
     \\    struct Big6 copied6 = z_frontier_big6_copy(input6);
     \\    if (copied6.a != 59 || copied6.b != 61 || copied6.c != 67 || copied6.d != 71 || copied6.e != 73 || copied6.f != 79) return 13;
+    \\    struct Big7 made7 = z_frontier_big7_make(83, 89, 97, 101, 103, 107, 109);
+    \\    if (made7.a != 83 || made7.b != 89 || made7.c != 97 || made7.d != 101 || made7.e != 103 || made7.f != 107 || made7.g != 109) return 14;
+    \\    struct Big7 input7 = { .a = 113, .b = 127, .c = 131, .d = 137, .e = 139, .f = 149, .g = 151 };
+    \\    if (z_frontier_big7_inner(input7) != 431) return 15;
+    \\    struct Big7 copied7 = z_frontier_big7_copy(input7);
+    \\    if (copied7.a != 113 || copied7.b != 127 || copied7.c != 131 || copied7.d != 137 || copied7.e != 139 || copied7.f != 149 || copied7.g != 151) return 16;
     \\    return 0;
     \\}
     \\
