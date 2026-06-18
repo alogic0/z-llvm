@@ -5335,6 +5335,42 @@ test "x86_64 codegen stores four-field sret i64 aggregate fields" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
+test "x86_64 codegen stores five-field sret i64 aggregate fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @make(ptr sret({ i64, i64, i64, i64, i64 }) %out, i64 %a, i64 %b, i64 %c, i64 %d, i64 %e) {
+        \\entry:
+        \\  %field0 = getelementptr { i64, i64, i64, i64, i64 }, ptr %out, i64 0, i32 0
+        \\  store i64 %a, ptr %field0
+        \\  %field1 = getelementptr { i64, i64, i64, i64, i64 }, ptr %out, i64 0, i32 1
+        \\  store i64 %b, ptr %field1
+        \\  %field2 = getelementptr { i64, i64, i64, i64, i64 }, ptr %out, i64 0, i32 2
+        \\  store i64 %c, ptr %field2
+        \\  %field3 = getelementptr { i64, i64, i64, i64, i64 }, ptr %out, i64 0, i32 3
+        \\  store i64 %d, ptr %field3
+        \\  %field4 = getelementptr { i64, i64, i64, i64, i64 }, ptr %out, i64 0, i32 4
+        \\  store i64 %e, ptr %field4
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .rsi, .offset = 0 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .rdx, .offset = 8 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .rcx, .offset = 16 } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .r8, .offset = 24 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdi, .src_reg = .r9, .offset = 32 } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[5]);
+}
+
 test "x86_64 codegen reads selected memory aggregate by-value fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5392,6 +5428,36 @@ test "x86_64 codegen reads four-field memory aggregate by-value fields" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 8 }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp8_rax = 32 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
+test "x86_64 codegen reads five-field memory aggregate by-value fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @edges({ i64, i64, i64, i64, i64 } %value) {
+        \\entry:
+        \\  %slot = alloca { i64, i64, i64, i64, i64 }
+        \\  store { i64, i64, i64, i64, i64 } %value, ptr %slot
+        \\  %field1 = getelementptr { i64, i64, i64, i64, i64 }, ptr %slot, i64 0, i32 1
+        \\  %b = load i64, ptr %field1
+        \\  %field4 = getelementptr { i64, i64, i64, i64, i64 }, ptr %slot, i64 0, i32 4
+        \\  %e = load i64, ptr %field4
+        \\  %sum = add i64 %b, %e
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 16 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp8_rax = 40 }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 

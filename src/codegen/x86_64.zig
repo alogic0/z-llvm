@@ -13314,7 +13314,7 @@ fn lowerGenericCfgSelectedSretStores(
     if (function.params.items.len < 4) return false;
     const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
-    if (field_count < 3 or field_count > 4 or function.params.items.len != field_count + 1) return false;
+    if (field_count < 3 or field_count > 5 or function.params.items.len != field_count + 1) return false;
     if (!isI64Aggregate(aggregate_ty)) return false;
     if (!function.params.items[0].ty.eql(.ptr)) return false;
     if ((try paramReg(function, function.params.items[0].name, .ptr)) != .rdi) return error.UnsupportedCodegenAbi;
@@ -13350,6 +13350,9 @@ fn lowerGenericCfgSelectedSretStores(
 
 fn sretAggregateType(attrs: ?[]const u8) ?ir.Type {
     const text = attrs orelse return null;
+    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64, i64, i64 })") != null) {
+        return .{ .aggregate = "{ i64, i64, i64, i64, i64 }" };
+    }
     if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64, i64 })") != null) {
         return .{ .aggregate = "{ i64, i64, i64, i64 }" };
     }
