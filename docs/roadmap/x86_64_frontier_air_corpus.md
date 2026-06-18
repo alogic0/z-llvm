@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=108
-structured_functions=108
-generic_codegen_functions=108
-generic_cfg_functions=108
+discovered_functions=110
+structured_functions=110
+generic_codegen_functions=110
+generic_cfg_functions=110
 structural_matcher_functions=0
-structured_air_v2_functions=108
-typed_air_operand_functions=108
+structured_air_v2_functions=110
+typed_air_operand_functions=110
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=108
+generic_lowering_functions=110
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=108
+object_emitted_functions=110
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -157,11 +157,12 @@ Closed in the current memory/aggregate frontier slice:
   to a private helper, and the construction-return row builds the nested
   aggregate from four scalar `i32` leaves by tracing typed AIR v2 field paths
   and packing both INTEGER eightbytes into `%rax`/`%rdx`
-- first nested mixed aggregate integer-field add-chain row in
+- first nested mixed aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
-  pointers carry `align(...)` qualifiers from typed AIR v2, are lowered through
-  layout-backed byte offsets, and read the nested integer pair from the SysV GPR
-  class while preserving the independent SSE field classification
+  pointers carry `align(...)` qualifiers from typed AIR v2, lower through
+  layout-backed byte offsets, read the nested integer pair from the SysV GPR
+  class, read the floating field from the independent SSE class, and construct
+  the aggregate in `%rax`/`%xmm0`
 - first array-in-struct INTEGER aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]i64` typed AIR pointer-element
   GEPs are lowered from typed v2 and summed from the SysV GPR pair; the
@@ -219,7 +220,7 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE integer add chains, selected
+  INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE field reads/construction, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
   reads/returns including `[2]f64` array-in-struct and nested `{ { double },

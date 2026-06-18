@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=108`,
-`generic_codegen_functions=108`, `generic_cfg_functions=108`,
+frontier gate reports `source_rows=13`, `discovered_functions=110`,
+`generic_codegen_functions=110`, `generic_cfg_functions=110`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=108`, `object_failures=0`,
+`object_emitted_functions=110`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -384,7 +384,7 @@ nested extern-struct field GEP paths, selected dynamic pointer addition /
 pointer-element GEP loads, and branch-local global/TLS add/sub updates. The
 first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, nested INTEGER aggregate add-chain
-field reads, nested mixed aggregate integer-field add-chain reads,
+field reads, nested mixed aggregate field reads/construction,
 array-in-struct INTEGER aggregate sums, and the selected
 up-to-six-live direct-call spill frame with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
@@ -411,8 +411,9 @@ return in `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
 in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
 packing into `%rax`. The nested mixed aggregate row adds
 `{ { i32, i32 }, double }` typed AIR v2 field pointers with `align(...)`
-qualifiers and lowers the nested integer fields through layout-backed offsets
-from the aggregate's INTEGER class while preserving the independent SSE class.
+qualifiers, lowers integer and floating fields through layout-backed offsets
+from independent INTEGER/SSE classes, and constructs the aggregate in
+`%rax`/`%xmm0`.
 The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
 through the SysV GPR pair to a private helper and returns the helper's scalar
 result without aggregate-specific wrapper dispatch; the nested construction
@@ -437,7 +438,7 @@ beyond the selected one- through six-live `f32`/`f64` no-argument-call shapes,
 or live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
-selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
+selected INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
 selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field

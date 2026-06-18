@@ -7390,7 +7390,7 @@ test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument reg
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
-test "x86_64 codegen reads integer fields from mixed aggregate register classes" {
+test "x86_64 codegen reads fields from mixed aggregate register classes" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -7407,6 +7407,15 @@ test "x86_64 codegen reads integer fields from mixed aggregate register classes"
         \\  ret i32 %sum
         \\}
         \\
+        \\define double @read_double({ { i32, i32 }, double } %value) {
+        \\entry:
+        \\  %slot = alloca { { i32, i32 }, double }
+        \\  store { { i32, i32 }, double } %value, ptr %slot
+        \\  %field = getelementptr { { i32, i32 }, double }, ptr %slot, i64 0, i32 1
+        \\  %result = load double, ptr %field
+        \\  ret double %result
+        \\}
+        \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
@@ -7419,6 +7428,12 @@ test "x86_64 codegen reads integer fields from mixed aggregate register classes"
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg_high32_eax = .rdi }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+
+    var double_machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer double_machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, double_machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, double_machine.instructions.items[0]);
 }
 
 test "x86_64 codegen preserves two live i32 params across direct call" {

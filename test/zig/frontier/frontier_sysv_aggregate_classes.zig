@@ -163,6 +163,14 @@ export fn frontier_nested_mixed_int_sum(value: NestedMixed) i32 {
     return value.ints.a + value.ints.b;
 }
 
+export fn frontier_nested_mixed_float(value: NestedMixed) f64 {
+    return value.value;
+}
+
+export fn frontier_nested_mixed_make(a: i32, b: i32, c: f64) NestedMixed {
+    return .{ .ints = .{ .a = a, .b = b }, .value = c };
+}
+
 export fn frontier_small_mixed_int(value: SmallMixed) i32 {
     return value.a;
 }

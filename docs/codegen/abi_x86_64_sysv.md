@@ -46,7 +46,7 @@ one fixed i32 stack slot can be reloaded into %edi before a direct call
 small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class return in %rax/%rdx
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
-selected nested mixed INTEGER/SSE aggregate integer-field add chains use layout-backed byte offsets and the independent SysV GPR/SSE streams
+selected nested mixed INTEGER/SSE aggregate field reads and construction returns use layout-backed byte offsets and the independent SysV GPR/SSE streams
 selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
@@ -163,7 +163,7 @@ selected reversed `double`/`i32` field reads through the same independent
 SSE/GPR streams, including high-lane `i32` extraction and `{ double, i32, i32 }`
 construction that packs adjacent `i32` fields into %rax
 frontier_sysv_aggregate_classes.NestedPair and NestedMixed prove nested
-INTEGER aggregate field add chains:
+aggregate field reads and construction:
   nested `{ i32, i32 }` fields are flattened by byte offset
   low/high 32-bit lanes are read from the SysV GPR pair without a
   function-name-specific backend path
@@ -172,8 +172,9 @@ INTEGER aggregate field add chains:
   `{ { i32, i32 }, { i32, i32 } }` construction returns trace typed AIR v2
   field-pointer store paths and pack both INTEGER eightbytes into %rax/%rdx
   `align(...)` pointer-qualified typed AIR field pointers are accepted for the
-  nested mixed `{ { i32, i32 }, double }` row while preserving its SSE field
-  classification
+  nested mixed `{ { i32, i32 }, double }` row
+  the nested mixed row reads INTEGER and SSE fields from independent streams and
+  returns construction results through %rax/%xmm0
 frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
 aggregate sums:
   `[2]i64` pointer-element GEPs are lowered from typed AIR v2
@@ -206,7 +207,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one- through six-live f32/f64 SSE spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested `{ { double }, { double } }` SSE/SSE construction returns, nested mixed INTEGER/SSE field reads/construction, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions

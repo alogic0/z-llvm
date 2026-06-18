@@ -42,7 +42,7 @@ selected backend subset:
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
   selected nested/array INTEGER aggregate construction returns are accepted
-  selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads are accepted
+  selected nested mixed INTEGER/SSE aggregate field reads and construction returns are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument-field reads are accepted through the reusable aggregate classifier
   selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument-field reads are accepted through the reusable aggregate classifier
@@ -180,7 +180,7 @@ immediate constant call arguments use generic XMM materialization through
 %xmm0..%xmm7
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
 INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
-INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add-chain,
+INTEGER/INTEGER, nested mixed INTEGER/SSE field reads/construction,
 selected nested/array INTEGER construction-return forms,
 mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms plus selected
 packed mixed construction-return forms

@@ -1664,6 +1664,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_nested_double_right(struct NestedDouble) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_right");
     \\extern struct NestedDouble z_frontier_nested_double_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_double_make");
     \\extern int z_frontier_nested_mixed_int_sum(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_int_sum");
+    \\extern double z_frontier_nested_mixed_float(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_float");
+    \\extern struct NestedMixed z_frontier_nested_mixed_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_make");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
     \\extern double z_frontier_small_reverse_mixed_float(struct SmallReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_reverse_mixed_float");
@@ -1716,6 +1718,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (made_nested_double.left.value != 16.5 || made_nested_double.right.value != 18.25) return 35;
     \\    struct NestedMixed nested_mixed = { { 47, 53 }, 59.0 };
     \\    if (z_frontier_nested_mixed_int_sum(nested_mixed) != 100) return 13;
+    \\    if (z_frontier_nested_mixed_float(nested_mixed) != 59.0) return 36;
+    \\    struct NestedMixed made_nested_mixed = z_frontier_nested_mixed_make(89, 97, 101.5);
+    \\    if (made_nested_mixed.ints.a != 89 || made_nested_mixed.ints.b != 97 || made_nested_mixed.value != 101.5) return 37;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };
     \\    if (z_frontier_small_mixed_int(small_mixed) != 17) return 16;
     \\    if (z_frontier_small_mixed_float(small_mixed) != 23.5) return 17;

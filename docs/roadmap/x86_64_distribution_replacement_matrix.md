@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=108`,
-`generic_codegen_functions=108`, `generic_cfg_functions=108`,
+three release modes at `source_rows=13`, `discovered_functions=110`,
+`generic_codegen_functions=110`, `generic_cfg_functions=110`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=108`, `object_failures=0`,
+`object_emitted_functions=110`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -402,7 +402,7 @@ global/TLS add/sub updates, and nested INTEGER aggregate add-chain field
 reads. The first SysV ABI closure-wave slice adds small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate argument
 field reads from the SysV integer register pair, nested INTEGER aggregate
-field add-chain reads, nested mixed aggregate integer-field add-chain reads,
+field add-chain reads, nested mixed aggregate field reads/construction,
 array-in-struct INTEGER aggregate sums, and a reusable
 up-to-six-live-i32 direct-call spill/reload frame with executable proof. The selected
 sret/byval-style frontier row adds `{ i64, i64, i64 }`,
@@ -453,7 +453,7 @@ one-/two-/three-live no-argument-call shapes, or live values across calls,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
-nested mixed INTEGER/SSE integer-field add-chain, selected nested/array
+nested mixed INTEGER/SSE field reads/construction, selected nested/array
 INTEGER construction returns, selected mixed INTEGER/SSE
 and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms
 plus selected packed mixed construction returns, SSE/SSE field-read/return including
