@@ -5956,6 +5956,24 @@ test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
         \\  ret i32 %b
         \\}
         \\
+        \\define i32 @packed_mixed_high_int({ i32, i32, double } %value) {
+        \\entry:
+        \\  %slot = alloca { i32, i32, double }
+        \\  store { i32, i32, double } %value, ptr %slot
+        \\  %b_ptr = getelementptr { i32, i32, double }, ptr %slot, i64 0, i32 1
+        \\  %b = load i32, ptr %b_ptr
+        \\  ret i32 %b
+        \\}
+        \\
+        \\define i32 @packed_reverse_mixed_high_int({ double, i32, i32 } %value) {
+        \\entry:
+        \\  %slot = alloca { double, i32, i32 }
+        \\  store { double, i32, i32 } %value, ptr %slot
+        \\  %c_ptr = getelementptr { double, i32, i32 }, ptr %slot, i64 0, i32 2
+        \\  %c = load i32, ptr %c_ptr
+        \\  ret i32 %c
+        \\}
+        \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
@@ -5972,6 +5990,20 @@ test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, small_reverse.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, small_reverse.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, small_reverse.instructions.items[1]);
+
+    var packed_mixed = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[2]);
+    defer packed_mixed.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, packed_mixed.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, packed_mixed.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shr_rax_imm6 = 32 }, packed_mixed.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, packed_mixed.instructions.items[2]);
+
+    var packed_reverse = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[3]);
+    defer packed_reverse.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, packed_reverse.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, packed_reverse.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shr_rax_imm6 = 32 }, packed_reverse.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, packed_reverse.instructions.items[2]);
 }
 
 test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sret" {

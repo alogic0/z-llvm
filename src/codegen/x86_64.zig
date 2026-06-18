@@ -6363,8 +6363,43 @@ fn emitSysVAggregateFieldOffsetReturn(
     field_offset: u64,
     field_ty: ir.Type,
 ) !void {
+    if (field_ty.eql(.{ .int = 32 }) or field_ty.eql(.{ .int = 64 })) {
+        const location = try sysvIntegerAggregateFieldLocation(function, param_name, aggregate_ty, field_offset, field_ty);
+        try emitSysVIntegerAggregateFieldLocationReturn(allocator, machine, location, field_ty);
+        return;
+    }
     const location = try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, field_offset, field_ty);
     try emitSysVAggregateFieldLocationReturn(allocator, machine, location, field_ty);
+}
+
+fn emitSysVIntegerAggregateFieldLocationReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    location: SysVIntegerAggregateFieldLocation,
+    field_ty: ir.Type,
+) !void {
+    switch (location) {
+        .gpr => |field| {
+            if (field_ty.eql(.{ .int = 64 })) {
+                if (field.offset_in_eightbyte != 0) return error.UnsupportedCodegenAbi;
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = field.reg });
+                return;
+            }
+            if (!field_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenAbi;
+            switch (field.offset_in_eightbyte) {
+                0 => try machine.instructions.append(allocator, .{ .mov_arg_eax = field.reg }),
+                4 => {
+                    try machine.instructions.append(allocator, .{ .mov_arg_rax = field.reg });
+                    try machine.instructions.append(allocator, .{ .shr_rax_imm6 = 32 });
+                },
+                else => return error.UnsupportedCodegenAbi,
+            }
+        },
+        .stack => |offset| {
+            if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+        },
+    }
 }
 
 fn emitSysVAggregateFieldLocationReturn(

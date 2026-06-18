@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=83`,
-`generic_codegen_functions=83`, `generic_cfg_functions=83`,
+frontier gate reports `source_rows=13`, `discovered_functions=89`,
+`generic_codegen_functions=89`, `generic_cfg_functions=89`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=83`, `object_failures=0`,
+`object_emitted_functions=89`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -427,8 +427,8 @@ beyond the selected one-/two-/three-live no-argument-call shapes, or live values
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
-selected mixed INTEGER/SSE and SSE/INTEGER `i32`/`i64`/`double` field reads,
-SSE/SSE field reads, and generated normal
+selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
+field reads, SSE/SSE field reads, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through seven flat
 fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,

@@ -4961,6 +4961,12 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.SmallReverseMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.PackedMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, i32, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.PackedReverseMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ double, i32, i32 }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big3")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } };
     }

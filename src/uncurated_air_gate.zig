@@ -1615,6 +1615,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct NestedMixed { struct Pair32 ints; double value; };
     \\struct SmallMixed { int a; double b; };
     \\struct SmallReverseMixed { double a; int b; };
+    \\struct PackedMixed { int a; int b; double c; };
+    \\struct PackedReverseMixed { double a; int b; int c; };
     \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
     \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
     \\extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
@@ -1633,6 +1635,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
     \\extern double z_frontier_small_reverse_mixed_float(struct SmallReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_reverse_mixed_float");
     \\extern int z_frontier_small_reverse_mixed_int(struct SmallReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_reverse_mixed_int");
+    \\extern int z_frontier_packed_mixed_low_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_low_int");
+    \\extern int z_frontier_packed_mixed_high_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_high_int");
+    \\extern double z_frontier_packed_mixed_float(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_float");
+    \\extern double z_frontier_packed_reverse_mixed_float(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_float");
+    \\extern int z_frontier_packed_reverse_mixed_low_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_low_int");
+    \\extern int z_frontier_packed_reverse_mixed_high_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_high_int");
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
@@ -1665,6 +1673,14 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct SmallReverseMixed small_reverse = { 29.5, 31 };
     \\    if (z_frontier_small_reverse_mixed_float(small_reverse) != 29.5) return 18;
     \\    if (z_frontier_small_reverse_mixed_int(small_reverse) != 31) return 19;
+    \\    struct PackedMixed packed_mixed = { 37, 41, 43.5 };
+    \\    if (z_frontier_packed_mixed_low_int(packed_mixed) != 37) return 20;
+    \\    if (z_frontier_packed_mixed_high_int(packed_mixed) != 41) return 21;
+    \\    if (z_frontier_packed_mixed_float(packed_mixed) != 43.5) return 22;
+    \\    struct PackedReverseMixed packed_reverse = { 47.5, 53, 59 };
+    \\    if (z_frontier_packed_reverse_mixed_float(packed_reverse) != 47.5) return 23;
+    \\    if (z_frontier_packed_reverse_mixed_low_int(packed_reverse) != 53) return 24;
+    \\    if (z_frontier_packed_reverse_mixed_high_int(packed_reverse) != 59) return 25;
     \\    return 0;
     \\}
     \\

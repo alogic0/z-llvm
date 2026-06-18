@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=83`,
-`generic_codegen_functions=83`, `generic_cfg_functions=83`,
+three release modes at `source_rows=13`, `discovered_functions=89`,
+`generic_codegen_functions=89`, `generic_cfg_functions=89`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=83`, `object_failures=0`,
+`object_emitted_functions=89`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -440,7 +440,7 @@ alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
 nested mixed INTEGER/SSE integer-field add-chain, selected mixed INTEGER/SSE
-and SSE/INTEGER `i32`/`i64`/`double` field-read/return forms, SSE/SSE
+and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms, SSE/SSE
 field-read/return, and generated normal MEMORY i64
 sret/byval field/copy forms currently proven through seven flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy,

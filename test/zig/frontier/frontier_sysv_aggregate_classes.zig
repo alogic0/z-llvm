@@ -42,6 +42,18 @@ const SmallReverseMixed = extern struct {
     b: i32,
 };
 
+const PackedMixed = extern struct {
+    a: i32,
+    b: i32,
+    c: f64,
+};
+
+const PackedReverseMixed = extern struct {
+    a: f64,
+    b: i32,
+    c: i32,
+};
+
 export fn frontier_mixed_int(value: Mixed) i64 {
     return value.a;
 }
@@ -120,4 +132,28 @@ export fn frontier_small_reverse_mixed_float(value: SmallReverseMixed) f64 {
 
 export fn frontier_small_reverse_mixed_int(value: SmallReverseMixed) i32 {
     return value.b;
+}
+
+export fn frontier_packed_mixed_low_int(value: PackedMixed) i32 {
+    return value.a;
+}
+
+export fn frontier_packed_mixed_high_int(value: PackedMixed) i32 {
+    return value.b;
+}
+
+export fn frontier_packed_mixed_float(value: PackedMixed) f64 {
+    return value.c;
+}
+
+export fn frontier_packed_reverse_mixed_float(value: PackedReverseMixed) f64 {
+    return value.a;
+}
+
+export fn frontier_packed_reverse_mixed_low_int(value: PackedReverseMixed) i32 {
+    return value.b;
+}
+
+export fn frontier_packed_reverse_mixed_high_int(value: PackedReverseMixed) i32 {
+    return value.c;
 }
