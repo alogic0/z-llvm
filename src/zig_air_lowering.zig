@@ -5118,6 +5118,7 @@ fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
     if (std.mem.eql(u8, trimmed, "[2]i64")) return .{ .ir_type = .{ .aggregate = "[2 x i64]" } };
+    if (std.mem.eql(u8, trimmed, "[5]i64")) return .{ .ir_type = .{ .aggregate = "[5 x i64]" } };
     if (std.mem.eql(u8, trimmed, "[2]f64")) return .{ .ir_type = .{ .aggregate = "[2 x double]" } };
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;

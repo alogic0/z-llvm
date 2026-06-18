@@ -318,7 +318,7 @@ MEMORY aggregate forms use by-value stack-passed aggregate field reads and
 byval-to-sret copies for all scalar integer leaves through layout-derived
 offsets, including the nested two-Big3 aggregate row and the mixed-width
 `{ i64, i32, i64, i32 }` copy row plus the array-backed `{ [5 x i64] }`
-copy row.
+copy/read rows.
 Boundaries still outside this
 wave are full
 SysV aggregate classification beyond the selected INTEGER/normal integer-leaf MEMORY classes,
@@ -366,12 +366,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=116`,
-`generic_codegen_functions=116`, `generic_cfg_functions=116`,
+frontier gate reports `source_rows=13`, `discovered_functions=117`,
+`generic_codegen_functions=117`, `generic_cfg_functions=117`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=116`, `object_failures=0`,
+`object_emitted_functions=117`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -402,7 +402,8 @@ copies and reads `{ { i64, i64, i64 }, { i64, i64, i64 } }` through recursive
 leaf byte offsets. The mixed-width MEMORY follow-up copies
 `{ i64, i32, i64, i32 }` through the same layout-derived byte offsets while
 using narrow `i32` stores for `i32` leaves. The array-backed MEMORY follow-up
-copies `{ [5 x i64] }` leaves through the same byte-offset copy path.
+copies `{ [5 x i64] }` leaves and reads edge array fields through the same
+byte-offset paths.
 The mixed aggregate
 class frontier row adds `{ i64, double }`, selected `{ i32, double }`, and
 selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate
@@ -452,7 +453,7 @@ reads including `[2]f64` array-in-struct and nested `{ { double }, { double }
 }`, selected stack-passed register aggregate field reads, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through eight flat
 fields, a nested two-Big3 aggregate, a mixed-width
-`{ i64, i32, i64, i32 }` copy, and an array-backed `{ [5 x i64] }` copy,
+`{ i64, i32, i64, i32 }` copy, and array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,
 varargs, vectors, more than three stack-passed live values, and
 broader SSE live-across-call frames beyond the selected one-live through

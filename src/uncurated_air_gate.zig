@@ -1586,6 +1586,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
     \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
+    \\extern long long z_frontier_big_array_sum_edges(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_sum_edges");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1634,6 +1635,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigArray array = { .values = { 233, 239, 241, 251, 257 } };
     \\    struct BigArray copied_array = z_frontier_big_array_copy(array);
     \\    if (copied_array.values[0] != 233 || copied_array.values[1] != 239 || copied_array.values[2] != 241 || copied_array.values[3] != 251 || copied_array.values[4] != 257) return 23;
+    \\    if (z_frontier_big_array_sum_edges(array) != 490) return 24;
     \\    return 0;
     \\}
     \\

@@ -156,3 +156,7 @@ export fn frontier_big_mixed_copy(value: BigMixed) BigMixed {
 export fn frontier_big_array_copy(value: BigArray) BigArray {
     return value;
 }
+
+export fn frontier_big_array_sum_edges(value: BigArray) i64 {
+    return value.values[0] + value.values[4];
+}
