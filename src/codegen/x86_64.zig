@@ -150,6 +150,7 @@ pub const Instruction = union(enum) {
     mov_imm_r8: i64,
     mov_imm_r9: i64,
     mov_rax_rdi,
+    mov_arg_rax: ArgReg,
     movq_xmm_rax: XmmReg,
     mov_arg_eax: ArgReg,
     mov_arg_arg: struct {
@@ -1245,6 +1246,49 @@ fn lowerSelectedI64ConstReturn(
     return true;
 }
 
+fn lowerGenericCfgI64ParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 0) return false;
+    const name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const reg = try sysvIntegerParamReg(function, name, .{ .int = 64 });
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgI64DirectCallReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 1) return false;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed) return false;
+    const call_result = instruction.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, call_result)) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (!call.ret_ty.eql(.{ .int = 64 }) or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+
+    const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
+    try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
 fn lowerControlFlowCallsWriterMainReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -1306,7 +1350,7 @@ fn lowerDirectI32CallMainReturn(
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     if (!call.ret_ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenInstruction;
-    if (call.args.items.len > 7) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
 
     var add_immediate: i32 = 0;
     if (block.instructions.items.len == 1) {
@@ -11122,7 +11166,7 @@ fn emitGenericCfgI32CallIntoEax(
         try machine.instructions.append(allocator, .smin_i32_edi_esi_eax);
         return;
     }
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 7) return error.UnsupportedCodegenInstruction;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return error.UnsupportedCodegenInstruction;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
     const stack_arg_count = try appendI32CallArgs(allocator, machine, function, call);
@@ -11374,6 +11418,14 @@ fn lowerGenericCfgSingleBlockI64(allocator: std.mem.Allocator, machine: *Machine
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgI64ParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
+    if (try lowerGenericCfgI64DirectCallReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerErrorUnionI64SelectReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -11454,7 +11506,7 @@ fn lowerGenericCfgSingleBlockDirectCallMain(allocator: std.mem.Allocator, machin
     };
     if (call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 7) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return false;
     for (call.args.items) |arg| {
         if (arg.attrs != null or !arg.ty.eql(.{ .int = 32 })) return false;
         switch (arg.value) {
@@ -12550,7 +12602,7 @@ fn genericCfgSupportsSingleBlockStore(function: ir.Function, block: ir.BasicBloc
 fn genericCfgSupportsSingleBlockCall(function: ir.Function, block: ir.BasicBlock, result: ?[]const u8, call: ir.CallInst) bool {
     if (genericCfgSupportsSminIntrinsicCall(function, call)) return result != null;
     if (result == null) return false;
-    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 7) return false;
+    if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return false;
     if (call.callee_value != null or call.inline_asm != null) return false;
     if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
     for (call.args.items, 0..) |arg, index| {
@@ -19700,6 +19752,15 @@ fn appendDirectCallWithStackArgs(
             try appendDirectCall(allocator, machine, symbol, ret_ty);
             try machine.instructions.append(allocator, .add_rsp_8);
         },
+        2 => {
+            try machine.instructions.append(allocator, .sub_rsp_8);
+            try appendDirectCall(allocator, machine, symbol, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_24);
+        },
+        3 => {
+            try appendDirectCall(allocator, machine, symbol, ret_ty);
+            try machine.instructions.append(allocator, .add_rsp_24);
+        },
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -19710,16 +19771,18 @@ fn appendI32CallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
-    if (call.args.items.len > 7) return error.UnsupportedCodegenAbi;
+    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
     var stack_arg_count: usize = 0;
+    var stack_args: [3]i32 = undefined;
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
         if (index >= 6) {
+            if (stack_arg_count == stack_args.len) return error.UnsupportedCodegenAbi;
             const value = switch (arg.value) {
                 .int => |int| try i32Value(int),
                 .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
             };
-            try machine.instructions.append(allocator, .{ .push_imm32 = value });
+            stack_args[stack_arg_count] = value;
             stack_arg_count += 1;
             continue;
         }
@@ -19733,6 +19796,11 @@ fn appendI32CallArgs(
             .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
         }
     }
+    var index = stack_arg_count;
+    while (index > 0) {
+        index -= 1;
+        try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[index] });
+    }
     return stack_arg_count;
 }
 
@@ -19745,15 +19813,17 @@ fn appendSysVScalarCallArgs(
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
     var stack_arg_count: usize = 0;
+    var stack_args: [3]i32 = undefined;
     for (call.args.items) |arg| {
         if (arg.attrs != null) return error.UnsupportedCodegenAbi;
-        if (arg.ty.eql(.{ .int = 32 })) {
+        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
             if (int_arg_index >= 6) {
+                if (stack_arg_count == stack_args.len) return error.UnsupportedCodegenAbi;
                 const value = switch (arg.value) {
                     .int => |int| try i32Value(int),
                     .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 };
-                try machine.instructions.append(allocator, .{ .push_imm32 = value });
+                stack_args[stack_arg_count] = value;
                 int_arg_index += 1;
                 stack_arg_count += 1;
                 continue;
@@ -19762,7 +19832,7 @@ fn appendSysVScalarCallArgs(
             switch (arg.value) {
                 .int => |int| try appendMoveImmToArgReg(allocator, machine, dst, try i64Value(int)),
                 .named => |name| {
-                    const src = try paramReg(function, name, .{ .int = 32 });
+                    const src = try sysvIntegerParamReg(function, name, arg.ty);
                     if (src != dst) try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = dst, .src = src } });
                 },
                 .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
@@ -19809,6 +19879,11 @@ fn appendSysVScalarCallArgs(
             continue;
         }
         return error.UnsupportedCodegenType;
+    }
+    var stack_index = stack_arg_count;
+    while (stack_index > 0) {
+        stack_index -= 1;
+        try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[stack_index] });
     }
     return stack_arg_count;
 }
@@ -20490,6 +20565,26 @@ fn paramReg(function: ir.Function, name: []const u8, ty: ir.Type) !ArgReg {
     return try paramRegOrNull(function, name, ty) orelse error.UnsupportedCodegenValue;
 }
 
+fn sysvIntegerParamReg(function: ir.Function, name: []const u8, ty: ir.Type) !ArgReg {
+    return try sysvIntegerParamRegOrNull(function, name, ty) orelse error.UnsupportedCodegenValue;
+}
+
+fn sysvIntegerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
+    if (!ty.eql(.{ .int = 32 }) and !ty.eql(.{ .int = 64 }) and !ty.eql(.ptr)) return error.UnsupportedCodegenType;
+    var int_index: usize = 0;
+    for (function.params.items) |param| {
+        const is_integer_class = param.ty.eql(.{ .int = 1 }) or param.ty.eql(.{ .int = 8 }) or
+            param.ty.eql(.{ .int = 16 }) or param.ty.eql(.{ .int = 32 }) or
+            param.ty.eql(.{ .int = 64 }) or param.ty.eql(.ptr);
+        if (std.mem.eql(u8, param.name, name)) {
+            if (!param.ty.eql(ty) or !is_integer_class) return error.UnsupportedCodegenValue;
+            return try ArgReg.fromIndex(int_index);
+        }
+        if (is_integer_class) int_index += 1;
+    }
+    return null;
+}
+
 fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
     for (function.params.items, 0..) |param, index| {
         if (!std.mem.eql(u8, param.name, name)) continue;
@@ -20525,7 +20620,7 @@ fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !
         if (!std.mem.eql(u8, param.name, name)) continue;
         if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
         if (index < 6) return null;
-        if (index == 6) return 8;
+        if (index <= 8) return @intCast(8 + (index - 6) * 8);
         return error.UnsupportedCodegenAbi;
     }
     return null;
@@ -20595,6 +20690,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm_r8,
         .mov_imm_r9,
         .mov_rax_rdi,
+        .mov_arg_rax,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
@@ -20725,7 +20821,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = function.ret_ty == .void;
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_stack_disp8_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_stack_disp8_eax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -20788,6 +20884,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm_r8,
         .mov_imm_r9,
         .mov_rax_rdi,
+        .mov_arg_rax,
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,

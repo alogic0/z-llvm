@@ -5249,6 +5249,60 @@ test "x86_64 codegen supports one stack-passed i32 call argument" {
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[6]);
 }
 
+test "x86_64 codegen supports multiple stack-passed i32 call arguments" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32, i32, i32, i32, i32, i32, i32, i32, i32)
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  %r = call i32 @callee(i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
+}
+
+test "x86_64 codegen aligns calls with two stack-passed arguments" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32, i32, i32, i32, i32, i32, i32, i32)
+        \\
+        \\define i32 @caller() {
+        \\entry:
+        \\  %r = call i32 @callee(i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 8 }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 7 }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[8]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_24, machine.instructions.items[machine.instructions.items.len - 2]);
+}
+
 test "x86_64 codegen supports direct f64 call return with SSE args" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5272,6 +5326,34 @@ test "x86_64 codegen supports direct f64 call return with SSE args" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4000_0000_0000_0000 }, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen supports mixed integer and SSE call streams with stack args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc double @callee(i32, float, i64, double, i32, i32, i32, i32, i32)
+        \\
+        \\define double @caller() {
+        \\entry:
+        \\  %r = call fastcc double @callee(i32 1, float 2.000000e+00, i64 3, double 4.000000e+00, i32 5, i32 6, i32 7, i32 8, i32 9)
+        \\  ret double %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 1 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm32_xmm0 = 0x4000_0000 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 3 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4010_0000_0000_0000 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[8]);
 }
 
 test "x86_64 codegen supports mixed integer and f64 direct call return" {
@@ -5299,6 +5381,31 @@ test "x86_64 codegen supports mixed integer and f64 direct call return" {
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[1]);
 }
 
+test "x86_64 codegen supports i64 direct call returns and mixed i32 i64 args" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare fastcc i64 @callee(i32, i64)
+        \\
+        \\define i64 @caller() {
+        \\entry:
+        \\  %r = call fastcc i64 @callee(i32 7, i64 123456789)
+        \\  ret i64 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 7 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 123456789 }, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen returns first f64 parameter from mixed signature" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5318,6 +5425,51 @@ test "x86_64 codegen returns first f64 parameter from mixed signature" {
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[0]);
+}
+
+test "x86_64 codegen returns i64 parameter from mixed integer signature" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define fastcc i64 @callee(i32 %tag, i64 %value) {
+        \\entry:
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen rejects vector call ABI boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(<2 x i32>)
+        \\
+        \\define i32 @caller(<2 x i32> %value) {
+        \\entry:
+        \\  %r = call i32 @callee(<2 x i32> %value)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedCodegenType,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
 }
 
 test "x86_64 codegen rejects unsupported call live pressure" {
