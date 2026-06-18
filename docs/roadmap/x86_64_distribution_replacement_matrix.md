@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=66`,
-`generic_codegen_functions=66`, `generic_cfg_functions=66`,
+three release modes at `source_rows=13`, `discovered_functions=67`,
+`generic_codegen_functions=67`, `generic_cfg_functions=67`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=66`, `object_failures=0`,
+`object_emitted_functions=67`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -419,7 +419,7 @@ field reads and register aggregate return in `%xmm0`/`%rax` from the
 independent SSE/GPR streams with executable proof.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call and a selected
-two-live `f32` spill/reload frame across a no-argument helper before a
+two-live `f32`/`f64` spill/reload frame across a no-argument helper before a
 post-call `fadd` return.
 Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with
@@ -432,7 +432,7 @@ generated normal MEMORY i64 sret/byval field/copy forms currently proven
 through seven fields, arbitrary non-selected sret/byval copies, varargs, and
 vectors, stack-passed live values,
 and broader SSE live-across-call frames beyond
-the selected one-live `f32`/`f64` and two-live `f32` no-argument-call shapes.
+the selected one-live `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes.
 The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

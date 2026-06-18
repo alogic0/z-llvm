@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=66
-structured_functions=66
-generic_codegen_functions=66
-generic_cfg_functions=66
+discovered_functions=67
+structured_functions=67
+generic_codegen_functions=67
+generic_cfg_functions=67
 structural_matcher_functions=0
-structured_air_v2_functions=66
-typed_air_operand_functions=66
+structured_air_v2_functions=67
+typed_air_operand_functions=67
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=66
+generic_lowering_functions=67
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=66
+object_emitted_functions=67
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -152,9 +152,9 @@ Closed in the current memory/aggregate frontier slice:
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
   and the saved value is reloaded to `%xmm0` for return
 - second selected SSE live-across-call row in `frontier_sysv_abi.zig`: two
-  live `f32` parameters are spilled from `%xmm0`/`%xmm1` to aligned frame
-  slots across a no-argument external C ABI `void` helper and reloaded for a
-  post-call `fadd` return
+  live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
+  frame slots across a no-argument external C ABI `void` helper and reloaded
+  for a post-call `fadd` return
 
 Remaining measured frontier blockers kept out of accepted rows:
 
@@ -173,7 +173,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
   values, and broader SSE live-across-call frames beyond the selected one-live
-  `f32`/`f64` and two-live `f32` no-argument-call shapes
+  `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

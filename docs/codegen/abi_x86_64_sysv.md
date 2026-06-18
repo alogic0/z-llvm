@@ -37,7 +37,7 @@ one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
 one live f32/f64 caller argument can be spilled from %xmm0 into an aligned
 frame slot, reloaded after one direct C ABI void call, and returned from %xmm0
-two live f32 caller arguments can be spilled from %xmm0/%xmm1 into aligned
+two live f32/f64 caller arguments can be spilled from %xmm0/%xmm1 into aligned
 frame slots across one no-argument direct C ABI void call and reloaded for a
 post-call fadd return
 one fixed i32 stack slot can be reloaded into %edi before a direct call
@@ -86,7 +86,7 @@ Caller-saved set considered clobbered by calls in this slice:
 Callee-saved registers are not allocated by this project yet.
 One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
-Two live f32 values in %xmm0/%xmm1 across one no-argument direct C ABI void
+Two live f32/f64 values in %xmm0/%xmm1 across one no-argument direct C ABI void
 call are accepted for the selected post-call add-return shape.
 Stack-passed live values, broader SSE live values, and live values across multiple calls fail closed.
 ```
@@ -143,7 +143,7 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   one live f32/f64 value is spilled from %xmm0 to an aligned frame slot
   another f32/f64 value is passed to an external C ABI void helper
   the saved value is reloaded to %xmm0 for return
-  two live f32 values can also be spilled from %xmm0/%xmm1 across a
+  two live f32/f64 values can also be spilled from %xmm0/%xmm1 across a
   no-argument external C ABI void helper and reloaded for a post-call fadd
   return
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
@@ -153,7 +153,7 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-live f32 no-argument-call spill shape
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-live f32/f64 no-argument-call spill shape
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms

@@ -233,6 +233,7 @@ pub const Instruction = union(enum) {
     test_rax_rax,
     test_rdx_rdx,
     mulsd_xmm1_xmm0,
+    addsd_xmm1_xmm0,
     addss_xmm1_xmm0,
     subss_xmm1_xmm0,
     divsd_xmm1_xmm0,
@@ -13785,7 +13786,7 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!function.ret_ty.eql(.float) or !ret.ty.eql(.float) or block.instructions.items.len != 2) return false;
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 2) return false;
     const call_inst = block.instructions.items[0];
     const binary_inst = block.instructions.items[1];
     if (call_inst.removed or binary_inst.removed) return false;
@@ -13807,7 +13808,7 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         .binary => |binary| binary,
         else => return false,
     };
-    if (binary.op != .fadd or !binary.ty.eql(.float)) return false;
+    if (binary.op != .fadd or !binary.ty.eql(function.ret_ty)) return false;
     const lhs_name = switch (binary.lhs) {
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
@@ -13816,18 +13817,30 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
-    const lhs_index = try fpParamIndex(function, lhs_name, .float);
-    const rhs_index = try fpParamIndex(function, rhs_name, .float);
+    const lhs_index = try fpParamIndex(function, lhs_name, function.ret_ty);
+    const rhs_index = try fpParamIndex(function, rhs_name, function.ret_ty);
     if (lhs_index != 0 or rhs_index != 1) return error.UnsupportedLiveAcrossCall;
 
-    try appendStackFrame(allocator, machine, 8);
-    try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-    try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    const frame_bytes: u8 = if (function.ret_ty.eql(.float)) 8 else 24;
+    try appendStackFrame(allocator, machine, frame_bytes);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    }
     try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
-    try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-    try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
-    try machine.instructions.append(allocator, .addss_xmm1_xmm0);
-    try appendStackFrameEnd(allocator, machine, 8);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+    }
+    try appendStackFrameEnd(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -22504,6 +22517,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .test_rax_rax,
         .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
+        .addsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,
         .divsd_xmm1_xmm0,
@@ -22602,7 +22616,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = function.ret_ty == .void or sysvAggregateReturnHasNoGpr(function.ret_ty);
             }
         },
-        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -22718,6 +22732,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .test_rax_rax,
         .test_rdx_rdx,
         .mulsd_xmm1_xmm0,
+        .addsd_xmm1_xmm0,
         .addss_xmm1_xmm0,
         .subss_xmm1_xmm0,
         .divsd_xmm1_xmm0,

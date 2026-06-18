@@ -147,7 +147,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal i64 MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven fields, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal i64 MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven fields, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -167,7 +167,7 @@ selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
 selected SSE/SSE aggregate returns are lowered in %xmm0/%xmm1
 selected one-live f32/f64 values across a direct C ABI void call are spilled
 from %xmm0 to an aligned frame slot and reloaded to %xmm0 for return
-selected two-live f32 values across a no-argument direct C ABI void call are
+selected two-live f32/f64 values across a no-argument direct C ABI void call are
 spilled from %xmm0/%xmm1 to aligned frame slots and reloaded for a post-call
 fadd return
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
