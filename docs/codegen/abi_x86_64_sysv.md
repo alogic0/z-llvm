@@ -117,8 +117,9 @@ frontier_sysv_sret_byval.Big3 through Big7 lower as selected normal MEMORY class
   user i64 args are shifted through the SysV GPR stream after the hidden pointer
   the seven-field make row reads multiple stack-passed user fields after the hidden pointer
   the typed AIR builder generates field names and sret/byval attrs instead of using a fixed field-count table
-  by-value stack aggregate field reads and byval-to-sret copies use layout-derived stack offsets for all scalar leaves in these selected normal i64 MEMORY forms
+  by-value stack aggregate field reads and byval-to-sret copies use layout-derived stack offsets for all scalar integer leaves in these selected normal MEMORY forms
   `{ { i64, i64, i64 }, { i64, i64, i64 } }` proves recursive leaf byte-offset reads and copies for nested normal MEMORY aggregates
+  `{ i64, i32, i64, i32 }` proves mixed-width MEMORY copies with narrow stores for `i32` leaves
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register
@@ -166,8 +167,8 @@ no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR s
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
-no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal i64 leaf sret/byval forms
-no arbitrary non-selected non-i64 sret/byval copy lowering
+no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
+no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or broader SSE live-across-call spill/reload-heavy call frames
 ```

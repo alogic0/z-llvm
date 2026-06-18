@@ -1022,7 +1022,7 @@ fn typedV2SretIntegerAggregateCopyRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    const leaf_count = integerAggregateLeafCount(function_type.return_type.ir_type) orelse return false;
+    const leaf_count = supportedIntegerAggregateLeafCount(function_type.return_type.ir_type) orelse return false;
     if (leaf_count < 3 or function_type.params.len != 1) return false;
     if (!function_type.params[0].ir_type.eql(function_type.return_type.ir_type)) return false;
     return typedOpcodeCount(structured_air_v2, "arg") == 1 and
@@ -1040,22 +1040,26 @@ fn integerAggregateFieldCount(ty: ir.Type) ?usize {
     return field_count;
 }
 
-fn integerAggregateLeafCount(ty: ir.Type) ?usize {
+fn supportedIntegerAggregateLeafCount(ty: ir.Type) ?usize {
     const field_count = aggregateFieldCount(ty) orelse return null;
     if (field_count == 0) return null;
     var count: usize = 0;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(ty, field_index) orelse return null;
-        if (field_ty.eql(.{ .int = 64 })) {
+        if (supportedAggregateIntegerLeaf(field_ty)) {
             count += 1;
         } else if (isAggregateIrType(field_ty)) {
-            count += integerAggregateLeafCount(field_ty) orelse return null;
+            count += supportedIntegerAggregateLeafCount(field_ty) orelse return null;
         } else {
             return null;
         }
     }
     return count;
+}
+
+fn supportedAggregateIntegerLeaf(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 });
 }
 
 fn isAggregateIrType(ty: ir.Type) bool {
@@ -1065,18 +1069,23 @@ fn isAggregateIrType(ty: ir.Type) bool {
     };
 }
 
-fn collectIntegerAggregateLeafOffsets(allocator: std.mem.Allocator, aggregate_ty: ir.Type) ![]u64 {
-    var offsets: std.ArrayList(u64) = .empty;
-    errdefer offsets.deinit(allocator);
+const IntegerAggregateLeaf = struct {
+    offset: u64,
+    ty: ir.Type,
+};
+
+fn collectIntegerAggregateLeaves(allocator: std.mem.Allocator, aggregate_ty: ir.Type) ![]IntegerAggregateLeaf {
+    var leaves: std.ArrayList(IntegerAggregateLeaf) = .empty;
+    errdefer leaves.deinit(allocator);
     const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return error.UnsupportedAir;
-    try collectIntegerAggregateLeafOffsetsInto(allocator, &offsets, layout, aggregate_ty, 0);
-    if (offsets.items.len < 3) return error.UnsupportedAir;
-    return try offsets.toOwnedSlice(allocator);
+    try collectIntegerAggregateLeavesInto(allocator, &leaves, layout, aggregate_ty, 0);
+    if (leaves.items.len < 3) return error.UnsupportedAir;
+    return try leaves.toOwnedSlice(allocator);
 }
 
-fn collectIntegerAggregateLeafOffsetsInto(
+fn collectIntegerAggregateLeavesInto(
     allocator: std.mem.Allocator,
-    offsets: *std.ArrayList(u64),
+    leaves: *std.ArrayList(IntegerAggregateLeaf),
     layout: target_mod.DataLayout,
     aggregate_ty: ir.Type,
     base_offset: u64,
@@ -1089,10 +1098,10 @@ fn collectIntegerAggregateLeafOffsetsInto(
         const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return error.UnsupportedAir;
         if (offset_i < 0) return error.UnsupportedAir;
         const field_offset = base_offset + @as(u64, @intCast(offset_i));
-        if (field_ty.eql(.{ .int = 64 })) {
-            try offsets.append(allocator, field_offset);
+        if (supportedAggregateIntegerLeaf(field_ty)) {
+            try leaves.append(allocator, .{ .offset = field_offset, .ty = field_ty });
         } else if (isAggregateIrType(field_ty)) {
-            try collectIntegerAggregateLeafOffsetsInto(allocator, offsets, layout, field_ty, field_offset);
+            try collectIntegerAggregateLeavesInto(allocator, leaves, layout, field_ty, field_offset);
         } else {
             return error.UnsupportedAir;
         }
@@ -1153,37 +1162,37 @@ fn lowerSretIntegerAggregateCopy(
     errdefer function.deinit(allocator);
     function.linkage = .default;
     function.calling_conv = null;
-    const leaf_offsets = try collectIntegerAggregateLeafOffsets(allocator, aggregate_ty);
-    defer allocator.free(leaf_offsets);
+    const leaves = try collectIntegerAggregateLeaves(allocator, aggregate_ty);
+    defer allocator.free(leaves);
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = try sretAttrsForAggregate(module, aggregate_ty), .name = "sret" });
     try function.params.append(allocator, .{ .ty = .ptr, .attrs = try byvalAttrsForAggregate(module, aggregate_ty), .name = "arg0" });
 
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    for (leaf_offsets, 0..) |field_offset, field_index| {
+    for (leaves, 0..) |leaf, field_index| {
         const src_result = try ownPrint(module, "src_leaf{}", .{field_index});
         const load_result = try ownPrint(module, "load{}", .{field_index});
         const dst_result = try ownPrint(module, "dst_leaf{}", .{field_index});
 
         var src_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "arg0" }, .indices = .empty };
         errdefer src_gep.deinit(allocator);
-        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(field_offset) } });
+        try src_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
         try block.instructions.append(allocator, .{ .result = src_result, .kind = .{ .gep = src_gep } });
 
         try block.instructions.append(allocator, .{ .result = load_result, .kind = .{ .load = .{
-            .ty = .{ .int = 64 },
+            .ty = leaf.ty,
             .ptr = .{ .named = src_result },
         } } });
 
         var dst_gep: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = .{ .named = "sret" }, .indices = .empty };
         errdefer dst_gep.deinit(allocator);
-        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(field_offset) } });
+        try dst_gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(leaf.offset) } });
         try block.instructions.append(allocator, .{ .result = dst_result, .kind = .{ .gep = dst_gep } });
 
         try block.instructions.append(allocator, .{
             .result = null,
             .kind = .{ .store = .{
-                .ty = .{ .int = 64 },
+                .ty = leaf.ty,
                 .value = .{ .named = load_result },
                 .ptr = .{ .named = dst_result },
             } },
@@ -4957,6 +4966,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigNested")) {
         return .{ .ir_type = .{ .aggregate = "{ { i64, i64, i64 }, { i64, i64, i64 } }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.BigMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i32, i64, i32 }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };

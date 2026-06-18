@@ -116,6 +116,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .store_imm64_arg_ptr_disp8 => |store| try writer.print("\tmovq ${}, {}({s})\n", .{ store.imm, store.offset, store.reg.name64() }),
             .store_arg64_arg_ptr_disp8 => |store| try writer.print("\tmovq {s}, {}({s})\n", .{ store.src_reg.name64(), store.offset, store.ptr_reg.name64() }),
             .store_rax_arg_ptr_disp8 => |store| try writer.print("\tmovq %rax, {}({s})\n", .{ store.offset, store.reg.name64() }),
+            .store_eax_arg_ptr_disp8 => |store| try writer.print("\tmovl %eax, {}({s})\n", .{ store.offset, store.reg.name64() }),
             .store_imm8_arg_ptr_disp8 => |store| try writer.print("\tmovb ${}, {}({s})\n", .{ store.imm, store.offset, store.reg.name64() }),
             .load_f128_arg_ptr_xmm0 => |load| try writer.print("\tmovaps {}({s}), %xmm0\n", .{ load.offset, load.reg.name64() }),
             .load_f128_const_xmm0 => |symbol| try writer.print("\tmovaps {s}(%rip), %xmm0\n", .{symbol}),

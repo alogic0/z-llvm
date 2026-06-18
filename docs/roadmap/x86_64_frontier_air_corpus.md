@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=74
-structured_functions=74
-generic_codegen_functions=74
-generic_cfg_functions=74
+discovered_functions=75
+structured_functions=75
+generic_codegen_functions=75
+generic_cfg_functions=75
 structural_matcher_functions=0
-structured_air_v2_functions=74
-typed_air_operand_functions=74
+structured_air_v2_functions=75
+typed_air_operand_functions=75
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=74
+generic_lowering_functions=75
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=74
+object_emitted_functions=75
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -122,12 +122,13 @@ Closed in the current memory/aggregate frontier slice:
   `{ i64, i64, i64, i64, i64, i64, i64 }` returns through a hidden sret pointer
   in `%rdi` with user arguments shifted through the SysV GPR stream; the
   seven-field make row proves multiple stack-passed user arguments after the
-  hidden pointer, the normal i64 MEMORY sret/byval typed builder now generates
-  field names and ABI attrs instead of using a fixed field-count table, and the
-  same selected normal MEMORY i64 aggregates copy all scalar leaves from the
-  stack-passed by-value argument to the hidden sret destination using
-  layout-derived byte offsets, including the nested `{ { i64, i64, i64 },
-  { i64, i64, i64 } }` copy/read row
+  hidden pointer, the normal integer-leaf MEMORY sret/byval typed builder now
+  generates field names and ABI attrs instead of using a fixed field-count
+  table, and the same selected normal MEMORY aggregates copy all scalar integer
+  leaves from the stack-passed by-value argument to the hidden sret destination
+  using layout-derived byte offsets, including the nested `{ { i64, i64, i64 },
+  { i64, i64, i64 } }` copy/read row and the mixed-width
+  `{ i64, i32, i64, i32 }` copy row
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
@@ -179,10 +180,11 @@ Remaining measured frontier blockers kept out of accepted rows:
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, nested mixed INTEGER/SSE integer add chains, mixed
   INTEGER/SSE, SSE/INTEGER, and SSE/SSE field reads/returns, and generated
-  normal MEMORY i64 aggregate sret/byval field/copy forms currently proven
-  through seven flat fields and a nested two-Big3 aggregate; X87,
+  normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
+  through seven flat fields, a nested two-Big3 aggregate, and a mixed-width
+  `{ i64, i32, i64, i32 }` copy; X87,
   packed/unaligned aggregate ABI classes,
-  arbitrary non-selected non-i64 sret/byval copies, varargs, vectors, stack-passed live
+  arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
   values, and broader SSE live-across-call frames beyond the selected one-live
   `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes
 

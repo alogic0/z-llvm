@@ -148,8 +148,8 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate argument field reads, register return, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal i64 MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields and a nested two-Big3 aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
-out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected non-i64 sret/byval copies, tail calls, unwind, and debug-info call-site handling
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate argument field reads, register return, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
+out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
 
@@ -158,10 +158,10 @@ ABI-shaped attributes:
 ```text
 byval(...) and sret(...) are preserved on pointer parameters and verified
 as pointer-only annotations; the frontier additionally lowers the selected
-source-backed normal i64 MEMORY aggregate hidden-sret returns, stack by-value
+source-backed normal integer-leaf MEMORY aggregate hidden-sret returns, stack by-value
 aggregate field-read shape, and byval-to-sret copies for all fields in those
-selected forms; the current frontier proves this through seven i64 fields and
-multiple stack-passed user fields after the hidden sret pointer
+selected forms; the current frontier proves this through seven i64 fields,
+mixed-width integer leaves, and multiple stack-passed user fields after the hidden sret pointer
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
 selected SSE/INTEGER aggregate returns are lowered in %xmm0/%rax
@@ -187,7 +187,7 @@ The first slice rejects:
 indirect calls
 inline assembly calls
 varargs
-byval/sret lowering beyond the generated normal i64 MEMORY aggregate frontier
+byval/sret lowering beyond the generated normal integer-leaf MEMORY aggregate frontier
 operand bundles
 invoke
 callbr

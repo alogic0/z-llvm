@@ -1532,6 +1532,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big6 { long long a; long long b; long long c; long long d; long long e; long long f; };
     \\struct Big7 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
+    \\struct BigMixed { long long a; int b; long long c; int d; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1550,6 +1551,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big7 z_frontier_big7_copy(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_copy");
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
+    \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1586,6 +1588,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 17;
     \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);
     \\    if (copied_nested.left.a != 2 || copied_nested.left.b != 3 || copied_nested.left.c != 5 || copied_nested.right.a != 7 || copied_nested.right.b != 11 || copied_nested.right.c != 13) return 18;
+    \\    struct BigMixed mixed = { .a = 211, .b = 223, .c = 227, .d = 229 };
+    \\    struct BigMixed copied_mixed = z_frontier_big_mixed_copy(mixed);
+    \\    if (copied_mixed.a != 211 || copied_mixed.b != 223 || copied_mixed.c != 227 || copied_mixed.d != 229) return 19;
     \\    return 0;
     \\}
     \\

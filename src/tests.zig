@@ -5163,6 +5163,18 @@ test "x86_64 encoding stores rax through argument pointer displacement" {
     try std.testing.expectEqualSlices(u8, &.{ 0x48, 0x89, 0x47, 0x10, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding stores eax through argument pointer displacement" {
+    var machine = codegen.x86_64.MachineFunction.init("store_eax_ptr", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 12 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 3), mc.encoding.instructionSize(.{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 12 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0x89, 0x47, 0x0c, 0xc3 }, bytes);
+}
+
 test "x86_64 encoding spills and reloads xmm frame slots" {
     var machine = codegen.x86_64.MachineFunction.init("xmm_frame_slots", .double);
     defer machine.deinit(std.testing.allocator);
@@ -5900,6 +5912,51 @@ test "x86_64 codegen sums array-in-struct INTEGER aggregate fields from SysV GPR
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg64_rax = .rsi }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
+test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sret" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @copy(ptr noalias sret({ i64, i32, i64, i32 }) %out, ptr byval({ i64, i32, i64, i32 }) %value) {
+        \\entry:
+        \\  %src0 = getelementptr i8, ptr %value, i64 0
+        \\  %load0 = load i64, ptr %src0
+        \\  %dst0 = getelementptr i8, ptr %out, i64 0
+        \\  store i64 %load0, ptr %dst0
+        \\  %src1 = getelementptr i8, ptr %value, i64 8
+        \\  %load1 = load i32, ptr %src1
+        \\  %dst1 = getelementptr i8, ptr %out, i64 8
+        \\  store i32 %load1, ptr %dst1
+        \\  %src2 = getelementptr i8, ptr %value, i64 16
+        \\  %load2 = load i64, ptr %src2
+        \\  %dst2 = getelementptr i8, ptr %out, i64 16
+        \\  store i64 %load2, ptr %dst2
+        \\  %src3 = getelementptr i8, ptr %value, i64 24
+        \\  %load3 = load i32, ptr %src3
+        \\  %dst3 = getelementptr i8, ptr %out, i64 24
+        \\  store i32 %load3, ptr %dst3
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 8 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 16 }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 8 } }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 24 }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 16 } }, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 32 }, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_eax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = 24 } }, machine.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[8]);
 }
 
 test "x86_64 codegen returns register aggregate from direct helper call" {
