@@ -182,7 +182,7 @@ The first slice rejects:
 indirect calls
 inline assembly calls
 varargs
-byval/sret lowering beyond the selected frontier MEMORY aggregate shape
+byval/sret lowering beyond the generated normal i64 MEMORY aggregate frontier
 operand bundles
 invoke
 callbr
