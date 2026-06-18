@@ -7135,13 +7135,13 @@ test "x86_64 codegen keeps callee-saved registers out of the selected ABI alloca
     try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
 }
 
-test "x86_64 codegen supports stack-passed live i32 across direct call" {
+test "x86_64 codegen supports six stack-passed live i32 values across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @id(i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h, i32 %i, i32 %j, i32 %k, i32 %l) {
         \\entry:
         \\  %r = call i32 @id(i32 %a)
         \\  %ab = add i32 %a, %b
@@ -7150,7 +7150,12 @@ test "x86_64 codegen supports stack-passed live i32 across direct call" {
         \\  %abcde = add i32 %abcd, %e
         \\  %abcdef = add i32 %abcde, %f
         \\  %abcdefg = add i32 %abcdef, %g
-        \\  %sum = add i32 %abcdefg, %r
+        \\  %abcdefgh = add i32 %abcdefg, %h
+        \\  %abcdefghi = add i32 %abcdefgh, %i
+        \\  %abcdefghij = add i32 %abcdefghi, %j
+        \\  %abcdefghijk = add i32 %abcdefghij, %k
+        \\  %abcdefghijkl = add i32 %abcdefghijk, %l
+        \\  %sum = add i32 %abcdefghijkl, %r
         \\  ret i32 %sum
         \\}
         \\
@@ -7164,6 +7169,11 @@ test "x86_64 codegen supports stack-passed live i32 across direct call" {
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 8 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 16 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 24 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 32 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 40 });
+    try expectMachineInstruction(machine.instructions.items, .{ .add_stack_disp8_eax = 48 });
 }
 
 test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {

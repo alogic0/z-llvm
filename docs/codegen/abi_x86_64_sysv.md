@@ -37,7 +37,7 @@ up to three constant i32 stack-passed direct-call arguments are supported
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
-up to three stack-passed live i32 caller arguments can be added after the call
+up to six stack-passed live i32 caller arguments can be added after the call
 once the local call frame is restored
 one live f32/f64 caller argument can be spilled from %xmm0 into an aligned
 frame slot, reloaded after one direct C ABI void call, and returned from %xmm0
@@ -95,7 +95,7 @@ One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
 ABI void call are accepted for the selected post-call add-return shape.
-More than three stack-passed live i32 values, SSE live values beyond the
+More than six stack-passed live i32 values, SSE live values beyond the
 selected one- through six-live f32/f64 shapes, and live values across multiple
 calls fail closed.
 ```
@@ -204,7 +204,7 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
-  up to three stack-passed live i32 parameters can be added after a direct call
+  up to six stack-passed live i32 parameters can be added after a direct call
   once the local call frame is restored
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
@@ -220,6 +220,6 @@ no full lowering for all classified SysV aggregate classes beyond selected INTEG
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-three stack-passed i32 and one- through six-live f32/f64 shapes
-stack-passed live i32 pressure beyond three selected incoming stack arguments is rejected explicitly rather than guessed
+no broader stack-passed or SSE live-across-call spill/reload-heavy call frames beyond the selected up-to-six stack-passed i32 and one- through six-live f32/f64 shapes
+stack-passed live i32 pressure beyond six selected incoming stack arguments is rejected explicitly rather than guessed
 ```

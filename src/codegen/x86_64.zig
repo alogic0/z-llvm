@@ -22932,7 +22932,8 @@ fn stackParamDisp8OrNull(function: ir.Function, name: []const u8, ty: ir.Type) !
         if (!std.mem.eql(u8, param.name, name)) continue;
         if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
         if (index < 6) return null;
-        if (index <= 8) return @intCast(8 + (index - 6) * 8);
+        const stack_index = index - 6;
+        if (stack_index <= 5) return @intCast(8 + stack_index * 8);
         return error.UnsupportedCodegenAbi;
     }
     return null;

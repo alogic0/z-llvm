@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=117`,
-`generic_codegen_functions=117`, `generic_cfg_functions=117`,
+three release modes at `source_rows=13`, `discovered_functions=120`,
+`generic_codegen_functions=120`, `generic_cfg_functions=120`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=117`, `object_failures=0`,
+`object_emitted_functions=120`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -405,7 +405,7 @@ field reads from the SysV integer register pair, nested INTEGER aggregate
 field add-chain reads, nested mixed aggregate field reads/construction,
 stack-passed register aggregate field reads after GPR exhaustion,
 array-in-struct INTEGER aggregate sums, and a reusable
-up-to-six-live-i32 direct-call spill/reload frame plus up-to-three stack-passed
+up-to-six-live-i32 direct-call spill/reload frame plus up-to-six stack-passed
 live `i32` post-call add-tree rows with executable proof. The selected
 sret/byval-style frontier row adds `{ i64, i64, i64 }`,
 `{ i64, i64, i64, i64 }`, `{ i64, i64, i64, i64, i64 }`,
@@ -450,7 +450,7 @@ pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
 immediate FP constants through `%xmm0..%xmm7`.
 Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with
-more than three stack-passed live values, broader live SSE values beyond the selected
+more than six stack-passed live values, broader live SSE values beyond the selected
 one-/two-/three-live no-argument-call shapes, or live values across calls,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
@@ -466,7 +466,7 @@ sret/byval field/copy forms currently proven through eight flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy and
 array-backed `{ [5 x i64] }` copy/read rows,
 arbitrary non-selected sret/byval copies,
-varargs, vectors, more than three stack-passed live values,
+varargs, vectors, more than six stack-passed live values,
 and broader SSE live-across-call frames beyond the selected one-live through
 six-live `f32`/`f64` no-argument-call shapes.
 The frontier audit lives in
