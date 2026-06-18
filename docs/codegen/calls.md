@@ -40,6 +40,7 @@ selected backend subset:
   up to three constant i32 stack call arguments are accepted
   one live i32 caller argument, or the selected two-live %rdi/%rsi shape, can be spilled across one call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
+  selected mixed INTEGER/SSE aggregate argument-field reads are accepted through the reusable aggregate classifier
 ```
 
 ## Accepted IR Contract
@@ -139,7 +140,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected `{ i64, i64, i64 }` hidden-sret return storage, and selected first stack MEMORY aggregate by-value field reads
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads, selected `{ i64, i64, i64 }` hidden-sret return storage, and selected first stack MEMORY aggregate by-value field reads
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -153,8 +154,11 @@ source-backed `{ i64, i64, i64 }` hidden-sret return and first stack
 by-value aggregate field-read shape
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
-arbitrary hidden sret storage, arbitrary stack-passed byval copies, full
-aggregate classification, and multi-target ABI parity are not implemented
+the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
+INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
+INTEGER/INTEGER and mixed INTEGER/SSE field-read forms
+arbitrary hidden sret storage, arbitrary stack-passed byval copies, complete
+aggregate lowering for every classified shape, and multi-target ABI parity are not implemented
 ```
 
 ## Rejected Surface
@@ -207,6 +211,7 @@ unsupported non-default calling convention diagnostic
 multiple stack-passed i32 call arguments
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
+selected mixed INTEGER/SSE aggregate argument-field reads
 selected two-live-i32 spill/reload call frame
 unsupported wider live-value call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics

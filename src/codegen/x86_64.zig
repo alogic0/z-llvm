@@ -111,6 +111,17 @@ pub const XmmReg = enum(u3) {
     pub fn lowCode(reg: XmmReg) u3 {
         return @intFromEnum(reg);
     }
+
+    pub fn fromIndex(index: usize) !XmmReg {
+        return switch (index) {
+            0 => .xmm0,
+            1 => .xmm1,
+            2 => .xmm2,
+            3 => .xmm3,
+            4 => .xmm4,
+            else => error.UnsupportedCodegenAbi,
+        };
+    }
 };
 
 pub const MachineBinaryOp = enum {
@@ -5403,7 +5414,7 @@ fn lowerAggregateAbiReturn(
     ret: anytype,
 ) !bool {
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
-    if (try lowerSmallIntegerAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMemoryIntegerAggregateFieldAddReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
@@ -5631,14 +5642,14 @@ fn lowerSmallIntegerAggregateReturn(
     return true;
 }
 
-fn lowerSmallIntegerAggregateFieldReturn(
+fn lowerSysVAggregateFieldReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 4) return false;
+    if ((!ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.double)) or block.instructions.items.len != 4) return false;
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
     const gep_inst = block.instructions.items[2];
@@ -5653,8 +5664,8 @@ fn lowerSmallIntegerAggregateFieldReturn(
         .alloca => |alloca| alloca,
         else => return false,
     };
-    const classification = classifySysVSmallIntegerAggregate(alloca.allocated_ty) orelse return false;
-    if (classification.eightbytes != 2) return false;
+    const classification = classifySysVAggregate(alloca.allocated_ty) catch return false;
+    if (classification.kind != .register or classification.eightbyte_count == 0) return false;
 
     const store = switch (store_inst.kind) {
         .store => |store| store,
@@ -5678,15 +5689,15 @@ fn lowerSmallIntegerAggregateFieldReturn(
         .int => |index| index,
         else => return false,
     };
-    if (field_index < 0 or field_index >= classification.eightbytes) return false;
+    if (field_index < 0 or field_index >= classification.eightbyte_count) return false;
 
     const load = switch (load_inst.kind) {
         .load => |load| load,
         else => return false,
     };
-    if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+    if (!load.ty.eql(ret.ty) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
 
-    try emitSysVSmallIntegerAggregateFieldIntoRax(allocator, machine, function, param_name, alloca.allocated_ty, @intCast(field_index));
+    try emitSysVAggregateFieldReturn(allocator, machine, function, param_name, alloca.allocated_ty, @intCast(field_index), load.ty);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -5771,59 +5782,137 @@ fn validateAggregateFieldGep(instruction: ir.Instruction, aggregate_ty: ir.Type,
     if (!gep.indices.items[1].ty.eql(.{ .int = 32 }) or !isInt(gep.indices.items[1].value, field_index)) return error.UnsupportedCodegenInstruction;
 }
 
-fn emitSysVSmallIntegerAggregateFieldIntoRax(
+fn emitSysVAggregateFieldReturn(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     function: ir.Function,
     param_name: []const u8,
     aggregate_ty: ir.Type,
-    field_index: u1,
+    field_index: usize,
+    field_ty: ir.Type,
 ) !void {
-    const location = try sysvSmallIntegerAggregateFieldLocation(function, param_name, aggregate_ty, field_index);
+    const location = try sysvAggregateFieldLocation(function, param_name, aggregate_ty, field_index, field_ty);
     switch (location) {
-        .reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_rax = reg }),
-        .stack => |offset| try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset }),
+        .gpr => |reg| {
+            if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+        },
+        .sse => |reg| {
+            if (!field_ty.eql(.double)) return error.UnsupportedCodegenAbi;
+            switch (reg) {
+                .xmm0 => {},
+                .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
+                .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+            }
+        },
+        .stack => |offset| {
+            if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
+            try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset });
+        },
     }
 }
 
 const SysVAggregateFieldLocation = union(enum) {
-    reg: ArgReg,
+    gpr: ArgReg,
+    sse: XmmReg,
     stack: u8,
 };
 
-fn sysvSmallIntegerAggregateFieldLocation(
+fn sysvAggregateFieldLocation(
     function: ir.Function,
     param_name: []const u8,
     aggregate_ty: ir.Type,
-    field_index: u1,
+    field_index: usize,
+    field_ty: ir.Type,
 ) !SysVAggregateFieldLocation {
-    var int_index: usize = 0;
-    var stack_index: usize = 0;
+    const layout = try x86_64SysVDataLayout();
+    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+        return error.UnsupportedCodegenAbi;
+    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
+    const field_offset: u64 = @intCast(field_offset_i);
+    if (!((memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi).eql(field_ty))) {
+        return error.UnsupportedCodegenAbi;
+    }
+
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
         if (std.mem.eql(u8, param.name, param_name)) {
             if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
-            const classification = classifySysVSmallIntegerAggregate(param.ty) orelse return error.UnsupportedCodegenAbi;
-            if (classification.eightbytes != 2) return error.UnsupportedCodegenAbi;
-            const target_index = int_index + field_index;
-            if (target_index < 6) return .{ .reg = try ArgReg.fromIndex(target_index) };
-            const offset = 8 + (stack_index + field_index) * 8;
-            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
-            return .{ .stack = @intCast(offset) };
-        }
-        if (param.ty.eql(.{ .int = 1 }) or param.ty.eql(.{ .int = 8 }) or param.ty.eql(.{ .int = 16 }) or
-            param.ty.eql(.{ .int = 32 }) or param.ty.eql(.{ .int = 64 }) or param.ty.eql(.ptr))
-        {
-            if (int_index >= 6) stack_index += 1;
-            int_index += 1;
-        } else if (classifySysVSmallIntegerAggregate(param.ty)) |classification| {
-            var field: usize = 0;
-            while (field < classification.eightbytes) : (field += 1) {
-                if (int_index >= 6) stack_index += 1;
-                int_index += 1;
+            const classification = try classifySysVAggregate(param.ty);
+            if (classification.kind != .register) return error.UnsupportedCodegenAbi;
+            const field_eightbyte = field_offset / 8;
+            const field_class = if (field_eightbyte < classification.eightbytes.len)
+                classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi
+            else
+                return error.UnsupportedCodegenAbi;
+            const needed = sysvAggregateRegisterNeeds(classification);
+            if (gpr_index + needed.gpr > 6 or sse_index + needed.sse > 8) {
+                const offset = 8 + stack_eightbytes * 8 + field_offset;
+                if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+                return .{ .stack = @intCast(offset) };
             }
+            const prior = sysvAggregateRegisterNeedsBefore(classification, @intCast(field_eightbyte));
+            return switch (field_class) {
+                .integer => .{ .gpr = try ArgReg.fromIndex(gpr_index + prior.gpr) },
+                .sse => .{ .sse = try XmmReg.fromIndex(sse_index + prior.sse) },
+            };
         }
+        try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
     }
     return error.UnsupportedCodegenValue;
+}
+
+const SysVRegisterNeeds = struct {
+    gpr: usize = 0,
+    sse: usize = 0,
+};
+
+fn sysvAggregateRegisterNeeds(classification: SysVAggregateClassification) SysVRegisterNeeds {
+    return sysvAggregateRegisterNeedsBefore(classification, classification.eightbyte_count);
+}
+
+fn sysvAggregateRegisterNeedsBefore(classification: SysVAggregateClassification, limit: usize) SysVRegisterNeeds {
+    var needs: SysVRegisterNeeds = .{};
+    var index: usize = 0;
+    while (index < limit and index < classification.eightbyte_count) : (index += 1) {
+        switch (classification.eightbytes[index] orelse continue) {
+            .integer => needs.gpr += 1,
+            .sse => needs.sse += 1,
+        }
+    }
+    return needs;
+}
+
+fn advanceSysVParamCursors(
+    ty: ir.Type,
+    gpr_index: *usize,
+    sse_index: *usize,
+    stack_eightbytes: *usize,
+) !void {
+    if (ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
+        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr))
+    {
+        if (gpr_index.* < 6) gpr_index.* += 1 else stack_eightbytes.* += 1;
+        return;
+    }
+    if (ty.eql(.float) or ty.eql(.double)) {
+        if (sse_index.* < 8) sse_index.* += 1 else stack_eightbytes.* += 1;
+        return;
+    }
+    const classification = classifySysVAggregate(ty) catch return;
+    if (classification.kind == .memory) {
+        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
+        return;
+    }
+    const needs = sysvAggregateRegisterNeeds(classification);
+    if (gpr_index.* + needs.gpr <= 6 and sse_index.* + needs.sse <= 8) {
+        gpr_index.* += needs.gpr;
+        sse_index.* += needs.sse;
+    } else {
+        stack_eightbytes.* += @intCast((classification.size_bytes + 7) / 8);
+    }
 }
 
 fn lowerAggregatePairAbiFamilyReturn(

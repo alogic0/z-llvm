@@ -32,26 +32,27 @@ Current frontier seed:
 - `test/zig/frontier/frontier_safety_edges.zig`
 - `test/zig/frontier/frontier_slice_pointer_arith.zig`
 - `test/zig/frontier/frontier_sysv_abi.zig`
+- `test/zig/frontier/frontier_sysv_aggregate_classes.zig`
 - `test/zig/frontier/frontier_sysv_sret_byval.zig`
 
 Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
-source_rows=12
-discovered_functions=34
-structured_functions=34
-generic_codegen_functions=34
-generic_cfg_functions=34
+source_rows=13
+discovered_functions=36
+structured_functions=36
+generic_codegen_functions=36
+generic_cfg_functions=36
 structural_matcher_functions=0
-structured_air_v2_functions=34
-typed_air_operand_functions=34
+structured_air_v2_functions=36
+typed_air_operand_functions=36
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=34
+generic_lowering_functions=36
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=34
+object_emitted_functions=36
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -60,8 +61,8 @@ local_fail=0
 Object inspection is green for all three modes:
 
 ```text
-inspected=12
-elf64_rel=12
+inspected=13
+elf64_rel=13
 relocation_rows=3
 tls_rows=1
 undefined_import_rows=0
@@ -74,9 +75,9 @@ local_fail=0
 Native-link progress is green for all three modes:
 
 ```text
-native_link_accepted_rows=12
+native_link_accepted_rows=13
 executable_ok_rows=0
-link_only_rows=12
+link_only_rows=13
 runtime_boundary_rows=0
 unsupported_zig_linker_feature_rows=0
 native_link_failures=0
@@ -88,8 +89,8 @@ local_fail=0
 Executable ABI proof is green for all three modes:
 
 ```text
-native_link_accepted_rows=12
-executable_ok_rows=12
+native_link_accepted_rows=13
+executable_ok_rows=13
 link_only_rows=0
 runtime_boundary_rows=0
 unsupported_zig_linker_feature_rows=0
@@ -118,6 +119,10 @@ Closed in the current memory/aggregate frontier slice:
   sret pointer in `%rdi` with user arguments shifted to `%rsi`/`%rdx`/`%rcx`,
   plus MEMORY aggregate by-value field reads from the first stack aggregate
   argument
+- first mixed SysV aggregate class row in
+  `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
+  mixed INTEGER/SSE, and field reads return the integer member from the GPR
+  stream and the floating member from the SSE stream
 
 Remaining measured frontier blockers kept out of accepted rows:
 
@@ -129,10 +134,10 @@ Remaining measured frontier blockers kept out of accepted rows:
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
-- full SysV aggregate classification beyond the selected INTEGER and MEMORY
-  aggregate forms, SSE/X87/packed aggregate ABI classes, arbitrary sret/byval
-  copies, varargs, vectors, and high-register-pressure spill/reload-heavy call
-  frames
+- full SysV aggregate lowering beyond selected INTEGER/INTEGER, mixed
+  INTEGER/SSE field reads, and selected MEMORY aggregate forms; X87,
+  packed/unaligned aggregate ABI classes, arbitrary sret/byval copies, varargs,
+  vectors, and high-register-pressure spill/reload-heavy call frames
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

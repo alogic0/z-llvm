@@ -1517,6 +1517,18 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE aggregate ABI", .c_body =
+    \\struct Mixed { long long a; double b; };
+    \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
+    \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
+    \\int main(void) {
+    \\    struct Mixed value = { 123456789LL, 6.25 };
+    \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
+    \\    if (z_frontier_mixed_float(value) != 6.25) return 2;
+    \\    return 0;
+    \\}
+    \\
+    };
     if (integratedModuleMainHarness(source)) |module_main| return .{
         .abi_mode = "c-stable-integrated-main",
         .expected = "module main expected return",

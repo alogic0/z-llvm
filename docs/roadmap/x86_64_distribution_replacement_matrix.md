@@ -383,17 +383,17 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=12`, `discovered_functions=34`,
-`generic_codegen_functions=34`, `generic_cfg_functions=34`,
+three release modes at `source_rows=13`, `discovered_functions=36`,
+`generic_codegen_functions=36`, `generic_cfg_functions=36`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=34`, `object_failures=0`,
+`object_emitted_functions=36`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
-green at `inspected=12`, `elf64_rel=12`, `relocation_rows=3`, `tls_rows=1`,
+green at `inspected=13`, `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=0`, `unsupported_relocation_rows=0`, and
 `local_fail=0`. Frontier native-link and executable proof are green for all
-three modes at `native_link_accepted_rows=12`, `executable_ok_rows=12`,
+three modes at `native_link_accepted_rows=13`, `executable_ok_rows=13`,
 `link_only_rows=0`, `runtime_boundary_rows=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
@@ -404,12 +404,15 @@ field reads from the SysV integer register pair, and a selected two-live-i32
 direct-call spill/reload frame with executable proof. The selected
 sret/byval-style frontier row adds `{ i64, i64, i64 }` hidden-sret return
 storage and first stack MEMORY aggregate by-value field reads with executable
-proof. Remaining non-accepted
+proof. The mixed aggregate class frontier row adds `{ i64, double }` INTEGER/SSE
+field reads from the independent GPR/SSE streams with executable proof.
+Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with more
 than two live integer values across calls, alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
-subset, full SysV aggregate classes beyond the selected INTEGER/MEMORY forms,
-arbitrary sret/byval copies, varargs, and vectors. The frontier audit lives in
+subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
+mixed INTEGER/SSE field-read, and MEMORY forms, arbitrary sret/byval copies,
+varargs, and vectors. The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad

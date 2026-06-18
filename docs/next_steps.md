@@ -350,18 +350,18 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=12`, `discovered_functions=34`,
-`generic_codegen_functions=34`, `generic_cfg_functions=34`,
+frontier gate reports `source_rows=13`, `discovered_functions=36`,
+`generic_codegen_functions=36`, `generic_cfg_functions=36`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=34`, `object_failures=0`,
+`object_emitted_functions=36`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
-and ReleaseSmall. Frontier object inspection is green at `inspected=12`,
-`elf64_rel=12`, `relocation_rows=3`, `tls_rows=1`,
+and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
+`elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=0`, `unsupported_relocation_rows=0`, and
 `local_fail=0`; native-link and executable gates are also green at
-`native_link_accepted_rows=12`, `executable_ok_rows=12`,
+`native_link_accepted_rows=13`, `executable_ok_rows=13`,
 `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`.
 
@@ -373,11 +373,13 @@ first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, and the selected two-live direct-call
 spill frame with executable proof. The selected sret/byval frontier row adds a
 `{ i64, i64, i64 }` hidden-sret return and first stack MEMORY aggregate
-field-read proof. The
+field-read proof. The mixed aggregate class frontier row adds `{ i64, double }`
+INTEGER/SSE field reads through the independent SysV GPR/SSE streams. The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
 private helper graphs with more than two live integer values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
-forms outside the selected scalar subset, full aggregate ABI classification,
+forms outside the selected scalar subset, full aggregate ABI lowering beyond
+selected INTEGER/INTEGER, mixed INTEGER/SSE field reads, and MEMORY forms,
 arbitrary sret/byval copies, varargs, and vectors. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
