@@ -6915,6 +6915,42 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     );
 }
 
+test "x86_64 codegen keeps callee-saved registers out of the selected ABI allocator" {
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.rdi, try codegen.x86_64.ArgReg.fromIndex(0));
+    try std.testing.expectEqual(codegen.x86_64.ArgReg.r9, try codegen.x86_64.ArgReg.fromIndex(5));
+    try std.testing.expectError(error.UnsupportedCodegenAbi, codegen.x86_64.ArgReg.fromIndex(6));
+}
+
+test "x86_64 codegen rejects stack-passed live i32 across direct call boundary" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @id(i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  %r = call i32 @id(i32 %a)
+        \\  %ab = add i32 %a, %b
+        \\  %abc = add i32 %ab, %c
+        \\  %abcd = add i32 %abc, %d
+        \\  %abcde = add i32 %abcd, %e
+        \\  %abcdef = add i32 %abcde, %f
+        \\  %abcdefg = add i32 %abcdef, %g
+        \\  %sum = add i32 %abcdefg, %r
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    try std.testing.expectError(
+        error.UnsupportedLiveAcrossCall,
+        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
+    );
+}
+
 test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

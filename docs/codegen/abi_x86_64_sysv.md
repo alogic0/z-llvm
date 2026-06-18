@@ -86,7 +86,9 @@ Register preservation boundary:
 ```text
 Caller-saved set considered clobbered by calls in this slice:
   %rax, %rcx, %rdx, %rsi, %rdi, %r8, %r9, %r10, %r11
-Callee-saved registers are not allocated by this project yet.
+Callee-saved registers are not allocated by this project yet; a focused
+backend test keeps the selected allocator limited to `%rdi`, `%rsi`, `%rdx`,
+`%rcx`, `%r8`, and `%r9`.
 One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two live f32/f64 values in %xmm0/%xmm1 across one no-argument direct C ABI void
@@ -195,4 +197,5 @@ no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes bey
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one-/two-/three-/four-live f32/f64 shapes
+stack-passed live i32 pressure is rejected explicitly rather than spilling from the incoming stack area
 ```
