@@ -5956,6 +5956,30 @@ test "x86_64 codegen returns mixed INTEGER SSE aggregate in rax xmm0" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 codegen returns mixed SSE INTEGER aggregate in xmm0 rax" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { double, i64 } @make_reverse_mixed(double %a, i64 %b) {
+        \\entry:
+        \\  %field0 = insertvalue { double, i64 } undef, double %a, 0
+        \\  %result = insertvalue { double, i64 } %field0, i64 %b, 1
+        \\  ret { double, i64 } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen returns SSE SSE aggregate in xmm0 xmm1" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

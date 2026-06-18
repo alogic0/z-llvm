@@ -336,8 +336,8 @@ pub fn main(init: std.process.Init) !void {
                         } else {
                             native_link_failures += 1;
                             std.debug.print(
-                                "executable-failure source={s} function=module abi={s} expected={s} actual={s} stderr={s}\n",
-                                .{ source, executable_harness.abi_mode, executable_harness.expected, termName(run_result.term), firstLine(run_result.stderr) },
+                                "executable-failure source={s} function=module abi={s} expected={s} actual={s} exit_code={d} stderr={s}\n",
+                                .{ source, executable_harness.abi_mode, executable_harness.expected, termName(run_result.term), termExitCode(run_result.term), firstLine(run_result.stderr) },
                             );
                         }
                     } else {
@@ -1538,6 +1538,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE and nested INTEGER aggregate ABI", .c_body =
     \\struct Mixed { long long a; double b; };
     \\struct DoublePair { double a; double b; };
+    \\struct ReverseMixed { double a; long long b; };
     \\struct Pair32 { int a; int b; };
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
     \\struct ArrayPair { long long values[2]; };
@@ -1547,6 +1548,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
     \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
     \\extern struct DoublePair z_frontier_double_pair_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_make");
+    \\extern double z_frontier_reverse_mixed_float(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_float");
+    \\extern long long z_frontier_reverse_mixed_int(struct ReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_int");
+    \\extern struct ReverseMixed z_frontier_reverse_mixed_make(double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_make");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
     \\int main(void) {
@@ -1560,10 +1564,16 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_double_pair_second(doubles) != 7.5) return 5;
     \\    struct DoublePair made_doubles = z_frontier_double_pair_make(3.5, 11.25);
     \\    if (made_doubles.a != 3.5 || made_doubles.b != 11.25) return 6;
+    \\    struct ReverseMixed reverse = { 2.75, 987654321LL };
+    \\    if (z_frontier_reverse_mixed_float(reverse) != 2.75) return 7;
+    \\    if (z_frontier_reverse_mixed_int(reverse) != 987654321LL) return 8;
+    \\    struct ReverseMixed made_reverse = z_frontier_reverse_mixed_make(13.5, 444);
+    \\    if (made_reverse.a != 13.5) return 9;
+    \\    if (made_reverse.b != 444) return 12;
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
-    \\    if (z_frontier_nested_pair_sum(nested) != 10) return 7;
+    \\    if (z_frontier_nested_pair_sum(nested) != 10) return 10;
     \\    struct ArrayPair array = { { 11, 31 } };
-    \\    if (z_frontier_array_pair_sum(array) != 42) return 8;
+    \\    if (z_frontier_array_pair_sum(array) != 42) return 11;
     \\    return 0;
     \\}
     \\
@@ -1710,6 +1720,13 @@ fn termName(term: std.process.Child.Term) []const u8 {
         .signal => "signal",
         .stopped => "stopped",
         .unknown => "unknown",
+    };
+}
+
+fn termExitCode(term: std.process.Child.Term) i32 {
+    return switch (term) {
+        .exited => |code| @intCast(code),
+        .signal, .stopped, .unknown => -1,
     };
 }
 

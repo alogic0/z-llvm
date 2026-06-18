@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=48
-structured_functions=48
-generic_codegen_functions=48
-generic_cfg_functions=48
+discovered_functions=51
+structured_functions=51
+generic_codegen_functions=51
+generic_cfg_functions=51
 structural_matcher_functions=0
-structured_air_v2_functions=48
-typed_air_operand_functions=48
+structured_air_v2_functions=51
+typed_air_operand_functions=51
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=48
+generic_lowering_functions=51
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=48
+object_emitted_functions=51
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -130,6 +130,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and
   construction returns the aggregate in `%xmm0`/`%xmm1`
+- first reversed mixed aggregate class row in
+  `frontier_sysv_aggregate_classes.zig`: `{ double, i64 }` is classified as
+  SSE/INTEGER, field reads return from the independent SSE/GPR streams, and
+  construction returns the aggregate in `%xmm0`/`%rax`
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
@@ -149,7 +153,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains, mixed INTEGER/SSE and SSE/SSE field reads/returns, and
+  INTEGER add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE
+  field reads/returns, and
   selected 3/4/5-field MEMORY i64 aggregate sret/byval field forms; X87,
   packed/unaligned aggregate ABI classes, arbitrary sret/byval copies,
   varargs, vectors, and four-or-more-live spill/reload-heavy call frames

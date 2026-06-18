@@ -351,12 +351,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=48`,
-`generic_codegen_functions=48`, `generic_cfg_functions=48`,
+frontier gate reports `source_rows=13`, `discovered_functions=51`,
+`generic_codegen_functions=51`, `generic_cfg_functions=51`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=48`, `object_failures=0`,
+`object_emitted_functions=51`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -381,13 +381,15 @@ class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
 through the independent SysV GPR/SSE streams. The SSE aggregate frontier row
 adds `{ double, double }` SSE/SSE field reads and register aggregate return in
-`%xmm0`/`%xmm1`. The
+`%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
+`{ double, i64 }` SSE/INTEGER field reads and register aggregate return in
+`%xmm0`/`%rax`. The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
 private helper graphs with more than three live integer values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
-selected INTEGER/INTEGER, mixed INTEGER/SSE and SSE/SSE field reads, and
-3/4/5-field MEMORY forms, arbitrary sret/byval copies, varargs, and vectors. The accepted frontier rows use typed
+selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field
+reads, and 3/4/5-field MEMORY forms, arbitrary sret/byval copies, varargs, and vectors. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
 optimizer, LLVM TargetMachine, or LLD are involved.

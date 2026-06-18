@@ -22030,35 +22030,28 @@ fn sysvIntegerParamReg(function: ir.Function, name: []const u8, ty: ir.Type) !Ar
 
 fn sysvIntegerParamRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
     if (!ty.eql(.{ .int = 32 }) and !ty.eql(.{ .int = 64 }) and !ty.eql(.ptr)) return error.UnsupportedCodegenType;
-    var int_index: usize = 0;
+    return try paramRegOrNull(function, name, ty);
+}
+
+fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
+    if (!isSysVIntegerParamType(ty)) return error.UnsupportedCodegenType;
+    var gpr_index: usize = 0;
+    var sse_index: usize = 0;
+    var stack_eightbytes: usize = 0;
     for (function.params.items) |param| {
-        const is_integer_class = param.ty.eql(.{ .int = 1 }) or param.ty.eql(.{ .int = 8 }) or
-            param.ty.eql(.{ .int = 16 }) or param.ty.eql(.{ .int = 32 }) or
-            param.ty.eql(.{ .int = 64 }) or param.ty.eql(.ptr);
         if (std.mem.eql(u8, param.name, name)) {
-            if (!param.ty.eql(ty) or !is_integer_class) return error.UnsupportedCodegenValue;
-            return try ArgReg.fromIndex(int_index);
+            if (!param.ty.eql(ty) or !isSysVIntegerParamType(param.ty)) return error.UnsupportedCodegenValue;
+            if (gpr_index >= 6) return error.UnsupportedCodegenAbi;
+            return try ArgReg.fromIndex(gpr_index);
         }
-        if (is_integer_class) int_index += 1;
+        try advanceSysVParamCursors(param.ty, &gpr_index, &sse_index, &stack_eightbytes);
     }
     return null;
 }
 
-fn paramRegOrNull(function: ir.Function, name: []const u8, ty: ir.Type) !?ArgReg {
-    for (function.params.items, 0..) |param, index| {
-        if (!std.mem.eql(u8, param.name, name)) continue;
-        if (!param.ty.eql(ty)) return error.UnsupportedCodegenValue;
-        return switch (index) {
-            0 => .rdi,
-            1 => .rsi,
-            2 => .rdx,
-            3 => .rcx,
-            4 => .r8,
-            5 => .r9,
-            else => error.UnsupportedCodegenAbi,
-        };
-    }
-    return null;
+fn isSysVIntegerParamType(ty: ir.Type) bool {
+    return ty.eql(.{ .int = 1 }) or ty.eql(.{ .int = 8 }) or ty.eql(.{ .int = 16 }) or
+        ty.eql(.{ .int = 32 }) or ty.eql(.{ .int = 64 }) or ty.eql(.ptr);
 }
 
 fn fpParamIndex(function: ir.Function, name: []const u8, ty: ir.Type) !usize {

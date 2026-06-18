@@ -40,6 +40,7 @@ small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
 selected mixed INTEGER/SSE aggregate argument field reads and register returns use the independent SysV GPR/SSE streams
+selected reversed mixed SSE/INTEGER aggregate argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
 leaf functions only
 no stack frame for register-only leaf functions
@@ -112,6 +113,11 @@ frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
   `{ double, double }` construction returns through %xmm0/%xmm1
+frontier_sysv_aggregate_classes.ReverseMixed proves the first reversed
+SSE/INTEGER aggregate argument field reads and register aggregate return:
+  field `double` is returned from the aggregate's SSE class register
+  field `i64` is returned from the aggregate's GPR class register
+  `{ double, i64 }` construction returns through %xmm0/%rax
 frontier_sysv_aggregate_classes.NestedPair proves nested INTEGER aggregate
 field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
@@ -131,7 +137,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-, two-, and three-live i32 spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes
 no arbitrary sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
