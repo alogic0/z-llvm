@@ -6536,7 +6536,7 @@ test "x86_64 codegen rejects unsupported aggregate field offset from generic cfg
         \\  %slot = alloca ptr
         \\  store ptr %pair, ptr %slot
         \\  %loaded_ptr = load ptr, ptr %slot
-        \\  %field_ptr = getelementptr i8, ptr %loaded_ptr, i64 8
+        \\  %field_ptr = getelementptr i8, ptr %loaded_ptr, i64 12
         \\  %loaded = load i32, ptr %field_ptr
         \\  ret i32 %loaded
         \\}

@@ -1365,21 +1365,31 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_loops.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier scalarized loop frontier values", .c_body =
     \\extern int z_frontier_flat_window_sum(int, int) __asm__("frontier_nested_loops.frontier_flat_window_sum");
     \\extern int z_frontier_window_threshold(int, int) __asm__("frontier_nested_loops.frontier_window_threshold");
+    \\extern int z_frontier_nested_memory_sum(const int *, unsigned long, int) __asm__("frontier_nested_loops.frontier_nested_memory_sum");
     \\int main(void) {
+    \\    const int values[] = { 1, 9, 4, 12, 7 };
     \\    if (z_frontier_flat_window_sum(7, 8) != 15) return 1;
     \\    if (z_frontier_window_threshold(1, 9) != 9) return 2;
     \\    if (z_frontier_window_threshold(0, 9) != 0) return 3;
+    \\    if (z_frontier_nested_memory_sum(values, 5, 6) != 28) return 4;
     \\    return 0;
     \\}
     \\
     };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_nested_records.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier record scalar values", .c_body =
+    \\struct Inner { int a; int b; };
+    \\struct Outer { struct Inner left; struct Inner right; };
     \\extern int z_frontier_record_sum(int, int) __asm__("frontier_nested_records.frontier_record_sum");
     \\extern int z_frontier_record_update(int, int) __asm__("frontier_nested_records.frontier_record_update");
+    \\extern int z_frontier_nested_field_left_b(const struct Outer *) __asm__("frontier_nested_records.frontier_nested_field_left_b");
+    \\extern int z_frontier_nested_field_right_a(const struct Outer *) __asm__("frontier_nested_records.frontier_nested_field_right_a");
     \\int main(void) {
+    \\    const struct Outer record = { { 10, 20 }, { 30, 40 } };
     \\    if (z_frontier_record_sum(11, 31) != 42) return 1;
     \\    if (z_frontier_record_update(1, 10) != 11) return 2;
     \\    if (z_frontier_record_update(0, 10) != 12) return 3;
+    \\    if (z_frontier_nested_field_left_b(&record) != 20) return 4;
+    \\    if (z_frontier_nested_field_right_a(&record) != 30) return 5;
     \\    return 0;
     \\}
     \\
@@ -1398,10 +1408,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_slice_pointer_arith.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier pointer load forms", .c_body =
     \\extern int z_frontier_slice_stride_sum(const int *) __asm__("frontier_slice_pointer_arith.frontier_slice_stride_sum");
     \\extern int z_frontier_pointer_offset_load(const int *) __asm__("frontier_slice_pointer_arith.frontier_pointer_offset_load");
+    \\extern int z_frontier_dynamic_ptr_add(const int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_dynamic_ptr_add");
+    \\extern int z_frontier_dynamic_ptr_pair_sum(const int *, unsigned long) __asm__("frontier_slice_pointer_arith.frontier_dynamic_ptr_pair_sum");
     \\int main(void) {
-    \\    int value = 37;
+    \\    const int value = 37;
+    \\    const int values[] = { 3, 5, 8, 13, 21 };
     \\    if (z_frontier_slice_stride_sum(&value) != 37) return 1;
     \\    if (z_frontier_pointer_offset_load(&value) != 37) return 2;
+    \\    if (z_frontier_dynamic_ptr_add(values, 3) != 13) return 3;
+    \\    if (z_frontier_dynamic_ptr_pair_sum(values, 1) != 13) return 4;
     \\    return 0;
     \\}
     \\
@@ -1442,9 +1457,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_tls_branch(int, int) __asm__("frontier_globals_tls.frontier_tls_branch");
     \\int main(void) {
     \\    if (z_frontier_global_branch(1, 5) != 26) return 1;
-    \\    if (z_frontier_global_branch(0, 3) != 29) return 2;
+    \\    if (z_frontier_global_branch(0, 3) != 23) return 2;
     \\    if (z_frontier_tls_branch(1, 2) != 6) return 3;
-    \\    if (z_frontier_tls_branch(0, 5) != 11) return 4;
+    \\    if (z_frontier_tls_branch(0, 5) != 1) return 4;
     \\    return 0;
     \\}
     \\

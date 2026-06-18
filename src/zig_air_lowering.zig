@@ -498,6 +498,8 @@ fn isTypedV2LowerableOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "block") or
         std.mem.eql(u8, opcode, "is_non_null") or
         std.mem.eql(u8, opcode, "optional_payload") or
+        std.mem.eql(u8, opcode, "ptr_add") or
+        std.mem.eql(u8, opcode, "ptr_elem_ptr") or
         std.mem.eql(u8, opcode, "array_elem_val") or
         std.mem.eql(u8, opcode, "runtime_nav_ptr") or
         isFieldPtrOpcode(opcode) or
@@ -517,6 +519,34 @@ fn isPlainFieldPointerChild(ty: ir.Type) bool {
         .int => |bits| bits != 1 and bits % 8 == 0,
         .float, .double, .ptr => true,
         .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+    };
+}
+
+fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
+    if (source_ty.eql(.{ .aggregate = "{ i32, i32 }" }) and field_child.eql(.{ .int = 32 })) {
+        return switch (field_index) {
+            0 => 0,
+            1 => 4,
+            else => null,
+        };
+    }
+    if (source_ty.eql(.{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }) and
+        field_child.eql(.{ .aggregate = "{ i32, i32 }" }))
+    {
+        return switch (field_index) {
+            0 => 0,
+            1 => 8,
+            else => null,
+        };
+    }
+    return null;
+}
+
+fn genericTypedGepIndex(value: ir.Value) bool {
+    return switch (value) {
+        .int => |int| int >= 0,
+        .named => true,
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
     };
 }
 
@@ -3381,6 +3411,10 @@ const LoweringContext = struct {
             try self.lowerTypedIsNonNull(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "optional_payload")) {
             try self.lowerTypedOptionalPayload(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "ptr_add")) {
+            try self.lowerTypedPtrGep(instruction);
+        } else if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
+            try self.lowerTypedPtrGep(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "runtime_nav_ptr")) {
             try self.lowerTypedRuntimeNavPtr(instruction);
         } else if (std.mem.eql(u8, instruction.opcode, "array_elem_val")) {
@@ -3834,6 +3868,35 @@ const LoweringContext = struct {
         };
     }
 
+    fn lowerTypedPtrGep(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
+        if (instruction.operands.len != 2) return error.UnsupportedAir;
+        const base = try self.resolveTypedOperand(instruction, 0);
+        const index = try self.resolveTypedOperand(instruction, 1);
+        const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
+        if (base.ty.ir_type != .ptr or result_type.ir_type != .ptr) return error.UnsupportedAir;
+        if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        const element_type = result_type.pointer_child orelse base.ty.pointer_child orelse return error.UnsupportedAir;
+        if (!element_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        if (!genericTypedGepIndex(index.value)) return error.UnsupportedAir;
+
+        const result_name = try self.resultName(instruction.index);
+        var gep: ir.GepInst = .{
+            .source_ty = element_type,
+            .ptr = base.value,
+            .indices = .empty,
+        };
+        errdefer gep.deinit(self.allocator);
+        try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = index.value });
+        try self.block.instructions.append(self.allocator, .{
+            .result = result_name,
+            .kind = .{ .gep = gep },
+        });
+        self.values[instruction.index] = .{
+            .ty = result_type,
+            .value = .{ .named = result_name },
+        };
+    }
+
     fn lowerTypedArrayElemVal(self: *LoweringContext, instruction: air_export.TypedInstruction) !void {
         if (instruction.operands.len != 2) return error.UnsupportedAir;
         const table_text = typedOperandTextDetail(instruction, 0) orelse return error.UnsupportedAir;
@@ -3873,19 +3936,17 @@ const LoweringContext = struct {
         const result_type = parseZigType(instruction.result_type) orelse return error.UnsupportedAir;
         if (result_type.ir_type != .ptr) return error.UnsupportedAir;
         const field_child = result_type.pointer_child orelse return error.UnsupportedAir;
-        if (!isPlainFieldPointerChild(field_child)) return error.UnsupportedAir;
         const field_index_text = typedDetail(instruction, "field_index") orelse return error.UnsupportedAir;
         const field_index = std.fmt.parseInt(i128, field_index_text, 10) catch return error.UnsupportedAir;
         const source_ty = aggregate_ptr.ty.pointer_child orelse return error.UnsupportedAir;
-        if (source_ty.eql(.{ .aggregate = "{ i32, i32 }" }) and field_child.eql(.{ .int = 32 })) {
-            if (field_index == 0) {
+        if (selectedFieldByteOffset(source_ty, field_child, field_index)) |offset| {
+            if (offset == 0) {
                 self.values[instruction.index] = .{
                     .ty = result_type,
                     .value = aggregate_ptr.value,
                 };
                 return;
             }
-            if (field_index != 1) return error.UnsupportedAir;
             const result_name = try self.resultName(instruction.index);
             var gep: ir.GepInst = .{
                 .source_ty = .{ .int = 8 },
@@ -3893,7 +3954,7 @@ const LoweringContext = struct {
                 .indices = .empty,
             };
             errdefer gep.deinit(self.allocator);
-            try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 4 } });
+            try gep.indices.append(self.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
             try self.block.instructions.append(self.allocator, .{
                 .result = result_name,
                 .kind = .{ .gep = gep },
@@ -3904,6 +3965,8 @@ const LoweringContext = struct {
             };
             return;
         }
+
+        if (!isPlainFieldPointerChild(field_child)) return error.UnsupportedAir;
 
         const result_name = try self.resultName(instruction.index);
         var gep: ir.GepInst = .{
@@ -4518,9 +4581,13 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "aggregates.Pair") or
         std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair") or
         std.mem.eql(u8, trimmed, "expanded_cfg_memory_aggregates.Pair") or
-        std.mem.eql(u8, trimmed, "scale_records_globals.Pair"))
+        std.mem.eql(u8, trimmed, "scale_records_globals.Pair") or
+        std.mem.eql(u8, trimmed, "frontier_nested_records.Inner"))
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_nested_records.Outer")) {
+        return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
@@ -4969,6 +5036,7 @@ fn isStraightLineOpcode(opcode: []const u8) bool {
         std.mem.eql(u8, opcode, "atomic_rmw") or
         std.mem.eql(u8, opcode, "array_elem_val") or
         std.mem.eql(u8, opcode, "aggregate_init") or
+        std.mem.eql(u8, opcode, "ptr_add") or
         std.mem.eql(u8, opcode, "ptr_elem_ptr") or
         std.mem.eql(u8, opcode, "assembly") or
         isFieldPtrOpcode(opcode) or

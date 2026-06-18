@@ -36,20 +36,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=10
-discovered_functions=22
-structured_functions=22
-generic_codegen_functions=22
-generic_cfg_functions=22
+discovered_functions=27
+structured_functions=27
+generic_codegen_functions=27
+generic_cfg_functions=27
 structural_matcher_functions=0
-structured_air_v2_functions=22
-typed_air_operand_functions=22
+structured_air_v2_functions=27
+typed_air_operand_functions=27
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=22
+generic_lowering_functions=27
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=22
+object_emitted_functions=27
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -97,21 +97,26 @@ lld_rows=0
 local_fail=0
 ```
 
-First measured frontier blockers kept out of accepted rows:
+Closed in the current memory/aggregate frontier slice:
 
-- nested counted loops with inner memory dependencies:
-  `block/control_flow_shape`
-- nested extern-struct field paths: `struct_field_ptr_index_0` lowering
-  validation
-- dynamic pointer addition and pointer-element GEP: `ptr_add` and
-  `ptr_elem_ptr` lowering validation
-- branch-local global/TLS updates with both add and subtract arms:
-  x86_64 CFG control-flow eligibility
+- nested counted loop-memory CFG through
+  `frontier_nested_memory_sum`
+- selected nested extern-struct field GEP paths through
+  `frontier_nested_field_left_b` and `frontier_nested_field_right_a`
+- selected dynamic pointer addition and pointer-element GEP loads through
+  `frontier_dynamic_ptr_add` and `frontier_dynamic_ptr_pair_sum`
+- branch-local global/TLS add/sub updates through
+  `frontier_global_branch` and `frontier_tls_branch`
+
+Remaining measured frontier blockers kept out of accepted rows:
+
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
 - private helper call graphs with live values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
+- broader unknown aggregate field, pointer arithmetic, and global/TLS address
+  forms outside the selected scalar layouts
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

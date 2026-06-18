@@ -339,12 +339,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=10`, `discovered_functions=22`,
-`generic_codegen_functions=22`, `generic_cfg_functions=22`,
+frontier gate reports `source_rows=10`, `discovered_functions=27`,
+`generic_codegen_functions=27`, `generic_cfg_functions=27`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=22`, `object_failures=0`,
+`object_emitted_functions=27`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=10`,
 `elf64_rel=10`, `relocation_rows=2`, `tls_rows=1`,
@@ -354,18 +354,17 @@ and ReleaseSmall. Frontier object inspection is green at `inspected=10`,
 `link_only_rows=0`, `runtime_boundary_rows=0`, `llvm_targetmachine_rows=0`,
 `lld_rows=0`, and `local_fail=0`.
 
-The first rejected frontier candidates were broader than the current local
-generic subset and remain the next implementation backlog rather than accepted
-fallback rows: nested counted loops with inner memory dependencies
-(`block/control_flow_shape`), nested extern-struct field paths
-(`struct_field_ptr_index_0`), dynamic pointer addition / pointer-element GEP
-(`ptr_add` / `ptr_elem_ptr`), branch-local global/TLS add/sub arms, mixed
-int-to-float multiply/add pipelines, private helper graphs with live values
-across multiple calls, and branch safety guards that return from the failure
-side. The accepted frontier rows use typed structured AIR v2 and generic CFG
-only; no case IDs, wrapper maps, source tags, legacy AIR text lowering, shape
-recognizers, structural matcher fallback, LLVM optimizer, LLVM TargetMachine,
-or LLD are involved.
+The memory/aggregate frontier moved several previously rejected classes into
+accepted rows: nested counted loops with inner memory dependencies, selected
+nested extern-struct field GEP paths, selected dynamic pointer addition /
+pointer-element GEP loads, and branch-local global/TLS add/sub updates. The
+remaining frontier backlog is mixed int-to-float multiply/add pipelines,
+private helper graphs with live values across multiple calls, alternate
+safety-guard control flow, and broader unknown aggregate/pointer/TLS forms
+outside the selected scalar subset. The accepted frontier rows use typed
+structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
+legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
+optimizer, LLVM TargetMachine, or LLD are involved.
 
 Broad ReleaseFast also has a native Zig linker progress gate outside
 `distribution-all`:
