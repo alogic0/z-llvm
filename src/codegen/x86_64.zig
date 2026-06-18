@@ -14125,21 +14125,9 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
-        (block.instructions.items.len != 2 and block.instructions.items.len != 3)) return false;
+        block.instructions.items.len < 2 or block.instructions.items.len > 4) return false;
     const call_inst = block.instructions.items[0];
-    const binary_inst = block.instructions.items[1];
-    if (call_inst.removed or binary_inst.removed) return false;
-    const binary_name = binary_inst.result orelse return false;
-    var third_binary_inst: ?ir.Instruction = null;
-    if (block.instructions.items.len == 2) {
-        if (!isNamed(ret.value orelse return error.InvalidRet, binary_name)) return false;
-    } else {
-        const third_inst = block.instructions.items[2];
-        if (third_inst.removed) return false;
-        const third_name = third_inst.result orelse return false;
-        if (!isNamed(ret.value orelse return error.InvalidRet, third_name)) return false;
-        third_binary_inst = third_inst;
-    }
+    if (call_inst.removed) return false;
 
     const call = switch (call_inst.kind) {
         .call => |call| call,
@@ -14152,41 +14140,8 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
 
-    const binary = switch (binary_inst.kind) {
-        .binary => |binary| binary,
-        else => return false,
-    };
-    if (binary.op != .fadd or !binary.ty.eql(function.ret_ty)) return false;
-    const lhs_name = switch (binary.lhs) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
-    const rhs_name = switch (binary.rhs) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-    };
-    const lhs_index = try fpParamIndex(function, lhs_name, function.ret_ty);
-    const rhs_index = try fpParamIndex(function, rhs_name, function.ret_ty);
-    if (lhs_index != 0 or rhs_index != 1) return error.UnsupportedLiveAcrossCall;
-    var addend_count: usize = 2;
-    if (third_binary_inst) |third_inst| {
-        const third_binary = switch (third_inst.kind) {
-            .binary => |third_binary| third_binary,
-            else => return false,
-        };
-        if (third_binary.op != .fadd or !third_binary.ty.eql(function.ret_ty)) return false;
-        const third_lhs_is_previous = isNamed(third_binary.lhs, binary_name);
-        const third_rhs_is_previous = isNamed(third_binary.rhs, binary_name);
-        if (third_lhs_is_previous == third_rhs_is_previous) return false;
-        const third_value = if (third_lhs_is_previous) third_binary.rhs else third_binary.lhs;
-        const third_name = switch (third_value) {
-            .named => |name| name,
-            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
-        };
-        const third_index = try fpParamIndex(function, third_name, function.ret_ty);
-        if (third_index != 2) return error.UnsupportedLiveAcrossCall;
-        addend_count = 3;
-    }
+    const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
+    if (addend_count > 3 and function.ret_ty.eql(.double)) return error.UnsupportedLiveAcrossCall;
 
     const frame_bytes: u8 = if (function.ret_ty.eql(.float))
         if (addend_count == 2) 8 else 24
@@ -14197,6 +14152,9 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
         if (addend_count == 3) {
             try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
+        } else if (addend_count == 4) {
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm3, .frame_index = .slot3 } });
         }
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
@@ -14213,6 +14171,11 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         if (addend_count == 3) {
             try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
             try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+        } else if (addend_count == 4) {
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+            try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot3 } });
+            try machine.instructions.append(allocator, .addss_xmm1_xmm0);
         }
     } else {
         try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
@@ -14226,6 +14189,64 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, ret_value: ir.Value) !usize {
+    const binary_count = block.instructions.items.len - 1;
+    if (binary_count < 1 or binary_count > 3) return error.UnsupportedCodegenInstruction;
+
+    var addend_seen = [_]bool{false} ** 4;
+    var addend_count: usize = 0;
+    var previous_name: ?[]const u8 = null;
+
+    for (block.instructions.items[1..], 0..) |instruction, index| {
+        if (instruction.removed) return error.UnsupportedCodegenInstruction;
+        const result_name = instruction.result orelse return error.UnsupportedCodegenInstruction;
+        if (index == binary_count - 1 and !isNamed(ret_value, result_name)) return error.UnsupportedCodegenInstruction;
+        const binary = switch (instruction.kind) {
+            .binary => |binary| binary,
+            else => return error.UnsupportedCodegenInstruction,
+        };
+        if (binary.op != .fadd or !binary.ty.eql(function.ret_ty)) return error.UnsupportedCodegenInstruction;
+        if (index == 0) {
+            const lhs_name = switch (binary.lhs) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            const rhs_name = switch (binary.rhs) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try noteFpAddendIndex(function, lhs_name, &addend_seen, &addend_count);
+            try noteFpAddendIndex(function, rhs_name, &addend_seen, &addend_count);
+        } else {
+            const previous = previous_name orelse return error.UnsupportedCodegenInstruction;
+            const lhs_is_previous = isNamed(binary.lhs, previous);
+            const rhs_is_previous = isNamed(binary.rhs, previous);
+            if (lhs_is_previous == rhs_is_previous) return error.UnsupportedCodegenInstruction;
+            const next_value = if (lhs_is_previous) binary.rhs else binary.lhs;
+            const next_name = switch (next_value) {
+                .named => |name| name,
+                .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+            };
+            try noteFpAddendIndex(function, next_name, &addend_seen, &addend_count);
+        }
+        previous_name = result_name;
+    }
+
+    var expected: usize = 0;
+    while (expected < addend_count) : (expected += 1) {
+        if (!addend_seen[expected]) return error.UnsupportedLiveAcrossCall;
+    }
+    return addend_count;
+}
+
+fn noteFpAddendIndex(function: ir.Function, name: []const u8, seen: *[4]bool, count: *usize) !void {
+    const index = try fpParamIndex(function, name, function.ret_ty);
+    if (index >= seen.len) return error.UnsupportedLiveAcrossCall;
+    if (seen[index]) return error.UnsupportedLiveAcrossCall;
+    seen[index] = true;
+    count.* += 1;
 }
 
 fn lowerGenericCfgFpParamReturn(

@@ -244,7 +244,8 @@ selected SSE/SSE aggregate argument-field reads and register returns
 selected up-to-six-live-i32 spill/reload call frame
 selected one-live f32/f64 SSE spill/reload call frame
 selected two-/three-live f32/f64 no-argument-call spill/reload frames
-unsupported stack-passed and broader-than-three-live SSE live-across-call pressure diagnostic
+selected four-live f32 no-argument-call spill/reload frame
+unsupported stack-passed and broader SSE live-across-call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
 ```
 

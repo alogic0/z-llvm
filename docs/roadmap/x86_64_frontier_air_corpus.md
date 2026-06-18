@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=93
-structured_functions=93
-generic_codegen_functions=93
-generic_cfg_functions=93
+discovered_functions=94
+structured_functions=94
+generic_codegen_functions=94
+generic_cfg_functions=94
 structural_matcher_functions=0
-structured_air_v2_functions=93
-typed_air_operand_functions=93
+structured_air_v2_functions=94
+typed_air_operand_functions=94
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=93
+generic_lowering_functions=94
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=93
+object_emitted_functions=94
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -180,6 +180,10 @@ Closed in the current memory/aggregate frontier slice:
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1`/`%xmm2` to
   aligned frame slots across a no-argument external C ABI `void` helper and
   reloaded for a two-step post-call `fadd` return
+- fourth selected SSE live-across-call row in `frontier_sysv_abi.zig`: four
+  live `f32` parameters are spilled from `%xmm0..%xmm3` to aligned frame slots
+  across the same no-argument helper shape and reloaded for a three-step
+  post-call `fadd` return
 - selected named FP argument pass-through rows in `frontier_sysv_abi.zig`:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
   through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP
@@ -206,8 +210,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
   values, and broader SSE live-across-call frames beyond the selected one-live,
-  two-live, and three-live `f32`/`f64` no-argument-call shapes plus selected
-  named `%xmm0..%xmm4` pass-through calls
+  two-live, and three-live `f32`/`f64` no-argument-call shapes, the selected
+  four-live `f32` no-argument-call shape, and selected named `%xmm0..%xmm4`
+  pass-through calls
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,
