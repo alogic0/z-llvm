@@ -4907,6 +4907,12 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "f32")) return .{ .ir_type = .float };
     if (std.mem.eql(u8, trimmed, "f64")) return .{ .ir_type = .double };
     if (std.mem.eql(u8, trimmed, "f128")) return .{ .ir_type = .fp128 };
+    if (std.mem.eql(u8, trimmed, "extern struct { a: i32, b: f64 }")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "extern struct { a: f64, b: i32 }")) {
+        return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
+    }
     if (std.mem.eql(u8, trimmed, "aggregate_abi.Pair") or
         std.mem.eql(u8, trimmed, "runtime_aggregate_pair_main.Pair") or
         std.mem.eql(u8, trimmed, "expanded_records_memory.Pair") or
@@ -4948,6 +4954,12 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.SmallMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ i32, double }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.SmallReverseMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ double, i32 }" } };
     }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big3")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } };

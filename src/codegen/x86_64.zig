@@ -5832,7 +5832,7 @@ fn lowerSysVAggregateFieldReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.double)) or
+    if ((!ret.ty.eql(.{ .int = 32 }) and !ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.double)) or
         (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
@@ -6375,8 +6375,15 @@ fn emitSysVAggregateFieldLocationReturn(
 ) !void {
     switch (location) {
         .gpr => |reg| {
-            if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
-            try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+            if (field_ty.eql(.{ .int = 64 })) {
+                try machine.instructions.append(allocator, .{ .mov_arg_rax = reg });
+                return;
+            }
+            if (field_ty.eql(.{ .int = 32 })) {
+                try machine.instructions.append(allocator, .{ .mov_arg_eax = reg });
+                return;
+            }
+            return error.UnsupportedCodegenAbi;
         },
         .sse => |reg| {
             if (!field_ty.eql(.double)) return error.UnsupportedCodegenAbi;

@@ -5934,6 +5934,46 @@ test "x86_64 codegen sums array-in-struct INTEGER aggregate fields from SysV GPR
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen returns i32 fields from mixed SysV aggregate classes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @small_mixed_int({ i32, double } %value) {
+        \\entry:
+        \\  %slot = alloca { i32, double }
+        \\  store { i32, double } %value, ptr %slot
+        \\  %a_ptr = getelementptr { i32, double }, ptr %slot, i64 0, i32 0
+        \\  %a = load i32, ptr %a_ptr
+        \\  ret i32 %a
+        \\}
+        \\
+        \\define i32 @small_reverse_mixed_int({ double, i32 } %value) {
+        \\entry:
+        \\  %slot = alloca { double, i32 }
+        \\  store { double, i32 } %value, ptr %slot
+        \\  %b_ptr = getelementptr { double, i32 }, ptr %slot, i64 0, i32 1
+        \\  %b = load i32, ptr %b_ptr
+        \\  ret i32 %b
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var small_mixed = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer small_mixed.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, small_mixed.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, small_mixed.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, small_mixed.instructions.items[1]);
+
+    var small_reverse = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer small_reverse.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, small_reverse.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, small_reverse.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, small_reverse.instructions.items[1]);
+}
+
 test "x86_64 codegen copies mixed-width memory aggregate leaves from byval to sret" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

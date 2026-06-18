@@ -32,6 +32,16 @@ const NestedMixed = extern struct {
     value: f64,
 };
 
+const SmallMixed = extern struct {
+    a: i32,
+    b: f64,
+};
+
+const SmallReverseMixed = extern struct {
+    a: f64,
+    b: i32,
+};
+
 export fn frontier_mixed_int(value: Mixed) i64 {
     return value.a;
 }
@@ -94,4 +104,20 @@ export fn frontier_array_pair_sum(value: ArrayPair) i64 {
 
 export fn frontier_nested_mixed_int_sum(value: NestedMixed) i32 {
     return value.ints.a + value.ints.b;
+}
+
+export fn frontier_small_mixed_int(value: SmallMixed) i32 {
+    return value.a;
+}
+
+export fn frontier_small_mixed_float(value: SmallMixed) f64 {
+    return value.b;
+}
+
+export fn frontier_small_reverse_mixed_float(value: SmallReverseMixed) f64 {
+    return value.a;
+}
+
+export fn frontier_small_reverse_mixed_int(value: SmallReverseMixed) i32 {
+    return value.b;
 }

@@ -47,8 +47,8 @@ small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
 selected nested mixed INTEGER/SSE aggregate integer-field add chains use layout-backed byte offsets and the independent SysV GPR/SSE streams
-selected mixed INTEGER/SSE aggregate argument field reads and register returns use the independent SysV GPR/SSE streams
-selected reversed mixed SSE/INTEGER aggregate argument field reads and register returns use the independent SysV SSE/GPR streams
+selected mixed INTEGER/SSE aggregate `i32`/`i64`/`double` argument field reads and register returns use the independent SysV GPR/SSE streams
+selected reversed mixed SSE/INTEGER aggregate `i32`/`i64`/`double` argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
 leaf functions only
 no stack frame for register-only leaf functions
@@ -128,6 +128,10 @@ aggregate argument field reads and register aggregate return:
   field `double` is returned from the aggregate's SSE class register
   `{ i64, double }` construction returns through %rax/%xmm0
   a noinline helper-call row returns `{ i64, double }` directly from the private helper without scalarized wrapper lowering
+frontier_sysv_aggregate_classes.SmallMixed proves selected `i32`/`double`
+mixed INTEGER/SSE field reads:
+  low-lane `i32` fields are returned from the aggregate's GPR class register
+  field `double` is returned from the aggregate's SSE class register
 frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
@@ -137,6 +141,8 @@ SSE/INTEGER aggregate argument field reads and register aggregate return:
   field `double` is returned from the aggregate's SSE class register
   field `i64` is returned from the aggregate's GPR class register
   `{ double, i64 }` construction returns through %xmm0/%rax
+frontier_sysv_aggregate_classes.SmallReverseMixed proves selected reversed
+`double`/`i32` field reads through the same independent SSE/GPR streams
 frontier_sysv_aggregate_classes.NestedPair and NestedMixed prove nested
 INTEGER aggregate field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
@@ -174,7 +180,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-/three-live f32/f64 no-argument-call spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER `i32`/`i64`/`double` field-read/register forms, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
