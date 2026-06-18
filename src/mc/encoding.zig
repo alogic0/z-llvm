@@ -214,6 +214,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .add_rsp_24 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x18 }),
             .sub_rsp_40 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x28 }),
             .add_rsp_40 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x28 }),
+            .sub_rsp_56 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xec, 0x38 }),
+            .add_rsp_56 => try bytes.appendSlice(allocator, &.{ 0x48, 0x83, 0xc4, 0x38 }),
             .spill_arg_rsp => |spill| try encodeRegToFrameSlot(&bytes, allocator, 0x89, spill.reg, spill.frame_index),
             .reload_arg_rsp => |reload| try encodeFrameSlotToReg(&bytes, allocator, 0x8b, reload.reg, reload.frame_index),
             .spill_xmm32_rsp => |spill| try encodeXmmFrameSlot(&bytes, allocator, 0xf3, 0x11, spill.reg, spill.frame_index),
@@ -438,7 +440,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .addsd_xmm1_xmm0 => 4,
         .sub_rsp_8, .add_rsp_8 => 4,
         .push_imm32 => 5,
-        .sub_rsp_24, .add_rsp_24, .sub_rsp_40, .add_rsp_40 => 4,
+        .sub_rsp_24, .add_rsp_24, .sub_rsp_40, .add_rsp_40, .sub_rsp_56, .add_rsp_56 => 4,
         .spill_arg_rsp => |spill| frameSlotInstructionSize(spill.reg, spill.frame_index),
         .reload_arg_rsp => |reload| frameSlotInstructionSize(reload.reg, reload.frame_index),
         .spill_xmm32_rsp, .reload_xmm32_rsp, .spill_xmm64_rsp, .reload_xmm64_rsp => 6,
@@ -626,6 +628,10 @@ fn frameSlotDisp(frame_index: x86_64.FrameIndex) u8 {
         .slot4 => 16,
         .slot5 => 20,
         .slot6 => 24,
+        .slot7 => 28,
+        .slot8 => 32,
+        .slot9 => 36,
+        .slot10 => 40,
     };
 }
 

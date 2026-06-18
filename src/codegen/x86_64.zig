@@ -159,6 +159,10 @@ pub const FrameIndex = enum {
     slot4,
     slot5,
     slot6,
+    slot7,
+    slot8,
+    slot9,
+    slot10,
 };
 
 pub const CodegenPath = enum {
@@ -287,6 +291,8 @@ pub const Instruction = union(enum) {
     add_rsp_24,
     sub_rsp_40,
     add_rsp_40,
+    sub_rsp_56,
+    add_rsp_56,
     spill_arg_rsp: struct {
         frame_index: FrameIndex,
         reg: ArgReg,
@@ -14126,7 +14132,7 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     ret: anytype,
 ) !bool {
     if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
-        block.instructions.items.len < 2 or block.instructions.items.len > 4) return false;
+        block.instructions.items.len < 2 or block.instructions.items.len > 6) return false;
     const call_inst = block.instructions.items[0];
     if (call_inst.removed) return false;
 
@@ -14142,56 +14148,33 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     }
 
     const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
-    if (addend_count > 4) return error.UnsupportedLiveAcrossCall;
+    if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
 
-    const frame_bytes: u8 = if (function.ret_ty.eql(.float))
-        if (addend_count == 2) 8 else 24
-    else if (addend_count == 2) 24 else 40;
+    const frame_bytes = try fpLiveAddendFrameBytes(function.ret_ty, addend_count);
     try appendStackFrame(allocator, machine, frame_bytes);
-    if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
-        if (addend_count == 3) {
-            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
-        } else if (addend_count == 4) {
-            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
-            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm3, .frame_index = .slot3 } });
-        }
-    } else {
-        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
-        if (addend_count == 3) {
-            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
-        } else if (addend_count == 4) {
-            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
-            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm3, .frame_index = .slot6 } });
+    var index: usize = 0;
+    while (index < addend_count) : (index += 1) {
+        const reg = try XmmReg.fromIndex(index);
+        const frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index);
+        if (function.ret_ty.eql(.float)) {
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = reg, .frame_index = frame_index } });
+        } else {
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = reg, .frame_index = frame_index } });
         }
     }
     try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
     if (function.ret_ty.eql(.float)) {
-        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
-        try machine.instructions.append(allocator, .addss_xmm1_xmm0);
-        if (addend_count == 3) {
-            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
-            try machine.instructions.append(allocator, .addss_xmm1_xmm0);
-        } else if (addend_count == 4) {
-            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
-            try machine.instructions.append(allocator, .addss_xmm1_xmm0);
-            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot3 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
+        index = 1;
+        while (index < addend_count) : (index += 1) {
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index) } });
             try machine.instructions.append(allocator, .addss_xmm1_xmm0);
         }
     } else {
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
-        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
-        try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
-        if (addend_count == 3) {
-            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
-            try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
-        } else if (addend_count == 4) {
-            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
-            try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
-            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot6 } });
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, 0) } });
+        index = 1;
+        while (index < addend_count) : (index += 1) {
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = try frameIndexForFpLiveAddend(function.ret_ty, index) } });
             try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
         }
     }
@@ -14202,9 +14185,9 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
 
 fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, ret_value: ir.Value) !usize {
     const binary_count = block.instructions.items.len - 1;
-    if (binary_count < 1 or binary_count > 3) return error.UnsupportedCodegenInstruction;
+    if (binary_count < 1 or binary_count > 5) return error.UnsupportedCodegenInstruction;
 
-    var addend_seen = [_]bool{false} ** 4;
+    var addend_seen = [_]bool{false} ** 6;
     var addend_count: usize = 0;
     var previous_name: ?[]const u8 = null;
 
@@ -14250,12 +14233,39 @@ fn collectFpVoidCallFaddParamChain(function: ir.Function, block: ir.BasicBlock, 
     return addend_count;
 }
 
-fn noteFpAddendIndex(function: ir.Function, name: []const u8, seen: *[4]bool, count: *usize) !void {
+fn noteFpAddendIndex(function: ir.Function, name: []const u8, seen: *[6]bool, count: *usize) !void {
     const index = try fpParamIndex(function, name, function.ret_ty);
     if (index >= seen.len) return error.UnsupportedLiveAcrossCall;
     if (seen[index]) return error.UnsupportedLiveAcrossCall;
     seen[index] = true;
     count.* += 1;
+}
+
+fn fpLiveAddendFrameBytes(ty: ir.Type, addend_count: usize) !u8 {
+    if (addend_count < 2 or addend_count > 6) return error.UnsupportedLiveAcrossCall;
+    if (ty.eql(.float)) {
+        return if (addend_count == 2) 8 else if (addend_count <= 4) 24 else 40;
+    }
+    if (ty.eql(.double)) {
+        return if (addend_count == 2) 24 else if (addend_count <= 4) 40 else 56;
+    }
+    return error.UnsupportedCodegenType;
+}
+
+fn frameIndexForFpLiveAddend(ty: ir.Type, index: usize) !FrameIndex {
+    if (ty.eql(.float)) {
+        return frameIndexForLiveParam(index);
+    }
+    if (!ty.eql(.double)) return error.UnsupportedCodegenType;
+    return switch (index) {
+        0 => .slot0,
+        1 => .slot2,
+        2 => .slot4,
+        3 => .slot6,
+        4 => .slot8,
+        5 => .slot10,
+        else => error.UnsupportedLiveAcrossCall,
+    };
 }
 
 fn lowerGenericCfgFpParamReturn(
@@ -21663,6 +21673,7 @@ fn appendStackFrame(allocator: std.mem.Allocator, machine: *MachineFunction, byt
         8 => try machine.instructions.append(allocator, .sub_rsp_8),
         24 => try machine.instructions.append(allocator, .sub_rsp_24),
         40 => try machine.instructions.append(allocator, .sub_rsp_40),
+        56 => try machine.instructions.append(allocator, .sub_rsp_56),
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -21672,6 +21683,7 @@ fn appendStackFrameEnd(allocator: std.mem.Allocator, machine: *MachineFunction, 
         8 => try machine.instructions.append(allocator, .add_rsp_8),
         24 => try machine.instructions.append(allocator, .add_rsp_24),
         40 => try machine.instructions.append(allocator, .add_rsp_40),
+        56 => try machine.instructions.append(allocator, .add_rsp_56),
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -23019,6 +23031,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_rsp_24,
         .sub_rsp_40,
         .add_rsp_40,
+        .sub_rsp_56,
+        .add_rsp_56,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,
@@ -23109,6 +23123,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .push_imm32 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
+        .sub_rsp_56, .add_rsp_56 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 56) % 16),
         .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .spill_xmm32_rsp, .spill_xmm64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
@@ -23246,6 +23261,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_rsp_24,
         .sub_rsp_40,
         .add_rsp_40,
+        .sub_rsp_56,
+        .add_rsp_56,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_xmm32_rsp,

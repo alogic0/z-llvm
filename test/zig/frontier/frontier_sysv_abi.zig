@@ -78,6 +78,16 @@ export fn frontier_four_f32_live_sum_after_call(a: f32, b: f32, c: f32, d: f32) 
     return a + b + c + d;
 }
 
+export fn frontier_five_f32_live_sum_after_call(a: f32, b: f32, c: f32, d: f32, e: f32) f32 {
+    frontier_touch_none();
+    return a + b + c + d + e;
+}
+
+export fn frontier_six_f32_live_sum_after_call(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) f32 {
+    frontier_touch_none();
+    return a + b + c + d + e + f;
+}
+
 export fn frontier_three_f64_live_sum_after_call(a: f64, b: f64, c: f64) f64 {
     frontier_touch_none();
     return a + b + c;
@@ -86,6 +96,16 @@ export fn frontier_three_f64_live_sum_after_call(a: f64, b: f64, c: f64) f64 {
 export fn frontier_four_f64_live_sum_after_call(a: f64, b: f64, c: f64, d: f64) f64 {
     frontier_touch_none();
     return a + b + c + d;
+}
+
+export fn frontier_five_f64_live_sum_after_call(a: f64, b: f64, c: f64, d: f64, e: f64) f64 {
+    frontier_touch_none();
+    return a + b + c + d + e;
+}
+
+export fn frontier_six_f64_live_sum_after_call(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) f64 {
+    frontier_touch_none();
+    return a + b + c + d + e + f;
 }
 
 export fn frontier_five_f32_external_call(a: f32, b: f32, c: f32, d: f32, e: f32) f32 {

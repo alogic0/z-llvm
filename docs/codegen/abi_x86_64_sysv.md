@@ -91,9 +91,10 @@ backend test keeps the selected allocator limited to `%rdi`, `%rsi`, `%rdx`,
 `%rcx`, `%r8`, and `%r9`.
 One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
-Two live f32/f64 values in %xmm0/%xmm1 across one no-argument direct C ABI void
-call are accepted for the selected post-call add-return shape.
-Stack-passed live values, SSE live values beyond the selected one-/two-/three-/four-live f32/f64 shapes, and live values across multiple calls fail closed.
+Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
+ABI void call are accepted for the selected post-call add-return shape.
+Stack-passed live values, SSE live values beyond the selected one- through
+six-live f32/f64 shapes, and live values across multiple calls fail closed.
 ```
 
 Upstream mapping:
@@ -182,9 +183,9 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   three live f32/f64 values can also be spilled from %xmm0/%xmm1/%xmm2
   across the same no-argument helper shape and reloaded for a two-step
   post-call fadd return
-  four live f32/f64 values can also be spilled from %xmm0/%xmm1/%xmm2/%xmm3
-  across the same no-argument helper shape and reloaded for a three-step
-  post-call fadd return
+  four, five, and six live f32/f64 values can also be spilled from
+  %xmm0..%xmm5 across the same no-argument helper shape and reloaded for
+  three-, four-, and five-step post-call fadd returns
   five named f32/f64 arguments can be forwarded to external C ABI helpers
   through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
   constant arguments through %xmm0..%xmm7
@@ -195,13 +196,13 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one-/two-/three-/four-live f32/f64 SSE spill shapes
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one- through six-live f32/f64 SSE spill shapes
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, `[2]f64` SSE/SSE array construction returns, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one-/two-/three-/four-live f32/f64 shapes
+no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one- through six-live f32/f64 shapes
 stack-passed live i32 pressure is rejected explicitly rather than spilling from the incoming stack area
 ```

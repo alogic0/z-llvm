@@ -6499,6 +6499,54 @@ test "x86_64 codegen preserves four live f32 params across direct call" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
+test "x86_64 codegen preserves six live f32 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch()
+        \\
+        \\define float @caller(float %a, float %b, float %c, float %d, float %e, float %f) {
+        \\entry:
+        \\  call void @touch()
+        \\  %ab = fadd float %a, %b
+        \\  %abc = fadd float %ab, %c
+        \\  %abcd = fadd float %abc, %d
+        \\  %abcde = fadd float %abcd, %e
+        \\  %sum = fadd float %abcde, %f
+        \\  ret float %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_40);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm3, .frame_index = .slot3 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm4, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm5, .frame_index = .slot5 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot3 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot5 } });
+    var add_count: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .addss_xmm1_xmm0) add_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 5), add_count);
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_40);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "x86_64 codegen preserves three live f64 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -6577,6 +6625,54 @@ test "x86_64 codegen preserves four live f64 params across direct call" {
     }
     try std.testing.expectEqual(@as(usize, 3), add_count);
     try expectMachineInstruction(machine.instructions.items, .add_rsp_40);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
+test "x86_64 codegen preserves six live f64 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch()
+        \\
+        \\define double @caller(double %a, double %b, double %c, double %d, double %e, double %f) {
+        \\entry:
+        \\  call void @touch()
+        \\  %ab = fadd double %a, %b
+        \\  %abc = fadd double %ab, %c
+        \\  %abcd = fadd double %abc, %d
+        \\  %abcde = fadd double %abcd, %e
+        \\  %sum = fadd double %abcde, %f
+        \\  ret double %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_56);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm3, .frame_index = .slot6 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm4, .frame_index = .slot8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm64_rsp = .{ .reg = .xmm5, .frame_index = .slot10 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot6 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot10 } });
+    var add_count: usize = 0;
+    for (machine.instructions.items) |instruction| {
+        if (instruction == .addsd_xmm1_xmm0) add_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 5), add_count);
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_56);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
 }
 
