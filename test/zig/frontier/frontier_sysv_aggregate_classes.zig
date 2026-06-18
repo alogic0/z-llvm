@@ -27,6 +27,10 @@ const ArrayPair = extern struct {
     values: [2]i64,
 };
 
+const ArrayDouble = extern struct {
+    values: [2]f64,
+};
+
 const NestedMixed = extern struct {
     ints: Pair32,
     value: f64,
@@ -119,6 +123,18 @@ export fn frontier_array_pair_sum(value: ArrayPair) i64 {
 }
 
 export fn frontier_array_pair_make(a: i64, b: i64) ArrayPair {
+    return .{ .values = .{ a, b } };
+}
+
+export fn frontier_array_double_first(value: ArrayDouble) f64 {
+    return value.values[0];
+}
+
+export fn frontier_array_double_second(value: ArrayDouble) f64 {
+    return value.values[1];
+}
+
+export fn frontier_array_double_make(a: f64, b: f64) ArrayDouble {
     return .{ .values = .{ a, b } };
 }
 

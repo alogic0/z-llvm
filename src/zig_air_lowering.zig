@@ -538,6 +538,14 @@ fn isPlainFieldPointerChild(ty: ir.Type) bool {
     };
 }
 
+fn isSupportedTypedGepElementType(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => |bits| bits == 32 or bits == 64,
+        .float, .double => true,
+        .void, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+    };
+}
+
 fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
     if (field_index < 0) return null;
     if (!isPlainFieldPointerChild(field_child)) return null;
@@ -4306,7 +4314,7 @@ const LoweringContext = struct {
         if (base.ty.ir_type != .ptr or result_type.ir_type != .ptr) return error.UnsupportedAir;
         if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         const element_type = result_type.pointer_child orelse base.ty.pointer_child orelse return error.UnsupportedAir;
-        if (!element_type.eql(.{ .int = 32 }) and !element_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
+        if (!isSupportedTypedGepElementType(element_type)) return error.UnsupportedAir;
         if (!genericTypedGepIndex(index.value)) return error.UnsupportedAir;
 
         const result_name = try self.resultName(instruction.index);
@@ -5050,6 +5058,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ArrayPair")) {
         return .{ .ir_type = .{ .aggregate = "{ [2 x i64] }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ArrayDouble")) {
+        return .{ .ir_type = .{ .aggregate = "{ [2 x double] }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedMixed")) {
         return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, double }" } };
     }
@@ -5095,6 +5106,7 @@ fn parseZigType(text: []const u8) ?ZigType {
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
     if (std.mem.eql(u8, trimmed, "[2]i64")) return .{ .ir_type = .{ .aggregate = "[2 x i64]" } };
+    if (std.mem.eql(u8, trimmed, "[2]f64")) return .{ .ir_type = .{ .aggregate = "[2 x double]" } };
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;
         const child = parseZigType(child_text);

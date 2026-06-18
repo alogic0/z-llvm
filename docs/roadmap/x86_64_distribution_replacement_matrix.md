@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=95`,
-`generic_codegen_functions=95`, `generic_cfg_functions=95`,
+three release modes at `source_rows=13`, `discovered_functions=98`,
+`generic_codegen_functions=98`, `generic_cfg_functions=98`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=95`, `object_failures=0`,
+`object_emitted_functions=98`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -430,7 +430,10 @@ helper's scalar result with executable proof; the nested construction row
 builds the same register aggregate from four scalar `i32` leaves by tracing
 typed AIR v2 field paths and packing both INTEGER eightbytes. The array
 construction row similarly traces `[2]i64` pointer-element stores and returns
-the elements in `%rax`/`%rdx`.
+the elements in `%rax`/`%rdx`. The `[2]f64` array-in-struct frontier row uses
+the same typed AIR v2 field/pointer-element path for SSE elements, reads them
+from the independent SysV SSE argument stream, and returns construction results
+in `%xmm0`/`%xmm1`.
 The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call, selected two-live
 `f32`/`f64` spill/reload frames across a no-argument helper before a post-call
@@ -451,7 +454,8 @@ subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
 nested mixed INTEGER/SSE integer-field add-chain, selected nested/array
 INTEGER construction returns, selected mixed INTEGER/SSE
 and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms
-plus selected packed mixed construction returns, SSE/SSE field-read/return, and
+plus selected packed mixed construction returns, SSE/SSE field-read/return including
+`[2]f64` array-in-struct, and
 generated normal MEMORY i64
 sret/byval field/copy forms currently proven through seven flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy,

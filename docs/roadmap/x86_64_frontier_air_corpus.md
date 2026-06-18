@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=95
-structured_functions=95
-generic_codegen_functions=95
-generic_cfg_functions=95
+discovered_functions=98
+structured_functions=98
+generic_codegen_functions=98
+generic_cfg_functions=98
 structural_matcher_functions=0
-structured_air_v2_functions=95
-typed_air_operand_functions=95
+structured_air_v2_functions=98
+typed_air_operand_functions=98
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=95
+generic_lowering_functions=98
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=95
+object_emitted_functions=98
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -168,6 +168,11 @@ Closed in the current memory/aggregate frontier slice:
   construction-return row traces typed AIR v2 array-element stores into
   flattened `insertvalue` paths and returns the two `i64` elements in
   `%rax`/`%rdx`
+- first array-in-struct SSE/SSE aggregate row in
+  `frontier_sysv_aggregate_classes.zig`: `[2]f64` field and pointer-element
+  GEPs lower from typed AIR v2, the two `double` elements are read from the
+  independent SysV SSE argument stream, and construction returns the elements
+  in `%xmm0`/`%xmm1`
 - first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
@@ -203,7 +208,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE integer add chains, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
-  reads/returns, and generated
+  reads/returns including `[2]f64` array-in-struct, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
   through seven flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,

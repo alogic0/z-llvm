@@ -6086,7 +6086,7 @@ fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, gep:
         if (offset < 0) return null;
         return @intCast(offset);
     }
-    if (isIntegerScalarType(gep.source_ty) and gep.indices.items.len == 1 and gep.indices.items[0].ty.eql(.{ .int = 64 })) {
+    if (isScalarElementGepType(gep.source_ty) and gep.indices.items.len == 1 and gep.indices.items[0].ty.eql(.{ .int = 64 })) {
         const index = switch (gep.indices.items[0].value) {
             .int => |int| int,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
@@ -6127,10 +6127,10 @@ fn aggregateFieldIndexAtOffset(aggregate_ty: ir.Type, expected_offset: u64, expe
     return null;
 }
 
-fn isIntegerScalarType(ty: ir.Type) bool {
+fn isScalarElementGepType(ty: ir.Type) bool {
     return switch (ty) {
-        .int => true,
-        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+        .int, .float, .double, .ptr => true,
+        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
     };
 }
 

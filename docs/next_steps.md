@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=95`,
-`generic_codegen_functions=95`, `generic_cfg_functions=95`,
+frontier gate reports `source_rows=13`, `discovered_functions=98`,
+`generic_codegen_functions=98`, `generic_cfg_functions=98`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=95`, `object_failures=0`,
+`object_emitted_functions=98`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -403,8 +403,8 @@ selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate
 returns in `%rax`/`%xmm0` through the independent SysV GPR/SSE streams,
 including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
 returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
-adds `{ double, double }` SSE/SSE field reads and register aggregate return in
-`%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
+adds `{ double, double }` plus `[2]f64` array-in-struct SSE/SSE field reads
+and register aggregate return in `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
 `{ double, i64 }`, selected `{ double, i32 }`, and selected
 `{ double, i32, i32 }` SSE/INTEGER field reads plus register aggregate returns
 in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
@@ -416,9 +416,9 @@ The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
 through the SysV GPR pair to a private helper and returns the helper's scalar
 result without aggregate-specific wrapper dispatch; the nested construction
 row traces typed AIR v2 field paths for four scalar `i32` leaves and returns
-the aggregate in `%rax`/`%rdx`. The array-in-struct construction row traces
-typed AIR v2 pointer-element stores for `[2]i64` and returns the elements in
-`%rax`/`%rdx`.
+the aggregate in `%rax`/`%rdx`. The array-in-struct construction rows trace
+typed AIR v2 pointer-element stores for `[2]i64` and `[2]f64` and return the
+elements in `%rax`/`%rdx` or `%xmm0`/`%xmm1`.
 The SSE live-across-call frontier rows add selected
 one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call
 and selected two-live `f32`/`f64` spill/reload frames across a no-argument
@@ -440,7 +440,7 @@ selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
 selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
-reads, and generated normal
+reads including `[2]f64` array-in-struct, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through seven flat
 fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,
