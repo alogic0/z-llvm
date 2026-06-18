@@ -296,8 +296,8 @@ argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
 classification beyond the selected INTEGER and normal integer-leaf MEMORY
 aggregate forms, arbitrary non-selected sret/byval copies, varargs, vectors, and live-across-call shapes
-involving stack-passed or SSE values; focused unit tests now fail closed for these
-unsupported classes.
+involving more than three stack-passed `i32` values or broader SSE pressure;
+focused unit tests now fail closed for these unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate field reads
 from the SysV integer register pair, and a selected up-to-six-live-i32

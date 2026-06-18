@@ -37,6 +37,8 @@ up to three constant i32 stack-passed direct-call arguments are supported
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
+up to three stack-passed live i32 caller arguments can be added after the call
+once the local call frame is restored
 one live f32/f64 caller argument can be spilled from %xmm0 into an aligned
 frame slot, reloaded after one direct C ABI void call, and returned from %xmm0
 two or three live f32/f64 caller arguments can be spilled from %xmm0/%xmm1
@@ -93,8 +95,9 @@ One to six live i32 argument registers across one direct call are accepted.
 One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
 Two to six live f32/f64 values in %xmm0..%xmm5 across one no-argument direct C
 ABI void call are accepted for the selected post-call add-return shape.
-Stack-passed live values, SSE live values beyond the selected one- through
-six-live f32/f64 shapes, and live values across multiple calls fail closed.
+More than three stack-passed live i32 values, SSE live values beyond the
+selected one- through six-live f32/f64 shapes, and live values across multiple
+calls fail closed.
 ```
 
 Upstream mapping:
