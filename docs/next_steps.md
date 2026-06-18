@@ -350,12 +350,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=37`,
-`generic_codegen_functions=37`, `generic_cfg_functions=37`,
+frontier gate reports `source_rows=13`, `discovered_functions=38`,
+`generic_codegen_functions=38`, `generic_cfg_functions=38`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=37`, `object_failures=0`,
+`object_emitted_functions=38`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -371,8 +371,9 @@ nested extern-struct field GEP paths, selected dynamic pointer addition /
 pointer-element GEP loads, and branch-local global/TLS add/sub updates. The
 first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, nested INTEGER aggregate add-chain
-field reads, and the selected two-live direct-call spill frame with executable
-proof. The selected sret/byval frontier row adds a
+field reads, array-in-struct INTEGER aggregate sums, and the selected two-live
+direct-call spill frame with executable proof. The selected sret/byval
+frontier row adds a
 `{ i64, i64, i64 }` hidden-sret return and first stack MEMORY aggregate
 field-read proof. The mixed aggregate class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads through the independent SysV GPR/SSE streams. The

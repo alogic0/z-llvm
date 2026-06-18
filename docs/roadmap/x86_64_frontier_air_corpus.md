@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=37
-structured_functions=37
-generic_codegen_functions=37
-generic_cfg_functions=37
+discovered_functions=38
+structured_functions=38
+generic_codegen_functions=38
+generic_cfg_functions=38
 structural_matcher_functions=0
-structured_air_v2_functions=37
-typed_air_operand_functions=37
+structured_air_v2_functions=38
+typed_air_operand_functions=38
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=37
+generic_lowering_functions=38
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=37
+object_emitted_functions=38
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -127,6 +127,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
   from the SysV GPR pair without a function-name-specific lowering path
+- first array-in-struct INTEGER aggregate row in
+  `frontier_sysv_aggregate_classes.zig`: `[2]i64` typed AIR pointer-element
+  GEPs are lowered from typed v2 and summed from the SysV GPR pair
 
 Remaining measured frontier blockers kept out of accepted rows:
 
@@ -140,9 +143,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, mixed INTEGER/SSE field reads, and selected MEMORY
-  aggregate forms; array-in-struct field pointer lowering, X87,
-  packed/unaligned aggregate ABI classes, arbitrary sret/byval copies, varargs,
-  vectors, and high-register-pressure spill/reload-heavy call frames
+  aggregate forms; X87, packed/unaligned aggregate ABI classes, arbitrary
+  sret/byval copies, varargs, vectors, and high-register-pressure
+  spill/reload-heavy call frames
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

@@ -4044,7 +4044,7 @@ const LoweringContext = struct {
         if (base.ty.ir_type != .ptr or result_type.ir_type != .ptr) return error.UnsupportedAir;
         if (!index.ty.ir_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         const element_type = result_type.pointer_child orelse base.ty.pointer_child orelse return error.UnsupportedAir;
-        if (!element_type.eql(.{ .int = 32 })) return error.UnsupportedAir;
+        if (!element_type.eql(.{ .int = 32 }) and !element_type.eql(.{ .int = 64 })) return error.UnsupportedAir;
         if (!genericTypedGepIndex(index.value)) return error.UnsupportedAir;
 
         const result_name = try self.resultName(instruction.index);
@@ -4783,6 +4783,7 @@ fn parseZigType(text: []const u8) ?ZigType {
         const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
         return .{ .ir_type = .{ .int = bits }, .signed = trimmed[0] == 'i' };
     }
+    if (std.mem.eql(u8, trimmed, "[2]i64")) return .{ .ir_type = .{ .aggregate = "[2 x i64]" } };
     if (isPointerType(trimmed)) {
         const child_text = pointerChildText(trimmed) orelse return null;
         const child = parseZigType(child_text);

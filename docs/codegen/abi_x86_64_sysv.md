@@ -110,6 +110,10 @@ field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
   low/high 32-bit lanes are read from the SysV GPR pair without a
   function-name-specific backend path
+frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
+aggregate sums:
+  `[2]i64` pointer-element GEPs are lowered from typed AIR v2
+  the two i64 fields are read from the SysV GPR pair
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 

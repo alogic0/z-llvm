@@ -1521,15 +1521,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Mixed { long long a; double b; };
     \\struct Pair32 { int a; int b; };
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
+    \\struct ArrayPair { long long values[2]; };
     \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
     \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
+    \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
     \\    if (z_frontier_mixed_float(value) != 6.25) return 2;
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
     \\    if (z_frontier_nested_pair_sum(nested) != 10) return 3;
+    \\    struct ArrayPair array = { { 11, 31 } };
+    \\    if (z_frontier_array_pair_sum(array) != 42) return 4;
     \\    return 0;
     \\}
     \\

@@ -5804,20 +5804,44 @@ fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, gep:
         if (offset < 0) return null;
         return @intCast(offset);
     }
-    if (gep.source_ty.eql(aggregate_ty) and gep.indices.items.len == 2 and
+    if (isIntegerScalarType(gep.source_ty) and gep.indices.items.len == 1 and gep.indices.items[0].ty.eql(.{ .int = 64 })) {
+        const index = switch (gep.indices.items[0].value) {
+            .int => |int| int,
+            .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
+        };
+        if (index < 0) return null;
+        const element_size = layout.typeStoreSizeBytes(gep.source_ty) catch return null;
+        return @intCast(@as(u128, @intCast(index)) * element_size);
+    }
+    _ = aggregate_ty;
+    if (isAggregateType(gep.source_ty) and gep.indices.items.len == 2 and
         gep.indices.items[0].ty.eql(.{ .int = 64 }) and isInt(gep.indices.items[0].value, 0) and
-        gep.indices.items[1].ty.eql(.{ .int = 32 }))
+        (gep.indices.items[1].ty.eql(.{ .int = 32 }) or gep.indices.items[1].ty.eql(.{ .int = 64 })))
     {
         const field_index = switch (gep.indices.items[1].value) {
             .int => |int| int,
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
         };
         if (field_index < 0 or field_index > std.math.maxInt(usize)) return null;
-        const offset = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, @intCast(field_index)) orelse return null;
+        const offset = memory_location.aggregateFieldOffsetWithLayout(layout, gep.source_ty, @intCast(field_index)) orelse return null;
         if (offset < 0) return null;
         return @intCast(offset);
     }
     return null;
+}
+
+fn isIntegerScalarType(ty: ir.Type) bool {
+    return switch (ty) {
+        .int => true,
+        .void, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => false,
+    };
+}
+
+fn isAggregateType(ty: ir.Type) bool {
+    return switch (ty) {
+        .aggregate => true,
+        .void, .int, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+    };
 }
 
 fn collectAggregateIntegerAddTerms(

@@ -41,6 +41,7 @@ selected backend subset:
   one live i32 caller argument, or the selected two-live %rdi/%rsi shape, can be spilled across one call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
+  selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate argument-field reads are accepted through the reusable aggregate classifier
 ```
 

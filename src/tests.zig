@@ -5333,6 +5333,36 @@ test "x86_64 codegen sums nested INTEGER aggregate fields from SysV GPR pair" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
 }
 
+test "x86_64 codegen sums array-in-struct INTEGER aggregate fields from SysV GPR pair" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @array_sum({ [2 x i64] } %value) {
+        \\entry:
+        \\  %slot = alloca { [2 x i64] }
+        \\  store { [2 x i64] } %value, ptr %slot
+        \\  %a_ptr = getelementptr i64, ptr %slot, i64 0
+        \\  %a = load i64, ptr %a_ptr
+        \\  %b_ptr = getelementptr i64, ptr %slot, i64 1
+        \\  %b = load i64, ptr %b_ptr
+        \\  %sum = add i64 %a, %b
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg64_rax = .rsi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
 test "x86_64 codegen rejects unsupported call ABI shapes" {
     const unsupported_cc_input =
         \\target triple = "x86_64-unknown-linux-gnu"
