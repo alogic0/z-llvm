@@ -13967,12 +13967,22 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 2) return false;
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or !ret.ty.eql(function.ret_ty) or
+        (block.instructions.items.len != 2 and block.instructions.items.len != 3)) return false;
     const call_inst = block.instructions.items[0];
     const binary_inst = block.instructions.items[1];
     if (call_inst.removed or binary_inst.removed) return false;
     const binary_name = binary_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, binary_name)) return false;
+    var third_binary_inst: ?ir.Instruction = null;
+    if (block.instructions.items.len == 2) {
+        if (!isNamed(ret.value orelse return error.InvalidRet, binary_name)) return false;
+    } else {
+        const third_inst = block.instructions.items[2];
+        if (third_inst.removed) return false;
+        const third_name = third_inst.result orelse return false;
+        if (!isNamed(ret.value orelse return error.InvalidRet, third_name)) return false;
+        third_binary_inst = third_inst;
+    }
 
     const call = switch (call_inst.kind) {
         .call => |call| call,
@@ -14001,25 +14011,60 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     const lhs_index = try fpParamIndex(function, lhs_name, function.ret_ty);
     const rhs_index = try fpParamIndex(function, rhs_name, function.ret_ty);
     if (lhs_index != 0 or rhs_index != 1) return error.UnsupportedLiveAcrossCall;
+    var addend_count: usize = 2;
+    if (third_binary_inst) |third_inst| {
+        const third_binary = switch (third_inst.kind) {
+            .binary => |third_binary| third_binary,
+            else => return false,
+        };
+        if (third_binary.op != .fadd or !third_binary.ty.eql(function.ret_ty)) return false;
+        const third_lhs_is_previous = isNamed(third_binary.lhs, binary_name);
+        const third_rhs_is_previous = isNamed(third_binary.rhs, binary_name);
+        if (third_lhs_is_previous == third_rhs_is_previous) return false;
+        const third_value = if (third_lhs_is_previous) third_binary.rhs else third_binary.lhs;
+        const third_name = switch (third_value) {
+            .named => |name| name,
+            .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+        };
+        const third_index = try fpParamIndex(function, third_name, function.ret_ty);
+        if (third_index != 2) return error.UnsupportedLiveAcrossCall;
+        addend_count = 3;
+    }
 
-    const frame_bytes: u8 = if (function.ret_ty.eql(.float)) 8 else 24;
+    const frame_bytes: u8 = if (function.ret_ty.eql(.float))
+        if (addend_count == 2) 8 else 24
+    else if (addend_count == 2) 24 else 40;
     try appendStackFrame(allocator, machine, frame_bytes);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
         try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+        if (addend_count == 3) {
+            try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm2, .frame_index = .slot2 } });
+        }
     } else {
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+        if (addend_count == 3) {
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
+        }
     }
     try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
     if (function.ret_ty.eql(.float)) {
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
         try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
         try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+        if (addend_count == 3) {
+            try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
+            try machine.instructions.append(allocator, .addss_xmm1_xmm0);
+        }
     } else {
         try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
         try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
         try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+        if (addend_count == 3) {
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
+            try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+        }
     }
     try appendStackFrameEnd(allocator, machine, frame_bytes);
     try machine.instructions.append(allocator, .ret);

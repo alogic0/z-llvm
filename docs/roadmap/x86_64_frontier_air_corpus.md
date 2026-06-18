@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=75
-structured_functions=75
-generic_codegen_functions=75
-generic_cfg_functions=75
+discovered_functions=77
+structured_functions=77
+generic_codegen_functions=77
+generic_cfg_functions=77
 structural_matcher_functions=0
-structured_air_v2_functions=75
-typed_air_operand_functions=75
+structured_air_v2_functions=77
+typed_air_operand_functions=77
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=75
+generic_lowering_functions=77
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=75
+object_emitted_functions=77
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -166,6 +166,10 @@ Closed in the current memory/aggregate frontier slice:
   live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1` to aligned
   frame slots across a no-argument external C ABI `void` helper and reloaded
   for a post-call `fadd` return
+- third selected SSE live-across-call row in `frontier_sysv_abi.zig`: three
+  live `f32` or `f64` parameters are spilled from `%xmm0`/`%xmm1`/`%xmm2` to
+  aligned frame slots across a no-argument external C ABI `void` helper and
+  reloaded for a two-step post-call `fadd` return
 
 Remaining measured frontier blockers kept out of accepted rows:
 
@@ -185,8 +189,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   `{ i64, i32, i64, i32 }` copy; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
-  values, and broader SSE live-across-call frames beyond the selected one-live
-  `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes
+  values, and broader SSE live-across-call frames beyond the selected one-live,
+  two-live, and three-live `f32`/`f64` no-argument-call shapes
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

@@ -148,7 +148,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate argument field reads, register return, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate argument field reads, register return, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return, and selected three-live f32/f64 spill/reload across the same helper shape before a two-step post-call fadd return
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -171,6 +171,9 @@ from %xmm0 to an aligned frame slot and reloaded to %xmm0 for return
 selected two-live f32/f64 values across a no-argument direct C ABI void call are
 spilled from %xmm0/%xmm1 to aligned frame slots and reloaded for a post-call
 fadd return
+selected three-live f32/f64 values across a no-argument direct C ABI void call are
+spilled from %xmm0/%xmm1/%xmm2 to aligned frame slots and reloaded for a
+two-step post-call fadd return
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
 INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
 INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add-chain,
@@ -234,7 +237,8 @@ selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
 selected up-to-six-live-i32 spill/reload call frame
 selected one-live f32/f64 SSE spill/reload call frame
-unsupported stack-passed and broader SSE live-across-call pressure diagnostic
+selected two-/three-live f32/f64 no-argument-call spill/reload frames
+unsupported stack-passed and broader-than-three-live SSE live-across-call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
 ```
 
