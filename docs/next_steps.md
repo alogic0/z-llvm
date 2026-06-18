@@ -361,12 +361,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=65`,
-`generic_codegen_functions=65`, `generic_cfg_functions=65`,
+frontier gate reports `source_rows=13`, `discovered_functions=66`,
+`generic_codegen_functions=66`, `generic_cfg_functions=66`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=65`, `object_failures=0`,
+`object_emitted_functions=66`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -397,18 +397,21 @@ through the independent SysV GPR/SSE streams. The SSE aggregate frontier row
 adds `{ double, double }` SSE/SSE field reads and register aggregate return in
 `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
 `{ double, i64 }` SSE/INTEGER field reads and register aggregate return in
-`%xmm0`/`%rax`. The SSE live-across-call frontier row adds selected
-one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call.
+`%xmm0`/`%rax`. The SSE live-across-call frontier rows add selected
+one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call
+and a selected two-live `f32` spill/reload frame across a no-argument helper
+before a post-call `fadd` return.
 The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
-private helper graphs with stack-passed live values, multiple live SSE values, or live values across calls,
+private helper graphs with stack-passed live values, broader live SSE values, or live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field
 reads, and generated normal MEMORY i64 field/copy forms currently proven
 through seven fields, arbitrary non-selected sret/byval copies, varargs,
 vectors, stack-passed live values, and broader SSE live-across-call frames
-beyond the selected one-live `f32`/`f64` direct-call shape. The accepted frontier rows use typed
+beyond the selected one-live `f32`/`f64` and two-live `f32` no-argument-call
+shapes. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
 optimizer, LLVM TargetMachine, or LLD are involved.

@@ -6001,6 +6001,46 @@ test "x86_64 codegen preserves live f32 parameter across direct call" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
 }
 
+test "x86_64 codegen preserves two live f32 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch()
+        \\
+        \\define float @caller(float %a, float %b) {
+        \\entry:
+        \\  call void @touch()
+        \\  %sum = fadd float %a, %b
+        \\  ret float %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_8);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    var saw_touch_call = false;
+    for (machine.instructions.items) |instruction| switch (instruction) {
+        .direct_call => |call| {
+            if (std.mem.eql(u8, call.symbol, "touch") and call.ret_ty == .void) saw_touch_call = true;
+        },
+        else => {},
+    };
+    try std.testing.expect(saw_touch_call);
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .addss_xmm1_xmm0);
+    try expectMachineInstruction(machine.instructions.items, .add_rsp_8);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[machine.instructions.items.len - 1]);
+}
+
 test "x86_64 codegen supports mixed integer and SSE call streams with stack args" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

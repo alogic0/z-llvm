@@ -1500,10 +1500,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_six_live_after_call(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_six_live_after_call");
     \\extern float z_frontier_f32_live_after_call(float, float) __asm__("frontier_sysv_abi.frontier_f32_live_after_call");
     \\extern double z_frontier_f64_live_after_call(double, double) __asm__("frontier_sysv_abi.frontier_f64_live_after_call");
+    \\extern float z_frontier_two_f32_live_sum_after_call(float, float) __asm__("frontier_sysv_abi.frontier_two_f32_live_sum_after_call");
     \\volatile float frontier_seen_f32 = 0.0f;
     \\volatile double frontier_seen_f64 = 0.0;
     \\void frontier_touch_f32(float value) { frontier_seen_f32 = value; }
     \\void frontier_touch_f64(double value) { frontier_seen_f64 = value; }
+    \\void frontier_touch_none(void) {}
     \\int main(void) {
     \\    struct Pair64 pair = z_frontier_pair64_make(0x1122334455667788LL, 0x0102030405060708LL);
     \\    if (pair.a != 0x1122334455667788LL || pair.b != 0x0102030405060708LL) return 1;
@@ -1516,6 +1518,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_six_live_after_call(2, 3, 5, 7, 11, 13) != 54) return 8;
     \\    if (z_frontier_f32_live_after_call(4.5f, 2.25f) != 4.5f || frontier_seen_f32 != 2.25f) return 9;
     \\    if (z_frontier_f64_live_after_call(9.5, 3.25) != 9.5 || frontier_seen_f64 != 3.25) return 10;
+    \\    if (z_frontier_two_f32_live_sum_after_call(1.5f, 2.75f) != 4.25f) return 11;
     \\    return 0;
     \\}
     \\

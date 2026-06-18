@@ -12584,6 +12584,10 @@ fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineF
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgFpVoidCallBinaryReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgFpVoidCallParamReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -13769,6 +13773,60 @@ fn lowerGenericCfgFpVoidCallParamReturn(
     } else {
         try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
     }
+    try appendStackFrameEnd(allocator, machine, 8);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpVoidCallBinaryReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!function.ret_ty.eql(.float) or !ret.ty.eql(.float) or block.instructions.items.len != 2) return false;
+    const call_inst = block.instructions.items[0];
+    const binary_inst = block.instructions.items[1];
+    if (call_inst.removed or binary_inst.removed) return false;
+    const binary_name = binary_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, binary_name)) return false;
+
+    const call = switch (call_inst.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.args.items.len != 0 or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+
+    const binary = switch (binary_inst.kind) {
+        .binary => |binary| binary,
+        else => return false,
+    };
+    if (binary.op != .fadd or !binary.ty.eql(.float)) return false;
+    const lhs_name = switch (binary.lhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const rhs_name = switch (binary.rhs) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const lhs_index = try fpParamIndex(function, lhs_name, .float);
+    const rhs_index = try fpParamIndex(function, rhs_name, .float);
+    if (lhs_index != 0 or rhs_index != 1) return error.UnsupportedLiveAcrossCall;
+
+    try appendStackFrame(allocator, machine, 8);
+    try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+    try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm1, .frame_index = .slot1 } });
+    try machine.instructions.append(allocator, .addss_xmm1_xmm0);
     try appendStackFrameEnd(allocator, machine, 8);
     try machine.instructions.append(allocator, .ret);
     return true;
