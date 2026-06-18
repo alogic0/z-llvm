@@ -5836,6 +5836,44 @@ test "x86_64 codegen rejects unsupported call ABI shapes" {
         error.UnsupportedCodegenCallingConvention,
         codegen.x86_64.lowerFunction(std.testing.allocator, unsupported_cc_module.target_triple.?, unsupported_cc_module.functions.items[0]),
     );
+
+    const tail_call_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a) {
+        \\entry:
+        \\  %r = tail call i32 @callee(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var tail_call_module = try ir.Module.parse(std.testing.allocator, tail_call_input);
+    defer tail_call_module.deinit();
+    try tail_call_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenAbi,
+        codegen.x86_64.lowerFunction(std.testing.allocator, tail_call_module.target_triple.?, tail_call_module.functions.items[0]),
+    );
+
+    const indirect_call_input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @caller(ptr %fn, i32 %a) {
+        \\entry:
+        \\  %r = call i32 %fn(i32 %a)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var indirect_call_module = try ir.Module.parse(std.testing.allocator, indirect_call_input);
+    defer indirect_call_module.deinit();
+    try indirect_call_module.verify();
+    try std.testing.expectError(
+        error.UnsupportedCodegenInstruction,
+        codegen.x86_64.lowerFunction(std.testing.allocator, indirect_call_module.target_triple.?, indirect_call_module.functions.items[0]),
+    );
 }
 
 test "x86_64 codegen supports one stack-passed i32 call argument" {

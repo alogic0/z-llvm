@@ -21312,6 +21312,7 @@ fn appendI32CallArgs(
     function: ir.Function,
     call: ir.CallInst,
 ) !usize {
+    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
     if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
     var stack_arg_count: usize = 0;
     var stack_args: [3]i32 = undefined;
@@ -21368,6 +21369,7 @@ fn appendSysVScalarCallArgs(
     // i32/i64 integer or pointer-class values in the integer stream, f32/f64 in
     // the SSE stream, and up to three constant i32 stack arguments. Varargs,
     // byval/sret attrs, vectors, and aggregate classes fail closed here.
+    if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
     }
