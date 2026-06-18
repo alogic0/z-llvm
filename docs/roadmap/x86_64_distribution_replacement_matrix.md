@@ -382,26 +382,31 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=10`, `discovered_functions=27`,
-`generic_codegen_functions=27`, `generic_cfg_functions=27`,
+three release modes at `source_rows=11`, `discovered_functions=32`,
+`generic_codegen_functions=32`, `generic_cfg_functions=32`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=27`, `object_failures=0`,
+`object_emitted_functions=32`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
-green at `inspected=10`, `elf64_rel=10`, `relocation_rows=2`, `tls_rows=1`,
+green at `inspected=11`, `elf64_rel=11`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=0`, `unsupported_relocation_rows=0`, and
 `local_fail=0`. Frontier native-link and executable proof are green for all
-three modes at `native_link_accepted_rows=10`, `executable_ok_rows=10`,
+three modes at `native_link_accepted_rows=11`, `executable_ok_rows=11`,
 `link_only_rows=0`, `runtime_boundary_rows=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The memory and
 aggregate frontier slice closes selected nested loop-memory CFG, nested
 extern-struct field GEP, dynamic pointer-element GEP, and branch-local
-global/TLS add/sub updates. Remaining non-accepted blockers are mixed
-int-to-float multiply/add pipelines, multi-call live-value helper graphs,
-alternate safety-guard control flow, and broader unknown aggregate, pointer,
-and global/TLS forms outside the selected scalar subset. The frontier audit
-lives in `docs/roadmap/x86_64_frontier_air_corpus.md`.
+global/TLS add/sub updates. The first SysV ABI closure-wave slice adds small
+INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate argument
+field reads from the SysV integer register pair, and a selected two-live-i32
+direct-call spill/reload frame with executable proof. Remaining non-accepted
+blockers are mixed int-to-float multiply/add pipelines, helper graphs with more
+than two live integer values across calls, alternate safety-guard control flow,
+broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
+subset, full SysV aggregate classes, arbitrary sret/byval copies, varargs, and
+vectors. The frontier audit lives in
+`docs/roadmap/x86_64_frontier_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:

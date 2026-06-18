@@ -59,6 +59,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .movq_xmm_rax => |reg| try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x0f, 0x7e, @as(u8, 0xc0) + (@as(u8, reg.lowCode()) << 3) }),
             .mov_arg_eax => |reg| try encodeRegToEax(&bytes, allocator, 0x89, reg),
             .mov_arg_arg => |mov| try encodeRegToReg(&bytes, allocator, mov.dst, mov.src),
+            .mov_arg64_arg => |mov| try encodeReg64ToReg64(&bytes, allocator, mov.dst, mov.src),
             .binary_arg_eax => |binary| try encodeRegToEax(&bytes, allocator, binaryOpcode(binary.op), binary.reg),
             .add_stack_disp8_eax => |disp| {
                 try bytes.appendSlice(allocator, &.{ 0x03, 0x44, 0x24 });
@@ -333,6 +334,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .movq_xmm_rax => 5,
         .mov_arg_eax => |reg| if (reg.rexR()) 3 else 2,
         .mov_arg_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
+        .mov_arg64_arg => |mov| if (mov.src.rexR() or mov.dst.rexR()) 3 else 2,
         .binary_arg_eax => |binary| if (binary.reg.rexR()) 3 else 2,
         .add_stack_disp8_eax => 4,
         .add_eax_imm32 => 5,
@@ -512,6 +514,15 @@ fn encodeRegToReg(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: 
         if (dst.rexR()) rex |= 0x01;
         try bytes.append(allocator, rex);
     }
+    try bytes.append(allocator, 0x89);
+    try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
+}
+
+fn encodeReg64ToReg64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, dst: x86_64.ArgReg, src: x86_64.ArgReg) !void {
+    var rex: u8 = 0x48;
+    if (src.rexR()) rex |= 0x04;
+    if (dst.rexR()) rex |= 0x01;
+    try bytes.append(allocator, rex);
     try bytes.append(allocator, 0x89);
     try bytes.append(allocator, 0xc0 | (@as(u8, src.lowCode()) << 3) | @as(u8, dst.lowCode()));
 }

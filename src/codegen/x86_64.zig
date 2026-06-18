@@ -157,6 +157,10 @@ pub const Instruction = union(enum) {
         dst: ArgReg,
         src: ArgReg,
     },
+    mov_arg64_arg: struct {
+        dst: ArgReg,
+        src: ArgReg,
+    },
     binary_arg_eax: struct {
         op: MachineBinaryOp,
         reg: ArgReg,
@@ -5391,9 +5395,205 @@ fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
+    if (try lowerSmallIntegerAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerTruncI64ArgReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerMakePairReturn(allocator, machine, function, block, ret)) return true;
     return false;
+}
+
+const SysVSmallIntegerAggregate = struct {
+    eightbytes: u2,
+    size_bytes: u8,
+};
+
+fn classifySysVSmallIntegerAggregate(ty: ir.Type) ?SysVSmallIntegerAggregate {
+    const text = switch (ty) {
+        .aggregate => |text| text,
+        else => return null,
+    };
+    if (text.len < 2 or text[0] != '{' or text[text.len - 1] != '}') return null;
+    var fields = std.mem.splitScalar(u8, text[1 .. text.len - 1], ',');
+    var offset: u8 = 0;
+    var saw_field = false;
+    while (fields.next()) |raw_field| {
+        const field = std.mem.trim(u8, raw_field, " \t");
+        const bits: u16 = if (std.mem.eql(u8, field, "i8"))
+            8
+        else if (std.mem.eql(u8, field, "i16"))
+            16
+        else if (std.mem.eql(u8, field, "i32"))
+            32
+        else if (std.mem.eql(u8, field, "i64"))
+            64
+        else
+            return null;
+        const size: u8 = @intCast(bits / 8);
+        const alignment: u8 = @min(size, 8);
+        const misalignment = offset % alignment;
+        if (misalignment != 0) offset += alignment - misalignment;
+        if (offset >= 16 or offset + size > 16) return null;
+        offset += size;
+        saw_field = true;
+    }
+    if (!saw_field or offset == 0) return null;
+    return .{
+        .eightbytes = if (offset <= 8) 1 else 2,
+        .size_bytes = offset,
+    };
+}
+
+fn lowerSmallIntegerAggregateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    const classification = classifySysVSmallIntegerAggregate(function.ret_ty) orelse return false;
+    if (classification.eightbytes != 2 or !ret.ty.eql(function.ret_ty)) return false;
+    if (block.instructions.items.len != 2) return false;
+    const first_inst = block.instructions.items[0];
+    const second_inst = block.instructions.items[1];
+    if (first_inst.removed or second_inst.removed) return false;
+    const first_name = first_inst.result orelse return false;
+    const second_name = second_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, second_name)) return false;
+
+    const first = switch (first_inst.kind) {
+        .insertvalue => |insert| insert,
+        else => return false,
+    };
+    const second = switch (second_inst.kind) {
+        .insertvalue => |insert| insert,
+        else => return false,
+    };
+    if (!first.aggregate_ty.eql(function.ret_ty) or !second.aggregate_ty.eql(function.ret_ty)) return false;
+    if (first.aggregate != .undef or !isNamed(second.aggregate, first_name)) return false;
+    if (!std.mem.eql(u8, first.indices, "0") or !std.mem.eql(u8, second.indices, "1")) return false;
+    if (!first.value_ty.eql(.{ .int = 64 }) or !second.value_ty.eql(.{ .int = 64 })) return false;
+    const first_reg = try paramValueReg(function, first.value, .{ .int = 64 });
+    const second_reg = try paramValueReg(function, second.value, .{ .int = 64 });
+
+    try machine.instructions.append(allocator, .{ .mov_arg_rax = first_reg });
+    try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = second_reg } });
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerSmallIntegerAggregateFieldReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(.{ .int = 64 }) or block.instructions.items.len != 4) return false;
+    const alloca_inst = block.instructions.items[0];
+    const store_inst = block.instructions.items[1];
+    const gep_inst = block.instructions.items[2];
+    const load_inst = block.instructions.items[3];
+    if (alloca_inst.removed or store_inst.removed or gep_inst.removed or load_inst.removed) return false;
+    const alloca_name = alloca_inst.result orelse return false;
+    const gep_name = gep_inst.result orelse return false;
+    const load_name = load_inst.result orelse return false;
+    if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
+
+    const alloca = switch (alloca_inst.kind) {
+        .alloca => |alloca| alloca,
+        else => return false,
+    };
+    const classification = classifySysVSmallIntegerAggregate(alloca.allocated_ty) orelse return false;
+    if (classification.eightbytes != 2) return false;
+
+    const store = switch (store_inst.kind) {
+        .store => |store| store,
+        else => return false,
+    };
+    if (!store.ty.eql(alloca.allocated_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name)) return false;
+    const param_name = switch (store.value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+
+    const gep = switch (gep_inst.kind) {
+        .gep => |gep| gep,
+        else => return false,
+    };
+    if (!gep.source_ty.eql(alloca.allocated_ty) or !isNamed(gep.ptr, alloca_name)) return false;
+    if (gep.indices.items.len != 2) return false;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 32 })) return false;
+    const field_index = switch (gep.indices.items[1].value) {
+        .int => |index| index,
+        else => return false,
+    };
+    if (field_index < 0 or field_index >= classification.eightbytes) return false;
+
+    const load = switch (load_inst.kind) {
+        .load => |load| load,
+        else => return false,
+    };
+    if (!load.ty.eql(.{ .int = 64 }) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+
+    try emitSysVSmallIntegerAggregateFieldIntoRax(allocator, machine, function, param_name, alloca.allocated_ty, @intCast(field_index));
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn emitSysVSmallIntegerAggregateFieldIntoRax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    field_index: u1,
+) !void {
+    const location = try sysvSmallIntegerAggregateFieldLocation(function, param_name, aggregate_ty, field_index);
+    switch (location) {
+        .reg => |reg| try machine.instructions.append(allocator, .{ .mov_arg_rax = reg }),
+        .stack => |offset| try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = offset }),
+    }
+}
+
+const SysVAggregateFieldLocation = union(enum) {
+    reg: ArgReg,
+    stack: u8,
+};
+
+fn sysvSmallIntegerAggregateFieldLocation(
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    field_index: u1,
+) !SysVAggregateFieldLocation {
+    var int_index: usize = 0;
+    var stack_index: usize = 0;
+    for (function.params.items) |param| {
+        if (std.mem.eql(u8, param.name, param_name)) {
+            if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
+            const classification = classifySysVSmallIntegerAggregate(param.ty) orelse return error.UnsupportedCodegenAbi;
+            if (classification.eightbytes != 2) return error.UnsupportedCodegenAbi;
+            const target_index = int_index + field_index;
+            if (target_index < 6) return .{ .reg = try ArgReg.fromIndex(target_index) };
+            const offset = 8 + (stack_index + field_index) * 8;
+            if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+            return .{ .stack = @intCast(offset) };
+        }
+        if (param.ty.eql(.{ .int = 1 }) or param.ty.eql(.{ .int = 8 }) or param.ty.eql(.{ .int = 16 }) or
+            param.ty.eql(.{ .int = 32 }) or param.ty.eql(.{ .int = 64 }) or param.ty.eql(.ptr))
+        {
+            if (int_index >= 6) stack_index += 1;
+            int_index += 1;
+        } else if (classifySysVSmallIntegerAggregate(param.ty)) |classification| {
+            var field: usize = 0;
+            while (field < classification.eightbytes) : (field += 1) {
+                if (int_index >= 6) stack_index += 1;
+                int_index += 1;
+            }
+        }
+    }
+    return error.UnsupportedCodegenValue;
 }
 
 fn lowerAggregatePairAbiFamilyReturn(
@@ -11260,17 +11460,7 @@ fn emitGenericCfgI32ValueIntoEax(
                                 .binary, .select, .call => {
                                     if (!genericCfgSupportsSingleBlockI32Value(function, block, binary.lhs)) return error.UnsupportedCodegenValue;
                                     try emitGenericCfgI32ValueIntoEax(allocator, machine, function, block, binary.rhs);
-                                    switch (binary.lhs) {
-                                        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
-                                        .named => |lhs_name| {
-                                            if (try registerParamRegOrNull(function, lhs_name, .{ .int = 32 })) |lhs_reg| {
-                                                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = lhs_reg } });
-                                            } else if (try stackParamDisp8OrNull(function, lhs_name, .{ .int = 32 })) |offset| {
-                                                try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
-                                            } else return error.UnsupportedCodegenValue;
-                                        },
-                                        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-                                    }
+                                    try emitGenericCfgI32AddValueToEax(allocator, machine, function, block, binary.lhs);
                                 },
                                 else => return error.UnsupportedCodegenInstruction,
                             }
@@ -11282,6 +11472,37 @@ fn emitGenericCfgI32ValueIntoEax(
                 .select => |select| try lowerGenericCfgSelectReturnValue(allocator, machine, function, block, select, 0),
                 .phi, .icmp, .fcmp, .cast, .freeze, .alloca, .store, .atomicrmw, .cmpxchg, .fence, .extractelement, .insertelement, .shufflevector, .extractvalue, .insertvalue, .gep => return error.UnsupportedCodegenInstruction,
             }
+        },
+        .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
+    }
+}
+
+fn emitGenericCfgI32AddValueToEax(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    value: ir.Value,
+) !void {
+    switch (value) {
+        .int => |int| try machine.instructions.append(allocator, .{ .add_eax_imm32 = try i32Value(int) }),
+        .named => |name| {
+            if (try registerParamRegOrNull(function, name, .{ .int = 32 })) |reg| {
+                try machine.instructions.append(allocator, .{ .binary_arg_eax = .{ .op = .add, .reg = reg } });
+                return;
+            }
+            if (try stackParamDisp8OrNull(function, name, .{ .int = 32 })) |offset| {
+                try machine.instructions.append(allocator, .{ .add_stack_disp8_eax = offset });
+                return;
+            }
+            const instruction = findInstruction(block, name) orelse return error.UnsupportedCodegenValue;
+            const binary = switch (instruction.kind) {
+                .binary => |binary| binary,
+                else => return error.UnsupportedCodegenValue,
+            };
+            if (!binary.ty.eql(.{ .int = 32 }) or binary.op != .add) return error.UnsupportedCodegenInstruction;
+            try emitGenericCfgI32AddValueToEax(allocator, machine, function, block, binary.lhs);
+            try emitGenericCfgI32AddValueToEax(allocator, machine, function, block, binary.rhs);
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     }
@@ -11359,12 +11580,13 @@ fn emitGenericCfgI32CallIntoEax(
     if (!call.ret_ty.eql(.{ .int = 32 }) or call.args.items.len > 9) return error.UnsupportedCodegenInstruction;
     if (call.callee_value != null or call.inline_asm != null) return error.UnsupportedCodegenInstruction;
     if (!callIsFastcc(call.calling_conv)) try validateDefaultCallConv(call.calling_conv);
-    const stack_arg_count = try appendI32CallArgs(allocator, machine, function, call);
-    const live_param = try singleLiveParamAfter(function, block, instruction_index);
-    if (stack_arg_count != 0 and live_param != null) return error.UnsupportedLiveAcrossCall;
+    const stack_arg_count = try i32CallStackArgCount(call);
+    const live_params = try liveParamsAfter(function, block, instruction_index);
+    if (stack_arg_count != 0 and live_params.count != 0) return error.UnsupportedLiveAcrossCall;
     if (stack_arg_count == 0) {
-        try appendAlignedDirectCallPreservingI32Param(allocator, machine, call.callee, call.ret_ty, live_param);
+        try appendAlignedDirectCallPreservingI32Params(allocator, machine, function, call, live_params);
     } else {
+        _ = try appendI32CallArgs(allocator, machine, function, call);
         try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
     }
 }
@@ -20031,6 +20253,19 @@ fn appendI32CallArgs(
     return stack_arg_count;
 }
 
+fn i32CallStackArgCount(call: ir.CallInst) !usize {
+    if (call.args.items.len > 9) return error.UnsupportedCodegenAbi;
+    var stack_arg_count: usize = 0;
+    for (call.args.items, 0..) |arg, index| {
+        if (!arg.ty.eql(.{ .int = 32 })) return error.UnsupportedCodegenType;
+        if (index >= 6) {
+            if (arg.value != .int) return error.UnsupportedCodegenValue;
+            stack_arg_count += 1;
+        }
+    }
+    return stack_arg_count;
+}
+
 fn appendSysVScalarCallArgs(
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
@@ -20156,6 +20391,46 @@ fn appendAlignedDirectCallPreservingI32Param(
         .frame_index = .slot0,
     } });
     try appendStackFrameEnd(allocator, machine, 8);
+}
+
+fn appendAlignedDirectCallPreservingI32Params(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    call: ir.CallInst,
+    live_params: LiveParamSet,
+) !void {
+    switch (live_params.count) {
+        0 => {
+            _ = try appendI32CallArgs(allocator, machine, function, call);
+            try appendAlignedDirectCall(allocator, machine, call.callee, call.ret_ty);
+        },
+        1 => {
+            try appendStackFrame(allocator, machine, 8);
+            try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
+                .frame_index = .slot0,
+                .reg = live_params.regs[0],
+            } });
+            _ = try appendI32CallArgs(allocator, machine, function, call);
+            try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+            try machine.instructions.append(allocator, .{ .reload_arg_rsp = .{
+                .reg = live_params.regs[0],
+                .frame_index = .slot0,
+            } });
+            try appendStackFrameEnd(allocator, machine, 8);
+        },
+        2 => {
+            if (!live_params.has(.rdi) or !live_params.has(.rsi)) return error.UnsupportedLiveAcrossCall;
+            try appendStackFrame(allocator, machine, 24);
+            try machine.instructions.append(allocator, .spill_rdi_rsi_rsp24);
+            _ = try appendI32CallArgs(allocator, machine, function, call);
+            try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+            try machine.instructions.append(allocator, .reload_rdi_rsp24);
+            try machine.instructions.append(allocator, .reload_rsi_rsp24);
+            try appendStackFrameEnd(allocator, machine, 24);
+        },
+        else => return error.UnsupportedLiveAcrossCall,
+    }
 }
 
 fn appendPanicCall(allocator: std.mem.Allocator, machine: *MachineFunction, label: []const u8, symbol: []const u8) !void {
@@ -20591,6 +20866,107 @@ fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction
     return live;
 }
 
+const LiveParamSet = struct {
+    regs: [2]ArgReg = undefined,
+    count: usize = 0,
+
+    fn add(self: *LiveParamSet, reg: ArgReg) !void {
+        if (self.has(reg)) return;
+        if (self.count == self.regs.len) return error.UnsupportedLiveAcrossCall;
+        self.regs[self.count] = reg;
+        self.count += 1;
+    }
+
+    fn has(self: LiveParamSet, reg: ArgReg) bool {
+        for (self.regs[0..self.count]) |existing| {
+            if (existing == reg) return true;
+        }
+        return false;
+    }
+};
+
+fn liveParamsAfter(function: ir.Function, block: ir.BasicBlock, instruction_index: usize) !LiveParamSet {
+    var live: LiveParamSet = .{};
+    for (block.instructions.items[instruction_index + 1 ..]) |instruction| {
+        if (instruction.removed) continue;
+        try noteLiveParamsSet(function, block, instruction, &live);
+    }
+    if (block.terminator) |terminator| switch (terminator) {
+        .ret => |ret| if (ret.value) |value| try noteLiveValueSet(function, block, value, &live),
+        .br, .condbr, .@"switch", .indirectbr, .@"unreachable" => {},
+    };
+    return live;
+}
+
+fn noteLiveParamsSet(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction, live: *LiveParamSet) !void {
+    switch (instruction.kind) {
+        .binary => |binary| {
+            try noteLiveValueSet(function, block, binary.lhs, live);
+            try noteLiveValueSet(function, block, binary.rhs, live);
+        },
+        .call => |call| for (call.args.items) |arg| try noteLiveValueSet(function, block, arg.value, live),
+        .cast => |cast| try noteLiveValueSet(function, block, cast.value, live),
+        .freeze => |freeze| try noteLiveValueSet(function, block, freeze.value, live),
+        .icmp => |icmp| {
+            try noteLiveValueSet(function, block, icmp.lhs, live);
+            try noteLiveValueSet(function, block, icmp.rhs, live);
+        },
+        .fcmp => |fcmp| {
+            try noteLiveValueSet(function, block, fcmp.lhs, live);
+            try noteLiveValueSet(function, block, fcmp.rhs, live);
+        },
+        .select => |select| {
+            try noteLiveValueSet(function, block, select.cond, live);
+            try noteLiveValueSet(function, block, select.true_value, live);
+            try noteLiveValueSet(function, block, select.false_value, live);
+        },
+        .phi => |phi| for (phi.incoming.items) |incoming| try noteLiveValueSet(function, block, incoming.value, live),
+        .load => |load| try noteLiveValueSet(function, block, load.ptr, live),
+        .store => |store| {
+            try noteLiveValueSet(function, block, store.value, live);
+            try noteLiveValueSet(function, block, store.ptr, live);
+        },
+        .atomicrmw => |atomicrmw| {
+            try noteLiveValueSet(function, block, atomicrmw.ptr, live);
+            try noteLiveValueSet(function, block, atomicrmw.value, live);
+        },
+        .cmpxchg => |cmpxchg| {
+            try noteLiveValueSet(function, block, cmpxchg.ptr, live);
+            try noteLiveValueSet(function, block, cmpxchg.expected, live);
+            try noteLiveValueSet(function, block, cmpxchg.replacement, live);
+        },
+        .extractvalue => |extract| try noteLiveValueSet(function, block, extract.aggregate, live),
+        .insertvalue => |insert| {
+            try noteLiveValueSet(function, block, insert.aggregate, live);
+            try noteLiveValueSet(function, block, insert.value, live);
+        },
+        .gep => |gep| {
+            try noteLiveValueSet(function, block, gep.ptr, live);
+            for (gep.indices.items) |index| try noteLiveValueSet(function, block, index.value, live);
+        },
+        .alloca, .fence, .extractelement, .insertelement, .shufflevector => {},
+    }
+}
+
+fn noteLiveValueSet(function: ir.Function, block: ir.BasicBlock, value: ir.Value, live: *LiveParamSet) !void {
+    const name = switch (value) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return,
+    };
+    if (try paramRegOrNull(function, name, .{ .int = 32 })) |reg| {
+        try live.add(reg);
+        return;
+    }
+    const instruction = findInstruction(block, name) orelse return;
+    const binary = switch (instruction.kind) {
+        .binary => |binary| binary,
+        else => return,
+    };
+    if (!binary.ty.eql(.{ .int = 32 }) or binary.op != .add) return error.UnsupportedLiveAcrossCall;
+    try noteLiveValueSet(function, block, binary.lhs, live);
+    try noteLiveValueSet(function, block, binary.rhs, live);
+}
+
 fn noteLiveParams(function: ir.Function, instruction: ir.Instruction, live: *?ArgReg) !void {
     switch (instruction.kind) {
         .binary => |binary| {
@@ -20937,6 +21313,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
+        .mov_arg64_arg,
         .binary_arg_eax,
         .add_stack_disp8_eax,
         .add_eax_imm32,
@@ -21099,7 +21476,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -21131,6 +21508,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .movq_xmm_rax,
         .mov_arg_eax,
         .mov_arg_arg,
+        .mov_arg64_arg,
         .binary_arg_eax,
         .add_stack_disp8_eax,
         .add_eax_imm32,

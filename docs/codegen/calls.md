@@ -1,10 +1,11 @@
 # Direct Calls and Stack-Frame Codegen
 
 This document tracks the call-codegen epic from the IR surface upward. The first
-implemented slice is an LLVM-compatible IR contract only: declarations and direct
-calls can be parsed, printed, verified, and carried conservatively through
-existing analysis and optimizer passes. Machine call lowering is intentionally
-not implemented yet.
+implemented slice began as an LLVM-compatible IR contract. Declarations and
+direct calls can be parsed, printed, verified, and carried conservatively
+through existing analysis and optimizer passes. Machine call lowering is now
+implemented for the selected x86_64 SysV release subset and remains fail-closed
+outside that subset.
 
 ## Upstream Mapping
 
@@ -33,10 +34,12 @@ local-only conservative:
   only direct named callees are accepted
   call attributes beyond the tiny preserved calling-convention subset are rejected
 
-bootstrap-only:
+selected backend subset:
   Machine IR direct-call representation supports assembly and ELF call relocations only
-  x86_64 argument move lowering only accepts already-matching i32 argument registers
-  no general stack-frame emission yet
+  x86_64 argument lowering supports selected i32/i64/pointer GPR args and f32/f64 SSE args
+  up to three constant i32 stack call arguments are accepted
+  one live i32 caller argument, or the selected two-live %rdi/%rsi shape, can be spilled across one call
+  selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
 ```
 
 ## Accepted IR Contract
@@ -73,11 +76,14 @@ Accepted call-codegen shape:
 
 ```text
 x86_64-linux SysV only
-i32 direct call arguments already in their ABI argument registers
-i32 call return in %eax
+i32/i64/pointer direct call arguments in the SysV integer stream
+f32/f64 direct call arguments in the independent SysV SSE stream
+i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
+selected small INTEGER/INTEGER aggregate return in %rax/%rdx
 void calls with no result
-one straight-line basic block
-at most one live i32 caller argument across one call
+one straight-line basic block or accepted generic CFG wrapper shape
+at most one live i32 caller argument across one call generally
+selected two-live-i32 %rdi/%rsi frame across one direct call
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -87,6 +93,19 @@ The local stack-alignment sequence is:
 subq $8, %rsp
 callq callee
 addq $8, %rsp
+```
+
+For the first broader SysV closure wave, a selected two-live-i32 frame uses a
+24-byte aligned frame and spills `%rdi`/`%rsi` before argument setup:
+
+```asm
+subq $24, %rsp
+movq %rdi, 8(%rsp)
+movq %rsi, 16(%rsp)
+callq callee
+movq 8(%rsp), %rdi
+movq 16(%rsp), %rsi
+addq $24, %rsp
 ```
 
 For one live caller argument, the same 8-byte alignment slot is used as a
@@ -120,7 +139,8 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-out of scope: general calling conventions, varargs, stack-passed arguments, tail calls, unwind, and debug-info call-site handling
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads
+out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
 
@@ -130,8 +150,9 @@ ABI-shaped attributes:
 byval(...) and sret(...) are preserved only on pointer parameters and verified
 as pointer-only annotations
 varargs remain rejected at declarations and call sites
-aggregate return lowering, hidden sret storage, stack-passed byval copies, and
-multi-target ABI parity are not implemented
+selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
+hidden sret storage, stack-passed byval copies, full aggregate classification,
+and multi-target ABI parity are not implemented
 ```
 
 ## Rejected Surface
@@ -181,8 +202,12 @@ call_return_used one-spill assembly fixture
 call_stack_slot stack-memory-to-call assembly, objdump, and readelf fixture
 call_internal assembly and objdump fixture
 unsupported non-default calling convention diagnostic
-unsupported stack-passed call argument diagnostic
-unsupported multiple-live-value call pressure diagnostic
+multiple stack-passed i32 call arguments
+mixed integer/SSE scalar call streams
+selected small INTEGER/INTEGER aggregate return and argument-field reads
+selected two-live-i32 spill/reload call frame
+unsupported wider live-value call pressure diagnostic
+unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
 ```
 
 Object relocation fixtures cover the current direct external call subset with

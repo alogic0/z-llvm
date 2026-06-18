@@ -5579,16 +5579,99 @@ test "x86_64 codegen rejects larger aggregate call and vector return ABI boundar
     );
 }
 
+test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i64, i64 } @make_pair64(i64 %a, i64 %b) {
+        \\entry:
+        \\  %field0 = insertvalue { i64, i64 } undef, i64 %a, 0
+        \\  %result = insertvalue { i64, i64 } %field0, i64 %b, 1
+        \\  ret { i64, i64 } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rsi } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
+test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument registers" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @second({ i64, i64 } %pair) {
+        \\entry:
+        \\  %slot = alloca { i64, i64 }
+        \\  store { i64, i64 } %pair, ptr %slot
+        \\  %field = getelementptr { i64, i64 }, ptr %slot, i64 0, i32 1
+        \\  %value = load i64, ptr %field
+        \\  ret i64 %value
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen preserves two live i32 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c) {
+        \\entry:
+        \\  %ab = add i32 %a, %b
+        \\  %r = call i32 @callee(i32 %c)
+        \\  %sum = add i32 %ab, %r
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_24, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.spill_rdi_rsi_rsp24, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.reload_rdi_rsp24, machine.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.reload_rsi_rsp24, machine.instructions.items[7]);
+}
+
 test "x86_64 codegen rejects unsupported call live pressure" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
-        \\declare i32 @callee()
+        \\declare i32 @callee(i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b) {
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d) {
         \\entry:
-        \\  %r = call i32 @callee()
-        \\  %sum = add i32 %a, %b
+        \\  %ab = add i32 %a, %b
+        \\  %abc = add i32 %ab, %c
+        \\  %r = call i32 @callee(i32 %d)
+        \\  %sum = add i32 %abc, %r
         \\  ret i32 %sum
         \\}
         \\

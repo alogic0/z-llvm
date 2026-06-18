@@ -288,6 +288,11 @@ pub fn firstUnsupported(
                 typedV2AggregateMakePairRecords(function_type, structured_air_v2)
         else
             false;
+    const typed_small_integer_aggregate =
+        if (function.structured_air_v2) |structured_air_v2|
+            typedV2SmallIntegerAggregateRecords(function_type, structured_air_v2)
+        else
+            false;
     const typed_error_union_payload =
         if (function.structured_air_v2) |structured_air_v2|
             typedV2ErrorUnionPayloadRecords(function, function_type, structured_air_v2)
@@ -387,6 +392,7 @@ pub fn firstUnsupported(
         typed_slice_sum or
         typed_packed_bits or
         typed_aggregate_pair or
+        typed_small_integer_aggregate or
         typed_mix_c_add_may_panic or
         mixCAddMayPanicShape(function) or
         typed_checked_int_from_float or
@@ -695,6 +701,9 @@ fn lowerFunctionTypedV2(
     if (try lowerTypedV2AggregatePairAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
+    if (try lowerTypedV2SmallIntegerAggregateAbi(allocator, air_function, function_type, structured_air_v2)) |function| {
+        return function;
+    }
     if (try lowerTypedV2ErrorUnionPayload(allocator, air_function, function_type, structured_air_v2)) |function| {
         return function;
     }
@@ -927,6 +936,37 @@ fn typedCalleeNameCount(structured_air_v2: air_export.StructuredAirV2, callee_na
 
 fn typedStoreOpcodeCount(structured_air_v2: air_export.StructuredAirV2) usize {
     return typedOpcodeCount(structured_air_v2, "store") + typedOpcodeCount(structured_air_v2, "store_safe");
+}
+
+fn lowerTypedV2SmallIntegerAggregateAbi(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) !?ir.Function {
+    if (!typedV2SmallIntegerAggregateRecords(function_type, structured_air_v2)) return null;
+    return try lowerSmallIntegerAggregateMake(allocator, air_function);
+}
+
+fn typedV2SmallIntegerAggregateRecords(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+) bool {
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 64 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }))
+    {
+        return false;
+    }
+    const returns_pair64 = function_type.return_type.ir_type.eql(.{ .aggregate = "{ i64, i64 }" }) or
+        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1;
+    return returns_pair64 and
+        typedOpcodeCount(structured_air_v2, "arg") == 2 and
+        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
+        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
+        typedStoreOpcodeCount(structured_air_v2) == 2 and
+        typedOpcodeCount(structured_air_v2, "ret_load") == 1;
 }
 
 fn typedHasReturnOpcode(structured_air_v2: air_export.StructuredAirV2) bool {
@@ -3090,6 +3130,50 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
     return function;
 }
 
+fn lowerSmallIntegerAggregateMake(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+    const function_type = try parseFunctionType(allocator, air_function.type_text);
+    defer function_type.deinit(allocator);
+    const aggregate_ty: ir.Type = .{ .aggregate = "{ i64, i64 }" };
+    if (function_type.params.len != 2 or
+        !function_type.params[0].ir_type.eql(.{ .int = 64 }) or
+        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
+        !function_type.return_type.ir_type.eql(aggregate_ty))
+    {
+        return error.UnsupportedAir;
+    }
+    var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
+    errdefer function.deinit(allocator);
+    function.linkage = if (function_type.c_calling_convention) .default else .internal;
+    function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
+    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    var block = ir.BasicBlock.init("entry");
+    errdefer block.deinit(allocator);
+    try block.instructions.append(allocator, .{
+        .result = "field0",
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = aggregate_ty,
+            .aggregate = .undef,
+            .value_ty = .{ .int = 64 },
+            .value = .{ .named = "arg0" },
+            .indices = "0",
+        } },
+    });
+    try block.instructions.append(allocator, .{
+        .result = "result",
+        .kind = .{ .insertvalue = .{
+            .aggregate_ty = aggregate_ty,
+            .aggregate = .{ .named = "field0" },
+            .value_ty = .{ .int = 64 },
+            .value = .{ .named = "arg1" },
+            .indices = "1",
+        } },
+    });
+    block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = .{ .named = "result" } } };
+    try function.blocks.append(allocator, block);
+    return function;
+}
+
 fn lowerMixCAddMayPanic(allocator: std.mem.Allocator, module: *ir.Module, air_function: air_export.Function) !ir.Function {
     return lowerMixCAddMayPanicChecked(allocator, module, air_function, functionHasOpcode(air_function, "add_safe"));
 }
@@ -4588,6 +4672,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "frontier_nested_records.Outer")) {
         return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" } };
+    }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_abi.Pair64")) {
+        return .{ .ir_type = .{ .aggregate = "{ i64, i64 }" } };
     }
     if (std.mem.startsWith(u8, trimmed, "error{")) {
         if (std.mem.indexOf(u8, trimmed, "}!")) |_| return .{ .ir_type = .{ .int = 64 } };
