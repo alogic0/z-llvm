@@ -1562,6 +1562,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big8 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; long long h; };
     \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\struct BigMixed { long long a; int b; long long c; int d; };
+    \\struct BigArray { long long values[5]; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1584,6 +1585,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
     \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\extern struct BigMixed z_frontier_big_mixed_copy(struct BigMixed) __asm__("frontier_sysv_sret_byval.frontier_big_mixed_copy");
+    \\extern struct BigArray z_frontier_big_array_copy(struct BigArray) __asm__("frontier_sysv_sret_byval.frontier_big_array_copy");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1629,6 +1631,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct BigMixed mixed = { .a = 211, .b = 223, .c = 227, .d = 229 };
     \\    struct BigMixed copied_mixed = z_frontier_big_mixed_copy(mixed);
     \\    if (copied_mixed.a != 211 || copied_mixed.b != 223 || copied_mixed.c != 227 || copied_mixed.d != 229) return 22;
+    \\    struct BigArray array = { .values = { 233, 239, 241, 251, 257 } };
+    \\    struct BigArray copied_array = z_frontier_big_array_copy(array);
+    \\    if (copied_array.values[0] != 233 || copied_array.values[1] != 239 || copied_array.values[2] != 241 || copied_array.values[3] != 251 || copied_array.values[4] != 257) return 23;
     \\    return 0;
     \\}
     \\

@@ -61,6 +61,10 @@ const BigMixed = extern struct {
     d: i32,
 };
 
+const BigArray = extern struct {
+    values: [5]i64,
+};
+
 export fn frontier_big3_make(a: i64, b: i64, c: i64) Big3 {
     return .{ .a = a, .b = b, .c = c };
 }
@@ -146,5 +150,9 @@ export fn frontier_big_nested_sum_inner(value: BigNested) i64 {
 }
 
 export fn frontier_big_mixed_copy(value: BigMixed) BigMixed {
+    return value;
+}
+
+export fn frontier_big_array_copy(value: BigArray) BigArray {
     return value;
 }

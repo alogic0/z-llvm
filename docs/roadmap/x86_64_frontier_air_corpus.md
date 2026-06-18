@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=115
-structured_functions=115
-generic_codegen_functions=115
-generic_cfg_functions=115
+discovered_functions=116
+structured_functions=116
+generic_codegen_functions=116
+generic_cfg_functions=116
 structural_matcher_functions=0
-structured_air_v2_functions=115
-typed_air_operand_functions=115
+structured_air_v2_functions=116
+typed_air_operand_functions=116
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=115
+generic_lowering_functions=116
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=115
+object_emitted_functions=116
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -128,7 +128,9 @@ Closed in the current memory/aggregate frontier slice:
   leaves from the stack-passed by-value argument to the hidden sret destination
   using layout-derived byte offsets, including the nested `{ { i64, i64, i64 },
   { i64, i64, i64 } }` copy/read row and the mixed-width
-  `{ i64, i32, i64, i32 }` copy row
+  `{ i64, i32, i64, i32 }` copy row; the array-backed `{ [5 x i64] }` row
+  proves the same byte-offset copy path for integer array leaves inside a
+  normal MEMORY aggregate
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }`, selected
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as
@@ -234,8 +236,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   reads/returns including `[2]f64` array-in-struct and nested `{ { double },
   { double } }`, selected stack-passed register aggregate field reads, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
-  through eight flat fields, a nested two-Big3 aggregate, and a mixed-width
-  `{ i64, i32, i64, i32 }` copy; X87,
+  through eight flat fields, a nested two-Big3 aggregate, a mixed-width
+  `{ i64, i32, i64, i32 }` copy, and an array-backed `{ [5 x i64] }` copy; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, more than three
   stack-passed live values, and broader SSE live-across-call frames beyond the
