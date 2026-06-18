@@ -66,10 +66,12 @@ retq
 
 The single-slot shape is intentionally fixed at `(%rsp)` after the prologue
 adjustment. The broader selected call-preservation shape uses a 24-byte aligned
-frame and exposes fixed `slot0`, `slot1`, and `slot2` operands at `(%rsp)`,
-`4(%rsp)`, and `8(%rsp)` for up to three live i32 caller parameters across one
-direct call. Slot coloring, callee-saved areas, arbitrary local-spill
-allocation, and outgoing call-argument areas are still out of scope.
+frame for up to three live i32 caller parameters and a 40-byte aligned frame for
+four to six live i32 caller parameters. It exposes fixed `slot0`...`slot5`
+operands at `(%rsp)`, `4(%rsp)`, `8(%rsp)`, `12(%rsp)`, `16(%rsp)`, and
+`20(%rsp)`. Slot coloring, callee-saved areas, arbitrary local-spill
+allocation, SSE live-value spills, stack-passed live-value spills, and outgoing
+call-argument areas are still out of scope.
 
 Cycle 07 adds a handoff proof where the fixed slot feeds a direct call:
 

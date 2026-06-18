@@ -1495,6 +1495,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern long long z_frontier_pair64_second(struct Pair64) __asm__("frontier_sysv_abi.frontier_pair64_second");
     \\extern int z_frontier_two_live_after_call(int, int, int) __asm__("frontier_sysv_abi.frontier_two_live_after_call");
     \\extern int z_frontier_three_live_after_call(int, int, int, int) __asm__("frontier_sysv_abi.frontier_three_live_after_call");
+    \\extern int z_frontier_four_live_after_call(int, int, int, int) __asm__("frontier_sysv_abi.frontier_four_live_after_call");
+    \\extern int z_frontier_five_live_after_call(int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_five_live_after_call");
+    \\extern int z_frontier_six_live_after_call(int, int, int, int, int, int) __asm__("frontier_sysv_abi.frontier_six_live_after_call");
     \\int main(void) {
     \\    struct Pair64 pair = z_frontier_pair64_make(0x1122334455667788LL, 0x0102030405060708LL);
     \\    if (pair.a != 0x1122334455667788LL || pair.b != 0x0102030405060708LL) return 1;
@@ -1502,6 +1505,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_pair64_second(pair) != 0x0102030405060708LL) return 3;
     \\    if (z_frontier_two_live_after_call(7, 11, 13) != 31) return 4;
     \\    if (z_frontier_three_live_after_call(7, 11, 13, 17) != 48) return 5;
+    \\    if (z_frontier_four_live_after_call(2, 3, 5, 7) != 24) return 6;
+    \\    if (z_frontier_five_live_after_call(2, 3, 5, 7, 11) != 39) return 7;
+    \\    if (z_frontier_six_live_after_call(2, 3, 5, 7, 11, 13) != 54) return 8;
     \\    return 0;
     \\}
     \\

@@ -146,6 +146,9 @@ pub const FrameIndex = enum {
     slot0,
     slot1,
     slot2,
+    slot3,
+    slot4,
+    slot5,
 };
 
 pub const CodegenPath = enum {
@@ -260,6 +263,8 @@ pub const Instruction = union(enum) {
     push_imm32: i32,
     sub_rsp_24,
     add_rsp_24,
+    sub_rsp_40,
+    add_rsp_40,
     spill_arg_rsp: struct {
         frame_index: FrameIndex,
         reg: ArgReg,
@@ -20984,6 +20989,7 @@ fn appendStackFrame(allocator: std.mem.Allocator, machine: *MachineFunction, byt
     switch (bytes) {
         8 => try machine.instructions.append(allocator, .sub_rsp_8),
         24 => try machine.instructions.append(allocator, .sub_rsp_24),
+        40 => try machine.instructions.append(allocator, .sub_rsp_40),
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -20992,6 +20998,7 @@ fn appendStackFrameEnd(allocator: std.mem.Allocator, machine: *MachineFunction, 
     switch (bytes) {
         8 => try machine.instructions.append(allocator, .add_rsp_8),
         24 => try machine.instructions.append(allocator, .add_rsp_24),
+        40 => try machine.instructions.append(allocator, .add_rsp_40),
         else => return error.UnsupportedCodegenAbi,
     }
 }
@@ -21240,8 +21247,9 @@ fn appendAlignedDirectCallPreservingI32Params(
             } });
             try appendStackFrameEnd(allocator, machine, 8);
         },
-        2, 3 => {
-            try appendStackFrame(allocator, machine, 24);
+        2...6 => {
+            const frame_bytes: u8 = if (live_params.count <= 3) 24 else 40;
+            try appendStackFrame(allocator, machine, frame_bytes);
             var index: usize = 0;
             while (index < live_params.count) : (index += 1) {
                 try machine.instructions.append(allocator, .{ .spill_arg_rsp = .{
@@ -21258,7 +21266,7 @@ fn appendAlignedDirectCallPreservingI32Params(
                     .frame_index = frameIndexForLiveParam(index),
                 } });
             }
-            try appendStackFrameEnd(allocator, machine, 24);
+            try appendStackFrameEnd(allocator, machine, frame_bytes);
         },
         else => return error.UnsupportedLiveAcrossCall,
     }
@@ -21269,6 +21277,9 @@ fn frameIndexForLiveParam(index: usize) FrameIndex {
         0 => .slot0,
         1 => .slot1,
         2 => .slot2,
+        3 => .slot3,
+        4 => .slot4,
+        5 => .slot5,
         else => unreachable,
     };
 }
@@ -21707,7 +21718,7 @@ fn singleLiveParamAfter(function: ir.Function, block: ir.BasicBlock, instruction
 }
 
 const LiveParamSet = struct {
-    regs: [3]ArgReg = undefined,
+    regs: [6]ArgReg = undefined,
     count: usize = 0,
 
     fn add(self: *LiveParamSet, reg: ArgReg) !void {
@@ -21793,7 +21804,10 @@ fn noteLiveValueSet(function: ir.Function, block: ir.BasicBlock, value: ir.Value
         .named => |name| name,
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return,
     };
-    if (try paramRegOrNull(function, name, .{ .int = 32 })) |reg| {
+    if (paramRegOrNull(function, name, .{ .int = 32 }) catch |err| switch (err) {
+        error.UnsupportedCodegenAbi => return error.UnsupportedLiveAcrossCall,
+        else => return err,
+    }) |reg| {
         try live.add(reg);
         return;
     }
@@ -22215,6 +22229,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .push_imm32,
         .sub_rsp_24,
         .add_rsp_24,
+        .sub_rsp_40,
+        .add_rsp_40,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_rdi_rsi_rsp24,
@@ -22292,6 +22308,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_8, .add_rsp_8 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .push_imm32 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 8) % 16),
         .sub_rsp_24, .add_rsp_24 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 24) % 16),
+        .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
@@ -22416,6 +22433,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .push_imm32,
         .sub_rsp_24,
         .add_rsp_24,
+        .sub_rsp_40,
+        .add_rsp_40,
         .spill_arg_rsp,
         .reload_arg_rsp,
         .spill_rdi_rsi_rsp24,

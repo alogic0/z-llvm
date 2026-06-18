@@ -5119,24 +5119,30 @@ test "x86_64 encoding emits expected add args bytes" {
 test "x86_64 encoding sizes nonzero frame spill slots" {
     var machine = codegen.x86_64.MachineFunction.init("frame_slots", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);
-    try machine.instructions.append(std.testing.allocator, .sub_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .sub_rsp_40);
     try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
     try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
+    try machine.instructions.append(std.testing.allocator, .{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot4 } });
     try machine.instructions.append(std.testing.allocator, .{ .mov_imm_eax = 0 });
-    try machine.instructions.append(std.testing.allocator, .add_rsp_24);
+    try machine.instructions.append(std.testing.allocator, .add_rsp_40);
     try machine.instructions.append(std.testing.allocator, .ret);
 
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } }));
     try std.testing.expectEqual(@as(u32, 4), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } }));
+    try std.testing.expectEqual(@as(u32, 5), mc.encoding.instructionSize(.{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot4 } }));
     const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
     defer std.testing.allocator.free(bytes);
     try std.testing.expectEqualSlices(u8, &.{
-        0x48, 0x83, 0xec, 0x18,
+        0x48, 0x83, 0xec, 0x28,
         0x89, 0x74, 0x24, 0x04,
         0x8b, 0x54, 0x24, 0x08,
-        0xb8, 0x00, 0x00, 0x00,
-        0x00, 0x48, 0x83, 0xc4,
-        0x18, 0xc3,
+        0x44, 0x89, 0x4c, 0x24,
+        0x14, 0x44, 0x8b, 0x44,
+        0x24, 0x10, 0xb8, 0x00,
+        0x00, 0x00, 0x00, 0x48,
+        0x83, 0xc4, 0x28, 0xc3,
     }, bytes);
 }
 
@@ -6094,19 +6100,65 @@ test "x86_64 codegen preserves three live i32 params across direct call" {
     try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
 }
 
-test "x86_64 codegen rejects four live i32 params across direct call" {
+test "x86_64 codegen preserves six live i32 params across direct call" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
         \\declare i32 @callee(i32)
         \\
-        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e) {
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f) {
         \\entry:
         \\  %ab = add i32 %a, %b
         \\  %abc = add i32 %ab, %c
         \\  %abcd = add i32 %abc, %d
-        \\  %r = call i32 @callee(i32 %e)
-        \\  %sum = add i32 %abcd, %r
+        \\  %abcde = add i32 %abcd, %e
+        \\  %abcdef = add i32 %abcde, %f
+        \\  %r = call i32 @callee(i32 %f)
+        \\  %sum = add i32 %abcdef, %r
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try expectMachineInstruction(machine.instructions.items, .sub_rsp_40);
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot0, .reg = .rdi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot1, .reg = .rsi } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot2, .reg = .rdx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot3, .reg = .rcx } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot4, .reg = .r8 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .spill_arg_rsp = .{ .frame_index = .slot5, .reg = .r9 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdi, .frame_index = .slot0 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rsi, .frame_index = .slot1 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rdx, .frame_index = .slot2 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot3 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r8, .frame_index = .slot4 } });
+    try expectMachineInstruction(machine.instructions.items, .{ .reload_arg_rsp = .{ .reg = .r9, .frame_index = .slot5 } });
+}
+
+test "x86_64 codegen rejects seven live i32 params across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare i32 @callee(i32)
+        \\
+        \\define i32 @caller(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g) {
+        \\entry:
+        \\  %ab = add i32 %a, %b
+        \\  %abc = add i32 %ab, %c
+        \\  %abcd = add i32 %abc, %d
+        \\  %abcde = add i32 %abcd, %e
+        \\  %abcdef = add i32 %abcde, %f
+        \\  %abcdefg = add i32 %abcdef, %g
+        \\  %r = call i32 @callee(i32 %f)
+        \\  %sum = add i32 %abcdefg, %r
         \\  ret i32 %sum
         \\}
         \\

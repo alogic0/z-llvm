@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=51
-structured_functions=51
-generic_codegen_functions=51
-generic_cfg_functions=51
+discovered_functions=54
+structured_functions=54
+generic_codegen_functions=54
+generic_cfg_functions=54
 structural_matcher_functions=0
-structured_air_v2_functions=51
-typed_air_operand_functions=51
+structured_air_v2_functions=54
+typed_air_operand_functions=54
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=51
+generic_lowering_functions=54
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=51
+object_emitted_functions=54
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -113,8 +113,8 @@ Closed in the current memory/aggregate frontier slice:
 - first SysV ABI closure-wave rows in `frontier_sysv_abi.zig`: small
   INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate field
   argument reads from the SysV integer register pair, and a reusable
-  up-to-three-live-i32 direct-call frame that spills and reloads caller
-  parameters through 24-byte aligned stack slots around the call
+  up-to-six-live-i32 direct-call frame that spills and reloads all six SysV
+  GPR argument registers through aligned stack slots around the call
 - selected sret/byval-style source-backed rows in
   `frontier_sysv_sret_byval.zig`: `{ i64, i64, i64 }`,
   `{ i64, i64, i64, i64 }`, and `{ i64, i64, i64, i64, i64 }` returns
@@ -146,8 +146,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
-- private helper call graphs with more than three live integer values across
-  calls or live values across multiple calls
+- private helper call graphs with stack-passed or SSE live values across calls,
+  or live values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
@@ -157,7 +157,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   field reads/returns, and
   selected 3/4/5-field MEMORY i64 aggregate sret/byval field forms; X87,
   packed/unaligned aggregate ABI classes, arbitrary sret/byval copies,
-  varargs, vectors, and four-or-more-live spill/reload-heavy call frames
+  varargs, vectors, stack-passed live values, and SSE live-across-call frames
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

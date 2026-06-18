@@ -26,3 +26,18 @@ export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
 export fn frontier_three_live_after_call(a: i32, b: i32, c: i32, d: i32) i32 {
     return a + b + c + frontier_id_i32(d);
 }
+
+export fn frontier_four_live_after_call(a: i32, b: i32, c: i32, d: i32) i32 {
+    const r = frontier_id_i32(d);
+    return a + b + c + d + r;
+}
+
+export fn frontier_five_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32) i32 {
+    const r = frontier_id_i32(e);
+    return a + b + c + d + e + r;
+}
+
+export fn frontier_six_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
+    const r = frontier_id_i32(f);
+    return a + b + c + d + e + f + r;
+}

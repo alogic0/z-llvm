@@ -295,14 +295,14 @@ mixed integer/f32/f64 call argument assignment, and selected two-i32 aggregate
 argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
 classification beyond the selected INTEGER and MEMORY aggregate forms,
-arbitrary sret/byval copies, varargs, vectors, and high-register-pressure
-spill/reload-heavy call frames; focused unit tests now fail closed for these
+arbitrary sret/byval copies, varargs, vectors, and live-across-call shapes
+involving stack-passed or SSE values; focused unit tests now fail closed for these
 unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
 INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate field reads
-from the SysV integer register pair, and a selected up-to-three-live-i32
-direct-call frame that spills and reloads caller parameters through aligned
-frame slots. The follow-up
+from the SysV integer register pair, and a selected up-to-six-live-i32
+direct-call frame that covers all six SysV GPR argument registers,
+spilling and reloading caller parameters through aligned frame slots. The follow-up
 `frontier_sysv_sret_byval.zig` row adds selected MEMORY aggregate ABI evidence:
 `{ i64, i64, i64 }` return through a hidden sret pointer in `%rdi` with user
 arguments shifted to `%rsi`/`%rdx`/`%rcx`, plus by-value stack aggregate field
@@ -351,12 +351,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=51`,
-`generic_codegen_functions=51`, `generic_cfg_functions=51`,
+frontier gate reports `source_rows=13`, `discovered_functions=54`,
+`generic_codegen_functions=54`, `generic_cfg_functions=54`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=51`, `object_failures=0`,
+`object_emitted_functions=54`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -373,7 +373,7 @@ pointer-element GEP loads, and branch-local global/TLS add/sub updates. The
 first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, nested INTEGER aggregate add-chain
 field reads, array-in-struct INTEGER aggregate sums, and the selected
-up-to-three-live direct-call spill frame with executable proof. The selected sret/byval
+up-to-six-live direct-call spill frame with executable proof. The selected sret/byval
 frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` hidden-sret returns plus first stack MEMORY
 aggregate field-read proof using layout-derived offsets. The mixed aggregate
@@ -385,11 +385,12 @@ adds `{ double, double }` SSE/SSE field reads and register aggregate return in
 `{ double, i64 }` SSE/INTEGER field reads and register aggregate return in
 `%xmm0`/`%rax`. The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
-private helper graphs with more than three live integer values across calls,
+private helper graphs with stack-passed or SSE live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field
-reads, and 3/4/5-field MEMORY forms, arbitrary sret/byval copies, varargs, and vectors. The accepted frontier rows use typed
+reads, and 3/4/5-field MEMORY forms, arbitrary sret/byval copies, varargs,
+vectors, stack-passed live values, and SSE live-across-call frames. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
 optimizer, LLVM TargetMachine, or LLD are involved.

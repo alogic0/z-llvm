@@ -38,7 +38,7 @@ selected backend subset:
   Machine IR direct-call representation supports assembly and ELF call relocations only
   x86_64 argument lowering supports selected i32/i64/pointer GPR args and f32/f64 SSE args
   up to three constant i32 stack call arguments are accepted
-  one to three live i32 caller arguments can be spilled across one direct call
+  one to six live i32 caller arguments can be spilled across one direct call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
@@ -88,7 +88,7 @@ selected small INTEGER/INTEGER aggregate return in %rax/%rdx
 selected SSE/SSE aggregate return in %xmm0/%xmm1
 void calls with no result
 one straight-line basic block or accepted generic CFG wrapper shape
-up to three live i32 caller arguments across one direct call
+up to six live i32 caller arguments across one direct call
 one fixed i32 stack slot can feed the first direct-call argument
 ```
 
@@ -101,8 +101,8 @@ addq $8, %rsp
 ```
 
 For the first broader SysV closure wave, the selected live-i32 frame uses a
-24-byte aligned frame and spills up to three live integer parameters before
-argument setup:
+24-byte aligned frame for up to three live integer parameters and a 40-byte
+aligned frame for four to six live integer parameters before argument setup:
 
 ```asm
 subq $24, %rsp
@@ -224,8 +224,8 @@ selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads
 selected reversed mixed SSE/INTEGER aggregate argument-field reads
 selected SSE/SSE aggregate argument-field reads and register returns
-selected up-to-three-live-i32 spill/reload call frame
-unsupported four-or-more-live call pressure diagnostic
+selected up-to-six-live-i32 spill/reload call frame
+unsupported stack-passed/SSE live-across-call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics
 ```
 

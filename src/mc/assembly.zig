@@ -91,6 +91,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .push_imm32 => |value| try writer.print("\tpushq ${}\n", .{value}),
             .sub_rsp_24 => try writer.writeAll("\tsubq $24, %rsp\n"),
             .add_rsp_24 => try writer.writeAll("\taddq $24, %rsp\n"),
+            .sub_rsp_40 => try writer.writeAll("\tsubq $40, %rsp\n"),
+            .add_rsp_40 => try writer.writeAll("\taddq $40, %rsp\n"),
             .spill_arg_rsp => |spill| try writer.print("\tmovl {s}, {s}\n", .{ spill.reg.name32(), frameAddress(spill.frame_index) }),
             .reload_arg_rsp => |reload| try writer.print("\tmovl {s}, {s}\n", .{ frameAddress(reload.frame_index), reload.reg.name32() }),
             .spill_rdi_rsi_rsp24 => try writer.writeAll("\tmovq %rdi, 8(%rsp)\n\tmovq %rsi, 16(%rsp)\n"),
@@ -236,5 +238,8 @@ fn frameAddress(frame_index: x86_64.FrameIndex) []const u8 {
         .slot0 => "(%rsp)",
         .slot1 => "4(%rsp)",
         .slot2 => "8(%rsp)",
+        .slot3 => "12(%rsp)",
+        .slot4 => "16(%rsp)",
+        .slot5 => "20(%rsp)",
     };
 }
