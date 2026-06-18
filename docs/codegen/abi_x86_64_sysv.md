@@ -97,10 +97,10 @@ frontier_sysv_abi.Pair64 lowers as the selected small INTEGER/INTEGER class
 aggregate return `{ i64, i64 }` uses %rax/%rdx
 aggregate argument field 0/1 reads use the SysV integer register pair
 the selected two-live-i32 direct-call frame spills and reloads %rdi/%rsi
-frontier_sysv_sret_byval.Big3 lowers as the selected MEMORY class:
-  `{ i64, i64, i64 }` return stores through the hidden sret pointer in %rdi
-  user i64 args are shifted to %rsi/%rdx/%rcx
-  first by-value stack aggregate field reads use 8(%rsp) and 24(%rsp)
+frontier_sysv_sret_byval.Big3 and Big4 lower as selected MEMORY classes:
+  `{ i64, i64, i64 }` and `{ i64, i64, i64, i64 }` returns store through the hidden sret pointer in %rdi
+  user i64 args are shifted through the SysV GPR stream after the hidden pointer
+  first by-value stack aggregate field reads use layout-derived stack offsets
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register

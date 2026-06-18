@@ -1506,13 +1506,20 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_sret_byval.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier SysV sret/byval ABI", .c_body =
     \\struct Big3 { long long a; long long b; long long c; };
+    \\struct Big4 { long long a; long long b; long long c; long long d; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
+    \\extern struct Big4 z_frontier_big4_make(long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big4_make");
+    \\extern long long z_frontier_big4_edges(struct Big4) __asm__("frontier_sysv_sret_byval.frontier_big4_edges");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
     \\    struct Big3 input = { .a = 13, .b = 17, .c = 19 };
     \\    if (z_frontier_big3_edges(input) != 32) return 2;
+    \\    struct Big4 made4 = z_frontier_big4_make(23, 29, 31, 37);
+    \\    if (made4.a != 23 || made4.b != 29 || made4.c != 31 || made4.d != 37) return 3;
+    \\    struct Big4 input4 = { .a = 41, .b = 43, .c = 47, .d = 53 };
+    \\    if (z_frontier_big4_edges(input4) != 94) return 4;
     \\    return 0;
     \\}
     \\

@@ -6094,9 +6094,11 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    const aggregate_ty: ir.Type = .{ .aggregate = "{ i64, i64, i64 }" };
     if (!ret.ty.eql(.{ .int = 64 }) or !function.ret_ty.eql(.{ .int = 64 })) return false;
-    if (function.params.items.len != 1 or !function.params.items[0].ty.eql(aggregate_ty)) return false;
+    if (function.params.items.len != 1) return false;
+    const aggregate_ty = function.params.items[0].ty;
+    const classification = classifySysVAggregate(aggregate_ty) catch return false;
+    if (classification.kind != .memory or !isI64Aggregate(aggregate_ty)) return false;
     if (block.instructions.items.len != 7) return false;
 
     const alloca_inst = block.instructions.items[0];
@@ -6130,8 +6132,9 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name) or
         !isNamed(store.value, function.params.items[0].name)) return false;
 
-    try validateAggregateFieldGep(first_gep_inst, aggregate_ty, alloca_name, 0);
-    try validateAggregateFieldGep(second_gep_inst, aggregate_ty, alloca_name, 2);
+    const first_field_index = aggregateFieldIndexFromGep(first_gep_inst, aggregate_ty, alloca_name) orelse return false;
+    const second_field_index = aggregateFieldIndexFromGep(second_gep_inst, aggregate_ty, alloca_name) orelse return false;
+    if (first_field_index == second_field_index) return false;
 
     const first_load = switch (first_load_inst.kind) {
         .load => |load| load,
@@ -6150,10 +6153,48 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     };
     if (add.op != .add or !add.ty.eql(.{ .int = 64 }) or !isNamed(add.lhs, first_load_name) or !isNamed(add.rhs, second_load_name)) return false;
 
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = 8 });
-    try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = 24 });
+    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, first_field_index) });
+    try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, second_field_index) });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn isI64Aggregate(aggregate_ty: ir.Type) bool {
+    const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
+    if (field_count == 0) return false;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return false;
+        if (!field_ty.eql(.{ .int = 64 })) return false;
+    }
+    return true;
+}
+
+fn aggregateFieldIndexFromGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8) ?usize {
+    const gep = switch (instruction.kind) {
+        .gep => |gep| gep,
+        else => return null,
+    };
+    if (!gep.source_ty.eql(aggregate_ty) or !isNamed(gep.ptr, base_name)) return null;
+    if (gep.indices.items.len != 2) return null;
+    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return null;
+    if (!gep.indices.items[1].ty.eql(.{ .int = 32 })) return null;
+    const field_index = switch (gep.indices.items[1].value) {
+        .int => |index| index,
+        else => return null,
+    };
+    if (field_index < 0) return null;
+    return @intCast(field_index);
+}
+
+fn stackAggregateFieldDisp8(aggregate_ty: ir.Type, field_index: usize) !u8 {
+    const layout = try x86_64SysVDataLayout();
+    const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+        return error.UnsupportedCodegenAbi;
+    if (offset_i < 0) return error.UnsupportedCodegenAbi;
+    const offset = 8 + @as(u64, @intCast(offset_i));
+    if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset);
 }
 
 fn validateAggregateFieldGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8, field_index: i128) !void {
@@ -13255,17 +13296,20 @@ fn lowerGenericCfgSelectedSretStores(
     function: ir.Function,
     block: ir.BasicBlock,
 ) !bool {
-    const aggregate_ty: ir.Type = .{ .aggregate = "{ i64, i64, i64 }" };
-    if (function.params.items.len != 4) return false;
-    if (!function.params.items[0].ty.eql(.ptr) or !paramAttrsContain(function.params.items[0], "sret({ i64, i64, i64 })")) return false;
+    if (function.params.items.len < 4) return false;
+    const aggregate_ty = sretAggregateType(function.params.items[0].attrs) orelse return false;
+    const field_count = aggregateFieldCount(aggregate_ty) orelse return false;
+    if (field_count < 3 or field_count > 4 or function.params.items.len != field_count + 1) return false;
+    if (!isI64Aggregate(aggregate_ty)) return false;
+    if (!function.params.items[0].ty.eql(.ptr)) return false;
     if ((try paramReg(function, function.params.items[0].name, .ptr)) != .rdi) return error.UnsupportedCodegenAbi;
     for (function.params.items[1..]) |param| {
         if (!param.ty.eql(.{ .int = 64 })) return false;
     }
-    if (block.instructions.items.len != 6) return false;
+    if (block.instructions.items.len != field_count * 2) return false;
 
     var pair_index: usize = 0;
-    while (pair_index < 3) : (pair_index += 1) {
+    while (pair_index < field_count) : (pair_index += 1) {
         const gep_inst = block.instructions.items[pair_index * 2];
         const store_inst = block.instructions.items[pair_index * 2 + 1];
         if (gep_inst.removed or store_inst.removed) return false;
@@ -13287,6 +13331,17 @@ fn lowerGenericCfgSelectedSretStores(
     }
     try appendGenericCfgReturn(allocator, machine);
     return true;
+}
+
+fn sretAggregateType(attrs: ?[]const u8) ?ir.Type {
+    const text = attrs orelse return null;
+    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64, i64 })") != null) {
+        return .{ .aggregate = "{ i64, i64, i64, i64 }" };
+    }
+    if (std.mem.indexOf(u8, text, "sret({ i64, i64, i64 })") != null) {
+        return .{ .aggregate = "{ i64, i64, i64 }" };
+    }
+    return null;
 }
 
 fn lowerGenericCfgPackedReplaceLowReturn(

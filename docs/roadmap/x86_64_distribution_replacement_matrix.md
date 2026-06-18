@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=39`,
-`generic_codegen_functions=39`, `generic_cfg_functions=39`,
+three release modes at `source_rows=13`, `discovered_functions=41`,
+`generic_codegen_functions=41`, `generic_cfg_functions=41`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=39`, `object_failures=0`,
+`object_emitted_functions=41`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=0`, `unsupported_relocation_rows=0`, and
@@ -404,9 +404,10 @@ INTEGER/INTEGER aggregate return in `%rax`/`%rdx`, small aggregate argument
 field reads from the SysV integer register pair, nested INTEGER aggregate
 field add-chain reads, array-in-struct INTEGER aggregate sums, and a selected
 two-live-i32 direct-call spill/reload frame with executable proof. The selected
-sret/byval-style frontier row adds `{ i64, i64, i64 }` hidden-sret return
-storage and first stack MEMORY aggregate by-value field reads with executable
-proof. The mixed aggregate class frontier row adds `{ i64, double }` INTEGER/SSE
+sret/byval-style frontier row adds `{ i64, i64, i64 }` and
+`{ i64, i64, i64, i64 }` hidden-sret return storage plus first stack MEMORY
+aggregate by-value field reads with executable proof. The mixed aggregate class
+frontier row adds `{ i64, double }` INTEGER/SSE
 field reads and register aggregate return in `%rax`/`%xmm0` from the
 independent GPR/SSE streams with executable proof.
 Remaining non-accepted
@@ -414,7 +415,8 @@ blockers are mixed int-to-float multiply/add pipelines, helper graphs with more
 than two live integer values across calls, alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
-mixed INTEGER/SSE field-read/return, and MEMORY forms, arbitrary sret/byval copies,
+mixed INTEGER/SSE field-read/return, and MEMORY i64 sret/byval field forms,
+arbitrary sret/byval copies,
 varargs, and vectors. The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

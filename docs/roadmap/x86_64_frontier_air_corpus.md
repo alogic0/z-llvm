@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=39
-structured_functions=39
-generic_codegen_functions=39
-generic_cfg_functions=39
+discovered_functions=41
+structured_functions=41
+generic_codegen_functions=41
+generic_cfg_functions=41
 structural_matcher_functions=0
-structured_air_v2_functions=39
-typed_air_operand_functions=39
+structured_air_v2_functions=41
+typed_air_operand_functions=41
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=39
+generic_lowering_functions=41
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=39
+object_emitted_functions=41
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -115,10 +115,11 @@ Closed in the current memory/aggregate frontier slice:
   argument reads from the SysV integer register pair, and a two-live-i32
   direct-call frame that spills and reloads `%rdi`/`%rsi` around the call
 - first selected sret/byval-style source-backed row in
-  `frontier_sysv_sret_byval.zig`: `{ i64, i64, i64 }` return through a hidden
-  sret pointer in `%rdi` with user arguments shifted to `%rsi`/`%rdx`/`%rcx`,
-  plus MEMORY aggregate by-value field reads from the first stack aggregate
-  argument
+  `frontier_sysv_sret_byval.zig`: `{ i64, i64, i64 }` and
+  `{ i64, i64, i64, i64 }` returns through a hidden sret pointer in `%rdi`
+  with user arguments shifted through the SysV GPR stream, plus MEMORY
+  aggregate by-value field reads from the first stack aggregate argument using
+  layout-derived offsets
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
@@ -144,7 +145,7 @@ Remaining measured frontier blockers kept out of accepted rows:
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, mixed INTEGER/SSE field reads/returns, and selected MEMORY
-  aggregate forms; X87, packed/unaligned aggregate ABI classes, arbitrary
+  i64 aggregate sret/byval field forms; X87, packed/unaligned aggregate ABI classes, arbitrary
   sret/byval copies, varargs, vectors, and high-register-pressure
   spill/reload-heavy call frames
 

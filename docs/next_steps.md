@@ -350,12 +350,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=39`,
-`generic_codegen_functions=39`, `generic_cfg_functions=39`,
+frontier gate reports `source_rows=13`, `discovered_functions=41`,
+`generic_codegen_functions=41`, `generic_cfg_functions=41`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=39`, `object_failures=0`,
+`object_emitted_functions=41`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -373,9 +373,9 @@ first SysV ABI closure-wave row adds small INTEGER/INTEGER aggregate return,
 small aggregate argument field reads, nested INTEGER aggregate add-chain
 field reads, array-in-struct INTEGER aggregate sums, and the selected two-live
 direct-call spill frame with executable proof. The selected sret/byval
-frontier row adds a
-`{ i64, i64, i64 }` hidden-sret return and first stack MEMORY aggregate
-field-read proof. The mixed aggregate class frontier row adds `{ i64, double }`
+frontier row now covers `{ i64, i64, i64 }` and `{ i64, i64, i64, i64 }`
+hidden-sret returns plus first stack MEMORY aggregate field-read proof using
+layout-derived offsets. The mixed aggregate class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
 through the independent SysV GPR/SSE streams. The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
