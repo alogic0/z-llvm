@@ -5810,14 +5810,15 @@ fn lowerSysVAggregateFieldReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if ((!ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.double)) or block.instructions.items.len != 4) return false;
+    if ((!ret.ty.eql(.{ .int = 64 }) and !ret.ty.eql(.double)) or
+        (block.instructions.items.len != 3 and block.instructions.items.len != 4)) return false;
     const alloca_inst = block.instructions.items[0];
     const store_inst = block.instructions.items[1];
-    const gep_inst = block.instructions.items[2];
-    const load_inst = block.instructions.items[3];
-    if (alloca_inst.removed or store_inst.removed or gep_inst.removed or load_inst.removed) return false;
+    const maybe_gep_inst: ?ir.Instruction = if (block.instructions.items.len == 4) block.instructions.items[2] else null;
+    const load_inst = block.instructions.items[block.instructions.items.len - 1];
+    if (alloca_inst.removed or store_inst.removed or load_inst.removed) return false;
+    if (maybe_gep_inst) |gep_inst| if (gep_inst.removed) return false;
     const alloca_name = alloca_inst.result orelse return false;
-    const gep_name = gep_inst.result orelse return false;
     const load_name = load_inst.result orelse return false;
     if (!isNamed(ret.value orelse return error.InvalidRet, load_name)) return false;
 
@@ -5838,27 +5839,29 @@ fn lowerSysVAggregateFieldReturn(
         .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
     };
 
-    const gep = switch (gep_inst.kind) {
-        .gep => |gep| gep,
-        else => return false,
-    };
-    if (!gep.source_ty.eql(alloca.allocated_ty) or !isNamed(gep.ptr, alloca_name)) return false;
-    if (gep.indices.items.len != 2) return false;
-    if (!gep.indices.items[0].ty.eql(.{ .int = 64 }) or !isInt(gep.indices.items[0].value, 0)) return false;
-    if (!gep.indices.items[1].ty.eql(.{ .int = 32 })) return false;
-    const field_index = switch (gep.indices.items[1].value) {
-        .int => |index| index,
-        else => return false,
-    };
-    if (field_index < 0 or field_index >= classification.eightbyte_count) return false;
-
     const load = switch (load_inst.kind) {
         .load => |load| load,
         else => return false,
     };
-    if (!load.ty.eql(ret.ty) or load.attrs.isBarrier() or !isNamed(load.ptr, gep_name)) return false;
+    if (!load.ty.eql(ret.ty) or load.attrs.isBarrier()) return false;
 
-    try emitSysVAggregateFieldReturn(allocator, machine, function, param_name, alloca.allocated_ty, @intCast(field_index), load.ty);
+    const layout = try x86_64SysVDataLayout();
+    const field_offset = if (maybe_gep_inst) |gep_inst| blk: {
+        const gep_name = gep_inst.result orelse return false;
+        if (!isNamed(load.ptr, gep_name)) return false;
+        const gep = switch (gep_inst.kind) {
+            .gep => |gep| gep,
+            else => return false,
+        };
+        if (!isNamed(gep.ptr, alloca_name)) return false;
+        break :blk aggregateGepByteOffset(layout, alloca.allocated_ty, gep) orelse return false;
+    } else blk: {
+        if (!isNamed(load.ptr, alloca_name)) return false;
+        break :blk @as(u64, 0);
+    };
+    _ = aggregateFieldIndexAtOffset(alloca.allocated_ty, field_offset, load.ty) orelse return false;
+
+    try emitSysVAggregateFieldOffsetReturn(allocator, machine, function, param_name, alloca.allocated_ty, field_offset, load.ty);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -5882,7 +5885,7 @@ fn lowerRegisterAggregateIntegerFieldAddReturn(
     if (function.params.items.len != 1) return false;
     const aggregate_ty = function.params.items[0].ty;
     const classification = classifySysVAggregate(aggregate_ty) catch return false;
-    if (!classification.isIntegerOnly()) return false;
+    if (classification.kind != .register) return false;
     if (block.instructions.items.len < 5) return false;
 
     const alloca_inst = block.instructions.items[0];
@@ -5984,6 +5987,18 @@ fn aggregateGepByteOffset(layout: target.DataLayout, aggregate_ty: ir.Type, gep:
         const offset = memory_location.aggregateFieldOffsetWithLayout(layout, gep.source_ty, @intCast(field_index)) orelse return null;
         if (offset < 0) return null;
         return @intCast(offset);
+    }
+    return null;
+}
+
+fn aggregateFieldIndexAtOffset(aggregate_ty: ir.Type, expected_offset: u64, expected_ty: ir.Type) ?usize {
+    const layout = x86_64SysVDataLayout() catch return null;
+    var field_index: usize = 0;
+    while (memory_location.aggregateFieldType(aggregate_ty, field_index)) |field_ty| : (field_index += 1) {
+        if (!field_ty.eql(expected_ty)) continue;
+        const offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse return null;
+        if (offset_i < 0) return null;
+        if (@as(u64, @intCast(offset_i)) == expected_offset) return field_index;
     }
     return null;
 }
@@ -6108,9 +6123,10 @@ fn sysvIntegerAggregateFieldLocation(
         if (std.mem.eql(u8, param.name, param_name)) {
             if (!param.ty.eql(aggregate_ty)) return error.UnsupportedCodegenValue;
             const classification = try classifySysVAggregate(param.ty);
-            if (!classification.isIntegerOnly()) return error.UnsupportedCodegenAbi;
             const field_eightbyte = field_offset / 8;
             if (field_eightbyte >= classification.eightbyte_count) return error.UnsupportedCodegenAbi;
+            const field_class = classification.eightbytes[@intCast(field_eightbyte)] orelse return error.UnsupportedCodegenAbi;
+            if (field_class != .integer) return error.UnsupportedCodegenAbi;
             const needed = sysvAggregateRegisterNeeds(classification);
             if (gpr_index + needed.gpr > 6 or sse_index + needed.sse > 8) {
                 const offset = 8 + stack_eightbytes * 8 + field_offset;
@@ -6160,18 +6176,28 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     if (!store.ty.eql(aggregate_ty) or store.attrs.isBarrier() or !isNamed(store.ptr, alloca_name) or
         !isNamed(store.value, function.params.items[0].name)) return false;
 
-    var pointer_fields = std.StringHashMap(usize).init(allocator);
-    defer pointer_fields.deinit();
+    var pointer_offsets = std.StringHashMap(u64).init(allocator);
+    defer pointer_offsets.deinit();
+    try pointer_offsets.put(alloca_name, 0);
+
     var field_loads = std.StringHashMap(AggregateIntegerFieldLoad).init(allocator);
     defer field_loads.deinit();
 
+    const layout = try x86_64SysVDataLayout();
     for (block.instructions.items[2..]) |instruction| {
         if (instruction.removed) return false;
         switch (instruction.kind) {
-            .gep => {
+            .gep => |gep| {
                 const result = instruction.result orelse return false;
-                const field_index = aggregateFieldIndexFromGep(instruction, aggregate_ty, alloca_name) orelse return false;
-                try pointer_fields.put(result, field_index);
+                const base_name = switch (gep.ptr) {
+                    .named => |name| name,
+                    .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+                };
+                const base_offset = pointer_offsets.get(base_name) orelse return false;
+                const offset = aggregateGepByteOffset(layout, aggregate_ty, gep) orelse return false;
+                const total_offset = base_offset + offset;
+                _ = aggregateFieldIndexAtOffset(aggregate_ty, total_offset, .{ .int = 64 }) orelse return false;
+                try pointer_offsets.put(result, total_offset);
             },
             .load => |load| {
                 const result = instruction.result orelse return false;
@@ -6180,8 +6206,9 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
                     .named => |name| name,
                     .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
                 };
-                const field_index = pointer_fields.get(ptr_name) orelse return false;
-                try field_loads.put(result, .{ .offset = field_index });
+                const offset = pointer_offsets.get(ptr_name) orelse return false;
+                _ = aggregateFieldIndexAtOffset(aggregate_ty, offset, load.ty) orelse return false;
+                try field_loads.put(result, .{ .offset = offset });
             },
             .binary => |binary| {
                 if (binary.op != .add or !binary.ty.eql(.{ .int = 64 })) return false;
@@ -6195,9 +6222,9 @@ fn lowerMemoryIntegerAggregateFieldAddReturn(
     if (!try collectAggregateIntegerAddTerms(block, ret.value orelse return error.InvalidRet, .{ .int = 64 }, field_loads, &terms, &term_count)) return false;
     if (term_count < 2) return false;
 
-    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, @intCast(terms[0].offset)) });
+    try machine.instructions.append(allocator, .{ .load_stack_disp8_rax = try stackAggregateByteDisp8(aggregate_ty, terms[0].offset, .{ .int = 64 }) });
     for (terms[1..term_count]) |term| {
-        try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateFieldDisp8(aggregate_ty, @intCast(term.offset)) });
+        try machine.instructions.append(allocator, .{ .add_stack_disp8_rax = try stackAggregateByteDisp8(aggregate_ty, term.offset, .{ .int = 64 }) });
     }
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -6241,6 +6268,13 @@ fn stackAggregateFieldDisp8(aggregate_ty: ir.Type, field_index: usize) !u8 {
     return @intCast(offset);
 }
 
+fn stackAggregateByteDisp8(aggregate_ty: ir.Type, field_offset: u64, field_ty: ir.Type) !u8 {
+    _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, field_ty) orelse return error.UnsupportedCodegenAbi;
+    const offset = 8 + field_offset;
+    if (offset > std.math.maxInt(u8)) return error.UnsupportedCodegenAbi;
+    return @intCast(offset);
+}
+
 fn validateAggregateFieldGep(instruction: ir.Instruction, aggregate_ty: ir.Type, base_name: []const u8, field_index: i128) !void {
     const gep = switch (instruction.kind) {
         .gep => |gep| gep,
@@ -6262,6 +6296,28 @@ fn emitSysVAggregateFieldReturn(
     field_ty: ir.Type,
 ) !void {
     const location = try sysvAggregateFieldLocation(function, param_name, aggregate_ty, field_index, field_ty);
+    try emitSysVAggregateFieldLocationReturn(allocator, machine, location, field_ty);
+}
+
+fn emitSysVAggregateFieldOffsetReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    field_offset: u64,
+    field_ty: ir.Type,
+) !void {
+    const location = try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, field_offset, field_ty);
+    try emitSysVAggregateFieldLocationReturn(allocator, machine, location, field_ty);
+}
+
+fn emitSysVAggregateFieldLocationReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    location: SysVAggregateFieldLocation,
+    field_ty: ir.Type,
+) !void {
     switch (location) {
         .gpr => |reg| {
             if (!field_ty.eql(.{ .int = 64 })) return error.UnsupportedCodegenAbi;
@@ -6303,7 +6359,21 @@ fn sysvAggregateFieldLocation(
     if (!((memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedCodegenAbi).eql(field_ty))) {
         return error.UnsupportedCodegenAbi;
     }
+    return try sysvAggregateFieldLocationByOffset(function, param_name, aggregate_ty, field_offset, field_ty);
+}
 
+fn sysvAggregateFieldLocationByOffset(
+    function: ir.Function,
+    param_name: []const u8,
+    aggregate_ty: ir.Type,
+    field_offset: u64,
+    field_ty: ir.Type,
+) !SysVAggregateFieldLocation {
+    const layout = try x86_64SysVDataLayout();
+    const field_size = try layout.typeStoreSizeBytes(field_ty);
+    const aggregate_size = try layout.typeStoreSizeBytes(aggregate_ty);
+    if (field_size == 0 or field_offset + field_size > aggregate_size) return error.UnsupportedCodegenAbi;
+    _ = aggregateFieldIndexAtOffset(aggregate_ty, field_offset, field_ty) orelse return error.UnsupportedCodegenAbi;
     var gpr_index: usize = 0;
     var sse_index: usize = 0;
     var stack_eightbytes: usize = 0;

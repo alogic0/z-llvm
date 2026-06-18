@@ -3,6 +3,7 @@ const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
 const memory_location = @import("analysis/memory_location.zig");
 const sib = @import("structured_ir_builder.zig");
+const target_mod = @import("target.zig");
 
 pub const UnsupportedReason = enum {
     function_type,
@@ -538,31 +539,13 @@ fn isPlainFieldPointerChild(ty: ir.Type) bool {
 }
 
 fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index: i128) ?i128 {
-    if (source_ty.eql(.{ .aggregate = "{ i32, i32 }" }) and field_child.eql(.{ .int = 32 })) {
-        return switch (field_index) {
-            0 => 0,
-            1 => 4,
-            else => null,
-        };
-    }
-    if (source_ty.eql(.{ .aggregate = "{ { i32, i32 }, { i32, i32 } }" }) and
-        field_child.eql(.{ .aggregate = "{ i32, i32 }" }))
-    {
-        return switch (field_index) {
-            0 => 0,
-            1 => 8,
-            else => null,
-        };
-    }
-    if (source_ty.eql(.{ .aggregate = "{ [2 x i64] }" }) and
-        field_child.eql(.{ .aggregate = "[2 x i64]" }))
-    {
-        return switch (field_index) {
-            0 => 0,
-            else => null,
-        };
-    }
-    return null;
+    if (field_index < 0) return null;
+    if (!isPlainFieldPointerChild(field_child)) return null;
+    const index: usize = @intCast(field_index);
+    const actual_child = memory_location.aggregateFieldType(source_ty, index) orelse return null;
+    if (!actual_child.eql(field_child)) return null;
+    const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return null;
+    return memory_location.aggregateFieldOffsetWithLayout(layout, source_ty, index);
 }
 
 fn genericTypedGepIndex(value: ir.Value) bool {
@@ -4898,6 +4881,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.ArrayPair")) {
         return .{ .ir_type = .{ .aggregate = "{ [2 x i64] }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.NestedMixed")) {
+        return .{ .ir_type = .{ .aggregate = "{ { i32, i32 }, double }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_sret_byval.Big3")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, i64, i64 }" } };
     }
@@ -5507,6 +5493,9 @@ fn pointerChildText(text: []const u8) ?[]const u8 {
             child = child["volatile ".len..];
         } else if (std.mem.startsWith(u8, child, "allowzero ")) {
             child = child["allowzero ".len..];
+        } else if (std.mem.startsWith(u8, child, "align(")) {
+            const close = std.mem.indexOfScalar(u8, child, ')') orelse return null;
+            child = std.mem.trim(u8, child[close + 1 ..], " ");
         } else {
             break;
         }

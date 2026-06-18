@@ -27,6 +27,11 @@ const ArrayPair = extern struct {
     values: [2]i64,
 };
 
+const NestedMixed = extern struct {
+    ints: Pair32,
+    value: f64,
+};
+
 export fn frontier_mixed_int(value: Mixed) i64 {
     return value.a;
 }
@@ -69,4 +74,8 @@ export fn frontier_nested_pair_sum(value: NestedPair) i32 {
 
 export fn frontier_array_pair_sum(value: ArrayPair) i64 {
     return value.values[0] + value.values[1];
+}
+
+export fn frontier_nested_mixed_int_sum(value: NestedMixed) i32 {
+    return value.ints.a + value.ints.b;
 }

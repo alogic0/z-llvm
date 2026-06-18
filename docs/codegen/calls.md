@@ -41,6 +41,7 @@ selected backend subset:
   one to six live i32 caller arguments can be spilled across one direct call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
+  selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate argument-field reads are accepted through the reusable aggregate classifier
   selected reversed mixed SSE/INTEGER aggregate argument-field reads are accepted through the reusable aggregate classifier
@@ -147,7 +148,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal i64 MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven fields, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected reversed mixed SSE/INTEGER aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, generated normal i64 MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven fields, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, and selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -172,7 +173,8 @@ spilled from %xmm0/%xmm1 to aligned frame slots and reloaded for a post-call
 fadd return
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
 INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
-INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms
+INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add-chain,
+mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms
 arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies, complete
 aggregate lowering for every classified shape, and multi-target ABI parity are not implemented
 ```

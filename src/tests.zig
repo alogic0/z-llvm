@@ -567,6 +567,11 @@ test "x86_64 SysV aggregate classifier covers register and memory classes" {
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), nested.eightbytes[0]);
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), nested.eightbytes[1]);
 
+    const nested_mixed = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ { i32, i32 }, double }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, nested_mixed.kind);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), nested_mixed.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), nested_mixed.eightbytes[1]);
+
     const too_large = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ i64, i64, i64 }" });
     try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.memory, too_large.kind);
 
@@ -6482,6 +6487,37 @@ test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument reg
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rsi }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen reads integer fields from mixed aggregate register classes" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @sum_ints({ { i32, i32 }, double } %value) {
+        \\entry:
+        \\  %slot = alloca { { i32, i32 }, double }
+        \\  store { { i32, i32 }, double } %value, ptr %slot
+        \\  %pair = getelementptr { { i32, i32 }, double }, ptr %slot, i64 0, i32 0
+        \\  %a_ptr = getelementptr { i32, i32 }, ptr %pair, i64 0, i32 0
+        \\  %a = load i32, ptr %a_ptr
+        \\  %b_ptr = getelementptr { i32, i32 }, ptr %pair, i64 0, i32 1
+        \\  %b = load i32, ptr %b_ptr
+        \\  %sum = add i32 %a, %b
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg_high32_eax = .rdi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
 test "x86_64 codegen preserves two live i32 params across direct call" {

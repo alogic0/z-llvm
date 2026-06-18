@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=67
-structured_functions=67
-generic_codegen_functions=67
-generic_cfg_functions=67
+discovered_functions=68
+structured_functions=68
+generic_codegen_functions=68
+generic_cfg_functions=68
 structural_matcher_functions=0
-structured_air_v2_functions=67
-typed_air_operand_functions=67
+structured_air_v2_functions=68
+typed_air_operand_functions=68
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=67
+generic_lowering_functions=68
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=67
+object_emitted_functions=68
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -144,6 +144,11 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
   from the SysV GPR pair without a function-name-specific lowering path
+- first nested mixed aggregate integer-field add-chain row in
+  `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
+  pointers carry `align(...)` qualifiers from typed AIR v2, are lowered through
+  layout-backed byte offsets, and read the nested integer pair from the SysV GPR
+  class while preserving the independent SSE field classification
 - first array-in-struct INTEGER aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]i64` typed AIR pointer-element
   GEPs are lowered from typed v2 and summed from the SysV GPR pair
@@ -167,9 +172,10 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE
-  field reads/returns, and generated normal MEMORY i64 aggregate sret/byval
-  field/copy forms currently proven through seven fields; X87,
+  INTEGER add chains, nested mixed INTEGER/SSE integer add chains, mixed
+  INTEGER/SSE, SSE/INTEGER, and SSE/SSE field reads/returns, and generated
+  normal MEMORY i64 aggregate sret/byval field/copy forms currently proven
+  through seven fields; X87,
   packed/unaligned aggregate ABI classes,
   arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
   values, and broader SSE live-across-call frames beyond the selected one-live

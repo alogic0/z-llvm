@@ -44,6 +44,7 @@ one fixed i32 stack slot can be reloaded into %edi before a direct call
 small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class return in %rax/%rdx
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
+selected nested mixed INTEGER/SSE aggregate integer-field add chains use layout-backed byte offsets and the independent SysV GPR/SSE streams
 selected mixed INTEGER/SSE aggregate argument field reads and register returns use the independent SysV GPR/SSE streams
 selected reversed mixed SSE/INTEGER aggregate argument field reads and register returns use the independent SysV SSE/GPR streams
 selected SSE/SSE aggregate argument field reads and register returns use the independent SysV SSE stream
@@ -130,11 +131,14 @@ SSE/INTEGER aggregate argument field reads and register aggregate return:
   field `double` is returned from the aggregate's SSE class register
   field `i64` is returned from the aggregate's GPR class register
   `{ double, i64 }` construction returns through %xmm0/%rax
-frontier_sysv_aggregate_classes.NestedPair proves nested INTEGER aggregate
-field add chains:
+frontier_sysv_aggregate_classes.NestedPair and NestedMixed prove nested
+INTEGER aggregate field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
   low/high 32-bit lanes are read from the SysV GPR pair without a
   function-name-specific backend path
+  `align(...)` pointer-qualified typed AIR field pointers are accepted for the
+  nested mixed `{ { i32, i32 }, double }` row while preserving its SSE field
+  classification
 frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
 aggregate sums:
   `[2]i64` pointer-element GEPs are lowered from typed AIR v2
@@ -156,7 +160,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-live f32/f64 no-argument-call spill shape
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal i64 sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
