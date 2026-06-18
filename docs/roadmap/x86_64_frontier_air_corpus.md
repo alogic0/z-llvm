@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=42
-structured_functions=42
-generic_codegen_functions=42
-generic_cfg_functions=42
+discovered_functions=45
+structured_functions=45
+generic_codegen_functions=45
+generic_cfg_functions=45
 structural_matcher_functions=0
-structured_air_v2_functions=42
-typed_air_operand_functions=42
+structured_air_v2_functions=45
+typed_air_operand_functions=45
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=42
+generic_lowering_functions=45
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=42
+object_emitted_functions=45
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -126,6 +126,10 @@ Closed in the current memory/aggregate frontier slice:
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
   stream and the floating member from the SSE stream; construction returns the
   aggregate in `%rax`/`%xmm0`
+- first SSE/SSE aggregate class row in
+  `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
+  SSE/SSE, field reads return from the independent SSE argument stream, and
+  construction returns the aggregate in `%xmm0`/`%xmm1`
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
@@ -145,10 +149,10 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains, mixed INTEGER/SSE field reads/returns, and selected MEMORY
-  i64 aggregate sret/byval field forms; X87, packed/unaligned aggregate ABI classes, arbitrary
-  sret/byval copies, varargs, vectors, and four-or-more-live spill/reload-heavy
-  call frames
+  INTEGER add chains, mixed INTEGER/SSE and SSE/SSE field reads/returns, and
+  selected MEMORY i64 aggregate sret/byval field forms; X87,
+  packed/unaligned aggregate ABI classes, arbitrary sret/byval copies,
+  varargs, vectors, and four-or-more-live spill/reload-heavy call frames
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

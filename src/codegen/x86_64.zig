@@ -5451,6 +5451,15 @@ pub const SysVAggregateClassification = struct {
         }
         return true;
     }
+
+    pub fn isSseOnly(classification: SysVAggregateClassification) bool {
+        if (classification.kind != .register or classification.eightbyte_count == 0) return false;
+        var index: usize = 0;
+        while (index < classification.eightbyte_count) : (index += 1) {
+            if (classification.eightbytes[index] != .sse) return false;
+        }
+        return true;
+    }
 };
 
 fn x86_64SysVDataLayout() !target.DataLayout {
@@ -5710,6 +5719,10 @@ fn lowerRegisterAggregateReturn(
                         .xmm0 => {},
                         .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
                         .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+                    },
+                    1 => switch (try XmmReg.fromIndex(fp_index)) {
+                        .xmm1 => {},
+                        .xmm0, .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
                     },
                     else => return error.UnsupportedCodegenAbi,
                 }
@@ -22257,7 +22270,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         => {},
     };
 
-    var eax_defined = function.ret_ty == .void or function.ret_ty.eql(.float) or function.ret_ty.eql(.double);
+    var eax_defined = function.ret_ty == .void or function.ret_ty.eql(.float) or function.ret_ty.eql(.double) or
+        sysvAggregateReturnHasNoGpr(function.ret_ty);
     var saw_terminator = false;
     var rsp_mod16: u4 = 8;
     for (function.instructions.items) |instruction| switch (instruction) {
@@ -22266,7 +22280,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 !std.mem.endsWith(u8, label, "generic_cfg_pointer_select_end") and
                 !std.mem.endsWith(u8, label, "conditional_slice_sum_skip"))
             {
-                eax_defined = function.ret_ty == .void;
+                eax_defined = function.ret_ty == .void or sysvAggregateReturnHasNoGpr(function.ret_ty);
             }
         },
         .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
@@ -22314,6 +22328,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         },
     };
     if (!saw_terminator) return error.MissingMachineReturn;
+}
+
+fn sysvAggregateReturnHasNoGpr(ret_ty: ir.Type) bool {
+    const classification = classifySysVAggregate(ret_ty) catch return false;
+    return classification.isSseOnly();
 }
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {

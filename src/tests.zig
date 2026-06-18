@@ -551,6 +551,12 @@ test "x86_64 SysV aggregate classifier covers register and memory classes" {
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), reversed.eightbytes[0]);
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), reversed.eightbytes[1]);
 
+    const sse_pair = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "{ double, double }" });
+    try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, sse_pair.kind);
+    try std.testing.expect(sse_pair.isSseOnly());
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), sse_pair.eightbytes[0]);
+    try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .sse), sse_pair.eightbytes[1]);
+
     const array = try codegen.x86_64.classifySysVAggregateForTest(.{ .aggregate = "[2 x i64]" });
     try std.testing.expectEqual(codegen.x86_64.SysVAggregateKind.register, array.kind);
     try std.testing.expectEqual(@as(?codegen.x86_64.SysVAggregateEightbyteClass, .integer), array.eightbytes[0]);
@@ -5882,6 +5888,29 @@ test "x86_64 codegen returns mixed INTEGER SSE aggregate in rax xmm0" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen returns SSE SSE aggregate in xmm0 xmm1" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { double, double } @make_double_pair(double %a, double %b) {
+        \\entry:
+        \\  %field0 = insertvalue { double, double } undef, double %a, 0
+        \\  %result = insertvalue { double, double } %field0, double %b, 1
+        \\  ret { double, double } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[0]);
 }
 
 test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument registers" {

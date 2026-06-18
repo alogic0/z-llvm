@@ -4791,6 +4791,9 @@ fn parseZigType(text: []const u8) ?ZigType {
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.Mixed")) {
         return .{ .ir_type = .{ .aggregate = "{ i64, double }" } };
     }
+    if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.DoublePair")) {
+        return .{ .ir_type = .{ .aggregate = "{ double, double }" } };
+    }
     if (std.mem.eql(u8, trimmed, "frontier_sysv_aggregate_classes.Pair32")) {
         return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     }

@@ -43,6 +43,7 @@ selected backend subset:
   selected nested INTEGER aggregate field add-chain reads are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate argument-field reads are accepted through the reusable aggregate classifier
+  selected SSE/SSE aggregate argument-field reads and register returns are accepted through the reusable aggregate classifier
 ```
 
 ## Accepted IR Contract
@@ -83,6 +84,7 @@ i32/i64/pointer direct call arguments in the SysV integer stream
 f32/f64 direct call arguments in the independent SysV SSE stream
 i32 return in %eax, i64/pointer return in %rax, f32/f64 return in %xmm0
 selected small INTEGER/INTEGER aggregate return in %rax/%rdx
+selected SSE/SSE aggregate return in %xmm0/%xmm1
 void calls with no result
 one straight-line basic block or accepted generic CFG wrapper shape
 up to three live i32 caller arguments across one direct call
@@ -144,7 +146,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected `{ i64, i64, i64 }`/`{ i64, i64, i64, i64 }` hidden-sret return storage, and selected first stack MEMORY aggregate by-value field reads
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected small INTEGER/INTEGER aggregate return/argument reads, selected mixed INTEGER/SSE aggregate argument field reads and register return, selected SSE/SSE aggregate argument field reads and register return, selected `{ i64, i64, i64 }`/`{ i64, i64, i64, i64 }` hidden-sret return storage, and selected first stack MEMORY aggregate by-value field reads
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -158,9 +160,10 @@ source-backed `{ i64, i64, i64 }` hidden-sret return and first stack
 by-value aggregate field-read shape
 varargs remain rejected at declarations and call sites
 selected small INTEGER/INTEGER aggregate returns are lowered in %rax/%rdx
+selected SSE/SSE aggregate returns are lowered in %xmm0/%xmm1
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
 INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
-INTEGER/INTEGER and mixed INTEGER/SSE field-read forms
+INTEGER/INTEGER, mixed INTEGER/SSE, and SSE/SSE field-read forms
 arbitrary hidden sret storage, arbitrary stack-passed byval copies, complete
 aggregate lowering for every classified shape, and multi-target ABI parity are not implemented
 ```
@@ -216,6 +219,7 @@ multiple stack-passed i32 call arguments
 mixed integer/SSE scalar call streams
 selected small INTEGER/INTEGER aggregate return and argument-field reads
 selected mixed INTEGER/SSE aggregate argument-field reads
+selected SSE/SSE aggregate argument-field reads and register returns
 selected up-to-three-live-i32 spill/reload call frame
 unsupported four-or-more-live call pressure diagnostic
 unsupported varargs/vector/sret/byval/larger aggregate ABI diagnostics

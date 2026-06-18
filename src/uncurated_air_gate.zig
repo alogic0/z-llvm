@@ -1528,12 +1528,16 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     };
     if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE and nested INTEGER aggregate ABI", .c_body =
     \\struct Mixed { long long a; double b; };
+    \\struct DoublePair { double a; double b; };
     \\struct Pair32 { int a; int b; };
     \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
     \\struct ArrayPair { long long values[2]; };
     \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
     \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
     \\extern struct Mixed z_frontier_mixed_make(long long, double) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_make");
+    \\extern double z_frontier_double_pair_first(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_first");
+    \\extern double z_frontier_double_pair_second(struct DoublePair) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_second");
+    \\extern struct DoublePair z_frontier_double_pair_make(double, double) __asm__("frontier_sysv_aggregate_classes.frontier_double_pair_make");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
     \\int main(void) {
@@ -1542,10 +1546,15 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_mixed_float(value) != 6.25) return 2;
     \\    struct Mixed made = z_frontier_mixed_make(77, 9.5);
     \\    if (made.a != 77 || made.b != 9.5) return 3;
+    \\    struct DoublePair doubles = { 1.25, 7.5 };
+    \\    if (z_frontier_double_pair_first(doubles) != 1.25) return 4;
+    \\    if (z_frontier_double_pair_second(doubles) != 7.5) return 5;
+    \\    struct DoublePair made_doubles = z_frontier_double_pair_make(3.5, 11.25);
+    \\    if (made_doubles.a != 3.5 || made_doubles.b != 11.25) return 6;
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
-    \\    if (z_frontier_nested_pair_sum(nested) != 10) return 4;
+    \\    if (z_frontier_nested_pair_sum(nested) != 10) return 7;
     \\    struct ArrayPair array = { { 11, 31 } };
-    \\    if (z_frontier_array_pair_sum(array) != 42) return 5;
+    \\    if (z_frontier_array_pair_sum(array) != 42) return 8;
     \\    return 0;
     \\}
     \\
