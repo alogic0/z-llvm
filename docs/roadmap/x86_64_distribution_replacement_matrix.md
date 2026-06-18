@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=89`,
-`generic_codegen_functions=89`, `generic_cfg_functions=89`,
+three release modes at `source_rows=13`, `discovered_functions=91`,
+`generic_codegen_functions=91`, `generic_cfg_functions=91`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=89`, `object_failures=0`,
+`object_emitted_functions=91`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -414,13 +414,16 @@ with executable proof; the seven-field make row exercises multiple
 stack-passed user fields after the hidden sret pointer, and the nested normal
 MEMORY copy/read row proves recursive leaf byte-offset handling for
 `{ { i64, i64, i64 }, { i64, i64, i64 } }`. The mixed aggregate class
-frontier row adds `{ i64, double }` INTEGER/SSE
-field reads and register aggregate return in `%rax`/`%xmm0` from the
-independent GPR/SSE streams with executable proof, plus a noinline helper-call
-row that returns the same register aggregate directly from a private helper.
-The reversed mixed aggregate frontier row adds `{ double, i64 }` SSE/INTEGER
-field reads and register aggregate return in `%xmm0`/`%rax` from the
-independent SSE/GPR streams with executable proof.
+frontier row adds `{ i64, double }`, selected `{ i32, double }`, and selected
+`{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate returns
+in `%rax`/`%xmm0` from the independent GPR/SSE streams with executable proof,
+including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
+returns the same register aggregate directly from a private helper.
+The reversed mixed aggregate frontier row adds `{ double, i64 }`, selected
+`{ double, i32 }`, and selected `{ double, i32, i32 }` SSE/INTEGER field reads
+plus register aggregate returns in `%xmm0`/`%rax` from the independent SSE/GPR
+streams with executable proof, including adjacent `i32` lane packing into
+`%rax`.
 The nested INTEGER helper-call frontier row passes `{ { i32, i32 },
 { i32, i32 } }` through the SysV GPR pair to a private helper and returns the
 helper's scalar result with executable proof.
@@ -440,8 +443,9 @@ alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
 nested mixed INTEGER/SSE integer-field add-chain, selected mixed INTEGER/SSE
-and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms, SSE/SSE
-field-read/return, and generated normal MEMORY i64
+and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/return forms
+plus selected packed mixed construction returns, SSE/SSE field-read/return, and
+generated normal MEMORY i64
 sret/byval field/copy forms currently proven through seven flat fields and a
 nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy,
 arbitrary non-selected sret/byval copies,

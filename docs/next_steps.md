@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=89`,
-`generic_codegen_functions=89`, `generic_cfg_functions=89`,
+frontier gate reports `source_rows=13`, `discovered_functions=91`,
+`generic_codegen_functions=91`, `generic_cfg_functions=91`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=89`, `object_failures=0`,
+`object_emitted_functions=91`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -398,14 +398,17 @@ leaf byte offsets. The mixed-width MEMORY follow-up copies
 `{ i64, i32, i64, i32 }` through the same layout-derived byte offsets while
 using narrow `i32` stores for `i32` leaves.
 The mixed aggregate
-class frontier row adds `{ i64, double }`
-INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
-through the independent SysV GPR/SSE streams, plus a noinline helper-call row
-that returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
+class frontier row adds `{ i64, double }`, selected `{ i32, double }`, and
+selected `{ i32, i32, double }` INTEGER/SSE field reads plus register aggregate
+returns in `%rax`/`%xmm0` through the independent SysV GPR/SSE streams,
+including adjacent `i32` lane packing into `%rax`; a noinline helper-call row
+returns the same register aggregate directly from a private helper. The SSE aggregate frontier row
 adds `{ double, double }` SSE/SSE field reads and register aggregate return in
 `%xmm0`/`%xmm1`. The reversed mixed aggregate frontier row adds
-`{ double, i64 }` SSE/INTEGER field reads and register aggregate return in
-`%xmm0`/`%rax`. The nested mixed aggregate row adds
+`{ double, i64 }`, selected `{ double, i32 }`, and selected
+`{ double, i32, i32 }` SSE/INTEGER field reads plus register aggregate returns
+in `%xmm0`/`%rax`, including high-lane `i32` extraction and adjacent `i32` lane
+packing into `%rax`. The nested mixed aggregate row adds
 `{ { i32, i32 }, double }` typed AIR v2 field pointers with `align(...)`
 qualifiers and lowers the nested integer fields through layout-backed offsets
 from the aggregate's INTEGER class while preserving the independent SSE class.
@@ -428,7 +431,8 @@ alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
-field reads, SSE/SSE field reads, and generated normal
+field reads plus selected packed mixed construction returns, SSE/SSE field
+reads, and generated normal
 MEMORY integer-leaf field/copy forms currently proven through seven flat
 fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,

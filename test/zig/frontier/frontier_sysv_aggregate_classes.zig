@@ -146,6 +146,10 @@ export fn frontier_packed_mixed_float(value: PackedMixed) f64 {
     return value.c;
 }
 
+export fn frontier_packed_mixed_make(a: i32, b: i32, c: f64) PackedMixed {
+    return .{ .a = a, .b = b, .c = c };
+}
+
 export fn frontier_packed_reverse_mixed_float(value: PackedReverseMixed) f64 {
     return value.a;
 }
@@ -156,4 +160,8 @@ export fn frontier_packed_reverse_mixed_low_int(value: PackedReverseMixed) i32 {
 
 export fn frontier_packed_reverse_mixed_high_int(value: PackedReverseMixed) i32 {
     return value.c;
+}
+
+export fn frontier_packed_reverse_mixed_make(a: f64, b: i32, c: i32) PackedReverseMixed {
+    return .{ .a = a, .b = b, .c = c };
 }

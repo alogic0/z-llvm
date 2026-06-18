@@ -6904,6 +6904,50 @@ test "x86_64 codegen returns mixed SSE INTEGER aggregate in xmm0 rax" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
 
+test "x86_64 codegen returns packed i32 mixed aggregate in rax xmm0" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i32, i32, double } @make_packed_mixed(i32 %a, i32 %b, double %c) {
+        \\entry:
+        \\  %field0 = insertvalue { i32, i32, double } undef, i32 %a, 0
+        \\  %field1 = insertvalue { i32, i32, double } %field0, i32 %b, 1
+        \\  %result = insertvalue { i32, i32, double } %field1, double %c, 2
+        \\  ret { i32, i32, double } %result
+        \\}
+        \\
+        \\define { double, i32, i32 } @make_packed_reverse(double %a, i32 %b, i32 %c) {
+        \\entry:
+        \\  %field0 = insertvalue { double, i32, i32 } undef, double %a, 0
+        \\  %field1 = insertvalue { double, i32, i32 } %field0, i32 %b, 1
+        \\  %result = insertvalue { double, i32, i32 } %field1, i32 %c, 2
+        \\  ret { double, i32, i32 } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var mixed = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer mixed.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, mixed.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rdx, .src = .rsi } }, mixed.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shl_rdx_imm6 = 32 }, mixed.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, mixed.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.or_rdx_rax, mixed.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, mixed.instructions.items[4]);
+
+    var reverse = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer reverse.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, reverse.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rdx, .src = .rsi } }, reverse.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shl_rdx_imm6 = 32 }, reverse.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, reverse.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.or_rdx_rax, reverse.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, reverse.instructions.items[4]);
+}
+
 test "x86_64 codegen returns SSE SSE aggregate in xmm0 xmm1" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

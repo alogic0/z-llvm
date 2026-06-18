@@ -5750,11 +5750,39 @@ fn lowerRegisterAggregateReturn(
         const field_class = classification.eightbytes[field_eightbyte] orelse return false;
         switch (field_class) {
             .integer => {
-                if (!field_ty.eql(.{ .int = 64 })) return false;
-                const src = try paramValueReg(function, field_values[field_index].value, field_ty);
+                if (field_ty.eql(.{ .int = 64 })) {
+                    const src = try paramValueReg(function, field_values[field_index].value, field_ty);
+                    switch (gpr_return_index) {
+                        0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
+                        1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
+                        else => return error.UnsupportedCodegenAbi,
+                    }
+                    gpr_return_index += 1;
+                    continue;
+                }
+                if (!field_ty.eql(.{ .int = 32 })) return false;
+                const field_offset = try aggregateFieldByteOffset(function.ret_ty, field_index);
+                if (field_offset % 8 != 0) return error.UnsupportedCodegenAbi;
+                const low_reg = try paramValueReg(function, field_values[field_index].value, field_ty);
+                if (field_index + 1 < field_count and
+                    (memory_location.aggregateFieldType(function.ret_ty, field_index + 1) orelse return false).eql(.{ .int = 32 }))
+                {
+                    const next_offset = try aggregateFieldByteOffset(function.ret_ty, field_index + 1);
+                    if (next_offset / 8 == field_eightbyte and next_offset % 8 == 4) {
+                        if (gpr_return_index != 0) return error.UnsupportedCodegenAbi;
+                        const high_reg = try paramValueReg(function, field_values[field_index + 1].value, .{ .int = 32 });
+                        try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+                        try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+                        try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+                        try machine.instructions.append(allocator, .or_rdx_rax);
+                        gpr_return_index += 1;
+                        field_index += 1;
+                        continue;
+                    }
+                }
                 switch (gpr_return_index) {
-                    0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
-                    1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
+                    0 => try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg }),
+                    1 => try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } }),
                     else => return error.UnsupportedCodegenAbi,
                 }
                 gpr_return_index += 1;
@@ -5780,6 +5808,14 @@ fn lowerRegisterAggregateReturn(
     }
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn aggregateFieldByteOffset(aggregate_ty: ir.Type, field_index: usize) !u64 {
+    const layout = try x86_64SysVDataLayout();
+    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+        return error.UnsupportedCodegenAbi;
+    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
+    return @intCast(field_offset_i);
 }
 
 fn aggregateFieldCount(ty: ir.Type) ?usize {

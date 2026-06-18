@@ -132,6 +132,7 @@ frontier_sysv_aggregate_classes.SmallMixed and PackedMixed prove selected
 `i32`/`double` mixed INTEGER/SSE field reads:
   low-lane and high-lane `i32` fields are returned from the aggregate's GPR class register
   field `double` is returned from the aggregate's SSE class register
+  `{ i32, i32, double }` construction packs adjacent `i32` fields into %rax and returns the `double` in %xmm0
 frontier_sysv_aggregate_classes.DoublePair proves the first SSE/SSE aggregate
 argument field reads and register aggregate return:
   both `double` fields are read from the SysV SSE argument stream
@@ -143,7 +144,8 @@ SSE/INTEGER aggregate argument field reads and register aggregate return:
   `{ double, i64 }` construction returns through %xmm0/%rax
 frontier_sysv_aggregate_classes.SmallReverseMixed and PackedReverseMixed prove
 selected reversed `double`/`i32` field reads through the same independent
-SSE/GPR streams, including high-lane `i32` extraction
+SSE/GPR streams, including high-lane `i32` extraction and `{ double, i32, i32 }`
+construction that packs adjacent `i32` fields into %rax
 frontier_sysv_aggregate_classes.NestedPair and NestedMixed prove nested
 INTEGER aggregate field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset
@@ -181,7 +183,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-/three-live f32/f64 no-argument-call spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions

@@ -1638,9 +1638,11 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern int z_frontier_packed_mixed_low_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_low_int");
     \\extern int z_frontier_packed_mixed_high_int(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_high_int");
     \\extern double z_frontier_packed_mixed_float(struct PackedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_float");
+    \\extern struct PackedMixed z_frontier_packed_mixed_make(int, int, double) __asm__("frontier_sysv_aggregate_classes.frontier_packed_mixed_make");
     \\extern double z_frontier_packed_reverse_mixed_float(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_float");
     \\extern int z_frontier_packed_reverse_mixed_low_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_low_int");
     \\extern int z_frontier_packed_reverse_mixed_high_int(struct PackedReverseMixed) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_high_int");
+    \\extern struct PackedReverseMixed z_frontier_packed_reverse_mixed_make(double, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_packed_reverse_mixed_make");
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
@@ -1677,10 +1679,14 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_packed_mixed_low_int(packed_mixed) != 37) return 20;
     \\    if (z_frontier_packed_mixed_high_int(packed_mixed) != 41) return 21;
     \\    if (z_frontier_packed_mixed_float(packed_mixed) != 43.5) return 22;
+    \\    struct PackedMixed made_packed_mixed = z_frontier_packed_mixed_make(61, 67, 71.5);
+    \\    if (made_packed_mixed.a != 61 || made_packed_mixed.b != 67 || made_packed_mixed.c != 71.5) return 26;
     \\    struct PackedReverseMixed packed_reverse = { 47.5, 53, 59 };
     \\    if (z_frontier_packed_reverse_mixed_float(packed_reverse) != 47.5) return 23;
     \\    if (z_frontier_packed_reverse_mixed_low_int(packed_reverse) != 53) return 24;
     \\    if (z_frontier_packed_reverse_mixed_high_int(packed_reverse) != 59) return 25;
+    \\    struct PackedReverseMixed made_packed_reverse = z_frontier_packed_reverse_mixed_make(73.5, 79, 83);
+    \\    if (made_packed_reverse.a != 73.5 || made_packed_reverse.b != 79 || made_packed_reverse.c != 83) return 27;
     \\    return 0;
     \\}
     \\

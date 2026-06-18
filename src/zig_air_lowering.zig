@@ -967,12 +967,13 @@ fn typedV2RegisterAggregateRecords(
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
     if (function_type.return_type.ir_type != .aggregate) return false;
+    if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
     const field_count = aggregateFieldCount(function_type.return_type.ir_type) orelse return false;
-    if (field_count == 0 or field_count > 2 or function_type.params.len != field_count) return false;
+    if (field_count == 0 or field_count > 8 or function_type.params.len != field_count) return false;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(function_type.return_type.ir_type, field_index) orelse return false;
-        if (!field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return false;
+        if (!field_ty.eql(.{ .int = 32 }) and !field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return false;
         if (!function_type.params[field_index].ir_type.eql(field_ty)) return false;
         if (typedFieldPtrIndexCount(structured_air_v2, field_index) != 1) return false;
     }
@@ -986,6 +987,19 @@ fn aggregateFieldCount(ty: ir.Type) ?usize {
     var count: usize = 0;
     while (memory_location.aggregateFieldType(ty, count)) |_| : (count += 1) {}
     return count;
+}
+
+fn isSysVRegisterAggregateCandidate(ty: ir.Type) bool {
+    switch (ty) {
+        .aggregate => |text| {
+            const trimmed = std.mem.trim(u8, text, " \t");
+            if (std.mem.startsWith(u8, trimmed, "<{")) return false;
+        },
+        else => return false,
+    }
+    const layout = target_mod.DataLayout.parse("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128") catch return false;
+    const size = layout.typeStoreSizeBytes(ty) catch return false;
+    return size > 0 and size <= 16;
 }
 
 fn lowerTypedV2SretIntegerAggregateAbi(
@@ -3383,26 +3397,27 @@ fn lowerRegisterAggregateMake(allocator: std.mem.Allocator, air_function: air_ex
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     const aggregate_ty = function_type.return_type.ir_type;
+    if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
     const field_count = aggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
-    if (field_count == 0 or field_count > 2 or function_type.params.len != field_count) return error.UnsupportedAir;
+    if (field_count == 0 or field_count > 8 or function_type.params.len != field_count) return error.UnsupportedAir;
     var field_index: usize = 0;
     while (field_index < field_count) : (field_index += 1) {
         const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedAir;
-        if (!field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return error.UnsupportedAir;
+        if (!field_ty.eql(.{ .int = 32 }) and !field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return error.UnsupportedAir;
         if (!function_type.params[field_index].ir_type.eql(field_ty)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
-    const arg_names = [_][]const u8{ "arg0", "arg1" };
+    const arg_names = [_][]const u8{ "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7" };
     for (function_type.params, 0..) |param, index| {
         try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
     }
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    const result_names = [_][]const u8{ "field0", "result" };
-    const index_texts = [_][]const u8{ "0", "1" };
+    const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
+    const index_texts = [_][]const u8{ "0", "1", "2", "3", "4", "5", "6", "7" };
     var aggregate_value: ir.Value = .undef;
     for (function_type.params, 0..) |param, index| {
         try block.instructions.append(allocator, .{

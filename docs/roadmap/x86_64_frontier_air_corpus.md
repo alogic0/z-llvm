@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=89
-structured_functions=89
-generic_codegen_functions=89
-generic_cfg_functions=89
+discovered_functions=91
+structured_functions=91
+generic_codegen_functions=91
+generic_cfg_functions=91
 structural_matcher_functions=0
-structured_air_v2_functions=89
-typed_air_operand_functions=89
+structured_air_v2_functions=91
+typed_air_operand_functions=91
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=89
+generic_lowering_functions=91
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=89
+object_emitted_functions=91
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -134,9 +134,10 @@ Closed in the current memory/aggregate frontier slice:
   `{ i32, double }`, and selected `{ i32, i32, double }` forms are classified as
   mixed INTEGER/SSE, and field reads return low/high integer members from the
   GPR stream and floating members from the SSE stream; construction returns the
-  `i64` aggregate in `%rax`/`%xmm0`; a noinline helper-call row returns the same
-  register aggregate directly from a private helper without scalarizing through
-  a selected wrapper
+  `i64` aggregate in `%rax`/`%xmm0`, while the packed mixed construction row
+  packs adjacent low/high `i32` fields into `%rax` and returns the `double` in
+  `%xmm0`; a noinline helper-call row returns the same register aggregate
+  directly from a private helper without scalarizing through a selected wrapper
 - first SSE/SSE aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ double, double }` is classified as
   SSE/SSE, field reads return from the independent SSE argument stream, and
@@ -145,8 +146,9 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: `{ double, i64 }`, selected
   `{ double, i32 }`, and selected `{ double, i32, i32 }` forms are classified as
   SSE/INTEGER, field reads return from the independent SSE/GPR streams including
-  high 32-bit integer lanes, and construction returns the `i64` aggregate in
-  `%xmm0`/`%rax`
+  high 32-bit integer lanes, construction returns the `i64` aggregate in
+  `%xmm0`/`%rax`, and the packed reversed construction row packs adjacent
+  low/high `i32` fields into `%rax`
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
@@ -191,7 +193,8 @@ Remaining measured frontier blockers kept out of accepted rows:
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
   INTEGER add chains, nested mixed INTEGER/SSE integer add chains, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
-  reads/returns, SSE/SSE field reads/returns, and generated
+  reads/returns plus selected packed mixed construction returns, SSE/SSE field
+  reads/returns, and generated
   normal MEMORY integer-leaf aggregate sret/byval field/copy forms currently proven
   through seven flat fields, a nested two-Big3 aggregate, and a mixed-width
   `{ i64, i32, i64, i32 }` copy; X87,
