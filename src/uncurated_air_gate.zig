@@ -1629,7 +1629,9 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct ReverseMixed z_frontier_reverse_mixed_make(double, long long) __asm__("frontier_sysv_aggregate_classes.frontier_reverse_mixed_make");
     \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\extern int z_frontier_nested_pair_call_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_call_sum");
+    \\extern struct NestedPair z_frontier_nested_pair_make(int, int, int, int) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_make");
     \\extern long long z_frontier_array_pair_sum(struct ArrayPair) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_sum");
+    \\extern struct ArrayPair z_frontier_array_pair_make(long long, long long) __asm__("frontier_sysv_aggregate_classes.frontier_array_pair_make");
     \\extern int z_frontier_nested_mixed_int_sum(struct NestedMixed) __asm__("frontier_sysv_aggregate_classes.frontier_nested_mixed_int_sum");
     \\extern int z_frontier_small_mixed_int(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_int");
     \\extern double z_frontier_small_mixed_float(struct SmallMixed) __asm__("frontier_sysv_aggregate_classes.frontier_small_mixed_float");
@@ -1665,8 +1667,12 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
     \\    if (z_frontier_nested_pair_sum(nested) != 10) return 10;
     \\    if (z_frontier_nested_pair_call_sum(nested) != 10) return 15;
+    \\    struct NestedPair made_nested = z_frontier_nested_pair_make(5, 7, 11, 13);
+    \\    if (made_nested.left.a != 5 || made_nested.left.b != 7 || made_nested.right.a != 11 || made_nested.right.b != 13) return 28;
     \\    struct ArrayPair array = { { 11, 31 } };
     \\    if (z_frontier_array_pair_sum(array) != 42) return 11;
+    \\    struct ArrayPair made_array = z_frontier_array_pair_make(17, 19);
+    \\    if (made_array.values[0] != 17 || made_array.values[1] != 19) return 29;
     \\    struct NestedMixed nested_mixed = { { 47, 53 }, 59.0 };
     \\    if (z_frontier_nested_mixed_int_sum(nested_mixed) != 100) return 13;
     \\    struct SmallMixed small_mixed = { 17, 23.5 };

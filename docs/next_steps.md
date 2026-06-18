@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=91`,
-`generic_codegen_functions=91`, `generic_cfg_functions=91`,
+frontier gate reports `source_rows=13`, `discovered_functions=93`,
+`generic_codegen_functions=93`, `generic_cfg_functions=93`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=91`, `object_failures=0`,
+`object_emitted_functions=93`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -414,7 +414,11 @@ qualifiers and lowers the nested integer fields through layout-backed offsets
 from the aggregate's INTEGER class while preserving the independent SSE class.
 The nested INTEGER helper-call row passes `{ { i32, i32 }, { i32, i32 } }`
 through the SysV GPR pair to a private helper and returns the helper's scalar
-result without aggregate-specific wrapper dispatch.
+result without aggregate-specific wrapper dispatch; the nested construction
+row traces typed AIR v2 field paths for four scalar `i32` leaves and returns
+the aggregate in `%rax`/`%rdx`. The array-in-struct construction row traces
+typed AIR v2 pointer-element stores for `[2]i64` and returns the elements in
+`%rax`/`%rdx`.
 The SSE live-across-call frontier rows add selected
 one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call
 and selected two-live `f32`/`f64` spill/reload frames across a no-argument
@@ -430,6 +434,7 @@ beyond the selected one-/two-/three-live no-argument-call shapes, or live values
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
+selected nested/array INTEGER construction returns,
 selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double`
 field reads plus selected packed mixed construction returns, SSE/SSE field
 reads, and generated normal

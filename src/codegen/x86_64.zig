@@ -203,6 +203,9 @@ pub const Instruction = union(enum) {
     shr_rax_imm6: u6,
     shl_rdx_imm6: u6,
     or_rdx_rax,
+    shl_rcx_imm6: u6,
+    or_rcx_rax,
+    or_rcx_rdx,
     add_rax_imm8: u8,
     add_ecx_eax,
     xor_ecx_ecx,
@@ -5715,11 +5718,10 @@ fn lowerRegisterAggregateReturn(
     if (!ret.ty.eql(function.ret_ty)) return false;
     const classification = classifySysVAggregate(function.ret_ty) catch return false;
     if (classification.kind != .register or classification.eightbyte_count == 0) return false;
-    const field_count = aggregateFieldCount(function.ret_ty) orelse return false;
-    if (field_count == 0 or field_count != block.instructions.items.len) return false;
+    const leaf_count = block.instructions.items.len;
+    if (leaf_count == 0 or leaf_count > 8) return false;
 
-    var field_values: [8]ir.InsertValueInst = undefined;
-    if (field_count > field_values.len) return false;
+    var leaves: [8]AggregateReturnLeaf = undefined;
     var aggregate_value: ir.Value = .undef;
     for (block.instructions.items, 0..) |instruction, index| {
         if (instruction.removed) return false;
@@ -5730,28 +5732,27 @@ fn lowerRegisterAggregateReturn(
         };
         if (!insert.aggregate_ty.eql(function.ret_ty)) return false;
         if (!valuesEqual(insert.aggregate, aggregate_value)) return false;
-        var expected_index_buf: [24]u8 = undefined;
-        const expected_index = try std.fmt.bufPrint(&expected_index_buf, "{}", .{index});
-        if (!std.mem.eql(u8, insert.indices, expected_index)) return false;
-        const expected_field_ty = memory_location.aggregateFieldType(function.ret_ty, index) orelse return false;
-        if (!insert.value_ty.eql(expected_field_ty)) return false;
-        field_values[index] = insert;
+        const offset = try aggregateInsertByteOffset(function.ret_ty, insert.indices, insert.value_ty);
+        if (index != 0 and offset <= leaves[index - 1].offset) return error.UnsupportedCodegenAbi;
+        leaves[index] = .{ .value = insert.value, .ty = insert.value_ty, .offset = offset };
         aggregate_value = .{ .named = result };
     }
     if (!valuesEqual(ret.value orelse return error.InvalidRet, aggregate_value)) return false;
 
+    if (try lowerFourI32RegisterAggregateReturn(allocator, machine, function, leaves[0..leaf_count], classification)) return true;
+
     var gpr_return_index: usize = 0;
     var sse_return_index: usize = 0;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(function.ret_ty, field_index) orelse return false;
-        const field_eightbyte = try aggregateFieldEightbyte(function.ret_ty, field_index);
-        if (field_eightbyte >= classification.eightbyte_count) return false;
-        const field_class = classification.eightbytes[field_eightbyte] orelse return false;
-        switch (field_class) {
+    var leaf_index: usize = 0;
+    while (leaf_index < leaf_count) : (leaf_index += 1) {
+        const leaf = leaves[leaf_index];
+        const leaf_eightbyte: usize = @intCast(leaf.offset / 8);
+        if (leaf_eightbyte >= classification.eightbyte_count) return false;
+        const leaf_class = classification.eightbytes[leaf_eightbyte] orelse return false;
+        switch (leaf_class) {
             .integer => {
-                if (field_ty.eql(.{ .int = 64 })) {
-                    const src = try paramValueReg(function, field_values[field_index].value, field_ty);
+                if (leaf.ty.eql(.{ .int = 64 })) {
+                    const src = try paramValueReg(function, leaf.value, leaf.ty);
                     switch (gpr_return_index) {
                         0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
                         1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
@@ -5760,25 +5761,33 @@ fn lowerRegisterAggregateReturn(
                     gpr_return_index += 1;
                     continue;
                 }
-                if (!field_ty.eql(.{ .int = 32 })) return false;
-                const field_offset = try aggregateFieldByteOffset(function.ret_ty, field_index);
-                if (field_offset % 8 != 0) return error.UnsupportedCodegenAbi;
-                const low_reg = try paramValueReg(function, field_values[field_index].value, field_ty);
-                if (field_index + 1 < field_count and
-                    (memory_location.aggregateFieldType(function.ret_ty, field_index + 1) orelse return false).eql(.{ .int = 32 }))
+                if (!leaf.ty.eql(.{ .int = 32 })) return false;
+                if (leaf.offset % 8 != 0) return error.UnsupportedCodegenAbi;
+                const low_reg = try paramValueReg(function, leaf.value, leaf.ty);
+                if (leaf_index + 1 < leaf_count and
+                    leaves[leaf_index + 1].ty.eql(.{ .int = 32 }) and
+                    leaves[leaf_index + 1].offset / 8 == leaf_eightbyte and
+                    leaves[leaf_index + 1].offset % 8 == 4)
                 {
-                    const next_offset = try aggregateFieldByteOffset(function.ret_ty, field_index + 1);
-                    if (next_offset / 8 == field_eightbyte and next_offset % 8 == 4) {
-                        if (gpr_return_index != 0) return error.UnsupportedCodegenAbi;
-                        const high_reg = try paramValueReg(function, field_values[field_index + 1].value, .{ .int = 32 });
-                        try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
-                        try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
-                        try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
-                        try machine.instructions.append(allocator, .or_rdx_rax);
-                        gpr_return_index += 1;
-                        field_index += 1;
-                        continue;
+                    const high_reg = try paramValueReg(function, leaves[leaf_index + 1].value, .{ .int = 32 });
+                    switch (gpr_return_index) {
+                        0 => {
+                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = high_reg } });
+                            try machine.instructions.append(allocator, .{ .shl_rdx_imm6 = 32 });
+                            try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg });
+                            try machine.instructions.append(allocator, .or_rdx_rax);
+                        },
+                        1 => {
+                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = high_reg } });
+                            try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+                            try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = low_reg } });
+                            try machine.instructions.append(allocator, .or_rcx_rdx);
+                        },
+                        else => return error.UnsupportedCodegenAbi,
                     }
+                    gpr_return_index += 1;
+                    leaf_index += 1;
+                    continue;
                 }
                 switch (gpr_return_index) {
                     0 => try machine.instructions.append(allocator, .{ .mov_arg_eax = low_reg }),
@@ -5788,8 +5797,8 @@ fn lowerRegisterAggregateReturn(
                 gpr_return_index += 1;
             },
             .sse => {
-                if (!field_ty.eql(.double)) return false;
-                const fp_index = try fpParamIndexFromValue(function, field_values[field_index].value, field_ty);
+                if (!leaf.ty.eql(.double)) return false;
+                const fp_index = try fpParamIndexFromValue(function, leaf.value, leaf.ty);
                 switch (sse_return_index) {
                     0 => switch (try XmmReg.fromIndex(fp_index)) {
                         .xmm0 => {},
@@ -5810,12 +5819,65 @@ fn lowerRegisterAggregateReturn(
     return true;
 }
 
-fn aggregateFieldByteOffset(aggregate_ty: ir.Type, field_index: usize) !u64 {
+const AggregateReturnLeaf = struct {
+    value: ir.Value,
+    ty: ir.Type,
+    offset: u64,
+};
+
+fn lowerFourI32RegisterAggregateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    leaves: []const AggregateReturnLeaf,
+    classification: SysVAggregateClassification,
+) !bool {
+    if (classification.eightbyte_count != 2 or
+        classification.eightbytes[0] != .integer or
+        classification.eightbytes[1] != .integer or
+        leaves.len != 4)
+    {
+        return false;
+    }
+    const expected_offsets = [_]u64{ 0, 4, 8, 12 };
+    for (leaves, 0..) |leaf, index| {
+        if (!leaf.ty.eql(.{ .int = 32 }) or leaf.offset != expected_offsets[index]) return false;
+    }
+    const a = try paramValueReg(function, leaves[0].value, .{ .int = 32 });
+    const b = try paramValueReg(function, leaves[1].value, .{ .int = 32 });
+    const c = try paramValueReg(function, leaves[2].value, .{ .int = 32 });
+    const d = try paramValueReg(function, leaves[3].value, .{ .int = 32 });
+
+    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = d } });
+    try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rdx, .src = c } });
+    try machine.instructions.append(allocator, .or_rcx_rdx);
+    try machine.instructions.append(allocator, .{ .mov_arg_arg = .{ .dst = .rcx, .src = b } });
+    try machine.instructions.append(allocator, .{ .shl_rcx_imm6 = 32 });
+    try machine.instructions.append(allocator, .{ .mov_arg_eax = a });
+    try machine.instructions.append(allocator, .or_rcx_rax);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn aggregateInsertByteOffset(aggregate_ty: ir.Type, indices: []const u8, value_ty: ir.Type) !u64 {
     const layout = try x86_64SysVDataLayout();
-    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
-        return error.UnsupportedCodegenAbi;
-    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
-    return @intCast(field_offset_i);
+    var current_ty = aggregate_ty;
+    var offset: u64 = 0;
+    var rest = indices;
+    while (rest.len != 0) {
+        const comma = std.mem.indexOfScalar(u8, rest, ',');
+        const part = std.mem.trim(u8, if (comma) |pos| rest[0..pos] else rest, " \t");
+        const field_index = std.fmt.parseInt(usize, part, 10) catch return error.UnsupportedCodegenAbi;
+        const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, current_ty, field_index) orelse
+            return error.UnsupportedCodegenAbi;
+        if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
+        offset += @intCast(field_offset_i);
+        current_ty = memory_location.aggregateFieldType(current_ty, field_index) orelse return error.UnsupportedCodegenAbi;
+        rest = if (comma) |pos| rest[pos + 1 ..] else "";
+    }
+    if (!current_ty.eql(value_ty)) return error.UnsupportedCodegenAbi;
+    return offset;
 }
 
 fn aggregateFieldCount(ty: ir.Type) ?usize {
@@ -22864,6 +22926,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .shr_rax_imm6,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .shl_rcx_imm6,
+        .or_rcx_rax,
+        .or_rcx_rdx,
         .add_rax_imm8,
         .add_ecx_eax,
         .xor_ecx_ecx,
@@ -23037,7 +23102,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             saw_terminator = true;
             eax_defined = true;
         },
-        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_rax_arg_ptr_disp8, .store_eax_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
+        .mov_arg_arg, .mov_arg64_arg, .shl_rdx_imm6, .shl_rcx_imm6, .or_rcx_rax, .or_rcx_rdx, .xor_ecx_ecx, .xor_ebp_ebp, .load_rdi_rcx4_ptr_r8d, .inc_rcx, .movzx_dil_edi, .and_edi_imm8, .mov_edi_edi, .mov_rsp_rdi, .load_rax_ptr_rdx, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_r8d_arg32, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rdi, .cmp_rax_rdx, .cmp_arg8_imm8, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .test_arg8, .test_arg32, .test_arg64, .base64_raw_args_to_decode4_regs, .store_eax_arg_ptr, .store_imm64_arg_ptr_disp8, .store_arg64_arg_ptr_disp8, .store_rax_arg_ptr_disp8, .store_eax_arg_ptr_disp8, .store_imm8_arg_ptr_disp8, .mov_imm64_xmm1, .mov_imm32_xmm1, .ucomisd, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .load_f128_arg_ptr_xmm0, .load_f128_const_xmm1, .store_f128_xmm0_arg_ptr, .store_eax_global_i32, .store_eax_tls_i32, .store_imm8_abs, .je, .jne, .jo, .jp, .js, .jae, .jle, .jmp => {},
         .ret => {
             if (!eax_defined) return error.ReturnRegisterUndefined;
             if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
@@ -23088,6 +23153,9 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .shr_rax_imm6,
         .shl_rdx_imm6,
         .or_rdx_rax,
+        .shl_rcx_imm6,
+        .or_rcx_rax,
+        .or_rcx_rdx,
         .add_rax_imm8,
         .add_ecx_eax,
         .xor_ecx_ecx,

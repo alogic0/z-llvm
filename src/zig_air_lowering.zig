@@ -959,28 +959,110 @@ fn lowerTypedV2SmallIntegerAggregateAbi(
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
     if (!typedV2RegisterAggregateRecords(function_type, structured_air_v2)) return null;
-    return try lowerRegisterAggregateMake(allocator, air_function);
+    return try lowerRegisterAggregateMake(allocator, air_function, structured_air_v2);
 }
 
 fn typedV2RegisterAggregateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
+    var leaf_paths: [8][]const u8 = undefined;
+    return typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths);
+}
+
+fn typedV2RegisterAggregateLeafPaths(
+    function_type: FunctionType,
+    structured_air_v2: air_export.StructuredAirV2,
+    leaf_paths: *[8][]const u8,
+) bool {
     if (function_type.return_type.ir_type != .aggregate) return false;
     if (!isSysVRegisterAggregateCandidate(function_type.return_type.ir_type)) return false;
-    const field_count = aggregateFieldCount(function_type.return_type.ir_type) orelse return false;
-    if (field_count == 0 or field_count > 8 or function_type.params.len != field_count) return false;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(function_type.return_type.ir_type, field_index) orelse return false;
-        if (!field_ty.eql(.{ .int = 32 }) and !field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return false;
-        if (!function_type.params[field_index].ir_type.eql(field_ty)) return false;
-        if (typedFieldPtrIndexCount(structured_air_v2, field_index) != 1) return false;
+    if (function_type.params.len == 0 or function_type.params.len > leaf_paths.len) return false;
+    if (typedOpcodeCount(structured_air_v2, "arg") != function_type.params.len) return false;
+    if (typedOpcodeCount(structured_air_v2, "ret_ptr") != 1) return false;
+    if (typedStoreOpcodeCount(structured_air_v2) != function_type.params.len) return false;
+    if (typedOpcodeCount(structured_air_v2, "ret_load") != 1) return false;
+    const ret_ptr_index = typedRetPtrIndex(structured_air_v2) orelse return false;
+    var store_index: usize = 0;
+    for (structured_air_v2.instructions) |instruction| {
+        if (!std.mem.eql(u8, instruction.opcode, "store") and !std.mem.eql(u8, instruction.opcode, "store_safe")) continue;
+        if (store_index >= function_type.params.len) return false;
+        if (instruction.operands.len != 2) return false;
+        if (!std.mem.eql(u8, instruction.operands[1].kind, "inst")) return false;
+        const arg_inst_index = std.fmt.parseInt(u32, instruction.operands[1].value, 10) catch return false;
+        if (arg_inst_index != store_index) return false;
+        const operand_type = parseZigType(instruction.operands[1].type_text) orelse return false;
+        if (!function_type.params[store_index].ir_type.eql(operand_type.ir_type)) return false;
+        const ptr_inst_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return false;
+        var path: [4]usize = undefined;
+        const path_len = typedAggregatePointerPath(structured_air_v2, ptr_inst_index, ret_ptr_index, &path) orelse return false;
+        leaf_paths[store_index] = aggregateIndexPathText(path[0..path_len]) orelse return false;
+        store_index += 1;
     }
-    return typedOpcodeCount(structured_air_v2, "arg") == field_count and
-        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == field_count and
-        typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+    return store_index == function_type.params.len;
+}
+
+fn typedRetPtrIndex(structured_air_v2: air_export.StructuredAirV2) ?u32 {
+    for (structured_air_v2.instructions) |instruction| {
+        if (std.mem.eql(u8, instruction.opcode, "ret_ptr")) return instruction.index;
+    }
+    return null;
+}
+
+fn typedAggregatePointerPath(
+    structured_air_v2: air_export.StructuredAirV2,
+    instruction_index: u32,
+    ret_ptr_index: u32,
+    path: *[4]usize,
+) ?usize {
+    const instruction = typedInstructionByIndex(structured_air_v2, instruction_index) orelse return null;
+    if (instruction.index == ret_ptr_index and std.mem.eql(u8, instruction.opcode, "ret_ptr")) return 0;
+    if (std.mem.eql(u8, instruction.data_kind, "field_ptr")) {
+        if (instruction.operands.len != 1 or !std.mem.eql(u8, instruction.operands[0].kind, "inst")) return null;
+        const base_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
+        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
+        if (len >= path.len) return null;
+        const field_index_text = typedDetail(instruction, "field_index") orelse return null;
+        path[len] = std.fmt.parseInt(usize, field_index_text, 10) catch return null;
+        return len + 1;
+    }
+    if (std.mem.eql(u8, instruction.opcode, "ptr_elem_ptr")) {
+        if (instruction.operands.len != 2 or !std.mem.eql(u8, instruction.operands[0].kind, "inst")) return null;
+        const base_index = std.fmt.parseInt(u32, instruction.operands[0].value, 10) catch return null;
+        const len = typedAggregatePointerPath(structured_air_v2, base_index, ret_ptr_index, path) orelse return null;
+        if (len >= path.len) return null;
+        path[len] = typedConstUsizeOperand(instruction, 1) orelse return null;
+        return len + 1;
+    }
+    return null;
+}
+
+fn typedConstUsizeOperand(instruction: air_export.TypedInstruction, operand_index: usize) ?usize {
+    const text = typedOperandTextDetail(instruction, operand_index) orelse return null;
+    if (std.mem.eql(u8, text, "@.zero_usize")) return 0;
+    if (std.mem.eql(u8, text, "@.one_usize")) return 1;
+    return null;
+}
+
+fn aggregateIndexPathText(path: []const usize) ?[]const u8 {
+    if (path.len == 1) return switch (path[0]) {
+        0 => "0",
+        1 => "1",
+        2 => "2",
+        3 => "3",
+        4 => "4",
+        5 => "5",
+        6 => "6",
+        7 => "7",
+        else => null,
+    };
+    if (path.len == 2) {
+        if (path[0] == 0 and path[1] == 0) return "0, 0";
+        if (path[0] == 0 and path[1] == 1) return "0, 1";
+        if (path[0] == 1 and path[1] == 0) return "1, 0";
+        if (path[0] == 1 and path[1] == 1) return "1, 1";
+    }
+    return null;
 }
 
 fn aggregateFieldCount(ty: ir.Type) ?usize {
@@ -3393,18 +3475,20 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
     return function;
 }
 
-fn lowerRegisterAggregateMake(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+fn lowerRegisterAggregateMake(
+    allocator: std.mem.Allocator,
+    air_function: air_export.Function,
+    structured_air_v2: air_export.StructuredAirV2,
+) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
     const aggregate_ty = function_type.return_type.ir_type;
     if (!isSysVRegisterAggregateCandidate(aggregate_ty)) return error.UnsupportedAir;
-    const field_count = aggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
-    if (field_count == 0 or field_count > 8 or function_type.params.len != field_count) return error.UnsupportedAir;
-    var field_index: usize = 0;
-    while (field_index < field_count) : (field_index += 1) {
-        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedAir;
-        if (!field_ty.eql(.{ .int = 32 }) and !field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return error.UnsupportedAir;
-        if (!function_type.params[field_index].ir_type.eql(field_ty)) return error.UnsupportedAir;
+    if (function_type.params.len == 0 or function_type.params.len > 8) return error.UnsupportedAir;
+    var leaf_paths: [8][]const u8 = undefined;
+    if (!typedV2RegisterAggregateLeafPaths(function_type, structured_air_v2, &leaf_paths)) return error.UnsupportedAir;
+    for (function_type.params) |param| {
+        if (!param.ir_type.eql(.{ .int = 32 }) and !param.ir_type.eql(.{ .int = 64 }) and !param.ir_type.eql(.double)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
@@ -3417,7 +3501,6 @@ fn lowerRegisterAggregateMake(allocator: std.mem.Allocator, air_function: air_ex
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
     const result_names = [_][]const u8{ "field0", "field1", "field2", "field3", "field4", "field5", "field6", "result" };
-    const index_texts = [_][]const u8{ "0", "1", "2", "3", "4", "5", "6", "7" };
     var aggregate_value: ir.Value = .undef;
     for (function_type.params, 0..) |param, index| {
         try block.instructions.append(allocator, .{
@@ -3427,7 +3510,7 @@ fn lowerRegisterAggregateMake(allocator: std.mem.Allocator, air_function: air_ex
                 .aggregate = aggregate_value,
                 .value_ty = param.ir_type,
                 .value = .{ .named = arg_names[index] },
-                .indices = index_texts[index],
+                .indices = leaf_paths[index],
             } },
         });
         aggregate_value = .{ .named = result_names[index] };

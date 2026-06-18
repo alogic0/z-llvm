@@ -41,6 +41,7 @@ selected backend subset:
   one to six live i32 caller arguments can be spilled across one direct call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
   selected nested INTEGER aggregate field add-chain reads are accepted
+  selected nested/array INTEGER aggregate construction returns are accepted
   selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads are accepted
   selected array-in-struct INTEGER aggregate sums are accepted
   selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument-field reads are accepted through the reusable aggregate classifier
@@ -148,7 +149,7 @@ Native backend handoff classification:
 ```text
 validation-only: call assembly/object fixtures validate ABI and relocation assumptions for tiny direct-call cases
 handoff study: the accepted call shape can be compared against Zig native AIR/MIR call lowering
-accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected named f32/f64 argument pass-through through %xmm0..%xmm4 plus backend FP constant materialization through %xmm0..%xmm7, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads, register return including packed adjacent `i32` construction returns, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register return including packed adjacent `i32` construction returns, selected SSE/SSE aggregate argument field reads and register return, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return, and selected three-live f32/f64 spill/reload across the same helper shape before a two-step post-call fadd return
+accepted frontier: selected stack-passed i32 arguments, mixed integer/SSE scalar arguments, selected named f32/f64 argument pass-through through %xmm0..%xmm4 plus backend FP constant materialization through %xmm0..%xmm7, selected small INTEGER/INTEGER aggregate return/argument reads, selected nested INTEGER aggregate pass-through helper calls and construction returns, selected array-in-struct INTEGER construction returns, selected nested mixed INTEGER/SSE aggregate integer-field add-chain reads, selected mixed INTEGER/SSE aggregate low/high `i32`, `i64`, and `double` argument field reads, register return including packed adjacent `i32` construction returns, and direct helper-call return, selected reversed mixed SSE/INTEGER aggregate low/high `i32`, `i64`, and `double` argument field reads and register return including packed adjacent `i32` construction returns, selected SSE/SSE aggregate argument field reads and register return, generated normal integer-leaf MEMORY aggregate hidden-sret return storage and byval-to-sret copies currently proven through seven flat fields, a nested two-Big3 aggregate, and a mixed-width `{ i64, i32, i64, i32 }` aggregate, selected stack-passed MEMORY aggregate by-value field reads, selected one-live f32/f64 SSE spill/reload around a direct C ABI void call, selected two-live f32/f64 spill/reload across a no-argument direct C ABI void call before a post-call fadd return, and selected three-live f32/f64 spill/reload across the same helper shape before a two-step post-call fadd return
 out of scope: varargs, vectors, arbitrary aggregate ABI classes, arbitrary non-selected sret/byval copies, tail calls, unwind, and debug-info call-site handling
 handoff doc: docs/codegen/zig_native_backend_handoff.md
 ```
@@ -180,6 +181,7 @@ immediate constant call arguments use generic XMM materialization through
 the local x86_64 SysV aggregate classifier records INTEGER, SSE, mixed
 INTEGER/SSE, and MEMORY decisions; lowering currently accepts selected
 INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add-chain,
+selected nested/array INTEGER construction-return forms,
 mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE field-read forms plus selected
 packed mixed construction-return forms
 arbitrary hidden sret storage, arbitrary non-selected stack-passed byval copies, complete

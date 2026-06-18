@@ -6948,6 +6948,52 @@ test "x86_64 codegen returns packed i32 mixed aggregate in rax xmm0" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, reverse.instructions.items[4]);
 }
 
+test "x86_64 codegen returns flattened nested and array register aggregates" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { { i32, i32 }, { i32, i32 } } @make_nested(i32 %a, i32 %b, i32 %c, i32 %d) {
+        \\entry:
+        \\  %field0 = insertvalue { { i32, i32 }, { i32, i32 } } undef, i32 %a, 0, 0
+        \\  %field1 = insertvalue { { i32, i32 }, { i32, i32 } } %field0, i32 %b, 0, 1
+        \\  %field2 = insertvalue { { i32, i32 }, { i32, i32 } } %field1, i32 %c, 1, 0
+        \\  %result = insertvalue { { i32, i32 }, { i32, i32 } } %field2, i32 %d, 1, 1
+        \\  ret { { i32, i32 }, { i32, i32 } } %result
+        \\}
+        \\
+        \\define { [2 x i64] } @make_array(i64 %a, i64 %b) {
+        \\entry:
+        \\  %field0 = insertvalue { [2 x i64] } undef, i64 %a, 0, 0
+        \\  %result = insertvalue { [2 x i64] } %field0, i64 %b, 0, 1
+        \\  ret { [2 x i64] } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var nested = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer nested.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, nested.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rcx, .src = .rcx } }, nested.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shl_rcx_imm6 = 32 }, nested.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rdx, .src = .rdx } }, nested.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.or_rcx_rdx, nested.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } }, nested.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .shl_rcx_imm6 = 32 }, nested.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, nested.instructions.items[6]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.or_rcx_rax, nested.instructions.items[7]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, nested.instructions.items[8]);
+
+    var array = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[1]);
+    defer array.deinit(std.testing.allocator);
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, array.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, array.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg64_arg = .{ .dst = .rdx, .src = .rsi } }, array.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, array.instructions.items[2]);
+}
+
 test "x86_64 codegen returns SSE SSE aggregate in xmm0 xmm1" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

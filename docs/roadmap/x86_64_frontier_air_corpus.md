@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=91
-structured_functions=91
-generic_codegen_functions=91
-generic_cfg_functions=91
+discovered_functions=93
+structured_functions=93
+generic_codegen_functions=93
+generic_cfg_functions=93
 structural_matcher_functions=0
-structured_air_v2_functions=91
-typed_air_operand_functions=91
+structured_air_v2_functions=93
+typed_air_operand_functions=93
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=91
+generic_lowering_functions=93
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=91
+object_emitted_functions=93
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -154,7 +154,9 @@ Closed in the current memory/aggregate frontier slice:
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
   from the SysV GPR pair without a function-name-specific lowering path; the
   noinline helper-call row passes the nested aggregate through the same GPR pair
-  to a private helper
+  to a private helper, and the construction-return row builds the nested
+  aggregate from four scalar `i32` leaves by tracing typed AIR v2 field paths
+  and packing both INTEGER eightbytes into `%rax`/`%rdx`
 - first nested mixed aggregate integer-field add-chain row in
   `frontier_sysv_aggregate_classes.zig`: `{ { i32, i32 }, double }` field
   pointers carry `align(...)` qualifiers from typed AIR v2, are lowered through
@@ -162,7 +164,10 @@ Closed in the current memory/aggregate frontier slice:
   class while preserving the independent SSE field classification
 - first array-in-struct INTEGER aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]i64` typed AIR pointer-element
-  GEPs are lowered from typed v2 and summed from the SysV GPR pair
+  GEPs are lowered from typed v2 and summed from the SysV GPR pair; the
+  construction-return row traces typed AIR v2 array-element stores into
+  flattened `insertvalue` paths and returns the two `i64` elements in
+  `%rax`/`%rdx`
 - first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
   `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
   another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
@@ -191,7 +196,7 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains, nested mixed INTEGER/SSE integer add chains, selected
+  INTEGER add chains plus nested construction returns, nested mixed INTEGER/SSE integer add chains, selected
   mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field
   reads/returns plus selected packed mixed construction returns, SSE/SSE field
   reads/returns, and generated

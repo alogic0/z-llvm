@@ -153,6 +153,8 @@ INTEGER aggregate field add chains:
   function-name-specific backend path
   a noinline helper-call row passes `{ { i32, i32 }, { i32, i32 } }` through
   the SysV GPR pair and returns the helper's scalar sum
+  `{ { i32, i32 }, { i32, i32 } }` construction returns trace typed AIR v2
+  field-pointer store paths and pack both INTEGER eightbytes into %rax/%rdx
   `align(...)` pointer-qualified typed AIR field pointers are accepted for the
   nested mixed `{ { i32, i32 }, double }` row while preserving its SSE field
   classification
@@ -160,6 +162,8 @@ frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
 aggregate sums:
   `[2]i64` pointer-element GEPs are lowered from typed AIR v2
   the two i64 fields are read from the SysV GPR pair
+  `[2]i64` construction returns trace typed AIR v2 pointer-element stores and
+  return the two elements in %rax/%rdx
 frontier_sysv_abi proves the first selected SSE live-across-call frame:
   one live f32/f64 value is spilled from %xmm0 to an aligned frame slot
   another f32/f64 value is passed to an external C ABI void helper
@@ -183,7 +187,7 @@ no callee-saved register saves
 no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes, selected one-live f32/f64 SSE spill shape, and selected two-/three-live f32/f64 no-argument-call spill shapes
 no varargs
 no vectors
-no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
+no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, nested/array INTEGER construction returns, nested mixed INTEGER/SSE integer-field add chains, selected mixed INTEGER/SSE and SSE/INTEGER low/high `i32`, `i64`, and `double` field-read/register forms, selected packed mixed construction returns, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes beyond the selected normal integer-leaf sret/byval forms
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions

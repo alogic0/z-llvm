@@ -110,8 +110,16 @@ export fn frontier_nested_pair_call_sum(value: NestedPair) i32 {
     return helperNestedPairSum(value);
 }
 
+export fn frontier_nested_pair_make(a: i32, b: i32, c: i32, d: i32) NestedPair {
+    return .{ .left = .{ .a = a, .b = b }, .right = .{ .a = c, .b = d } };
+}
+
 export fn frontier_array_pair_sum(value: ArrayPair) i64 {
     return value.values[0] + value.values[1];
+}
+
+export fn frontier_array_pair_make(a: i64, b: i64) ArrayPair {
+    return .{ .values = .{ a, b } };
 }
 
 export fn frontier_nested_mixed_int_sum(value: NestedMixed) i32 {
