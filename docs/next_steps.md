@@ -294,8 +294,8 @@ arguments, f32/f64 direct-call returns, i64 direct-call returns/pass-through,
 mixed integer/f32/f64 call argument assignment, and selected two-i32 aggregate
 argument/return rows. Milestone 1 is closed for this selected practical SysV
 ABI subset. Remaining non-selected ABI boundaries are full aggregate
-classification beyond the selected INTEGER and MEMORY aggregate forms,
-arbitrary non-selected sret/byval copies, varargs, vectors, and live-across-call shapes
+classification beyond the selected INTEGER and normal i64 MEMORY aggregate forms,
+arbitrary non-selected non-i64 sret/byval copies, varargs, vectors, and live-across-call shapes
 involving stack-passed or SSE values; focused unit tests now fail closed for these
 unsupported classes.
 The first broader SysV closure wave adds `frontier_sysv_abi.zig` with small
@@ -313,11 +313,12 @@ multiple stack-passed user fields after the hidden sret pointer. The normal i64
 MEMORY sret/byval typed builder now generates field names and ABI attrs instead
 of using a fixed field-count table. The same selected normal i64 MEMORY
 aggregate forms use by-value stack-passed aggregate field reads and
-byval-to-sret copies for all fields through layout-derived offsets.
+byval-to-sret copies for all scalar leaves through layout-derived offsets,
+including the nested two-Big3 aggregate row.
 Boundaries still outside this
 wave are full
-SysV aggregate classification beyond the selected INTEGER/MEMORY classes,
-arbitrary non-selected sret/byval copies, varargs, vectors, and wider
+SysV aggregate classification beyond the selected INTEGER/normal i64 MEMORY classes,
+arbitrary non-selected non-i64 sret/byval copies, varargs, vectors, and wider
 spill/reload pressure.
 
 Scale corpus frontier:
@@ -361,12 +362,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=68`,
-`generic_codegen_functions=68`, `generic_cfg_functions=68`,
+frontier gate reports `source_rows=13`, `discovered_functions=70`,
+`generic_codegen_functions=70`, `generic_cfg_functions=70`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=68`, `object_failures=0`,
+`object_emitted_functions=70`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
@@ -389,8 +390,10 @@ frontier row now covers `{ i64, i64, i64 }`, `{ i64, i64, i64, i64 }`, and
 `{ i64, i64, i64, i64, i64 }` hidden-sret returns plus stack-passed MEMORY
 aggregate field-read and byval-to-sret copy proof using layout-derived offsets;
 the Big6/Big7 follow-up extends that normal i64 MEMORY proof through
-`{ i64, i64, i64, i64, i64, i64, i64 }` and exercises multiple stack-passed
-user fields after the hidden sret pointer.
+`{ i64, i64, i64, i64, i64, i64, i64 }`, exercises multiple stack-passed
+user fields after the hidden sret pointer, and the nested MEMORY follow-up
+copies and reads `{ { i64, i64, i64 }, { i64, i64, i64 } }` through recursive
+leaf byte offsets.
 The mixed aggregate
 class frontier row adds `{ i64, double }`
 INTEGER/SSE field reads and register aggregate return in `%rax`/`%xmm0`
@@ -413,8 +416,9 @@ alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,
 mixed INTEGER/SSE, SSE/INTEGER, SSE/SSE field reads, and generated normal
-MEMORY i64 field/copy forms currently proven through seven fields, arbitrary
-non-selected sret/byval copies, varargs, vectors, stack-passed live values, and
+MEMORY i64 field/copy forms currently proven through seven flat fields and a
+nested two-Big3 aggregate, arbitrary non-selected non-i64 sret/byval copies,
+varargs, vectors, stack-passed live values, and
 broader SSE live-across-call frames
 beyond the selected one-live `f32`/`f64` and two-live `f32`/`f64`
 no-argument-call shapes. The accepted frontier rows use typed

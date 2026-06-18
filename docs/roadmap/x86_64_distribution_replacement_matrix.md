@@ -348,7 +348,7 @@ independent integer/SSE argument streams, i32/i64/f32/f64 returns, mixed
 integer/floating direct calls, and selected two-i32 aggregate argument/return
 rows with executable C ABI proof. Non-selected ABI boundaries remain explicit:
 full aggregate classification beyond the selected INTEGER and MEMORY aggregate
-forms, arbitrary non-selected sret/byval copies, varargs, vectors, and high-register-pressure
+forms, arbitrary non-selected non-i64 sret/byval copies, varargs, vectors, and high-register-pressure
 spill/reload-heavy call frames.
 
 The scale corpus frontier is intentionally separate from both closed baselines:
@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=68`,
-`generic_codegen_functions=68`, `generic_cfg_functions=68`,
+three release modes at `source_rows=13`, `discovered_functions=70`,
+`generic_codegen_functions=70`, `generic_cfg_functions=70`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=68`, `object_failures=0`,
+`object_emitted_functions=70`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=3`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -411,7 +411,9 @@ sret/byval-style frontier row adds `{ i64, i64, i64 }`,
 `{ i64, i64, i64, i64, i64, i64, i64 }` hidden-sret return storage plus
 stack-passed MEMORY aggregate by-value field reads and byval-to-sret copies
 with executable proof; the seven-field make row exercises multiple
-stack-passed user fields after the hidden sret pointer. The mixed aggregate class
+stack-passed user fields after the hidden sret pointer, and the nested normal
+MEMORY copy/read row proves recursive leaf byte-offset handling for
+`{ { i64, i64, i64 }, { i64, i64, i64 } }`. The mixed aggregate class
 frontier row adds `{ i64, double }` INTEGER/SSE
 field reads and register aggregate return in `%rax`/`%xmm0` from the
 independent GPR/SSE streams with executable proof.
@@ -430,8 +432,9 @@ broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,
 nested mixed INTEGER/SSE integer-field add-chain, mixed INTEGER/SSE,
 SSE/INTEGER, SSE/SSE field-read/return, and generated normal MEMORY i64
-sret/byval field/copy forms currently proven through seven fields, arbitrary
-non-selected sret/byval copies, varargs, vectors, stack-passed live values,
+sret/byval field/copy forms currently proven through seven flat fields and a
+nested two-Big3 aggregate, arbitrary non-selected non-i64 sret/byval copies,
+varargs, vectors, stack-passed live values,
 and broader SSE live-across-call frames beyond
 the selected one-live `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes.
 The frontier audit lives in

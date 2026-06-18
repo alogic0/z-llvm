@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=68
-structured_functions=68
-generic_codegen_functions=68
-generic_cfg_functions=68
+discovered_functions=70
+structured_functions=70
+generic_codegen_functions=70
+generic_cfg_functions=70
 structural_matcher_functions=0
-structured_air_v2_functions=68
-typed_air_operand_functions=68
+structured_air_v2_functions=70
+typed_air_operand_functions=70
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=68
+generic_lowering_functions=70
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=68
+object_emitted_functions=70
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -124,9 +124,10 @@ Closed in the current memory/aggregate frontier slice:
   seven-field make row proves multiple stack-passed user arguments after the
   hidden pointer, the normal i64 MEMORY sret/byval typed builder now generates
   field names and ABI attrs instead of using a fixed field-count table, and the
-  same selected normal MEMORY i64 aggregates copy all fields from the
+  same selected normal MEMORY i64 aggregates copy all scalar leaves from the
   stack-passed by-value argument to the hidden sret destination using
-  layout-derived offsets
+  layout-derived byte offsets, including the nested `{ { i64, i64, i64 },
+  { i64, i64, i64 } }` copy/read row
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
@@ -175,9 +176,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   INTEGER add chains, nested mixed INTEGER/SSE integer add chains, mixed
   INTEGER/SSE, SSE/INTEGER, and SSE/SSE field reads/returns, and generated
   normal MEMORY i64 aggregate sret/byval field/copy forms currently proven
-  through seven fields; X87,
+  through seven flat fields and a nested two-Big3 aggregate; X87,
   packed/unaligned aggregate ABI classes,
-  arbitrary non-selected sret/byval copies, varargs, vectors, stack-passed live
+  arbitrary non-selected non-i64 sret/byval copies, varargs, vectors, stack-passed live
   values, and broader SSE live-across-call frames beyond the selected one-live
   `f32`/`f64` and two-live `f32`/`f64` no-argument-call shapes
 

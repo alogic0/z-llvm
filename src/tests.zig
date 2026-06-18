@@ -5663,6 +5663,56 @@ test "x86_64 codegen copies seven-field memory aggregate from byval to sret" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[14]);
 }
 
+test "x86_64 codegen copies nested memory aggregate leaves from byval to sret" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define void @copy(ptr noalias sret({ { i64, i64, i64 }, { i64, i64, i64 } }) %out, ptr byval({ { i64, i64, i64 }, { i64, i64, i64 } }) %value) {
+        \\entry:
+        \\  %src0 = getelementptr i8, ptr %value, i64 0
+        \\  %load0 = load i64, ptr %src0
+        \\  %dst0 = getelementptr i8, ptr %out, i64 0
+        \\  store i64 %load0, ptr %dst0
+        \\  %src1 = getelementptr i8, ptr %value, i64 8
+        \\  %load1 = load i64, ptr %src1
+        \\  %dst1 = getelementptr i8, ptr %out, i64 8
+        \\  store i64 %load1, ptr %dst1
+        \\  %src2 = getelementptr i8, ptr %value, i64 16
+        \\  %load2 = load i64, ptr %src2
+        \\  %dst2 = getelementptr i8, ptr %out, i64 16
+        \\  store i64 %load2, ptr %dst2
+        \\  %src3 = getelementptr i8, ptr %value, i64 24
+        \\  %load3 = load i64, ptr %src3
+        \\  %dst3 = getelementptr i8, ptr %out, i64 24
+        \\  store i64 %load3, ptr %dst3
+        \\  %src4 = getelementptr i8, ptr %value, i64 32
+        \\  %load4 = load i64, ptr %src4
+        \\  %dst4 = getelementptr i8, ptr %out, i64 32
+        \\  store i64 %load4, ptr %dst4
+        \\  %src5 = getelementptr i8, ptr %value, i64 40
+        \\  %load5 = load i64, ptr %src5
+        \\  %dst5 = getelementptr i8, ptr %out, i64 40
+        \\  store i64 %load5, ptr %dst5
+        \\  ret void
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    var field_index: usize = 0;
+    while (field_index < 6) : (field_index += 1) {
+        try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = @intCast(8 + field_index * 8) }, machine.instructions.items[field_index * 2]);
+        try std.testing.expectEqual(codegen.x86_64.Instruction{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdi, .offset = @intCast(field_index * 8) } }, machine.instructions.items[field_index * 2 + 1]);
+    }
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[12]);
+}
+
 test "x86_64 codegen reads selected memory aggregate by-value fields" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5750,6 +5800,37 @@ test "x86_64 codegen reads five-field memory aggregate by-value fields" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 16 }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp8_rax = 40 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
+}
+
+test "x86_64 codegen reads nested memory aggregate by-value fields" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i64 @sum({ { i64, i64, i64 }, { i64, i64, i64 } } %value) {
+        \\entry:
+        \\  %slot = alloca { { i64, i64, i64 }, { i64, i64, i64 } }
+        \\  store { { i64, i64, i64 }, { i64, i64, i64 } } %value, ptr %slot
+        \\  %left_b_ptr = getelementptr i8, ptr %slot, i64 8
+        \\  %left_b = load i64, ptr %left_b_ptr
+        \\  %right_ptr = getelementptr i8, ptr %slot, i64 24
+        \\  %right_c_ptr = getelementptr i8, ptr %right_ptr, i64 16
+        \\  %right_c = load i64, ptr %right_c_ptr
+        \\  %sum = add i64 %left_b, %right_c
+        \\  ret i64 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .load_stack_disp8_rax = 16 }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_stack_disp8_rax = 48 }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 

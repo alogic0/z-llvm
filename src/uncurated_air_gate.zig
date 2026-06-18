@@ -1531,6 +1531,7 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\struct Big5 { long long a; long long b; long long c; long long d; long long e; };
     \\struct Big6 { long long a; long long b; long long c; long long d; long long e; long long f; };
     \\struct Big7 { long long a; long long b; long long c; long long d; long long e; long long f; long long g; };
+    \\struct BigNested { struct Big3 left; struct Big3 right; };
     \\extern struct Big3 z_frontier_big3_make(long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big3_make");
     \\extern long long z_frontier_big3_edges(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_edges");
     \\extern struct Big3 z_frontier_big3_copy(struct Big3) __asm__("frontier_sysv_sret_byval.frontier_big3_copy");
@@ -1547,6 +1548,8 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\extern struct Big7 z_frontier_big7_make(long long, long long, long long, long long, long long, long long, long long) __asm__("frontier_sysv_sret_byval.frontier_big7_make");
     \\extern long long z_frontier_big7_inner(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_inner");
     \\extern struct Big7 z_frontier_big7_copy(struct Big7) __asm__("frontier_sysv_sret_byval.frontier_big7_copy");
+    \\extern struct BigNested z_frontier_big_nested_copy(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_copy");
+    \\extern long long z_frontier_big_nested_sum_inner(struct BigNested) __asm__("frontier_sysv_sret_byval.frontier_big_nested_sum_inner");
     \\int main(void) {
     \\    struct Big3 made = z_frontier_big3_make(5, 7, 11);
     \\    if (made.a != 5 || made.b != 7 || made.c != 11) return 1;
@@ -1579,6 +1582,10 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\    if (z_frontier_big7_inner(input7) != 431) return 15;
     \\    struct Big7 copied7 = z_frontier_big7_copy(input7);
     \\    if (copied7.a != 113 || copied7.b != 127 || copied7.c != 131 || copied7.d != 137 || copied7.e != 139 || copied7.f != 149 || copied7.g != 151) return 16;
+    \\    struct BigNested nested = { .left = { .a = 2, .b = 3, .c = 5 }, .right = { .a = 7, .b = 11, .c = 13 } };
+    \\    if (z_frontier_big_nested_sum_inner(nested) != 16) return 17;
+    \\    struct BigNested copied_nested = z_frontier_big_nested_copy(nested);
+    \\    if (copied_nested.left.a != 2 || copied_nested.left.b != 3 || copied_nested.left.c != 5 || copied_nested.right.a != 7 || copied_nested.right.b != 11 || copied_nested.right.c != 13) return 18;
     \\    return 0;
     \\}
     \\
