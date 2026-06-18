@@ -363,12 +363,12 @@ x86_64 ReleaseFast/ReleaseSafe/ReleaseSmall real-source bucket under
 broad, expanded, and scale gates: inputs covers `test/zig/inputs`, broad adds
 `test/zig/integrated`, expanded adds `test/zig/expanded`, scale adds
 `test/zig/scale`, and frontier covers only the new frontier directory. The
-frontier gate reports `source_rows=13`, `discovered_functions=94`,
-`generic_codegen_functions=94`, `generic_cfg_functions=94`,
+frontier gate reports `source_rows=13`, `discovered_functions=95`,
+`generic_codegen_functions=95`, `generic_cfg_functions=95`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=94`, `object_failures=0`,
+`object_emitted_functions=95`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0` for ReleaseFast, ReleaseSafe,
 and ReleaseSmall. Frontier object inspection is green at `inspected=13`,
 `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
@@ -424,14 +424,15 @@ one-live `f32`/`f64` spill/reload around an external C ABI `void` helper call
 and selected two-live `f32`/`f64` spill/reload frames across a no-argument
 helper before a post-call `fadd` return, plus selected three-live `f32`/`f64`
 spill/reload frames across the same no-argument helper shape before a two-step
-post-call `fadd` return, plus a selected four-live `f32` spill/reload frame
-across the same helper shape before a three-step post-call `fadd` return. The FP argument frontier now also proves selected
+post-call `fadd` return, plus selected four-live `f32`/`f64` spill/reload
+frames across the same helper shape before a three-step post-call `fadd`
+return. The FP argument frontier now also proves selected
 named `f32`/`f64` external-call pass-through through `%xmm0..%xmm4`; immediate
 FP constant materialization now uses generic XMM loads through `%xmm0..%xmm7`.
 The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
 private helper graphs with stack-passed live values, broader live SSE values
-beyond the selected one-/two-/three-live `f32`/`f64` and four-live `f32`
+beyond the selected one-/two-/three-/four-live `f32`/`f64`
 no-argument-call shapes, or live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
@@ -445,9 +446,8 @@ fields, a nested two-Big3 aggregate, and a mixed-width
 `{ i64, i32, i64, i32 }` copy, arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values, and
 broader SSE live-across-call frames
-beyond the selected one-live, two-live, and three-live `f32`/`f64`
-no-argument-call shapes plus the selected four-live `f32` no-argument-call
-shape. The accepted frontier rows use typed
+beyond the selected one-live, two-live, three-live, and four-live `f32`/`f64`
+no-argument-call shapes. The accepted frontier rows use typed
 structured AIR v2 and generic CFG only; no case IDs, wrapper maps, source tags,
 legacy AIR text lowering, shape recognizers, structural matcher fallback, LLVM
 optimizer, LLVM TargetMachine, or LLD are involved.

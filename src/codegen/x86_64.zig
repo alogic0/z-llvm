@@ -158,6 +158,7 @@ pub const FrameIndex = enum {
     slot3,
     slot4,
     slot5,
+    slot6,
 };
 
 pub const CodegenPath = enum {
@@ -14141,7 +14142,7 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
     }
 
     const addend_count = try collectFpVoidCallFaddParamChain(function, block, ret.value orelse return error.InvalidRet);
-    if (addend_count > 3 and function.ret_ty.eql(.double)) return error.UnsupportedLiveAcrossCall;
+    if (addend_count > 4) return error.UnsupportedLiveAcrossCall;
 
     const frame_bytes: u8 = if (function.ret_ty.eql(.float))
         if (addend_count == 2) 8 else 24
@@ -14161,6 +14162,9 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot2 } });
         if (addend_count == 3) {
             try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
+        } else if (addend_count == 4) {
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm2, .frame_index = .slot4 } });
+            try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm3, .frame_index = .slot6 } });
         }
     }
     try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
@@ -14183,6 +14187,11 @@ fn lowerGenericCfgFpVoidCallBinaryReturn(
         try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
         if (addend_count == 3) {
             try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
+            try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+        } else if (addend_count == 4) {
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot4 } });
+            try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
+            try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot6 } });
             try machine.instructions.append(allocator, .addsd_xmm1_xmm0);
         }
     }

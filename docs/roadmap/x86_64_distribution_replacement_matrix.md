@@ -383,12 +383,12 @@ The next corpus frontier is isolated rather than cumulative:
 `distribution-zig-air-uncurated-releasesmall-frontier` cover only
 `test/zig/frontier/*.zig`. This keeps broad/expanded/scale stable while
 admitting new real Zig source rows. The current frontier slice is green for all
-three release modes at `source_rows=13`, `discovered_functions=94`,
-`generic_codegen_functions=94`, `generic_cfg_functions=94`,
+three release modes at `source_rows=13`, `discovered_functions=95`,
+`generic_codegen_functions=95`, `generic_cfg_functions=95`,
 `structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
 `typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
 `unsupported_functions=0`, `codegen_failures=0`,
-`object_emitted_functions=94`, `object_failures=0`,
+`object_emitted_functions=95`, `object_failures=0`,
 `llvm_targetmachine_rows=0`, and `local_fail=0`. Frontier object inspection is
 green at `inspected=13`, `elf64_rel=13`, `relocation_rows=4`, `tls_rows=1`,
 `undefined_import_rows=1`, `unsupported_relocation_rows=0`, and
@@ -435,8 +435,8 @@ The SSE live-across-call frontier rows add selected one-live `f32`/`f64`
 spill/reload around an external C ABI `void` helper call, selected two-live
 `f32`/`f64` spill/reload frames across a no-argument helper before a post-call
 `fadd` return, selected three-live `f32`/`f64` spill/reload frames across the
-same helper shape before a two-step post-call `fadd` return, and a selected
-four-live `f32` spill/reload frame across the same helper shape before a
+same helper shape before a two-step post-call `fadd` return, and selected
+four-live `f32`/`f64` spill/reload frames across the same helper shape before a
 three-step post-call `fadd` return.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
 pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
@@ -458,8 +458,8 @@ nested two-Big3 aggregate plus a mixed-width `{ i64, i32, i64, i32 }` copy,
 arbitrary non-selected sret/byval copies,
 varargs, vectors, stack-passed live values,
 and broader SSE live-across-call frames beyond
-the selected one-live, two-live, and three-live `f32`/`f64`
-no-argument-call shapes plus the selected four-live `f32` no-argument-call shape.
+the selected one-live, two-live, three-live, and four-live `f32`/`f64`
+no-argument-call shapes.
 The frontier audit lives in
 `docs/roadmap/x86_64_frontier_air_corpus.md`.
 

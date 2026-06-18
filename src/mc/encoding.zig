@@ -625,6 +625,7 @@ fn frameSlotDisp(frame_index: x86_64.FrameIndex) u8 {
         .slot3 => 12,
         .slot4 => 16,
         .slot5 => 20,
+        .slot6 => 24,
     };
 }
 
