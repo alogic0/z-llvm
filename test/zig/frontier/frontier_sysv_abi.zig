@@ -19,6 +19,9 @@ noinline fn frontier_id_i32(value: i32) i32 {
     return value;
 }
 
+extern fn frontier_touch_f32(value: f32) void;
+extern fn frontier_touch_f64(value: f64) void;
+
 export fn frontier_two_live_after_call(a: i32, b: i32, c: i32) i32 {
     return a + b + frontier_id_i32(c);
 }
@@ -40,4 +43,14 @@ export fn frontier_five_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32) 
 export fn frontier_six_live_after_call(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) i32 {
     const r = frontier_id_i32(f);
     return a + b + c + d + e + f + r;
+}
+
+export fn frontier_f32_live_after_call(a: f32, b: f32) f32 {
+    frontier_touch_f32(b);
+    return a;
+}
+
+export fn frontier_f64_live_after_call(a: f64, b: f64) f64 {
+    frontier_touch_f64(b);
+    return a;
 }

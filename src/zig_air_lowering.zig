@@ -4276,7 +4276,11 @@ const LoweringContext = struct {
         const call_type = try parseFunctionType(self.allocator, signature_text);
         defer call_type.deinit(self.allocator);
         if (instruction.operands.len != call_type.params.len + 1) return error.UnsupportedAir;
-        const callee = try self.qualifiedCalleeName(typedCalleeName(callee_text) orelse return error.UnsupportedAir);
+        const parsed_callee = typedCallee(callee_text) orelse return error.UnsupportedAir;
+        const callee = if (parsed_callee.external)
+            parsed_callee.name
+        else
+            try self.qualifiedCalleeName(parsed_callee.name);
 
         var call: ir.CallInst = .{
             .ret_ty = call_type.return_type.ir_type,
@@ -5322,12 +5326,29 @@ fn typedOperandTextDetail(instruction: air_export.TypedInstruction, operand_inde
 }
 
 fn typedCalleeName(callee_text: []const u8) ?[]const u8 {
-    const marker = "function '";
+    return (typedCallee(callee_text) orelse return null).name;
+}
+
+const TypedCallee = struct {
+    name: []const u8,
+    external: bool,
+};
+
+fn typedCallee(callee_text: []const u8) ?TypedCallee {
+    if (typedCalleeWithMarker(callee_text, "function '", false)) |callee| return callee;
+    if (typedCalleeWithMarker(callee_text, "extern '", true)) |callee| return callee;
+    return null;
+}
+
+fn typedCalleeWithMarker(callee_text: []const u8, marker: []const u8, external: bool) ?TypedCallee {
     const start = std.mem.indexOf(u8, callee_text, marker) orelse return null;
     const name_start = start + marker.len;
     const name_end = std.mem.indexOf(u8, callee_text[name_start..], "'") orelse return null;
     if (name_end == 0) return null;
-    return callee_text[name_start .. name_start + name_end];
+    return .{
+        .name = callee_text[name_start .. name_start + name_end],
+        .external = external,
+    };
 }
 
 fn isIgnoredOpcode(opcode: []const u8) bool {

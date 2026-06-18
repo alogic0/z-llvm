@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=57
-structured_functions=57
-generic_codegen_functions=57
-generic_cfg_functions=57
+discovered_functions=59
+structured_functions=59
+generic_codegen_functions=59
+generic_cfg_functions=59
 structural_matcher_functions=0
-structured_air_v2_functions=57
-typed_air_operand_functions=57
+structured_air_v2_functions=59
+typed_air_operand_functions=59
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=57
+generic_lowering_functions=59
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=57
+object_emitted_functions=59
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -65,7 +65,7 @@ inspected=13
 elf64_rel=13
 relocation_rows=3
 tls_rows=1
-undefined_import_rows=0
+undefined_import_rows=1
 comdat_rows=0
 eh_frame_rows=0
 unsupported_relocation_rows=0
@@ -142,13 +142,17 @@ Closed in the current memory/aggregate frontier slice:
 - first array-in-struct INTEGER aggregate row in
   `frontier_sysv_aggregate_classes.zig`: `[2]i64` typed AIR pointer-element
   GEPs are lowered from typed v2 and summed from the SysV GPR pair
+- first SSE live-across-call row in `frontier_sysv_abi.zig`: one live
+  `f32`/`f64` parameter is spilled from `%xmm0` to an aligned frame slot,
+  another `f32`/`f64` parameter is passed to an external C ABI `void` helper,
+  and the saved value is reloaded to `%xmm0` for return
 
 Remaining measured frontier blockers kept out of accepted rows:
 
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
-- private helper call graphs with stack-passed or SSE live values across calls,
-  or live values across multiple calls
+- private helper call graphs with stack-passed live values, multiple live SSE
+  values, or live values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
@@ -158,7 +162,8 @@ Remaining measured frontier blockers kept out of accepted rows:
   field reads/returns, and
   selected 3/4/5-field MEMORY i64 aggregate sret/byval field/copy forms; X87,
   packed/unaligned aggregate ABI classes, arbitrary non-selected sret/byval copies,
-  varargs, vectors, stack-passed live values, and SSE live-across-call frames
+  varargs, vectors, stack-passed live values, and broader SSE live-across-call
+  frames beyond the selected one-live `f32`/`f64` direct-call shape
 
 These blockers are the next local frontier backlog. They are not accepted rows
 and do not use case IDs, wrapper maps, source tags, legacy AIR text lowering,

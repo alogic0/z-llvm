@@ -5158,6 +5158,29 @@ test "x86_64 encoding stores rax through argument pointer displacement" {
     try std.testing.expectEqualSlices(u8, &.{ 0x48, 0x89, 0x47, 0x10, 0xc3 }, bytes);
 }
 
+test "x86_64 encoding spills and reloads xmm frame slots" {
+    var machine = codegen.x86_64.MachineFunction.init("xmm_frame_slots", .double);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .sub_rsp_8);
+    try machine.instructions.append(std.testing.allocator, .{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } });
+    try machine.instructions.append(std.testing.allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    try machine.instructions.append(std.testing.allocator, .add_rsp_8);
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .spill_xmm64_rsp = .{ .reg = .xmm1, .frame_index = .slot0 } }));
+    try std.testing.expectEqual(@as(u32, 6), mc.encoding.instructionSize(.{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0x48, 0x83, 0xec, 0x08,
+        0xf2, 0x0f, 0x11, 0x4c,
+        0x24, 0x00, 0xf2, 0x0f,
+        0x10, 0x44, 0x24, 0x00,
+        0x48, 0x83, 0xc4, 0x08,
+        0xc3,
+    }, bytes);
+}
+
 test "x86_64 elf writer emits relocatable object metadata" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -5723,6 +5746,64 @@ test "x86_64 codegen supports direct f64 call return with SSE args" {
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4000_0000_0000_0000 }, machine.instructions.items[1]);
+}
+
+test "x86_64 codegen preserves live f64 parameter across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch(double)
+        \\
+        \\define double @caller(double %a, double %b) {
+        \\entry:
+        \\  call void @touch(double %b)
+        \\  ret double %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .spill_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.movapd_xmm1_xmm0, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
+}
+
+test "x86_64 codegen preserves live f32 parameter across direct call" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\declare void @touch(float)
+        \\
+        \\define float @caller(float %a, float %b) {
+        \\entry:
+        \\  call void @touch(float %b)
+        \\  ret float %a
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.sub_rsp_8, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .spill_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.movapd_xmm1_xmm0, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } }, machine.instructions.items[4]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[5]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[6]);
 }
 
 test "x86_64 codegen supports mixed integer and SSE call streams with stack args" {

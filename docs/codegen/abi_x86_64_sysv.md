@@ -35,6 +35,8 @@ up to three constant i32 stack-passed direct-call arguments are supported
 direct calls preserve SysV stack alignment by subtracting 8 from %rsp before callq and adding it back after the call
 one live i32 caller argument can be spilled to (%rsp) across one call
 up to six live i32 caller arguments can be spilled into aligned frame slots and reloaded after one direct call
+one live f32/f64 caller argument can be spilled from %xmm0 into an aligned
+frame slot, reloaded after one direct C ABI void call, and returned from %xmm0
 one fixed i32 stack slot can be reloaded into %edi before a direct call
 small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class return in %rax/%rdx
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
@@ -80,7 +82,8 @@ Caller-saved set considered clobbered by calls in this slice:
   %rax, %rcx, %rdx, %rsi, %rdi, %r8, %r9, %r10, %r11
 Callee-saved registers are not allocated by this project yet.
 One to six live i32 argument registers across one direct call are accepted.
-Stack-passed live values, SSE live values, and live values across multiple calls fail closed.
+One live f32/f64 value in %xmm0 across one direct C ABI void call is accepted.
+Stack-passed live values, broader SSE live values, and live values across multiple calls fail closed.
 ```
 
 Upstream mapping:
@@ -129,6 +132,10 @@ frontier_sysv_aggregate_classes.ArrayPair proves array-in-struct INTEGER
 aggregate sums:
   `[2]i64` pointer-element GEPs are lowered from typed AIR v2
   the two i64 fields are read from the SysV GPR pair
+frontier_sysv_abi proves the first selected SSE live-across-call frame:
+  one live f32/f64 value is spilled from %xmm0 to an aligned frame slot
+  another f32/f64 value is passed to an external C ABI void helper
+  the saved value is reloaded to %xmm0 for return
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -136,12 +143,12 @@ Known gaps:
 
 ```text
 no callee-saved register saves
-no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes
+no full caller-saved clobber model beyond the selected one-to-six-live i32 GPR spill shapes and selected one-live f32/f64 SSE spill shape
 no varargs
 no vectors
 no full lowering for all classified SysV aggregate classes beyond selected INTEGER/INTEGER, mixed INTEGER/SSE, SSE/INTEGER, and SSE/SSE register forms
 no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
-no stack-passed or SSE live-across-call spill/reload-heavy call frames
+no stack-passed or broader SSE live-across-call spill/reload-heavy call frames
 ```

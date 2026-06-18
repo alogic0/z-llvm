@@ -273,6 +273,22 @@ pub const Instruction = union(enum) {
         reg: ArgReg,
         frame_index: FrameIndex,
     },
+    spill_xmm32_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    reload_xmm32_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    spill_xmm64_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
+    reload_xmm64_rsp: struct {
+        reg: XmmReg,
+        frame_index: FrameIndex,
+    },
     spill_rdi_rsi_rsp24,
     reload_rdi_rsp24,
     reload_rsi_rsp24,
@@ -12565,6 +12581,10 @@ fn lowerGenericCfgSingleBlockFp(allocator: std.mem.Allocator, machine: *MachineF
         machine.codegen_path = .generic_cfg;
         return true;
     }
+    if (try lowerGenericCfgFpVoidCallParamReturn(allocator, machine, function, block, ret)) {
+        machine.codegen_path = .generic_cfg;
+        return true;
+    }
     if (try lowerGenericCfgFpDirectCallReturn(allocator, machine, function, block, ret)) {
         machine.codegen_path = .generic_cfg;
         return true;
@@ -13654,6 +13674,54 @@ fn lowerGenericCfgFpDirectCallReturn(
 
     const stack_arg_count = try appendSysVScalarCallArgs(allocator, machine, function, call);
     try appendDirectCallWithStackArgs(allocator, machine, call.callee, call.ret_ty, stack_arg_count);
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn lowerGenericCfgFpVoidCallParamReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if ((!function.ret_ty.eql(.float) and !function.ret_ty.eql(.double)) or
+        !ret.ty.eql(function.ret_ty) or block.instructions.items.len != 1) return false;
+    const ret_name = switch (ret.value orelse return error.InvalidRet) {
+        .named => |name| name,
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return false,
+    };
+    const live_index = fpParamIndex(function, ret_name, function.ret_ty) catch return false;
+    if (live_index >= 2) return error.UnsupportedLiveAcrossCall;
+    const instruction = block.instructions.items[0];
+    if (instruction.removed or instruction.result != null) return false;
+    const call = switch (instruction.kind) {
+        .call => |call| call,
+        else => return false,
+    };
+    if (call.ret_ty != .void or call.callee_value != null or call.inline_asm != null) return false;
+    if (!callIsFastcc(call.calling_conv)) validateDefaultCallConv(call.calling_conv) catch return false;
+    if (call.ret_attrs != null or call.attrs != null) return error.UnsupportedCodegenAbi;
+    if (call.callee_function_ty) |function_ty| {
+        if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
+    }
+    if (sysvScalarCallNeedsStackArgs(call)) return error.UnsupportedLiveAcrossCall;
+
+    try appendStackFrame(allocator, machine, 8);
+    const live_reg = try XmmReg.fromIndex(live_index);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .spill_xmm32_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .spill_xmm64_rsp = .{ .reg = live_reg, .frame_index = .slot0 } });
+    }
+    _ = try appendSysVScalarCallArgs(allocator, machine, function, call);
+    try appendDirectCall(allocator, machine, call.callee, call.ret_ty);
+    if (function.ret_ty.eql(.float)) {
+        try machine.instructions.append(allocator, .{ .reload_xmm32_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    } else {
+        try machine.instructions.append(allocator, .{ .reload_xmm64_rsp = .{ .reg = .xmm0, .frame_index = .slot0 } });
+    }
+    try appendStackFrameEnd(allocator, machine, 8);
     try machine.instructions.append(allocator, .ret);
     return true;
 }
@@ -21219,7 +21287,14 @@ fn appendSysVScalarCallArgs(
             const bits = switch (arg.value) {
                 .fp => try fp32TextBits(arg.value),
                 .named => |name| {
-                    if (try fpParamIndex(function, name, .float) != fp_arg_index) return error.UnsupportedCodegenAbi;
+                    const src_index = try fpParamIndex(function, name, .float);
+                    if (src_index != fp_arg_index) {
+                        if (src_index == 1 and fp_arg_index == 0) {
+                            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+                        } else {
+                            return error.UnsupportedCodegenAbi;
+                        }
+                    }
                     fp_arg_index += 1;
                     continue;
                 },
@@ -21238,7 +21313,14 @@ fn appendSysVScalarCallArgs(
             const bits = switch (arg.value) {
                 .fp => try fp64TextBits(arg.value),
                 .named => |name| {
-                    if (try fpParamIndex(function, name, .double) != fp_arg_index) return error.UnsupportedCodegenAbi;
+                    const src_index = try fpParamIndex(function, name, .double);
+                    if (src_index != fp_arg_index) {
+                        if (src_index == 1 and fp_arg_index == 0) {
+                            try machine.instructions.append(allocator, .movapd_xmm1_xmm0);
+                        } else {
+                            return error.UnsupportedCodegenAbi;
+                        }
+                    }
                     fp_arg_index += 1;
                     continue;
                 },
@@ -21260,6 +21342,24 @@ fn appendSysVScalarCallArgs(
         try machine.instructions.append(allocator, .{ .push_imm32 = stack_args[stack_index] });
     }
     return stack_arg_count;
+}
+
+fn sysvScalarCallNeedsStackArgs(call: ir.CallInst) bool {
+    var int_arg_index: usize = 0;
+    var fp_arg_index: usize = 0;
+    for (call.args.items) |arg| {
+        if (arg.attrs != null) return true;
+        if (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 })) {
+            if (int_arg_index >= 6) return true;
+            int_arg_index += 1;
+        } else if (arg.ty.eql(.float) or arg.ty.eql(.double)) {
+            if (fp_arg_index >= 2) return true;
+            fp_arg_index += 1;
+        } else {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn appendMoveImmToArgReg(
@@ -22310,6 +22410,10 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .add_rsp_40,
         .spill_arg_rsp,
         .reload_arg_rsp,
+        .spill_xmm32_rsp,
+        .reload_xmm32_rsp,
+        .spill_xmm64_rsp,
+        .reload_xmm64_rsp,
         .spill_rdi_rsi_rsp24,
         .reload_rdi_rsp24,
         .reload_rsi_rsp24,
@@ -22389,6 +22493,11 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .sub_rsp_40, .add_rsp_40 => rsp_mod16 = @intCast((@as(u8, rsp_mod16) + 40) % 16),
         .spill_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
         .reload_arg_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .spill_xmm32_rsp, .spill_xmm64_rsp => if (rsp_mod16 != 0) return error.StackSlotWithoutFrame,
+        .reload_xmm32_rsp, .reload_xmm64_rsp => {
+            if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
+            eax_defined = true;
+        },
         .spill_rdi_rsi_rsp24, .reload_rdi_rsp24, .reload_rsi_rsp24 => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
         },
@@ -22515,6 +22624,10 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .add_rsp_40,
         .spill_arg_rsp,
         .reload_arg_rsp,
+        .spill_xmm32_rsp,
+        .reload_xmm32_rsp,
+        .spill_xmm64_rsp,
+        .reload_xmm64_rsp,
         .spill_rdi_rsi_rsp24,
         .reload_rdi_rsp24,
         .reload_rsi_rsp24,
