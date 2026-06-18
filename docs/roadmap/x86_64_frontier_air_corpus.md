@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=36
-structured_functions=36
-generic_codegen_functions=36
-generic_cfg_functions=36
+discovered_functions=37
+structured_functions=37
+generic_codegen_functions=37
+generic_cfg_functions=37
 structural_matcher_functions=0
-structured_air_v2_functions=36
-typed_air_operand_functions=36
+structured_air_v2_functions=37
+typed_air_operand_functions=37
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=36
+generic_lowering_functions=37
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=36
+object_emitted_functions=37
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -123,6 +123,10 @@ Closed in the current memory/aggregate frontier slice:
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
   stream and the floating member from the SSE stream
+- first nested INTEGER aggregate add-chain row in
+  `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
+  flattened through byte offsets, classified as INTEGER/INTEGER, and summed
+  from the SysV GPR pair without a function-name-specific lowering path
 
 Remaining measured frontier blockers kept out of accepted rows:
 
@@ -134,8 +138,9 @@ Remaining measured frontier blockers kept out of accepted rows:
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
-- full SysV aggregate lowering beyond selected INTEGER/INTEGER, mixed
-  INTEGER/SSE field reads, and selected MEMORY aggregate forms; X87,
+- full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
+  INTEGER add chains, mixed INTEGER/SSE field reads, and selected MEMORY
+  aggregate forms; array-in-struct field pointer lowering, X87,
   packed/unaligned aggregate ABI classes, arbitrary sret/byval copies, varargs,
   vectors, and high-register-pressure spill/reload-heavy call frames
 

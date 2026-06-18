@@ -1517,14 +1517,19 @@ fn executableHarnessForSource(source: []const u8) ?ExecutableHarness {
     \\}
     \\
     };
-    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE aggregate ABI", .c_body =
+    if (std.mem.eql(u8, source, "test/zig/frontier/frontier_sysv_aggregate_classes.zig")) return .{ .abi_mode = "c-stable-module", .expected = "frontier mixed integer/SSE and nested INTEGER aggregate ABI", .c_body =
     \\struct Mixed { long long a; double b; };
+    \\struct Pair32 { int a; int b; };
+    \\struct NestedPair { struct Pair32 left; struct Pair32 right; };
     \\extern long long z_frontier_mixed_int(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_int");
     \\extern double z_frontier_mixed_float(struct Mixed) __asm__("frontier_sysv_aggregate_classes.frontier_mixed_float");
+    \\extern int z_frontier_nested_pair_sum(struct NestedPair) __asm__("frontier_sysv_aggregate_classes.frontier_nested_pair_sum");
     \\int main(void) {
     \\    struct Mixed value = { 123456789LL, 6.25 };
     \\    if (z_frontier_mixed_int(value) != 123456789LL) return 1;
     \\    if (z_frontier_mixed_float(value) != 6.25) return 2;
+    \\    struct NestedPair nested = { { 1, 2 }, { 3, 4 } };
+    \\    if (z_frontier_nested_pair_sum(nested) != 10) return 3;
     \\    return 0;
     \\}
     \\

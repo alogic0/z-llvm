@@ -105,6 +105,11 @@ frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
 aggregate argument field reads:
   field `i64` is returned from the aggregate's GPR class register
   field `double` is returned from the aggregate's SSE class register
+frontier_sysv_aggregate_classes.NestedPair proves nested INTEGER aggregate
+field add chains:
+  nested `{ i32, i32 }` fields are flattened by byte offset
+  low/high 32-bit lanes are read from the SysV GPR pair without a
+  function-name-specific backend path
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 

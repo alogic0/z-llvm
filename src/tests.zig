@@ -5295,6 +5295,44 @@ test "x86_64 codegen reads selected memory aggregate by-value fields" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen sums nested INTEGER aggregate fields from SysV GPR pair" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define i32 @nested_sum({ { i32, i32 }, { i32, i32 } } %value) {
+        \\entry:
+        \\  %slot = alloca { { i32, i32 }, { i32, i32 } }
+        \\  store { { i32, i32 }, { i32, i32 } } %value, ptr %slot
+        \\  %a = load i32, ptr %slot
+        \\  %b_ptr = getelementptr i8, ptr %slot, i64 4
+        \\  %b = load i32, ptr %b_ptr
+        \\  %ab = add i32 %a, %b
+        \\  %c_ptr = getelementptr i8, ptr %slot, i64 8
+        \\  %c = load i32, ptr %c_ptr
+        \\  %abc = add i32 %ab, %c
+        \\  %right_ptr = getelementptr i8, ptr %slot, i64 8
+        \\  %d_ptr = getelementptr i8, ptr %right_ptr, i64 4
+        \\  %d = load i32, ptr %d_ptr
+        \\  %sum = add i32 %abc, %d
+        \\  ret i32 %sum
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_eax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg_high32_eax = .rdi }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .binary_arg_eax = .{ .op = .add, .reg = .rsi } }, machine.instructions.items[2]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .add_arg_high32_eax = .rsi }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[4]);
+}
+
 test "x86_64 codegen rejects unsupported call ABI shapes" {
     const unsupported_cc_input =
         \\target triple = "x86_64-unknown-linux-gnu"

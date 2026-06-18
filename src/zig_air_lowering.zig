@@ -530,7 +530,8 @@ fn isPlainFieldPointerChild(ty: ir.Type) bool {
     return switch (ty) {
         .int => |bits| bits != 1 and bits % 8 == 0,
         .float, .double, .ptr => true,
-        .void, .x86_fp80, .fp128, .metadata, .aggregate, .vector => false,
+        .aggregate => true,
+        .void, .x86_fp80, .fp128, .metadata, .vector => false,
     };
 }
 
@@ -548,6 +549,14 @@ fn selectedFieldByteOffset(source_ty: ir.Type, field_child: ir.Type, field_index
         return switch (field_index) {
             0 => 0,
             1 => 8,
+            else => null,
+        };
+    }
+    if (source_ty.eql(.{ .aggregate = "{ [2 x i64] }" }) and
+        field_child.eql(.{ .aggregate = "[2 x i64]" }))
+    {
+        return switch (field_index) {
+            0 => 0,
             else => null,
         };
     }

@@ -22,6 +22,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_arg_arg => |mov| try writer.print("\tmovl {s}, {s}\n", .{ mov.src.name32(), mov.dst.name32() }),
             .mov_arg64_arg => |mov| try writer.print("\tmovq {s}, {s}\n", .{ mov.src.name64(), mov.dst.name64() }),
             .binary_arg_eax => |binary| try writer.print("\t{s} {s}, %eax\n", .{ binary.op.mnemonic(), binary.reg.name32() }),
+            .add_arg64_rax => |reg| try writer.print("\taddq {s}, %rax\n", .{reg.name64()}),
+            .add_arg_high32_eax => |reg| try writer.print("\tmovq {s}, %rcx\n\tshrq $32, %rcx\n\taddl %ecx, %eax\n", .{reg.name64()}),
             .add_stack_disp8_eax => |offset| try writer.print("\taddl {}(%rsp), %eax\n", .{offset}),
             .add_stack_disp8_rax => |offset| try writer.print("\taddq {}(%rsp), %rax\n", .{offset}),
             .add_eax_imm32 => |value| try writer.print("\taddl ${}, %eax\n", .{value}),

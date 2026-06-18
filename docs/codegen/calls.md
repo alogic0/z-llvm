@@ -40,6 +40,7 @@ selected backend subset:
   up to three constant i32 stack call arguments are accepted
   one live i32 caller argument, or the selected two-live %rdi/%rsi shape, can be spilled across one call
   selected small INTEGER/INTEGER aggregate return and argument-field reads are accepted
+  selected nested INTEGER aggregate field add-chain reads are accepted
   selected mixed INTEGER/SSE aggregate argument-field reads are accepted through the reusable aggregate classifier
 ```
 
