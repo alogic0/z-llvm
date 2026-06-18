@@ -292,6 +292,26 @@ helper function types such as `noinline fn (...)`, and the reusable SysV
 direct-call/frame helpers cover multiple stack-passed integer parameters/call
 arguments, f32/f64 direct-call returns, i64 direct-call returns/pass-through,
 and mixed integer/f32/f64 call argument assignment.
+
+Scale corpus frontier:
+`zig build distribution-zig-air-uncurated-releasefast-scale`,
+`zig build distribution-zig-air-uncurated-releasesafe-scale`, and
+`zig build distribution-zig-air-uncurated-releasesmall-scale` add
+`test/zig/scale/*.zig` on top of the expanded corpus without weakening the
+closed broad or expanded baselines. The first scale bucket covers broader
+SysV call shapes, memory loops, branch-local pointer memory, extern-struct
+field updates, direct calls across branches, globals, and TLS. All three
+release modes currently report `source_rows=112`, `discovered_functions=214`,
+`generic_codegen_functions=214`, `generic_cfg_functions=214`,
+`structural_matcher_functions=0`, `legacy_air_text_lowering_functions=0`,
+`typed_v2_fallback_functions=0`, `shape_recognizer_functions=0`,
+`unsupported_functions=0`, `codegen_failures=0`,
+`object_emitted_functions=214`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`. The scale gate is fail-closed
+but intentionally remains a frontier outside `distribution-all`; object
+inspection, native-link, and executable proof for the scale bucket are the
+next evidence layer.
+
 Volatile memory roundtrips, broader aggregate field stores, broader global/TLS
 addressing, and larger loop-memory dependencies remain named future generic CFG
 memory/aggregate candidates.
@@ -461,6 +481,8 @@ checked `@intFromFloat` and guarded table lookup/bounds paths. Gates report
 `generic_cfg_functions` and `structural_matcher_functions`: broad reports
 ReleaseFast `152/0`, ReleaseSafe `152/0`, ReleaseSmall `152/0`; expanded
 reports ReleaseFast `197/0`, ReleaseSafe `197/0`, ReleaseSmall `197/0`.
+The scale frontier reports ReleaseFast `214/0`, ReleaseSafe `214/0`, and
+ReleaseSmall `214/0`.
 Former structural aggregate field-offset rows now include alloca-stored pointer
 field loads at offsets 0 and 4 plus branch-local field-0 updates. The
 conditional slice-loop row has also moved into generic CFG as a conservative

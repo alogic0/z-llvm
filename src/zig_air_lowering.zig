@@ -4516,7 +4516,8 @@ fn parseZigType(text: []const u8) ?ZigType {
     }
     if (std.mem.eql(u8, trimmed, "aggregates.Pair") or
         std.mem.eql(u8, trimmed, "runtime_struct_sum_main.Pair") or
-        std.mem.eql(u8, trimmed, "expanded_cfg_memory_aggregates.Pair"))
+        std.mem.eql(u8, trimmed, "expanded_cfg_memory_aggregates.Pair") or
+        std.mem.eql(u8, trimmed, "scale_records_globals.Pair"))
     {
         return .{ .ir_type = .{ .aggregate = "{ i32, i32 }" } };
     }

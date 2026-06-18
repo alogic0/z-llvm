@@ -402,7 +402,7 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
-    const air_local_fail: usize = if (options.corpus == .expanded and
+    const air_local_fail: usize = if ((options.corpus == .expanded or options.corpus == .scale) and
         (unsupported_functions != 0 or codegen_failures != 0 or typed_v2_fallback_functions != 0 or legacy_air_text_lowering_functions != 0 or shape_recognizer_functions != 0))
         1
     else
@@ -572,12 +572,14 @@ const Corpus = enum {
     inputs,
     broad,
     expanded,
+    scale,
 
     fn name(self: Corpus) []const u8 {
         return switch (self) {
             .inputs => "inputs",
             .broad => "broad",
             .expanded => "expanded",
+            .scale => "scale",
         };
     }
 };
@@ -599,6 +601,8 @@ fn parseOptions(args: std.process.Args) !Options {
             options.corpus = .broad;
         } else if (std.mem.eql(u8, arg, "--corpus=expanded")) {
             options.corpus = .expanded;
+        } else if (std.mem.eql(u8, arg, "--corpus=scale")) {
+            options.corpus = .scale;
         } else if (std.mem.eql(u8, arg, "--object-progress")) {
             options.object_progress = true;
         } else if (std.mem.eql(u8, arg, "--object-inspection")) {
@@ -641,7 +645,7 @@ fn validateStrictFinish(counters: StrictFinishCounters) !void {
     const expected_source_rows: usize, const expected_functions: usize = switch (counters.corpus) {
         .broad => .{ 101, 152 },
         .expanded => .{ 109, 197 },
-        .inputs => {
+        .inputs, .scale => {
             std.debug.print(
                 "strict-finish-failure mode={s} field=corpus expected=broad-or-expanded actual={s}\n",
                 .{ counters.mode.name(), counters.corpus.name() },
@@ -1497,11 +1501,14 @@ fn collectSources(allocator: std.mem.Allocator, io: std.Io, corpus: Corpus) ![][
         sources.deinit(allocator);
     }
     try collectSourcesFromRoot(allocator, io, &sources, "test/zig/inputs");
-    if (corpus == .broad or corpus == .expanded) {
+    if (corpus == .broad or corpus == .expanded or corpus == .scale) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/integrated");
     }
-    if (corpus == .expanded) {
+    if (corpus == .expanded or corpus == .scale) {
         try collectSourcesFromRoot(allocator, io, &sources, "test/zig/expanded");
+    }
+    if (corpus == .scale) {
+        try collectSourcesFromRoot(allocator, io, &sources, "test/zig/scale");
     }
     std.mem.sort([]const u8, sources.items, {}, struct {
         fn lessThan(_: void, lhs: []const u8, rhs: []const u8) bool {

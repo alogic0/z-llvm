@@ -214,7 +214,8 @@ zig build distribution-no-llvm
 ```
 
 The uncurated real-AIR release gate is now green for the current
-`test/zig/inputs/*.zig` source corpus in both ReleaseFast and ReleaseSafe:
+`test/zig/inputs/*.zig` source corpus in ReleaseFast, ReleaseSafe, and
+ReleaseSmall:
 
 ```text
 zig build distribution-zig-air-uncurated-release
@@ -231,7 +232,8 @@ zig build distribution-zig-air-uncurated-release
   local_fail=0
 ```
 
-This is the strongest current real-AIR ownership evidence: patched Zig exports
+This is real-AIR ownership evidence for the narrow compatibility corpus:
+patched Zig exports
 compiler-owned AIR/liveness via `zllvm-air-export-v1` and `structured_air-v1`,
 while z_llvm parses and lowers the source functions without selected case IDs,
 wrapper maps, source-fact body classification, canned DescriptorV2 bodies,
@@ -339,6 +341,21 @@ at `native_link_accepted_rows=108`, `executable_ok_rows=108`,
 `unsupported_zig_linker_feature_rows=0`, `native_link_failures=0`,
 `llvm_targetmachine_rows=0`, `lld_rows=0`, and `local_fail=0`. The expanded
 audit lives in `docs/roadmap/x86_64_expanded_air_corpus.md`.
+
+The scale corpus frontier is intentionally separate from both closed baselines:
+`distribution-zig-air-uncurated-releasefast-scale`,
+`distribution-zig-air-uncurated-releasesafe-scale`, and
+`distribution-zig-air-uncurated-releasesmall-scale` add explicit sources from
+`test/zig/scale/*.zig` on top of the expanded corpus. The current scale slice
+is green for all three release modes at `source_rows=112`,
+`discovered_functions=214`, `generic_codegen_functions=214`,
+`generic_cfg_functions=214`, `structural_matcher_functions=0`,
+`legacy_air_text_lowering_functions=0`, `typed_v2_fallback_functions=0`,
+`shape_recognizer_functions=0`, `unsupported_functions=0`,
+`codegen_failures=0`, `object_emitted_functions=214`, `object_failures=0`,
+`llvm_targetmachine_rows=0`, and `local_fail=0`. Scale object inspection,
+native-link, and executable proof are the next evidence layer. The scale audit
+lives in `docs/roadmap/x86_64_scale_air_corpus.md`.
 
 The broad native-link progress gates link the z_llvm object for each broad
 source module with a tiny C `main` harness and Zig's native linker:
@@ -560,24 +577,29 @@ uses the temporary manual fixture dispatch oracle.
 The fixed 146-row selected gate, 90-row broad source-backed gate, and 49-row
 source-wrapper gate remain regression checks with separate counters.
 
-The strongest current real-AIR ownership gate is the broad x86_64 release
-source-discovered gate rather than row-selected case IDs:
+The strongest current real-AIR ownership gate with object progress is the scale
+x86_64 release source-discovered frontier rather than row-selected case IDs:
 
 ```text
-gate=zig build distribution-zig-air-uncurated-releasefast-broad
-gate=zig build distribution-zig-air-uncurated-releasesafe-broad
-gate=zig build distribution-zig-air-uncurated-releasesmall-broad
+gate=zig build distribution-zig-air-uncurated-releasefast-scale
+gate=zig build distribution-zig-air-uncurated-releasesafe-scale
+gate=zig build distribution-zig-air-uncurated-releasesmall-scale
 target=x86_64-linux-gnu
 modes=ReleaseFast,ReleaseSafe,ReleaseSmall
-source_rows=101
-discovered_functions=152
-structured_functions=152
-generic_codegen_functions=152
+source_rows=112
+discovered_functions=214
+structured_functions=214
+generic_codegen_functions=214
+generic_cfg_functions=214
+structural_matcher_functions=0
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
+object_emitted_functions=214
+object_failures=0
+llvm_targetmachine_rows=0
 case_id_rows=0
 source_fact_classification_rows=0
 top_unsupported_construct=-
@@ -589,12 +611,14 @@ Patched Zig emits `zllvm-air-export-v1` with the legacy AIR text and a
 `structured_air-v1` section containing reachable body records, instruction
 tags, branch/conditional-branch records, and repeat metadata, plus typed
 `structured_air-v2` operand/type records. z_llvm consumes that compiler-owned
-stream directly for the broad uncurated gates; it does not select rows by case
+stream directly for the uncurated real-AIR gates; it does not select rows by case
 ID, source facts, wrapper maps, or canned DescriptorV2 bodies. The broad
 ReleaseFast/ReleaseSafe/ReleaseSmall gates now lower all 152 discovered
 functions from typed-v2 authority without legacy AIR text fallback or
-shape-recognizer ownership. This is still a selected x86_64 release corpus, not
-a full AIR/liveness lowering replacement for every Zig source.
+shape-recognizer ownership, the expanded gates raise that to 197 functions, and
+the current scale frontier raises it to 214 functions with object progress. This
+is still a selected x86_64 release corpus, not a full AIR/liveness lowering
+replacement for every Zig source.
 
 The same 100-row release source-owned replacement boundary now has a pre-link
 ELF object-format proof before Zig native linker handoff:
