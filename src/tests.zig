@@ -5766,6 +5766,30 @@ test "x86_64 codegen returns small INTEGER aggregate in rax rdx" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[2]);
 }
 
+test "x86_64 codegen returns mixed INTEGER SSE aggregate in rax xmm0" {
+    const input =
+        \\target triple = "x86_64-unknown-linux-gnu"
+        \\
+        \\define { i64, double } @make_mixed(i64 %a, double %b) {
+        \\entry:
+        \\  %field0 = insertvalue { i64, double } undef, i64 %a, 0
+        \\  %result = insertvalue { i64, double } %field0, double %b, 1
+        \\  ret { i64, double } %result
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_arg_rax = .rdi }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
+}
+
 test "x86_64 codegen reads small INTEGER aggregate fields from SysV argument registers" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"

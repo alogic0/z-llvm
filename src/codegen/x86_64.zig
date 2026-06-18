@@ -5415,6 +5415,7 @@ fn lowerAggregateAbiReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
+    if (try lowerRegisterAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSmallIntegerAggregateReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerSysVAggregateFieldReturn(allocator, machine, function, block, ret)) return true;
     if (try lowerRegisterAggregateIntegerFieldAddReturn(allocator, machine, function, block, ret)) return true;
@@ -5643,6 +5644,122 @@ fn lowerSmallIntegerAggregateReturn(
     try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = second_reg } });
     try machine.instructions.append(allocator, .ret);
     return true;
+}
+
+fn lowerRegisterAggregateReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!ret.ty.eql(function.ret_ty)) return false;
+    const classification = classifySysVAggregate(function.ret_ty) catch return false;
+    if (classification.kind != .register or classification.eightbyte_count == 0) return false;
+    const field_count = aggregateFieldCount(function.ret_ty) orelse return false;
+    if (field_count == 0 or field_count != block.instructions.items.len) return false;
+
+    var field_values: [8]ir.InsertValueInst = undefined;
+    if (field_count > field_values.len) return false;
+    var aggregate_value: ir.Value = .undef;
+    for (block.instructions.items, 0..) |instruction, index| {
+        if (instruction.removed) return false;
+        const result = instruction.result orelse return false;
+        const insert = switch (instruction.kind) {
+            .insertvalue => |insert| insert,
+            else => return false,
+        };
+        if (!insert.aggregate_ty.eql(function.ret_ty)) return false;
+        if (!valuesEqual(insert.aggregate, aggregate_value)) return false;
+        var expected_index_buf: [24]u8 = undefined;
+        const expected_index = try std.fmt.bufPrint(&expected_index_buf, "{}", .{index});
+        if (!std.mem.eql(u8, insert.indices, expected_index)) return false;
+        const expected_field_ty = memory_location.aggregateFieldType(function.ret_ty, index) orelse return false;
+        if (!insert.value_ty.eql(expected_field_ty)) return false;
+        field_values[index] = insert;
+        aggregate_value = .{ .named = result };
+    }
+    if (!valuesEqual(ret.value orelse return error.InvalidRet, aggregate_value)) return false;
+
+    var gpr_return_index: usize = 0;
+    var sse_return_index: usize = 0;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(function.ret_ty, field_index) orelse return false;
+        const field_eightbyte = try aggregateFieldEightbyte(function.ret_ty, field_index);
+        if (field_eightbyte >= classification.eightbyte_count) return false;
+        const field_class = classification.eightbytes[field_eightbyte] orelse return false;
+        switch (field_class) {
+            .integer => {
+                if (!field_ty.eql(.{ .int = 64 })) return false;
+                const src = try paramValueReg(function, field_values[field_index].value, field_ty);
+                switch (gpr_return_index) {
+                    0 => try machine.instructions.append(allocator, .{ .mov_arg_rax = src }),
+                    1 => try machine.instructions.append(allocator, .{ .mov_arg64_arg = .{ .dst = .rdx, .src = src } }),
+                    else => return error.UnsupportedCodegenAbi,
+                }
+                gpr_return_index += 1;
+            },
+            .sse => {
+                if (!field_ty.eql(.double)) return false;
+                const fp_index = try fpParamIndexFromValue(function, field_values[field_index].value, field_ty);
+                switch (sse_return_index) {
+                    0 => switch (try XmmReg.fromIndex(fp_index)) {
+                        .xmm0 => {},
+                        .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
+                        .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+                    },
+                    else => return error.UnsupportedCodegenAbi,
+                }
+                sse_return_index += 1;
+            },
+        }
+    }
+    try machine.instructions.append(allocator, .ret);
+    return true;
+}
+
+fn aggregateFieldCount(ty: ir.Type) ?usize {
+    var count: usize = 0;
+    while (memory_location.aggregateFieldType(ty, count)) |_| : (count += 1) {}
+    return count;
+}
+
+fn aggregateFieldEightbyte(aggregate_ty: ir.Type, field_index: usize) !usize {
+    const layout = try x86_64SysVDataLayout();
+    const field_offset_i = memory_location.aggregateFieldOffsetWithLayout(layout, aggregate_ty, field_index) orelse
+        return error.UnsupportedCodegenAbi;
+    if (field_offset_i < 0) return error.UnsupportedCodegenAbi;
+    return @intCast(@as(u64, @intCast(field_offset_i)) / 8);
+}
+
+fn fpParamIndexFromValue(function: ir.Function, value: ir.Value, ty: ir.Type) !usize {
+    return switch (value) {
+        .named => |name| try fpParamIndex(function, name, ty),
+        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => error.UnsupportedCodegenValue,
+    };
+}
+
+fn valuesEqual(a: ir.Value, b: ir.Value) bool {
+    return switch (a) {
+        .named => |a_name| switch (b) {
+            .named => |b_name| std.mem.eql(u8, a_name, b_name),
+            else => false,
+        },
+        .undef => b == .undef,
+        .poison => b == .poison,
+        .null_value => b == .null_value,
+        .zero_initializer => b == .zero_initializer,
+        .int => |a_int| switch (b) {
+            .int => |b_int| a_int == b_int,
+            else => false,
+        },
+        .fp => |a_fp| switch (b) {
+            .fp => |b_fp| std.mem.eql(u8, a_fp, b_fp),
+            else => false,
+        },
+        .vector, .constant_expr => false,
+    };
 }
 
 fn lowerSysVAggregateFieldReturn(

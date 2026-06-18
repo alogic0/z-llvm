@@ -25,6 +25,10 @@ export fn frontier_mixed_float(value: Mixed) f64 {
     return value.b;
 }
 
+export fn frontier_mixed_make(a: i64, b: f64) Mixed {
+    return .{ .a = a, .b = b };
+}
+
 export fn frontier_nested_pair_sum(value: NestedPair) i32 {
     return value.left.a + value.left.b + value.right.a + value.right.b;
 }

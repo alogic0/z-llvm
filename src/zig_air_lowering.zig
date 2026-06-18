@@ -1,6 +1,7 @@
 const std = @import("std");
 const air_export = @import("zig_air_export.zig");
 const ir = @import("ir.zig");
+const memory_location = @import("analysis/memory_location.zig");
 const sib = @import("structured_ir_builder.zig");
 
 pub const UnsupportedReason = enum {
@@ -288,9 +289,9 @@ pub fn firstUnsupported(
                 typedV2AggregateMakePairRecords(function_type, structured_air_v2)
         else
             false;
-    const typed_small_integer_aggregate =
+    const typed_register_aggregate =
         if (function.structured_air_v2) |structured_air_v2|
-            typedV2SmallIntegerAggregateRecords(function_type, structured_air_v2)
+            typedV2RegisterAggregateRecords(function_type, structured_air_v2)
         else
             false;
     const typed_sret_integer_aggregate =
@@ -397,7 +398,7 @@ pub fn firstUnsupported(
         typed_slice_sum or
         typed_packed_bits or
         typed_aggregate_pair or
-        typed_small_integer_aggregate or
+        typed_register_aggregate or
         typed_sret_integer_aggregate or
         typed_mix_c_add_may_panic or
         mixCAddMayPanicShape(function) or
@@ -962,29 +963,36 @@ fn lowerTypedV2SmallIntegerAggregateAbi(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) !?ir.Function {
-    if (!typedV2SmallIntegerAggregateRecords(function_type, structured_air_v2)) return null;
-    return try lowerSmallIntegerAggregateMake(allocator, air_function);
+    if (!typedV2RegisterAggregateRecords(function_type, structured_air_v2)) return null;
+    return try lowerRegisterAggregateMake(allocator, air_function);
 }
 
-fn typedV2SmallIntegerAggregateRecords(
+fn typedV2RegisterAggregateRecords(
     function_type: FunctionType,
     structured_air_v2: air_export.StructuredAirV2,
 ) bool {
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 64 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 64 }))
-    {
-        return false;
+    if (function_type.return_type.ir_type != .aggregate) return false;
+    const field_count = aggregateFieldCount(function_type.return_type.ir_type) orelse return false;
+    if (field_count == 0 or field_count > 2 or function_type.params.len != field_count) return false;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(function_type.return_type.ir_type, field_index) orelse return false;
+        if (!field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return false;
+        if (!function_type.params[field_index].ir_type.eql(field_ty)) return false;
+        var opcode_buf: [48]u8 = undefined;
+        const opcode = std.fmt.bufPrint(&opcode_buf, "struct_field_ptr_index_{}", .{field_index}) catch return false;
+        if (typedOpcodeCount(structured_air_v2, opcode) != 1) return false;
     }
-    const returns_pair64 = function_type.return_type.ir_type.eql(.{ .aggregate = "{ i64, i64 }" }) or
-        typedOpcodeCount(structured_air_v2, "ret_ptr") == 1;
-    return returns_pair64 and
-        typedOpcodeCount(structured_air_v2, "arg") == 2 and
+    return typedOpcodeCount(structured_air_v2, "arg") == field_count and
         typedOpcodeCount(structured_air_v2, "ret_ptr") == 1 and
-        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_0") == 1 and
-        typedOpcodeCount(structured_air_v2, "struct_field_ptr_index_1") == 1 and
-        typedStoreOpcodeCount(structured_air_v2) == 2 and
+        typedStoreOpcodeCount(structured_air_v2) == field_count and
         typedOpcodeCount(structured_air_v2, "ret_load") == 1;
+}
+
+fn aggregateFieldCount(ty: ir.Type) ?usize {
+    var count: usize = 0;
+    while (memory_location.aggregateFieldType(ty, count)) |_| : (count += 1) {}
+    return count;
 }
 
 fn lowerTypedV2SretIntegerAggregateAbi(
@@ -3214,46 +3222,45 @@ fn lowerAggregateMakePair(allocator: std.mem.Allocator, air_function: air_export
     return function;
 }
 
-fn lowerSmallIntegerAggregateMake(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
+fn lowerRegisterAggregateMake(allocator: std.mem.Allocator, air_function: air_export.Function) !ir.Function {
     const function_type = try parseFunctionType(allocator, air_function.type_text);
     defer function_type.deinit(allocator);
-    const aggregate_ty: ir.Type = .{ .aggregate = "{ i64, i64 }" };
-    if (function_type.params.len != 2 or
-        !function_type.params[0].ir_type.eql(.{ .int = 64 }) or
-        !function_type.params[1].ir_type.eql(.{ .int = 64 }) or
-        !function_type.return_type.ir_type.eql(aggregate_ty))
-    {
-        return error.UnsupportedAir;
+    const aggregate_ty = function_type.return_type.ir_type;
+    const field_count = aggregateFieldCount(aggregate_ty) orelse return error.UnsupportedAir;
+    if (field_count == 0 or field_count > 2 or function_type.params.len != field_count) return error.UnsupportedAir;
+    var field_index: usize = 0;
+    while (field_index < field_count) : (field_index += 1) {
+        const field_ty = memory_location.aggregateFieldType(aggregate_ty, field_index) orelse return error.UnsupportedAir;
+        if (!field_ty.eql(.{ .int = 64 }) and !field_ty.eql(.double)) return error.UnsupportedAir;
+        if (!function_type.params[field_index].ir_type.eql(field_ty)) return error.UnsupportedAir;
     }
     var function = ir.Function.init(shortFunctionName(air_function.name), aggregate_ty);
     errdefer function.deinit(allocator);
     function.linkage = if (function_type.c_calling_convention) .default else .internal;
     function.calling_conv = if (function_type.c_calling_convention) null else "fastcc";
-    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg0" });
-    try function.params.append(allocator, .{ .ty = .{ .int = 64 }, .name = "arg1" });
+    const arg_names = [_][]const u8{ "arg0", "arg1" };
+    for (function_type.params, 0..) |param, index| {
+        try function.params.append(allocator, .{ .ty = param.ir_type, .name = arg_names[index] });
+    }
     var block = ir.BasicBlock.init("entry");
     errdefer block.deinit(allocator);
-    try block.instructions.append(allocator, .{
-        .result = "field0",
-        .kind = .{ .insertvalue = .{
-            .aggregate_ty = aggregate_ty,
-            .aggregate = .undef,
-            .value_ty = .{ .int = 64 },
-            .value = .{ .named = "arg0" },
-            .indices = "0",
-        } },
-    });
-    try block.instructions.append(allocator, .{
-        .result = "result",
-        .kind = .{ .insertvalue = .{
-            .aggregate_ty = aggregate_ty,
-            .aggregate = .{ .named = "field0" },
-            .value_ty = .{ .int = 64 },
-            .value = .{ .named = "arg1" },
-            .indices = "1",
-        } },
-    });
-    block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = .{ .named = "result" } } };
+    const result_names = [_][]const u8{ "field0", "result" };
+    const index_texts = [_][]const u8{ "0", "1" };
+    var aggregate_value: ir.Value = .undef;
+    for (function_type.params, 0..) |param, index| {
+        try block.instructions.append(allocator, .{
+            .result = result_names[index],
+            .kind = .{ .insertvalue = .{
+                .aggregate_ty = aggregate_ty,
+                .aggregate = aggregate_value,
+                .value_ty = param.ir_type,
+                .value = .{ .named = arg_names[index] },
+                .indices = index_texts[index],
+            } },
+        });
+        aggregate_value = .{ .named = result_names[index] };
+    }
+    block.terminator = .{ .ret = .{ .ty = aggregate_ty, .value = aggregate_value } };
     try function.blocks.append(allocator, block);
     return function;
 }

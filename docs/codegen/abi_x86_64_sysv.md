@@ -39,7 +39,7 @@ one fixed i32 stack slot can be reloaded into %edi before a direct call
 small INTEGER/INTEGER aggregates up to the selected 16-byte `{ i64, i64 }` class return in %rax/%rdx
 selected small INTEGER/INTEGER aggregate argument field reads use the SysV integer register pair or stack field locations
 the reusable aggregate classifier now distinguishes INTEGER, SSE, mixed INTEGER/SSE, and MEMORY classes for <=16-byte aggregates, with packed/unaligned and too-large aggregates classified as MEMORY
-selected mixed INTEGER/SSE aggregate argument field reads use the independent SysV GPR/SSE streams
+selected mixed INTEGER/SSE aggregate argument field reads and register returns use the independent SysV GPR/SSE streams
 leaf functions only
 no stack frame for register-only leaf functions
 ```
@@ -102,9 +102,10 @@ frontier_sysv_sret_byval.Big3 lowers as the selected MEMORY class:
   user i64 args are shifted to %rsi/%rdx/%rcx
   first by-value stack aggregate field reads use 8(%rsp) and 24(%rsp)
 frontier_sysv_aggregate_classes.Mixed proves the first mixed INTEGER/SSE
-aggregate argument field reads:
+aggregate argument field reads and register aggregate return:
   field `i64` is returned from the aggregate's GPR class register
   field `double` is returned from the aggregate's SSE class register
+  `{ i64, double }` construction returns through %rax/%xmm0
 frontier_sysv_aggregate_classes.NestedPair proves nested INTEGER aggregate
 field add chains:
   nested `{ i32, i32 }` fields are flattened by byte offset

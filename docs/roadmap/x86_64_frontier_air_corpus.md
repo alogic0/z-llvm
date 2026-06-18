@@ -39,20 +39,20 @@ Current ReleaseFast, ReleaseSafe, and ReleaseSmall counters:
 
 ```text
 source_rows=13
-discovered_functions=38
-structured_functions=38
-generic_codegen_functions=38
-generic_cfg_functions=38
+discovered_functions=39
+structured_functions=39
+generic_codegen_functions=39
+generic_cfg_functions=39
 structural_matcher_functions=0
-structured_air_v2_functions=38
-typed_air_operand_functions=38
+structured_air_v2_functions=39
+typed_air_operand_functions=39
 legacy_air_text_lowering_functions=0
 typed_v2_fallback_functions=0
-generic_lowering_functions=38
+generic_lowering_functions=39
 shape_recognizer_functions=0
 unsupported_functions=0
 codegen_failures=0
-object_emitted_functions=38
+object_emitted_functions=39
 object_failures=0
 llvm_targetmachine_rows=0
 local_fail=0
@@ -122,7 +122,8 @@ Closed in the current memory/aggregate frontier slice:
 - first mixed SysV aggregate class row in
   `frontier_sysv_aggregate_classes.zig`: `{ i64, double }` is classified as
   mixed INTEGER/SSE, and field reads return the integer member from the GPR
-  stream and the floating member from the SSE stream
+  stream and the floating member from the SSE stream; construction returns the
+  aggregate in `%rax`/`%xmm0`
 - first nested INTEGER aggregate add-chain row in
   `frontier_sysv_aggregate_classes.zig`: nested `{ i32, i32 }` fields are
   flattened through byte offsets, classified as INTEGER/INTEGER, and summed
@@ -142,7 +143,7 @@ Remaining measured frontier blockers kept out of accepted rows:
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address
   forms outside the selected scalar layouts
 - full SysV aggregate lowering beyond selected INTEGER/INTEGER, nested
-  INTEGER add chains, mixed INTEGER/SSE field reads, and selected MEMORY
+  INTEGER add chains, mixed INTEGER/SSE field reads/returns, and selected MEMORY
   aggregate forms; X87, packed/unaligned aggregate ABI classes, arbitrary
   sret/byval copies, varargs, vectors, and high-register-pressure
   spill/reload-heavy call frames
