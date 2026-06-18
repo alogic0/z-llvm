@@ -64,10 +64,12 @@ addq $8, %rsp
 retq
 ```
 
-The slot is intentionally fixed at `(%rsp)` after the prologue adjustment.
-The Machine IR carries an explicit `slot0` frame-index operand, but only that one
-slot is legal today. Multiple slots, slot coloring, callee-saved areas, and
-outgoing call-argument areas are still out of scope.
+The single-slot shape is intentionally fixed at `(%rsp)` after the prologue
+adjustment. The broader selected call-preservation shape uses a 24-byte aligned
+frame and exposes fixed `slot0`, `slot1`, and `slot2` operands at `(%rsp)`,
+`4(%rsp)`, and `8(%rsp)` for up to three live i32 caller parameters across one
+direct call. Slot coloring, callee-saved areas, arbitrary local-spill
+allocation, and outgoing call-argument areas are still out of scope.
 
 Cycle 07 adds a handoff proof where the fixed slot feeds a direct call:
 
