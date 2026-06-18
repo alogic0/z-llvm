@@ -430,13 +430,12 @@ two-live `f32`/`f64` spill/reload frame across a no-argument helper before a
 post-call `fadd` return, plus selected three-live `f32`/`f64` spill/reload
 frames across the same helper shape before a two-step post-call `fadd` return.
 The FP argument frontier also proves selected named `f32`/`f64` external-call
-pass-through through `%xmm0..%xmm4`; immediate FP constant call arguments beyond
-`%xmm1` remain a fail-closed ABI boundary.
+pass-through through `%xmm0..%xmm4`; backend unit/object tests materialize
+immediate FP constants through `%xmm0..%xmm7`.
 Remaining non-accepted
 blockers are mixed int-to-float multiply/add pipelines, helper graphs with
 stack-passed live values, broader live SSE values beyond the selected
-one-/two-/three-live no-argument-call shapes, FP constant call arguments beyond
-`%xmm1`, or live values across calls,
+one-/two-/three-live no-argument-call shapes, or live values across calls,
 alternate safety-guard control flow,
 broader unknown aggregate/pointer/global/TLS forms outside the selected scalar
 subset, full SysV aggregate lowering beyond the selected INTEGER/INTEGER,

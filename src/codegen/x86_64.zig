@@ -97,6 +97,9 @@ pub const XmmReg = enum(u3) {
     xmm2,
     xmm3,
     xmm4,
+    xmm5,
+    xmm6,
+    xmm7,
 
     pub fn name(reg: XmmReg) []const u8 {
         return switch (reg) {
@@ -105,6 +108,9 @@ pub const XmmReg = enum(u3) {
             .xmm2 => "%xmm2",
             .xmm3 => "%xmm3",
             .xmm4 => "%xmm4",
+            .xmm5 => "%xmm5",
+            .xmm6 => "%xmm6",
+            .xmm7 => "%xmm7",
         };
     }
 
@@ -119,6 +125,9 @@ pub const XmmReg = enum(u3) {
             2 => .xmm2,
             3 => .xmm3,
             4 => .xmm4,
+            5 => .xmm5,
+            6 => .xmm6,
+            7 => .xmm7,
             else => error.UnsupportedCodegenAbi,
         };
     }
@@ -251,6 +260,14 @@ pub const Instruction = union(enum) {
     mov_imm64_xmm1: u64,
     mov_imm32_xmm0: u32,
     mov_imm32_xmm1: u32,
+    mov_imm64_xmm: struct {
+        reg: XmmReg,
+        bits: u64,
+    },
+    mov_imm32_xmm: struct {
+        reg: XmmReg,
+        bits: u32,
+    },
     ucomisd: struct {
         src: XmmReg,
         dst: XmmReg,
@@ -5749,11 +5766,11 @@ fn lowerRegisterAggregateReturn(
                     0 => switch (try XmmReg.fromIndex(fp_index)) {
                         .xmm0 => {},
                         .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
-                        .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+                        .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
                     },
                     1 => switch (try XmmReg.fromIndex(fp_index)) {
                         .xmm1 => {},
-                        .xmm0, .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+                        .xmm0, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
                     },
                     else => return error.UnsupportedCodegenAbi,
                 }
@@ -6366,7 +6383,7 @@ fn emitSysVAggregateFieldLocationReturn(
             switch (reg) {
                 .xmm0 => {},
                 .xmm1 => try machine.instructions.append(allocator, .movapd_xmm1_xmm0),
-                .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
+                .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 => return error.UnsupportedCodegenAbi,
             }
         },
         .stack => |offset| {
@@ -20214,11 +20231,7 @@ fn appendCompareXmmF64(
     fail: []const u8,
 ) !void {
     if (arg_reg == scratch_reg) return error.UnsupportedCodegenAbi;
-    switch (scratch_reg) {
-        .xmm0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = expected_bits }),
-        .xmm1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = expected_bits }),
-        .xmm2, .xmm3, .xmm4 => return error.UnsupportedCodegenAbi,
-    }
+    try appendMoveImm64ToXmm(allocator, machine, scratch_reg, expected_bits);
     try machine.instructions.append(allocator, .{ .ucomisd = .{ .src = scratch_reg, .dst = arg_reg } });
     try machine.instructions.append(allocator, .{ .jp = fail });
     try machine.instructions.append(allocator, .{ .jne = fail });
@@ -21595,10 +21608,10 @@ fn appendSysVScalarCallArgs(
     // pass-through register aggregates: i32/i64 integer or pointer-class values
     // in the integer stream, f32/f64 in the SSE stream, register aggregate
     // parameters that are already in the destination argument registers, and up
-    // to three constant i32 stack arguments. FP constants are only materialized
-    // for %xmm0/%xmm1 today; named FP pass-through may use the full SysV SSE
-    // register stream. Varargs, byval/sret attrs, vectors, MEMORY aggregates,
-    // and aggregate register shuffles fail closed here.
+    // to three constant i32 stack arguments. FP constants and named FP
+    // pass-through use the full SysV SSE register stream. Varargs, byval/sret
+    // attrs, vectors, MEMORY aggregates, and aggregate register shuffles fail
+    // closed here.
     if (call.tail_kind != null) return error.UnsupportedCodegenAbi;
     if (call.callee_function_ty) |function_ty| {
         if (std.mem.indexOf(u8, function_ty, "...") != null) return error.UnsupportedCodegenAbi;
@@ -21635,11 +21648,8 @@ fn appendSysVScalarCallArgs(
         }
         if (arg.ty.eql(.float)) {
             if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
-            const bits = blk: switch (arg.value) {
-                .fp => {
-                    if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
-                    break :blk try fp32TextBits(arg.value);
-                },
+            switch (arg.value) {
+                .fp => try appendMoveImm32ToXmm(allocator, machine, try XmmReg.fromIndex(fp_arg_index), try fp32TextBits(arg.value)),
                 .named => |name| {
                     const src_index = try fpParamIndex(function, name, .float);
                     if (src_index != fp_arg_index) {
@@ -21653,22 +21663,14 @@ fn appendSysVScalarCallArgs(
                     continue;
                 },
                 .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            };
-            switch (fp_arg_index) {
-                0 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm0 = bits }),
-                1 => try machine.instructions.append(allocator, .{ .mov_imm32_xmm1 = bits }),
-                else => return error.UnsupportedCodegenAbi,
             }
             fp_arg_index += 1;
             continue;
         }
         if (arg.ty.eql(.double)) {
             if (fp_arg_index >= 8) return error.UnsupportedCodegenAbi;
-            const bits = blk: switch (arg.value) {
-                .fp => {
-                    if (fp_arg_index >= 2) return error.UnsupportedCodegenAbi;
-                    break :blk try fp64TextBits(arg.value);
-                },
+            switch (arg.value) {
+                .fp => try appendMoveImm64ToXmm(allocator, machine, try XmmReg.fromIndex(fp_arg_index), try fp64TextBits(arg.value)),
                 .named => |name| {
                     const src_index = try fpParamIndex(function, name, .double);
                     if (src_index != fp_arg_index) {
@@ -21682,11 +21684,6 @@ fn appendSysVScalarCallArgs(
                     continue;
                 },
                 .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
-            };
-            switch (fp_arg_index) {
-                0 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm0 = bits }),
-                1 => try machine.instructions.append(allocator, .{ .mov_imm64_xmm1 = bits }),
-                else => unreachable,
             }
             fp_arg_index += 1;
             continue;
@@ -21777,6 +21774,24 @@ fn appendMoveImmToArgReg(
         .r8 => try machine.instructions.append(allocator, .{ .mov_imm_r8 = value }),
         .r9 => try machine.instructions.append(allocator, .{ .mov_imm_r9 = value }),
     }
+}
+
+fn appendMoveImm32ToXmm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: XmmReg,
+    bits: u32,
+) !void {
+    try machine.instructions.append(allocator, .{ .mov_imm32_xmm = .{ .reg = reg, .bits = bits } });
+}
+
+fn appendMoveImm64ToXmm(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    reg: XmmReg,
+    bits: u64,
+) !void {
+    try machine.instructions.append(allocator, .{ .mov_imm64_xmm = .{ .reg = reg, .bits = bits } });
 }
 
 fn appendAlignedDirectCallPreservingI32Param(
@@ -22817,6 +22832,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
         .mov_imm32_xmm1,
+        .mov_imm64_xmm,
+        .mov_imm32_xmm,
         .ucomisd,
         .ucomisd_xmm1_xmm0,
         .ucomiss_xmm1_xmm0,
@@ -22900,6 +22917,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
             }
         },
         .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_eax_imm32, .shl_eax_imm5, .or_eax_imm32, .imul_eax_imm32, .and_eax_imm32, .shr_rax_imm6, .or_rdx_rax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .smin_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .load_stack_disp8_rax, .load_rax_ptr_disp8_rax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp8_u8_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .movapd_xmm1_xmm0, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al => eax_defined = true,
+        .mov_imm64_xmm => |load| {
+            if (load.reg == .xmm0) eax_defined = true;
+        },
+        .mov_imm32_xmm => |load| {
+            if (load.reg == .xmm0) eax_defined = true;
+        },
         .mov_imm_rdi, .mov_imm_rdx, .mov_imm_rsi, .mov_imm_rcx, .mov_imm_r8, .mov_imm_r9, .mov_rax_rdi, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx => {},
         .reload_rsp_eax => {
             if (rsp_mod16 != 0) return error.StackSlotWithoutFrame;
@@ -23033,6 +23056,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_imm64_xmm1,
         .mov_imm32_xmm0,
         .mov_imm32_xmm1,
+        .mov_imm64_xmm,
+        .mov_imm32_xmm,
         .ucomisd,
         .ucomisd_xmm1_xmm0,
         .ucomiss_xmm1_xmm0,

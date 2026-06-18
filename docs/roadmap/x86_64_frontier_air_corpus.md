@@ -172,16 +172,15 @@ Closed in the current memory/aggregate frontier slice:
   reloaded for a two-step post-call `fadd` return
 - selected named FP argument pass-through rows in `frontier_sysv_abi.zig`:
   five `f32` and five `f64` parameters are forwarded to external C ABI helpers
-  through `%xmm0..%xmm4`; constant FP argument materialization remains limited
-  to `%xmm0/%xmm1`
+  through `%xmm0..%xmm4`; backend unit/object tests materialize immediate FP
+  constants through `%xmm0..%xmm7`
 
 Remaining measured frontier blockers kept out of accepted rows:
 
 - mixed int-to-float plus multiply/add pipelines beyond the current selected
   FP binary subset
 - private helper call graphs with stack-passed live values, multiple live SSE
-  values beyond the selected spill shapes, FP constant call arguments beyond
-  `%xmm1`, or live values across multiple calls
+  values beyond the selected spill shapes, or live values across multiple calls
 - branch safety guards that return from the failure side rather than the
   current checked-runtime boundary shape
 - broader unknown aggregate field, pointer arithmetic, and global/TLS address

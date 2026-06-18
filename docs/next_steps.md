@@ -419,12 +419,11 @@ helper before a post-call `fadd` return, plus selected three-live `f32`/`f64`
 spill/reload frames across the same no-argument helper shape before a two-step
 post-call `fadd` return. The FP argument frontier now also proves selected
 named `f32`/`f64` external-call pass-through through `%xmm0..%xmm4`; immediate
-FP constant materialization is still limited to `%xmm0/%xmm1`.
+FP constant materialization now uses generic XMM loads through `%xmm0..%xmm7`.
 The
 remaining frontier backlog is mixed int-to-float multiply/add pipelines,
 private helper graphs with stack-passed live values, broader live SSE values
-beyond the selected one-/two-/three-live no-argument-call shapes, FP constant
-call arguments beyond `%xmm1`, or live values across calls,
+beyond the selected one-/two-/three-live no-argument-call shapes, or live values across calls,
 alternate safety-guard control flow, broader unknown aggregate/pointer/TLS
 forms outside the selected scalar subset, full aggregate ABI lowering beyond
 selected INTEGER/INTEGER, nested mixed INTEGER/SSE integer-field add chains,

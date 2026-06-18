@@ -81,6 +81,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .mov_imm64_xmm1 => |bits| try writer.print("\tmovabsq ${x}, %rax\n\tmovq %rax, %xmm1\n", .{bits}),
             .mov_imm32_xmm0 => |bits| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, %xmm0\n", .{bits}),
             .mov_imm32_xmm1 => |bits| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, %xmm1\n", .{bits}),
+            .mov_imm64_xmm => |load| try writer.print("\tmovabsq ${x}, %rax\n\tmovq %rax, {s}\n", .{ load.bits, load.reg.name() }),
+            .mov_imm32_xmm => |load| try writer.print("\tmovl ${x}, %eax\n\tmovd %eax, {s}\n", .{ load.bits, load.reg.name() }),
             .ucomisd => |cmp| try writer.print("\tucomisd {s}, {s}\n", .{ cmp.src.name(), cmp.dst.name() }),
             .ucomisd_xmm1_xmm0 => try writer.writeAll("\tucomisd %xmm1, %xmm0\n"),
             .ucomiss_xmm1_xmm0 => try writer.writeAll("\tucomiss %xmm1, %xmm0\n"),

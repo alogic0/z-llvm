@@ -27,7 +27,9 @@ i64 and pointer-class return values in %rax for selected rows
 f32/f64 return values in %xmm0 for selected rows
 first six integer/pointer-class register arguments are recognized as %edi, %esi, %edx, %ecx, %r8d, and %r9d for i32 values
 i64/pointer-class arguments use the corresponding 64-bit GPR view for selected rows
-f32/f64 arguments use the independent SysV SSE stream (%xmm0, %xmm1 for the current selected rows)
+f32/f64 arguments use the independent SysV SSE stream; named source-frontier
+proof currently reaches %xmm0..%xmm4, and backend constant materialization
+reaches %xmm0..%xmm7
 i1 branch conditions use the matching low 8-bit argument registers
 i32/i64/pointer direct-call operands use the first-six integer argument register order
 f32/f64 direct-call operands use the independent SSE register order
@@ -160,8 +162,8 @@ frontier_sysv_abi proves the first selected SSE live-across-call frame:
   across the same no-argument helper shape and reloaded for a two-step
   post-call fadd return
   five named f32/f64 arguments can be forwarded to external C ABI helpers
-  through %xmm0..%xmm4; immediate FP constant arguments are still materialized
-  only for %xmm0/%xmm1
+  through %xmm0..%xmm4; backend unit/object tests materialize immediate FP
+  constant arguments through %xmm0..%xmm7
 frontier executable probes validate the aggregate return/argument and call frame in ReleaseFast, ReleaseSafe, and ReleaseSmall
 ```
 
@@ -177,5 +179,4 @@ no arbitrary MEMORY, X87, packed/unaligned, or complex aggregate ABI classes bey
 no arbitrary non-selected sret/byval copy lowering
 no indirect calls, tail calls, or unsupported non-default call conventions
 no stack-passed or broader SSE live-across-call spill/reload-heavy call frames beyond the selected one-/two-/three-live f32/f64 shapes
-no FP immediate constant call arguments beyond %xmm1 yet, though named FP argument pass-through is proven through %xmm4
 ```

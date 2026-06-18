@@ -5198,6 +5198,26 @@ test "x86_64 encoding spills and reloads xmm frame slots" {
     }, bytes);
 }
 
+test "x86_64 encoding materializes FP immediates into generic xmm registers" {
+    var machine = codegen.x86_64.MachineFunction.init("xmm_immediates", .void);
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm2, .bits = 0x4040_0000 } });
+    try machine.instructions.append(std.testing.allocator, .{ .mov_imm64_xmm = .{ .reg = .xmm7, .bits = 0x4008_0000_0000_0000 } });
+    try machine.instructions.append(std.testing.allocator, .ret);
+
+    try std.testing.expectEqual(@as(u32, 9), mc.encoding.instructionSize(.{ .mov_imm32_xmm = .{ .reg = .xmm2, .bits = 0x4040_0000 } }));
+    try std.testing.expectEqual(@as(u32, 15), mc.encoding.instructionSize(.{ .mov_imm64_xmm = .{ .reg = .xmm7, .bits = 0x4008_0000_0000_0000 } }));
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{
+        0xb8, 0x00, 0x00, 0x40, 0x40,
+        0x66, 0x0f, 0x6e, 0xd0, 0x48,
+        0xb8, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x08, 0x40, 0x66,
+        0x48, 0x0f, 0x6e, 0xf8, 0xc3,
+    }, bytes);
+}
+
 test "x86_64 elf writer emits relocatable object metadata" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
@@ -6186,8 +6206,8 @@ test "x86_64 codegen supports direct f64 call return with SSE args" {
     defer machine.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4000_0000_0000_0000 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm0, .bits = 0x4018_0000_0000_0000 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm1, .bits = 0x4000_0000_0000_0000 } }, machine.instructions.items[1]);
 }
 
 test "x86_64 codegen preserves live f64 parameter across direct call" {
@@ -6420,9 +6440,9 @@ test "x86_64 codegen supports mixed integer and SSE call streams with stack args
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 1 }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm32_xmm0 = 0x4000_0000 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm32_xmm = .{ .reg = .xmm0, .bits = 0x4000_0000 } }, machine.instructions.items[1]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rsi = 3 }, machine.instructions.items[2]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm1 = 0x4010_0000_0000_0000 }, machine.instructions.items[3]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm1, .bits = 0x4010_0000_0000_0000 } }, machine.instructions.items[3]);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .push_imm32 = 9 }, machine.instructions.items[8]);
 }
 
@@ -6490,7 +6510,7 @@ test "x86_64 codegen supports five named f32 pass-through call args" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
 }
 
-test "x86_64 codegen rejects third FP constant call arg until xmm2 materialization exists" {
+test "x86_64 codegen supports third FP constant call arg in xmm2" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -6507,10 +6527,13 @@ test "x86_64 codegen rejects third FP constant call arg until xmm2 materializati
     defer module.deinit();
     try module.verify();
 
-    try std.testing.expectError(
-        error.UnsupportedCodegenAbi,
-        codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]),
-    );
+    var machine = try codegen.x86_64.lowerFunction(std.testing.allocator, module.target_triple.?, module.functions.items[0]);
+    defer machine.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm0, .bits = 0x3ff0_0000_0000_0000 } }, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm1, .bits = 0x4000_0000_0000_0000 } }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm2, .bits = 0x4008_0000_0000_0000 } }, machine.instructions.items[2]);
 }
 
 test "x86_64 codegen supports mixed integer and f64 direct call return" {
@@ -6535,7 +6558,7 @@ test "x86_64 codegen supports mixed integer and f64 direct call return" {
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm_rdi = 7 }, machine.instructions.items[0]);
-    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm0 = 0x4018_0000_0000_0000 }, machine.instructions.items[1]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .mov_imm64_xmm = .{ .reg = .xmm0, .bits = 0x4018_0000_0000_0000 } }, machine.instructions.items[1]);
 }
 
 test "x86_64 codegen supports i64 direct call returns and mixed i32 i64 args" {
